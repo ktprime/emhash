@@ -18,7 +18,7 @@ for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint6
 
 - **lru** is also used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
-- can dump hash **collision statics**, and set different hash algorithm by set compile marco
+- can dump hash **collision statics** to analy, and choose different hash algorithm by set compile marco EMILIB_FIBONACCI_HASH or EMILIB_IDENTITY_HASH
 
 - **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
@@ -151,12 +151,17 @@ the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unorder
 *    uset insert time = 2916 ms loadf = 0.939
 
 # some bad
+- it's not node based hash map, so it can't keep the reference stable if rehash happens, use pointer or choose node base hash map.
 
-- on some platform it'll be hanged, compile with flag **-fno-stirct-aliasing**, I'll fix it some time
-- it's not node based hash map, so it's not keep the reference stable, use pointer or choose node base hash map.
+- rehash/iteration performance is some slower than other robin-hood based hash implementation
+
+- on some platform it'll be hanged compiled by some g++ on some system, compile with flag **-fno-stirct-aliasing**, it'll be fixed soon
 - for very large key.value, use pointer instead of value if your care about memory usage and insertion and copy opertion is very frequcney.
+
 - some bucket function is support just like stl do. load factor is less than 1.0.
+
 - the only known bug as follow. if erase not current key or iterater during iteration without break. some key will iteraored twice or missed.
+
 ```
     HashMap<int,int> myhash;
     int key = some_key;
@@ -169,6 +174,5 @@ the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unorder
        do_some_more();
     }
 ```
-
-
+# futrue work to improve
 
