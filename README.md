@@ -2,15 +2,20 @@
 
 A very fast and efficient *open address based c++ flat hash map*, it can be bench/test it and compare the result with third party hash map. 
 
-    some features are not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to merged and used in different hash table file. Not all feature can be open in only one file(one hash map).
+  some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
 - the default load factor is 0.8, also be set **1.0** by enable compile marco EMILIB_HIGH_LOAD (average 5% performance loss in hash_table3.hpp)
 
-- **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function is added for performance issiue if needed. for example _erase, shrink_to_fit, insert_unqiue, try_find
+- **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function is added for performance issiue if needed.
+    - _erase : without return next iearator
+    - shrink_to_fit : shrink memory to fit for saveing memory
+    - insert_unqiue : insert unique key into hash without search
+    - try_find : easy to used  without  use iterator
+
 
 - At present from my 6 different benchmark(4 of them in bench dir), it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash(call reserve before inserting) and effficient erase.
 
-- more **memory efficient** if the key.value size is not aligned than other's implemention *(size(key) % 8 != size(value) % 8)* 
+- more **memory efficient** if the key.value size is not aligned than other's implemention *(size(key) % 8 != size(value) % 8)  
 for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint64_t, uint64_t>
 
 - only one array allocted, a simple and **smart collision algorithm** with the collision element linked by array index like stl::unordered_map
@@ -19,11 +24,12 @@ for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint6
 
 - **lru** is also used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
-- dump hash **collision statics** to analyze cache performanceby dump you can easy know number of probes of look up of successful/unsuccessful
-                                         
+- dump hash **collision statics** to analyze cache performanceby, number of probes of look up of successful/unsuccessful can be know from dump info.
+ 
 - choose *different* hash algorithm by set compile marco EMILIB_FIBONACCI_HASH or EMILIB_IDENTITY_HASH
 
-- **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
+- **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
+    
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
 for example some case pay attention on finding hot, some foucus on finding code(miss), and others care about insert or erase and somne on.
 
