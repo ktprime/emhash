@@ -49,22 +49,6 @@ using namespace std;
 #include <sys/resource.h>
 #endif
 
-/*
-
-   bench_IterateIntegers map = N7 emilib2 7HashMapImmN10robin_hood4hashImEESt8equal_toImEEE
-   total iterate/removing time = 9.760, 11.096
-   bench_IterateIntegers map = N7 emilib5 7HashMapImmN10robin_hood4hashImEESt8equal_toImEEE
-   total iterate/removing time = 9.884, 11.124
-   bench_IterateIntegers map = N7 emilib3 7HashMapImmN10robin_hood4hashImEESt8equal_toImEEE
-   total iterate/removing time = 10.592, 11.092
-   bench_IterateIntegers map = N3 tsl9 robin_map ImmN10robin_hood4hashImEESt8equal_toImESaISt4pairImmEELb0ENS_2rh26power_of_two_growth_policyILm2EEEEE total iterate/removing time = 11.676, 14.152
-   bench_IterateIntegers map = N10 robin_hood 6detail13unordered_mapILb1ELm88EmmNS_4hashImEESt8equal_toImEEE
-   total iterate/removing time = 6.372, 12.624
-   bench_IterateIntegers map = N3 ska 13flat_hash_map ImmN10robin_hood4hashImEESt8equal_toImESaISt4pairImmEEEE
-   total iterate/removing time = 10.524, 10.572
-   bench_IterateIntegers map = N5 phmap 13 flat_hash_map ImmN10robin_hood4hashImEENS_7EqualToImEESaISt4pairIKmmEEEE
-
-*/
 emilib3::HashMap<std::string, std::string> show_name =
 {
     {"emilib2", "emilib2"},
@@ -93,16 +77,6 @@ static const char* find(const std::string& map_name)
 
     return map_name.c_str();
 }
-
-
-//#pragma once
-/**
-#include <array>
-#include <cstdint>
-#include <limits>
-#include <random>
-#include <utility>
- ***/
 
 // this is probably the fastest high quality 64bit random number generator that exists.
 // Implements Small Fast Counting v4 RNG from PractRand.
