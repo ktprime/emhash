@@ -17,7 +17,7 @@ A quite fast and memory efficient *open address based c++ flat hash map*, it eas
 
 - more **efficient** than other's hash map implemention if key.value is some aligned (sizeof(key) % 8 != sizeof(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 total memoery than hash_map<uint64_t, uint64_t>.
 
-- it can use a **second/backup hash** if the input hash is bad with a very high collision by compile marco *EMILIB_SAFE_HASH* is set to defend hash attack.
+- it can use a **second/backup hash** if the input hash is bad with a very high collision by compile marco *EMILIB_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
 - **lru** can be used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
