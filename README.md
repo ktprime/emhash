@@ -34,7 +34,7 @@ for example some case pay attention on finding hot, some foucus on finding cold(
 
 - it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion. at present from 6 different benchmark(4 of them in this bench dir) by my bench
 
-- It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, g++) and cpu(AMD, Intel, Arm).
+- It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, Arm).
 
 - many optimization with *integer* key, some new feature is underdeveloping if it's stable to release.
 
@@ -144,7 +144,7 @@ static void basic_test(int n)
 ```
 
 # insert result
-the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unordered_map/std::unordered_set on 
+the simple benchmark (code in bench/martin_bench.cpp) compared with std::unordered_map/std::unordered_set on platform
 
 * Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz 
 * gcc version 5.4.0 20160609 (Ubuntu 5.4.0-6ubuntu1~16.04.11
@@ -169,7 +169,7 @@ if your want more benchmark result, you can download other hash map and compile 
 [![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench High Load](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
 
 # some bad
-- it's not node based hash map, can't keep the reference stable if insert/erase/rehash happens, use pointer or choose node base hash map.
+- it's not a node based hash map and can't keep the reference stable if insert/erase/rehash happens, use pointer or choose the node base hash map.
 ```
     emilib2:HashMap<int,int> myhash(10);
     myhash[1] = 1;
@@ -177,13 +177,13 @@ if your want more benchmark result, you can download other hash map and compile 
 ```
 - rehash/iteration performance is some slower than other robin-hood based implementation
 
-- run on some platform it'll be hanged compiled by some g++, set compile flag with **-fno-stirct-aliasing**, it'll be fixed soon
+- on some platform it'll be hanged compiled by some g++ with -O2, set compile flag with **-fno-stirct-aliasing** to be a work around, it'll be fixed soon
 
-- for very large key.value, use pointer instead of value if your care about memory usage and insertion an erase opertion is very frequcney.
+- for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
 
-- some bucket function is not support just like other falt hash map do. load factor is always less than 1.0.
+- some bucket function is not supported just like other falt hash map do. load factor is always less than 1.0.
 
-- the only known bug as follow. if erase not current key or iterater during iteration without break. some key will be iteraored twice or missed.
+- the only known bug as follow if erase not current key/iterater during iteration without break. some key will be iteraored twice or missed.to fix it can deserase performance 20％ or even much more
 
 ```
     emilib2:HashMap<int,int> myhash;
