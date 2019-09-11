@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include "sfc64.h"
+
 //#include "wyhash.h"
 
 #define TP                   1
@@ -35,15 +36,13 @@
     #define TVal  1
 #endif
 
-//#include "hash_table57.hpp"
+#include "hash_table2.hpp"
+#include "hash_table6.hpp"
+#include "hash_table3.hpp"
+#include "hash_table4.hpp"
+#include "hash_table5.hpp"
 
-#include "hash_table52.hpp"
-#include "hash_table522.hpp"
-#include "hash_table53.hpp"
-#include "hash_table54.hpp"
-#include "hash_table55.hpp"
 //#include "hash_table64.hpp"
-
 ////some others
 //https://github.com/ilyapopov/car-race
 //https://hpjansson.org/blag/2018/07/24/a-hash-table-re-hash/
@@ -137,25 +136,23 @@ struct RankItem;
 
 emilib6::HashMap<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
-
     {"emilib2", "emilib2"},
     {"emilib6", "emilib6"},
-//    {"emilib4", "emilib4"},
-//    {"emilib3", "emilib3"},
+    {"emilib4", "emilib4"},
+    {"emilib3", "emilib3"},
     {"emilib5", "emilib5"},
 //    {"emilib7", "emilib7"},
 
-#if ET
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
+    
 #if HOOD_HASH || KEY_INT == 0
     {"robin", "tessil robin"},
-//    {"hopsco", "tessil hopsco"},
+    {"hopsco", "tessil hopsco"},
     {"flat", "skarupk flat"},
 #endif
-#endif
-
-//    {"byte", "skarupk byte"},
+   
+     {"byte", "skarupk byte"},
 };
 
 static int64_t getTime()
