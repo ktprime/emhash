@@ -17,24 +17,24 @@ A quite fast and memory efficient *open address based c++ flat hash map*, it eas
 
 - more **efficient** than other's hash map implemention if key.value is some aligned (sizeof(key) % 8 != sizeof(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 total memoery than hash_map<uint64_t, uint64_t>.
 
-- it can use a **second/backup hash** if the input hash is bad with a very high collision by compile marco *EMILIB_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
+- it can use a **second/backup hash** if the input hash is bad with a very high collision if the compile marco *EMILIB_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
-- **lru** can be used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
+- **lru** can be used if compile marco EMILIB_LRU_SET set for some special case. for exmaple some key "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be probed only once during next access.
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be knowed from dump info.
  
-- choose *different* hash algorithm by set compile marco *EMILIB_FIBONACCI_HASH* or *EMILIB_IDENTITY_HASH*
+- choose *different* hash algorithm by set compile marco *EMILIB_FIBONACCI_HASH* or *EMILIB_IDENTITY_HASH* depend on use case.
 
 - **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
     
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
-for example some case pay attention on finding hot, some foucus on finding code(miss), and others care about insert or erase and somne on.
-
-- many optimization with key is *integer*, some new feature is underdeveloing bfore statle to use.
+for example some case pay attention on finding hot, some foucus on finding cold(miss), and others only care about insert or erase and so on.
 
 - it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion. at present from 6 different benchmark(4 of them in this bench dir) by my bench
 
 - It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, g++) and cpu(AMD, Intel, Arm).
+
+- many optimization with *integer* key, some new feature is underdeveloping if it's stable to release.
 
 # insert example
 
