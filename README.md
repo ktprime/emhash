@@ -1,8 +1,9 @@
 # emhash key feature
-A very fast and efficient *open address based c++ flat hash map*, you can bench it and compare the result with third party hash map,
-some feature is not opened by default and it can be used by set the compile marco becasue it's loss some tiny performance, some featue is collsion each and set in differnt hash table file. not all feature can be open at same time in only one file.
+A very fast and efficient *open address based c++ flat hash map*, it can be bench/test it and compare the result with third party hash map. 
 
-- the default load factor is 0.8, also be set to **1.0** by set compile marco EMILIB_HIGH_LOAD (average 5% performance loss in hash_table3.hpp)
+some features are not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to merged and used in different hash table file. Not all feature can be open at same time in only one file.
+
+- the default load factor is 0.8, also be set **1.0** by enable compile marco EMILIB_HIGH_LOAD (average 5% performance loss in hash_table3.hpp)
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function is added for performance issiue if needed. for example _erase, shrink_to_fit, insert_unqiue, try_find
 
@@ -24,6 +25,8 @@ for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint6
 for example some case pay attention on finding hot, some foucus on finding code(miss), and others care about insert or erase and somne on.
 
 - many optimization with key is *integer*, some new feature is underdeveloing bfore statle to use.
+
+- It's fully tested on OS(Win, Linux, Mac) with compiler(VS, clang, g++) and cpu(AMD, Intel, Arm).
 
 # Example
 
@@ -146,4 +149,26 @@ the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unorder
 *    umap insert time = 2912 ms loadf = 0.939
 *    eset insert range time = 1412 ms loadf = 0.734
 *    uset insert time = 2916 ms loadf = 0.939
+
+# some bad
+
+- on some platform it'll be hanged, compile with flag **-fno-stirct-aliasing**, I'll fix it some time
+- it's not node based hash map, so it's not keep the reference stable, use pointer or choose node base hash map.
+- for very large key.value, use pointer instead of value if your care about memory usage and insertion and copy opertion is very frequcney.
+- some bucket function is support just like stl do. load factor is less than 1.0.
+- the only known bug as follow. if erase not current key or iterater during iteration without break. some key will iteraored twice or missed.
+```
+    HashMap<int,int> myhash;
+    int key = some_key;
+    //dome some init
+    for (auto it : myhash)
+    {
+        if (key = it.first) {
+            myhash.erase(key);  //no any break
+       }
+       do_some_more();
+    }
+```
+
+
 
