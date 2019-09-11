@@ -1,32 +1,29 @@
 # emhash key feature
-A very fast and efficient open address based c++ flat hash map, you can bench it and compare the result with third party hash map
+A very fast and efficient *open address based c++ flat hash map*, you can bench it and compare the result with third party hash map
 
-1. the default load factor is 0.8, also be set to **1.0** by set compile marco (average 5% performance loss)
+- the default load factor is 0.8, also be set to **1.0** by set compile marco (average 5% performance loss)
 
-2. **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function is added for performance issiue if needed. for example _erase, shrink_to_fit, insert_unqiue, try_find
+- **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function is added for performance issiue if needed. for example _erase, shrink_to_fit, insert_unqiue, try_find
 
-3. At present from my 6 different benchmark(4 of them in bench dir), it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash(call reserve before inserting) and effficient erase.
+- At present from my 6 different benchmark(4 of them in bench dir), it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash(call reserve before inserting) and effficient erase.
 
-4. more **memory efficient** if the key.value size is not aligned than other's implemention *(size(key) % 8 != size(value) % 8)* 
+- more **memory efficient** if the key.value size is not aligned than other's implemention *(size(key) % 8 != size(value) % 8)* 
 for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint64_t, uint64_t>
 
-5. only one array allocted, a simple and **smart collision algorithm** with the collision element linked by array index like stl::unordered_map
+- only one array allocted, a simple and **smart collision algorithm** with the collision element linked by array index like stl::unordered_map
 
-6. it can use a **second/backup hash** if the input hash is very bad with high collision by compile marco set
+- it can use a **second/backup hash** if the input hash is very bad with high collision by compile marco set
 
-7. **lru** is also used if compile marco set for some special user case. for exmaple some key is "frequceny accessed", if the key
+- **lru** is also used if compile marco set for some special user case. for exmaple some key is "frequceny accessed", if the key
 is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
-8. can dump hash **collision statics**, and set different hash algorithm by set compile marco
+- can dump hash **collision statics**, and set different hash algorithm by set compile marco
 
-9. **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
-
-10.more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
+ **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
+- more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
 for example some case pay attention on finding hot, some foucus on finding code(miss), and others care about insert or erase and somne on.
 
-11. many optimization with key is *integer*.
-
-12. some new feature is underdeveloing bfore statle to use.
+- many optimization with key is *integer*, some new feature is underdeveloing bfore statle to use.
 
 # Example
 
