@@ -36,8 +36,8 @@
 #include "khash.h"
 #endif
 #ifdef EMIMAP
-#include "hash_table7.hpp"
-#include "hash_table5.hpp"
+#include "hash_table2.hpp"
+#include "hash_table6.hpp"
 #endif
 
 #if HOODMAP
