@@ -23,29 +23,26 @@ for exmaple hash_map<long, int> can save 1/3 memoery the hash_map<long, long>
 
 10.more than 5 different flat hash map implemention to choose, each of them is some tiny different can be used in many case
 
-
 # bench result
-some simple benchmark (code in bench/martin_bench.cpp) compraed with std::unordered_map/std::unordered_set
+the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unordered_map/std::unordered_set
+##1 random_shuffle 1 - 12345678
+* emap insert time = 440 ms
+* emap unique time = 312 ms
+* umap insert time = 1628 ms loadf = 0.942
+* vec    time = 296 ms
+* eset unique time = 220 ms
+* uset insert time = 1728 ms
 
-1. random_shuffle 1 - 12345678
-*    emap insert time = 440 ms
-*    emap unique time = 312 ms
-*    umap insert time = 1628 ms loadf = 0.942
-*    vec    time = 296 ms
-*    eset unique time = 220 ms
-*    uset insert time = 1728 ms
-
-2. random data
-*    emap insert time = 568 ms loadf = 0.734/size 12310422
+##2. random data
+*    emap insert time = 568 ms loadf = 0.7
 *    umap insert time = 2912 ms loadf = 0.939
-*    eset insert range time = 1412 ms loadf = 0.734/size 12310422
-*    uset insert time = 2916 ms loadf = 0.939/size 12310422
-
-#bench exmpale
+*    eset insert range time = 1412 ms loadf = 0.734
+*    uset insert time = 2916 ms loadf = 0.939
 
 
-'''c++
+# Example
 
+```
 static void basic_test(int n)
 {
     printf("2. random_shuffle 1 - %d\n", n);
@@ -146,4 +143,4 @@ static void basic_test(int n)
         puts("\n");
     }
 }
-'''
+```
