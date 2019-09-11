@@ -15,17 +15,17 @@ A very fast and efficient *open address based c++ flat hash map*, it can be benc
 
 - At present from 6 different benchmark(4 of them in this bench dir) by my test, it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash(call reserve before inserting) and effficient erase.
 
-- more **memory efficient** if the key.value size is not aligned than other's implemention *(size(key) % 8 != size(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint64_t, uint64_t>
+- more **memory efficient** if the key.value size is not aligned than other's hash map implemention if (size(key) % 8 != size(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint64_t, uint64_t>
 
 - only one array allocted, a simple and **smart collision algorithm** with the collision element linked by array index like stl::unordered_map
 
-- it can use a **second/backup hash** if the input hash is very bad with high collision by compile marco EMILIB_SAFE_HASH is set
+- it can use a **second/backup hash** if the input hash is very bad with high collision by compile marco *EMILIB_SAFE_HASH* is set
 
 - **lru** is also used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
-- dump hash **collision statics** to analyze cache performanceby, number of probes of look up of successful/unsuccessful can be know from dump info.
+- dump hash **collision statics** to analyze cache performance, number of probes of look up of successful/unsuccessful can be know from dump info.
  
-- choose *different* hash algorithm by set compile marco EMILIB_FIBONACCI_HASH or EMILIB_IDENTITY_HASH
+- choose *different* hash algorithm by set compile marco *EMILIB_FIBONACCI_HASH* or *EMILIB_IDENTITY_HASH*
 
 - **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
     
@@ -34,7 +34,7 @@ for example some case pay attention on finding hot, some foucus on finding code(
 
 - many optimization with key is *integer*, some new feature is underdeveloing bfore statle to use.
 
-- It's fully tested on OS(Win, Linux, Mac) with compiler(VS, clang, g++) and cpu(AMD, Intel, Arm).
+- It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, g++) and cpu(AMD, Intel, Arm).
 
 # Example
 
