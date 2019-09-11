@@ -19,7 +19,9 @@ for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint6
 
 - **lru** is also used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
-- can dump hash **collision statics** to analy, and choose different hash algorithm by set compile marco EMILIB_FIBONACCI_HASH or EMILIB_IDENTITY_HASH
+- dump hash **collision statics** to analyze cache performanceby dump you can easy know number of probes of look up of successful/unsuccessful
+                                         
+- choose *different* hash algorithm by set compile marco EMILIB_FIBONACCI_HASH or EMILIB_IDENTITY_HASH
 
 - **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
@@ -184,3 +186,4 @@ if your want more benchmark result, you can download other hash map and compile 
        do_some_more();
     }
 ```
+
