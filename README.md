@@ -36,7 +36,7 @@ for example some case pay attention on finding hot, some foucus on finding code(
 
 - It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, g++) and cpu(AMD, Intel, Arm).
 
-# Example
+# insert example
 
 ```
 static void basic_test(int n)
@@ -77,7 +77,7 @@ static void basic_test(int n)
             std::vector<int> v(n);
             for (auto d: data)
                 v[d] = 0;
-            printf("vec    time = %ld ms\n", now2ms() - ts);
+            printf("vector insert time = %ld ms\n", now2ms() - ts);
         }
 
         {
@@ -149,18 +149,18 @@ the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unorder
 * Linux ubuntu 4.9.0-39-custom #12 SMP  x86_64 GNU/Linux
 * compiled with flag -mtune=native -mavx2 -O3 
 
-## random_shuffle
+### random_shuffle
 * emap insert time = 440 ms
 * emap unique time = 312 ms
 * umap insert time = 1628 ms loadf = 0.942
-* vec    time = 296 ms
+* vector insert time = 296 ms
 * eset unique time = 220 ms
 * uset insert time = 1728 ms
 
-##. random data
-*    emap insert time = 568 ms loadf = 0.7
+### random data
+*    emap insert time = 568  ms loadf = 0.7
 *    umap insert time = 2912 ms loadf = 0.939
-*    eset insert range time = 1412 ms loadf = 0.734
+*    eset insert range time = 488 ms loadf = 0.734
 *    uset insert time = 2916 ms loadf = 0.939
 
 if your want more benchmark result, you can download other hash map and compile it to run bench
