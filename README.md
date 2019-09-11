@@ -19,7 +19,7 @@ is not in **main bucket** position, it'll be moved to main bucket from the tail 
 
 - can dump hash **collision statics**, and set different hash algorithm by set compile marco
 
- **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
+- **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
 for example some case pay attention on finding hot, some foucus on finding code(miss), and others care about insert or erase and somne on.
 
