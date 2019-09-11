@@ -1,0 +1,369 @@
+bench_randomEraseString map = emilib2
+    00000000000fffff time = 3.648, loadf = 0.500 524228
+    000000000001ffff time = 6.772, loadf = 0.562 589622
+    00000000000fffff time = 5.588, loadf = 0.531 1113850
+    00000000000fffff time = 5.480, loadf = 0.781 1638078
+    000000000007ffff time = 5.420, loadf = 0.453 1900153
+total time = 26.908
+
+bench_randomEraseString map = emilib3
+    00000000000fffff time = 6.040, loadf = 0.500 524228
+    000000000001ffff time = 6.804, loadf = 0.562 589622
+    00000000000fffff time = 5.980, loadf = 0.531 1113850
+    00000000000fffff time = 6.720, loadf = 0.781 1638078
+    000000000007ffff time = 5.504, loadf = 0.453 1900153
+total time = 31.052
+
+bench_randomEraseString map = emilib5
+    00000000000fffff time = 3.780, loadf = 0.500 524228
+    000000000001ffff time = 6.792, loadf = 0.562 589622
+    00000000000fffff time = 5.588, loadf = 0.531 1113850
+    00000000000fffff time = 5.584, loadf = 0.781 1638078
+    000000000007ffff time = 5.448, loadf = 0.453 1900153
+total time = 27.196
+
+bench_randomEraseString map = emilib6
+    00000000000fffff time = 4.020, loadf = 0.500 524228
+    000000000001ffff time = 6.828, loadf = 0.562 589622
+    00000000000fffff time = 5.300, loadf = 0.531 1113850
+    00000000000fffff time = 5.476, loadf = 0.781 1638078
+    000000000007ffff time = 5.532, loadf = 0.453 1900153
+total time = 27.160
+
+bench_randomEraseString map = tessil robin
+    00000000000fffff time = 4.484, loadf = 0.500 524228
+    000000000001ffff time = 6.200, loadf = 0.562 589622
+    00000000000fffff time = 5.868, loadf = 0.531 1113850
+    00000000000fffff time = 7.952, loadf = 0.781 1638078
+    000000000007ffff time = 5.404, loadf = 0.453 1900153
+total time = 29.908
+
+bench_randomEraseString map = martin flat
+    00000000000fffff time = 3.452, loadf = 0.500 524228
+    000000000001ffff time = 5.704, loadf = 0.562 589622
+    00000000000fffff time = 4.924, loadf = 0.531 1113850
+    00000000000fffff time = 6.312, loadf = 0.781 1638078
+    000000000007ffff time = 4.812, loadf = 0.453 1900153
+total time = 25.204
+
+bench_randomEraseString map = skarupk flat
+    00000000000fffff time = 3.700, loadf = 0.500 524228
+    000000000001ffff time = 6.112, loadf = 0.562 589622
+    00000000000fffff time = 5.468, loadf = 0.531 1113850
+    00000000000fffff time = 3.700, loadf = 0.391 1638078
+    000000000007ffff time = 4.820, loadf = 0.453 1900153
+total time = 23.800
+
+bench_randomEraseString map = phmap flat
+    00000000000fffff time = 3.404, loadf = 0.500 524228
+    000000000001ffff time = 6.660, loadf = 0.562 589622
+    00000000000fffff time = 4.924, loadf = 0.531 1113850
+    00000000000fffff time = 4.464, loadf = 0.391 1638078
+    000000000007ffff time = 4.812, loadf = 0.453 1900153
+total time = 24.264
+
+
+bench_randomFind map = tessil robin
+      0% 00000000ffffffff success time = 7.976 s loadf = 0.488
+      0% ffffffff00000000 success time = 6.640 s loadf = 0.488
+     25% 00000000ffffffff success time = 6.612 s loadf = 0.488
+     25% ffffffff00000000 success time = 6.184 s loadf = 0.488
+     50% 00000000ffffffff success time = 5.708 s loadf = 0.488
+     50% ffffffff00000000 success time = 5.724 s loadf = 0.488
+     75% 00000000ffffffff success time = 4.936 s loadf = 0.488
+     75% ffffffff00000000 success time = 5.000 s loadf = 0.488
+    100% 00000000ffffffff success time = 4.864 s loadf = 0.488
+    100% ffffffff00000000 success time = 4.884 s loadf = 0.488
+total time = 58.528
+
+bench_randomFind map = martin flat
+      0% 00000000ffffffff success time = 8.736 s loadf = 0.488
+      0% ffffffff00000000 success time = 8.484 s loadf = 0.488
+     25% 00000000ffffffff success time = 8.904 s loadf = 0.488
+     25% ffffffff00000000 success time = 8.476 s loadf = 0.488
+     50% 00000000ffffffff success time = 7.588 s loadf = 0.488
+     50% ffffffff00000000 success time = 7.504 s loadf = 0.488
+     75% 00000000ffffffff success time = 8.200 s loadf = 0.488
+     75% ffffffff00000000 success time = 8.220 s loadf = 0.488
+    100% 00000000ffffffff success time = 5.880 s loadf = 0.488
+    100% ffffffff00000000 success time = 5.852 s loadf = 0.488
+total time = 77.844
+
+bench_randomFind map = skarupk flat
+      0% 00000000ffffffff success time = 5.352 s loadf = 0.488
+      0% ffffffff00000000 success time = 5.560 s loadf = 0.488
+     25% 00000000ffffffff success time = 5.168 s loadf = 0.488
+     25% ffffffff00000000 success time = 4.948 s loadf = 0.488
+     50% 00000000ffffffff success time = 5.136 s loadf = 0.488
+     50% ffffffff00000000 success time = 5.156 s loadf = 0.488
+     75% 00000000ffffffff success time = 5.220 s loadf = 0.488
+     75% ffffffff00000000 success time = 5.160 s loadf = 0.488
+    100% 00000000ffffffff success time = 5.752 s loadf = 0.488
+    100% ffffffff00000000 success time = 6.180 s loadf = 0.488
+total time = 53.632
+
+bench_randomFind map = martin flat
+      0% 00000000ffffffff success time = 6.740 s loadf = 0.488
+      0% ffffffff00000000 success time = 7.000 s loadf = 0.488
+     25% 00000000ffffffff success time = 6.672 s loadf = 0.488
+     25% ffffffff00000000 success time = 6.628 s loadf = 0.488
+     50% 00000000ffffffff success time = 6.828 s loadf = 0.488
+     50% ffffffff00000000 success time = 6.736 s loadf = 0.488
+     75% 00000000ffffffff success time = 6.996 s loadf = 0.488
+     75% ffffffff00000000 success time = 6.912 s loadf = 0.488
+    100% 00000000ffffffff success time = 7.256 s loadf = 0.488
+    100% ffffffff00000000 success time = 7.212 s loadf = 0.488
+total time = 68.980
+
+bench_randomFind map = emilib2
+      0% 00000000ffffffff success time = 4.376 s loadf = 0.488
+      0% ffffffff00000000 success time = 4.320 s loadf = 0.488
+     25% 00000000ffffffff success time = 4.392 s loadf = 0.488
+     25% ffffffff00000000 success time = 4.352 s loadf = 0.488
+     50% 00000000ffffffff success time = 4.312 s loadf = 0.488
+     50% ffffffff00000000 success time = 4.340 s loadf = 0.488
+     75% 00000000ffffffff success time = 4.228 s loadf = 0.488
+     75% ffffffff00000000 success time = 4.228 s loadf = 0.488
+    100% 00000000ffffffff success time = 4.440 s loadf = 0.488
+    100% ffffffff00000000 success time = 4.612 s loadf = 0.488
+total time = 43.604
+
+bench_randomFind map = emilib5
+      0% 00000000ffffffff success time = 4.272 s loadf = 0.488
+      0% ffffffff00000000 success time = 4.252 s loadf = 0.488
+     25% 00000000ffffffff success time = 4.172 s loadf = 0.488
+     25% ffffffff00000000 success time = 4.152 s loadf = 0.488
+     50% 00000000ffffffff success time = 4.260 s loadf = 0.488
+     50% ffffffff00000000 success time = 4.264 s loadf = 0.488
+     75% 00000000ffffffff success time = 4.352 s loadf = 0.488
+     75% ffffffff00000000 success time = 4.324 s loadf = 0.488
+    100% 00000000ffffffff success time = 4.628 s loadf = 0.488
+    100% ffffffff00000000 success time = 4.656 s loadf = 0.488
+total time = 43.332
+
+bench_randomFind map = emilib3
+      0% 00000000ffffffff success time = 8.992 s loadf = 0.488
+      0% ffffffff00000000 success time = 9.360 s loadf = 0.488
+     25% 00000000ffffffff success time = 4.680 s loadf = 0.488
+     25% ffffffff00000000 success time = 4.620 s loadf = 0.488
+     50% 00000000ffffffff success time = 4.268 s loadf = 0.488
+     50% ffffffff00000000 success time = 4.280 s loadf = 0.488
+     75% 00000000ffffffff success time = 4.084 s loadf = 0.488
+     75% ffffffff00000000 success time = 4.088 s loadf = 0.488
+    100% 00000000ffffffff success time = 4.292 s loadf = 0.488
+    100% ffffffff00000000 success time = 4.296 s loadf = 0.488
+total time = 52.960
+
+bench_randomFind map = emilib6
+      0% 00000000ffffffff success time = 5.120 s loadf = 0.488
+      0% ffffffff00000000 success time = 4.448 s loadf = 0.488
+     25% 00000000ffffffff success time = 4.332 s loadf = 0.488
+     25% ffffffff00000000 success time = 4.308 s loadf = 0.488
+     50% 00000000ffffffff success time = 4.328 s loadf = 0.488
+     50% ffffffff00000000 success time = 4.284 s loadf = 0.488
+     75% 00000000ffffffff success time = 4.116 s loadf = 0.488
+     75% ffffffff00000000 success time = 4.104 s loadf = 0.488
+    100% 00000000ffffffff success time = 5.980 s loadf = 0.488
+    100% ffffffff00000000 success time = 5.452 s loadf = 0.488
+total time = 46.472
+bench_insert map = emilib5
+    insert 100M int 13.7040 sec loadf = 0.74, size = 98844677
+    clear 100M int 0.2640 , size = 0
+    reinsert 100M int 8.5880 sec loadf = 0.74, size = 98844479
+    remove 100M int 3.0920 sec, size = 96571080
+bench_insert 25.648 s
+
+bench_insert map = emilib2
+    insert 100M int 13.5640 sec loadf = 0.74, size = 98844677
+    clear 100M int 0.2640 , size = 0
+    reinsert 100M int 8.4960 sec loadf = 0.74, size = 98844479
+    remove 100M int 3.1840 sec, size = 96571080
+bench_insert 25.508 s
+
+bench_insert map = emilib3
+    insert 100M int 13.9120 sec loadf = 0.74, size = 98844677
+    clear 100M int 0.2640 , size = 0
+    reinsert 100M int 8.4720 sec loadf = 0.74, size = 98844479
+    remove 100M int 3.7040 sec, size = 96571080
+bench_insert 26.352 s
+
+bench_insert map = emilib6
+    insert 100M int 11.8480 sec loadf = 0.74, size = 98844677
+    clear 100M int 0.2640 , size = 0
+    reinsert 100M int 7.4960 sec loadf = 0.74, size = 98844479
+    remove 100M int 3.4920 sec, size = 96571080
+bench_insert 23.100 s
+
+bench_insert map = tessil robin
+    insert 100M int 11.8480 sec loadf = 0.74, size = 98844677
+    clear 100M int 0.5440 , size = 0
+    reinsert 100M int 7.7200 sec loadf = 0.74, size = 98844479
+    remove 100M int 4.8000 sec, size = 96571080
+bench_insert 24.912 s
+
+bench_insert map = martin flat
+    insert 100M int 14.9200 sec loadf = 0.74, size = 98844677
+    clear 100M int 0.0200 , size = 0
+    reinsert 100M int 10.2840 sec loadf = 0.74, size = 98844479
+    remove 100M int 4.1200 sec, size = 96571080
+bench_insert 29.344 s
+
+bench_insert map = skarupk flat
+    insert 100M int 15.2880 sec loadf = 0.37, size = 98844677
+    clear 100M int 1.2360 , size = 0
+    reinsert 100M int 6.3600 sec loadf = 0.37, size = 98844479
+    remove 100M int 3.8880 sec, size = 96571080
+bench_insert 26.772 s
+
+bench_insert map = martin flat
+    insert 100M int 10.6160 sec loadf = 0.74, size = 98844677
+    clear 100M int 0.0280 , size = 0
+    reinsert 100M int 10.6120 sec loadf = 0.74, size = 98844479
+    remove 100M int 3.6240 sec, size = 96571080
+bench_insert 24.880 s
+
+bench_randomDistinct2 map = emilib5
+     05% distinct 1.5000 sec loadf = 0.60, size = 2500000
+     25% distinct 2.3200 sec loadf = 0.73, size = 12270975
+     50% distinct 2.6720 sec loadf = 0.64, size = 21616698
+    100% distinct 4.9760 sec loadf = 0.74, size = 49709265
+bench_randomDistinct2 11.572 s
+
+bench_randomDistinct2 map = emilib3
+     05% distinct 1.5120 sec loadf = 0.60, size = 2500000
+     25% distinct 2.3400 sec loadf = 0.73, size = 12270975
+     50% distinct 2.6840 sec loadf = 0.64, size = 21616698
+    100% distinct 4.9760 sec loadf = 0.74, size = 49709265
+bench_randomDistinct2 11.620 s
+
+bench_randomDistinct2 map = emilib2
+     05% distinct 1.5000 sec loadf = 0.60, size = 2500000
+     25% distinct 2.3000 sec loadf = 0.73, size = 12270975
+     50% distinct 2.6480 sec loadf = 0.64, size = 21616698
+    100% distinct 4.9040 sec loadf = 0.74, size = 49709265
+bench_randomDistinct2 11.456 s
+
+bench_randomDistinct2 map = emilib6
+     05% distinct 1.5840 sec loadf = 0.60, size = 2500000
+     25% distinct 2.3400 sec loadf = 0.73, size = 12270975
+     50% distinct 2.6640 sec loadf = 0.64, size = 21616698
+    100% distinct 4.3360 sec loadf = 0.74, size = 49709265
+bench_randomDistinct2 11.028 s
+
+bench_randomDistinct2 map = tessil robin
+     05% distinct 1.5800 sec loadf = 0.60, size = 2500000
+     25% distinct 2.3400 sec loadf = 0.73, size = 12270975
+     50% distinct 2.6000 sec loadf = 0.64, size = 21616698
+    100% distinct 4.3440 sec loadf = 0.74, size = 49709265
+bench_randomDistinct2 11.028 s
+
+bench_randomDistinct2 map = martin flat
+     05% distinct 1.4840 sec loadf = 0.60, size = 2500000
+     25% distinct 2.4280 sec loadf = 0.73, size = 12270975
+     50% distinct 2.8760 sec loadf = 0.64, size = 21616698
+    100% distinct 5.2000 sec loadf = 0.74, size = 49709265
+bench_randomDistinct2 11.992 s
+
+bench_randomDistinct2 map = skarupk flat
+     05% distinct 1.4920 sec loadf = 0.60, size = 2500000
+     25% distinct 2.8800 sec loadf = 0.73, size = 12270975
+     50% distinct 3.7120 sec loadf = 0.64, size = 21616698
+    100% distinct 6.7400 sec loadf = 0.37, size = 49709265
+bench_randomDistinct2 14.972 s
+
+bench_randomDistinct2 map = martin flat
+     05% distinct 1.5720 sec loadf = 0.60, size = 2500000
+     25% distinct 2.8200 sec loadf = 0.73, size = 12270975
+     50% distinct 3.6120 sec loadf = 0.64, size = 21616698
+    100% distinct 5.0720 sec loadf = 0.74, size = 49709265
+bench_randomDistinct2 13.076 s
+
+bench_randomInsertErase map = emilib2
+    04 bits 50 M cycles time use 1.4040 sec map 7 size
+    08 bits 50 M cycles time use 1.8400 sec map 127 size
+    12 bits 50 M cycles time use 2.0800 sec map 2084 size
+    16 bits 50 M cycles time use 2.3120 sec map 32722 size
+    20 bits 50 M cycles time use 2.8800 sec map 524149 size
+    24 bits 50 M cycles time use 5.1360 sec map 8367491 size
+bench_randomInsertErase 15.652 s
+
+bench_randomInsertErase map = emilib5
+    04 bits 50 M cycles time use 1.4080 sec map 7 size
+    08 bits 50 M cycles time use 1.8400 sec map 127 size
+    12 bits 50 M cycles time use 2.0800 sec map 2084 size
+    16 bits 50 M cycles time use 2.4440 sec map 32722 size
+    20 bits 50 M cycles time use 2.9160 sec map 524149 size
+    24 bits 50 M cycles time use 5.1800 sec map 8367491 size
+bench_randomInsertErase 15.868 s
+
+bench_randomInsertErase map = emilib3
+    04 bits 50 M cycles time use 1.4320 sec map 7 size
+    08 bits 50 M cycles time use 1.8720 sec map 127 size
+    12 bits 50 M cycles time use 2.1240 sec map 2084 size
+    16 bits 50 M cycles time use 2.4920 sec map 32722 size
+    20 bits 50 M cycles time use 2.9840 sec map 524149 size
+    24 bits 50 M cycles time use 5.4000 sec map 8367491 size
+bench_randomInsertErase 16.304 s
+
+bench_randomInsertErase map = emilib6
+    04 bits 50 M cycles time use 1.4040 sec map 7 size
+    08 bits 50 M cycles time use 1.8200 sec map 127 size
+    12 bits 50 M cycles time use 2.0640 sec map 2084 size
+    16 bits 50 M cycles time use 2.4080 sec map 32722 size
+    20 bits 50 M cycles time use 2.8960 sec map 524149 size
+    24 bits 50 M cycles time use 5.1560 sec map 8367491 size
+bench_randomInsertErase 15.748 s
+
+bench_randomInsertErase map = tessil robin
+    04 bits 50 M cycles time use 2.2920 sec map 7 size
+    08 bits 50 M cycles time use 2.1200 sec map 127 size
+    12 bits 50 M cycles time use 2.5480 sec map 2084 size
+    16 bits 50 M cycles time use 3.0120 sec map 32722 size
+    20 bits 50 M cycles time use 3.5320 sec map 524149 size
+    24 bits 50 M cycles time use 5.7400 sec map 8367491 size
+bench_randomInsertErase 19.244 s
+
+bench_randomInsertErase map = martin flat
+    04 bits 50 M cycles time use 1.4160 sec map 7 size
+    08 bits 50 M cycles time use 1.8760 sec map 127 size
+    12 bits 50 M cycles time use 2.1600 sec map 2084 size
+    16 bits 50 M cycles time use 2.3040 sec map 32722 size
+    20 bits 50 M cycles time use 2.8480 sec map 524149 size
+    24 bits 50 M cycles time use 5.8600 sec map 8367491 size
+bench_randomInsertErase 16.464 s
+
+bench_randomInsertErase map = skarupk flat
+    04 bits 50 M cycles time use 1.7760 sec map 7 size
+    08 bits 50 M cycles time use 2.3640 sec map 127 size
+    12 bits 50 M cycles time use 2.6000 sec map 2084 size
+    16 bits 50 M cycles time use 3.3560 sec map 32722 size
+    20 bits 50 M cycles time use 3.5640 sec map 524149 size
+    24 bits 50 M cycles time use 6.2120 sec map 8367491 size
+bench_randomInsertErase 19.872 s
+
+bench_randomInsertErase map = martin flat
+    04 bits 50 M cycles time use 2.0160 sec map 7 size
+    08 bits 50 M cycles time use 2.0200 sec map 127 size
+    12 bits 50 M cycles time use 3.1280 sec map 2084 size
+    16 bits 50 M cycles time use 3.4120 sec map 32722 size
+    20 bits 50 M cycles time use 3.5160 sec map 524149 size
+    24 bits 50 M cycles time use 5.2400 sec map 8367491 size
+bench_randomInsertErase 19.332 s
+
+bench_IterateIntegers map = emilib3
+    total iterate/removing time = 10.652, 11.224
+bench_IterateIntegers map = emilib5
+    total iterate/removing time = 10.612, 11.212
+bench_IterateIntegers map = emilib2
+    total iterate/removing time = 10.404, 11.220
+bench_IterateIntegers map = emilib6
+    total iterate/removing time = 9.996, 11.172
+bench_IterateIntegers map = tessil robin
+    total iterate/removing time = 11.712, 14.212
+bench_IterateIntegers map = martin flat
+    total iterate/removing time = 6.372, 12.636
+bench_IterateIntegers map = skarupk flat
+    total iterate/removing time = 10.636, 10.748
+bench_IterateIntegers map = martin flat
+    total iterate/removing time = 6.636, 8.804
+huangyuanbing@ubuntu:~$ ~~~~~~~~~
