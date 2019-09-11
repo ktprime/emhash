@@ -1,7 +1,8 @@
 # emhash key feature
+
 A very fast and efficient *open address based c++ flat hash map*, it can be bench/test it and compare the result with third party hash map. 
 
-some features are not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to merged and used in different hash table file. Not all feature can be open at same time in only one file.
+    some features are not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to merged and used in different hash table file. Not all feature can be open in only one file(one hash map).
 
 - the default load factor is 0.8, also be set **1.0** by enable compile marco EMILIB_HIGH_LOAD (average 5% performance loss in hash_table3.hpp)
 
@@ -155,22 +156,23 @@ the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unorder
 
 - rehash/iteration performance is some slower than other robin-hood based hash implementation
 
-- on some platform it'll be hanged compiled by some g++ on some system, compile with flag **-fno-stirct-aliasing**, it'll be fixed soon
+- on some platform it'll be hanged compiled by some g++, compile with flag **-fno-stirct-aliasing**, it'll be fixed soon
 - for very large key.value, use pointer instead of value if your care about memory usage and insertion and copy opertion is very frequcney.
 
-- some bucket function is support just like stl do. load factor is less than 1.0.
+- some bucket function is not support just like other falt hash map do. load factor is always less than 1.0.
 
-- the only known bug as follow. if erase not current key or iterater during iteration without break. some key will iteraored twice or missed.
+- the only known bug as follow. if erase not current key or iterater during iteration without break. some key will be iteraored twice or missed.
 
 ```
-    HashMap<int,int> myhash;
+    emilib2:HashMap<int,int> myhash;
     int key = some_key;
     //dome some init
-    for (auto it : myhash)
+    for (const auto& it : myhash)
     {
         if (key = it.first) {
             myhash.erase(key);  //no any break
        }
+       ...
        do_some_more();
     }
 ```
