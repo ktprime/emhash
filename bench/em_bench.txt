@@ -1,4 +1,4 @@
-benchMarkHashMa keyType = int64_t, valueType = int64_t
+benchMarkHash keyType = int64_t, valueType = int64_t
 erase_half
    522          emilib5                 100
    558          martin flat             93
@@ -35,7 +35,7 @@ find_half
    602          skarupk flat            42
    652          tessil robin            39
 
-find_hit
+find_all
    553          emilib5                 100
    554          emilib2                 99
    554          emilib6                 99
@@ -84,6 +84,95 @@ insert_reserve
   martin flat   85
    phmap flat   99
  skarupk flat   77
- tessil robin   71
+ 
+ 
+ 
+ benchMarkHashMap keyType = int64_t, valueType = int
+
+ erase_half
+   332          emilib5                 100
+   362          emilib6                 91
+   377          emilib2                 88
+   452          martin flat             73
+   473          phmap flat              70
+   490          skarupk flat            67
+   610          tessil robin            54
+
+erase_reinsert
+   1358         emilib6                 100
+   1399         emilib2                 97
+   1403         emilib5                 96
+   1420         phmap flat              95
+   1496         skarupk flat            90
+   1798         tessil robin            75
+   1814         martin flat             74
+
+find_erase
+   182          martin flat             100
+   203          phmap flat              89
+   273          skarupk flat            66
+   309          emilib2                 58
+   311          emilib6                 58
+   311          emilib5                 58
+   341          tessil robin            53
+
+find_half
+   193          phmap flat              100
+   249          emilib6                 77
+   250          emilib5                 77
+   251          emilib2                 76
+   259          martin flat             74
+   417          skarupk flat            46
+   478          tessil robin            40
+
+find_hit
+   353          emilib5                 100
+   354          emilib2                 99
+   356          emilib6                 99
+   417          skarupk flat            84
+   438          phmap flat              80
+   494          martin flat             71
+   632          tessil robin            55
+
+find_miss
+   302          phmap flat              100
+   359          martin flat             84
+   402          emilib6                 75
+   415          emilib5                 72
+   416          emilib2                 72
+   590          skarupk flat            51
+   675          tessil robin            44
+
+insert_noreserve
+   1130         phmap flat              100
+   1225         emilib2                 92
+   1243         emilib5                 90
+   1299         emilib6                 86
+   1525         martin flat             74
+   1644         skarupk flat            68
+   1716         tessil robin            65
+
+insert_reserve
+   526          emilib2                 100
+   539          emilib5                 97
+   566          emilib6                 92
+   639          tessil robin            82
+   812          phmap flat              64
+   968          skarupk flat            54
+   1118         martin flat             47
+
+======== map  top1   top2  top3 =======================
+      emilib2  5.8  16.0   15
+      emilib5 22.8   8.0    3
+      emilib6  2.3   5.5   19
+   phmap flat 14.0   2.5    3
+======== map    score ================================
+      emilib2   97
+      emilib5   98
+      emilib6   96
+  martin flat   74
+   phmap flat   92
+ skarupk flat   73
+ tessil robin   68
 --------------------------------------------------------------------
 
