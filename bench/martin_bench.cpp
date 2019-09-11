@@ -20,10 +20,10 @@
 
 using namespace std;
 
-//#include "hash_table2.hpp"
+#include "hash_table2.hpp"
 #include "hash_table5.hpp"
 #include "hash_table6.hpp"
-#include "hash_table7.hpp"
+#include "hash_table3.hpp"
 #include "hash_set.hpp"
 
 #if __cplusplus >= 199711LL
