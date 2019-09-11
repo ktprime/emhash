@@ -155,8 +155,8 @@ the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unorder
 *    eset insert range time = 1412 ms loadf = 0.734
 *    uset insert time = 2916 ms loadf = 0.939
 
-if your want more benchmark, you can download other hash map run bench
-[![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench Some](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
+if your want more benchmark result, you can download other hash map and compile it to run bench
+[![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench High Load](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
 
 # some bad
 - it's not node based hash map, so it can't keep the reference stable if rehash happens, use pointer or choose node base hash map.
@@ -183,5 +183,4 @@ if your want more benchmark, you can download other hash map run bench
        do_some_more();
     }
 ```
-# futrue work to improve
 
