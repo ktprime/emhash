@@ -6,17 +6,16 @@ A very fast and efficient *open address based c++ flat hash map*, it can be benc
 
 - the default load factor is 0.8, also be set **1.0** by enable compile marco EMILIB_HIGH_LOAD (average 5% performance loss in hash_table3.hpp)
 
-- **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function is added for performance issiue if needed.
-    - _erase : without return next iearator
-    - shrink_to_fit : shrink memory to fit for saveing memory
+- **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
+    - _erase :  without return next iterator after erasion
+    - shrink_to_fit : shrink memory to fit for saving memory
     - insert_unqiue : insert unique key into hash without search
-    - try_find : easy to used  without  use iterator
+    - try_find : check or get key/value without use iterator
 
 
-- At present from my 6 different benchmark(4 of them in bench dir), it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash(call reserve before inserting) and effficient erase.
+- At present from 6 different benchmark(4 of them in this bench dir) by my test, it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash(call reserve before inserting) and effficient erase.
 
-- more **memory efficient** if the key.value size is not aligned than other's implemention *(size(key) % 8 != size(value) % 8)  
-for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint64_t, uint64_t>
+- more **memory efficient** if the key.value size is not aligned than other's implemention *(size(key) % 8 != size(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint64_t, uint64_t>
 
 - only one array allocted, a simple and **smart collision algorithm** with the collision element linked by array index like stl::unordered_map
 
