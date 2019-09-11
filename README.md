@@ -32,8 +32,7 @@ for example some case pay attention on finding hot, some foucus on finding code(
 
 - many optimization with key is *integer*, some new feature is underdeveloing bfore statle to use.
 
-- it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion.
-(At present from 6 different benchmark(4 of them in this bench dir) by my test)
+- it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion. at present from 6 different benchmark(4 of them in this bench dir) by my bench
 
 - It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, g++) and cpu(AMD, Intel, Arm).
 
@@ -168,8 +167,12 @@ if your want more benchmark result, you can download other hash map and compile 
 [![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench High Load](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
 
 # some bad
-- it's not node based hash map, so it can't keep the reference stable if rehash happens, use pointer or choose node base hash map.
-
+- it's not node based hash map, can't keep the reference stable if insert/erase/rehash happens, use pointer or choose node base hash map.
+```
+    emilib2:HashMap<int,int> myhash(10);
+    myhash[1] = 1;
+    auto& ref = myhash[1];//wrong used here
+```
 - rehash/iteration performance is some slower than other robin-hood based implementation
 
 - run on some platform it'll be hanged compiled by some g++, set compile flag with **-fno-stirct-aliasing**, it'll be fixed soon
