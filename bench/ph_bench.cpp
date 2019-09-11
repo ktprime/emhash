@@ -1,16 +1,16 @@
 #include <inttypes.h>
 
 #if EMILIB == 2
-    #include "hash_table52.hpp"
+    #include "hash_table2.hpp"
     #define MAPNAME emilib2::HashMap
     #define EXTRAARGS
 #elif EMILIB == 6
-    #include "hash_table522.hpp"
+    #include "hash_table6.hpp"
     #define MAPNAME emilib6::HashMap
     #define EXTRAARGS
 
 #elif EMILIB == 5
-    #include "hash_table55.hpp"
+    #include "hash_table5.hpp"
     #define MAPNAME emilib5::HashMap
     #define EXTRAARGS
 
