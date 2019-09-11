@@ -1,10 +1,12 @@
 # emhash key feature
 
-A very fast and efficient *open address based c++ flat hash map*, it can be bench/test it and compare the result with third party hash map. 
+A quite fast and memory efficient *open address based c++ flat hash map*, it easy to be benched or tested it and compare the result with other's hash map.
 
-  some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
+    some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- the default load factor is 0.8, also be set **1.0** by enable compile marco EMILIB_HIGH_LOAD (average 5% performance loss in hash_table3.hpp)
+- the default load factor is 0.8 and can be set **1.0** by enable compile marco *EMILIB_HIGH_LOAD* (5% performance loss in hash_table3.hpp)
+
+- only one array used, a simple and smart **collision algorithm** uesd for the collision, the collision bucket is linked after the main bucket with a auxiliary integer index just like stl::unordered_map. the main bucket can not occupyed and all opertion is searching from main bucket. 
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
     - _erase :  without return next iterator after erasion
@@ -13,17 +15,12 @@ A very fast and efficient *open address based c++ flat hash map*, it can be benc
     - try_find : check or get key/value without use iterator
 
 
-- At present from 6 different benchmark(4 of them in this bench dir) by my test, it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash(call reserve before inserting) and effficient erase.
-
-- more **memory efficient** if the key.value size is not aligned than other's hash map implemention if (size(key) % 8 != size(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint64_t, uint64_t>
-
-- only one array allocted, a simple and **smart collision algorithm** with the collision element linked by array index like stl::unordered_map
-
+- more **efficient** than other's hash map implemention if key.value is some aligned (sizeof(key) % 8 != sizeof(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 total memoery than hash_map<uint64_t, uint64_t>.
 - it can use a **second/backup hash** if the input hash is very bad with high collision by compile marco *EMILIB_SAFE_HASH* is set
 
-- **lru** is also used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
+- **lru** can be used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
-- dump hash **collision statics** to analyze cache performance, number of probes of look up of successful/unsuccessful can be know from dump info.
+- dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be knowed from dump info.
  
 - choose *different* hash algorithm by set compile marco *EMILIB_FIBONACCI_HASH* or *EMILIB_IDENTITY_HASH*
 
@@ -33,6 +30,9 @@ A very fast and efficient *open address based c++ flat hash map*, it can be benc
 for example some case pay attention on finding hot, some foucus on finding code(miss), and others care about insert or erase and somne on.
 
 - many optimization with key is *integer*, some new feature is underdeveloing bfore statle to use.
+
+- it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion.
+(At present from 6 different benchmark(4 of them in this bench dir) by my test)
 
 - It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, g++) and cpu(AMD, Intel, Arm).
 
@@ -169,10 +169,11 @@ if your want more benchmark result, you can download other hash map and compile 
 # some bad
 - it's not node based hash map, so it can't keep the reference stable if rehash happens, use pointer or choose node base hash map.
 
-- rehash/iteration performance is some slower than other robin-hood based hash implementation
+- rehash/iteration performance is some slower than other robin-hood based implementation
 
-- on some platform it'll be hanged compiled by some g++, compile with flag **-fno-stirct-aliasing**, it'll be fixed soon
-- for very large key.value, use pointer instead of value if your care about memory usage and insertion and copy opertion is very frequcney.
+- run on some platform it'll be hanged compiled by some g++, set compile flag with **-fno-stirct-aliasing**, it'll be fixed soon
+
+- for very large key.value, use pointer instead of value if your care about memory usage and insertion an erase opertion is very frequcney.
 
 - some bucket function is not support just like other falt hash map do. load factor is always less than 1.0.
 
