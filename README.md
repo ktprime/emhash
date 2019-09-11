@@ -134,9 +134,13 @@ static void basic_test(int n)
 }
 ```
 
-
 # insert result
-the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unordered_map/std::unordered_set
+the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unordered_map/std::unordered_set on 
+1.Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz 
+2.gcc version 5.4.0 20160609 (Ubuntu 5.4.0-6ubuntu1~16.04.11
+3.Linux ubuntu 4.9.0-39-custom #12 SMP Sat Jul 22 13:14:22 CST 2017 x86_64 x86_64 x86_64 GNU/Linux
+4.-mtune=native -mavx2 -O3 
+
 ##1 random_shuffle 1 - 12345678
 * emap insert time = 440 ms
 * emap unique time = 312 ms
@@ -150,6 +154,9 @@ the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unorder
 *    umap insert time = 2912 ms loadf = 0.939
 *    eset insert range time = 1412 ms loadf = 0.734
 *    uset insert time = 2916 ms loadf = 0.939
+
+if your want more benchmark, you can download other hash map run bench
+[![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench Some](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
 
 # some bad
 - it's not node based hash map, so it can't keep the reference stable if rehash happens, use pointer or choose node base hash map.
