@@ -69,7 +69,7 @@ static const char* find(const std::string& map_name)
 {
     for (const auto& kv : show_name)
     {
-        if (map_name.find(kv.first) != std::string::npos)
+        if (map_name.find(kv.first) < 10)
         {
             return kv.second.c_str();
         }
