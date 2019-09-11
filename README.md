@@ -1,7 +1,8 @@
 # emhash key feature
-A very fast and efficient *open address based c++ flat hash map*, you can bench it and compare the result with third party hash map
+A very fast and efficient *open address based c++ flat hash map*, you can bench it and compare the result with third party hash map,
+some feature is not opened by default and it can be used by set the compile marco becasue it's loss some tiny performance, some featue is collsion each and set in differnt hash table file. not all feature can be open at same time in only one file.
 
-- the default load factor is 0.8, also be set to **1.0** by set compile marco (average 5% performance loss)
+- the default load factor is 0.8, also be set to **1.0** by set compile marco EMILIB_HIGH_LOAD (average 5% performance loss in hash_table3.hpp)
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function is added for performance issiue if needed. for example _erase, shrink_to_fit, insert_unqiue, try_find
 
@@ -12,10 +13,9 @@ for example hash_map<uint64_t, uint32_t> can save 1/3 memoery the hash_map<uint6
 
 - only one array allocted, a simple and **smart collision algorithm** with the collision element linked by array index like stl::unordered_map
 
-- it can use a **second/backup hash** if the input hash is very bad with high collision by compile marco set
+- it can use a **second/backup hash** if the input hash is very bad with high collision by compile marco EMILIB_SAFE_HASH is set
 
-- **lru** is also used if compile marco set for some special user case. for exmaple some key is "frequceny accessed", if the key
-is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
+- **lru** is also used if compile marco EMILIB_LRU_SET set for some special user case. for exmaple some key is "frequceny accessed", if the key is not in **main bucket** position, it'll be moved to main bucket from the tail to head and only  will be find only once during next time.
 
 - can dump hash **collision statics**, and set different hash algorithm by set compile marco
 
