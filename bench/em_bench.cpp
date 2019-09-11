@@ -12,9 +12,9 @@
 //#include "wyhash.h"
 
 #define TP                   1
-//#define HOOD_HASH            1
-//#define EMILIB_BUCKET_INDEX  1
+#define HOOD_HASH            1
 
+//#define EMILIB_BUCKET_INDEX  1
 //#define EMILIB_REHASH_LOG  1
 //#define EMILIB_AVX_MEMCPY  1
 //#define EMILIB_STATIS      1
@@ -42,7 +42,6 @@
 #include "hash_table4.hpp"
 #include "hash_table5.hpp"
 
-//#include "hash_table64.hpp"
 ////some others
 //https://github.com/ilyapopov/car-race
 //https://hpjansson.org/blag/2018/07/24/a-hash-table-re-hash/
@@ -1004,7 +1003,7 @@ int main(int argc, char* argv[])
     srand((unsigned)time(0));
 
     auto n = rand() % 1234567 + 100000;
-    auto maxn = 1323456;
+    auto maxn = 5123456;
 
 //    testSynax();
 
@@ -1055,7 +1054,7 @@ int main(int argc, char* argv[])
 #endif
 
 #if TP
-        if (time(0) > nows + 7200)
+        if (time(0) > nows + 600)
             break;
 #elif GCOV
         break;
@@ -1067,4 +1066,3 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-
