@@ -1,44 +1,30 @@
 # emhash feature
-a very fast and efficient open address c++ flat hash map, you can bench it and compare the result with third party hash map
+A very fast and efficient open address c++ flat hash map, you can bench it and compare the result with third party hash map
 
+1. the default load factor is 0.8, also be set to **1.0** by open compile marco set(average 5% performance loss)
 
-1. the default load factor is 0.8, also be set to 1.0 by open compile marco set(average 5% performance loss)
+2. **head only** with c++11/14/17 without any depency, interface is highly compatible with std::unordered_map, some new function
+is added for performance issiue if needed. for example _erase, shrink_to_fit, insert_unqiue
 
-2. head only with c++11/14/17 without any depency, interface is highly compatible with std::unordered_map
+3. it's the **fastest** hash map for find performance(100% hit), and good inserting performacne if no rehash(call reserve before insert)
 
-3. it's the fastest hash map for find performance(100% hit), and good inserting performacne if no rehash(call reserve before insert)
-
-4. more memory efficient if the key.vlaue size is not aligned (size(key) % 8 != size(value) % 8) than other's implemention
+4. more **memory efficient** if the key.vlaue size is not aligned (size(key) % 8 != size(value) % 8) than other's implemention
 for exmaple hash_map<long, int> can save 1/3 memoery the hash_map<long, long>
 
-5. it's only one array allocted, a simple and smart collision algorithm linked collsion bucket by array index
+5. it's only one array allocted, a simple and **smart collision algorithm** with collision bucket linked by array index
 
-6. it's can use a second hash if the input hash is bad with high collision
+6. it's can use a **second/backup hash** if the input hash is bad with high collision
 
-7. lru is also used in main bucket if compile marco set for some special case
+7. **lru** is also used in main bucket if compile marco set for some special case
 
-8. can dump hash collsion statics, and set different hash algorithm by set compile marco
+8. can dump hash **collision statics**, and set different hash algorithm by set compile marco
 
-9. no tombstones is used in my hash map. performance will no deteriorate even high insertion and erasion
+9. **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion
 
-10.more than 5 different flat hash map implemention to choose, each of them is some tiny different can be used in many case
+10.more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
+for example some case pay attention on finding hot, some foucus on finding code(miss), and others care about insert or erase and somne on.
 
-# bench result
-the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unordered_map/std::unordered_set
-##1 random_shuffle 1 - 12345678
-* emap insert time = 440 ms
-* emap unique time = 312 ms
-* umap insert time = 1628 ms loadf = 0.942
-* vec    time = 296 ms
-* eset unique time = 220 ms
-* uset insert time = 1728 ms
-
-##2. random data
-*    emap insert time = 568 ms loadf = 0.7
-*    umap insert time = 2912 ms loadf = 0.939
-*    eset insert range time = 1412 ms loadf = 0.734
-*    uset insert time = 2916 ms loadf = 0.939
-
+11. many optimization with key is *integer*.
 
 # Example
 
@@ -64,7 +50,7 @@ static void basic_test(int n)
             auto ts = now2ms();
             emilib2::HashMap<int, int> emap(n);
             for (auto v: data)
-                emap.insert_unique(v, 0);
+                emap.insert_unique(v, 0); //assure key is not exist
             printf("emap unique time = %ld ms\n", now2ms() - ts);
         }
 
@@ -144,3 +130,21 @@ static void basic_test(int n)
     }
 }
 ```
+
+
+# insert result
+the simple benchmark (code in bench/martin_bench.cpp) compraed with std::unordered_map/std::unordered_set
+##1 random_shuffle 1 - 12345678
+* emap insert time = 440 ms
+* emap unique time = 312 ms
+* umap insert time = 1628 ms loadf = 0.942
+* vec    time = 296 ms
+* eset unique time = 220 ms
+* uset insert time = 1728 ms
+
+##2. random data
+*    emap insert time = 568 ms loadf = 0.7
+*    umap insert time = 2912 ms loadf = 0.939
+*    eset insert range time = 1412 ms loadf = 0.734
+*    uset insert time = 2916 ms loadf = 0.939
+
