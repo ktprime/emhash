@@ -4,11 +4,16 @@ A quite fast and memory efficient *open address based c++ flat hash map*, it is 
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- the default load factor is 0.8 and can be set **1.0** by enable compile marco *EMILIB_HIGH_LOAD* (5% performance loss in hash_table3.hpp)
+- the default load factor is 0.8 and can be set **1.0** by enable compile marco *EMILIB_HIGH_LOAD* (*5% performance loss in hash_table3.hpp*)
 
-- only one array used，each bucket contains a struct（key,bucket,value)，bucket is not always in the middle bwteen key and value，depend on both size and align pack。
+- only *one array* allocted, each node/bucket contains a struct (keyT key, int bucket, ValueT value), bucket is not awalys in the middle between key and value, depend on struct align pack.
 
 - a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index just like std unordered_map. main bucket can not be occupyed and all opertions is to search from main bucket. 
+
+- **three different ways** of probe is used to seach the empty bucket from array. it's not suffer heavily performance loss by primary or  secondary clustering.
+   - linear probing search the first cpu cacheline
+   - quadratic probing start work after limited linear probing
+   - random probing used with a very bad hash
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
     - _erase :  without return next iterator after erasion
