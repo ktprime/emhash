@@ -185,13 +185,23 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
 ```
     emilib2:HashMap<int,int> myhash(10);
     myhash[1] = 1;
-    auto& ref = myhash[1];//wrong used here
+    auto& myref = myhash[1];//**wrong used here**,  can not keep reference stable
+     ....
+    auto old = myref ;  // myref maybe changed
 ```
+
 - rehash/iteration performance is some slower than other robin-hood based implementation
 
 - on some platform it'll be hanged compiled by some g++ with -O2, set compile flag with **-fno-stirct-aliasing** to be a work around, it'll be fixed soon
 
 - for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
+```  
+  emilib2:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
+
+  emilib2:HashMap<keyT,*valueT> myhash2; //new valueT, or use std::shared_ptr<valueT>.
+  
+```
+
 
 - some bucket function is not supported just like other falt hash map do. load factor is always less than 1.0.
 
