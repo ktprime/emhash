@@ -1,5 +1,5 @@
 
-// emilib2::HashMap for C++11
+// emilib5::HashMap for C++11
 // version 1.2.3
 // https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
 //
@@ -74,7 +74,7 @@
 #ifndef EMILIB_BUCKET_INDEX
     #define EMILIB_BUCKET_INDEX 1
 #endif
-#if EMILIB_CACHE_LINE_SIZE < 32
+#if EMILIB_CACHE_LINE_SIZE < 32 || EMILIB_CACHE_LINE_SIZE > 256
     #define EMILIB_CACHE_LINE_SIZE 64
 #endif
 
@@ -98,7 +98,7 @@
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
 #endif
 
-#define CLEAR_BUCKET(bucket)  NEXT_BUCKET(_pairs, bucket) = INACTIVE; _pairs[bucket].~PairT(); _num_filled --
+#define CLEAR_BUCKET(bucket)  NEXT_BUCKET(_pairs, bucket) = INACTIVE; _pairs[bucket].~PairT(); _num_filled -- 
 
 namespace emilib2 {
 
@@ -323,7 +323,7 @@ public:
         _pairs = nullptr;
         _num_filled = 0;
         _hash_inter = 0;
-        max_load_factor(0.8f);
+        max_load_factor(0.9f);
         reserve(bucket);
     }
 
@@ -356,7 +356,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (is_notriviall_destructable())
+        if (is_notrivially())
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -376,7 +376,7 @@ public:
 
     ~HashMap()
     {
-        if (is_notriviall_destructable())
+        if (is_notrivially())
             clearkv();
 
         free(_pairs);
@@ -493,12 +493,12 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) / (float)_loadlf;
+        return (1 << 13) /(float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
-        if (value < 0.90f && value > 0.2f)
+        if (value < 0.95f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 13) / value);
     }
 
@@ -843,7 +843,7 @@ public:
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket != INACTIVE)
             return INACTIVE;
-        //if (!_eq(key, GET_KEY(_pairs, bucket))
+
         NEW_KVALUE(key, value, bucket);
         return bucket;
     }
@@ -874,6 +874,8 @@ public:
     /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key) noexcept
     {
+        //check_expand_need();
+
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
@@ -914,7 +916,6 @@ public:
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
-
     iterator erase(const_iterator cit) noexcept
     {
         iterator it(this, cit._bucket);
@@ -951,7 +952,7 @@ public:
         CLEAR_BUCKET(bucket);
     }
 
-    static constexpr bool is_notriviall_destructable()
+    static constexpr bool is_notrivially()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -981,7 +982,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear() noexcept
     {
-        if (is_notriviall_destructable() || sizeof(PairT) > EMILIB_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
+        if (is_notrivially() || sizeof(PairT) > EMILIB_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
             clearkv();
         else
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
@@ -997,7 +998,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) noexcept
     {
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13);
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13) + 2;
         //const auto required_buckets = num_elems * 19 / 16;
         if (EMILIB_LIKELY(required_buckets < _num_buckets))
             return false;
@@ -1010,7 +1011,7 @@ public:
     void rehash(uint32_t required_buckets) noexcept
     {
         if (required_buckets < _num_filled)
-            return ;
+            return;
 
         uint32_t num_buckets = _num_filled > 65536 ? (1 << 16) : 4;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
@@ -1136,7 +1137,7 @@ private:
         const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
         if (next_bucket == bucket)
             return eqkey ? bucket : INACTIVE;
-        else if (EMILIB_UNLIKELY(bucket != hash_bucket(GET_KEY(_pairs, bucket))))
+        else if (bucket != hash_bucket(GET_KEY(_pairs, bucket)))
             return INACTIVE;
 
         //find erase key and swap to last bucket
@@ -1321,7 +1322,6 @@ private:
 
             else if (slot > 5) {
                 const auto next = (bucket_from + _num_filled + last) & _mask;
-//                const auto next = (bucket_from - last) & _mask;
 
                 const auto bucket3 = next + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
