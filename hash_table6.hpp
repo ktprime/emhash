@@ -1,6 +1,6 @@
 
 // emilib6::HashMap for C++11
-// version 1.6.0
+// version 1.6.1
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -300,7 +300,7 @@ public:
         _pairs = nullptr;
         _num_filled = 0;
         _hash_inter = 0;
-        max_load_factor(0.8f);
+        max_load_factor(0.9f);
         reserve(bucket);
     }
 
@@ -470,12 +470,12 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) / _loadlf;
+        return (1 << 13) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
-        if (value < 0.90f && value > 0.2f)
+        if (value < 0.95f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 13) / value);
     }
 
@@ -963,7 +963,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) noexcept
     {
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13);
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13) + 2;
         //const auto required_buckets = num_elems * 19 / 16;
         if (EMILIB_LIKELY(required_buckets < _num_buckets))
             return false;
@@ -1279,7 +1279,7 @@ private:
             if (ISEMPTY_BUCKET(_pairs, bucket2))
                 return bucket2;
 
-            else if (slot > 5) {
+            else if (slot > 8) {
                 const auto next = (bucket_from + _num_filled + last) & _mask;
 //                const auto next = (bucket_from - last) & _mask;
 
@@ -1287,7 +1287,7 @@ private:
                 if (ISEMPTY_BUCKET(_pairs, bucket3))
                     return bucket3;
 
-                const auto bucket4 = next + 1;
+                const auto bucket4 = next + 2;
                 if (ISEMPTY_BUCKET(_pairs, bucket4))
                     return bucket4;
             }
@@ -1449,7 +1449,6 @@ private:
     //8 * 3 + 4 + 4 + 4 * 3 = 32 + 12 = 44
     HashT     _hasher;
     EqT       _eq;
-    PairT*    _pairs;
     uint32_t  _mask;
     uint32_t  _num_buckets;
     //unchar  _cache_packed[128 / sizeof(char)];//packed no thread cache line share read
@@ -1457,6 +1456,7 @@ private:
     uint32_t  _num_filled;
     uint32_t  _hash_inter;
     uint32_t  _loadlf;
+    PairT*    _pairs;
 };
 } // namespace emilib
 #if __cplusplus >= 201103L
