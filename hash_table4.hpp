@@ -1,6 +1,6 @@
-// emilib5::HashMap for C++11
-// version 1.4.1
-// https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
+// emilib4::HashMap for C++11
+// version 1.4.2
+// https://github.com/ktprime/ktprime/blob/master/hash_table4.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -98,7 +98,7 @@
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
 #endif
 
-#define CLEAR_BUCKET(bucket)  NEXT_BUCKET(_pairs, bucket) = INACTIVE; _pairs[bucket].~PairT(); _num_filled -= 1
+#define CLEAR_BUCKET(bucket)  NEXT_BUCKET(_pairs, bucket) = INACTIVE; _pairs[bucket].~PairT(); _num_filled --
 
 namespace emilib4 {
 
@@ -316,9 +316,7 @@ public:
         uint32_t  _bucket;
     };
 
-    // ------------------------------------------------------------------------
-
-    void init()
+    void init(uint32_t bucket)
     {
         _num_buckets = 0;
         _max_bucket = 0;
@@ -327,13 +325,13 @@ public:
         _pairs = nullptr;
         _num_filled = 0;
         _hash_inter = 0;
-        max_load_factor(0.8f);
+        max_load_factor(0.9f);
+        reserve(bucket);
     }
 
     HashMap(uint32_t bucket = 4)
     {
-        init();
-        reserve(bucket);
+        init(bucket);
     }
 
     HashMap(const HashMap& other)
@@ -342,46 +340,15 @@ public:
         clone(other);
     }
 
-    void clone(const HashMap& other)
-    {
-        _hasher      = other._hasher;
-        _num_buckets = other._num_buckets;
-        _num_filled  = other._num_filled;
-        _max_bucket  = other._max_bucket;
-        _last_colls  = other._last_colls;
-        _mask        = other._mask;
-        _hash_inter       = other._hash_inter;
-        _loadlf      = other._loadlf;
-
-#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value) {
-#else
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
-#endif
-            memcpy(_pairs, other._pairs, other._max_bucket * sizeof(PairT));
-        }
-        else {
-            auto old_pairs = other._pairs;
-            for (uint32_t bucket = 0; bucket < _max_bucket; bucket++) {
-                auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(old_pairs, bucket);
-                if (next_bucket != INACTIVE)
-                    new(_pairs + bucket) PairT(old_pairs[bucket]);
-            }
-        }
-        NEXT_BUCKET(_pairs, _max_bucket) =  NEXT_BUCKET(_pairs, _max_bucket + 1) = 0;
-    }
-
     HashMap(HashMap&& other)
     {
-        init();
-        reserve(1);
+        init(1);
         *this = std::move(other);
     }
 
     HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
     {
-        init();
-        reserve((uint32_t)il.size());
+        init((uint32_t)il.size());
         for (auto begin = il.begin(); begin != il.end(); ++begin)
             insert(*begin);
     }
@@ -415,6 +382,35 @@ public:
             clearkv();
 
         free(_pairs);
+    }
+
+    void clone(const HashMap& other)
+    {
+        _hasher      = other._hasher;
+        _num_buckets = other._num_buckets;
+        _num_filled  = other._num_filled;
+        _max_bucket  = other._max_bucket;
+        _last_colls  = other._last_colls;
+        _mask        = other._mask;
+        _hash_inter       = other._hash_inter;
+        _loadlf      = other._loadlf;
+
+#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
+        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value) {
+#else
+        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
+#endif
+            memcpy(_pairs, other._pairs, other._max_bucket * sizeof(PairT));
+        }
+        else {
+            auto old_pairs = other._pairs;
+            for (uint32_t bucket = 0; bucket < _max_bucket; bucket++) {
+                auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(old_pairs, bucket);
+                if (next_bucket != INACTIVE)
+                    new(_pairs + bucket) PairT(old_pairs[bucket]);
+            }
+        }
+        NEXT_BUCKET(_pairs, _max_bucket) =  NEXT_BUCKET(_pairs, _max_bucket + 1) = 0;
     }
 
     void swap(HashMap& other)
@@ -504,7 +500,7 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) / _loadlf;
+        return (1 << 13) /(float)_loadlf;
     }
 
     void max_load_factor(float value)
@@ -523,6 +519,7 @@ public:
         return (1 << 30) / sizeof(PairT);
     }
 
+#ifdef EMILIB_STATIS
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
@@ -560,7 +557,6 @@ public:
         return ibucket_size;
     }
 
-#ifdef EMILIB_STATIS
     size_type get_main_bucket(const uint32_t bucket) const
     {
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -730,8 +726,8 @@ public:
         return { {this, bucket}, find };
     }
 
-//    std::pair<iterator, bool> insert(const value_type& value) { return m_ht.insert(value); }
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
+//    std::pair<iterator, bool> insert(const value_pair& value) { return insert(value.first, value.second); }
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value) noexcept
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -854,7 +850,7 @@ public:
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket != INACTIVE)
             return INACTIVE;
-        //if (!_eq(key, GET_KEY(_pairs, bucket))
+
         NEW_KVALUE(key, value, bucket);
         return bucket;
     }
@@ -901,8 +897,6 @@ public:
 
     ValueT& operator[](KeyT&& key) noexcept
     {
-        //check_expand_need();
-
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
@@ -953,7 +947,6 @@ public:
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
-
     iterator erase(const_iterator cit) noexcept
     {
         iterator it(this, cit._bucket);
@@ -1019,7 +1012,7 @@ public:
     }
 
     /// Remove all elements, keeping full capacity.
-    void clear()
+    void clear() noexcept
     {
         if (is_notrivially() || sizeof(PairT) > EMILIB_CACHE_LINE_SIZE || _num_filled < _max_bucket / 4)
             clearkv();
@@ -1029,18 +1022,18 @@ public:
         _last_colls = _max_bucket - 1;
     }
 
-    void shrink_to_fit() noexcept
+    void shrink_to_fit()
     {
         rehash(_num_filled);
     }
 
     /// Make room for this many elements
-    bool reserve(uint32_t num_elems)
+    bool reserve(uint64_t num_elems) noexcept
     {
 #ifdef EMILIB_HIGH_LOAD
-        const auto required_buckets = num_elems + num_elems / 8; //f = 8.0 / 9
+        const auto required_buckets = num_elems + num_elems / 8 + 2; //f = 8.0 / 9
 #else
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13) + 2;
 #endif
 
         if (EMILIB_LIKELY(required_buckets < _max_bucket))
@@ -1050,6 +1043,7 @@ public:
         return true;
     }
 
+private:
     /// Make room for this many elements
     void rehash(uint32_t required_buckets)
     {
@@ -1078,7 +1072,6 @@ public:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
         _last_colls  = _num_buckets;
-
         _pairs       = new_pairs;
 
 #if EMILIB_SAFE_HASH
@@ -1269,14 +1262,16 @@ private:
         return _max_bucket;
     }
 
-    uint32_t kickout_bucket(const uint32_t main_bucket, const uint32_t bucket) noexcept
+    //main --> prev --> bucekt -->next --> new
+    uint32_t kickout_bucket(const uint32_t main_bucket, const uint32_t bucket)
     {
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _pairs[bucket].~PairT();
-        NEXT_BUCKET(_pairs, new_bucket) = (next_bucket == bucket) ? new_bucket : next_bucket;
+        if (next_bucket == bucket)
+            NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         return bucket;
     }
@@ -1335,16 +1330,18 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(uint32_t bucket_from) noexcept
     {
-        const auto bucket = (bucket_from + 1);
-        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
-            return bucket;
+        const auto bucket1 = bucket_from + 1;
+        if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
+            return bucket1;
 
-        const auto bucket2 = (bucket + 1);
+        const auto bucket2 = bucket_from + 2;
         if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
             return bucket2;
 
-#ifdef EMILIB_HIGH_LOAD
+       constexpr bool is_big = sizeof(PairT) > EMILIB_CACHE_LINE_SIZE / 2;
         //if (bucket_from > _num_buckets && INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
+#ifdef EMILIB_HIGH_LOAD
+        if (is_big)
         if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
 #endif
 
@@ -1359,9 +1356,10 @@ private:
                 return bucket2;
 
 #ifdef EMILIB_HIGH_LOAD
-            //if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
+            if (!is_big)
+            if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
 #endif
-            else if (slot > 5) {
+            if (slot > 5) {
                 const auto next = (bucket_from + _num_filled + last) & _mask;
                 const auto bucket3 = next + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
