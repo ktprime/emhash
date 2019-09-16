@@ -1,6 +1,6 @@
 // emilib4::HashMap for C++11
 // version 1.4.3
-// https://github.com/ktprime/ktprime/blob/master/hash_table4.hpp
+// https://github.com/ktprime/emhash/blob/master/hash_table4.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -913,10 +913,10 @@ public:
     //reset last_bucket collision bucket to bucket
     void erase_coll(uint32_t bucket)
     {
-        if (bucket == ++_last_colls)
+        const auto last_bucket = ++ _last_colls;
+        if (bucket == last_bucket)
             return;
 
-        const auto last_bucket = _last_colls;
         const auto last_next = NEXT_BUCKET(_pairs, last_bucket);
         auto& key = GET_KEY(_pairs, last_bucket);
         const auto main_bucket = hash_bucket(key);
@@ -1060,7 +1060,7 @@ private:
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-        _last_colls  = _num_buckets;
+        _last_colls  = num_buckets;
         _pairs       = new_pairs;
 
 #if EMILIB_SAFE_HASH
@@ -1329,8 +1329,9 @@ private:
        constexpr bool is_big = sizeof(PairT) > EMILIB_CACHE_LINE_SIZE / 2;
         //if (bucket_from > _num_buckets && INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
 #ifdef EMILIB_HIGH_LOAD
-        if (is_big)
-        if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
+//        if (is_big)
+//        if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls))
+//          if (_last_colls > _num_buckets) return _last_colls --;
 #endif
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
@@ -1344,11 +1345,11 @@ private:
                 return bucket2;
 
 #ifdef EMILIB_HIGH_LOAD
-            if (!is_big)
             if (_last_colls > _num_buckets) return _last_colls --;
 #endif
+
             if (slot > 5) {
-                const auto next = (bucket_from + _num_filled + last) & _mask;
+                const auto next = (bucket_from + last * last) & _mask;
                 const auto bucket3 = next + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
                     return bucket3;
