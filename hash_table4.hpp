@@ -1,5 +1,5 @@
 // emilib4::HashMap for C++11
-// version 1.4.2
+// version 1.4.3
 // https://github.com/ktprime/ktprime/blob/master/hash_table4.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -410,7 +410,7 @@ public:
                     new(_pairs + bucket) PairT(old_pairs[bucket]);
             }
         }
-        NEXT_BUCKET(_pairs, _max_bucket) =  NEXT_BUCKET(_pairs, _max_bucket + 1) = 0;
+        NEXT_BUCKET(_pairs, _max_bucket) = NEXT_BUCKET(_pairs, _max_bucket + 1) = 0;
     }
 
     void swap(HashMap& other)
@@ -500,7 +500,7 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) /(float)_loadlf;
+        return (1 << 13) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
@@ -913,17 +913,17 @@ public:
     //reset last_bucket collision bucket to bucket
     void erase_coll(uint32_t bucket)
     {
-        const auto last_bucket = ++ _last_colls;
-        if (bucket == last_bucket)
+        if (bucket == ++_last_colls)
             return;
 
+        const auto last_bucket = _last_colls;
         const auto last_next = NEXT_BUCKET(_pairs, last_bucket);
         auto& key = GET_KEY(_pairs, last_bucket);
         const auto main_bucket = hash_bucket(key);
         const auto prev_bucket = find_prev_bucket(main_bucket, last_bucket);
 
         new(_pairs + bucket) PairT(_pairs[last_bucket]);
-        NEXT_BUCKET(_pairs, bucket) =  last_next != last_bucket ? last_next : bucket;
+        NEXT_BUCKET(_pairs, bucket) = last_next != last_bucket ? last_next : bucket;
 
         NEXT_BUCKET(_pairs, prev_bucket) = bucket;
         NEXT_BUCKET(_pairs, last_bucket) = INACTIVE;
@@ -940,7 +940,7 @@ public:
 
         CLEAR_BUCKET(bucket);
 #if EMILIB_HIGH_LOAD
-        if (bucket >= _last_colls)
+        if (bucket > _last_colls)
             erase_coll(bucket);
 #endif
         return 1;
@@ -957,22 +957,11 @@ public:
     /// Returns an iterator to the next element (or end()).
     iterator erase(iterator it) noexcept
     {
-#if 0
-        // we assume that it always points to a valid entry, and not end().
-        assert(this == it._map);
-        if (it._bucket >= _max_bucket)
-            return end();
-        else if (INACTIVE == NEXT_BUCKET(_pairs, it._bucket)) {
-            return ++it;
-        }
-        assert(*it == GET_KEY(_pairs, it._bucket));
-#endif
-
         const auto bucket = erase_bucket(it._bucket);
         CLEAR_BUCKET(bucket);
         //move last bucket to current
 #if EMILIB_HIGH_LOAD
-        if (bucket >= _last_colls)
+        if (bucket > _last_colls)
             erase_coll(bucket);
 #endif
 
@@ -1031,7 +1020,7 @@ public:
     bool reserve(uint64_t num_elems) noexcept
     {
 #ifdef EMILIB_HIGH_LOAD
-        const auto required_buckets = num_elems + num_elems / 8 + 2; //f = 8.0 / 9
+        const auto required_buckets = num_elems * 9 / 8 + 2; //f = 8.0 / 9
 #else
         const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13) + 2;
 #endif
@@ -1056,7 +1045,7 @@ private:
         const auto old_max_bucket = _max_bucket;
 
 #ifdef EMILIB_HIGH_LOAD
-        _max_bucket = num_buckets + num_buckets / 8;
+        _max_bucket = num_buckets * 8 / 7 + 2;
 #else
         _max_bucket = num_buckets;
 #endif
@@ -1096,7 +1085,7 @@ private:
             for (uint32_t bucket = 0; bucket < _max_bucket; bucket++)
                 NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         }
-        NEXT_BUCKET(_pairs, _max_bucket) =  NEXT_BUCKET(_pairs, _max_bucket + 1) = 0;
+        NEXT_BUCKET(_pairs, _max_bucket) = NEXT_BUCKET(_pairs, _max_bucket + 1) = 0;
 
         uint32_t collision = 0;
         //set all main bucket first
@@ -1161,7 +1150,6 @@ private:
 #endif
         }
 #endif
-
         free(old_pairs);
         assert(old_num_filled == _num_filled);
     }
@@ -1330,11 +1318,11 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(uint32_t bucket_from) noexcept
     {
-        const auto bucket1 = bucket_from + 1;
+        const auto bucket1 = (bucket_from + 1) & _mask;
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
-        const auto bucket2 = bucket_from + 2;
+        const auto bucket2 = bucket1 + 1;
         if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
             return bucket2;
 
@@ -1357,7 +1345,7 @@ private:
 
 #ifdef EMILIB_HIGH_LOAD
             if (!is_big)
-            if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
+            if (_last_colls > _num_buckets) return _last_colls --;
 #endif
             if (slot > 5) {
                 const auto next = (bucket_from + _num_filled + last) & _mask;
