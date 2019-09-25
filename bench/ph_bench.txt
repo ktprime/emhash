@@ -1,0 +1,50 @@
+time                         map                                function     memory
+1.17        phmap::flat_hash_map                                sequential   1192.00
+0.47            emilib6::HashMap                                sequential   476.00
+0.45            emilib2::HashMap                                sequential   464.00
+0.45              tsl::robin_map                                sequential   460.00
+0.76   robin_hood::unordered_map                                sequential   772.00
+1.15          ska::flat_hash_map                                sequential   1172.00
+
+1.40        phmap::flat_hash_map                                    random   1424.00
+1.84            emilib6::HashMap                                    random   1876.00
+1.85            emilib2::HashMap                                    random   1884.00
+1.69              tsl::robin_map                                    random   1724.00
+1.63   robin_hood::unordered_map                                    random   1660.00
+2.44          ska::flat_hash_map                                    random   2484.00
+
+1.38            emilib2::HashMap                                    lookup   3836.00
+1.37              tsl::robin_map                                    lookup   3648.00
+1.54        phmap::flat_hash_map                                    lookup   4436.00
+1.35            emilib6::HashMap                                    lookup   3816.00
+1.28   robin_hood::unordered_map                                    lookup   3856.00
+1.59          ska::flat_hash_map                                    lookup   4316.00
+
+0.60            emilib6::HashMap                                    delete   3868.00
+0.63   robin_hood::unordered_map                                    delete   3844.00
+0.57            emilib2::HashMap                                    delete   3760.00
+0.55              tsl::robin_map                                    delete   3524.00
+1.87        phmap::flat_hash_map                                    delete   5540.00
+0.59          ska::flat_hash_map                                    delete   3964.00
+
+2.88              tsl::robin_map                          sequentialstring   2928.00
+3.42            emilib6::HashMap                          sequentialstring   3484.00
+3.59   robin_hood::unordered_map                          sequentialstring   3652.00
+3.34            emilib2::HashMap                          sequentialstring   3404.00
+4.42        phmap::flat_hash_map                          sequentialstring   4508.00
+3.84          ska::flat_hash_map                          sequentialstring   3908.00
+
+
+4.17   robin_hood::unordered_map                              randomstring   4248.00
+3.25              tsl::robin_map                              randomstring   3312.00
+3.75            emilib6::HashMap                              randomstring   3820.00
+3.82            emilib2::HashMap                              randomstring   3892.00
+5.06        phmap::flat_hash_map                              randomstring   5156.00
+4.26          ska::flat_hash_map                              randomstring   4344.00
+
+2.42              tsl::robin_map                              deletestring   2464.00
+2.10   robin_hood::unordered_map                              deletestring   2136.00
+2.83            emilib2::HashMap                              deletestring   2880.00
+2.80            emilib6::HashMap                              deletestring   2848.00
+2.71        phmap::flat_hash_map                              deletestring   2756.00
+3.03          ska::flat_hash_map                              deletestring   3084.00
