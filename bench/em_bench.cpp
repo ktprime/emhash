@@ -22,7 +22,7 @@
 
 //#define EMILIB_FIBONACCI_HASAH 1
 //#define EMILIB_SAFE_HASH     1
-#define EMILIB_IDENTITY_HASH 1
+//#define EMILIB_IDENTITY_HASH 1
 
 //#define EMILIB_LRU_SET       1
 //#define EMILIB_ERASE_SMALL     1
@@ -37,14 +37,11 @@
     #define TVal  1
 #endif
 
-//#include "hash_table57.hpp"
-
 #include "hash_table52.hpp"
-#include "hash_table522.hpp"
-//#include "hash_table53.hpp"
-#include "hash_table532.hpp"
+#include "hash_table56.hpp"
+#include "hash_table53.hpp"
 #include "hash_table54.hpp"
-#include "hash_table551.hpp"
+#include "hash_table55.hpp"
 //#include "hash_table64.hpp"
 
 ////some others
@@ -150,13 +147,13 @@ emilib6::HashMap<std::string, std::string> show_name = {
 
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
-#if ET
+//#if ET
 #if HOOD_HASH || KEY_INT == 0
     {"robin", "tessil robin"},
 //    {"hopsco", "tessil hopsco"},
     {"flat", "skarupk flat"},
 #endif
-#endif
+//#endif
 
 //    {"byte", "skarupk byte"},
 };
@@ -190,15 +187,6 @@ static int ilog(int x, const int n = 2)
 
     return logn;
 }
-
-/*
-#include <array>
-#include <cstdint>
-#include <limits>
-#include <random>
-#include <ctime>
-#include <utility>
-**/
 
 uint64_t randomseed() {
 	std::random_device rd;
