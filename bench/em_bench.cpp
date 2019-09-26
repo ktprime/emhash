@@ -7,26 +7,27 @@
 #include <string>
 #include <algorithm>
 #include <array>
-#include "sfc64.h"
 
 //#include "wyhash.h"
 
-#define TP                   1
-#define HOOD_HASH            1
-
+#ifndef TP
+#define TP                   100
+#endif
+//#define HOOD_HASH            1
 //#define EMILIB_BUCKET_INDEX  1
+
 //#define EMILIB_REHASH_LOG  1
 //#define EMILIB_AVX_MEMCPY  1
 //#define EMILIB_STATIS      1
 
 //#define EMILIB_FIBONACCI_HASAH 1
 //#define EMILIB_SAFE_HASH     1
-//#define EMILIB_IDENTITY_HASH 1
+#define EMILIB_IDENTITY_HASH 1
 
 //#define EMILIB_LRU_SET       1
 //#define EMILIB_ERASE_SMALL     1
 //#define EMILIB_STD_STRING    1
-//#define EMILIB_HIGH_LOAD 101000
+//#define EMILIB_HIGH_LOAD 201000
 
 
 #ifndef TKey
@@ -36,11 +37,15 @@
     #define TVal  1
 #endif
 
-#include "hash_table2.hpp"
-#include "hash_table6.hpp"
-#include "hash_table3.hpp"
-#include "hash_table4.hpp"
-#include "hash_table5.hpp"
+//#include "hash_table57.hpp"
+
+#include "hash_table52.hpp"
+#include "hash_table522.hpp"
+//#include "hash_table53.hpp"
+#include "hash_table532.hpp"
+#include "hash_table54.hpp"
+#include "hash_table551.hpp"
+//#include "hash_table64.hpp"
 
 ////some others
 //https://github.com/ilyapopov/car-race
@@ -64,11 +69,11 @@
 //http://www.ilikebigbits.com/2016_08_28_hash_table.html
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 
-#if __cplusplus >= 199711L && HOOD_HASH
-    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#if __cplusplus >= 199711L
+//    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
-#if __cplusplus >= 201103L || _MSC_VER >= 1600
+#if __cplusplus >= 201103L || _MSC_VER >= 1601
     #define _CPP11_HASH    1
     #include "./tsl/robin_map.h"        //https://github.com/tessil/robin-map
     #include "./tsl/hopscotch_map.h"    //https://github.com/tessil/hopscotch-map
@@ -76,7 +81,7 @@
     #include "./ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
     #include "./phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 
-#if __cplusplus >= 201402L || _MSC_VER >= 1600
+#if __cplusplus > 201402L || _MSC_VER >= 1600
     #define _CPP14_HASH   1
     #include "./ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
@@ -135,28 +140,30 @@ struct RankItem;
 
 emilib6::HashMap<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
+
     {"emilib2", "emilib2"},
     {"emilib6", "emilib6"},
     {"emilib4", "emilib4"},
-    {"emilib3", "emilib3"},
+//    {"emilib3", "emilib3"},
     {"emilib5", "emilib5"},
 //    {"emilib7", "emilib7"},
 
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
-    
+#if ET
 #if HOOD_HASH || KEY_INT == 0
     {"robin", "tessil robin"},
-    {"hopsco", "tessil hopsco"},
+//    {"hopsco", "tessil hopsco"},
     {"flat", "skarupk flat"},
 #endif
-   
-     {"byte", "skarupk byte"},
+#endif
+
+//    {"byte", "skarupk byte"},
 };
 
 static int64_t getTime()
 {
-#if _WIN32 && 0
+#if _WIN32
     FILETIME ptime[4] = {0};
     GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[1], &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
@@ -184,12 +191,153 @@ static int ilog(int x, const int n = 2)
     return logn;
 }
 
+/*
+#include <array>
+#include <cstdint>
+#include <limits>
+#include <random>
+#include <ctime>
+#include <utility>
+**/
+
+uint64_t randomseed() {
+	std::random_device rd;
+	return std::uniform_int_distribution<uint64_t>{}(rd);
+}
+// this is probably the fastest high quality 64bit random number generator that exists.
+// Implements Small Fast Counting v4 RNG from PractRand.
+class sfc64 {
+public:
+	using result_type = uint64_t;
+
+	sfc64()
+		: sfc64(randomseed()) {}
+
+	sfc64(uint64_t a, uint64_t b, uint64_t c, uint64_t counter)
+		: m_a{ a }
+		, m_b{ b }
+		, m_c{ c }
+		, m_counter{ counter } {}
+
+	sfc64(std::array<uint64_t, 4> const& state)
+		: m_a{ state[0] }
+		, m_b{ state[1] }
+		, m_c{ state[2] }
+		, m_counter{ state[3] } {}
+
+	explicit sfc64(uint64_t seed)
+		: m_a(seed)
+		, m_b(seed)
+		, m_c(seed)
+		, m_counter(1) {
+		for (int i = 0; i < 12; ++i) {
+			operator()();
+		}
+	}
+
+	// no copy ctors so we don't accidentally get the same random again
+	sfc64(sfc64 const&) = delete;
+	sfc64& operator=(sfc64 const&) = delete;
+
+	sfc64(sfc64&&) = default;
+	sfc64& operator=(sfc64&&) = default;
+
+	~sfc64() = default;
+
+	static constexpr uint64_t(min)() {
+		return (std::numeric_limits<uint64_t>::min)();
+	}
+	static constexpr uint64_t(max)() {
+		return (std::numeric_limits<uint64_t>::max)();
+	}
+
+	void seed() {
+		seed(randomseed());
+	}
+
+	void seed(uint64_t seed) {
+		state(sfc64{ seed }.state());
+	}
+
+	uint64_t operator()() noexcept {
+		auto const tmp = m_a + m_b + m_counter++;
+		m_a = m_b ^ (m_b >> right_shift);
+		m_b = m_c + (m_c << left_shift);
+		m_c = rotl(m_c, rotation) + tmp;
+		return tmp;
+	}
+
+	template <typename T>
+	T uniform(T input) {
+		return static_cast<T>(operator()(static_cast<uint64_t>(input)));
+	}
+
+	template <typename T>
+	T uniform() {
+		return static_cast<T>(operator()());
+	}
+
+	// Uses the java method. A bit slower than 128bit magic from
+	// https://arxiv.org/pdf/1805.10941.pdf, but produces the exact same results in both 32bit and
+	// 64 bit.
+	uint64_t operator()(uint64_t boundExcluded) noexcept {
+		uint64_t x, r;
+		do {
+			x = operator()();
+			r = x % boundExcluded;
+		} while (x - r > (UINT64_C(0) - boundExcluded));
+		return r;
+	}
+
+	std::array<uint64_t, 4> state() const {
+		return { {m_a, m_b, m_c, m_counter} };
+	}
+
+	void state(std::array<uint64_t, 4> const& s) {
+		m_a = s[0];
+		m_b = s[1];
+		m_c = s[2];
+		m_counter = s[3];
+	}
+
+private:
+	template <typename T>
+	T rotl(T const x, size_t k) {
+		return (x << k) | (x >> (8 * sizeof(T) - k));
+	}
+
+	static constexpr size_t rotation = 24;
+	static constexpr size_t right_shift = 11;
+	static constexpr size_t left_shift = 3;
+	uint64_t m_a;
+	uint64_t m_b;
+	uint64_t m_c;
+	uint64_t m_counter;
+};
+
+class RandomBool {
+public:
+	template <typename Rng>
+	bool operator()(Rng& rng) {
+		if (1 == m_rand) {
+			m_rand = std::uniform_int_distribution<size_t>{}(rng) | s_mask_left1;
+		}
+		bool const ret = m_rand & 1;
+		m_rand >>= 1;
+		return ret;
+	}
+
+private:
+	static constexpr const size_t s_mask_left1 = size_t(1) << (sizeof(size_t) * 8 - 1);
+	size_t m_rand = 1;
+};
+
 static std::map<std::string, size_t>  check_result;
 static std::multimap <int64_t, std::string> func_time;
 static std::map<std::string, int64_t> map_time;
 static std::map<std::string, std::map<std::string, int64_t>> func_map_time;
 
-#define AVE_TIME(ts, n)             1000 * (getTime() - ts) / (n)
+#define AVE_TIME(ts, n)             int(1000 * (getTime() - ts) / (n))
 
 static void check_mapfunc_result(const std::string& map_name, const std::string& func, size_t sum, int64_t ts1)
 {
@@ -227,7 +375,7 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
 
     auto min = functime.begin()->first + 1;
     for (auto& v : functime)
-        printf("   %-8ld     %-21s   %02d\n", v.first / 10000, v.second.c_str(), (int)((min * 100) / (v.first + 1)));
+        printf("   %-8d     %-21s   %02d\n", (int)(v.first / 10000), v.second.c_str(), (int)((min * 100) / (v.first + 1)));
     putchar('\n');
 }
 
@@ -272,7 +420,7 @@ void erase_reinsert(MAP& amap, const std::string& map_name, std::vector<keyType>
 
         }
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-        //printf("    %82s    reinsert  %5ld ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
+        printf("    %82s    reinsert  %5d ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
     }
 }
 
@@ -313,13 +461,13 @@ void insert_reserve(MAP& amap, const std::string& map_name, std::vector<keyType>
     {
         size_t sum = 0;
         MAP nmap(1);
-        nmap.max_load_factor(7.0f/8);
+        nmap.max_load_factor(80.0f/100);
         nmap.reserve(vList.size());
         auto ts1 = getTime();
         for (const auto v : vList)
             sum += nmap.emplace(v, TO_VAL(0)).second;
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-//        printf("    %12s    %s  %5zd ns, factor = %.2f\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), nmap.load_factor());
+        printf("    %12s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), nmap.load_factor());
     }
 }
 
@@ -566,12 +714,12 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
 #if AR > 0
     const auto iRation = AR;
 #else
-    const auto iRation = 10;
+    const auto iRation = 20;
 #endif
 
     if (rand() % 100 > iRation)
     {
-        phmap::flat_hash_map<keyType,int> eset(size);
+        emilib6 ::HashMap<keyType, int> eset(size);
         for (int i = 0; ; i++) {
             auto key = TO_KEY(srng());
             if (eset.emplace(key, 0).second) {
@@ -612,17 +760,18 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
 
 static int HashMapTest(int n, int max_loops = 1234567)
 {
-    emilib3::HashMap <keyType,int> emap5;
+    emilib6::HashMap <keyType,int> emap5;
     emilib2::HashMap <keyType,int> emap2;
 
 #if _CPP11_HASH
-    robin_hood::unordered_map <keyType,int> umap;
+    //robin_hood::unordered_map <keyType,int> umap;
+    emilib5::HashMap <keyType,int> umap;
 #else
     std::unordered_map<keyType,int> umap;
 #endif
 
     const auto step = n % 2 + 1;
-    emap2.reserve(8); emap5.reserve(n / 8);
+  //  emap2.reserve(8); emap5.reserve(n / 8);
     umap.reserve(n);
 
     for (int i = 1; i < n * step; i += step) {
@@ -709,11 +858,12 @@ static int HashMapTest(int n, int max_loops = 1234567)
 }
 
 template<class MAP>
-int benOneMap(MAP& hmap, const std::string& map_name, std::vector<keyType> vList)
+int benOneMap(MAP& hmap, const std::string& map_name, std::vector<keyType>& oList)
 {
     if (show_name.find(map_name) == show_name.end())
         return 80;
 
+    auto vList(oList);
     func_time.clear();
 
     hmap.reserve(vList.size() / 8);
@@ -771,7 +921,7 @@ struct StrHasher
   }
 };
 
-static void benchMarkHashMap2(int n)
+static int benchMarkHashMap2(int n)
 {
     if (n < 10000)
         n = 123456;
@@ -787,7 +937,7 @@ static void benchMarkHashMap2(int n)
 #endif
 
     auto iload = 0;
-    const float lf = 7.0f / 8;
+    const float lf = 90.5f / 100;
 
     check_result.clear();
     map_time.clear();
@@ -803,16 +953,15 @@ static void benchMarkHashMap2(int n)
 #endif
 
     {
-        { emilib3::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emilib3", vList); }
         { emilib4::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emilib4", vList); }
-        { emilib6::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emilib6", vList); }
+        { emilib3::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emilib3", vList); }
+        { emilib6::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emilib6", vList); }
         { emilib2::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emilib2", vList); }
-        { emilib5::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emilib5", vList); }
+        { emilib5::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emilib5", vList); }
     }
 
-//  { std::unordered_map<keyType, valueType, hash_func> umap; umap.max_load_factor(lf); benOneMap(umap, "stl_hash", vList); }
-
 #if _CPP14_HASH
+    { std::unordered_map<keyType, valueType, hash_func> umap; umap.max_load_factor(lf); benOneMap(umap, "stl_hash", vList); }
     { ska::bytell_hash_map <keyType, valueType, hash_func > bmap; bmap.max_load_factor(lf); benOneMap(bmap, "byte", vList); }
 #endif
 
@@ -833,7 +982,7 @@ static void benchMarkHashMap2(int n)
     const auto last  = double(time_map.rbegin()->first);
     const auto first = double(time_map.begin()->first);
     if (first < 10 || last < 9)
-        return;
+        return -1;
 
     static std::map<std::string,int64_t> rank;
     static std::map<std::string,int64_t> rank_time;
@@ -870,7 +1019,7 @@ static void benchMarkHashMap2(int n)
     set_func_time(func_rank_time);
     for (auto& v : time_map) {
         rank_time[v.second] += (int)(first * 100 / v.first);
-        printf("%5ld   %13s   (%4.2lf %6.1lf%%)\n", v.first * 1000l / n, v.second.c_str(), last * 1.0 / v.first, first * 100.0 / v.first);
+        printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first * 1000l / n), v.second.c_str(), last * 1.0 / v.first, first * 100.0 / v.first);
     }
 
     if (tcase++ % 5 == 0) {
@@ -890,10 +1039,11 @@ static void benchMarkHashMap2(int n)
         usleep(1000*4000);
 #endif
         printf("--------------------------------------------------------------------\n\n");
-        return;
+        return tcase;
     }
 
     printf("=======================================================================\n\n");
+    return tcase;
 }
 
 #ifdef TREAD
@@ -914,9 +1064,9 @@ static int readFile(std::string fileName, int size)
         while (scanf("%ld", &uid) == size) vList.emplace_back(uid);
     } else if (size == 2) {
         while (scanf("%ld %ld", &uid, &score) == size) vList.emplace_back(uid);
-    } else if (size == 4) {
+    } else if (size == 6) {
         int items = 0;
-        while (scanf("%ld %ld %d %ld", &uid, &pid, &items, &score) == size)
+        while (scanf("%ld %ld %d %ld %d %d", &uid, &pid, &items, &score, &items, &items) == size)
             vList.emplace_back(pid + uid);
     }
     freopen(CONSOLE, "r", stdin);
@@ -936,15 +1086,15 @@ static int readFile(std::string fileName, int size)
     robin_hood::unordered_map<int64_t, int> mmap(n);
 #endif
 
-    ts1 = getTime();    for (auto v : vList)        emap5[v] = 1; printf("emilib5   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap5.size());
-    ts1 = getTime();    for (auto v : vList)        emap2.insert(v,1); printf("emilib2   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap2.size());
+    ts1 = getTime();    for (auto v : vList)        emap2[v] = 1; printf("emilib2   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap2.size());
     ts1 = getTime();    for (auto v : vList)        emap6[v] = 1; printf("emilib6   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap6.size());
+    ts1 = getTime();    for (auto v : vList)        emap5[v] = 1; printf("emilib5   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap5.size());
 
 #if _CPP11_HASH
     ts1 = getTime();    for (auto v : vList)        fmap[v] = 1;  printf("skamap    insert  %4ld ms, size = %zd\n", getTime() - ts1, fmap.size());
-    ts1 = getTime();    for (auto v : vList)        rmap.emplace(v,1);  printf("tslmap    insert  %4ld ms, size = %zd\n", getTime() - ts1, rmap.size());
+    ts1 = getTime();    for (auto v : vList)        rmap[v] = 1;  printf("tslmap    insert  %4ld ms, size = %zd\n", getTime() - ts1, rmap.size());
     ts1 = getTime();    for (auto v : vList)        pmap[v] = 1;  printf("phflat    insert  %4ld ms, size = %zd\n", getTime() - ts1, pmap.size());
-    ts1 = getTime();    for (auto v : vList)        mmap.emplace(v,1);  printf("martin    insert  %4ld ms, size = %zd\n", getTime() - ts1, mmap.size());
+    ts1 = getTime();    for (auto v : vList)        mmap[v] = 1;  printf("martin    insert  %4ld ms, size = %zd\n", getTime() - ts1, mmap.size());
 #endif
 
     printf("\n");
@@ -1003,19 +1153,39 @@ int main(int argc, char* argv[])
     srand((unsigned)time(0));
 
     auto n = rand() % 1234567 + 100000;
-    auto maxn = 5123456;
+    auto maxn = 3123456;
 
 //    testSynax();
+    double load_factor = 0.0;
 
-    printf("./test maxn load_factor(0-100) n (key=%s,value=%s)\n", sKeyType, sValueType);
-    double load_factor = 0.1f;
+    sfc64 srng(1);
 
-    if (argc > 1 && argv[1][0] >= '0' && argv[1][0] <= '9')
+    if (argc == 1)
+        printf("./test maxn load_factor(0-100) n (key=%s,value=%s)\n", sKeyType, sValueType);
+
+    if (argc > 1 && argv[1][0] > '0' && argv[1][0] <= '9')
         maxn = atoi(argv[1]) + 1000;
-    if (argc > 2)
+    if (argc > 2 && argv[1][0] > '0' && argv[1][0] <= '9')
         load_factor = atoi(argv[2]) / 100.0;
-    if (argc > 3)
-        n = atoi(argv[2]) / 100.0;
+    if (argc > 3 && argv[3][0] > '0' && argv[3][0] <= '9')
+        n = atoi(argv[2]);
+
+    if (argc > 2 && argv[2][0] == 'd') {
+        for (char c = argv[2][0], i = 0; c != '\0'; c = argv[2][i ++ ]) {
+            if (c >= '2' && c < '8') {
+                std:: string map_name("emilib");
+                map_name += c;
+                show_name.erase(map_name);
+            } else if (c == 'm')
+                show_name.erase("martin");
+            else if (c == 'p')
+                show_name.erase("phmap");
+            else if (c == 't')
+                show_name.erase("robin");
+            else if (c == 's')
+                show_name.erase("flat");
+        }
+    }
 
     HashMapTest(n, 234567);
 
@@ -1023,7 +1193,7 @@ int main(int argc, char* argv[])
     //readFile("./uid_income.txt", 1);
     //readFile("./pid_income.txt", 1);
     //readFile("./uids.csv", 2);
-    readFile("./item.log2", 4);
+    readFile("./item.log", 6);
 #endif
 
     auto nows = time(0);
@@ -1045,24 +1215,26 @@ int main(int argc, char* argv[])
             benchMarkHashMap2(n);
         }
 #else
-        n = (get32rand() % maxn) + rand() % 1234567 + 10000;
+        n = (srng() % maxn) + srng() % 1234567 + 10000;
         if (load_factor > 0.4 && load_factor < 0.95) {
             auto pow2 = 1 << ilog(n, 2);
             n = int(pow2 * load_factor) + (1 << 12) - (rand() * rand()) % (1 << 13);
         }
-        benchMarkHashMap2(n);
+
+        int tp = benchMarkHashMap2(n);
 #endif
 
 #if TP
-        if (time(0) > nows + 600)
+        if (tp > TP)
             break;
 #elif GCOV
         break;
 #endif
 
         if (time(0) % 101 == 0)
-            HashMapTest(n, (rand() * rand()) % 1234567 + 10000);
+            HashMapTest(n, (rand() * rand()) % 123457 + 10000);
     }
 
     return 0;
 }
+
