@@ -1,4 +1,4 @@
-# emhash key feature
+# emhash feature
 
 A quite fast and memory efficient *open address based c++ flat hash map*, it is easy to be benched/tested and compared the result with other's hash map.
 
@@ -6,25 +6,13 @@ A quite fast and memory efficient *open address based c++ flat hash map*, it is 
 
 - the default load factor is 0.8 and can be set **1.0** by enable compile marco *EMILIB_HIGH_LOAD* (*5% performance loss in hash_table3.hpp*)
 
-- only *one array* allocted, each node/bucket contains a struct (keyT key, int bucket, ValueT value), bucket is not awalys in the middle between key and value, depend on struct align pack.
-
-- a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index just like std unordered_map. main bucket can not be occupyed and all opertions is to search from main bucket. 
-
-- **three different ways** of probe is used to seach the empty bucket from array. it's not suffer heavily performance loss by primary or  secondary clustering.
-   - linear probing search the first cpu cacheline
-   - quadratic probing start work after limited linear probing
-   - random probing used with a very bad hash
-
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
     - _erase :  without return next iterator after erasion
     - shrink_to_fit : shrink memory to fit for saving memory
     - insert_unqiue : insert unique key into hash without search
     - try_find : check or get key/value without use iterator
 
-
 - more **efficient** than other's hash map implemention if key.value is some aligned (sizeof(key) % 8 != sizeof(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 total memoery than hash_map<uint64_t, uint64_t>.
-
-- use the **second/backup hashing**  when the input hash is bad with a very high collision if the compile marco *EMILIB_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
 - **lru** can be used if compile marco EMILIB_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be probed only once during next access.
 
@@ -42,6 +30,19 @@ for example some case pay attention on finding hot, some foucus on finding cold(
 - It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, Arm).
 
 - many optimization with *integer* key, some new feature is underdeveloping if it's stable to release.
+
+# emhash design
+
+- only *one array* allocted, each node/bucket contains a struct (keyT key, int bucket, ValueT value), bucket is not awalys in the middle between key and value, depend on struct align pack.
+
+- a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index just like std unordered_map. main bucket can not be occupyed and all opertions is to search from main bucket. 
+
+- **three different ways** of probe is used to seach the empty bucket from array. it's not suffer heavily performance loss by primary or  secondary clustering.
+   - linear probing search the first cpu cacheline
+   - quadratic probing start work after limited linear probing
+   - random probing used with a very bad hash
+
+- use the **second/backup hashing**  when the input hash is bad with a very high collision if the compile marco *EMILIB_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
 # insert example
 
