@@ -8,16 +8,16 @@
 #include <random>
 #include <string>
 #include <unordered_map>
-
 #ifdef PATCHMAP
 #include "ordered_patch_map.hpp"
 #endif
+//https://1ykos.github.io/patchmap/
 //#include "doubling_patchmap.hpp"
 //#include "unordered_map.hpp"
 #ifdef SPARSE_PATCHMAP
 #include "sparse_patchmap.hpp"
 #endif
-#ifdef FLATMAP
+#ifdef SKA
 #include "ska/flat_hash_map.hpp"
 #endif
 #ifdef BYTELL
@@ -35,20 +35,19 @@
 #ifdef KHASH
 #include "khash.h"
 #endif
-#ifdef EMIMAP
-#include "hash_table2.hpp"
-#include "hash_table6.hpp"
-#endif
-
-#if HOODMAP
+#if EMILIB == 2
+#include "hash_table52.hpp"
+#elif EMILIB == 6
+#define EMILIB_HIGH_LOAD  100000
+#include "hash_table54.hpp"
+#elif MARTIN
 #include "martin/robin_hood.h"
-#endif
-
-#if PHMAP
+#elif PHMAP_FLAT
 #include "phmap/phmap.h"
-#endif
+#elif TSL
 
 #include "tsl/robin_map.h"
+#endif
 
 #include <stdio.h>
 #if defined (__has_include) && (__has_include(<x86intrin.h>))
@@ -216,10 +215,11 @@ size_t getCurrentRSS( )
 #endif
 }
 
-int main(int argc, char** argv){
+int main(int argc, char** argv)
+{
   std::ios_base::sync_with_stdio(false);
-  if (argc<2) return 1;
-  const size_t N = stoi(argv[1]);
+  const size_t N = argc >  1 ? stoi(argv[1]) : 12345678;
+
   std::random_device urand;
   std::minstd_rand mr(urand());
   std::uniform_int_distribution<uint32_t> u32distr(1u<<30);
@@ -249,7 +249,7 @@ int main(int argc, char** argv){
 #ifdef WMATH_ROBIN_MAP
   wmath::robin_map<uint32_t,uint32_t> test;
 #endif
-#ifdef HOODMAP
+#ifdef MARTIN
   robin_hood::unordered_map<uint32_t,uint32_t> test;
 #endif
 #ifdef SPARSEPP
@@ -261,7 +261,7 @@ int main(int argc, char** argv){
 #ifdef MAP
   std::map<size_t,size_t> test;
 #endif
-#ifdef FLATMAP
+#ifdef SKA
   ska::flat_hash_map<uint32_t,uint32_t> test;
 #endif
 #ifdef BYTELL
@@ -274,21 +274,19 @@ int main(int argc, char** argv){
   google::dense_hash_map<uint32_t,uint32_t> test;
   test.set_empty_key(0);
   test.set_deleted_key(~uint32_t(0));
-#endif
-#ifdef KHASH
+
+#elif KHASH
   khash_t(32) *h = kh_init(32);
   int ret, is_missing;
   khiter_t k;
-#elif EMIMAP
-   #define EMILIB_HIGH_LOAD  100000
-#if EM3
-   emilib6::HashMap<uint32_t, uint32_t> test;
-#else
+
+#elif EMILIB == 2
    emilib2::HashMap<uint32_t, uint32_t> test;
-#endif
-#elif ROBINMAP
+#elif EMILIB == 6
+   emilib4::HashMap<uint32_t, uint32_t> test;
+#elif TSL
    tsl::robin_map<uint32_t,uint32_t> test;
-#elif PHMAP
+#elif PHMAP_FLAT
   phmap::flat_hash_map<uint32_t, uint32_t> test;
 #endif
 
@@ -368,10 +366,10 @@ int main(int argc, char** argv){
     }
     if (0 == (i & (i - 1)) && i > 24) {
         printf("%8zd  %.4lf %.4lf %.4lf %.4lf %.4lf\n", i,
-                typical_memory/(i*4096),
+                typical_memory/(i*4096),       
                 typical_insert_time/(i*4096),
-                typical_delete_time/(i*4096),
-                typical_find_time/(i*4096),
+                typical_delete_time/(i*4096),   
+                typical_find_time/(i*4096),     
                 typical_not_find_time/(i*4096) );
     }
   }
