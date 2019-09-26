@@ -1,6 +1,6 @@
 
 // emilib6::HashMap for C++11
-// version 1.6.1
+// version 1.6.4
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
