@@ -16,10 +16,6 @@ A quite fast and memory efficient *open address based c++ flat hash map*, it is 
 
 - **lru** can be used if compile marco EMILIB_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be probed only once during next access.
 
-- dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be knowed from dump info.
- 
-- choose *different* hash algorithm by set compile marco *EMILIB_FIBONACCI_HASH* or *EMILIB_IDENTITY_HASH* depend on use case.
-
 - **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
     
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
@@ -43,6 +39,11 @@ for example some case pay attention on finding hot, some foucus on finding cold(
    - random probing used with a very bad hash
 
 - use the **second/backup hashing**  when the input hash is bad with a very high collision if the compile marco *EMILIB_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
+
+- dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be knowed from dump info.
+ 
+- choose *different* hash algorithm by set compile marco *EMILIB_FIBONACCI_HASH* or *EMILIB_IDENTITY_HASH* depend on use case.
+
 
 # insert example
 
