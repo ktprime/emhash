@@ -1,22 +1,25 @@
 #include <inttypes.h>
+#define THR 1
 
 #if EMILIB == 2
-    #include "hash_table2.hpp"
+    #include "hash_table52.hpp"
     #define MAPNAME emilib2::HashMap
     #define EXTRAARGS
 #elif EMILIB == 6
-    #include "hash_table6.hpp"
+    #include "hash_table56.hpp"
     #define MAPNAME emilib6::HashMap
     #define EXTRAARGS
-
 #elif EMILIB == 5
-    #include "hash_table5.hpp"
+    #include "hash_table55.hpp"
     #define MAPNAME emilib5::HashMap
     #define EXTRAARGS
-
-#elif RBHOOD
+#elif MARTIN
     #include "martin/robin_hood.h"
     #define MAPNAME robin_hood::unordered_map
+    #define EXTRAARGS
+#elif SKA
+    #include "ska/flat_hash_map.hpp"
+    #define MAPNAME ska::flat_hash_map
     #define EXTRAARGS
 #elif TSL
     #include "tsl/robin_map.h"
@@ -36,7 +39,7 @@
     #define MAPNAME absl::flat_hash_map
     #define EXTRAARGS
 #elif defined(PHMAP_FLAT)
-    #include "parallel_hashmap/phmap.h"
+    #include "phmap/phmap.h"
     #define MAPNAME phmap::flat_hash_map
     #define NMSP phmap
     #define EXTRAARGS
@@ -56,7 +59,7 @@
             #define MTX std::mutex
         #endif
 
-        #include "parallel_hashmap/phmap.h"
+        #include "phmap/phmap.h"
         #define MAPNAME phmap::parallel_flat_hash_map
         #define NMSP phmap
     #endif
@@ -103,7 +106,7 @@ const char *program_slug = xstr(MAPNAME); // "_4";
 #include <thread>
 #include <chrono>
 #include <ostream>
-#include "parallel_hashmap/meminfo.h"
+#include "phmap/meminfo.h"
 #include <vector>
 using std::vector;
 
@@ -223,7 +226,7 @@ Timer _fill_random(vector<T> &v, HT &hash)
     Timer timer(true);
 
     for (size_t i = 0, sz = v.size(); i < sz; ++i)
-        hash.insert(typename HT::value_type(v[i], 0));
+        hash.emplace(v[i], 0);
     return timer;
 }
 
@@ -236,7 +239,10 @@ void out(const char* test, int64_t cnt, const Timer &t)
 // --------------------------------------------------------------------------
 void outmem(const char* test, int64_t cnt, uint64_t mem)
 {
-  printf("%s,memory,%lld,%s,%lld\r", test, cnt, program_slug, mem);
+  if (mem < 1024 * 1024)
+	  printf("%s,memory,%lld,%s,%lld KB\r", test, cnt, program_slug, mem / 1024);
+  else
+	  printf("%s,memory,%lld,%s,%.2lf MB\r", test, cnt, program_slug, mem / (1024 * 1024.0));
 }
 
 static bool all_done = false;
@@ -251,7 +257,7 @@ void _fill_random_inner(int64_t cnt, HT &hash, RSU &rsu)
 {
     for (int64_t i=0; i<cnt; ++i)
     {
-        hash.insert(typename HT::value_type(rsu.next(), 0));
+        hash.emplace(rsu.next(), 0);
         ++num_keys[0];
     }
 }
@@ -260,6 +266,7 @@ void _fill_random_inner(int64_t cnt, HT &hash, RSU &rsu)
 template <class HT>
 void _fill_random_inner_mt(int64_t cnt, HT &hash, RSU &rsu)
 {
+#if 1 && MT_SUPPORT
     constexpr int64_t num_threads = 8;   // has to be a power of two
     std::unique_ptr<std::thread> threads[num_threads];
 
@@ -269,7 +276,7 @@ void _fill_random_inner_mt(int64_t cnt, HT &hash, RSU &rsu)
 
         for (int64_t i=0; i<cnt; ++i)                       // iterate over all values
         {
-            unsigned int key = rsu.next();                  // get next key to insert
+            unsigned int key = rsu.next();                  // get next key to emplace
 #if MT_SUPPORT == 1
             size_t hashval = hash.hash(key);                   // compute its hash
             size_t idx  = hash.subidx(hashval);             // compute the submap index for this hash
@@ -278,16 +285,16 @@ void _fill_random_inner_mt(int64_t cnt, HT &hash, RSU &rsu)
             if (i % num_threads == thread_idx)
 #endif
             {
-                hash.insert(typename HT::value_type(key, 0)); // insert the value
-                ++(num_keys[thread_idx]);                     // increment count of inserted values
+                hash.emplace(key, 0); // emplace the value
+                ++(num_keys[thread_idx]);                     // increment count of emplaceed values
             }
         }
 #endif
     };
 
-    // create and start 8 threads - each will insert in their own submaps
-    // thread 0 will insert the keys whose hash direct them to submap0 or submap1
-    // thread 1 will insert the keys whose hash direct them to submap2 or submap3
+    // create and start 8 threads - each will emplace in their own submaps
+    // thread 0 will emplace the keys whose hash direct them to submap0 or submap1
+    // thread 1 will emplace the keys whose hash direct them to submap2 or submap3
     // --------------------------------------------------------------------------
     for (int64_t i=0; i<num_threads; ++i)
         threads[i].reset(new std::thread(thread_fn, i, rsu));
@@ -299,6 +306,7 @@ void _fill_random_inner_mt(int64_t cnt, HT &hash, RSU &rsu)
     // wait for the threads to finish their work and exit
     for (int64_t i=0; i<num_threads; ++i)
         threads[i]->join();
+#endif
 }
 
 // --------------------------------------------------------------------------
@@ -328,14 +336,14 @@ Timer _fill_random2(int64_t cnt, HT &hash)
     for (loop_idx=0; loop_idx<num_loops; ++loop_idx)
     {
 #if 1 && MT_SUPPORT
-        // multithreaded insert
+        // multithreaded emplace
         _fill_random_inner_mt(inner_cnt, hash, rsu);
 #else
         _fill_random_inner(inner_cnt, hash, rsu);
 #endif
         out(test, total_num_keys(), timer);
     }
-    fprintf(stderr, "inserted %.2lfM\n", (double)hash.size() / 1000000);
+    fprintf(stderr, "emplaceed %.2lfM\n", (double)hash.size() / 1000000);
     return timer;
 }
 
@@ -352,7 +360,7 @@ Timer _lookup(vector<T> &v, HT &hash, size_t &num_present)
     for (size_t i = 0, sz = v.size(); i < sz; ++i)
     {
         num_present += (size_t)(hash.find(v[i]) != hash.end());
-        num_present += (size_t)(hash.find((T)(rand() % max_val)) != hash.end());
+        num_present += (size_t)(hash.find((T)(rand() + max_val)) != hash.end());
     }
     return timer;
 }
@@ -362,7 +370,7 @@ template <class T, class HT>
 Timer _delete(vector<T> &v, HT &hash)
 {
     _fill_random(v, hash);
-    _shuffle(v); // don't delete in insertion order
+    _shuffle(v); // don't delete in emplaceion order
 
     Timer timer(true);
 
@@ -374,6 +382,7 @@ Timer _delete(vector<T> &v, HT &hash)
 // --------------------------------------------------------------------------
 void memlog()
 {
+#if THR
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     uint64_t nbytes_old_out = spp::GetProcessMemoryUsed();
     uint64_t nbytes_old     = spp::GetProcessMemoryUsed(); // last non outputted mem measurement
@@ -403,24 +412,27 @@ void memlog()
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+#endif
 }
 
 
 // --------------------------------------------------------------------------
 int main(int argc, char ** argv)
 {
-    int64_t i, value = 0;
-    char* benchs[] = {"sequential", "random", "lookup", "delete", "sequentialstring", "randomstring", "deletestring"};
+    int i, value = 0;
+    const char * benchs[] = {"sequential", "random", "lookup", "delete", "sequentialstring", "randomstring", "deletestring"};
 
     hash_t     hash;
     str_hash_t str_hash;
-    for (int i = 0; i < 7; i++) {
-        printf("%d %s ", i + 1, benchs[i]);
+    if (argc <= 1) {
+        printf("pro type[1-7] n(100k-10000k)\n");
+        for (int i = 0; i < 7; i++)
+            printf("%d %s\n", i + 1, benchs[i]);
+//        return 0;
     }
-	printf("\n");
 
-    const char* bench = argc > 1 ? benchs[atoi(argv[1]) - 1] : benchs[2];
-    int64_t num_keys  = argc > 2 ? atoi(argv[2]) : 12345678;
+    const char* bench = argc > 1 ? benchs[atoi(argv[1]) - 1] : benchs[3];
+    int num_keys      = argc > 2 ? atoi(argv[2]) : 103456789 + (time(0) * 1234567) % 12345678;
 
     srand(1); // for a fair/deterministic comparison
     Timer timer(true);
@@ -433,14 +445,16 @@ int main(int argc, char ** argv)
         program_slug = xstr(MAPNAME) "_mt";
 #endif
 
+#if THR
     std::thread t1(memlog);
+#endif
 
     try
     {
         if(!strcmp(bench, "sequential"))
         {
             for(i = 0; i < num_keys; i++)
-                hash.insert(hash_t::value_type(i, value));
+                hash.emplace(i, value);
         }
 #if 0
         else if(!strcmp(bench, "random"))
@@ -452,10 +466,10 @@ int main(int argc, char ** argv)
 #endif
         else if(!strcmp(bench, "random"))
         {
-            fprintf(stderr, "size = %d\n", sizeof(hash));
+            fprintf(stderr, "size = %zd\n", sizeof(hash));
             timer = _fill_random2(num_keys, hash);
             //out("random", num_keys, timer);
-            //fprintf(stderr, "inserted %llu\n", hash.size());
+            //fprintf(stderr, "emplaceed %llu\n", hash.size());
         }
         else if(!strcmp(bench, "lookup"))
         {
@@ -473,24 +487,24 @@ int main(int argc, char ** argv)
         else if(!strcmp(bench, "sequentialstring"))
         {
             for(i = 0; i < num_keys; i++)
-                str_hash.insert(str_hash_t::value_type(new_string_from_integer(i), value));
+                str_hash.emplace(new_string_from_integer(i), value);
         }
         else if(!strcmp(bench, "randomstring"))
         {
             for(i = 0; i < num_keys; i++)
-                str_hash.insert(str_hash_t::value_type(new_string_from_integer((int)rand()), value));
+                str_hash.emplace(new_string_from_integer((int)rand()), value);
         }
         else if(!strcmp(bench, "deletestring"))
         {
             for(i = 0; i < num_keys; i++)
-                str_hash.insert(str_hash_t::value_type(new_string_from_integer(i), value));
+                str_hash.emplace(new_string_from_integer(i), value);
             timer.reset();
-			ts = getTime();
+            ts = getTime();
             for(i = 0; i < num_keys; i++)
                 str_hash.erase(new_string_from_integer(i));
         }
 
-        printf("%s %.2f %.2lf\n", bench, (float)((double)timer.elapsed().count() / 1000), (getTime() - ts) / 1000.0);
+        printf("%.2lf %-10s %-10s %d %.2lf\n\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         fflush(stdout);
         //std::this_thread::sleep_for(std::chrono::seconds(1000));
     }
@@ -499,6 +513,8 @@ int main(int argc, char ** argv)
     }
 
     all_done = true;
+#if THR
     t1.join();
+#endif
     return 0;
 }
