@@ -36,10 +36,10 @@
 #include "khash.h"
 #endif
 #if EMHASH == 2
-#include "hash_table52.hpp"
+#include "hash_table2.hpp"
 #elif EMHASH == 6
 #define EMHASH_HIGH_LOAD  100000
-#include "hash_table54.hpp"
+#include "hash_table4.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
 #elif PHMAP_FLAT

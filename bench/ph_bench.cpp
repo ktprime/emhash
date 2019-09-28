@@ -2,15 +2,15 @@
 #define THR 1
 
 #if EMHASH == 2
-    #include "hash_table52.hpp"
+    #include "hash_table2.hpp"
     #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
 #elif EMHASH == 6
-    #include "hash_table56.hpp"
+    #include "hash_table6.hpp"
     #define MAPNAME emhash6::HashMap
     #define EXTRAARGS
 #elif EMHASH == 5
-    #include "hash_table55.hpp"
+    #include "hash_table5.hpp"
     #define MAPNAME emhash5::HashMap
     #define EXTRAARGS
 #elif MARTIN
