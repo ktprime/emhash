@@ -24,8 +24,8 @@ benchmarks:
 iteration 0
 "absl::flat_hash_map"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 1.14e-07; 0
 "phmap::flat_hash_map"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 1.14e-07; 0
-"emilib6::HashMap"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 4.22378; 0
-"emilib2::HashMap"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 4.22522; 0
+"emhash6::HashMap"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 4.22378; 0
+"emhash2::HashMap"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 4.22522; 0
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 1.27e-07; 0
 "ska::flat_hash_map"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 0.174085; 0
 "tsl::robin_map"; "robin_hood::hash"; "CtorDtorEmptyMap"; "01"; "ctor & dtor empty map"; 0; 0.0435223; 0
@@ -33,8 +33,8 @@ iteration 0
 iteration 0
 "absl::flat_hash_map"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 3.63605; 0
 "phmap::flat_hash_map"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 3.55315; 0
-"emilib6::HashMap"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 3.19115; 0
-"emilib2::HashMap"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 3.18715; 0
+"emhash6::HashMap"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 3.19115; 0
+"emhash2::HashMap"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 3.18715; 0
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 2.65718; 0
 "ska::flat_hash_map"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 4.88578; 0
 "tsl::robin_map"; "robin_hood::hash"; "CtorDtorSingleEntryMap"; "01"; "ctor & dtor map with 1 entry"; 50000000; 1.85075; 0
@@ -54,18 +54,18 @@ total time = 31280.03
 "phmap::flat_hash_map"; "robin_hood::hash"; "InsertHugeInt"; "05"; "destructor empty map"; 0; 0.00538879; 1721.05
 total time = 27633.33
 
-"emilib6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "01"; "insert 100M int"; 98841586; 10.6003; 2296.79
-"emilib6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "02"; "clear 100M int"; 0; 0.261358; 2296.79
-"emilib6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "03"; "reinsert 100M int"; 98843646; 6.01501; 2296.79
-"emilib6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "04"; "remove 100M int"; 0; 3.85087; 2296.79
-"emilib6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "05"; "destructor empty map"; 0; 0.0326806; 2296.79
+"emhash6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "01"; "insert 100M int"; 98841586; 10.6003; 2296.79
+"emhash6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "02"; "clear 100M int"; 0; 0.261358; 2296.79
+"emhash6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "03"; "reinsert 100M int"; 98843646; 6.01501; 2296.79
+"emhash6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "04"; "remove 100M int"; 0; 3.85087; 2296.79
+"emhash6::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "05"; "destructor empty map"; 0; 0.0326806; 2296.79
 total time = 20760.64
 
-"emilib2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "01"; "insert 100M int"; 98841586; 9.64222; 2296.75
-"emilib2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "02"; "clear 100M int"; 0; 0.259756; 2296.75
-"emilib2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "03"; "reinsert 100M int"; 98843646; 5.53417; 2296.75
-"emilib2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "04"; "remove 100M int"; 0; 3.89282; 2296.75
-"emilib2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "05"; "destructor empty map"; 0; 0.0325943; 2296.75
+"emhash2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "01"; "insert 100M int"; 98841586; 9.64222; 2296.75
+"emhash2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "02"; "clear 100M int"; 0; 0.259756; 2296.75
+"emhash2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "03"; "reinsert 100M int"; 98843646; 5.53417; 2296.75
+"emhash2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "04"; "remove 100M int"; 0; 3.89282; 2296.75
+"emhash2::HashMap"; "robin_hood::hash"; "InsertHugeInt"; "05"; "destructor empty map"; 0; 0.0325943; 2296.75
 total time = 19362.00
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "InsertHugeInt"; "01"; "insert 100M int"; 98841586; 13.0731; 1720.79
@@ -99,12 +99,12 @@ total time = 15190.00
 "phmap::flat_hash_map"; "robin_hood::hash"; "IterateIntegers"; "02"; "iterate while removing"; 62498750000000; 8.58882; 0
 total time = 14938.38
 
-"emilib6::HashMap"; "robin_hood::hash"; "IterateIntegers"; "01"; "iterate while adding"; 20833333325000; 9.82633; 0
-"emilib6::HashMap"; "robin_hood::hash"; "IterateIntegers"; "02"; "iterate while removing"; 62498750000000; 12.9667; 0
+"emhash6::HashMap"; "robin_hood::hash"; "IterateIntegers"; "01"; "iterate while adding"; 20833333325000; 9.82633; 0
+"emhash6::HashMap"; "robin_hood::hash"; "IterateIntegers"; "02"; "iterate while removing"; 62498750000000; 12.9667; 0
 total time = 22793.44
 
-"emilib2::HashMap"; "robin_hood::hash"; "IterateIntegers"; "01"; "iterate while adding"; 20833333325000; 10.3596; 0
-"emilib2::HashMap"; "robin_hood::hash"; "IterateIntegers"; "02"; "iterate while removing"; 62498750000000; 13.6579; 0
+"emhash2::HashMap"; "robin_hood::hash"; "IterateIntegers"; "01"; "iterate while adding"; 20833333325000; 10.3596; 0
+"emhash2::HashMap"; "robin_hood::hash"; "IterateIntegers"; "02"; "iterate while removing"; 62498750000000; 13.6579; 0
 total time = 24017.87
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "IterateIntegers"; "01"; "iterate while adding"; 20833333325000; 5.83332; 0
@@ -133,16 +133,16 @@ total time = 15371.52
 "phmap::flat_hash_map"; "robin_hood::hash"; "RandomDistinct2"; "04"; "100% distinct"; 50291811; 5.81293; 856.902
 total time = 14017.26
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "01"; "5% distinct"; 549985352; 1.26205; 64.793
-"emilib6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "02"; "25% distinct"; 149979034; 2.07295; 280.953
-"emilib6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "03"; "50% distinct"; 249981806; 2.6845; 568.777
-"emilib6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "04"; "100% distinct"; 50291811; 5.12731; 1144.8
+"emhash6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "01"; "5% distinct"; 549985352; 1.26205; 64.793
+"emhash6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "02"; "25% distinct"; 149979034; 2.07295; 280.953
+"emhash6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "03"; "50% distinct"; 249981806; 2.6845; 568.777
+"emhash6::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "04"; "100% distinct"; 50291811; 5.12731; 1144.8
 total time = 11147.06
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "01"; "5% distinct"; 549985352; 1.07279; 64.8242
-"emilib2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "02"; "25% distinct"; 149979034; 1.86214; 280.926
-"emilib2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "03"; "50% distinct"; 249981806; 2.37621; 568.98
-"emilib2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "04"; "100% distinct"; 50291811; 4.6103; 1144.98
+"emhash2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "01"; "5% distinct"; 549985352; 1.07279; 64.8242
+"emhash2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "02"; "25% distinct"; 149979034; 1.86214; 280.926
+"emhash2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "03"; "50% distinct"; 249981806; 2.37621; 568.98
+"emhash2::HashMap"; "robin_hood::hash"; "RandomDistinct2"; "04"; "100% distinct"; 50291811; 4.6103; 1144.98
 total time = 9921.69
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "RandomDistinct2"; "01"; "5% distinct"; 549985352; 1.16872; 46.7383
@@ -179,18 +179,18 @@ total time = 30963.02
 "phmap::flat_hash_map"; "robin_hood::hash"; "RandomFindString"; "05"; "100% 100 byte"; 99989650; 7.08785; 11.125
 total time = 30832.67
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString"; "01"; "0% 100 byte"; 1721; 6.88178; 9.35547; "ERROR: expected 3214"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString"; "02"; "25% 100 byte"; 24997572; 8.09938; 11.9219; "ERROR: expected 24998929"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString"; "03"; "50% 100 byte"; 49994828; 8.3469; 11.9219; "ERROR: expected 49996121"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString"; "04"; "75% 100 byte"; 74992237; 8.28242; 11.9219; "ERROR: expected 74993243"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString"; "05"; "100% 100 byte"; 99989650; 7.95706; 11.9219
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString"; "01"; "0% 100 byte"; 1721; 6.88178; 9.35547; "ERROR: expected 3214"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString"; "02"; "25% 100 byte"; 24997572; 8.09938; 11.9219; "ERROR: expected 24998929"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString"; "03"; "50% 100 byte"; 49994828; 8.3469; 11.9219; "ERROR: expected 49996121"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString"; "04"; "75% 100 byte"; 74992237; 8.28242; 11.9219; "ERROR: expected 74993243"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString"; "05"; "100% 100 byte"; 99989650; 7.95706; 11.9219
 total time = 39568.16
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString"; "01"; "0% 100 byte"; 1721; 7.6064; 9.08984; "ERROR: expected 3214"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString"; "02"; "25% 100 byte"; 24997572; 8.45531; 11.6211; "ERROR: expected 24998929"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString"; "03"; "50% 100 byte"; 49994828; 8.3823; 11.6211; "ERROR: expected 49996121"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString"; "04"; "75% 100 byte"; 74992237; 8.26207; 11.6211; "ERROR: expected 74993243"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString"; "05"; "100% 100 byte"; 99989650; 7.83301; 11.6211
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString"; "01"; "0% 100 byte"; 1721; 7.6064; 9.08984; "ERROR: expected 3214"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString"; "02"; "25% 100 byte"; 24997572; 8.45531; 11.6211; "ERROR: expected 24998929"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString"; "03"; "50% 100 byte"; 49994828; 8.3823; 11.6211; "ERROR: expected 49996121"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString"; "04"; "75% 100 byte"; 74992237; 8.26207; 11.6211; "ERROR: expected 74993243"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString"; "05"; "100% 100 byte"; 99989650; 7.83301; 11.6211
 total time = 40539.71
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "RandomFindString"; "01"; "0% 100 byte"; 1721; 3.99765; 8.30078; "ERROR: expected 3214"
@@ -230,18 +230,18 @@ total time = 45393.04
 "phmap::flat_hash_map"; "robin_hood::hash"; "RandomFindString_1000000"; "05"; "100% 13 byte"; 199997474; 10.8803; 115.566
 total time = 44516.87
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "01"; "0% 13 byte"; 26187; 10.1046; 136.57; "ERROR: expected 25189"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "02"; "25% 13 byte"; 50016738; 11.7001; 136.57; "ERROR: expected 50019351"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "03"; "50% 13 byte"; 100010563; 12.0828; 136.57; "ERROR: expected 100010271"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "04"; "75% 13 byte"; 150004560; 11.5285; 136.57; "ERROR: expected 150003848"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "05"; "100% 13 byte"; 199997474; 10.7688; 136.57
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "01"; "0% 13 byte"; 26187; 10.1046; 136.57; "ERROR: expected 25189"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "02"; "25% 13 byte"; 50016738; 11.7001; 136.57; "ERROR: expected 50019351"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "03"; "50% 13 byte"; 100010563; 12.0828; 136.57; "ERROR: expected 100010271"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "04"; "75% 13 byte"; 150004560; 11.5285; 136.57; "ERROR: expected 150003848"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "05"; "100% 13 byte"; 199997474; 10.7688; 136.57
 total time = 56185.56
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "01"; "0% 13 byte"; 26187; 10.5612; 136.34; "ERROR: expected 25189"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "02"; "25% 13 byte"; 50016738; 11.6047; 136.504; "ERROR: expected 50019351"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "03"; "50% 13 byte"; 100010563; 11.8888; 136.566; "ERROR: expected 100010271"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "04"; "75% 13 byte"; 150004560; 11.4252; 136.566; "ERROR: expected 150003848"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "05"; "100% 13 byte"; 199997474; 10.4812; 136.566
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "01"; "0% 13 byte"; 26187; 10.5612; 136.34; "ERROR: expected 25189"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "02"; "25% 13 byte"; 50016738; 11.6047; 136.504; "ERROR: expected 50019351"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "03"; "50% 13 byte"; 100010563; 11.8888; 136.566; "ERROR: expected 100010271"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "04"; "75% 13 byte"; 150004560; 11.4252; 136.566; "ERROR: expected 150003848"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFindString_1000000"; "05"; "100% 13 byte"; 199997474; 10.4812; 136.566
 total time = 55961.77
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "RandomFindString_1000000"; "01"; "0% 13 byte"; 26187; 5.82033; 115.543; "ERROR: expected 25189"
@@ -291,28 +291,28 @@ total time = 58818.95
 "phmap::flat_hash_map"; "robin_hood::hash"; "RandomFind_200"; "10"; "100% success, 0xffffffff00000000"; 979228096; 7.36217; 0
 total time = 65830.83
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "01"; "0% success, 0x00000000ffffffff"; 0; 4.19981; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "02"; "0% success, 0xffffffff00000000"; 0; 3.88605; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "03"; "25% success, 0x00000000ffffffff"; 244807024; 4.11147; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "04"; "25% success, 0xffffffff00000000"; 244807024; 4.05337; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "05"; "50% success, 0x00000000ffffffff"; 489614048; 4.33224; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "06"; "50% success, 0xffffffff00000000"; 489614048; 4.25892; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "07"; "75% success, 0x00000000ffffffff"; 734421072; 4.29142; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "08"; "75% success, 0xffffffff00000000"; 734421072; 4.3996; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "09"; "100% success, 0x00000000ffffffff"; 979228096; 4.77883; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "10"; "100% success, 0xffffffff00000000"; 979228096; 4.82335; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "01"; "0% success, 0x00000000ffffffff"; 0; 4.19981; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "02"; "0% success, 0xffffffff00000000"; 0; 3.88605; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "03"; "25% success, 0x00000000ffffffff"; 244807024; 4.11147; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "04"; "25% success, 0xffffffff00000000"; 244807024; 4.05337; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "05"; "50% success, 0x00000000ffffffff"; 489614048; 4.33224; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "06"; "50% success, 0xffffffff00000000"; 489614048; 4.25892; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "07"; "75% success, 0x00000000ffffffff"; 734421072; 4.29142; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "08"; "75% success, 0xffffffff00000000"; 734421072; 4.3996; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "09"; "100% success, 0x00000000ffffffff"; 979228096; 4.77883; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_200"; "10"; "100% success, 0xffffffff00000000"; 979228096; 4.82335; 0
 total time = 43135.85
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "01"; "0% success, 0x00000000ffffffff"; 0; 4.07874; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "02"; "0% success, 0xffffffff00000000"; 0; 3.95752; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "03"; "25% success, 0x00000000ffffffff"; 244807024; 4.02298; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "04"; "25% success, 0xffffffff00000000"; 244807024; 3.96957; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "05"; "50% success, 0x00000000ffffffff"; 489614048; 3.96951; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "06"; "50% success, 0xffffffff00000000"; 489614048; 3.88697; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "07"; "75% success, 0x00000000ffffffff"; 734421072; 4.01206; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "08"; "75% success, 0xffffffff00000000"; 734421072; 4.14626; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "09"; "100% success, 0x00000000ffffffff"; 979228096; 4.13731; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "10"; "100% success, 0xffffffff00000000"; 979228096; 4.17293; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "01"; "0% success, 0x00000000ffffffff"; 0; 4.07874; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "02"; "0% success, 0xffffffff00000000"; 0; 3.95752; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "03"; "25% success, 0x00000000ffffffff"; 244807024; 4.02298; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "04"; "25% success, 0xffffffff00000000"; 244807024; 3.96957; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "05"; "50% success, 0x00000000ffffffff"; 489614048; 3.96951; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "06"; "50% success, 0xffffffff00000000"; 489614048; 3.88697; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "07"; "75% success, 0x00000000ffffffff"; 734421072; 4.01206; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "08"; "75% success, 0xffffffff00000000"; 734421072; 4.14626; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "09"; "100% success, 0x00000000ffffffff"; 979228096; 4.13731; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_200"; "10"; "100% success, 0xffffffff00000000"; 979228096; 4.17293; 0
 total time = 40354.61
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "RandomFind_200"; "01"; "0% success, 0x00000000ffffffff"; 0; 6.20584; 0
@@ -379,29 +379,29 @@ total time = 63289.44
 total time = 69417.16
 
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "01"; "0% success, 0x00000000ffffffff"; 0; 5.41265; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "02"; "0% success, 0xffffffff00000000"; 0; 5.36195; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "03"; "25% success, 0x00000000ffffffff"; 249194556; 4.4707; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "04"; "25% success, 0xffffffff00000000"; 249194556; 4.38983; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "05"; "50% success, 0x00000000ffffffff"; 498389112; 4.74499; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "06"; "50% success, 0xffffffff00000000"; 498389112; 4.71235; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "07"; "75% success, 0x00000000ffffffff"; 747583668; 4.85421; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "08"; "75% success, 0xffffffff00000000"; 747583668; 4.82941; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "09"; "100% success, 0x00000000ffffffff"; 996778223; 5.27902; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "10"; "100% success, 0xffffffff00000000"; 996778223; 5.44417; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "01"; "0% success, 0x00000000ffffffff"; 0; 5.41265; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "02"; "0% success, 0xffffffff00000000"; 0; 5.36195; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "03"; "25% success, 0x00000000ffffffff"; 249194556; 4.4707; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "04"; "25% success, 0xffffffff00000000"; 249194556; 4.38983; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "05"; "50% success, 0x00000000ffffffff"; 498389112; 4.74499; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "06"; "50% success, 0xffffffff00000000"; 498389112; 4.71235; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "07"; "75% success, 0x00000000ffffffff"; 747583668; 4.85421; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "08"; "75% success, 0xffffffff00000000"; 747583668; 4.82941; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "09"; "100% success, 0x00000000ffffffff"; 996778223; 5.27902; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "10"; "100% success, 0xffffffff00000000"; 996778223; 5.44417; 0
 total time = 49500.05
 
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "01"; "0% success, 0x00000000ffffffff"; 0; 4.38266; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "02"; "0% success, 0xffffffff00000000"; 0; 4.3332; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "03"; "25% success, 0x00000000ffffffff"; 249194556; 4.24973; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "04"; "25% success, 0xffffffff00000000"; 249194556; 4.19802; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "05"; "50% success, 0x00000000ffffffff"; 498389112; 4.18317; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "06"; "50% success, 0xffffffff00000000"; 498389112; 4.1997; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "07"; "75% success, 0x00000000ffffffff"; 747583668; 4.35849; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "08"; "75% success, 0xffffffff00000000"; 747583668; 4.35372; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "09"; "100% success, 0x00000000ffffffff"; 996778223; 4.56098; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "10"; "100% success, 0xffffffff00000000"; 996778223; 4.66391; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "01"; "0% success, 0x00000000ffffffff"; 0; 4.38266; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "02"; "0% success, 0xffffffff00000000"; 0; 4.3332; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "03"; "25% success, 0x00000000ffffffff"; 249194556; 4.24973; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "04"; "25% success, 0xffffffff00000000"; 249194556; 4.19802; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "05"; "50% success, 0x00000000ffffffff"; 498389112; 4.18317; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "06"; "50% success, 0xffffffff00000000"; 498389112; 4.1997; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "07"; "75% success, 0x00000000ffffffff"; 747583668; 4.35849; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "08"; "75% success, 0xffffffff00000000"; 747583668; 4.35372; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "09"; "100% success, 0x00000000ffffffff"; 996778223; 4.56098; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_2000"; "10"; "100% success, 0xffffffff00000000"; 996778223; 4.66391; 0
 total time = 43484.27
 
 
@@ -472,29 +472,29 @@ total time = 78584.98
 total time = 82773.82
 
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "01"; "0% success, 0x00000000ffffffff"; 32264; 8.45259; 28.25; "ERROR: expected 33571"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "02"; "0% success, 0xffffffff00000000"; 25224; 8.4535; 40.4805; "ERROR: expected 29114"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "03"; "25% success, 0x00000000ffffffff"; 125013829; 10.6928; 40.4805; "ERROR: expected 125018398"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "04"; "25% success, 0xffffffff00000000"; 125017650; 10.6859; 40.4805; "ERROR: expected 125016517"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "05"; "50% success, 0x00000000ffffffff"; 250003876; 10.6531; 40.4805; "ERROR: expected 250006412"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "06"; "50% success, 0xffffffff00000000"; 250010118; 10.6544; 40.4805; "ERROR: expected 250004852"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "07"; "75% success, 0x00000000ffffffff"; 374996427; 8.92469; 40.4805; "ERROR: expected 374997827"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "08"; "75% success, 0xffffffff00000000"; 374997723; 8.93104; 40.4805; "ERROR: expected 374996290"
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "09"; "100% success, 0x00000000ffffffff"; 499988041; 6.61558; 40.4805
-"emilib6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "10"; "100% success, 0xffffffff00000000"; 499988041; 6.61476; 40.4805
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "01"; "0% success, 0x00000000ffffffff"; 32264; 8.45259; 28.25; "ERROR: expected 33571"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "02"; "0% success, 0xffffffff00000000"; 25224; 8.4535; 40.4805; "ERROR: expected 29114"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "03"; "25% success, 0x00000000ffffffff"; 125013829; 10.6928; 40.4805; "ERROR: expected 125018398"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "04"; "25% success, 0xffffffff00000000"; 125017650; 10.6859; 40.4805; "ERROR: expected 125016517"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "05"; "50% success, 0x00000000ffffffff"; 250003876; 10.6531; 40.4805; "ERROR: expected 250006412"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "06"; "50% success, 0xffffffff00000000"; 250010118; 10.6544; 40.4805; "ERROR: expected 250004852"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "07"; "75% success, 0x00000000ffffffff"; 374996427; 8.92469; 40.4805; "ERROR: expected 374997827"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "08"; "75% success, 0xffffffff00000000"; 374997723; 8.93104; 40.4805; "ERROR: expected 374996290"
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "09"; "100% success, 0x00000000ffffffff"; 499988041; 6.61558; 40.4805
+"emhash6::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "10"; "100% success, 0xffffffff00000000"; 499988041; 6.61476; 40.4805
 total time = 90679.71
 
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "01"; "0% success, 0x00000000ffffffff"; 32264; 7.53767; 28.2031; "ERROR: expected 33571"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "02"; "0% success, 0xffffffff00000000"; 25224; 7.54493; 40.3594; "ERROR: expected 29114"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "03"; "25% success, 0x00000000ffffffff"; 125013829; 9.14911; 40.3711; "ERROR: expected 125018398"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "04"; "25% success, 0xffffffff00000000"; 125017650; 9.15767; 40.4336; "ERROR: expected 125016517"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "05"; "50% success, 0x00000000ffffffff"; 250003876; 9.47429; 40.4336; "ERROR: expected 250006412"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "06"; "50% success, 0xffffffff00000000"; 250010118; 9.50948; 40.4336; "ERROR: expected 250004852"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "07"; "75% success, 0x00000000ffffffff"; 374996427; 8.0905; 40.4336; "ERROR: expected 374997827"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "08"; "75% success, 0xffffffff00000000"; 374997723; 8.10938; 40.4336; "ERROR: expected 374996290"
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "09"; "100% success, 0x00000000ffffffff"; 499988041; 5.97341; 40.4336
-"emilib2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "10"; "100% success, 0xffffffff00000000"; 499988041; 5.97168; 40.4336
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "01"; "0% success, 0x00000000ffffffff"; 32264; 7.53767; 28.2031; "ERROR: expected 33571"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "02"; "0% success, 0xffffffff00000000"; 25224; 7.54493; 40.3594; "ERROR: expected 29114"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "03"; "25% success, 0x00000000ffffffff"; 125013829; 9.14911; 40.3711; "ERROR: expected 125018398"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "04"; "25% success, 0xffffffff00000000"; 125017650; 9.15767; 40.4336; "ERROR: expected 125016517"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "05"; "50% success, 0x00000000ffffffff"; 250003876; 9.47429; 40.4336; "ERROR: expected 250006412"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "06"; "50% success, 0xffffffff00000000"; 250010118; 9.50948; 40.4336; "ERROR: expected 250004852"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "07"; "75% success, 0x00000000ffffffff"; 374996427; 8.0905; 40.4336; "ERROR: expected 374997827"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "08"; "75% success, 0xffffffff00000000"; 374997723; 8.10938; 40.4336; "ERROR: expected 374996290"
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "09"; "100% success, 0x00000000ffffffff"; 499988041; 5.97341; 40.4336
+"emhash2::HashMap"; "robin_hood::hash"; "RandomFind_500000"; "10"; "100% success, 0xffffffff00000000"; 499988041; 5.97168; 40.4336
 total time = 80518.23
 
 
@@ -555,20 +555,20 @@ total time = 19809.27
 "phmap::flat_hash_map"; "robin_hood::hash"; "RandomInsertErase"; "06"; "24 bits, 50M cycles"; 8367491; 5.3086; 400.281
 total time = 19455.12
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "01"; "4 bits, 50M cycles"; 7; 1.41641; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "02"; "8 bits, 50M cycles"; 127; 1.84651; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "03"; "12 bits, 50M cycles"; 2084; 2.08194; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "04"; "16 bits, 50M cycles"; 32722; 2.39253; 0
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "05"; "20 bits, 50M cycles"; 524149; 2.88862; 28.25
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "06"; "24 bits, 50M cycles"; 8367491; 5.02467; 568.492
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "01"; "4 bits, 50M cycles"; 7; 1.41641; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "02"; "8 bits, 50M cycles"; 127; 1.84651; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "03"; "12 bits, 50M cycles"; 2084; 2.08194; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "04"; "16 bits, 50M cycles"; 32722; 2.39253; 0
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "05"; "20 bits, 50M cycles"; 524149; 2.88862; 28.25
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "06"; "24 bits, 50M cycles"; 8367491; 5.02467; 568.492
 total time = 15651.03
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "01"; "4 bits, 50M cycles"; 7; 1.42711; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "02"; "8 bits, 50M cycles"; 127; 1.86859; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "03"; "12 bits, 50M cycles"; 2084; 2.10724; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "04"; "16 bits, 50M cycles"; 32722; 2.43906; 0
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "05"; "20 bits, 50M cycles"; 524149; 2.90372; 28.2852
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "06"; "24 bits, 50M cycles"; 8367491; 5.06109; 568.355
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "01"; "4 bits, 50M cycles"; 7; 1.42711; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "02"; "8 bits, 50M cycles"; 127; 1.86859; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "03"; "12 bits, 50M cycles"; 2084; 2.10724; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "04"; "16 bits, 50M cycles"; 32722; 2.43906; 0
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "05"; "20 bits, 50M cycles"; 524149; 2.90372; 28.2852
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertErase"; "06"; "24 bits, 50M cycles"; 8367491; 5.06109; 568.355
 total time = 15807.18
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "RandomInsertErase"; "01"; "4 bits, 50M cycles"; 7; 1.49643; 0
@@ -611,18 +611,18 @@ total time = 23256.40
 "phmap::flat_hash_map"; "robin_hood::hash"; "RandomInsertEraseStrings"; "05"; "1000 bytes"; 2966452; 6.96754; 89.8984
 total time = 22920.97
 
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "01"; "7 bytes"; 9734165; 4.03069; 100.273
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "02"; "8 bytes"; 9734165; 5.56721; 100.465
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "03"; "13 bytes"; 9734165; 4.27868; 100.465
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "04"; "100 bytes"; 5867228; 5.53901; 100.465
-"emilib6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "05"; "1000 bytes"; 2966452; 7.53543; 100.465
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "01"; "7 bytes"; 9734165; 4.03069; 100.273
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "02"; "8 bytes"; 9734165; 5.56721; 100.465
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "03"; "13 bytes"; 9734165; 4.27868; 100.465
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "04"; "100 bytes"; 5867228; 5.53901; 100.465
+"emhash6::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "05"; "1000 bytes"; 2966452; 7.53543; 100.465
 total time = 26962.10
 
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "01"; "7 bytes"; 9734165; 4.42521; 100.273
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "02"; "8 bytes"; 9734165; 5.74514; 100.414
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "03"; "13 bytes"; 9734165; 4.65666; 100.414
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "04"; "100 bytes"; 5867228; 5.84386; 100.414
-"emilib2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "05"; "1000 bytes"; 2966452; 7.98149; 100.414
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "01"; "7 bytes"; 9734165; 4.42521; 100.273
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "02"; "8 bytes"; 9734165; 5.74514; 100.414
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "03"; "13 bytes"; 9734165; 4.65666; 100.414
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "04"; "100 bytes"; 5867228; 5.84386; 100.414
+"emhash2::HashMap"; "robin_hood::hash"; "RandomInsertEraseStrings"; "05"; "1000 bytes"; 2966452; 7.98149; 100.414
 total time = 28669.03
 
 "robin_hood::unordered_flat_map"; "robin_hood::hash"; "RandomInsertEraseStrings"; "01"; "7 bytes"; 9734165; 3.32515; 89.6758

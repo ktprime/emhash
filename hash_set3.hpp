@@ -1,5 +1,5 @@
 
-// emilib6::HashSet for C++11
+// emhash6::HashSet for C++11
 // version 1.2.0
 // https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
 //
@@ -91,7 +91,7 @@
 #define GET_KEY(p,n)      p[n].first
 #define NEXT_BUCKET(s,n)  s[n].second
 
-namespace emilib7 {
+namespace emhash7 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashSet
@@ -99,7 +99,7 @@ class HashSet
     constexpr static uint32_t INACTIVE = 0xFFFFFFFF;
 
 private:
-    typedef  HashSet<KeyT, HashT> MyType;
+    typedef  HashSet<KeyT, HashT> htype;
     typedef  std::pair<KeyT, uint32_t> PairT;
 
 public:
@@ -121,7 +121,7 @@ public:
 
         iterator() { }
 
-        iterator(MyType* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket)
+        iterator(htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket)
         {
         }
 
@@ -167,7 +167,7 @@ public:
         }
 
     public:
-        MyType* _set;
+        htype* _set;
         uint32_t  _bucket;
     };
 
@@ -183,7 +183,7 @@ public:
 
         const_iterator() { }
         const_iterator(iterator proto) : _set(proto._set), _bucket(proto._bucket) {  }
-        const_iterator(const MyType* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) {  }
+        const_iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) {  }
 
         const_iterator& operator++()
         {
@@ -227,7 +227,7 @@ public:
         }
 
     public:
-        const MyType* _set;
+        const htype* _set;
         uint32_t  _bucket;
     };
 
@@ -1354,7 +1354,7 @@ private:
     uint32_t  _num_mains;
     PairT*    _pairs;
 };
-} // namespace emilib
+} // namespace emhash
 #if __cplusplus > 199711
-//template <class Key> using emihash = emilib1::HashSet<Key, std::hash<Key>>;
+//template <class Key> using emihash = emhash1::HashSet<Key, std::hash<Key>>;
 #endif

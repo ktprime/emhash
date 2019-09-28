@@ -37,11 +37,11 @@
     #define TVal  1
 #endif
 
-#include "hash_table52.hpp"
-#include "hash_table56.hpp"
-#include "hash_table53.hpp"
-#include "hash_table54.hpp"
-#include "hash_table55.hpp"
+#include "hash_table2.hpp"
+#include "hash_table3.hpp"
+#include "hash_table4.hpp"
+#include "hash_table5.hpp"
+#include "hash_table6.hpp"
 //#include "hash_table64.hpp"
 
 ////some others
@@ -135,15 +135,15 @@ struct RankItem;
     #define sValueType  "RankItem"
 #endif
 
-emilib6::HashMap<std::string, std::string> show_name = {
+emhash6::HashMap<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
 
-    {"emilib2", "emilib2"},
-    {"emilib6", "emilib6"},
-    {"emilib4", "emilib4"},
-//    {"emilib3", "emilib3"},
-    {"emilib5", "emilib5"},
-//    {"emilib7", "emilib7"},
+    {"emhash2", "emhash2"},
+    {"emhash6", "emhash6"},
+    {"emhash4", "emhash4"},
+//    {"emhash3", "emhash3"},
+    {"emhash5", "emhash5"},
+//    {"emhash7", "emhash7"},
 
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
@@ -707,7 +707,7 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
 
     if (rand() % 100 > iRation)
     {
-        emilib6 ::HashMap<keyType, int> eset(size);
+        emhash6 ::HashMap<keyType, int> eset(size);
         for (int i = 0; ; i++) {
             auto key = TO_KEY(srng());
             if (eset.emplace(key, 0).second) {
@@ -748,12 +748,12 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
 
 static int HashMapTest(int n, int max_loops = 1234567)
 {
-    emilib6::HashMap <keyType,int> emap5;
-    emilib2::HashMap <keyType,int> emap2;
+    emhash6::HashMap <keyType,int> emap5;
+    emhash2::HashMap <keyType,int> emap2;
 
 #if _CPP11_HASH
     //robin_hood::unordered_map <keyType,int> umap;
-    emilib5::HashMap <keyType,int> umap;
+    emhash5::HashMap <keyType,int> umap;
 #else
     std::unordered_map<keyType,int> umap;
 #endif
@@ -941,11 +941,11 @@ static int benchMarkHashMap2(int n)
 #endif
 
     {
-        { emilib4::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emilib4", vList); }
-        { emilib3::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emilib3", vList); }
-        { emilib6::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emilib6", vList); }
-        { emilib2::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emilib2", vList); }
-        { emilib5::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emilib5", vList); }
+        { emhash4::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emhash4", vList); }
+        { emhash3::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emhash3", vList); }
+        { emhash6::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); iload = benOneMap(emap, "emhash6", vList); }
+        { emhash2::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emhash2", vList); }
+        { emhash5::HashMap <keyType, valueType, emap_func> emap; emap.max_load_factor(lf); benOneMap(emap, "emhash5", vList); }
     }
 
 #if _CPP14_HASH
@@ -1063,9 +1063,9 @@ static int readFile(std::string fileName, int size)
     int n = (int)vList.size();
     printf("\nread file %s  %ld ms, size = %zd\n", fileName.c_str(), getTime() - ts1, vList.size());
 
-    emilib2::HashMap<int64_t, int> emap2(n);
-    emilib6::HashMap<int64_t, int> emap6(n);
-    emilib5::HashMap<int64_t, int> emap5(n);
+    emhash2::HashMap<int64_t, int> emap2(n);
+    emhash6::HashMap<int64_t, int> emap6(n);
+    emhash5::HashMap<int64_t, int> emap5(n);
 
 #if _CPP11_HASH
     ska::flat_hash_map  <int64_t, int> fmap(n);
@@ -1074,9 +1074,9 @@ static int readFile(std::string fileName, int size)
     robin_hood::unordered_map<int64_t, int> mmap(n);
 #endif
 
-    ts1 = getTime();    for (auto v : vList)        emap2[v] = 1; printf("emilib2   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap2.size());
-    ts1 = getTime();    for (auto v : vList)        emap6[v] = 1; printf("emilib6   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap6.size());
-    ts1 = getTime();    for (auto v : vList)        emap5[v] = 1; printf("emilib5   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap5.size());
+    ts1 = getTime();    for (auto v : vList)        emap2[v] = 1; printf("emhash2   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap2.size());
+    ts1 = getTime();    for (auto v : vList)        emap6[v] = 1; printf("emhash6   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap6.size());
+    ts1 = getTime();    for (auto v : vList)        emap5[v] = 1; printf("emhash5   insert  %4ld ms, size = %zd\n", getTime() - ts1, emap5.size());
 
 #if _CPP11_HASH
     ts1 = getTime();    for (auto v : vList)        fmap[v] = 1;  printf("skamap    insert  %4ld ms, size = %zd\n", getTime() - ts1, fmap.size());
@@ -1091,7 +1091,7 @@ static int readFile(std::string fileName, int size)
 
 void testSynax()
 {
-    emilib3::HashMap <std::string, std::string> mymap =
+    emhash3::HashMap <std::string, std::string> mymap =
     {
         {"house","maison"},
         {"apple","pomme"},
@@ -1161,7 +1161,7 @@ int main(int argc, char* argv[])
     if (argc > 2 && argv[2][0] == 'd') {
         for (char c = argv[2][0], i = 0; c != '\0'; c = argv[2][i ++ ]) {
             if (c >= '2' && c < '8') {
-                std:: string map_name("emilib");
+                std:: string map_name("emhash");
                 map_name += c;
                 show_name.erase(map_name);
             } else if (c == 'm')

@@ -281,9 +281,9 @@ int main(int argc, char** argv)
   khiter_t k;
 
 #elif EMILIB == 2
-   emilib2::HashMap<uint32_t, uint32_t> test;
+   emhash2::HashMap<uint32_t, uint32_t> test;
 #elif EMILIB == 6
-   emilib4::HashMap<uint32_t, uint32_t> test;
+   emhash4::HashMap<uint32_t, uint32_t> test;
 #elif TSL
    tsl::robin_map<uint32_t,uint32_t> test;
 #elif PHMAP_FLAT

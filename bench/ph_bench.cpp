@@ -3,15 +3,15 @@
 
 #if EMILIB == 2
     #include "hash_table52.hpp"
-    #define MAPNAME emilib2::HashMap
+    #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
 #elif EMILIB == 6
     #include "hash_table56.hpp"
-    #define MAPNAME emilib6::HashMap
+    #define MAPNAME emhash6::HashMap
     #define EXTRAARGS
 #elif EMILIB == 5
     #include "hash_table55.hpp"
-    #define MAPNAME emilib5::HashMap
+    #define MAPNAME emhash5::HashMap
     #define EXTRAARGS
 #elif MARTIN
     #include "martin/robin_hood.h"

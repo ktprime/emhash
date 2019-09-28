@@ -55,8 +55,6 @@
 #    define EMHASH_UNLIKELY(condition) condition
 #endif
 
-#define hash_bucket(key)  ((uint32_t)_hasher(key) & _mask)
-
 #ifndef EMHASH_BUCKET_INDEX
     #define EMHASH_BUCKET_INDEX 1
 #endif
@@ -1279,6 +1277,11 @@ private:
 private:
 
     //the first cache line packed
+    uint32_t hash_bucket(const KeyT& key) const
+    {
+        return _hasher(key) & _mask;
+    }
+
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;

@@ -1,9 +1,9 @@
 benchMarkHashMap keyType = int64_t, valueType = int64_t
 erase_half
-   522          emilib5                 100
+   522          emhash5                 100
    558          martin flat             93
-   562          emilib6                 92
-   588          emilib2                 88
+   562          emhash6                 92
+   588          emhash2                 88
    706          phmap flat              74
    710          skarupk flat            73
    818          tessil robin            63
@@ -11,9 +11,9 @@ erase_half
 erase_reinsert
    1845         phmap flat              100
    1934         martin flat             95
-   2053         emilib6                 89
-   2161         emilib5                 85
-   2183         emilib2                 84
+   2053         emhash6                 89
+   2161         emhash5                 85
+   2183         emhash2                 84
    2275         skarupk flat            81
    2726         tessil robin            67
 
@@ -21,24 +21,24 @@ find_erase
    259          martin flat             100
    270          phmap flat              96
    400          skarupk flat            64
-   470          emilib6                 55
-   482          emilib5                 53
-   484          emilib2                 53
+   470          emhash6                 55
+   482          emhash5                 53
+   484          emhash2                 53
    491          tessil robin            52
 
 find_half
    256          phmap flat              100
    346          martin flat             74
-   392          emilib6                 65
-   404          emilib5                 63
-   405          emilib2                 63
+   392          emhash6                 65
+   404          emhash5                 63
+   405          emhash2                 63
    602          skarupk flat            42
    652          tessil robin            39
 
 find_all
-   553          emilib5                 100
-   554          emilib2                 99
-   554          emilib6                 99
+   553          emhash5                 100
+   554          emhash2                 99
+   554          emhash6                 99
    600          skarupk flat            92
    663          phmap flat              83
    692          martin flat             79
@@ -47,40 +47,40 @@ find_all
 find_miss
    402          phmap flat              100
    470          martin flat             85
-   560          emilib6                 71
-   589          emilib5                 68
-   591          emilib2                 68
+   560          emhash6                 71
+   589          emhash5                 68
+   591          emhash2                 68
    837          skarupk flat            48
    891          tessil robin            45
 
 insert_noreserve
    1760         phmap flat              100
-   2344         emilib5                 75
-   2346         emilib2                 75
+   2344         emhash5                 75
+   2346         emhash2                 75
    2376         martin flat             74
-   2402         emilib6                 73
+   2402         emhash6                 73
    2453         skarupk flat            71
    2665         tessil robin            66
 
 insert_reserve
-   868          emilib2                 100
+   868          emhash2                 100
    882          tessil robin            98
-   887          emilib5                 97
-   909          emilib6                 95
+   887          emhash5                 97
+   909          emhash6                 95
    1227         phmap flat              70
    1322         skarupk flat            65
    1706         martin flat             50
 
 ======== map  top1   top2  top3 =======================
-      emilib2  1.0   2.0   12
-      emilib5  2.0  21.5   29
-      emilib6  1.0  35.0    9
+      emhash2  1.0   2.0   12
+      emhash5  2.0  21.5   29
+      emhash6  1.0  35.0    9
   martin flat  0.0   2.5    0
    phmap flat 61.0   1.0    0
 ======== map    score ================================
-      emilib2   89
-      emilib5   90
-      emilib6   90
+      emhash2   89
+      emhash5   90
+      emhash6   90
   martin flat   85
    phmap flat   99
  skarupk flat   77
@@ -90,18 +90,18 @@ insert_reserve
 benchMarkHashMap keyType = int64_t, valueType = int
 
  erase_half
-   332          emilib5                 100
-   362          emilib6                 91
-   377          emilib2                 88
+   332          emhash5                 100
+   362          emhash6                 91
+   377          emhash2                 88
    452          martin flat             73
    473          phmap flat              70
    490          skarupk flat            67
    610          tessil robin            54
 
 erase_reinsert
-   1358         emilib6                 100
-   1399         emilib2                 97
-   1403         emilib5                 96
+   1358         emhash6                 100
+   1399         emhash2                 97
+   1403         emhash5                 96
    1420         phmap flat              95
    1496         skarupk flat            90
    1798         tessil robin            75
@@ -111,24 +111,24 @@ find_erase
    182          martin flat             100
    203          phmap flat              89
    273          skarupk flat            66
-   309          emilib2                 58
-   311          emilib6                 58
-   311          emilib5                 58
+   309          emhash2                 58
+   311          emhash6                 58
+   311          emhash5                 58
    341          tessil robin            53
 
 find_half
    193          phmap flat              100
-   249          emilib6                 77
-   250          emilib5                 77
-   251          emilib2                 76
+   249          emhash6                 77
+   250          emhash5                 77
+   251          emhash2                 76
    259          martin flat             74
    417          skarupk flat            46
    478          tessil robin            40
 
 find_hit
-   353          emilib5                 100
-   354          emilib2                 99
-   356          emilib6                 99
+   353          emhash5                 100
+   354          emhash2                 99
+   356          emhash6                 99
    417          skarupk flat            84
    438          phmap flat              80
    494          martin flat             71
@@ -137,39 +137,39 @@ find_hit
 find_miss
    302          phmap flat              100
    359          martin flat             84
-   402          emilib6                 75
-   415          emilib5                 72
-   416          emilib2                 72
+   402          emhash6                 75
+   415          emhash5                 72
+   416          emhash2                 72
    590          skarupk flat            51
    675          tessil robin            44
 
 insert_noreserve
    1130         phmap flat              100
-   1225         emilib2                 92
-   1243         emilib5                 90
-   1299         emilib6                 86
+   1225         emhash2                 92
+   1243         emhash5                 90
+   1299         emhash6                 86
    1525         martin flat             74
    1644         skarupk flat            68
    1716         tessil robin            65
 
 insert_reserve
-   526          emilib2                 100
-   539          emilib5                 97
-   566          emilib6                 92
+   526          emhash2                 100
+   539          emhash5                 97
+   566          emhash6                 92
    639          tessil robin            82
    812          phmap flat              64
    968          skarupk flat            54
    1118         martin flat             47
 
 ======== map  top1   top2  top3 =======================
-      emilib2  5.8  16.0   15
-      emilib5 22.8   8.0    3
-      emilib6  2.3   5.5   19
+      emhash2  5.8  16.0   15
+      emhash5 22.8   8.0    3
+      emhash6  2.3   5.5   19
    phmap flat 14.0   2.5    3
 ======== map    score ================================
-      emilib2   97
-      emilib5   98
-      emilib6   96
+      emhash2   97
+      emhash5   98
+      emhash6   96
   martin flat   74
    phmap flat   92
  skarupk flat   73
@@ -181,85 +181,85 @@ benchMarkHashMap  keyType = string, valueType = int
 erase_half
    696          martin flat             100
    847          phmap flat              82
-   874          emilib5                 79
-   894          emilib2                 77
-   894          emilib6                 77
+   874          emhash5                 79
+   894          emhash2                 77
+   894          emhash6                 77
    987          skarupk flat            70
    1076         tessil robin            64
 
 erase_reinsert
-   1842         emilib6                 100
+   1842         emhash6                 100
    1886         phmap flat              97
-   1961         emilib5                 93
+   1961         emhash5                 93
    1966         martin flat             93
    1990         skarupk flat            92
-   1992         emilib2                 92
+   1992         emhash2                 92
    2239         tessil robin            82
 
 find_erase
    348          martin flat             100
    366          phmap flat              95
-   639          emilib5                 54
-   649          emilib2                 53
-   705          emilib6                 49
+   639          emhash5                 54
+   649          emhash2                 53
+   705          emhash6                 49
    805          skarupk flat            43
    814          tessil robin            42
 
 find_half
    569          phmap flat              100
    573          martin flat             99
-   647          emilib5                 88
-   657          emilib2                 86
-   688          emilib6                 82
+   647          emhash5                 88
+   657          emhash2                 86
+   688          emhash6                 82
    892          skarupk flat            63
    895          tessil robin            63
 
 find_hit
    868          skarupk flat            100
    872          martin flat             99
-   889          emilib5                 97
-   891          emilib2                 97
-   914          emilib6                 95
+   889          emhash5                 97
+   891          emhash2                 97
+   914          emhash6                 95
    986          tessil robin            88
    1145         phmap flat              75
 
 find_miss
    1647         martin flat             100
    1656         phmap flat              99
-   1694         emilib5                 97
-   1714         emilib2                 96
-   1769         emilib6                 93
+   1694         emhash5                 97
+   1714         emhash2                 96
+   1769         emhash6                 93
    2570         skarupk flat            64
    2607         tessil robin            63
 
 insert_noreserve
    1817         phmap flat              100
-   1882         emilib6                 96
-   1974         emilib5                 92
+   1882         emhash6                 96
+   1974         emhash5                 92
    1978         skarupk flat            91
-   2010         emilib2                 90
+   2010         emhash2                 90
    2268         tessil robin            80
    2268         martin flat             80
 
 insert_reserve
-   988          emilib6                 100
-   992          emilib2                 99
-   996          emilib5                 99
+   988          emhash6                 100
+   992          emhash2                 99
+   996          emhash5                 99
    1152         skarupk flat            85
    1302         martin flat             75
    1416         tessil robin            69
    1605         phmap flat              61
 
 ======== map  top1   top2  top3 =======================
-      emilib2  0.0   0.0    2
-      emilib5  0.0   2.0   13
-      emilib6  4.0  12.0    3
+      emhash2  0.0   0.0    2
+      emhash5  0.0   2.0   13
+      emhash6  4.0  12.0    3
   martin flat 10.0   4.0    2
    phmap flat  6.0   2.0    0
 ======== map    score ================================
-      emilib2   94
-      emilib5   95
-      emilib6   95
+      emhash2   94
+      emhash5   95
+      emhash6   95
   martin flat   97
    phmap flat   94
  skarupk flat   82
