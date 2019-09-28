@@ -1,15 +1,15 @@
 #include <inttypes.h>
 #define THR 1
 
-#if EMILIB == 2
+#if EMHASH == 2
     #include "hash_table52.hpp"
     #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
-#elif EMILIB == 6
+#elif EMHASH == 6
     #include "hash_table56.hpp"
     #define MAPNAME emhash6::HashMap
     #define EXTRAARGS
-#elif EMILIB == 5
+#elif EMHASH == 5
     #include "hash_table55.hpp"
     #define MAPNAME emhash5::HashMap
     #define EXTRAARGS

@@ -35,10 +35,10 @@
 #ifdef KHASH
 #include "khash.h"
 #endif
-#if EMILIB == 2
+#if EMHASH == 2
 #include "hash_table52.hpp"
-#elif EMILIB == 6
-#define EMILIB_HIGH_LOAD  100000
+#elif EMHASH == 6
+#define EMHASH_HIGH_LOAD  100000
 #include "hash_table54.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
@@ -280,9 +280,9 @@ int main(int argc, char** argv)
   int ret, is_missing;
   khiter_t k;
 
-#elif EMILIB == 2
+#elif EMHASH == 2
    emhash2::HashMap<uint32_t, uint32_t> test;
-#elif EMILIB == 6
+#elif EMHASH == 6
    emhash4::HashMap<uint32_t, uint32_t> test;
 #elif TSL
    tsl::robin_map<uint32_t,uint32_t> test;

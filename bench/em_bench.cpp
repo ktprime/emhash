@@ -14,20 +14,20 @@
 #define TP                   100
 #endif
 //#define HOOD_HASH            1
-//#define EMILIB_BUCKET_INDEX  1
+//#define EMHASH_BUCKET_INDEX  1
 
-//#define EMILIB_REHASH_LOG  1
-//#define EMILIB_AVX_MEMCPY  1
-//#define EMILIB_STATIS      1
+//#define EMHASH_REHASH_LOG  1
+//#define EMHASH_AVX_MEMCPY  1
+//#define EMHASH_STATIS      1
 
-//#define EMILIB_FIBONACCI_HASAH 1
-//#define EMILIB_SAFE_HASH     1
-//#define EMILIB_IDENTITY_HASH 1
+//#define EMHASH_FIBONACCI_HASAH 1
+//#define EMHASH_SAFE_HASH     1
+//#define EMHASH_IDENTITY_HASH 1
 
-//#define EMILIB_LRU_SET       1
-//#define EMILIB_ERASE_SMALL     1
-//#define EMILIB_STD_STRING    1
-//#define EMILIB_HIGH_LOAD 201000
+//#define EMHASH_LRU_SET       1
+//#define EMHASH_ERASE_SMALL     1
+//#define EMHASH_STD_STRING    1
+//#define EMHASH_HIGH_LOAD 201000
 
 
 #ifndef TKey
