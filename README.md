@@ -1,10 +1,10 @@
 # emhash feature
 
-A quite fast and memory efficient *open address based c++ flat hash map*, it is easy to be benched/tested and compared the result with other's hash map.
+A quite fast and memory efficient *open address based c++ flat hash map*, it is easy to be benched/tested/compared the result with other's hash map.
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- the default load factor is 0.8 and can be set **1.0** by enable compile marco *EMILIB_HIGH_LOAD* (*5% performance loss in hash_table3.hpp*)
+- the default load factor is 0.8 and can be set **1.0** by enable compile marco *emhash_HIGH_LOAD* (*5% performance loss in hash_table3.hpp*)
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
     - _erase :  without return next iterator after erasion
@@ -14,14 +14,14 @@ A quite fast and memory efficient *open address based c++ flat hash map*, it is 
 
 - more **efficient** than other's hash map implemention if key.value is some aligned (sizeof(key) % 8 != sizeof(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 total memoery than hash_map<uint64_t, uint64_t>.
 
-- **lru** can be used if compile marco EMILIB_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be probed only once during next access.
+- **lru** can be used if compile marco emhash_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be probed only once during next access.
 
 - **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
     
-- more than **5 different** implementation to choose, each of them is some tiny different can be used in many case
-for example some case pay attention on finding hot, some foucus on finding cold(miss), and others only care about insert or erase and so on.
+- more than **5 different** implementation to choose, each of them is some tiny different can be used in some case
+for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
 
-- it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion. at present from 6 different benchmark(4 of them in this bench dir) by my bench
+- it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion. at present from 6 different benchmark(4 of them in my bench dir) by my bench
 
 - It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, Arm).
 
@@ -38,11 +38,11 @@ for example some case pay attention on finding hot, some foucus on finding cold(
    - quadratic probing start work after limited linear probing
    - random probing used with a very bad hash
 
-- use the **second/backup hashing**  when the input hash is bad with a very high collision if the compile marco *EMILIB_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
+- use the **second/backup hashing**  when the input hash is bad with a very high collision if the compile marco *emhash_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be knowed from dump info.
  
-- choose *different* hash algorithm by set compile marco *EMILIB_FIBONACCI_HASH* or *EMILIB_IDENTITY_HASH* depend on use case.
+- choose *different* hash algorithm by set compile marco *emhash_FIBONACCI_HASH* or *emhash_IDENTITY_HASH* depend on use case.
 
 
 # insert example
@@ -59,7 +59,7 @@ static void basic_test(int n)
         myrandom_shuffle(data.begin(), data.end());
         {
             auto ts = now2ms();
-            emilib2::HashMap<int, int> emap(n);
+            emhash2::HashMap<int, int> emap(n);
             for (auto v: data)
                 emap.insert(v, 0);
             printf("emap insert time = %ld ms\n", now2ms() - ts);
@@ -67,7 +67,7 @@ static void basic_test(int n)
 
         {
             auto ts = now2ms();
-            emilib2::HashMap<int, int> emap(n);
+            emhash2::HashMap<int, int> emap(n);
             for (auto v: data)
                 emap.insert_unique(v, 0); //assure key is not exist
             printf("emap unique time = %ld ms\n", now2ms() - ts);
@@ -91,7 +91,7 @@ static void basic_test(int n)
 
         {
             auto ts = now2ms();
-            emilib9::HashSet<int> eset(n);
+            emhash9::HashSet<int> eset(n);
             for (auto v: data)
                 eset.insert_unique(v);
             printf("eset unique time = %ld ms\n", now2ms() - ts);
@@ -116,7 +116,7 @@ static void basic_test(int n)
 
         {
             auto ts = now2ms();
-            emilib2::HashMap<int, int> emap(n);
+            emhash2::HashMap<int, int> emap(n);
             for (auto v: data)
                 emap.insert(v, 0);
             printf("emap insert time = %ld ms loadf = %.3lf/size %zd\n", now2ms() - ts, emap.load_factor(), emap.size());
@@ -133,7 +133,7 @@ static void basic_test(int n)
 
         {
             auto ts = now2ms();
-            emilib9::HashSet<int> eset(n);
+            emhash9::HashSet<int> eset(n);
             eset.insert(data.begin(), data.end());
             printf("eset insert range time = %ld ms loadf = %.3lf/size %zd\n", now2ms() - ts, eset.load_factor(), eset.size());
         }
@@ -174,7 +174,7 @@ the simple benchmark (code in bench/martin_bench.cpp) compared with std::unorder
 
 ### other benchmark
 
-some of benchmark result is uploaded, I use other hash map (martin, ska, phmap, dense_hash_map) source to compile and benchmark.
+some of benchmark result is uploaded, I use other hash map (martinus, ska, phmap, dense_hash_map) source to compile and benchmark.
 [![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench High Load](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
 
 another html result with impressive curve [chartsAll.html](https://github.com/ktprime/emhash/blob/master/bench/tsl_bench/chartsAll.html) 
@@ -188,34 +188,32 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
 
 
 # some bad
-- it's not a node based hash map and can't keep the reference stable if insert/erase/rehash happens, use pointer or choose the node base hash map.
+- it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
 ```
-    emilib2:HashMap<int,int> myhash(10);
+    emhash2:HashMap<int,int> myhash(10);
     myhash[1] = 1;
     auto& myref = myhash[1];//**wrong used here**,  can not keep reference stable
      ....
     auto old = myref ;  // myref maybe changed
 ```
 
-- rehash/iteration performance is some slower than other robin-hood based implementation
-
-- on some platform it'll be hanged compiled by some g++ with -O2, set compile flag with **-fno-stirct-aliasing** to be a work around, it'll be fixed soon
+- on some platform it'll be hanged compiled by some g++ with -O2, set compile flag with **-fno-stirct-aliasing** is a work around, it'll be fixed soon
 
 - for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
 ```  
-  emilib2:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
+  emhash2:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
 
-  emilib2:HashMap<keyT,*valueT> myhash2; //new valueT, or use std::shared_ptr<valueT>.
+  emhash2:HashMap<keyT,*valueT> myhash2; //new valueT, or use std::shared_ptr<valueT>.
   
 ```
 
 
-- some bucket function is not supported just like other falt hash map do. load factor is always less than 1.0.
+- some bucket function is not supported just like other falt hash map do, load factor is always less than 1.0.
 
-- the only known bug as follow if erase not current key/iterater during iteration without break. some key will be iteraored twice or missed.to fix it can deserase performance 20％ or even much more
+- the only known bug as follow if erase not current key/iterator during iteration without break. some key will be iteraored twice or missed.to fix it can desearse performance 20％ or even much more.
 
 ```
-    emilib2:HashMap<int,int> myhash;
+    emhash2:HashMap<int,int> myhash;
     int key = some_key;
     //dome some init
     for (const auto& it : myhash)
