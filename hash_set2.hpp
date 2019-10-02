@@ -67,7 +67,7 @@
 #endif
 
 #define NEW_KEY(key, bucket) new(_pairs + bucket) PairT(key, bucket), _num_filled ++
-#define CLEAR_BUCKET(_bucket)   _pairs[bucket].~PairT(); _num_filled --; NEXT_BUCKET(_pairs, bucket) = INACTIVE
+#define clear_bucket(_bucket)   _pairs[bucket].~PairT(); _num_filled --; NEXT_BUCKET(_pairs, bucket) = INACTIVE
 #define hash_bucket(key)  ((uint32_t)_hasher(key) & _mask)
 
 #if EMILIB_CACHE_LINE_SIZE < 32
@@ -736,7 +736,7 @@ public:
         if (bucket == INACTIVE)
             return 0;
 
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
 #if EMILIB_HIGH_LOAD
         if (bucket >= _last_colls)
             erase_coll(bucket);
@@ -765,7 +765,7 @@ public:
 #endif
 
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
         //move last bucket to current
 #if EMILIB_HIGH_LOAD
         if (bucket >= _last_colls)
@@ -782,7 +782,7 @@ public:
     void _erase(iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
  #if EMILIB_HIGH_LOAD
         if (bucket >= _last_colls)
             erase_coll(bucket);
@@ -793,7 +793,7 @@ public:
     {
         for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
             if (NEXT_BUCKET(_pairs, bucket) != INACTIVE) {
-                CLEAR_BUCKET(bucket);
+                clear_bucket(bucket);
             }
         }
         _last_colls = _max_bucket - 1;
@@ -824,7 +824,7 @@ public:
         const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
 #endif
 
-        if (EMILIB_LIKELY(required_buckets < _max_bucket))
+        if (EMILIB_LIKELY(required_buckets  + 1 < _max_bucket))
             return false;
 
         rehash(required_buckets + 2);

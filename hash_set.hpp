@@ -68,7 +68,6 @@
 
 #define NEW_KEY(key, bucket)    new(_pairs + bucket) PairT(key, bucket), _num_filled ++
 #define COPY_KEY(key, bucket)   _pairs[bucket].first = key
-#define CLEAR_BUCKET(_bucket)   _pairs[bucket].~PairT(); _num_filled --; NEXT_BUCKET(_pairs, bucket) = INACTIVE
 #define hash_bucket(key)  ((uint32_t)_hasher(key) & _mask)
 
 #if EMILIB_CACHE_LINE_SIZE < 32
@@ -702,7 +701,7 @@ public:
         if (bucket == INACTIVE)
             return 0;
 
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
         return 1;
     }
 
@@ -728,7 +727,7 @@ public:
 
         const auto bucket = erase_bucket(it._bucket);
 
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
         if (bucket == it._bucket)
             ++it;
@@ -739,14 +738,14 @@ public:
     void _erase(iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
     }
 
     void clearkv()
     {
         for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
             if (NEXT_BUCKET(_pairs, bucket) != INACTIVE) {
-                CLEAR_BUCKET(bucket);
+                clear_bucket(bucket);
             }
         }
     }
@@ -771,7 +770,7 @@ public:
     {
         auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13);
         //const auto required_buckets = num_elems * 10 / 8;
-        if (EMILIB_LIKELY(required_buckets < _num_buckets))
+        if (EMILIB_LIKELY(required_buckets < _mask))
             return false;
 
         rehash(required_buckets + 2);
@@ -840,6 +839,13 @@ private:
     inline bool check_expand_need()
     {
         return reserve(_num_filled);
+    }
+
+    void clear_bucket(uint32_t bucket)
+    {
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+        _pairs[bucket].~PairT();
+        _num_filled --;
     }
 
     uint32_t erase_key(const KeyT& key) noexcept

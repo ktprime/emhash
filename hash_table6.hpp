@@ -102,8 +102,6 @@
     #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++
 #endif
 
-#define CLEAR_BUCKET(bucket)  ADDR_BUCKET(_pairs, bucket) = INACTIVE; _pairs[bucket].~PairT(); _num_filled --
-
 namespace emhash6 {
 
 constexpr uint32_t INACTIVE = (1u << 31) + 1;
@@ -470,13 +468,13 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) / (float)_loadlf;
+        return (1 << 17) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
         if (value < 0.90f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 13) / value);
+            _loadlf = (uint32_t)((1 << 17) / value);
     }
 
     constexpr size_type max_size() const
@@ -875,7 +873,7 @@ public:
         if ((int)bucket < 0)
             return 0;
 
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
         return 1;
     }
 
@@ -892,7 +890,7 @@ public:
     iterator erase(iterator it) noexcept
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
         if (bucket == it._bucket)
             ++it;
@@ -903,7 +901,7 @@ public:
     void _erase(const_iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
     }
 
     static constexpr bool is_notriviall_destructable()
@@ -929,7 +927,7 @@ public:
         for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
             if (ISEMPTY_BUCKET(_pairs, bucket))
                 continue;
-            CLEAR_BUCKET(bucket);
+            clear_bucket(bucket);
         }
     }
 
@@ -952,9 +950,9 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) noexcept
     {
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13) + 2;
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 17);
         //const auto required_buckets = num_elems * 19 / 16;
-        if (EMHASH_LIKELY(required_buckets < _num_buckets))
+        if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
         rehash(required_buckets + 2);
@@ -1039,6 +1037,13 @@ private:
     inline bool check_expand_need()
     {
         return reserve(_num_filled);
+    }
+
+    void clear_bucket(uint32_t bucket)
+    {
+        ADDR_BUCKET(_pairs, bucket) = INACTIVE;
+        _pairs[bucket].~PairT();
+        _num_filled --;
     }
 
 #if EMHASH_ERASE_SMALL

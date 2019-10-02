@@ -82,8 +82,6 @@
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
 #endif
 
-#define CLEAR_BUCKET(bucket)  NEXT_BUCKET(_pairs, bucket) = INACTIVE; _pairs[bucket].~PairT(); _num_filled --
-
 namespace emhash5 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
@@ -898,7 +896,7 @@ public:
         if (bucket == INACTIVE)
             return 0;
 
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
         return 1;
     }
 
@@ -914,7 +912,7 @@ public:
     iterator erase(iterator it) noexcept
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
         if (bucket == it._bucket)
             ++it;
@@ -925,7 +923,7 @@ public:
     void _erase(const_iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        clear_bucket(bucket);
     }
 
     constexpr bool is_notrivially() noexcept
@@ -940,9 +938,8 @@ public:
     void clearkv()
     {
         for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
-            if (NEXT_BUCKET(_pairs, bucket) != INACTIVE) {
-                CLEAR_BUCKET(bucket);
-            }
+            if (NEXT_BUCKET(_pairs, bucket) != INACTIVE)
+                clear_bucket(bucket);
         }
     }
 
@@ -965,9 +962,9 @@ public:
     /// Make room for this many elements
     bool reserve(uint32_t num_elems) noexcept
     {
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 13) + 2;
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 13);
         //const auto required_buckets = num_elems * 19 / 16;
-        if (EMHASH_LIKELY(required_buckets < _num_buckets))
+        if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
         rehash(required_buckets + 2);
@@ -1039,7 +1036,14 @@ private:
         return reserve(_num_filled);
     }
 
-    uint32_t erase_key(const KeyT& key) noexcept
+    void clear_bucket(uint32_t bucket)
+    {
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+        _pairs[bucket].~PairT();
+        _num_filled --;
+    }
+
+    uint32_t erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -1078,7 +1082,7 @@ private:
         return INACTIVE;
     }
 
-    uint32_t erase_bucket(const uint32_t bucket) noexcept
+    uint32_t erase_bucket(const uint32_t bucket)
     {
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
@@ -1100,7 +1104,7 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
-    uint32_t find_filled_bucket(const KeyT& key) const noexcept
+    uint32_t find_filled_bucket(const KeyT& key) const
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -1148,7 +1152,7 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    uint32_t find_or_allocate(const KeyT& key) noexcept
+    uint32_t find_or_allocate(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         const auto& bucket_key = GET_KEY(_pairs, bucket);
@@ -1193,7 +1197,7 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    uint32_t find_empty_bucket(const uint32_t bucket_from) const noexcept
+    uint32_t find_empty_bucket(const uint32_t bucket_from) const
     {
         const auto bucket1 = bucket_from + 1;
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
