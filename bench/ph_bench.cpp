@@ -240,9 +240,9 @@ void out(const char* test, int64_t cnt, const Timer &t)
 void outmem(const char* test, int64_t cnt, uint64_t mem)
 {
   if (mem < 1024 * 1024)
-	  printf("%s,memory,%lld,%s,%lld KB\r", test, cnt, program_slug, mem / 1024);
+      printf("%s,memory,%lld,%s,%lld KB\r", test, cnt, program_slug, mem / 1024);
   else
-	  printf("%s,memory,%lld,%s,%.2lf MB\r", test, cnt, program_slug, mem / (1024 * 1024.0));
+      printf("%s,memory,%lld,%s,%.2lf MB\r", test, cnt, program_slug, mem / (1024 * 1024.0));
 }
 
 static bool all_done = false;

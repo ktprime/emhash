@@ -223,7 +223,7 @@ template<class MAP> void bench_insert(MAP& map)
         {
             auto ts = now2ms();
             map.clear();
-            printf("    clear 100M int %.4lf , size = %d\n", ((int)(now2ms() - ts)) / 1000.0, (int)map.size());
+            printf("    clear 100M int %.4lf, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, (int)map.size());
         }
 
         {
@@ -304,7 +304,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
 
         printf("    %02ld bits %2zd M cycles time use %.4lf sec map %zd size\n", std::bitset<64>(bitMask).count(), (max_n / 1000'000), ((int)(now2ms() - ts)) / 1000.0, map.size());
 #ifndef _MSC_VER
-        assert(map.size() == expectedFinalSizes[i]);
+       // assert(map.size() == expectedFinalSizes[i]);
 #endif
     }
     printf("total time = %.2lf s\n\n", (now2ms() - nowms) / 1000.0);
@@ -904,6 +904,53 @@ int main(int argc, char* argv[])
 
     if (1)
     {
+#ifdef HOOD_HASH
+        typedef robin_hood::hash<int> hash_func;
+#else
+        typedef std::hash<int> hash_func;
+#endif
+        { emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+        { emhash5::HashMap<int, int, hash_func> emap; bench_insert(emap); /*            emap.dump_statis(); **/ }
+        { emhash2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+#if EM3
+        { emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+#endif
+        { emhash4::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+#if OHASH
+        { tsl::robin_map     <int, int, hash_func> rmap; bench_insert(rmap); }
+        { robin_hood::unordered_flat_map <int, int, hash_func> martin; bench_insert(martin); }
+        { ska::flat_hash_map <int, int, hash_func> fmap; bench_insert(fmap); }
+        { phmap::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
+#endif
+        putchar('\n');
+    }
+
+    if (1)
+    {
+#if 1
+        typedef robin_hood::hash<uint64_t> hash_func;
+#else
+        typedef std::hash<uint64_t> hash_func;
+#endif
+
+		{ emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); /*            emap.dump_statis(); */ }
+		{ emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+		{ emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+		{ emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+#if EM3
+		{ emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); /*            emap.dump_statis(); */ }
+#endif
+#if OHASH
+		{ tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
+		{ robin_hood::unordered_flat_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
+		{ ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
+		{ phmap::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+#endif
+		putchar('\n');
+	}
+
+    if (1)
+    {
 #if 1
         typedef robin_hood::hash<size_t> hash_func;
 #else
@@ -922,53 +969,6 @@ int main(int argc, char* argv[])
         { emhash6::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 #if EM3
         { emhash3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
-#endif
-        putchar('\n');
-    }
-
-    if (1)
-    {
-#if 1
-        typedef robin_hood::hash<uint64_t> hash_func;
-#else
-        typedef std::hash<uint64_t> hash_func;
-#endif
-
-        { emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); /*            emap.dump_statis(); */ }
-        { emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-#if EM3
-        { emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); /*            emap.dump_statis(); */ }
-#endif
-#if OHASH
-        { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
-        { robin_hood::unordered_flat_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
-        { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
-        { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
-#endif
-        putchar('\n');
-    }
-
-    if (1)
-    {
-#ifdef HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
-        typedef std::hash<int> hash_func;
-#endif
-        { emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-        { emhash5::HashMap<int, int, hash_func> emap; bench_insert(emap); /*            emap.dump_statis(); **/ }
-        { emhash2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-#if EM3
-        { emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-#endif
-        { emhash4::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-#if OHASH
-        { tsl::robin_map     <int, int, hash_func> rmap; bench_insert(rmap); }
-        { robin_hood::unordered_flat_map <int, int, hash_func> martin; bench_insert(martin); }
-        { ska::flat_hash_map <int, int, hash_func> fmap; bench_insert(fmap); }
-        { phmap::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
 #endif
         putchar('\n');
     }
