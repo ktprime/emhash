@@ -171,7 +171,6 @@ struct entry {
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
 {
-
 private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
 
@@ -338,7 +337,7 @@ public:
 
     HashMap(HashMap&& other)
     {
-        init(1);
+        init(0);
         *this = std::move(other);
     }
 
@@ -670,7 +669,7 @@ public:
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
-    bool try_get(const KeyT& key, ValueT& val) const noexcept
+    bool try_get(const KeyT& key, ValueT& val) const
     {
         const auto bucket = find_filled_bucket(key);
         const auto find = bucket != _num_buckets;
@@ -977,7 +976,7 @@ public:
     }
 
     /// Make room for this many elements
-    bool reserve(uint64_t num_elems)
+    bool reserve(uint64_t num_elems) noexcept
     {
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13);
         //const auto required_buckets = num_elems * 19 / 16;
@@ -1299,7 +1298,7 @@ private:
             if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
                 return bucket2;
 #if 0
-            else if (slot > 5) {
+            else if (slot > 8) {
                 const auto next2 = (bucket_from + _num_buckets + last) & _mask;
                 const auto bucket3 = next2 + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)

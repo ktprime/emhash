@@ -190,7 +190,7 @@ public:
     typedef ValueT mapped_type;
 
     typedef  size_t       size_type;
-    typedef  PairT        value_type;
+    typedef  std::pair<KeyT, ValueT>        value_type;
     typedef  PairT&       reference;
     typedef  const PairT& const_reference;
 

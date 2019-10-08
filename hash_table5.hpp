@@ -971,7 +971,6 @@ public:
         return true;
     }
 
-private:
     /// Make room for this many elements
     void rehash(uint32_t required_buckets) noexcept
     {

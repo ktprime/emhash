@@ -11,7 +11,7 @@
 //#include "wyhash.h"
 
 #ifndef TP
-#define TP                   100
+#define TP                   1000
 #endif
 //#define HOOD_HASH            1
 //#define EMHASH_BUCKET_INDEX  1
@@ -25,9 +25,9 @@
 //#define EMHASH_IDENTITY_HASH 1
 
 //#define EMHASH_LRU_SET       1
-//#define EMHASH_ERASE_SMALL     1
+//#define EMHASH_ERASE_SMALL   1
 //#define EMHASH_STD_STRING    1
-//#define EMHASH_HIGH_LOAD 201000
+#define EMHASH_HIGH_LOAD 201000
 
 
 #ifndef TKey
@@ -74,7 +74,7 @@
     #define _CPP11_HASH    1
     #include "./tsl/robin_map.h"        //https://github.com/tessil/robin-map
     #include "./tsl/hopscotch_map.h"    //https://github.com/tessil/hopscotch-map
-    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "./martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
     #include "./ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
     #include "./phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 
@@ -141,21 +141,23 @@ emhash6::HashMap<std::string, std::string> show_name = {
     {"emhash2", "emhash2"},
     {"emhash6", "emhash6"},
     {"emhash4", "emhash4"},
-//    {"emhash3", "emhash3"},
-    {"emhash5", "emhash5"},
-//    {"emhash7", "emhash7"},
 
+//    {"emhash3", "emhash3"},
+//    {"emhash5", "emhash5"},
+
+#if ET > 0
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
-//#if ET
-#if HOOD_HASH || KEY_INT == 0
+#if ET > 1
     {"robin", "tessil robin"},
-//    {"hopsco", "tessil hopsco"},
     {"flat", "skarupk flat"},
 #endif
-//#endif
+#if ET > 2
+    {"hopsco", "tessil hopsco"},
+    {"byte", "skarupk byte"},
+#endif
+#endif
 
-//    {"byte", "skarupk byte"},
 };
 
 static int64_t getTime()
@@ -189,135 +191,135 @@ static int ilog(int x, const int n = 2)
 }
 
 uint64_t randomseed() {
-	std::random_device rd;
-	return std::uniform_int_distribution<uint64_t>{}(rd);
+    std::random_device rd;
+    return std::uniform_int_distribution<uint64_t>{}(rd);
 }
 // this is probably the fastest high quality 64bit random number generator that exists.
 // Implements Small Fast Counting v4 RNG from PractRand.
 class sfc64 {
 public:
-	using result_type = uint64_t;
+    using result_type = uint64_t;
 
-	sfc64()
-		: sfc64(randomseed()) {}
+    sfc64()
+        : sfc64(randomseed()) {}
 
-	sfc64(uint64_t a, uint64_t b, uint64_t c, uint64_t counter)
-		: m_a{ a }
-		, m_b{ b }
-		, m_c{ c }
-		, m_counter{ counter } {}
+    sfc64(uint64_t a, uint64_t b, uint64_t c, uint64_t counter)
+        : m_a{ a }
+        , m_b{ b }
+        , m_c{ c }
+        , m_counter{ counter } {}
 
-	sfc64(std::array<uint64_t, 4> const& state)
-		: m_a{ state[0] }
-		, m_b{ state[1] }
-		, m_c{ state[2] }
-		, m_counter{ state[3] } {}
+    sfc64(std::array<uint64_t, 4> const& state)
+        : m_a{ state[0] }
+        , m_b{ state[1] }
+        , m_c{ state[2] }
+        , m_counter{ state[3] } {}
 
-	explicit sfc64(uint64_t seed)
-		: m_a(seed)
-		, m_b(seed)
-		, m_c(seed)
-		, m_counter(1) {
-		for (int i = 0; i < 12; ++i) {
-			operator()();
-		}
-	}
+    explicit sfc64(uint64_t seed)
+        : m_a(seed)
+        , m_b(seed)
+        , m_c(seed)
+        , m_counter(1) {
+        for (int i = 0; i < 12; ++i) {
+            operator()();
+        }
+    }
 
-	// no copy ctors so we don't accidentally get the same random again
-	sfc64(sfc64 const&) = delete;
-	sfc64& operator=(sfc64 const&) = delete;
+    // no copy ctors so we don't accidentally get the same random again
+    sfc64(sfc64 const&) = delete;
+    sfc64& operator=(sfc64 const&) = delete;
 
-	sfc64(sfc64&&) = default;
-	sfc64& operator=(sfc64&&) = default;
+    sfc64(sfc64&&) = default;
+    sfc64& operator=(sfc64&&) = default;
 
-	~sfc64() = default;
+    ~sfc64() = default;
 
-	static constexpr uint64_t(min)() {
-		return (std::numeric_limits<uint64_t>::min)();
-	}
-	static constexpr uint64_t(max)() {
-		return (std::numeric_limits<uint64_t>::max)();
-	}
+    static constexpr uint64_t(min)() {
+        return (std::numeric_limits<uint64_t>::min)();
+    }
+    static constexpr uint64_t(max)() {
+        return (std::numeric_limits<uint64_t>::max)();
+    }
 
-	void seed() {
-		seed(randomseed());
-	}
+    void seed() {
+        seed(randomseed());
+    }
 
-	void seed(uint64_t seed) {
-		state(sfc64{ seed }.state());
-	}
+    void seed(uint64_t seed) {
+        state(sfc64{ seed }.state());
+    }
 
-	uint64_t operator()() noexcept {
-		auto const tmp = m_a + m_b + m_counter++;
-		m_a = m_b ^ (m_b >> right_shift);
-		m_b = m_c + (m_c << left_shift);
-		m_c = rotl(m_c, rotation) + tmp;
-		return tmp;
-	}
+    uint64_t operator()() noexcept {
+        auto const tmp = m_a + m_b + m_counter++;
+        m_a = m_b ^ (m_b >> right_shift);
+        m_b = m_c + (m_c << left_shift);
+        m_c = rotl(m_c, rotation) + tmp;
+        return tmp;
+    }
 
-	template <typename T>
-	T uniform(T input) {
-		return static_cast<T>(operator()(static_cast<uint64_t>(input)));
-	}
+    template <typename T>
+    T uniform(T input) {
+        return static_cast<T>(operator()(static_cast<uint64_t>(input)));
+    }
 
-	template <typename T>
-	T uniform() {
-		return static_cast<T>(operator()());
-	}
+    template <typename T>
+    T uniform() {
+        return static_cast<T>(operator()());
+    }
 
-	// Uses the java method. A bit slower than 128bit magic from
-	// https://arxiv.org/pdf/1805.10941.pdf, but produces the exact same results in both 32bit and
-	// 64 bit.
-	uint64_t operator()(uint64_t boundExcluded) noexcept {
-		uint64_t x, r;
-		do {
-			x = operator()();
-			r = x % boundExcluded;
-		} while (x - r > (UINT64_C(0) - boundExcluded));
-		return r;
-	}
+    // Uses the java method. A bit slower than 128bit magic from
+    // https://arxiv.org/pdf/1805.10941.pdf, but produces the exact same results in both 32bit and
+    // 64 bit.
+    uint64_t operator()(uint64_t boundExcluded) noexcept {
+        uint64_t x, r;
+        do {
+            x = operator()();
+            r = x % boundExcluded;
+        } while (x - r > (UINT64_C(0) - boundExcluded));
+        return r;
+    }
 
-	std::array<uint64_t, 4> state() const {
-		return { {m_a, m_b, m_c, m_counter} };
-	}
+    std::array<uint64_t, 4> state() const {
+        return { {m_a, m_b, m_c, m_counter} };
+    }
 
-	void state(std::array<uint64_t, 4> const& s) {
-		m_a = s[0];
-		m_b = s[1];
-		m_c = s[2];
-		m_counter = s[3];
-	}
+    void state(std::array<uint64_t, 4> const& s) {
+        m_a = s[0];
+        m_b = s[1];
+        m_c = s[2];
+        m_counter = s[3];
+    }
 
 private:
-	template <typename T>
-	T rotl(T const x, size_t k) {
-		return (x << k) | (x >> (8 * sizeof(T) - k));
-	}
+    template <typename T>
+    T rotl(T const x, size_t k) {
+        return (x << k) | (x >> (8 * sizeof(T) - k));
+    }
 
-	static constexpr size_t rotation = 24;
-	static constexpr size_t right_shift = 11;
-	static constexpr size_t left_shift = 3;
-	uint64_t m_a;
-	uint64_t m_b;
-	uint64_t m_c;
-	uint64_t m_counter;
+    static constexpr size_t rotation = 24;
+    static constexpr size_t right_shift = 11;
+    static constexpr size_t left_shift = 3;
+    uint64_t m_a;
+    uint64_t m_b;
+    uint64_t m_c;
+    uint64_t m_counter;
 };
 
 class RandomBool {
 public:
-	template <typename Rng>
-	bool operator()(Rng& rng) {
-		if (1 == m_rand) {
-			m_rand = std::uniform_int_distribution<size_t>{}(rng) | s_mask_left1;
-		}
-		bool const ret = m_rand & 1;
-		m_rand >>= 1;
-		return ret;
-	}
+    template <typename Rng>
+    bool operator()(Rng& rng) {
+        if (1 == m_rand) {
+            m_rand = std::uniform_int_distribution<size_t>{}(rng) | s_mask_left1;
+        }
+        bool const ret = m_rand & 1;
+        m_rand >>= 1;
+        return ret;
+    }
 
 private:
-	static constexpr const size_t s_mask_left1 = size_t(1) << (sizeof(size_t) * 8 - 1);
-	size_t m_rand = 1;
+    static constexpr const size_t s_mask_left1 = size_t(1) << (sizeof(size_t) * 8 - 1);
+    size_t m_rand = 1;
 };
 
 static std::map<std::string, size_t>  check_result;
@@ -560,9 +562,6 @@ void hash_copy(MAP& amap, const std::string& map_name, std::vector<keyType>& vLi
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
     }
 }
-
-//#define FUNC_RANK() for (auto& v : func_time) \ printf("   %-4ld     %-49s\n",  v.first, v.second.c_str()); putchar('\n'); func_time.clear();
-#define FUNC_RANK()  func_time.clear();
 
 #ifndef PACK
 #define PACK 128
@@ -885,7 +884,7 @@ int benOneMap(MAP& hmap, const std::string& map_name, std::vector<keyType>& oLis
 
     auto lf = (int)(hmap.load_factor() * 100);
 
-#if UF
+#ifdef UF
     hash_iter(hmap, map_name, vList);
     hash_copy(hmap, map_name, vList);
     hash_clear(hmap, map_name, vList);
@@ -1016,12 +1015,13 @@ static int benchMarkHashMap2(int n)
 
         puts("======== map  top1   top2  top3 =======================");
         for (auto& v : rank)
-            printf("%13s %4.1lf  %4.1lf %4ld\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (v.second % (base2 / 2)));
+            printf("%13s %4.1lf  %4.1lf %4d\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (int)(v.second % (base2 / 2)));
 
         puts("======== map    score ================================");
         for (auto& v : rank_time)
-            printf("%13s %4ld\n", v.first.c_str(), v.second / (tcase - 1));
+            printf("%13s %4d\n", v.first.c_str(), (int)(v.second / (tcase - 1)));
 #if _WIN32
+        Sleep(1000*5);
         //        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 #else
         usleep(1000*4000);
@@ -1146,7 +1146,7 @@ int main(int argc, char* argv[])
 //    testSynax();
     double load_factor = 0.0;
 
-    sfc64 srng(1);
+    sfc64 srng;
 
     if (argc == 1)
         printf("./test maxn load_factor(0-100) n (key=%s,value=%s)\n", sKeyType, sValueType);

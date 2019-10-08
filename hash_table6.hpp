@@ -473,7 +473,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.90f && value > 0.2f)
+        if (value < 0.95f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 17) / value);
     }
 
@@ -1047,7 +1047,7 @@ private:
     }
 
 #if EMHASH_ERASE_SMALL
-    uint32_t erase_key(const KeyT& key) noexcept
+    uint32_t erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
@@ -1089,7 +1089,7 @@ private:
         return INACTIVE;
     }
 #else
-    uint32_t erase_key(const KeyT& key) noexcept
+    uint32_t erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
@@ -1127,7 +1127,7 @@ private:
     }
 #endif
 
-    uint32_t erase_bucket(const uint32_t bucket) noexcept
+    uint32_t erase_bucket(const uint32_t bucket)
     {
         const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -1156,7 +1156,7 @@ private:
     // Find the bucket with this key, or return bucket size
     //1. next_bucket = INACTIVE, empty bucket
     //2. next_bucket % 2 == 0 is main bucket
-    uint32_t find_filled_bucket(const KeyT& key) const noexcept
+    uint32_t find_filled_bucket(const KeyT& key) const
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
@@ -1186,7 +1186,7 @@ private:
     //it will break the orgin link and relnik again.
     //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
     //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
-    uint32_t kickout_bucket(const uint32_t bucket) noexcept
+    uint32_t kickout_bucket(const uint32_t bucket)
     {
         const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
@@ -1209,7 +1209,7 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    uint32_t find_or_allocate(const KeyT& key) noexcept
+    uint32_t find_or_allocate(const KeyT& key)
     {
         auto bucket = hash_bucket(key);
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
@@ -1252,7 +1252,7 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    uint32_t find_empty_bucket(const uint32_t bucket_from) const noexcept
+    uint32_t find_empty_bucket(const uint32_t bucket_from) const
     {
         const auto bucket1 = bucket_from + 1;
         if (ISEMPTY_BUCKET(_pairs, bucket1))
@@ -1301,7 +1301,7 @@ private:
         }
     }
 
-    uint32_t find_prev_bucket(uint32_t main_bucket, const uint32_t bucket) const noexcept
+    uint32_t find_prev_bucket(uint32_t main_bucket, const uint32_t bucket) const
     {
         auto next_bucket = NEXT_BUCKET(_pairs, main_bucket);
         if (next_bucket == bucket)
@@ -1315,7 +1315,7 @@ private:
         }
     }
 
-    uint32_t find_unique_bucket(const KeyT& key) noexcept
+    uint32_t find_unique_bucket(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
