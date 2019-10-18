@@ -1073,10 +1073,7 @@ private:
         while (true) {
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (_eq(key, GET_KEY(_pairs, next_bucket))) {
-                if (prev_bucket == bucket)
-                    ADDR_BUCKET(_pairs, prev_bucket) = nbucket == next_bucket ? prev_bucket * 2 : nbucket * 2;
-                else
-                    ADDR_BUCKET(_pairs, prev_bucket) = nbucket == next_bucket ? prev_bucket * 2 + 1 : nbucket * 2 + 1;
+                ADDR_BUCKET(_pairs, prev_bucket) = (nbucket == next_bucket ? prev_bucket * 2 : nbucket * 2) + (1 - (prev_bucket == bucket));
                 return next_bucket;
             }
 
@@ -1106,7 +1103,7 @@ private:
             if (_eq(key, GET_KEY(_pairs, next_bucket))) {
                 find_bucket = next_bucket;
                 if (nbucket == next_bucket) {
-                    ADDR_BUCKET(_pairs, prev_bucket) = prev_bucket * 2 + (prev_bucket == bucket ? 0 : 1);
+                    ADDR_BUCKET(_pairs, prev_bucket) = prev_bucket * 2 + 1 - (prev_bucket == bucket);
                     break;
                 }
             }
@@ -1114,7 +1111,7 @@ private:
                 if ((int)find_bucket >= 0) {
                     GET_PKV(_pairs, find_bucket).swap(GET_PKV(_pairs, nbucket));
 //                    GET_PKV(_pairs, find_bucket) = GET_PKV(_pairs, nbucket);
-                    ADDR_BUCKET(_pairs, prev_bucket) = prev_bucket * 2 + (prev_bucket == bucket ? 0 : 1);
+                    ADDR_BUCKET(_pairs, prev_bucket) = prev_bucket * 2 + 1 - (prev_bucket == bucket);
                     find_bucket = nbucket;
                 }
                 break;
@@ -1193,7 +1190,7 @@ private:
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
 
-        ADDR_BUCKET(_pairs, prev_bucket) = new_bucket * 2 + (prev_bucket == main_bucket ?  0 : 1);
+        ADDR_BUCKET(_pairs, prev_bucket) += (new_bucket - bucket) * 2;
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _pairs[bucket].~PairT();
 
         if (next_bucket == bucket)
