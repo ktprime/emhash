@@ -1299,7 +1299,7 @@ private:
                 return bucket2;
 #if 0
             else if (slot > 8) {
-                const auto next2 = (bucket_from + _num_buckets + last) & _mask;
+                const auto next2 = (bucket_from + _num_filled + last / 4) & _mask;
                 const auto bucket3 = next2 + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
                     return bucket3;

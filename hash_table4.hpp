@@ -1353,7 +1353,7 @@ private:
 
 #if 0
             if (slot > 5) {
-                const auto next = (bucket_from + last * last) & _mask;
+                const auto next = (bucket + last * last) & _mask;
                 const auto bucket3 = next2 + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
                     return bucket3;

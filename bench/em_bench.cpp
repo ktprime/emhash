@@ -20,13 +20,13 @@
 //#define EMHASH_AVX_MEMCPY  1
 //#define EMHASH_STATIS      1
 
-//#define EMHASH_FIBONACCI_HASAH 1
-#define EMHASH_SAFE_HASH     1
+//#define EMHASH_FIBONACCI_HASH 1
+//#define EMHASH_SAFE_HASH     1
 //#define EMHASH_IDENTITY_HASH 1
 
 //#define EMHASH_LRU_SET       1
-//#define EMHASH_ERASE_SMALL     1
 //#define EMHASH_STD_STRING    1
+//#define EMHASH_ERASE_SMALL     1
 //#define EMHASH_HIGH_LOAD 201000
 
 
@@ -72,11 +72,11 @@
 //http://www.ilikebigbits.com/2016_08_28_hash_table.html
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 
-#if __cplusplus >= 199711L
-//    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#if __cplusplus >= 199711L || HOOD_HASH
+    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
-#if __cplusplus >= 201103L || _MSC_VER >= 1601
+#if ET
     #define _CPP11_HASH    1
     #include "./tsl/robin_map.h"        //https://github.com/tessil/robin-map
     #include "./tsl/hopscotch_map.h"    //https://github.com/tessil/hopscotch-map
@@ -151,7 +151,7 @@ emhash6::HashMap<std::string, std::string> show_name = {
 //    {"emhash3", "emhash3"},
 //    {"emhash5", "emhash5"},
 
-#if ET >= 0
+#if ET > 0
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
 #if ET > 1
@@ -167,8 +167,8 @@ emhash6::HashMap<std::string, std::string> show_name = {
 
 static int64_t getTime()
 {
-#if _WIN32
-    FILETIME ptime[4] = {0};
+#if 0
+    FILETIME ptime[4] = {0, 0, 0, 0};
     GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[1], &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif __linux__ || __unix__
@@ -646,17 +646,6 @@ static_assert(sizeof(RankItem) == PACK, "PACK >=24");
 #endif
 
 #include <chrono>
-
-static uint32_t get32rand()
-{
-    return (rand() ^ (rand() << 15u) ^ (rand() << 30u));
-}
-
-static int64_t get64rand()
-{
-    return (((uint64_t)get32rand()) << 32) | get32rand();
-}
-
 static const std::array<char, 62> ALPHANUMERIC_CHARS = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -667,6 +656,7 @@ static const std::int64_t SEED = 0;
 static std::mt19937_64 generator(SEED);
 std::uniform_int_distribution<std::size_t> rd_uniform(0, ALPHANUMERIC_CHARS.size() - 1);
 
+#ifndef KEY_INT
 static std::string get_random_alphanum_string(std::size_t size) {
     std::string str(size, '\0');
     for(std::size_t i = 0; i < size; i++) {
@@ -675,6 +665,7 @@ static std::string get_random_alphanum_string(std::size_t size) {
 
     return str;
 }
+#endif
 
 template<class RandomIt>
 void shuffle(RandomIt first, RandomIt last)
@@ -741,7 +732,7 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
             }
             else if (flag == 4) {
                 if (srng() % 32 == 0)
-                    k += 64;
+                    k += 32;
             } else if (flag == 5) {
                 k = i * (uint64_t)pow2 + srng() % (pow2 / 8);
             }
@@ -759,7 +750,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
     emhash6::HashMap <keyType,int> ehash5;
     emhash2::HashMap <keyType,int> ehash2;
 
-#if _CPP11_HASH
+#if 1
     //robin_hood::unordered_map <keyType,int> unhash;
     emhash5::HashMap <keyType,int> unhash;
 #else
@@ -861,7 +852,7 @@ int benOneHash(hash_type& hash, const std::string& hash_name, std::vector<keyTyp
 
     auto vList(oList);
 
-    hash.reserve(vList.size() / 8);
+    hash.reserve(vList.size() / 64);
     insert_noreserve(hash, hash_name, vList);
     insert_reserve(hash, hash_name, vList);
 
@@ -916,6 +907,36 @@ struct StrHasher
   }
 };
 
+constexpr auto base1 = 300000000;
+constexpr auto base2 =      20000; 
+void reset_top3(std::map<std::string,int64_t>& top3, const std::multimap <int64_t, std::string>& once_time_hash)
+{
+    auto it0 = once_time_hash.begin();
+    auto it1 = *(it0++);
+    auto it2 = *(it0++);
+    auto it3 = *(it0++);
+
+    //the top 3 func map
+    if (it1.first == it3.first) {
+        top3[it1.second] += base1 / 3;
+        top3[it2.second] += base1 / 3;
+        top3[it3.second] += base1 / 3;
+    } else if (it1.first == it2.first) {
+        top3[it1.second] += base1 / 2;
+        top3[it2.second] += base1 / 2;
+        top3[it3.second] += 1;
+    } else {
+        top3[it1.second] += base1;
+        if (it2.first == it3.first) {
+            top3[it2.second] += base2 / 2;
+            top3[it3.second] += base2 / 2;
+        } else {
+            top3[it2.second] += base2;
+            top3[it3.second] += 1;
+        }
+    }    
+}
+
 static int benchHashMap(int n)
 {
     if (n < 10000)
@@ -938,7 +959,7 @@ static int benchHashMap(int n)
     once_func_hash_time.clear();
 
     std::vector<keyType> vList;
-    auto step = buildTestData(n, vList);
+    auto flag = buildTestData(n, vList);
 
 #ifdef KEY_INT
     using ehash_func = hash_func;
@@ -968,7 +989,7 @@ static int benchHashMap(int n)
 #endif
 
     static int tcase = 1;
-    printf("\n %d ======== n = %d, flag = %d load_factor = %.2lf ========\n", tcase, n, step, iload / 100.0);
+    printf("\n %d ======== n = %d, load_factor = %.2lf, flag = %d ========\n", tcase, n, iload / 100.0, flag);
     std::multimap <int64_t, std::string> once_time_hash;
     static std::map<std::string, std::map<std::string, int64_t>> func_hash_time;
     static std::map<std::string,int64_t> top3;
@@ -977,36 +998,9 @@ static int benchHashMap(int n)
     add_hash_func_time(func_hash_time, once_time_hash);
     const auto last  = double(once_time_hash.rbegin()->first);
     const auto first = double(once_time_hash.begin()->first);
-    if (first < 10 || last < 9) {
-        //return -1;
-    }
 
-    auto it0 = once_time_hash.begin();
-    auto it1 = *(it0++);
-    auto it2 = *(it0++);
-    auto it3 = *(it0++);
-
-    constexpr auto base1 = 300000000;
-    constexpr auto base2 =      20000;
-
-    //the top 3 func map
-    if (it1.first == it3.first) {
-        top3[it1.second] += base1 / 3;
-        top3[it2.second] += base1 / 3;
-        top3[it3.second] += base1 / 3;
-    } else if (it1.first == it2.first) {
-        top3[it1.second] += base1 / 2;
-        top3[it2.second] += base1 / 2;
-        top3[it3.second] += 1;
-    } else {
-        top3[it1.second] += base1;
-        if (it2.first == it3.first) {
-            top3[it2.second] += base2 / 2;
-            top3[it3.second] += base2 / 2;
-        } else {
-            top3[it2.second] += base2;
-            top3[it3.second] += 1;
-        }
+    if (once_time_hash.size() >= 3) {
+        reset_top3(top3, once_time_hash);
     }
 
     for (auto& v : once_time_hash) {
@@ -1021,6 +1015,7 @@ static int benchHashMap(int n)
         printf("--------------------------------%s lf = %d--------------------------------\n", __FUNCTION__, iload);
         dump_all(func_hash_time, hash_score);
 
+        if (top3.size() >= 3)
         puts("======== hash  top1   top2  top3 =======================");
         for (auto& v : top3)
             printf("%13s %4.1lf  %4.1lf %4d\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (int)(v.second % (base2 / 2)));
@@ -1103,7 +1098,7 @@ static int readFile(std::string fileName, int size)
 
 void testSynax()
 {
-    emhash3::HashMap <std::string, std::string> mymap =
+    emhash6::HashMap <std::string, std::string> mymap =
     {
         {"house","maison"},
         {"apple","pomme"},
