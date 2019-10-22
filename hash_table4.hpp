@@ -962,10 +962,7 @@ public:
 #endif
 
         //erase from main bucket, return main bucket as next
-        if (bucket == it._bucket)
-            ++it;
-
-        return it;
+        return (bucket == it._bucket) ? ++it : it;
     }
 
     constexpr bool is_notriviall_destructable()
@@ -1016,19 +1013,18 @@ public:
     bool reserve(size_t num_elems) noexcept
     {
 #ifdef EMHASH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)(num_elems * 9 / 8) + 2; //f = 8.0 / 9
+        const auto required_buckets = (uint32_t)(num_elems * 9 / 8); //f = 8.0 / 9
 #else
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13) + 2;
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
 #endif
 
         if (EMHASH_LIKELY(required_buckets < _max_bucket))
             return false;
 
-        rehash(required_buckets);
+        rehash(required_buckets + 2);
         return true;
     }
 
-private:
     /// Make room for this many elements
     void rehash(uint32_t required_buckets)
     {
@@ -1066,7 +1062,7 @@ private:
 #if EMHASH_SAFE_HASH
         if (_hash_inter == 0 && old_num_filled > 10000) {
             //adjust hash function if bad hash function, alloc more memory
-            auto mbucket = 0;
+            uint32_t mbucket = 0;
             for (uint32_t src_bucket = 0; src_bucket < old_num_buckets; src_bucket++) {
                 if (NEXT_BUCKET(old_pairs, src_bucket) == src_bucket)
                     mbucket ++;

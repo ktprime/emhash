@@ -892,10 +892,7 @@ public:
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
-        if (bucket == it._bucket)
-            ++it;
-
-        return it;
+        return (bucket == it._bucket) ? ++it : it;
     }
 
     void _erase(const_iterator it)
@@ -959,7 +956,7 @@ public:
         return true;
     }
 
-    /// Make room for this many elements
+    ///three ways may incr rehash: bad hash function, load_factor is high, or need shrink
     void rehash(uint32_t required_buckets) noexcept
     {
         if (required_buckets < _num_filled)
@@ -987,11 +984,8 @@ public:
                 if (ADDR_BUCKET(old_pairs, src_bucket) % 2 == 0)
                     mbucket ++;
             }
-            if (mbucket * 2 < old_num_filled) {
-                _hash_inter = 1;
-                while (mbucket < (old_num_filled >> _hash_inter))
-                    _hash_inter ++;
-            }
+
+            if (_num_main * 2 < old_num_filled) { _hash_inter = 1; }
         }
 #endif
 
@@ -1232,7 +1226,6 @@ private:
 #endif
             }
 
-            //          bucket ++;
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
                 break;
@@ -1358,7 +1351,7 @@ private:
     static inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__ && _MPCLMUL
-        //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j){
+        //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j)
         __m128i I{}; I[0] ^= key;
         __m128i J{}; J[0] ^= UINT64_C(0xde5fb9d2630458e9);
         __m128i M{}; M[0] ^= 0xb000000000000000ull;

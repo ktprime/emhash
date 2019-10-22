@@ -503,7 +503,7 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) /(float)_loadlf;
+        return (1 << 13) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
@@ -954,10 +954,7 @@ public:
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
-        if (bucket == it._bucket)
-            ++it;
-
-        return it;
+       return (bucket == it._bucket) ? ++it : it;
     }
 
     void _erase(const_iterator it)
@@ -1418,7 +1415,7 @@ private:
                     return pop_pempty();
 #endif
 
-                const auto next = (bucket_from + _num_filled + last) & _mask;
+                const auto next = (bucket_from + _num_filled + last / 4) & _mask;
                 const auto bucket3 = next + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
                     return bucket3;
