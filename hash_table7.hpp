@@ -1160,7 +1160,7 @@ private:
         else if (_eq(key, GET_KEY(_pairs, bucket)))
             return bucket;
         else if (next_bucket == bucket)
-
+            return _num_buckets;
 #if 0
         const auto bucket = hash_bucket(key);
         if (IS_EMPTY(bucket))
@@ -1270,22 +1270,21 @@ private:
             return bucket2;
 
         //fast find by bit
-        const auto bofset =  bucket_from % MASK_BIT;
-        const auto pack_from = bucket_from - bofset;
-        const auto bmask = _bitmask[pack_from / MASK_BIT];// & ~((1 << bofset) - 1);
+        const auto boset = bucket_from % 8;
+        const uint32_t bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8);
         if (bmask != 0)
-            return pack_from + CTZ(bmask);
+            return bucket_from - boset + CTZ(bmask);
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
-        for (uint32_t last = 21, slot = 34; slot += last; last = slot - last) {
-        //for (uint32_t slot = 5; ; slot ++) {
+        for (uint32_t last = 21, slot = 34; ; slot += last, last = slot - last) {
             const auto next = (bucket_from + slot) & _mask;
-            //const auto next = (bucket_from + slot * slot / 2) & _mask;
             const auto pack_from = next - next % MASK_BIT;
             const auto bmask = _bitmask[pack_from / MASK_BIT];
             if (bmask != 0)
                 return pack_from + CTZ(bmask);
         }
+
+        return 0;
     }
 
     uint32_t find_last_bucket(uint32_t main_bucket) const
