@@ -921,10 +921,7 @@ public:
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
-        if (bucket == it._bucket)
-            ++it;
-
-        return it;
+        return (bucket == it._bucket) ? ++it : it;
     }
 
     void _erase(const_iterator it)
@@ -1017,8 +1014,7 @@ public:
             }
             if (mbucket * 2 < old_num_filled) {
                 _hash_inter = 1;
-                while (mbucket < (old_num_filled >> _hash_inter))
-                    _hash_inter ++;
+//                while (mbucket < (old_num_filled >> _hash_inter)) _hash_inter ++;
             }
         }
 #endif

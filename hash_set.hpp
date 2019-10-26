@@ -716,7 +716,6 @@ public:
     iterator erase(iterator it)
     {
 #if _DEBUG
-        // we assume that it always points to a valid entry, and not end().
         assert(this == it._set);
         if (it._bucket >= _num_buckets)
             return end();
@@ -729,10 +728,7 @@ public:
 
         clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
-        if (bucket == it._bucket)
-            ++it;
-
-        return it;
+        return (bucket == it._bucket) ? ++it : it;
     }
 
     void _erase(iterator it)

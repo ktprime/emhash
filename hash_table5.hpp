@@ -914,10 +914,7 @@ public:
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
-        if (bucket == it._bucket)
-            ++it;
-
-        return it;
+        return (bucket == it._bucket) ? ++it : it;
     }
 
     void _erase(const_iterator it)
