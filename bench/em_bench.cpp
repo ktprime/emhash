@@ -148,8 +148,8 @@ emhash6::HashMap<std::string, std::string> show_name = {
     {"emhash2", "emhash2"},
     {"emhash4", "emhash4"},
 
-//    {"emhash3", "emhash3"},
-//    {"emhash5", "emhash5"},
+    {"emhash3", "emhash3"},
+    {"emhash5", "emhash5"},
 
 #if ET > 0
     {"martin", "martin flat"},

@@ -1214,10 +1214,11 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _pairs[bucket].~PairT();
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+
+        clear_bucket(bucket); _num_filled ++;
         return bucket;
     }
 
