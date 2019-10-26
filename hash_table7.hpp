@@ -84,9 +84,9 @@
 
 #define MASK_BIT          32
 #define MASK_N(n)         1 << (n % MASK_BIT)
-#define CLS_BIT(bucket)  _bitmask[bucket / MASK_BIT] |= MASK_N(bucket)
 #define SET_BIT(bucket)  _bitmask[bucket / MASK_BIT] &= ~(MASK_N(bucket))
-#define IS_EMPTY(bucket) (_bitmask[bucket / MASK_BIT] & (MASK_N(bucket)))
+#define CLS_BIT(bucket)  _bitmask[bucket / MASK_BIT] |= MASK_N(bucket)
+#define IS_EMPTY(bucket) _bitmask[bucket / MASK_BIT] & (MASK_N(bucket))
 
 inline static uint32_t CTZ(const uint32_t n)
 {
@@ -865,16 +865,6 @@ public:
         return bucket;
     }
 
-    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value)
-    {
-        return insert(key, std::move(value));
-    }
-
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value)
-    {
-        return insert(std::move(key), std::move(value));
-    }
-
     /// Return the old value or ValueT() if it didn't exist.
     ValueT set_get(const KeyT& key, const ValueT& value)
     {
@@ -981,7 +971,7 @@ public:
         if (is_notrivially() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _num_buckets / 4)
             clearkv();
         else
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * (2 + _num_buckets));
+            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 
         memset(_bitmask, INACTIVE, _num_buckets / 8);
         _num_filled = 0;
@@ -1085,14 +1075,10 @@ private:
         CLS_BIT(bucket);
     }
 
+#if 1
     uint32_t erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
-#if 0
-        if (IS_EMPTY(bucket))
-            return INACTIVE;
-#endif
-
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
             return INACTIVE;
@@ -1127,6 +1113,48 @@ private:
 
         return INACTIVE;
     }
+#else
+    uint32_t erase_key(const KeyT& key)
+    {
+        const auto bucket = hash_bucket(key);
+        auto next_bucket = NEXT_BUCKET(_pairs, bucket);
+        if (next_bucket == INACTIVE)
+            return INACTIVE;
+
+        const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
+        if (next_bucket == bucket)
+            return eqkey ? bucket : INACTIVE;
+        else if (bucket != hash_bucket(GET_KEY(_pairs, bucket)))
+            return INACTIVE;
+
+        //find erase key and swap to last bucket
+        uint32_t prev_bucket = bucket, find_bucket = INACTIVE;
+        next_bucket = bucket;
+        while (true) {
+            const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
+            if (_eq(key, GET_KEY(_pairs, next_bucket))) {
+                find_bucket = next_bucket;
+                if (nbucket == next_bucket) {
+                    NEXT_BUCKET(_pairs, prev_bucket) = prev_bucket;
+                    break;
+                }
+            }
+            if (nbucket == next_bucket) {
+                if (find_bucket != INACTIVE) {
+                    GET_PKV(_pairs, find_bucket).swap(GET_PKV(_pairs, nbucket));
+//                    GET_PKV(_pairs, find_bucket) = GET_PKV(_pairs, nbucket);
+                    NEXT_BUCKET(_pairs, prev_bucket) = prev_bucket;
+                    find_bucket = nbucket;
+                }
+                break;
+            }
+            prev_bucket = next_bucket;
+            next_bucket = nbucket;
+        }
+
+        return find_bucket;
+    }
+#endif
 
     uint32_t erase_bucket(const uint32_t bucket)
     {
@@ -1152,7 +1180,7 @@ private:
     // Find the bucket with this key, or return bucket size
     uint32_t find_filled_bucket(const KeyT& key) const
     {
-       const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
 
         if (next_bucket == INACTIVE)
@@ -1265,23 +1293,22 @@ private:
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
-        const auto bucket2 = bucket_from + 2;
-        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-            return bucket2;
+//        const auto bucket2 = bucket_from + 2;
+//        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
+//            return bucket2;
 
         //fast find by bit
         const auto boset = bucket_from % 8;
         const uint32_t bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8);
         if (bmask != 0)
-            return bucket_from - boset + CTZ(bmask);
+            return bucket_from + CTZ(bmask) - boset;
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
         for (uint32_t last = 21, slot = 34; ; slot += last, last = slot - last) {
-            const auto next = (bucket_from + slot) & _mask;
-            const auto pack_from = next - next % MASK_BIT;
-            const auto bmask = _bitmask[pack_from / MASK_BIT];
+            const auto next = (bucket_from + _num_filled + slot) & _mask;
+            const auto bmask = _bitmask[next / MASK_BIT];
             if (bmask != 0)
-                return pack_from + CTZ(bmask);
+                return next + CTZ(bmask) - next % MASK_BIT;
         }
 
         return 0;
@@ -1333,14 +1360,13 @@ private:
         return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
-private:
-
     //the first cache line packed
-    uint32_t hash_bucket(const KeyT& key) const
+    inline uint32_t hash_bucket(const KeyT& key) const
     {
         return _hasher(key) & _mask;
     }
 
+private:
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
