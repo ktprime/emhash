@@ -1,6 +1,6 @@
 // By Huang Yuanbing 2019-2020
-// bailuzhou@163.com
-// version 1.0.3
+// bailuzhou AT 163.com
+// version 1.0.4
 
 
 // LICENSE:
@@ -88,6 +88,9 @@
 #define CLS_BIT(bucket)  _bitmask[bucket / MASK_BIT] |= MASK_N(bucket)
 #define IS_EMPTY(bucket) _bitmask[bucket / MASK_BIT] & (MASK_N(bucket))
 
+namespace emhash7 {
+
+constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 inline static uint32_t CTZ(const uint32_t n)
 {
 #if _MSC_VER > 1400
@@ -110,10 +113,6 @@ inline static uint32_t CTZ(const uint32_t n)
 
     return (uint32_t)index;
 }
-
-namespace emhash7 {
-
-constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 
 template <typename First, typename Second>
 struct entry {
@@ -347,7 +346,7 @@ public:
 
     HashMap(const HashMap& other)
     {
-        _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + 8);
+        _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(uint64_t));
         clone(other);
     }
 
@@ -374,7 +373,7 @@ public:
 
         if (_num_buckets != other._num_buckets) {
             free(_pairs);
-            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + 8);
+            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(uint64_t));
         }
 
         clone(other);
@@ -404,18 +403,17 @@ public:
         _loadlf      = other._loadlf;
         _bitmask     = (uint32_t*)(_pairs + 2 + _num_buckets);
 
+        auto opairs = other._pairs;
         if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
-            memcpy(_pairs, other._pairs, other._num_buckets * sizeof(PairT));
+            memcpy(_pairs, opairs, other._num_buckets * sizeof(PairT));
         } else {
-            auto old_pairs = other._pairs;
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
-                auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(old_pairs, bucket);
+                auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(opairs, bucket);
                 if (next_bucket != INACTIVE)
-                    new(_pairs + bucket) PairT(old_pairs[bucket]);
+                    new(_pairs + bucket) PairT(opairs[bucket]);
             }
         }
-        memcpy(_bitmask, other._bitmask, _num_buckets / 8 + 8);
-        NEXT_BUCKET(_pairs, _num_buckets) = NEXT_BUCKET(_pairs, _num_buckets + 1) = 0;
+        memcpy(_pairs + _num_buckets, opairs + _num_buckets, 2 * sizeof(PairT) + _num_buckets / 8 + sizeof(uint64_t));
     }
 
     void swap(HashMap& other)
@@ -970,10 +968,11 @@ public:
     {
         if (is_notrivially() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _num_buckets / 4)
             clearkv();
-        else
+        else {
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
-
-        memset(_bitmask, INACTIVE, _num_buckets / 8);
+            memset(_bitmask, INACTIVE, _num_buckets / 8);
+            _bitmask[_num_buckets / MASK_BIT] &= (1 << _num_buckets % MASK_BIT) - 1;
+        }
         _num_filled = 0;
     }
 
@@ -1005,7 +1004,7 @@ private:
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto num_byte = num_buckets / 8;
-        auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_byte + 8);
+        auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_byte + sizeof(uint64_t));
         auto old_num_filled  = _num_filled;
         auto old_pairs = _pairs;
 
@@ -1023,10 +1022,9 @@ private:
 
         /***************** ----------------------**/
         memset(_bitmask, INACTIVE, num_byte);
-        memset(((char*)_bitmask) + num_byte, 0, 8);
+        memset(((char*)_bitmask) + num_byte, 0, sizeof(uint64_t));
         //set high bit to zero
-        if (num_buckets % 8 != 0)
-            _bitmask[num_buckets / MASK_BIT] &= (1 << num_buckets % MASK_BIT) - 1;
+        _bitmask[num_buckets / MASK_BIT] &= (1 << num_buckets % MASK_BIT) - 1;
         /***************** ----------------------**/
 
         NEXT_BUCKET(new_pairs, _num_buckets) = NEXT_BUCKET(new_pairs, _num_buckets + 1) = 0;
@@ -1240,11 +1238,6 @@ private:
     uint32_t find_or_allocate(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
-#if 0
-        if (IS_EMPTY(bucket))
-            return bucket;
-#endif
-
         const auto& bucket_key = GET_KEY(_pairs, bucket);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE || _eq(key, bucket_key))
@@ -1293,22 +1286,23 @@ private:
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
-//        const auto bucket2 = bucket_from + 2;
-//        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-//            return bucket2;
+        const auto bucket2 = bucket_from + 2;
+        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
+            return bucket2;
 
         //fast find by bit
         const auto boset = bucket_from % 8;
-        const uint32_t bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8);
+        const uint32_t bmask = *(uint32_t*)((unsigned char*)_bitmask + bucket_from / 8);
         if (bmask != 0)
             return bucket_from + CTZ(bmask) - boset;
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
-        for (uint32_t last = 21, slot = 34; ; slot += last, last = slot - last) {
-            const auto next = (bucket_from + _num_filled + slot) & _mask;
-            const auto bmask = _bitmask[next / MASK_BIT];
+        const auto qmask = (MASK_BIT + _num_buckets - 1) / MASK_BIT - 1;
+        for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+            const auto next = (bucket_from + _num_filled + slot) & qmask;
+            const auto bmask = _bitmask[next];
             if (bmask != 0)
-                return next + CTZ(bmask) - next % MASK_BIT;
+                return next * MASK_BIT + CTZ(bmask);
         }
 
         return 0;
