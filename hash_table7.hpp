@@ -82,25 +82,29 @@
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++; SET_BIT(bucket)
 #endif
 
-#define MASK_BIT          32
-#define MASK_N(n)         1 << (n % MASK_BIT)
-#define SET_BIT(bucket)  _bitmask[bucket / MASK_BIT] &= ~(MASK_N(bucket))
-#define CLS_BIT(bucket)  _bitmask[bucket / MASK_BIT] |= MASK_N(bucket)
-#define IS_EMPTY(bucket) _bitmask[bucket / MASK_BIT] & (MASK_N(bucket))
+#define MASK_BIT         32
+#define MASK_N(n)        1 << (n % MASK_BIT)
+#define SET_BIT(bucket) _bitmask[bucket / MASK_BIT] &= ~(MASK_N(bucket))
+#define CLS_BIT(bucket) _bitmask[bucket / MASK_BIT] |= MASK_N(bucket)
+#define IS_SET(bucket)  _bitmask[bucket / MASK_BIT] & (MASK_N(bucket))
+
+#if _WIN32 || _MSC_VER > 1400
+    #include <intrin.h>
+#endif
 
 namespace emhash7 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 inline static uint32_t CTZ(const uint32_t n)
 {
-#if _MSC_VER > 1400
+#if _WIN32 || _MSC_VER > 1400
     unsigned long index;
     _BitScanForward(&index, n);
-#elif __GNUC__
+#elif __GNUC__ || __clang__
     uint32_t index = __builtin_ctz(n);
-#elif ASM_X86
+#elif 1
     stype index;
-    #if __GNUC__ || __TINYC__
+    #if __GNUC__ || __clang__
     __asm__ ("bsfl %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
     #else
     __asm
@@ -259,7 +263,7 @@ public:
             auto _bitmask = _map->_bitmask;
             do {
                 _bucket++;
-            } while (IS_EMPTY(_bucket));
+            } while (IS_SET(_bucket));
         }
 
     public:
@@ -320,7 +324,7 @@ public:
             auto _bitmask = _map->_bitmask;
             do {
                 _bucket++;
-            } while (IS_EMPTY(_bucket));
+            } while (IS_SET(_bucket));
         }
 
     public:
@@ -335,7 +339,7 @@ public:
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
-        max_load_factor(0.85f);
+        max_load_factor(0.90f);
         reserve(bucket);
     }
 
@@ -432,7 +436,7 @@ public:
     iterator begin()
     {
         uint32_t bucket = 0;
-        while (IS_EMPTY(bucket)) {
+        while (IS_SET(bucket)) {
             ++bucket;
         }
         return {this, bucket};
@@ -441,7 +445,7 @@ public:
     const_iterator cbegin() const
     {
         uint32_t bucket = 0;
-        while (IS_EMPTY(bucket)) {
+        while (IS_SET(bucket)) {
             ++bucket;
         }
         return {this, bucket};
@@ -1026,8 +1030,7 @@ private:
         //set high bit to zero
         _bitmask[num_buckets / MASK_BIT] &= (1 << num_buckets % MASK_BIT) - 1;
         /***************** ----------------------**/
-
-        NEXT_BUCKET(new_pairs, _num_buckets) = NEXT_BUCKET(new_pairs, _num_buckets + 1) = 0;
+        memset(new_pairs + _num_buckets, 0, sizeof(PairT) * 2);
         _pairs       = new_pairs;
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
@@ -1189,7 +1192,7 @@ private:
             return _num_buckets;
 #if 0
         const auto bucket = hash_bucket(key);
-        if (IS_EMPTY(bucket))
+        if (IS_SET(bucket))
             return _num_buckets;
         else if (_eq(key, GET_KEY(_pairs, bucket)))
             return bucket;
@@ -1286,9 +1289,9 @@ private:
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
-        const auto bucket2 = bucket_from + 2;
-        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-            return bucket2;
+//        const auto bucket2 = bucket_from + 2;
+//        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
+//            return bucket2;
 
         //fast find by bit
         const auto boset = bucket_from % 8;
@@ -1299,7 +1302,13 @@ private:
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
         const auto qmask = (MASK_BIT + _num_buckets - 1) / MASK_BIT - 1;
         for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-            const auto next = (bucket_from + _num_filled + slot) & qmask;
+#if 1
+            const auto next2 = (bucket_from + last) & qmask;
+            const auto bmask2 = _bitmask[next2];
+            if (bmask2 != 0)
+                return next2 * MASK_BIT + CTZ(bmask2);
+#endif
+            const auto next = (bucket_from + _num_filled + slot * slot / 2) & qmask;
             const auto bmask = _bitmask[next];
             if (bmask != 0)
                 return next * MASK_BIT + CTZ(bmask);
