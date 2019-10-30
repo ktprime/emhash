@@ -1,6 +1,6 @@
 
 // emhash6::HashMap for C++11
-// version 1.6.4
+// version 1.6.5
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1354,7 +1354,6 @@ private:
         const auto bucket1 = bucket_from + 1;
         if (ISEMPTY_BUCKET(_pairs, bucket1))
             return bucket1;
-
 #if BF
         const auto bucket2 = bucket_from + 2;
         if (ISEMPTY_BUCKET(_pairs, bucket2))
@@ -1371,7 +1370,7 @@ private:
             if (ISEMPTY_BUCKET(_pairs, bucket1))
                 return bucket1;
 
-            if (ISEMPTY_BUCKET(_pairs, bucket2))
+            else if (ISEMPTY_BUCKET(_pairs, bucket2))
                 return bucket2;
 #if B6
             else if (slot > rand_find) {
@@ -1395,17 +1394,21 @@ private:
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
+#if QS
         for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-#if 1
             const auto next2 = (bucket_from + last) & qmask;
+#else
+        for (uint32_t last = 1, step = bucket_from + _num_filled + 2; ; last ++, step += last) {
+            const auto next2 = step & qmask;
+#endif
             const auto bmask2 = *((uint64_t*)_bitmask + next2);
             if (bmask2 != 0)
                 return next2 * 64 + CTZ(bmask2);
-#endif
-            const auto next = (bucket_from + _num_filled + slot * slot) & qmask;
-            const auto bmask = *((uint64_t*)_bitmask + next);
+
+            const auto next1 = (next2 + 1);
+            const auto bmask = *((uint64_t*)_bitmask + next1);
             if (bmask != 0)
-                return next * 64 + CTZ(bmask);
+                return next1 * 64 + CTZ(bmask);
         }
 
         return 0;
