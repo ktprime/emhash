@@ -4,7 +4,7 @@ A quite fast and memory efficient *open address based c++ flat hash map*, it is 
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- the default load factor is 0.8 and can be set **1.0** by enable compile marco *emhash_HIGH_LOAD* (*5% performance loss in hash_table3.hpp*)
+- the default load factor is 0.9 and can be set **1.0** by enable compile marco *emhash_HIGH_LOAD* (*5% performance loss in hash_table3.hpp*)
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
     - _erase :  without return next iterator after erasion
