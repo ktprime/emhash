@@ -1,6 +1,6 @@
 // By Huang Yuanbing 2019-2020
 // bailuzhou AT 163.com
-// version 1.0.4
+// version 1.0.5
 
 
 // LICENSE:
@@ -1301,17 +1301,23 @@ private:
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
         const auto qmask = (MASK_BIT + _num_buckets - 1) / MASK_BIT - 1;
+#if SQ
         for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-#if 1
             const auto next2 = (bucket_from + last) & qmask;
+#else
+        for (uint32_t last = 1, step = bucket_from + _num_filled + 2; ; last ++, step += last) {
+            const auto next2 = step & qmask;
+#endif
+
             const auto bmask2 = _bitmask[next2];
             if (bmask2 != 0)
                 return next2 * MASK_BIT + CTZ(bmask2);
-#endif
-            const auto next = (bucket_from + _num_filled + slot * slot / 2) & qmask;
-            const auto bmask = _bitmask[next];
+#if 1
+            const auto next1 = next2 + 1;
+            const auto bmask = _bitmask[next1];
             if (bmask != 0)
-                return next * MASK_BIT + CTZ(bmask);
+                return next1 * MASK_BIT + CTZ(bmask);
+#endif
         }
 
         return 0;
