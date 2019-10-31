@@ -49,7 +49,7 @@
 #include <cstdint>
 #include <functional>
 
-#if EMILIB_TAF_LOG
+#if EMHASH_TAF_LOG
     #include "servant/AutoLog.h"
     #include "servant/RollLogHelper.h"
 #endif
@@ -62,11 +62,11 @@
 
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
-#    define EMILIB_LIKELY(condition)   __builtin_expect(condition, 1)
-#    define EMILIB_UNLIKELY(condition) __builtin_expect(condition, 0)
+#    define EMHASH_LIKELY(condition)   __builtin_expect(condition, 1)
+#    define EMHASH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
-#    define EMILIB_LIKELY(condition) condition
-#    define EMILIB_UNLIKELY(condition) condition
+#    define EMHASH_LIKELY(condition) condition
+#    define EMHASH_UNLIKELY(condition) condition
 #endif
 
 //#define next_coll_bucket(bucket)  ((bucket + 1) & _main_mask + _bucket)
@@ -74,7 +74,7 @@
     #define hash_main_bucket(key)     (uint32_t)((_hasher(key) & (_mains_buckets - 1)) + _colls_buckets)
     #define next_coll_bucket(bucket)  (bucket) & _main_mask
     #define hash_coll_bucket(key)     (hash_inter(key) & _main_mask)
-#elif EMILIB_HASH
+#elif EMHASH_HASH
     #define hash_main_bucket(key)     (uint32_t)(_hasher(key) & _main_mask)
     #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
     #define hash_coll_bucket(key)     ((hash_inter(key) & _coll_mask) + _mains_buckets)
@@ -84,8 +84,8 @@
     #define hash_coll_bucket(key)     ((_hasher(key) & _coll_mask) + _mains_buckets)
 #endif
 
-#if EMILIB_CACHE_LINE_SIZE < 32
-    #define EMILIB_CACHE_LINE_SIZE 64
+#if EMHASH_CACHE_LINE_SIZE < 32
+    #define EMHASH_CACHE_LINE_SIZE 64
 #endif
 
 #define GET_KEY(p,n)      p[n].first
@@ -458,7 +458,7 @@ public:
         return (NEXT_BUCKET(_pairs, bucket) + 1) / 2;
     }
 
-#ifdef EMILIB_STATIS
+#ifdef EMHASH_STATIS
     size_type get_main_bucket(const uint32_t bucket) const
     {
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -869,7 +869,7 @@ public:
     {
         //auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
         const auto required_buckets = num_elems * 10 / 8;
-        if (EMILIB_LIKELY(required_buckets < _colls_buckets))
+        if (EMHASH_LIKELY(required_buckets < _colls_buckets))
             return false;
 
         rehash(required_buckets + 2);
@@ -905,7 +905,7 @@ public:
         _num_mains   = 0;
         _num_colls   = 0;
 
-        if (sizeof(PairT) <= EMILIB_CACHE_LINE_SIZE / 2)
+        if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
             memset(_pairs, INACTIVE, _total_buckets * sizeof(_pairs[0]));
         else {
             for (uint32_t bucket = 0; bucket < _total_buckets; bucket++)
@@ -971,13 +971,13 @@ public:
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         }
 
-#if EMILIB_REHASH_LOG == 0
+#if EMHASH_REHASH_LOG == 0
         if (_num_colls > 100000) {
             auto mbucket = size() - collision;
             char buff[255] = {0};
             sprintf(buff, "    _num_colls/_num_mains/filled_ration/K/pack/collision = %u/%.2lf/%.2lf/%s/%zd/%.2lf%%",
                     _num_colls, _num_mains * 100.0 / size(), 100.0 * _num_colls / _colls_buckets, typeid(KeyT).name(), sizeof(_pairs[0]), (collision * 100.0 / size()));
-#if EMILIB_TAF_LOG
+#if EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
@@ -1020,7 +1020,7 @@ private:
                 GET_KEY(_pairs, bucket) = GET_KEY(_pairs, next_bucket);
             NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
-        } else if (EMILIB_UNLIKELY(bucket != hash_coll_bucket(GET_KEY(_pairs, bucket))))
+        } else if (EMHASH_UNLIKELY(bucket != hash_coll_bucket(GET_KEY(_pairs, bucket))))
             return INACTIVE;
 
         auto prev_bucket = bucket;
@@ -1136,7 +1136,7 @@ private:
         //find next linked bucket and check key
         while (true) {
             if (_eq(key, GET_KEY(_pairs, next_bucket))) {
-#if EMILIB_LRU_SET
+#if EMHASH_LRU_SET
                 std::swap(GET_KEY(_pairs, bucket), GET_KEY(_pairs, next_bucket));
                 return bucket;
 #else
@@ -1167,10 +1167,10 @@ private:
             return bucket_from;
 
 #if 0
-        const auto bucket_address = (uint32_t)(reinterpret_cast<size_t>(&NEXT_BUCKET(_pairs, bucket_from)) % EMILIB_CACHE_LINE_SIZE);
-        const auto max_probe_length = 2 + (uint32_t)((EMILIB_CACHE_LINE_SIZE * 2 - bucket_address) / sizeof(PairT));
+        const auto bucket_address = (uint32_t)(reinterpret_cast<size_t>(&NEXT_BUCKET(_pairs, bucket_from)) % EMHASH_CACHE_LINE_SIZE);
+        const auto max_probe_length = 2 + (uint32_t)((EMHASH_CACHE_LINE_SIZE * 2 - bucket_address) / sizeof(PairT));
 #else
-        constexpr auto max_probe_length = 2 + EMILIB_CACHE_LINE_SIZE / sizeof(PairT);//cpu cache line 64 byte,2-3 cache line miss
+        constexpr auto max_probe_length = 2 + EMHASH_CACHE_LINE_SIZE / sizeof(PairT);//cpu cache line 64 byte,2-3 cache line miss
 #endif
 
 #if 0
@@ -1315,7 +1315,7 @@ private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_inter(const UType key) const
     {
-#if EMILIB_IDENTITY_HASH
+#if EMHASH_IDENTITY_HASH
         return (uint32_t)key;
 #elif 1
         if (sizeof(UType) <= sizeof(uint32_t))
@@ -1330,7 +1330,7 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_inter(const UType& key) const
     {
-#ifdef EMILIB_FIBONACCI_HASH
+#ifdef EMHASH_FIBONACCI_HASH
         return (uint32_t)(_hasher(key) * 11400714819323198485ull);
 #else
         return (uint32_t)_hasher(key);

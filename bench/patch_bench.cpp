@@ -35,11 +35,10 @@
 #ifdef KHASH
 #include "khash.h"
 #endif
-#if EMHASH == 2
-#include "hash_table2.hpp"
+#if EMHASH == 7
+#include "hash_table7.hpp"
 #elif EMHASH == 6
-#define EMHASH_HIGH_LOAD  100000
-#include "hash_table4.hpp"
+#include "hash_table6.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
 #elif PHMAP_FLAT
@@ -280,10 +279,10 @@ int main(int argc, char** argv)
   int ret, is_missing;
   khiter_t k;
 
-#elif EMHASH == 2
-   emhash2::HashMap<uint32_t, uint32_t> test;
+#elif EMHASH == 7
+   emhash7::HashMap<uint32_t, uint32_t> test;
 #elif EMHASH == 6
-   emhash4::HashMap<uint32_t, uint32_t> test;
+   emhash6::HashMap<uint32_t, uint32_t> test;
 #elif TSL
    tsl::robin_map<uint32_t,uint32_t> test;
 #elif PHMAP_FLAT

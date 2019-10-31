@@ -59,19 +59,19 @@
 
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
-#    define EMILIB_LIKELY(condition) __builtin_expect(condition, 1)
-#    define EMILIB_UNLIKELY(condition) __builtin_expect(condition, 0)
+#    define EMHASH_LIKELY(condition) __builtin_expect(condition, 1)
+#    define EMHASH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
-#    define EMILIB_LIKELY(condition) condition
-#    define EMILIB_UNLIKELY(condition) condition
+#    define EMHASH_LIKELY(condition) condition
+#    define EMHASH_UNLIKELY(condition) condition
 #endif
 
 #define NEW_KEY(key, bucket)    new(_pairs + bucket) PairT(key, bucket), _num_filled ++
 #define COPY_KEY(key, bucket)   _pairs[bucket].first = key
 #define hash_bucket(key)  ((uint32_t)_hasher(key) & _mask)
 
-#if EMILIB_CACHE_LINE_SIZE < 32
-    #define EMILIB_CACHE_LINE_SIZE 64
+#if EMHASH_CACHE_LINE_SIZE < 32
+    #define EMHASH_CACHE_LINE_SIZE 64
 #endif
 
 #define GET_KEY(p,n)     p[n].first
@@ -435,7 +435,7 @@ public:
         return ibucket_size;
     }
 
-#ifdef EMILIB_STATIS
+#ifdef EMHASH_STATIS
     size_type get_main_bucket(const uint32_t bucket) const
     {
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -766,7 +766,7 @@ public:
     {
         auto required_buckets = (uint32_t)(num_elems * _loadlf >> 13);
         //const auto required_buckets = num_elems * 10 / 8;
-        if (EMILIB_LIKELY(required_buckets < _mask))
+        if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
         rehash(required_buckets + 2);
@@ -793,7 +793,7 @@ public:
         _pairs       = new_pairs;
         _num_filled  = 0;
 
-        if (sizeof(PairT) <= EMILIB_CACHE_LINE_SIZE / 2)
+        if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         else {
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
@@ -812,12 +812,12 @@ public:
             old_pairs[src_bucket].~PairT();
         }
 
-#if EMILIB_REHASH_LOG
+#if EMHASH_REHASH_LOG
         if (_num_filled > 100000) {
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/K/pack= %u/%s/%zd/",
                     _num_filled, typeid(KeyT).name(), sizeof(_pairs[0]));
-#if EMILIB_TAF_LOG
+#if EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
@@ -854,7 +854,7 @@ private:
         const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
         if (next_bucket == bucket)
             return eqkey ? bucket : INACTIVE;
-        else if (EMILIB_UNLIKELY(bucket != hash_bucket(GET_KEY(_pairs, bucket))))
+        else if (EMHASH_UNLIKELY(bucket != hash_bucket(GET_KEY(_pairs, bucket))))
             return INACTIVE;
 
         //find erase key and swap to last bucket
@@ -975,7 +975,7 @@ private:
         //find next linked bucket and check key
         while (true) {
             if (_eq(key, GET_KEY(_pairs, next_bucket))) {
-#if EMILIB_LRU_SET
+#if EMHASH_LRU_SET
                 std::swap(GET_KEY(_pairs, bucket), GET_KEY(_pairs, next_bucket));
                 return bucket;
 #else
@@ -1029,7 +1029,7 @@ private:
             }
         }
 #else
-        constexpr auto max_probe_length = 2 + EMILIB_CACHE_LINE_SIZE / sizeof(PairT);//cpu cache line 64 byte,2-3 cache line miss
+        constexpr auto max_probe_length = 2 + EMHASH_CACHE_LINE_SIZE / sizeof(PairT);//cpu cache line 64 byte,2-3 cache line miss
         for (uint32_t slot = 1; ; ++slot) {
             const auto bucket = (bucket_from + slot) & _mask;
             if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)

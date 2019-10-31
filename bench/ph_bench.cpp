@@ -1,8 +1,8 @@
 #include <inttypes.h>
 #define THR 1
 
-#if EMHASH == 2
-    #include "hash_table2.hpp"
+#if EMHASH == 7
+    #include "hash_table7.hpp"
     #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
 #elif EMHASH == 6

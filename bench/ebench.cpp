@@ -72,7 +72,7 @@ constexpr int max_loop = 1000000;
 //http://www.ilikebigbits.com/2016_08_28_hash_table.html
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 
-#if __cplusplus >= 199711L || HOOD_HASH
+#if __cplusplus >= 201103L && HOOD_HASH
     #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
@@ -84,7 +84,7 @@ constexpr int max_loop = 1000000;
     #include "./ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
     #include "./phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 
-#if __cplusplus > 201402L || _MSC_VER >= 1600
+#if __cplusplus >= 201402L || _MSC_VER >= 1600
     #define _CPP14_HASH   1
     #include "./ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
@@ -463,7 +463,7 @@ void insert_reserve(hash_type& ahash, const std::string& hash_name, std::vector<
     {
         size_t sum = 0;
         hash_type tmp(1);
-        tmp.max_load_factor(80.0f/100);
+        tmp.max_load_factor(94.5f/100);
         tmp.reserve(vList.size());
         auto ts1 = getTime();
         for (const auto v : vList)
@@ -703,7 +703,7 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
 #if AR > 0
     const auto iRation = AR;
 #else
-    const auto iRation = 20;
+    const auto iRation = 5;
 #endif
 
     if (rand() % 100 > iRation)
@@ -763,7 +763,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
 
     const auto step = n % 2 + 1;
   //  ehash2.reserve(8); ehash5.reserve(n / 8);
-    unhash.reserve(n);
+  //  unhash.reserve(n);
 
     for (int i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
@@ -852,9 +852,10 @@ template<class hash_type>
 int benOneHash(hash_type& hash, const std::string& hash_name, std::vector<keyType>& oList)
 {
     if (show_name.find(hash_name) == show_name.end())
-        return 80;
+        return 0;
 
-    int lf = 0;
+    int lf = 94;
+    hash.max_load_factor(lf / 100.0);
     check_flag = max_loop < oList.size();
 
     //pack for small packet
@@ -880,7 +881,6 @@ int benOneHash(hash_type& hash, const std::string& hash_name, std::vector<keyTyp
 #endif
 
         erase_half(hash, hash_name, vList);
-        //    shuffle(vList.begin(), vList.end());
         find_erase(hash, hash_name, vList);
         erase_reinsert(hash, hash_name, vList);
 
@@ -964,7 +964,6 @@ static int benchHashMap(int n)
 #endif
 
     auto iload = 0;
-    const float lf = 90.5f / 100;
 
     check_result.clear();
     once_func_hash_time.clear();
@@ -980,34 +979,34 @@ static int benchHashMap(int n)
 
     if (vList.size() % 2 == 0)
     {
-        { emhash4::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash4", vList); }
-        { emhash3::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); iload = benOneHash(ehash, "emhash3", vList); }
-        { emhash6::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); iload = benOneHash(ehash, "emhash6", vList); }
-        { emhash2::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash2", vList); }
-        { emhash5::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash5", vList); }
-        { emhash7::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash7", vList); }
+        { emhash4::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash4", vList); }
+        { emhash3::HashMap <keyType, valueType, ehash_func> ehash; iload = benOneHash(ehash, "emhash3", vList); }
+        { emhash6::HashMap <keyType, valueType, ehash_func> ehash; iload = benOneHash(ehash, "emhash6", vList); }
+        { emhash2::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash2", vList); }
+        { emhash5::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash5", vList); }
+        { emhash7::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash7", vList); }
     }
     else
     {
-        { emhash5::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash5", vList); }
-        { emhash7::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash7", vList); }
-        { emhash2::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash2", vList); }
-        { emhash6::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); iload = benOneHash(ehash, "emhash6", vList); }
-        { emhash3::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); iload = benOneHash(ehash, "emhash3", vList); }
-        { emhash4::HashMap <keyType, valueType, ehash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "emhash4", vList); }
+        { emhash5::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash5", vList); }
+        { emhash7::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash7", vList); }
+        { emhash2::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash2", vList); }
+        { emhash6::HashMap <keyType, valueType, ehash_func> ehash; iload = benOneHash(ehash, "emhash6", vList); }
+        { emhash3::HashMap <keyType, valueType, ehash_func> ehash; iload = benOneHash(ehash, "emhash3", vList); }
+        { emhash4::HashMap <keyType, valueType, ehash_func> ehash; benOneHash(ehash, "emhash4", vList); }
     }
 
-    { std::unordered_map<keyType, valueType, hash_func> ehash; ehash.max_load_factor(lf); benOneHash(ehash, "stl_hash", vList); }
+    { std::unordered_map<keyType, valueType, hash_func> ehash;  benOneHash(ehash, "stl_hash", vList); }
 #if _CPP14_HASH
-    { ska::bytell_hash_map <keyType, valueType, hash_func > byehash; byehash.max_load_factor(lf); benOneHash(byehash, "byte", vList); }
+    { ska::bytell_hash_map <keyType, valueType, hash_func > byehash;  benOneHash(byehash, "byte", vList); }
 #endif
 
 #if _CPP11_HASH
-    { phmap::flat_hash_map <keyType, valueType, hash_func> phmap; phmap.max_load_factor(lf); benOneHash(phmap, "phmap", vList); }
+    { phmap::flat_hash_map <keyType, valueType, hash_func> phmap;  benOneHash(phmap, "phmap", vList); }
     { robin_hood::unordered_map <keyType, valueType, hash_func> mhash; benOneHash(mhash, "martin", vList); }
-    { ska::flat_hash_map <keyType, valueType, hash_func> smap; smap.max_load_factor(lf); benOneHash(smap, "flat", vList); }
-    { tsl::hopscotch_map <keyType, valueType, hash_func> hops; hops.max_load_factor(lf); benOneHash(hops, "hopsco", vList); }
-    { tsl::robin_map     <keyType, valueType, hash_func> tmap; tmap.max_load_factor(lf); benOneHash(tmap, "robin", vList); }
+    { ska::flat_hash_map <keyType, valueType, hash_func> smap;  benOneHash(smap, "flat", vList); }
+    { tsl::hopscotch_map <keyType, valueType, hash_func> hops;  benOneHash(hops, "hopsco", vList); }
+    { tsl::robin_map     <keyType, valueType, hash_func> tmap;  benOneHash(tmap, "robin", vList); }
 #endif
 
     static int tcase = 1;
@@ -1175,14 +1174,11 @@ int main(int argc, char* argv[])
 //    testSynax();
     double load_factor = 0.0;
 
-    sfc64 srng;
-
-    if (argc == 1)
-        printf("./test maxn load_factor(0-100) n (key=%s,value=%s)\n", sKeyType, sValueType);
+    printf("./test maxn load_factor(0-100) n (key=%s,value=%s)\n", sKeyType, sValueType);
 
     if (argc > 1 && argv[1][0] > '0' && argv[1][0] <= '9')
         maxn = atoi(argv[1]) + 1000;
-    if (argc > 2 && argv[1][0] > '0' && argv[1][0] <= '9')
+    if (argc > 2 && argv[2][0] > '0' && argv[2][0] <= '9')
         load_factor = atoi(argv[2]) / 100.0;
     if (argc > 3 && argv[3][0] > '0' && argv[3][0] <= '9')
         n = atoi(argv[2]);
@@ -1217,6 +1213,7 @@ int main(int argc, char* argv[])
     readFile("./item.log", 6);
 #endif
 
+    sfc64 srng;
     auto nows = time(0);
 
     while (true) {
@@ -1239,7 +1236,7 @@ int main(int argc, char* argv[])
         n = (srng() % maxn) + max_loop / 4;
         if (load_factor > 0.4 && load_factor < 0.95) {
             auto pow2 = 1 << ilog(n, 2);
-            n = int(pow2 * load_factor) + (1 << 12) - (rand() * rand()) % (1 << 13);
+            n = int(pow2 * load_factor) - (1 << 10) + (rand()) % (1 << 8);
         }
 
         int tp = benchHashMap(n);
