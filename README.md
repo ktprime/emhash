@@ -42,7 +42,7 @@ for example some case pay attention on finding hot, some focus on finding cold(m
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be knowed from dump info.
  
- A new cache friendly algorithm of finding multi empty bucket base on cpu bitscanf(ctz) instruction(x86). it can search *64* bucket once than other's implemention.
+- A new cache friendly algorithm of finding multi empty bucket base on cpu bitscanf(ctz) instruction(x86). it can search *64* bucket once than other's implemention.
  
 - choose *different* hash algorithm by set compile marco *emhash_FIBONACCI_HASH* or *emhash_IDENTITY_HASH* depend on use case.
 
