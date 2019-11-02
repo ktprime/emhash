@@ -1,6 +1,6 @@
 // By Huang Yuanbing 2019-2020
 // bailuzhou AT 163.com
-// version 1.0.5
+// version 1.0.4
 
 
 // LICENSE:
@@ -335,11 +335,12 @@ public:
     void init(uint32_t bucket)
     {
         _num_buckets = 0;
+        _last = 0;
         _mask = 0;
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
-        max_load_factor(0.90f);
+        max_load_factor(0.95f);
         reserve(bucket);
     }
 
@@ -394,7 +395,6 @@ public:
     {
         if (is_notrivially())
             clearkv();
-
         free(_pairs);
     }
 
@@ -405,6 +405,7 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
+        _last        = other._last;
         _bitmask     = (uint32_t*)(_pairs + 2 + _num_buckets);
 
         auto opairs = other._pairs;
@@ -505,13 +506,13 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) / (float)_loadlf;
+        return (1 << 17) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
-        if (value < 0.95f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 13) / value);
+        if (value < 0.995f && value > 0.2f)
+            _loadlf = (uint32_t)((1 << 17) / value);
     }
 
     constexpr size_type max_size() const
@@ -978,6 +979,7 @@ public:
             _bitmask[_num_buckets / MASK_BIT] &= (1 << _num_buckets % MASK_BIT) - 1;
         }
         _num_filled = 0;
+        _last = 0;
     }
 
     void shrink_to_fit() noexcept
@@ -988,12 +990,12 @@ public:
     /// Make room for this many elements
     bool reserve(uint32_t num_elems) noexcept
     {
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 13);
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17);
         //const auto required_buckets = num_elems * 19 / 16;
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
-        rehash(required_buckets + 3);
+        rehash(required_buckets + 2);
         return true;
     }
 
@@ -1015,7 +1017,7 @@ private:
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-        const auto bitmask = _bitmask;
+        _last = 0;
         _bitmask     = (uint32_t*)(new_pairs + 2 + num_buckets);
 
         if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
@@ -1224,7 +1226,8 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); SET_BIT(new_bucket);
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
+        SET_BIT(new_bucket);
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         _pairs[bucket].~PairT(); NEXT_BUCKET(_pairs, bucket) = INACTIVE;
@@ -1283,40 +1286,42 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    uint32_t find_empty_bucket(const uint32_t bucket_from) const
+    uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
         const auto bucket1 = bucket_from + 1;
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
-//        const auto bucket2 = bucket_from + 2;
-//        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-//            return bucket2;
-
         //fast find by bit
         const auto boset = bucket_from % 8;
-        const uint32_t bmask = *(uint32_t*)((unsigned char*)_bitmask + bucket_from / 8);
+        const uint32_t bmask = *(uint32_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
         if (bmask != 0)
-            return bucket_from + CTZ(bmask) - boset;
+            return bucket_from + CTZ(bmask) - 0;
 
-        //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
         const auto qmask = (MASK_BIT + _num_buckets - 1) / MASK_BIT - 1;
-#if SQ
-        for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-            const auto next2 = (bucket_from + last) & qmask;
-#else
-        for (uint32_t last = 1, step = bucket_from + _num_filled + 2; ; last ++, step += last) {
-            const auto next2 = step & qmask;
-#endif
+        if (1)
+        {
+            const auto next = _last ++ & qmask;
+            const auto bmask2 = _bitmask[next];
+            if (bmask2 != 0) {
+                return next * MASK_BIT + CTZ(bmask2);
+            }
+        }
 
+        for (uint32_t last = 1, step = bucket_from + MASK_BIT * 2; ; last ++, step += last) {
+            const auto next2 = step & qmask;
             const auto bmask2 = _bitmask[next2];
-            if (bmask2 != 0)
+            if (bmask2 != 0) {
+                _last = next2;
                 return next2 * MASK_BIT + CTZ(bmask2);
-#if 1
-            const auto next1 = next2 + 1;
-            const auto bmask = _bitmask[next1];
-            if (bmask != 0)
-                return next1 * MASK_BIT + CTZ(bmask);
+            }
+#if 0
+            const auto next = next2 + 1;
+            const auto bmask = _bitmask[next];
+            if (bmask != 0) {
+                _last = next;
+                return next * MASK_BIT + CTZ(bmask);
+            }
 #endif
         }
 
@@ -1379,9 +1384,9 @@ private:
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
+    uint32_t  _last;
     uint32_t  _num_buckets;
     uint32_t  _mask;
-    //uint32_t  _pack[12];
 
     uint32_t  _num_filled;
     PairT*    _pairs;
