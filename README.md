@@ -1,6 +1,6 @@
 # emhash feature
 
-A quite fast and memory efficient *open address based c++ flat hash map*, it is easy to be benched/tested/compared the result with other's hash map.
+A quite fast and memory efficient *open address c++ flat hash map*, it is easy to be benched/tested/compared with other's hash map.
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
