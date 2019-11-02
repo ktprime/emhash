@@ -1,6 +1,6 @@
 
 // emhash6::HashMap for C++11
-// version 1.6.5
+// version 1.6.3
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -337,7 +337,7 @@ public:
         _bitmask = nullptr;
         _num_filled = 0;
         _hash_inter = 0;
-        max_load_factor(0.90f);
+        max_load_factor(0.95f);
         reserve(bucket);
     }
 
@@ -516,7 +516,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.95f && value > 0.2f)
+        if (value < 0.995f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 17) / value);
     }
 
@@ -1089,7 +1089,7 @@ private:
     // Can we fit another element?
     inline bool check_expand_need()
     {
-#if EMHASH_SAFE_HASH == 2
+#if EMHASH_SAFE_HASH > 1
         if (_num_main * 2 < _num_filled && _num_filled > 100 && _hash_inter == 0) {
             rehash(_num_filled);
             return true;
@@ -1116,7 +1116,11 @@ private:
 
         const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
         if (next_bucket == bucket * 2) {
+#if EMHASH_SAFE_HASH
             return eqkey ? (_num_main --, bucket) : INACTIVE;
+#else
+            return eqkey ? bucket : INACTIVE;
+#endif
          } else if (eqkey) {
             next_bucket /= 2;
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
@@ -1154,7 +1158,11 @@ private:
         if (next_bucket % 2 > 0)
             return empty_bucket;
         else if (next_bucket == bucket * 2) //only one main bucket
+#if EMHASH_SAFE_HASH
             return _eq(key, GET_KEY(_pairs, bucket)) ? (_num_main --, bucket) : empty_bucket;
+#else
+            return _eq(key, GET_KEY(_pairs, bucket)) ? bucket : empty_bucket;
+#endif
 
         //find erase key and swap to last bucket
         uint32_t prev_bucket = bucket, find_bucket = empty_bucket;
@@ -1193,8 +1201,11 @@ private:
             if (bucket != main_bucket) {
                 const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
                 ADDR_BUCKET(_pairs, prev_bucket) = prev_bucket * 2 + 1 - (prev_bucket == main_bucket); //maybe only left main bucket
-            } else
+            }
+#if EMHASH_SAFE_HASH
+            else
                 _num_main --;
+#endif
             return bucket;
         }
 
@@ -1354,6 +1365,7 @@ private:
         const auto bucket1 = bucket_from + 1;
         if (ISEMPTY_BUCKET(_pairs, bucket1))
             return bucket1;
+
 #if BF
         const auto bucket2 = bucket_from + 2;
         if (ISEMPTY_BUCKET(_pairs, bucket2))
@@ -1388,9 +1400,9 @@ private:
 #else
       //fast find by bit
         const auto boset = bucket_from % 8;
-        const uint32_t bmask = *(uint32_t*)((uint8_t*)_bitmask + bucket_from / 8);
+        const uint32_t bmask = *(uint32_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
         if (bmask != 0)
-            return bucket_from + CTZ(bmask) - boset;
+            return bucket_from + CTZ(bmask) - 0;
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
@@ -1405,10 +1417,10 @@ private:
             if (bmask2 != 0)
                 return next2 * 64 + CTZ(bmask2);
 
-            const auto next1 = (next2 + 1);
-            const auto bmask = *((uint64_t*)_bitmask + next1);
+            const auto next = (next2 + 1) & qmask;
+            const auto bmask = *((uint64_t*)_bitmask + next);
             if (bmask != 0)
-                return next1 * 64 + CTZ(bmask);
+                return next * 64 + CTZ(bmask);
         }
 
         return 0;
