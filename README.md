@@ -31,18 +31,18 @@ for example some case pay attention on finding hot, some focus on finding cold(m
 
 - only *one array* allocted, each node/bucket contains a struct (keyT key, int bucket, ValueT value), bucket is not awalys in the middle between key and value, depend on struct align pack.
 
-- a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index just like std unordered_map. main bucket can not be occupyed and all opertions is to search from main bucket. 
+- a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index(bucket) just like std unordered_map. main bucket can not be occupyed and all opertion starts from it. 
 
-- **three different ways** of probe is used to seach the empty bucket from array. it's not suffer heavily performance loss by primary or  secondary clustering.
+- **three different ways** of probe is used to seach the empty bucket from array. it's not suffered heavily performance loss by primary and secondary clustering.
    - linear probing search the first cpu cacheline
    - quadratic probing start work after limited linear probing
    - random probing used with a very bad hash
 
-- use the **second/backup hashing**  when the input hash is bad with a very high collision if the compile marco *emhash_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
+- use the **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *emhash_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
-- dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be knowed from dump info.
+- dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be showed from dump info.
  
-- A new cache friendly algorithm of finding multi empty bucket base on cpu bitscanf(ctz) instruction(x86). it can search *64* bucket once than other's implemention.
+- A new cache friendly algorithm of finding multi empty bucket base on cpu bitscanf(ctz) instruction(x86). it filters *64* bucket at once than other's implemention.
  
 - choose *different* hash algorithm by set compile marco *emhash_FIBONACCI_HASH* or *emhash_IDENTITY_HASH* depend on use case.
 
