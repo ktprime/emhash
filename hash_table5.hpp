@@ -1,5 +1,5 @@
 // By Huang Yuanbing 2019-2020
-// bailuzhou@163.com
+// bailuzhou AT 163.com
 // version 1.0.3
 
 
@@ -301,10 +301,11 @@ public:
     void init(uint32_t bucket)
     {
         _num_buckets = 0;
+        _last = 0;
         _mask = 0;
         _pairs = nullptr;
         _num_filled = 0;
-        max_load_factor(0.85f);
+        max_load_factor(0.95f);
         reserve(bucket);
     }
 
@@ -359,7 +360,6 @@ public:
     {
         if (is_notrivially())
             clearkv();
-
         free(_pairs);
     }
 
@@ -370,15 +370,15 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
-
+        _last        = other._last;
+        auto opairs = other._pairs;
         if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
-            memcpy(_pairs, other._pairs, other._num_buckets * sizeof(PairT));
+            memcpy(_pairs, opairs, other._num_buckets * sizeof(PairT));
         } else {
-            auto old_pairs = other._pairs;
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
-                auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(old_pairs, bucket);
+                auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(opairs, bucket);
                 if (next_bucket != INACTIVE)
-                    new(_pairs + bucket) PairT(old_pairs[bucket]);
+                    new(_pairs + bucket) PairT(opairs[bucket]);
             }
         }
         NEXT_BUCKET(_pairs, _num_buckets) = NEXT_BUCKET(_pairs, _num_buckets + 1) = 0;
@@ -468,13 +468,13 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) / (float)_loadlf;
+        return (1 << 17) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
-        if (value < 0.95f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 13) / value);
+        if (value < 0.995f && value > 0.2f)
+            _loadlf = (uint32_t)((1 << 17) / value);
     }
 
     constexpr size_type max_size() const
@@ -949,6 +949,7 @@ public:
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 
         _num_filled = 0;
+        _last = 0;
     }
 
     void shrink_to_fit() noexcept
@@ -959,7 +960,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint32_t num_elems) noexcept
     {
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 13);
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17) + 2;
         //const auto required_buckets = num_elems * 19 / 16;
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
@@ -977,25 +978,23 @@ public:
         uint32_t num_buckets = _num_filled > 65536 ? (1 << 16) : 4;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
-        //assert(num_buckets > _num_filled);
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
-        //auto old_num_buckets = _num_buckets;
         auto old_num_filled  = _num_filled;
         auto old_pairs = _pairs;
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
+        _last = 0;
 
         if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
             memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         else
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
                 NEXT_BUCKET(new_pairs, bucket) = INACTIVE;
-        NEXT_BUCKET(new_pairs, _num_buckets) = NEXT_BUCKET(new_pairs, _num_buckets + 1) = 0;
 
+        memset(new_pairs + _num_buckets, 0, sizeof(PairT) * 2);
         _pairs       = new_pairs;
-//        uint32_t collision = 0;
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
                 continue;
@@ -1034,8 +1033,8 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _pairs[bucket].~PairT();
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
     }
 
@@ -1134,10 +1133,10 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _pairs[bucket].~PairT();
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+        _pairs[bucket].~PairT(); NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         return bucket;
     }
 
@@ -1193,39 +1192,38 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    uint32_t find_empty_bucket(const uint32_t bucket_from) const
+    uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
         const auto bucket1 = bucket_from + 1;
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
-        const auto bucket2 = bucket_from + 2;
-        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-            return bucket2;
+//        const auto bucket2 = bucket_from + 2;
+//       if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
+//           return bucket2;
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
-        for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-            const auto next = (bucket_from + slot) & _mask;
+//        for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+//            const auto next = (bucket_from + slot) & _mask;
+        for (uint32_t last = 2, step = bucket_from + 2; last < 5; last ++, step += last) {
+            const auto next = step & _mask;
             const auto bucket1 = next + 0;
-            if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
+            if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE) {
+                _last = bucket1;
                 return bucket1;
-
-            const auto bucket2 = next + 1;
-            if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-                return bucket2;
-#if 0
-            else if (slot > 5) {
-                const auto next2 = (bucket_from + _num_filled + last) & _mask;
-                const auto bucket3 = next2 + 0;
-                if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
-                    return bucket3;
-
-                const auto bucket4 = next2 + 1;
-                if (NEXT_BUCKET(_pairs, bucket4) == INACTIVE)
-                    return bucket4;
             }
-#endif
+            const auto bucket2 = next + 1;
+            if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE) {
+                _last = bucket2;
+                return bucket2;
+            }
         }
+
+        while (NEXT_BUCKET(_pairs, ++_last) != INACTIVE) {
+            _last &= _mask;
+        }
+
+        return _last;
     }
 
     uint32_t find_last_bucket(uint32_t main_bucket) const
@@ -1274,20 +1272,19 @@ private:
         return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
-private:
-
     //the first cache line packed
-    uint32_t hash_bucket(const KeyT& key) const
+    inline uint32_t hash_bucket(const KeyT& key) const
     {
         return _hasher(key) & _mask;
     }
 
+private:
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
+    uint32_t  _last;
     uint32_t  _num_buckets;
     uint32_t  _mask;
-    //uint32_t  _pack[12];
 
     uint32_t  _num_filled;
     PairT*    _pairs;
