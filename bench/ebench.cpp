@@ -167,9 +167,9 @@ emhash6::HashMap<std::string, std::string> show_name = {
 
 static int64_t getTime()
 {
-#if _WIN32
-    FILETIME ptime[4] = {0, 0, 0, 0};
-    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[1], &ptime[2], &ptime[3]);
+#if _WIN32 && 0
+    FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
+    GetThreadTimes(GetCurrentThread(), NULL, NULL, &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif __linux__ || __unix__
     struct rusage rup;
@@ -178,7 +178,15 @@ static int64_t getTime()
     long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
     return sec * 1000000 + usec;
 #elif _WIN32
-    return GetTickCount(); //clock() * 1000ll;
+    static LARGE_INTEGER freq = {0};
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+        SetThreadAffinityMask(GetCurrentThread(), 0x3);
+    }
+
+    LARGE_INTEGER nowus;
+    QueryPerformanceCounter(&nowus);
+    return (nowus.QuadPart * 1000000) / (freq.QuadPart);
 #else
     return clock();
 #endif
@@ -463,7 +471,7 @@ void insert_reserve(hash_type& ahash, const std::string& hash_name, std::vector<
     {
         size_t sum = 0;
         hash_type tmp(1);
-        tmp.max_load_factor(94.5f/100);
+        tmp.max_load_factor(0.99);
         tmp.reserve(vList.size());
         auto ts1 = getTime();
         for (const auto v : vList)
@@ -1172,7 +1180,7 @@ int main(int argc, char* argv[])
     auto maxn = 3123456;
 
 //    testSynax();
-    double load_factor = 0.0;
+    double load_factor = 0.0099;
 
     printf("./test maxn load_factor(0-100) n (key=%s,value=%s)\n", sKeyType, sValueType);
 
@@ -1181,7 +1189,7 @@ int main(int argc, char* argv[])
     if (argc > 2 && argv[2][0] > '0' && argv[2][0] <= '9')
         load_factor = atoi(argv[2]) / 100.0;
     if (argc > 3 && argv[3][0] > '0' && argv[3][0] <= '9')
-        n = atoi(argv[2]);
+        n = atoi(argv[3]);
 
     if (argc > 2 && argv[2][0] == 'd') {
         for (char c = argv[2][0], i = 0; c != '\0'; c = argv[2][i ++ ]) {
@@ -1226,15 +1234,15 @@ int main(int argc, char* argv[])
                 n = (get32rand() >> 9) + 14567;
             else if (n < 0)
                 break;
-            if (load_factor > 0.4 && load_factor < 0.99) {
+            if (load_factor > 0.4 && load_factor < 1) {
                 int log2 = ilog(n, 2);
                 n = int((1 << log2) * load_factor) + rand() % (1 << 10);
             }
             benchHashMap(n);
         }
 #else
-        n = (srng() % maxn) + max_loop / 4;
-        if (load_factor > 0.4 && load_factor < 0.95) {
+        n = (srng() % maxn) + max_loop / 2;
+        if (load_factor > 0.4 && load_factor < 1) {
             auto pow2 = 1 << ilog(n, 2);
             n = int(pow2 * load_factor) - (1 << 10) + (rand()) % (1 << 8);
         }

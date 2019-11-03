@@ -1298,29 +1298,25 @@ private:
         if (bmask != 0)
             return bucket_from + CTZ(bmask) - 0;
 
-        const auto qmask = (MASK_BIT + _num_buckets - 1) / MASK_BIT - 1;
-        if (1)
-        {
-            const auto next = _last ++ & qmask;
-            const auto bmask2 = _bitmask[next];
-            if (bmask2 != 0) {
-                return next * MASK_BIT + CTZ(bmask2);
-            }
-        }
+        const auto bmask2 = _bitmask[_last];
+        if (bmask2 != 0)
+            return _last * MASK_BIT + CTZ(bmask2);
 
-        for (uint32_t last = 1, step = bucket_from + MASK_BIT * 2; ; last ++, step += last) {
+        const auto qmask = (MASK_BIT + _num_buckets - 1) / MASK_BIT - 1;
+        //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
+        for (uint32_t last = 2, step = bucket_from + _num_filled; ; last ++, step += last) {
             const auto next2 = step & qmask;
             const auto bmask2 = _bitmask[next2];
             if (bmask2 != 0) {
                 _last = next2;
                 return next2 * MASK_BIT + CTZ(bmask2);
             }
-#if 0
-            const auto next = next2 + 1;
-            const auto bmask = _bitmask[next];
+#if 1
+            const auto next1 = next2 + 1;
+            const auto bmask = _bitmask[next1];
             if (bmask != 0) {
-                _last = next;
-                return next * MASK_BIT + CTZ(bmask);
+                _last = next1;
+                return next1 * MASK_BIT + CTZ(bmask);
             }
 #endif
         }
