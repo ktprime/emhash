@@ -95,24 +95,28 @@
 namespace emhash7 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
-inline static uint32_t CTZ(const uint32_t n)
+inline static uint32_t CTZ64(const uint64_t n)
 {
-#if _WIN32 || _MSC_VER > 1400
+#if _MSC_VER > 1400 || _WIN32
     unsigned long index;
+#if __x86_64__ || __amd64__ || _M_X64
+    _BitScanForward64(&index, n);
+#else
     _BitScanForward(&index, n);
+#endif
 #elif __GNUC__ || __clang__
-    uint32_t index = __builtin_ctz(n);
+    uint32_t index = __builtin_ctzll(n);
 #elif 1
-    stype index;
-    #if __GNUC__ || __clang__
-    __asm__ ("bsfl %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-    #else
+    uint64_t index;
+#if __GNUC__ || __clang__
+    __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
+#else
     __asm
     {
-        bsf eax, n
+        bsfq eax, n
         mov index, eax
     }
-    #endif
+#endif
 #endif
 
     return (uint32_t)index;
@@ -340,7 +344,7 @@ public:
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
-        max_load_factor(0.95f);
+        max_load_factor(0.90f);
         reserve(bucket);
     }
 
@@ -506,13 +510,13 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 17) / (float)_loadlf;
+        return (1 << 13) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
         if (value < 0.995f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 17) / value);
+            _loadlf = (uint32_t)((1 << 13) / value);
     }
 
     constexpr size_type max_size() const
@@ -990,7 +994,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint32_t num_elems) noexcept
     {
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17);
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 13);
         //const auto required_buckets = num_elems * 19 / 16;
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
@@ -1021,7 +1025,7 @@ private:
         _bitmask     = (uint32_t*)(new_pairs + 2 + num_buckets);
 
         if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
-            memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * (2 + num_buckets));
+            memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         else
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
                 NEXT_BUCKET(new_pairs, bucket) = INACTIVE;
@@ -1294,31 +1298,27 @@ private:
 
         //fast find by bit
         const auto boset = bucket_from % 8;
-        const uint32_t bmask = *(uint32_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
+        const auto bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
         if (bmask != 0)
-            return bucket_from + CTZ(bmask) - 0;
+            return bucket_from + CTZ64(bmask) - 0;
 
-        const auto bmask2 = _bitmask[_last];
+        const auto bmask2 = *((uint64_t*)_bitmask + _last);
         if (bmask2 != 0)
-            return _last * MASK_BIT + CTZ(bmask2);
+            return _last * 64 + CTZ64(bmask2);
 
-        const auto qmask = (MASK_BIT + _num_buckets - 1) / MASK_BIT - 1;
+        const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
+#ifndef QS
         for (uint32_t last = 2, step = bucket_from + _num_filled; ; last ++, step += last) {
+#else
+        for (uint32_t step = _last + 1; ; step ++) {
+#endif
             const auto next2 = step & qmask;
-            const auto bmask2 = _bitmask[next2];
+            const auto bmask2 = *((uint64_t*)_bitmask + next2);
             if (bmask2 != 0) {
                 _last = next2;
-                return next2 * MASK_BIT + CTZ(bmask2);
+                return next2 * 64 + CTZ64(bmask2);
             }
-#if 1
-            const auto next1 = next2 + 1;
-            const auto bmask = _bitmask[next1];
-            if (bmask != 0) {
-                _last = next1;
-                return next1 * MASK_BIT + CTZ(bmask);
-            }
-#endif
         }
 
         return 0;
