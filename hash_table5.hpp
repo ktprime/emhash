@@ -392,6 +392,7 @@ public:
         std::swap(_num_filled, other._num_filled);
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
+        std::swap(_last, other._last);
     }
 
     // -------------------------------------------------------------
