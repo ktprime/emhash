@@ -996,7 +996,6 @@ public:
     bool reserve(uint32_t num_elems) noexcept
     {
         const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17);
-        //const auto required_buckets = num_elems * 19 / 16;
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
@@ -1005,7 +1004,6 @@ public:
     }
 
 private:
-    /// Make room for this many elements
     void rehash(uint32_t required_buckets) noexcept
     {
         if (required_buckets < _num_filled)
@@ -1311,7 +1309,7 @@ private:
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
 #ifndef QS
-        for (uint32_t last = 2, step = bucket_from + _num_filled; ; last ++, step += last) {
+        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ; last ++, step += last) {
 #else
         for (uint32_t step = _last + 1; ; step ++) {
 #endif

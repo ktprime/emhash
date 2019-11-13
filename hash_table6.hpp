@@ -1410,7 +1410,7 @@ private:
         for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
             const auto next2 = (bucket_from + last) & qmask;
 #else
-        for (uint32_t last = 2, step = bucket_from + _num_filled; ; last ++, step += last) {
+        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ; last ++, step += last) {
             const auto next2 = step & qmask;
 #endif
             const auto bmask2 = *((uint64_t*)_bitmask + next2);
