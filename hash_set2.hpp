@@ -773,10 +773,8 @@ public:
 #endif
 
         //erase from main bucket, return main bucket as next
-        if (bucket == it._bucket)
-            ++it;
+        return (bucket == it._bucket) ? ++it : it;
 
-        return it;
     }
 
     void _erase(iterator it)
@@ -821,7 +819,7 @@ public:
 #ifdef EMHASH_HIGH_LOAD
         const auto required_buckets = num_elems + num_elems / 8;
 #else
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13) + 2;
 #endif
 
         if (EMHASH_LIKELY(required_buckets < _mask))
@@ -1058,11 +1056,11 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(uint32_t bucket_from)
     {
-        const auto bucket = (bucket_from + 1);
-        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
-            return bucket;
+        const auto bucket1 = bucket_from + 1;
+        if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
+            return bucket1;
 
-        const auto bucket2 = (bucket + 1);
+        const auto bucket2 = bucket_from + 2;
         if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
             return bucket2;
 
@@ -1072,7 +1070,8 @@ private:
 #endif
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
-        for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+        //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+        for (uint32_t last = 2, slot = 3; ; last ++, slot += last) {
             const auto bucket = (bucket_from + slot) & _mask;
             if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
                 return bucket;
@@ -1087,9 +1086,6 @@ private:
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
                     return bucket3;
 
-                const auto bucket4 = next + 1;
-                if (NEXT_BUCKET(_pairs, bucket4) == INACTIVE)
-                    return bucket4;
             }
         }
     }
