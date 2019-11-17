@@ -55,11 +55,11 @@
 
 #define GET_KEY(p,n)     p[n].first
 #define GET_VAL(p,n)     p[n].second
-#define NEXT_BUCKET(s,n) s[n].bucket
-#define GET_PKV(s,n)    s[n]
+#define NEXT_BUCKET(p,n) p[n].bucket
+#define GET_PKV(s,n)     s[n]
 #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket, _time_out), _num_filled ++
 
-namespace emhash {
+namespace emlru_time {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 
@@ -115,8 +115,8 @@ struct entry {
     entry& operator = (entry&& pairT)
     {
         second = std::move(pairT.second);
-        bucket = pairT.bucket;
         first = std::move(pairT.first);
+        bucket = pairT.bucket;
         timeout = pairT.timeout;
 
         return *this;
@@ -125,8 +125,8 @@ struct entry {
     entry& operator = (entry& o)
     {
         second = o.second;
-        bucket = o.bucket;
         first  = o.first;
+        bucket = o.bucket;
         timeout = o.timeout;
         return *this;
     }
@@ -146,11 +146,11 @@ struct entry {
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
-class lru_hash_map
+class lru_cache
 {
 
 private:
-    typedef lru_hash_map<KeyT, ValueT, HashT, EqT> htype;
+    typedef lru_cache<KeyT, ValueT, HashT, EqT> htype;
     typedef entry<KeyT, ValueT>             PairT;
     typedef entry<KeyT, ValueT>             value_pair;
 
@@ -291,11 +291,11 @@ public:
         _pairs = nullptr;
         _num_filled = 0;
         _time_out = 5;
-        _max_buckets = 1 << 16;
+        _max_buckets = 1 << 30;
         max_load_factor(0.8f);
     }
 
-    lru_hash_map(uint32_t bucket = 4, int timeout = 1, uint32_t max_bucket = 1 << 20)
+    lru_cache(uint32_t bucket = 4, uint32_t max_bucket = 1 << 24, int timeout = 3600 * 24 * 365)
     {
         init();
         _time_out = timeout;
@@ -303,20 +303,20 @@ public:
         reserve(bucket);
     }
 
-    lru_hash_map(const lru_hash_map& other)
+    lru_cache(const lru_cache& other)
     {
         _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
         clone(other);
     }
 
-    lru_hash_map(lru_hash_map&& other)
+    lru_cache(lru_cache&& other)
     {
         init();
         reserve(1);
         *this = std::move(other);
     }
 
-    lru_hash_map(std::initializer_list<std::pair<KeyT, ValueT>> il)
+    lru_cache(std::initializer_list<std::pair<KeyT, ValueT>> il)
     {
         init();
         reserve((uint32_t)il.size());
@@ -324,7 +324,7 @@ public:
             insert(*begin);
     }
 
-    lru_hash_map& operator=(const lru_hash_map& other)
+    lru_cache& operator=(const lru_cache& other)
     {
         if (this == &other)
             return *this;
@@ -341,13 +341,13 @@ public:
         return *this;
     }
 
-    lru_hash_map& operator=(lru_hash_map&& other)
+    lru_cache& operator=(lru_cache&& other)
     {
         this->swap(other);
         return *this;
     }
 
-    ~lru_hash_map()
+    ~lru_cache()
     {
         if (is_notrivially())
             clearkv();
@@ -355,7 +355,7 @@ public:
         free(_pairs);
     }
 
-    void clone(const lru_hash_map& other)
+    void clone(const lru_cache& other)
     {
         _hasher      = other._hasher;
         _num_buckets = other._num_buckets;
@@ -375,11 +375,11 @@ public:
                     new(_pairs + bucket) PairT(opairs[bucket]);
             }
             NEXT_BUCKET(_pairs, _num_buckets) = NEXT_BUCKET(_pairs, _num_buckets + 1) = 0;
-            _pairs[_num_buckets].timeout = _pairs[_num_buckets + 1].timeout = INACTIVE;
+            _pairs[_num_buckets + 0].timeout = _pairs[_num_buckets + 1].timeout = INACTIVE;
         }
     }
 
-    void swap(lru_hash_map& other)
+    void swap(lru_cache& other)
     {
         std::swap(_hasher, other._hasher);
         std::swap(_pairs, other._pairs);
@@ -391,14 +391,13 @@ public:
         std::swap(_max_buckets, other._max_buckets);
     }
 
-    bool clear_timeout(uint32_t bucket)
+    bool check_timeout(uint32_t bucket)
     {
         //check only main bucket
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
-        const auto main_bucket = hash_bucket(bucket_key);
-        if (main_bucket == bucket && IS_TIMEOUT(_pairs, bucket))
+        if (IS_TIMEOUT(_pairs, bucket) || hash_bucket(GET_KEY(_pairs, bucket)) == bucket)
         {
-            _pairs[bucket].~PairT(), _num_filled--;
+            //_pairs[bucket].~PairT();
+            clear_bucket(bucket);
             return true;
         }
 
@@ -1018,18 +1017,10 @@ public:
 
     void rehash(uint32_t required_buckets) noexcept
     {
-        auto num_filled = 0;
-        auto now_ts = nowts();
-        for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
-            if (NEXT_BUCKET(_pairs, bucket) != INACTIVE && _pairs[bucket].timeout >= now_ts) {
-                num_filled ++;
-            }
-        }
-        if (required_buckets > num_filled * 2) {
- //           required_buckets = num_filled + 8;
-        }
+        if (required_buckets > 2 * _max_buckets)
+            required_buckets = 2 * _max_buckets;
 
-        uint32_t num_buckets = num_filled > 65536 ? (1 << 16) : 4;
+        uint32_t num_buckets = _num_filled > 65536 ? (1 << 16) : 4;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
@@ -1040,15 +1031,15 @@ public:
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-
         for (uint32_t bucket = 0; bucket < num_buckets; bucket++) {
             NEXT_BUCKET(_pairs, bucket) = INACTIVE;
             _pairs[bucket].timeout = 0;
         }
 
-        NEXT_BUCKET(_pairs, _num_buckets + 0) = NEXT_BUCKET(_pairs, _num_buckets + 1) = 0;
+        NEXT_BUCKET(_pairs, _num_buckets) = NEXT_BUCKET(_pairs, _num_buckets + 1) = 0;
         _pairs[_num_buckets + 0].timeout = _pairs[_num_buckets + 1].timeout = INACTIVE;
 
+        auto now_ts = nowts();
         for (uint32_t src_bucket = 0; old_num_filled > 0; src_bucket++) {
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
                 continue;
@@ -1062,7 +1053,7 @@ public:
             old_pairs[src_bucket].~PairT();
         }
 
-#if EMHASH_REHASH_LOG
+#if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
         if (_num_filled > 1000000) {
             auto mbucket = _num_filled;
             char buff[255] = {0};
@@ -1248,11 +1239,11 @@ private:
     uint32_t find_empty_bucket(uint32_t bucket_from)
     {
         auto bucket = bucket_from + 1;
-        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE /*|| clear_timeout(bucket)*/)
+        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE /*|| check_timeout(bucket)**/)
             return bucket;
 
         bucket = (bucket_from + 2) & _mask;
-        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE /*|| clear_timeout(bucket)**/)
+        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE /*|| check_timeout(bucket)**/)
             return bucket;
 
         for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
@@ -1260,7 +1251,7 @@ private:
             if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
                 return bucket1;
 
-//            else if (clear_timeout(bucket1))
+//            else if (check_timeout(bucket1))
 //                return bucket1;
 
             const auto bucket2 = bucket1 + 1;
@@ -1342,5 +1333,5 @@ private:
 };
 } // namespace emhash
 #if __cplusplus > 199711
-//template <class Key, class Val> using emihash = emhash1::lru_hash_map<Key, Val, std::hash<Key>>;
+//template <class Key, class Val> using emihash = emhash1::lru_cache<Key, Val, std::hash<Key>>;
 #endif
