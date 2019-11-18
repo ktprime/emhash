@@ -930,7 +930,7 @@ public:
     bool reserve(uint32_t num_elems) noexcept
     {
         const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17);
-        if (EMHASH_LIKELY(required_buckets < _mask) || _num_filled > _max_buckets * 2)
+        if (EMHASH_LIKELY(required_buckets < _mask) && _num_filled < _max_buckets * 2)
             return false;
 
         rehash(required_buckets + 2);
