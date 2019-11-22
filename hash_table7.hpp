@@ -1309,11 +1309,11 @@ private:
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
 #ifndef QS
-        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ; last ++, step += last) {
+        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
 #else
-        for (uint32_t step = _last + 1; ; step ++) {
+        for (uint32_t step = _last + 1; ; step = ++step & qmask) {
 #endif
-            const auto next2 = step & qmask;
+            const auto next2 = step;
             const auto bmask2 = *((uint64_t*)_bitmask + next2);
             if (bmask2 != 0) {
                 _last = next2;

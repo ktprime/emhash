@@ -1246,7 +1246,8 @@ private:
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE /*|| check_timeout(bucket)**/)
             return bucket;
 
-        for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+        //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+        for (uint32_t last = 2, slot = 3; ; last ++, slot += last) {
             const auto bucket1 = (bucket_from + slot) & _mask;
             if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
                 return bucket1;
@@ -1258,7 +1259,7 @@ private:
             if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
                 return bucket2;
 
-            else if (slot > 5) {
+            else if (last > 5) {
                 const auto next = (bucket_from + _num_filled + last) & _mask;
                 const auto bucket3 = next;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)

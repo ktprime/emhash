@@ -1360,7 +1360,7 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    uint32_t find_empty_bucket(const uint32_t bucket_from) const
+    uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
         const auto bucket1 = bucket_from + 1;
         if (ISEMPTY_BUCKET(_pairs, bucket1))
@@ -1398,20 +1398,18 @@ private:
 
         return empty_bucket;
 #else
-      //fast find by bit
         const auto boset = bucket_from % 8;
-        const uint32_t bmask = *(uint32_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
+        const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
         if (bmask != 0)
             return bucket_from + CTZ(bmask) - 0;
 
-        //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
-#if QS
+#ifndef QS
+        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ; step = (step + ++last) & qmask) {
+            const auto next2 = step;
+#else
         for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
             const auto next2 = (bucket_from + last) & qmask;
-#else
-        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ; last ++, step += last) {
-            const auto next2 = step & qmask;
 #endif
             const auto bmask2 = *((uint64_t*)_bitmask + next2);
             if (bmask2 != 0)
