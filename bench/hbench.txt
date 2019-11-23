@@ -1,0 +1,91 @@
+huangyuanbing@ubuntu:~$ g++     -std=c++17 -O3 -mtune=core-avx2 hbench.cpp -o hb && ./hb
+
+hrd::hash_map
+    insert[]: 4207
+       erase: 207
+    insert[]: 4146
+  find_erase: 201
+    insert[]: 3802
+     emplace: 3696
+    insert[]: 3715
+        find: 148
+       count: 149
+ctor_initlist: 14
+    insert[]: 4064
+   copy_ctor: 3963
+copy_operator: 4475
+
+emhash6::HashMap
+    insert[]: 3394
+       erase: 183
+    insert[]: 3064
+  find_erase: 440
+    insert[]: 3062
+     emplace: 2835
+    insert[]: 2980
+        find: 102
+       count: 101
+ctor_initlist: 4
+    insert[]: 3323
+   copy_ctor: 9
+copy_operator: 763
+
+emhash7::HashMap
+    insert[]: 3355
+       erase: 465
+    insert[]: 3015
+  find_erase: 438
+    insert[]: 3014
+     emplace: 2537
+    insert[]: 2891
+        find: 108
+       count: 107
+ctor_initlist: 7
+    insert[]: 3360
+   copy_ctor: 8
+copy_operator: 771
+
+robin_hood::unordered_map
+    insert[]: 3938
+       erase: 174
+    insert[]: 3700
+  find_erase: 209
+    insert[]: 3720
+     emplace: 3074
+    insert[]: 3468
+        find: 131
+       count: 128
+ctor_initlist: 6
+    insert[]: 3946
+   copy_ctor: 1883
+copy_operator: 552
+
+tsl::robin_map
+    insert[]: 3837
+       erase: 211
+    insert[]: 3427
+  find_erase: 735
+    insert[]: 3427
+     emplace: 3192
+    insert[]: 3364
+        find: 156
+       count: 157
+ctor_initlist: 60
+    insert[]: 3833
+   copy_ctor: 3301
+copy_operator: 1342
+
+parallel-hashmap::flat_map
+    insert[]: 10382
+       erase: 459
+    insert[]: 10246
+  find_erase: 408
+    insert[]: 10256
+     emplace: 3303
+    insert[]: 10549
+        find: 161
+       count: 159
+ctor_initlist: 8
+    insert[]: 10419
+   copy_ctor: 3337
+copy_operator: 3435
