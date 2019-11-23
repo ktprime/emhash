@@ -34,7 +34,7 @@ private:
 class Timer
 {
 public:
-    Timer(const char* msg) :_msg(msg) { clock_gettime(CLOCK_MONOTONIC_RAW, &_start); }
+    Timer(const char* msg, const char* msg2) :_msg(msg) { clock_gettime(CLOCK_MONOTONIC_RAW, &_start); }
     ~Timer()
     {
         struct timespec end;
