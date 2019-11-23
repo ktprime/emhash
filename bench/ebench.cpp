@@ -401,7 +401,7 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 template<class hash_type>
 void hash_iter(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime(); size_t sum = 0;
         for (const auto& v : ahash)
@@ -419,7 +419,7 @@ void hash_iter(hash_type& ahash, const std::string& hash_name, std::vector<keyTy
 template<class hash_type>
 void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
         auto ts1 = getTime();
@@ -439,7 +439,7 @@ void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<
 template<class hash_type>
 void hash_insert2(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
         auto ts1 = getTime();
@@ -455,7 +455,7 @@ void hash_insert2(hash_type& ahash, const std::string& hash_name, std::vector<ke
 template<class hash_type>
 void insert_no_reserve(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
         auto ts1 = getTime();
@@ -469,12 +469,12 @@ void insert_no_reserve(hash_type& ahash, const std::string& hash_name, std::vect
 template<class hash_type>
 void insert_reserve(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
-        hash_type tmp(1);
+        hash_type tmp(vList.size());
         tmp.max_load_factor(0.99);
-        tmp.reserve(vList.size());
+//        tmp.reserve(vList.size());
         auto ts1 = getTime();
         for (const auto v : vList)
             sum += tmp.emplace(v, TO_VAL(0)).second;
@@ -486,10 +486,11 @@ void insert_reserve(hash_type& ahash, const std::string& hash_name, std::vector<
 template<class hash_type>
 void insert_find_erase(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
         hash_type tmp(ahash);
+
         auto ts1 = getTime();
         for (const auto v : vList) {
 #if KEY_INT
@@ -502,14 +503,36 @@ void insert_find_erase(hash_type& ahash, const std::string& hash_name, std::vect
             sum += tmp.erase(v2);
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %52s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+        //printf("             %52s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+    }
+}
+
+template<class hash_type>
+void insert_high_load(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+{
+    if (show_name.count(hash_name) != 0)
+    {
+        hash_type tmp(ahash);
+
+        auto ts1 = getTime();
+        for (const auto v : vList) {
+#if KEY_INT
+            auto v2 = v + (v & 1);
+#else
+            auto v2 = v; v2[0] += '1';
+#endif
+            tmp[v2] = TO_VAL(0);
+        }
+
+        check_func_result(hash_name, __FUNCTION__, tmp.size(), ts1);
+        printf("             %82s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
 template<class hash_type>
 void find_miss_all(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         auto n = vList.size();
         size_t pow2 = 2 << ilog(n, 2);
@@ -521,9 +544,9 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name, std::vector<k
 }
 
 template<class hash_type>
-void find_both_half(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void find_hit_half(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         auto n = vList.size();
         auto ts1 = getTime(); size_t sum = 0;
@@ -537,7 +560,7 @@ void find_both_half(hash_type& ahash, const std::string& hash_name, std::vector<
 template<class hash_type>
 void find_hit_all(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime();
         size_t sum = 0;
@@ -555,7 +578,7 @@ void find_hit_all(hash_type& ahash, const std::string& hash_name, std::vector<ke
 template<class hash_type>
 void erase_find_half(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime();
         size_t sum = 0;
@@ -568,7 +591,7 @@ void erase_find_half(hash_type& ahash, const std::string& hash_name, std::vector
 template<class hash_type>
 void erase_half(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime(); size_t sum = 0;
         for (const auto v : vList)
@@ -580,7 +603,7 @@ void erase_half(hash_type& ahash, const std::string& hash_name, std::vector<keyT
 template<class hash_type>
 void hash_clear(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime();
         size_t sum = ahash.size();
@@ -592,7 +615,7 @@ void hash_clear(hash_type& ahash, const std::string& hash_name, std::vector<keyT
 template<class hash_type>
 void hash_copy(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    if (show_name.find(hash_name) != show_name.end())
+    if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
         auto ts1 = getTime();
@@ -778,7 +801,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 static int TestHashMap(int n, int max_loops = 1234567)
 {
     emhash5::HashMap <keyType,int> ehash5;
-    emhash2::HashMap <keyType,int> ehash2;
+    emhash6::HashMap <keyType,int> ehash2;
 
     sfc64 srng;
 #if 1
@@ -872,21 +895,23 @@ static int TestHashMap(int n, int max_loops = 1234567)
 }
 
 template<class hash_type>
-int benOneHash(hash_type& hash, const std::string& hash_name, std::vector<keyType>& oList)
+int benOneHash(hash_type& tmp, const std::string& hash_name, std::vector<keyType>& oList)
 {
     if (show_name.find(hash_name) == show_name.end())
         return 0;
 
     int load_factor = 87;
-    hash.max_load_factor(load_factor / 100.0);
     check_flag = max_loop < oList.size();
 
     //pack for small packet
     for (int i = 0; i < max_loop; i += oList.size())
     {
+        hash_type hash;
+        hash.max_load_factor(load_factor / 100.0);
         auto vList(oList);
         insert_reserve(hash, hash_name, vList);
         insert_no_reserve(hash, hash_name, vList);
+        insert_high_load(hash, hash_name, vList);
         find_hit_all (hash, hash_name, vList);
         find_miss_all(hash, hash_name, vList);
 
@@ -896,14 +921,14 @@ int benOneHash(hash_type& hash, const std::string& hash_name, std::vector<keyTyp
 #else
             vList[v][0] += 1;
 #endif
-        find_both_half(hash, hash_name, vList);
+        find_hit_half(hash, hash_name, vList);
         erase_half(hash, hash_name, vList);
         erase_find_half(hash, hash_name, vList);
         erase_reinsert(hash, hash_name, vList);
 #if 0
-        check_result.erase("find_both_half");
-        find_both_half(hash, hash_name, vList);
-        check_result.erase("find_both_half");
+        check_result.erase("find_hit_half");
+        find_hit_half(hash, hash_name, vList);
+        check_result.erase("find_hit_half");
 #endif
         load_factor = (int)(hash.load_factor() * 100);
         insert_find_erase(hash, hash_name, vList);
@@ -1193,8 +1218,8 @@ int main(int argc, char* argv[])
 {
     srand((unsigned)time(0));
 
-    auto tn = rand() % 1234567 + 100000;
-    auto maxn = 2123456;
+    auto tn = 0;
+    auto maxn = 4123456;
     double load_factor = 0.00945;
     printf("./ebench maxn f(0-100) d[2-6]mpsf t(n)\n");
 
@@ -1240,35 +1265,27 @@ int main(int argc, char* argv[])
     readFile("./item.log", 6);
 #endif
 
-    sfc64 srng;
     auto nows = time(0);
+    sfc64 srng(nows);
 
     while (true) {
+
 #if INP
-        char ccmd[257];
+        auto n = 0; char ccmd[257];
         printf(">> ");
-        if (fgets(ccmd, 255, stdin)) {
-            auto n = atol(ccmd);
-            if (n == 0)
-                n = (get32rand() >> 9) + 14567;
-            else if (n < 0)
-                break;
-            if (load_factor > 0.4 && load_factor < 1) {
-                int log2 = ilog(n, 2);
-                n = int((1 << log2) * load_factor) + rand() % (1 << 10);
-            }
-            benchHashMap(n);
-        }
+        if (fgets(ccmd, 255, stdin))
+            n = atoi(ccmd);
 #else
         auto n = (srng() % maxn) + max_loop / 2;
+#endif
         if (load_factor > 0.4 && load_factor < 1) {
             auto pow2 = 1 << ilog(n, 2);
             n = int(pow2 * load_factor) - (1 << 10) + (rand()) % (1 << 8);
         }
+        if (n < 1000 || n > 1234567890)
+            n = 1234567;
 
         int tp = benchHashMap(n);
-#endif
-
         if (tp > TP)
             break;
 #if GCOV
