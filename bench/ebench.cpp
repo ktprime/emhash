@@ -475,6 +475,7 @@ void insert_reserve(hash_type& ahash, const std::string& hash_name, std::vector<
         hash_type tmp(vList.size());
         tmp.max_load_factor(0.99);
 //        tmp.reserve(vList.size());
+
         auto ts1 = getTime();
         for (const auto v : vList)
             sum += tmp.emplace(v, TO_VAL(0)).second;
@@ -912,6 +913,7 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, std::vector<keyType
         insert_reserve(hash, hash_name, vList);
         insert_no_reserve(hash, hash_name, vList);
         insert_high_load(hash, hash_name, vList);
+
         find_hit_all (hash, hash_name, vList);
         find_miss_all(hash, hash_name, vList);
 
@@ -932,6 +934,7 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, std::vector<keyType
 #endif
         load_factor = (int)(hash.load_factor() * 100);
         insert_find_erase(hash, hash_name, vList);
+
 #ifdef UF
         hash_iter(hash, hash_name, vList);
         hash_copy(hash, hash_name, vList);
@@ -1081,7 +1084,7 @@ static int benchHashMap(int n)
         printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first * 1000l / n), v.second.c_str(), last * 1.0 / v.first, first * 100.0 / v.first);
     }
 
-    constexpr int dis_input = 6;
+    constexpr int dis_input = 5;
     if (tcase++ % dis_input == 0) {
         printf("--------------------------------%s load_factor = %d--------------------------------\n", __FUNCTION__, iload);
         dump_all(func_hash_time, hash_score);

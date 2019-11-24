@@ -59,7 +59,7 @@ const uint64_t MAX_ELEMENTS = 5000000;
 uint64_t* ELEMENTS;
 
 
-static HRD_ALWAYS_INLINE uint64_t make_value(uint64_t v, const uint64_t*) {
+static HRD_ALWAYS_INLINE uint64_t make_value(uint64_t v, const Value*) {
     return v;
 }
 
