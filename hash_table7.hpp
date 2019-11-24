@@ -421,12 +421,13 @@ public:
     void clone(const HashMap& other)
     {
         _hasher      = other._hasher;
+        _eq          = other._eq;
         _num_buckets = other._num_buckets;
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
         _last        = other._last;
-        _bitmask     = (uint32_t*)(_pairs + 2 + _num_buckets);
+        _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
         auto opairs = other._pairs;
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__

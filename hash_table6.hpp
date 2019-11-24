@@ -411,7 +411,7 @@ public:
         _mask        = other._mask;
         _loadlf      = other._loadlf;
         _hash_inter  = other._hash_inter;
-        _bitmask     = (uint32_t*)(_pairs + 2 + _num_buckets);
+        _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
         auto opairs  = other._pairs;
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
@@ -529,12 +529,12 @@ public:
 
     constexpr size_type max_size() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1 << 31) / sizeof(PairT);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1 << 31) / sizeof(PairT);
     }
 
 #ifdef EMHASH_STATIS

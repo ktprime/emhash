@@ -43,10 +43,11 @@
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
 
+//#include "lru_time.h"
+//#include "lru_size.h"
 
 constexpr int max_loop = 1000000;
 
-//#include "hash_table64.hpp"
 //https://www.zhihu.com/question/46156495
 //https://eourcs.github.io/LockFreeCuckooHash/
 
@@ -79,6 +80,7 @@ constexpr int max_loop = 1000000;
 
 #if ET
     #define _CPP11_HASH    1
+    #include "hrd/hash_set.h"
     #include "./tsl/robin_map.h"        //https://github.com/tessil/robin-map
     #include "./tsl/hopscotch_map.h"    //https://github.com/tessil/hopscotch-map
     #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
@@ -145,12 +147,15 @@ struct RankItem;
 emhash6::HashMap<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
 
-    {"emhash2", "emhash2"},
+//    {"emhash2", "emhash72"},
 //    {"emhash4", "emhash4"},
-//   {"emhash3", "emhash3"},
+//    {"emhash3",  "emhash62"},
 //    {"emhash5", "emhash5"},
     {"emhash7", "emhash7"},
     {"emhash6", "emhash6"},
+    {"hrdset",   "hrd set"},
+//    {"lru_time", "lru_time"},
+//    {"lru_size", "lru_size"},
 
 #if ET > 0
     {"martin", "martin flat"},
@@ -399,7 +404,7 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 }
 
 template<class hash_type>
-void hash_iter(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void hash_iter(const hash_type& ahash, const std::string& hash_name)
 {
     if (show_name.count(hash_name) != 0)
     {
@@ -443,7 +448,7 @@ void hash_insert2(hash_type& ahash, const std::string& hash_name, std::vector<ke
     {
         size_t sum = 0;
         auto ts1 = getTime();
-        for (const auto v : vList) {
+        for (const auto& v : vList) {
             ahash.insert_unique(v, TO_VAL(0));
             sum ++;
         }
@@ -459,7 +464,7 @@ void insert_no_reserve(hash_type& ahash, const std::string& hash_name, std::vect
     {
         size_t sum = 0;
         auto ts1 = getTime();
-        for (const auto v : vList)
+        for (const auto& v : vList)
             sum += ahash.emplace(v, TO_VAL(0)).second;
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
 //        printf("    %12s  %s  %5zd ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), ahash.load_factor());
@@ -467,17 +472,16 @@ void insert_no_reserve(hash_type& ahash, const std::string& hash_name, std::vect
 }
 
 template<class hash_type>
-void insert_reserve(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void insert_reserve(const hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
         hash_type tmp(vList.size());
         tmp.max_load_factor(0.99);
-//        tmp.reserve(vList.size());
 
         auto ts1 = getTime();
-        for (const auto v : vList)
+        for (const auto& v : vList)
             sum += tmp.emplace(v, TO_VAL(0)).second;
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
         printf("    %12s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
@@ -485,12 +489,16 @@ void insert_reserve(hash_type& ahash, const std::string& hash_name, std::vector<
 }
 
 template<class hash_type>
-void insert_find_erase(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void insert_find_erase(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
+#if 0
         hash_type tmp(ahash);
+#else
+        hash_type tmp(ahash.size()); for (const auto& v : ahash) tmp.emplace(v.first, v.second);
+#endif
 
         auto ts1 = getTime();
         for (const auto v : vList) {
@@ -504,19 +512,24 @@ void insert_find_erase(hash_type& ahash, const std::string& hash_name, std::vect
             sum += tmp.erase(v2);
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        //printf("             %52s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+//        printf("             %52s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
 template<class hash_type>
-void insert_high_load(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void insert_high_load(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
+#if 0
         hash_type tmp(ahash);
+#else
+        hash_type tmp(ahash.size()); for (const auto& v : ahash) tmp.emplace(v.first, v.second);
+#endif
 
         auto ts1 = getTime();
-        for (const auto v : vList) {
+
+        for (const auto& v : vList) {
 #if KEY_INT
             auto v2 = v + (v & 1);
 #else
@@ -531,7 +544,7 @@ void insert_high_load(hash_type& ahash, const std::string& hash_name, std::vecto
 }
 
 template<class hash_type>
-void find_miss_all(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void find_miss_all(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
@@ -545,7 +558,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name, std::vector<k
 }
 
 template<class hash_type>
-void find_hit_half(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
@@ -559,13 +572,13 @@ void find_hit_half(hash_type& ahash, const std::string& hash_name, std::vector<k
 }
 
 template<class hash_type>
-void find_hit_all(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void find_hit_all(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime();
         size_t sum = 0;
-        for (const auto v : vList) {
+        for (const auto& v : vList) {
 #ifdef KEY_INT
             sum += ahash.count(v) + v;
 #else
@@ -577,32 +590,32 @@ void find_hit_all(hash_type& ahash, const std::string& hash_name, std::vector<ke
 }
 
 template<class hash_type>
-void erase_find_half(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void erase_find_half(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime();
         size_t sum = 0;
-        for (const auto v : vList)
+        for (const auto& v : vList)
             sum += ahash.count(v);
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
     }
 }
 
 template<class hash_type>
-void erase_half(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void erase_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
         auto ts1 = getTime(); size_t sum = 0;
-        for (const auto v : vList)
+        for (const auto& v : vList)
             sum += ahash.erase(v);
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
     }
 }
 
 template<class hash_type>
-void hash_clear(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void hash_clear(hash_type& ahash, const std::string& hash_name)
 {
     if (show_name.count(hash_name) != 0)
     {
@@ -614,7 +627,7 @@ void hash_clear(hash_type& ahash, const std::string& hash_name, std::vector<keyT
 }
 
 template<class hash_type>
-void hash_copy(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void hash_copy(hash_type& ahash, const std::string& hash_name)
 {
     if (show_name.count(hash_name) != 0)
     {
@@ -896,7 +909,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
 }
 
 template<class hash_type>
-int benOneHash(hash_type& tmp, const std::string& hash_name, std::vector<keyType>& oList)
+int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<keyType>& oList)
 {
     if (show_name.find(hash_name) == show_name.end())
         return 0;
@@ -910,6 +923,7 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, std::vector<keyType
         hash_type hash;
         hash.max_load_factor(load_factor / 100.0);
         auto vList(oList);
+
         insert_reserve(hash, hash_name, vList);
         insert_no_reserve(hash, hash_name, vList);
         insert_high_load(hash, hash_name, vList);
@@ -936,9 +950,9 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, std::vector<keyType
         insert_find_erase(hash, hash_name, vList);
 
 #ifdef UF
-        hash_iter(hash, hash_name, vList);
-        hash_copy(hash, hash_name, vList);
-        hash_clear(hash, hash_name, vList);
+        hash_iter(hash, hash_name);
+        hash_copy(hash, hash_name);
+        hash_clear(hash, hash_name);
 #endif
     }
 
@@ -1011,17 +1025,14 @@ static int benchHashMap(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#ifdef KEY_INT
     using ehash_func = hash_func;
-#else
-    using ehash_func = StrHasher;
-#endif
+//    using ehash_func = StrHasher;
 
     if (vList.size() % 2 == 0)
     {
 #if _CPP14_HASH
         { std::unordered_map<keyType, valueType, hash_func> unhash;        benOneHash(unhash, "stl_hash", vList); }
-        { ska::bytell_hash_map <keyType, valueType, hash_func > ohash;    benOneHash(ohash, "byte", vList); }
+        { ska::bytell_hash_map <keyType, valueType, hash_func > ohash;     benOneHash(ohash, "byte", vList); }
 #endif
 
 #if _CPP11_HASH
@@ -1030,9 +1041,12 @@ static int benchHashMap(int n)
         { ska::flat_hash_map <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "flat", vList); }
         { tsl::hopscotch_map <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hopsco", vList); }
         { tsl::robin_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "robin", vList); }
+        { hrd::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
 #endif
 
         { emhash7::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash7", vList); }
+//        { emlru_time::lru_cache <keyType, valueType, ehash_func> ehash(1<<10,1<<30,5);  benOneHash(ehash, "lru_time", vList); }
+//        { emlru_size::lru_cache <keyType, valueType, ehash_func> ehash(1<<10,1<<22);  benOneHash(ehash, "lru_size", vList); }
         { emhash4::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash4", vList); }
         { emhash3::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash3", vList); }
         { emhash6::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash6", vList); }
@@ -1046,14 +1060,17 @@ static int benchHashMap(int n)
         { emhash6::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash6", vList); }
         { emhash3::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash3", vList); }
         { emhash4::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash4", vList); }
+//        { emlru_time::lru_cache <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "lru_time", vList); }
+//        { emlru_size::lru_cache <keyType, valueType, ehash_func> ehash(1<<10,1<<28);  benOneHash(ehash, "lru_size", vList); }
         { emhash7::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash7", vList); }
 
 #if _CPP14_HASH
         { std::unordered_map<keyType, valueType, hash_func> unhash;        benOneHash(unhash, "stl_hash", vList); }
-        { ska::bytell_hash_map <keyType, valueType, hash_func > ohash;    benOneHash(ohash, "byte", vList); }
+        { ska::bytell_hash_map <keyType, valueType, hash_func > ohash;     benOneHash(ohash, "byte", vList); }
 #endif
 
 #if _CPP11_HASH
+        { hrd::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
         { phmap::flat_hash_map <keyType, valueType, hash_func> ohash;      benOneHash(ohash, "phmap", vList); }
         { robin_hood::unordered_map <keyType, valueType, hash_func> ohash; benOneHash(ohash, "martin", vList); }
         { ska::flat_hash_map <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "flat", vList); }
@@ -1223,7 +1240,7 @@ int main(int argc, char* argv[])
 
     auto tn = 0;
     auto maxn = 4123456;
-    double load_factor = 0.00945;
+    double load_factor = 0.0945;
     printf("./ebench maxn f(0-100) d[2-6]mpsf t(n)\n");
 
     for (int i = 1; i < argc; i++) {
@@ -1299,3 +1316,4 @@ int main(int argc, char* argv[])
     }
     return 0;
 }
+
