@@ -155,7 +155,7 @@ emhash6::HashMap<std::string, std::string> show_name = {
 //    {"emhash5", "emhash5"},
     {"emhash7", "emhash7"},
     {"emhash6", "emhash6"},
-//    {"hrdset",   "hrdset"},
+    {"hrdset",   "hrd set"},
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
 
@@ -496,11 +496,7 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, con
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
-#if 0
         hash_type tmp(ahash);
-#else
-        hash_type tmp(vList.size()); for (const auto& v : vList) tmp.emplace(v, TO_VAL(0));
-#endif
 
         auto ts1 = getTime();
         for (const auto& v : vList) {
@@ -524,13 +520,7 @@ void insert_high_load(const hash_type& ahash, const std::string& hash_name, cons
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
-#if 0
         hash_type tmp(ahash);
-#else
-        hash_type tmp(vList.size());
-        for (const auto& v : vList)
-            tmp.emplace(v, TO_VAL(0));
-#endif
 
         auto ts1 = getTime();
         for (const auto& v : vList) {
@@ -924,13 +914,14 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
     if (show_name.find(hash_name) == show_name.end())
         return 0;
 
-    int load_factor = 90;
+    int load_factor = 0;
     check_flag = max_loop < oList.size();
 
     //pack for small packet
-    for (int i = 0; i < max_loop; i += oList.size())
+    for (int i = 0; i < max_loop; i += (int)oList.size())
     {
         hash_type hash;
+        load_factor = 90;
         hash.max_load_factor(load_factor / 100.0);
         hash.clear();
 
