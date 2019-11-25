@@ -702,7 +702,7 @@ public:
         return 1 - (find_filled_bucket(key) == _num_buckets);
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT & key)
+    std::pair<iterator, iterator> equal_range(const KeyT& key)
     {
         iterator found = find(key);
         if (found == end())
@@ -806,7 +806,7 @@ public:
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             emplace(*begin);
         }
@@ -825,7 +825,7 @@ public:
     {
         Iter citbeg = begin;
         Iter citend = begin;
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             if (try_insert_mainbucket(begin->first, begin->second) == INACTIVE) {
                 std::swap(*begin, *citend++);
@@ -839,7 +839,7 @@ public:
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             insert_unique(*begin);
         }
@@ -928,7 +928,6 @@ public:
     ValueT set_get(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
-
         const auto bucket = find_or_allocate(key);
 
         // Check if inserting a new value rather than overwriting an old entry
@@ -936,7 +935,7 @@ public:
             NEW_KVALUE(key, value, bucket);
             return ValueT();
         } else {
-            const ValueT& old_value = GET_VAL(_pairs, bucket);
+            const ValueT old_value = GET_VAL(_pairs, bucket);
             GET_VAL(_pairs, bucket) = value;
             return old_value;
         }

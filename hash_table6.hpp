@@ -829,7 +829,7 @@ public:
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(end - begin) + _num_filled);
         for (; begin != end; ++begin) {
             insert_unique(*begin);
         }
