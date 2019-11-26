@@ -935,9 +935,9 @@ public:
             NEW_KVALUE(key, value, bucket);
             return ValueT();
         } else {
-            const ValueT old_value = GET_VAL(_pairs, bucket);
-            GET_VAL(_pairs, bucket) = value;
-            return old_value;
+            ValueT old_value(value);
+            std::swap(GET_VAL(_pairs, bucket), old_value);
+            return old_value
         }
     }
 
