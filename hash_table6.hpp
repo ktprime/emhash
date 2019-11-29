@@ -1,6 +1,6 @@
 
 // emhash6::HashMap for C++11
-// version 1.6.4
+// version 1.6.5
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -214,9 +214,9 @@ public:
     class iterator
     {
     public:
-        //typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
+        typedef std::forward_iterator_tag iterator_category;
+        typedef std::ptrdiff_t            difference_type;
+        typedef value_pair                value_type;
 
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
@@ -274,9 +274,9 @@ public:
     class const_iterator
     {
     public:
-        //typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
+        typedef std::forward_iterator_tag iterator_category;
+        typedef std::ptrdiff_t            difference_type;
+        typedef value_pair                value_type;
 
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
@@ -683,7 +683,7 @@ public:
 
     size_type count(const KeyT& key) const noexcept
     {
-        return 1 - (find_filled_bucket(key) == _num_buckets);
+        return (size_type)(find_filled_bucket(key) != _num_buckets);
     }
 
     std::pair<iterator, iterator> equal_range(const KeyT & key)
@@ -714,14 +714,14 @@ public:
     }
 
     /// Const version of the above
-    const ValueT* try_get(const KeyT& key) const noexcept
+    ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
     }
 
     /// Convenience function.
-    const ValueT get_or_return_default(const KeyT& key) const noexcept
+    ValueT get_or_return_default(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? ValueT() : GET_VAL(_pairs, bucket);
@@ -735,66 +735,57 @@ public:
     std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        const auto next   = bucket / 2;
-        const auto find = ISEMPTY_BUCKET(_pairs, next);
-        if (find) {
-            NEW_BUCKET(key, value, next, bucket);
-        }
-        return { {this, next}, find };
+        return do_insert(key, value);
     }
 
     std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        const auto next   = bucket / 2;
-        const auto find = ISEMPTY_BUCKET(_pairs, next);
-        if (find) {
-            NEW_BUCKET(std::move(key), std::move(value), next, bucket);
-        }
-        return { {this, next}, find };
+        return do_insert(std::move(key), std::move(value));
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
     {
         check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        const auto next   = bucket / 2;
-        const auto find = ISEMPTY_BUCKET(_pairs, next);
-        if (find) {
-            NEW_BUCKET(key, std::move(value), next, bucket);
-        }
-        return { {this, next}, find };
+        return do_insert(key, std::move(value));
     }
 
-    std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
+    std::pair<iterator, bool> insert(KeyT& key, const ValueT& value)
+    {
+        check_expand_need();
+        return do_insert(std::move(key), value);
+    }
+
+    template<typename K, typename V>
+    std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
         const auto next   = bucket / 2;
         const auto find = ISEMPTY_BUCKET(_pairs, next);
         if (find) {
-            NEW_BUCKET(std::move(key), value, next, bucket);
+            NEW_BUCKET(std::forward<K>(key), std::forward<V>(value), next, bucket);
         }
         return { {this, next}, find };
     }
 
     inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
     {
-        return insert(p.first, p.second);
+        check_expand_need();
+        return do_insert(p.first, p.second);
     }
 
     inline std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p)
     {
-        return insert(std::move(p.first), std::move(p.second));
+        check_expand_need();
+        return do_insert(std::move(p.first), std::move(p.second));
     }
 
 #if 0
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             emplace(*begin);
         }
@@ -813,7 +804,7 @@ public:
     {
         Iter citbeg = begin;
         Iter citend = begin;
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             if ((int)try_insert_mainbucket(begin->first, begin->second) < 0) {
                 std::swap(*begin, *citend++);
@@ -829,59 +820,50 @@ public:
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
-        reserve(std::distance(end - begin) + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
-            insert_unique(*begin);
+            do_insert_unqiue(*begin);
         }
     }
 
     /// Same as above, but contains(key) MUST be false
-    uint32_t insert_unique(const KeyT& key, const ValueT& value)
-    {
-        check_expand_need();
-        auto bucket = find_unique_bucket(key);
-        NEW_BUCKET(key, value, bucket / 2, bucket);
-        return bucket;
-    }
-
     uint32_t insert_unique(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
-        auto bucket = find_unique_bucket(key);
-        NEW_BUCKET(std::move(key), std::move(value), bucket / 2, bucket);
-        return bucket;
+        return do_insert_unqiue(std::move(key), std::move(value));
     }
 
-    uint32_t insert_unique(const KeyT& key, ValueT&& value)
+    uint32_t insert_unique(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
-        auto bucket = find_unique_bucket(key);
-        NEW_BUCKET(key, std::move(value), bucket / 2, bucket);
-        return bucket;
+        return do_insert_unqiue(key, value);
     }
 
-    uint32_t insert_unique(KeyT&& key, const ValueT& value)
+    uint32_t insert_unique(std::pair<KeyT, ValueT>&& p)
     {
         check_expand_need();
+        return do_insert_unqiue(std::move(p.first), std::move(p.second));
+    }
+
+    uint32_t insert_unique(const std::pair<KeyT, ValueT>& p)
+    {
+        check_expand_need();
+        return do_insert_unqiue(p.first, p.second);
+    }
+
+    template<typename K, typename V>
+    inline uint32_t do_insert_unqiue(K&& key, V&& value)
+    {
         auto bucket = find_unique_bucket(key);
-        NEW_BUCKET(std::move(key), value, bucket / 2, bucket);
+        NEW_BUCKET(std::forward<K>(key), std::forward<V>(value), bucket / 2, bucket);
         return bucket;
-    }
-
-    inline uint32_t insert_unique(std::pair<KeyT, ValueT>&& p)
-    {
-        return insert_unique(std::move(p.first), std::move(p.second));
-    }
-
-    inline uint32_t insert_unique(const std::pair<KeyT, ValueT>& p)
-    {
-        return insert_unique(p.first, p.second);
     }
 
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(std::forward<Args>(args)...);
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...);
     }
 
     //no any optimize for position
@@ -892,10 +874,10 @@ public:
     }
 
     template<class... Args>
-    std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args)
-    {
-        return insert(k, std::forward<Args>(args)...).first;
-    }
+    std::pair<iterator, bool> try_emplace(const key_type& k, Args&&... args) { return insert(k, std::forward<Args>(args)...).first; }
+
+    template<class... Args>
+    std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args) { return insert(std::move(k), std::forward<Args>(args)...).first; }
 
     template <class... Args>
     inline std::pair<iterator, bool> emplace_unique(Args&&... args)
@@ -916,10 +898,8 @@ public:
         return -1u;
     }
 
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value)
-    {
-        return insert(std::forward<KeyT>(key), std::forward<ValueT>(value));
-    }
+    std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) { return insert(key, std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return insert(std::move(key), std::move(value)); }
 
     ValueT& operator[](const KeyT& key)
     {
@@ -1460,6 +1440,7 @@ private:
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
 #ifndef QS
         for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
+        //for (uint32_t last = qmask > 2 ? qmask / 2 + 2 : 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
 #else
         for (uint32_t last = 2, step = (bucket_from + 2 * 64) & qmask; ; step = (step + ++last) & qmask) {
 #endif

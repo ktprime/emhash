@@ -10,7 +10,7 @@
 //#include "wyhash.h"
 
 #ifndef TP
-#define TP                   100
+#define TP                   500
 #endif
 
 #define ET 1
@@ -530,12 +530,12 @@ void insert_high_load(const hash_type& ahash, const std::string& hash_name, cons
             sum += tmp[v2] = TO_VAL(0);
 #else
             tmp[v2] = TO_VAL(0);
-            sum ++;
 #endif
 #else
             auto v2 = v; v2[0] += '1';
             sum += tmp[v2] = TO_VAL(0).size();
 #endif
+            sum += tmp.count(v2);
         }
 
         check_func_result(hash_name, __FUNCTION__, sum, ts1);

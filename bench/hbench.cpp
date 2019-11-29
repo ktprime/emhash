@@ -2,7 +2,7 @@
 #include "martin/robin_hood.h"
 #include "tsl/robin_map.h"
 
-#include "hash_table7.hpp"
+#include "hash_table2.hpp"
 #include "hash_table6.hpp"
 #include "phmap/phmap.h"
 
@@ -330,7 +330,7 @@ int main()
     std::unordered_map<uint64_t, Value> m3;
     robin_hood::unordered_map<uint64_t, Value> m4;
     tsl::robin_map<uint64_t, Value> m5;
-    emhash7::HashMap<uint64_t, Value> m7;
+    emhash2::HashMap<uint64_t, Value> m7;
     emhash6::HashMap<uint64_t, Value> m6;
     phmap::flat_hash_map<uint64_t, Value> m8;
 
