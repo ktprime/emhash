@@ -60,6 +60,8 @@
     #undef  GET_VAL
     #undef  NEXT_BUCKET
     #undef  GET_PKV
+    #undef  hash_bucket
+    #undef  NEW_KVALUE
 #endif
 
 // likely/unlikely
@@ -112,6 +114,13 @@ struct entry {
 
     entry(First&& key, Second&& value, uint32_t ibucket)
         :second(std::move(value)), first(std::move(key))
+    {
+        bucket = ibucket;
+    }
+
+    template<typename K, typename V>
+    entry(K&& key, V&& value, uint32_t ibucket)
+        :second(std::forward<V>(value)), first(std::forward<K>(key))
     {
         bucket = ibucket;
     }
@@ -688,14 +697,14 @@ public:
     }
 
     /// Const version of the above
-    const ValueT* try_get(const KeyT& key) const noexcept
+    ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
     }
 
     /// Convenience function.
-    const ValueT get_or_return_default(const KeyT& key) const noexcept
+    ValueT get_or_return_default(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? ValueT() : GET_VAL(_pairs, bucket);
@@ -1028,7 +1037,7 @@ public:
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
                 continue;
 
-            auto& key = GET_KEY(old_pairs, src_bucket);
+            auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
             old_pairs[src_bucket].~PairT();

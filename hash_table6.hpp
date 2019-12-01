@@ -60,6 +60,7 @@
     #undef  GET_VAL
     #undef  NEXT_BUCKET
     #undef  GET_PKV
+    #undef  NEW_BUCKET
 #endif
 
 // likely/unlikely
@@ -156,6 +157,13 @@ struct entry {
 
     entry(const entry& pairT) :second(pairT.second),first(pairT.first) { bucket = pairT.bucket; }
     entry(entry&& pairT) :second(std::move(pairT.second)),first(std::move(pairT.first)) { bucket = pairT.bucket; }
+
+    template<typename K, typename V>
+    entry(K&& key, V&& value, uint32_t ibucket)
+        :second(std::forward<V>(value)), first(std::forward<K>(key))
+    {
+        bucket = ibucket;
+    }
 
     entry& operator = (entry&& pairT)
     {
@@ -688,7 +696,7 @@ public:
 
     std::pair<iterator, iterator> equal_range(const KeyT & key)
     {
-        iterator found = find(key);
+        const auto found = find(key);
         if (found == end())
             return { found, found };
         else
@@ -1093,7 +1101,7 @@ public:
             if (ISEMPTY_BUCKET(old_pairs, src_bucket))
                 continue;
 
-            auto& key = GET_KEY(old_pairs, src_bucket);
+            auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_BUCKET(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
             old_pairs[src_bucket].~PairT();

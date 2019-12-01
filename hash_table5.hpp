@@ -44,6 +44,7 @@
     #undef  NEXT_BUCKET
     #undef  GET_PKV
     #undef  hash_bucket
+    #undef  NEW_KVALUE
 #endif
 
 // likely/unlikely
@@ -96,6 +97,13 @@ struct entry {
 
     entry(First&& key, Second&& value, uint32_t ibucket)
         :second(std::move(value)), first(std::move(key))
+    {
+        bucket = ibucket;
+    }
+
+    template<typename K, typename V>
+    entry(K&& key, V&& value, uint32_t ibucket)
+        :second(std::forward<V>(value)), first(std::forward<K>(key))
     {
         bucket = ibucket;
     }
@@ -457,12 +465,12 @@ public:
         return static_cast<float>(_num_filled) / (_num_buckets + 1);
     }
 
-    HashT hash_function() const
+    HashT& hash_function() const
     {
         return _hasher;
     }
 
-    EqT key_eq() const
+    EqT& key_eq() const
     {
         return _eq;
     }
@@ -638,7 +646,7 @@ public:
         return find_filled_bucket(key) == _num_buckets ? 0 : 1;
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT & key)
+    std::pair<iterator, iterator> equal_range(const KeyT& key)
     {
         iterator found = find(key);
         if (found == end())
@@ -666,14 +674,14 @@ public:
     }
 
     /// Const version of the above
-    const ValueT* try_get(const KeyT& key) const noexcept
+    ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
     }
 
     /// Convenience function.
-    const ValueT get_or_return_default(const KeyT& key) const noexcept
+    ValueT get_or_return_default(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? ValueT() : GET_VAL(_pairs, bucket);
@@ -684,7 +692,7 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value) noexcept
+    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -695,8 +703,7 @@ public:
         return { {this, bucket}, find };
     }
 
-//    std::pair<iterator, bool> insert(const value_pair& value) { return insert(value.first, value.second); }
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value) noexcept
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -741,7 +748,7 @@ public:
     {
         Iter citbeg = begin;
         Iter citend = begin;
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             if (try_insert_mainbucket(begin->first, begin->second) == INACTIVE) {
                 std::swap(*begin, *citend++);
@@ -755,7 +762,7 @@ public:
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             insert_unique(*begin);
         }
@@ -853,14 +860,14 @@ public:
             NEW_KVALUE(key, value, bucket);
             return ValueT();
         } else {
-            const ValueT& old_value = GET_VAL(_pairs, bucket);
-            GET_VAL(_pairs, bucket) = value;
+            ValueT old_value(value);
+            std::swap(GET_VAL(_pairs, bucket), old_value);
             return old_value;
         }
     }
 
     /// Like std::map<KeyT,ValueT>::operator[].
-    ValueT& operator[](const KeyT& key) noexcept
+    ValueT& operator[](const KeyT& key)
     {
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
@@ -874,7 +881,7 @@ public:
         return GET_VAL(_pairs, bucket);
     }
 
-    ValueT& operator[](KeyT&& key) noexcept
+    ValueT& operator[](KeyT&& key)
     {
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
@@ -891,7 +898,7 @@ public:
     // -------------------------------------------------------
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    size_type erase(const KeyT& key) noexcept
+    size_type erase(const KeyT& key)
     {
         const auto bucket = erase_key(key);
         if (bucket == INACTIVE)
@@ -902,7 +909,8 @@ public:
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
-    iterator erase(const_iterator cit) noexcept
+
+    iterator erase(const_iterator cit)
     {
         iterator it(this, cit._bucket);
         return erase(it);
@@ -910,7 +918,7 @@ public:
 
     /// Erase an element typedef an iterator.
     /// Returns an iterator to the next element (or end()).
-    iterator erase(iterator it) noexcept
+    iterator erase(iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
@@ -942,7 +950,7 @@ public:
     }
 
     /// Remove all elements, keeping full capacity.
-    void clear() noexcept
+    void clear()
     {
         if (is_notrivially() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _num_buckets / 4)
             clearkv();
@@ -953,13 +961,13 @@ public:
         _last = 0;
     }
 
-    void shrink_to_fit() noexcept
+    void shrink_to_fit()
     {
         rehash(_num_filled);
     }
 
     /// Make room for this many elements
-    bool reserve(uint32_t num_elems) noexcept
+    bool reserve(uint32_t num_elems)
     {
         const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17) + 2;
         //const auto required_buckets = num_elems * 19 / 16;
@@ -971,7 +979,7 @@ public:
     }
 
     /// Make room for this many elements
-    void rehash(uint32_t required_buckets) noexcept
+    void rehash(uint32_t required_buckets)
     {
         if (required_buckets < _num_filled)
             return ;
@@ -1000,7 +1008,7 @@ public:
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
                 continue;
 
-            auto& key = GET_KEY(old_pairs, src_bucket);
+            auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
             old_pairs[src_bucket].~PairT();
