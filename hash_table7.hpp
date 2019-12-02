@@ -58,9 +58,10 @@
 #ifdef  GET_KEY
     #undef  GET_KEY
     #undef  GET_VAL
-    #undef  NEXT_BUCKET
     #undef  GET_PKV
     #undef  hash_bucket
+    #undef  NEXT_BUCKET
+    #undef  NEW_KVALUE
 #endif
 
 // likely/unlikely
@@ -82,20 +83,20 @@
 #if EMHASH_BUCKET_INDEX == 0
     #define GET_KEY(p,n)     p[n].second.first
     #define GET_VAL(p,n)     p[n].second.second
-    #define NEXT_BUCKET(s,n) s[n].first
-    #define GET_PKV(s,n)    s[n].second
+    #define NEXT_BUCKET(p,n) p[n].first
+    #define GET_PKV(s,n)     s[n].second
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
-    #define NEXT_BUCKET(s,n) s[n].second
-    #define GET_PKV(s,n)    s[n].first
+    #define NEXT_BUCKET(p,n) p[n].second
+    #define GET_PKV(s,n)     s[n].first
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
-    #define NEXT_BUCKET(s,n) s[n].bucket
-    #define GET_PKV(s,n)    s[n]
+    #define NEXT_BUCKET(p,n) p[n].bucket
+    #define GET_PKV(p,n)     p[n]
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++; SET_BIT(bucket)
 #endif
 
@@ -149,6 +150,13 @@ struct entry {
 
     entry(First&& key, Second&& value, uint32_t ibucket)
         :second(std::move(value)), first(std::move(key))
+    {
+        bucket = ibucket;
+    }
+
+    template<typename K, typename V>
+    entry(K&& key, V&& value, uint32_t ibucket)
+        :second(std::forward<V>(value)), first(std::forward<K>(key))
     {
         bucket = ibucket;
     }
@@ -652,7 +660,7 @@ public:
         }
 
         uint32_t sumb = 0, collision = 0, sumc = 0, finds = 0, sumn = 0;
-        puts("============== buckets size ration =========");
+        puts("============== buckets size ration ========");
         for (uint32_t i = 0; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
             const auto bucketsi = buckets[i];
             if (bucketsi == 0)
@@ -661,7 +669,7 @@ public:
             sumn += bucketsi * i;
             collision += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
-            printf("  %2u  %8u  %.2lf  %.2lf\n", i, bucketsi, bucketsi * 100.0 * i / _num_filled, sumn * 100.0 / _num_filled);
+            printf("  %2u  %8u  %0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, sumn * 100.0 / _num_filled);
         }
 
         puts("========== collision miss ration ===========");
@@ -669,14 +677,15 @@ public:
             sumc += steps[i];
             if (steps[i] <= 2)
                 continue;
-            printf("  %2u  %8u  %.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
+            printf("  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
+        printf("    _num_filled/aver_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
                 _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumn == _num_filled);
         assert(sumc == collision);
+        puts("============== buckets size end =============");
     }
 #endif
 
@@ -1099,7 +1108,7 @@ private:
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
                 continue;
 
-            auto& key = GET_KEY(old_pairs, src_bucket);
+            auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
             old_pairs[src_bucket].~PairT();
@@ -1116,6 +1125,9 @@ private:
             FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
+#endif
+#ifdef EMHASH_STATIS
+            dump_statis();
 #endif
         }
 #endif

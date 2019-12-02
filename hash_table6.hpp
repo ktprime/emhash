@@ -60,6 +60,7 @@
     #undef  GET_VAL
     #undef  NEXT_BUCKET
     #undef  GET_PKV
+    #undef  NEW_BUCKET
 #endif
 
 // likely/unlikely
@@ -81,24 +82,24 @@
 #if EMHASH_BUCKET_INDEX == 0
     #define GET_KEY(p,n)     p[n].second.first
     #define GET_VAL(p,n)     p[n].second.second
-    #define NEXT_BUCKET(s,n) s[n].first / 2
+    #define NEXT_BUCKET(p,n) p[n].first / 2
     #define GET_PKV(s,n)     s[n].second
     #define NEW_BUCKET(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)), _num_filled ++; SET_BIT(bucket)
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
-    #define NEXT_BUCKET(s,n) s[n].second / 2
-    #define ADDR_BUCKET(s,n) s[n].second
+    #define NEXT_BUCKET(p,n) p[n].second / 2
+    #define ADDR_BUCKET(p,n) p[n].second
     #define ISEMPTY_BUCKET(s,n) (int)s[n].second < 0
     #define GET_PKV(s,n)     s[n].first
     #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), next), _num_filled ++; SET_BIT(bucket)
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
-    #define NEXT_BUCKET(s,n) s[n].bucket / 2
-    #define ADDR_BUCKET(s,n) s[n].bucket
+    #define NEXT_BUCKET(p,n) p[n].bucket / 2
+    #define ADDR_BUCKET(p,n) p[n].bucket
     #define ISEMPTY_BUCKET(s,n) 0 > (int)s[n].bucket
-    #define GET_PKV(s,n)     s[n]
+    #define GET_PKV(p,n)     p[n]
     #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; SET_BIT(bucket)
 #endif
 
@@ -156,6 +157,13 @@ struct entry {
 
     entry(const entry& pairT) :second(pairT.second),first(pairT.first) { bucket = pairT.bucket; }
     entry(entry&& pairT) :second(std::move(pairT.second)),first(std::move(pairT.first)) { bucket = pairT.bucket; }
+
+    template<typename K, typename V>
+    entry(K&& key, V&& value, uint32_t ibucket)
+        :second(std::forward<V>(value)), first(std::forward<K>(key))
+    {
+        bucket = ibucket;
+    }
 
     entry& operator = (entry&& pairT)
     {
@@ -688,7 +696,7 @@ public:
 
     std::pair<iterator, iterator> equal_range(const KeyT & key)
     {
-        iterator found = find(key);
+        const auto found = find(key);
         if (found == end())
             return { found, found };
         else
@@ -949,7 +957,6 @@ public:
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
-
     iterator erase(const_iterator cit)
     {
         iterator it(this, cit._bucket);
@@ -1093,14 +1100,14 @@ public:
             if (ISEMPTY_BUCKET(old_pairs, src_bucket))
                 continue;
 
-            auto& key = GET_KEY(old_pairs, src_bucket);
+            auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_BUCKET(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
             old_pairs[src_bucket].~PairT();
         }
 
 #if EMHASH_REHASH_LOG
-        if (_num_filled > 100) {
+        if (_num_filled > EMHASH_REHASH_LOG) {
             uint32_t collision = _num_filled - _num_main;
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/_hash_inter/aver_size/K.V/pack/collision = %u/%u/%.2lf/%s.%s/%zd/%.2lf%%",

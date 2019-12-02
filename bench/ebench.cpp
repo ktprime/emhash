@@ -533,7 +533,7 @@ void insert_high_load(const hash_type& ahash, const std::string& hash_name, cons
 #endif
 #else
             auto v2 = v; v2[0] += '1';
-            sum += tmp[v2] = TO_VAL(0).size();
+            tmp[v2] = TO_VAL(0);
 #endif
             sum += tmp.count(v2);
         }
@@ -770,7 +770,11 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     const auto iRation = 10;
 #endif
 
+#if 0
     sfc64 srng;
+#else
+    std::mt19937_64 srng; srng.seed(size);
+#endif
     if (rand() % 100 > iRation)
     {
         emhash6::HashMap<keyType, int> ehash(size);
@@ -1238,9 +1242,9 @@ int main(int argc, char* argv[])
     srand((unsigned)time(0));
 
     auto tn = 0;
-    auto maxn = 4123456;
+    auto maxn = 42345678 / (sizeof (keyType) + sizeof(valueType) + 8);
     double load_factor = 0.0945;
-    printf("./ebench maxn f(0-100) d[2-6]mpsf t(n)\n");
+    printf("./ebench maxn = %d f(0-100) d[2-6]hmpsf t(n)\n", maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];

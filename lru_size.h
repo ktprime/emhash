@@ -1,6 +1,6 @@
 // By Huang Yuanbing 2019-2020
 // bailuzhou@163.com
-// version 1.0.0
+// version 2.0.1
 
 // LICENSE:
 //   This software is dual-licensed to the public domain and under the following
@@ -37,6 +37,14 @@
     #include "servant/RollLogHelper.h"
 #endif
 
+#ifdef  GET_KEY
+    #undef  GET_KEY
+    #undef  GET_VAL
+    #undef  NEXT_BUCKET
+    #undef  GET_PKV
+    #undef  hash_bucket
+    #undef  NEW_KVALUE
+#endif
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
 #    define EMHASH_LIKELY(condition) __builtin_expect(condition, 1)
@@ -49,7 +57,7 @@
 #define GET_KEY(p,n)     p[n].first
 #define GET_VAL(p,n)     p[n].second
 #define NEXT_BUCKET(p,n) p[n].bucket
-#define GET_PKV(s,n)    s[n]
+#define GET_PKV(p,n)     p[n]
 #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
 
 namespace emlru_size {
@@ -157,9 +165,9 @@ public:
     class iterator
     {
     public:
-       //typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
+        typedef std::forward_iterator_tag iterator_category;
+        typedef std::ptrdiff_t            difference_type;
+        typedef value_pair                value_type;
 
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
@@ -216,9 +224,9 @@ public:
     class const_iterator
     {
     public:
-        //typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
+        typedef std::forward_iterator_tag iterator_category;
+        typedef std::ptrdiff_t            difference_type;
+        typedef value_pair                value_type;
 
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
@@ -281,11 +289,11 @@ public:
         _mask = 0;
         _pairs = nullptr;
         _num_filled = 0;
-        _max_buckets = 1 << 20;
+        _max_buckets = 1 << 28;
         max_load_factor(0.8f);
     }
 
-    lru_cache(uint32_t bucket = 8, uint32_t max_bucket = 1 << 20)
+    lru_cache(uint32_t bucket = 8, uint32_t max_bucket = 1 << 28)
     {
         init();
         _max_buckets = max_bucket;
@@ -438,12 +446,12 @@ public:
         return static_cast<float>(_num_filled) / (_num_buckets + 1);
     }
 
-    HashT hash_function() const
+    HashT& hash_function() const
     {
         return _hasher;
     }
 
-    EqT key_eq() const
+    EqT& key_eq() const
     {
         return _eq;
     }
@@ -455,18 +463,18 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.995f && value > 0.2f)
+        if (value < 0.95f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 17) / value);
     }
 
     constexpr size_type max_size() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1 << 31) / sizeof(PairT);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1 << 31) / sizeof(PairT);
     }
 
 #ifdef EMHASH_STATIS
@@ -485,7 +493,7 @@ public:
     }
 
     //Returns the number of elements in bucket n.
-    size_type bucket_size(const size_type bucket) const
+    size_type bucket_size(const uint32_t bucket) const
     {
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
@@ -590,7 +598,7 @@ public:
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
+        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_found = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
                 _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumn == _num_filled);
         assert(sumc == collision);
@@ -619,7 +627,7 @@ public:
         return find_filled_bucket(key) == _num_buckets ? 0 : 1;
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT & key)
+    std::pair<iterator, iterator> equal_range(const KeyT& key)
     {
         iterator found = find(key);
         if (found == end())
@@ -628,15 +636,15 @@ public:
             return { found, std::next(found) };
     }
 
-    /// Returns the matching ValueT or nullptr if k isn't found.
-    bool try_get(const KeyT& key, ValueT& val) const
+    /// Returns false if key isn't found.
+    bool try_get(const KeyT& key, ValueT& val) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        const auto find = bucket != _num_buckets;
-        if (find) {
+        const auto found = bucket != _num_buckets;
+        if (found) {
             val = GET_VAL(_pairs, bucket);
         }
-        return find;
+        return found;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
@@ -647,14 +655,14 @@ public:
     }
 
     /// Const version of the above
-    const ValueT* try_get(const KeyT& key) const noexcept
+    ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
     }
 
     /// Convenience function.
-    const ValueT get_or_return_default(const KeyT& key) const noexcept
+    ValueT get_or_return_default(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? ValueT() : GET_VAL(_pairs, bucket);
@@ -665,31 +673,30 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value) noexcept
+    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        auto find = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
-        if (find) {
+        const auto found = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
+        if (found) {
             NEW_KVALUE(key, value, bucket);
         } else {
             _pairs[bucket].timeout = nowts();
         }
-        return { {this, bucket}, find };
+        return { {this, bucket}, found };
     }
 
-//    std::pair<iterator, bool> insert(const value_pair& value) { return insert(value.first, value.second); }
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value) noexcept
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        auto find = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
-        if (find) {
+        const auto found = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
+        if (found) {
             NEW_KVALUE(std::move(key), std::move(value), bucket);
         } else {
             _pairs[bucket].timeout = nowts();
         }
-        return { {this, bucket}, find };
+        return { {this, bucket}, found };
     }
 
     inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
@@ -706,7 +713,7 @@ public:
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             emplace(*begin);
         }
@@ -726,7 +733,7 @@ public:
     {
         Iter citbeg = begin;
         Iter citend = begin;
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             if (try_insert_mainbucket(begin->first, begin->second) == INACTIVE) {
                 std::swap(*begin, *citend++);
@@ -740,7 +747,7 @@ public:
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             insert_unique(*begin);
         }
@@ -827,7 +834,7 @@ public:
     }
 
     /// Like std::map<KeyT,ValueT>::operator[].
-    ValueT& operator[](const KeyT& key) noexcept
+    ValueT& operator[](const KeyT& key)
     {
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
@@ -842,7 +849,7 @@ public:
         return GET_VAL(_pairs, bucket);
     }
 
-    ValueT& operator[](KeyT&& key) noexcept
+    ValueT& operator[](KeyT&& key)
     {
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
@@ -860,7 +867,7 @@ public:
     // -------------------------------------------------------
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    size_type erase(const KeyT& key) noexcept
+    size_type erase(const KeyT& key)
     {
         const auto bucket = erase_key(key);
         if (bucket == INACTIVE)
@@ -871,7 +878,7 @@ public:
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
-    iterator erase(const_iterator cit) noexcept
+    iterator erase(const_iterator cit)
     {
         iterator it(this, cit._bucket);
         return erase(it);
@@ -879,7 +886,7 @@ public:
 
     /// Erase an element typedef an iterator.
     /// Returns an iterator to the next element (or end()).
-    iterator erase(iterator it) noexcept
+    iterator erase(iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
@@ -911,7 +918,7 @@ public:
     }
 
     /// Remove all elements, keeping full capacity.
-    void clear() noexcept
+    void clear()
     {
         if (is_notrivially() || sizeof(PairT) > 32 || _num_filled < _num_buckets / 4)
             clearkv();
@@ -921,26 +928,26 @@ public:
         _num_filled = 0;
     }
 
-    void shrink_to_fit() noexcept
+    void shrink_to_fit()
     {
         rehash(_num_filled);
     }
 
     /// Make room for this many elements
-    bool reserve(uint32_t num_elems) noexcept
+    bool reserve(uint32_t num_elems)
     {
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17);
-        if (EMHASH_LIKELY(required_buckets < _mask) || _num_filled > _max_buckets * 2)
+        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17) + 2;
+        if (EMHASH_LIKELY(required_buckets < _mask) && _num_filled < _max_buckets * 2)
             return false;
 
         rehash(required_buckets + 2);
         return true;
     }
 
-    void rehash(uint32_t required_buckets) noexcept
+    void rehash(uint32_t required_buckets)
     {
-        if (required_buckets > 2 * _max_buckets)
-            required_buckets = 2 * _max_buckets;
+//        if (required_buckets > 2 * _max_buckets)
+//            required_buckets = 2 * _max_buckets;
 
         uint32_t num_buckets = _num_filled > 65536 ? (1 << 16) : 4;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
@@ -960,17 +967,18 @@ public:
         }
         NEXT_BUCKET(_pairs, _num_buckets) = NEXT_BUCKET(_pairs, _num_buckets + 1) = 0;
 
+        //remove the timeout bucket
         uint32_t min_ts = 0;
-        if (old_num_filled > _max_buckets * 2) {
+        if (old_num_filled > _max_buckets) {
             std::vector<uint32_t> time_out;
             time_out.reserve(old_num_filled);
             for (uint32_t src_bucket = 0; src_bucket < old_num_buckets; src_bucket++) {
                 if (NEXT_BUCKET(old_pairs, src_bucket) != INACTIVE)
                     time_out.emplace_back(old_pairs[src_bucket].timeout);
             }
-            if (time_out.size() > old_num_filled) {
-                std::partial_sort(time_out.begin(), time_out.begin() + time_out.size() - old_num_filled, time_out.end());
-                min_ts = time_out[time_out.size() - old_num_filled - 1];
+            if (time_out.size() > _max_buckets) {
+                std::partial_sort(time_out.begin(), time_out.begin() + time_out.size() - _max_buckets, time_out.end());
+                min_ts = time_out[time_out.size() - _max_buckets - 1];
             }
         }
 
@@ -980,7 +988,7 @@ public:
 
             old_num_filled -- ;
             if (old_pairs[src_bucket].timeout > min_ts && _num_filled < _max_buckets) {
-                auto& key = GET_KEY(old_pairs, src_bucket);
+                auto&& key = GET_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
                 NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
             }
@@ -988,7 +996,7 @@ public:
         }
 
 #if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
-        if (_num_filled > 1000000) {
+        if (_num_filled > 10000) {
             auto mbucket = _num_filled;
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
@@ -1015,8 +1023,8 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        _pairs[bucket].~PairT();
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+        _pairs[bucket].~PairT();
         _num_filled --;
         _pairs[bucket].timeout = 0;
     }
