@@ -76,22 +76,22 @@ constexpr int max_loop = 1000000;
 //http://www.ilikebigbits.com/2016_08_28_hash_table.html
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 
-#if __cplusplus >= 201103L && HOOD_HASH
-    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#if HOOD_HASH
+    #include "martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
 #if ET
     #define _CPP11_HASH    1
     #include "hrd/hash_set.h"
-    #include "./tsl/robin_map.h"        //https://github.com/tessil/robin-map
-    #include "./tsl/hopscotch_map.h"    //https://github.com/tessil/hopscotch-map
-    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
-    #include "./ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
-    #include "./phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
+    #include "tsl/robin_map.h"        //https://github.com/tessil/robin-map
+    #include "tsl/hopscotch_map.h"    //https://github.com/tessil/hopscotch-map
+    #include "martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
+    #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 
 #if __cplusplus >= 201402L || _MSC_VER >= 1600
     #define _CPP14_HASH   1
-    #include "./ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
+    #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
 #endif
 
@@ -508,6 +508,32 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, con
             sum += tmp.emplace(v2, TO_VAL(0)).second;
             sum += tmp.count(v2);
             sum += tmp.erase(v2);
+        }
+        check_func_result(hash_name, __FUNCTION__, sum, ts1);
+        printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+    }
+}
+
+template<class hash_type>
+void insert_small_size(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+{
+    if (show_name.count(hash_name) != 0)
+    {
+        auto ts1 = getTime();
+        size_t sum = 0;
+        const auto small = 100 + vList.size() % 1000;
+        hash_type tmp, empty;
+
+        for (const auto& v : vList)
+        {
+            sum += tmp.emplace(v, TO_VAL(0)).second;
+            sum += tmp.count(v);
+            if (tmp.size() > small) {
+                if (small % 2 == 0)
+                    tmp.clear();
+                else
+                    tmp = empty;
+            }
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
         printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
@@ -932,6 +958,7 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         insert_reserve(hash, hash_name, oList);
         insert_no_reserve(hash, hash_name, oList);
         insert_high_load(hash, hash_name, oList);
+        insert_small_size(hash, hash_name, oList);
 
         find_hit_all (hash, hash_name, oList);
         find_miss_all(hash, hash_name);
@@ -952,8 +979,8 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         insert_find_erase(hash, hash_name, vList);
         load_factor = (int)(hash.load_factor() * 100);
 
-#ifdef UF
         hash_iter(hash, hash_name);
+#ifdef UF
         hash_copy(hash, hash_name);
         hash_clear(hash, hash_name);
 #endif
