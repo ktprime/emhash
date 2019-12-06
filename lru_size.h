@@ -31,6 +31,7 @@
 #include <functional>
 #include <iterator>
 #include <ctime>
+#include <algorithm>
 
 #if EMHASH_TAF_LOG
     #include "servant/AutoLog.h"
@@ -45,6 +46,7 @@
     #undef  hash_bucket
     #undef  NEW_KVALUE
 #endif
+
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
 #    define EMHASH_LIKELY(condition) __builtin_expect(condition, 1)
@@ -80,6 +82,14 @@ struct entry {
 
     entry(First&& key, Second&& value, uint32_t ibucket)
         :second(std::move(value)), first(std::move(key))
+    {
+        bucket = ibucket;
+        timeout = nowts();
+    }
+
+    template<typename K, typename V>
+    entry(K&& key, V&& value, uint32_t ibucket)
+        :second(std::forward<V>(value)), first(std::forward<K>(key))
     {
         bucket = ibucket;
         timeout = nowts();
@@ -526,10 +536,10 @@ public:
         return main_bucket;
     }
 
-    int get_cache_info(uint32_t bucket, uint32_t next_bucket) const
+    size_type get_cache_info(uint32_t bucket, uint32_t next_bucket) const
     {
-        auto pbucket = reinterpret_cast<size_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<size_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<std::uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<std::uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / 64 == pnext / 64)
             return 0;
         auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
@@ -598,7 +608,7 @@ public:
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_found = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
+        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
                 _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumn == _num_filled);
         assert(sumc == collision);
@@ -946,8 +956,8 @@ public:
 
     void rehash(uint32_t required_buckets)
     {
-//        if (required_buckets > 2 * _max_buckets)
-//            required_buckets = 2 * _max_buckets;
+        if (required_buckets > 2 * _max_buckets)
+            required_buckets = 2 * _max_buckets;
 
         uint32_t num_buckets = _num_filled > 65536 ? (1 << 16) : 4;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
@@ -991,19 +1001,19 @@ public:
                 auto&& key = GET_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
                 NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
+                _pairs[bucket].timeout = old_pairs[src_bucket].timeout;
             }
             old_pairs[src_bucket].~PairT();
         }
 
 #if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
         if (_num_filled > 10000) {
-            auto mbucket = _num_filled;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
-                    _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
+            sprintf(buff, "    _num_filled/K.V/pack/min_ts = %u/%s.%s/%zd/%u",
+                    _num_filled, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), nowts() - min_ts);
 #if EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
-            FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            FDLOG("lru_size") << __FUNCTION__ << " rhashs = " << ihashs ++ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1050,7 +1060,7 @@ private:
             return next_bucket;
         }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(GET_KEY(_pairs, bucket))))
             return INACTIVE;
-**/
+        */
 
         auto prev_bucket = bucket;
         while (true) {

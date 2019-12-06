@@ -1049,6 +1049,7 @@ public:
                 auto& key = GET_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
                 NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
+                _pairs[bucket].timeout = old_pairs[src_bucket].timeout;
             }
             old_pairs[src_bucket].~PairT();
         }
