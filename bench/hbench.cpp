@@ -4,6 +4,7 @@
 
 #include "hash_table2.hpp"
 #include "hash_table6.hpp"
+#include "hash_emilib.hpp"
 #include "phmap/phmap.h"
 
 #include <random>
@@ -332,6 +333,7 @@ int main()
     tsl::robin_map<uint64_t, Value> m5;
     emhash2::HashMap<uint64_t, Value> m7;
     emhash6::HashMap<uint64_t, Value> m6;
+    emilib::HashMap<uint64_t, Value> me;
     phmap::flat_hash_map<uint64_t, Value> m8;
 
 //    m7.max_load_factor(0.5f);
@@ -340,12 +342,12 @@ int main()
     const size_t ROUNDS = 1;
     uint64_t ret = 0;
     //ret -= test(m0, "ska::flat_hash_map");
-    for (size_t i = 0; i != ROUNDS; ++i)
+    //for (size_t i = 0; i != ROUNDS; ++i)
         ret -= test(m1, "\nhrd::hash_map");
-    for (size_t i = 0; i != ROUNDS; ++i)
-        ret -= test(m6, "\nemhash6::HashMap");
-    for (size_t i = 0; i != ROUNDS; ++i)
-        ret -= test(m7, "\nemhash7::HashMap");
+    //for (size_t i = 0; i != ROUNDS; ++i)
+       ret -= test(m6, "\nemhash6::HashMap");
+       ret -= test(m7, "\nemhash2::HashMap");
+       ret -= test(me, "\nemilib ::HashMap");
 
     //ret -= test(m12, "\nhrd2::hash_map");
     //for (int i = 0; i != 3; ++i)

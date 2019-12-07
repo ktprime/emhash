@@ -44,6 +44,7 @@
 #include "hash_table5.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
+#include "hash_emilib.hpp"
 
 //#include "lru_time.h"
 //#include "lru_size.h"
@@ -54,6 +55,7 @@ constexpr int max_loop = 1000000;
 //https://eourcs.github.io/LockFreeCuckooHash/
 
 ////some others
+//https://sites.google.com/view/patchmap/overview
 //https://github.com/ilyapopov/car-race
 //https://hpjansson.org/blag/2018/07/24/a-hash-table-re-hash/
 //https://attractivechaos.wordpress.com/2018/01/13/revisiting-hash-table-performance/
@@ -71,7 +73,6 @@ constexpr int max_loop = 1000000;
 //https://en.wikipedia.org/wiki/Hash_table
 //https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html
 //https://probablydance.com/2017/02/26/i-wrote-the-fastest-hashtable/
-//https://martin.ankerl.com/2016/09/21/very-fast-hashmap-in-c-part-3/
 //https://andre.arko.net/2017/08/24/robin-hood-hashing/
 //http://www.ilikebigbits.com/2016_08_28_hash_table.html
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
@@ -155,7 +156,8 @@ emhash6::HashMap<std::string, std::string> show_name = {
 //    {"emhash5", "emhash5"},
     {"emhash7", "emhash7"},
     {"emhash6", "emhash6"},
-    {"hrdset",   "hrd set"},
+    {"emilib", "emilib"},
+//    {"hrdset",   "hrd set"},
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
 
@@ -510,7 +512,7 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, con
             sum += tmp.erase(v2);
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+        //printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
@@ -521,15 +523,15 @@ void insert_small_size(const hash_type& ahash, const std::string& hash_name, con
     {
         auto ts1 = getTime();
         size_t sum = 0;
-        const auto small = 100 + vList.size() % 1000;
+        const auto smalls = 100 + vList.size() % 1000;
         hash_type tmp, empty;
 
         for (const auto& v : vList)
         {
             sum += tmp.emplace(v, TO_VAL(0)).second;
             sum += tmp.count(v);
-            if (tmp.size() > small) {
-                if (small % 2 == 0)
+            if (tmp.size() > smalls) {
+                if (smalls % 2 == 0)
                     tmp.clear();
                 else
                     tmp = empty;
@@ -588,7 +590,6 @@ void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::ve
 {
     if (show_name.count(hash_name) != 0)
     {
-        auto n = vList.size();
         auto ts1 = getTime(); size_t sum = 0;
         for (const auto& v : vList) {
             sum += ahash.count(v);
@@ -1082,9 +1083,11 @@ static int benchHashMap(int n)
         { emhash6::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash6", vList); }
         { emhash2::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash2", vList); }
         { emhash5::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash5", vList); }
+        { emilib::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emilib", vList); }
     }
     else
     {
+        { emilib::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emilib", vList); }
         { emhash5::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash5", vList); }
         { emhash2::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash2", vList); }
         { emhash6::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash6", vList); }
@@ -1271,7 +1274,7 @@ int main(int argc, char* argv[])
     auto tn = 0;
     auto maxn = 42345678 / (sizeof (keyType) + sizeof(valueType) + 8);
     double load_factor = 0.0945;
-    printf("./ebench maxn = %d f(0-100) d[2-6]hmpsf t(n)\n", maxn);
+    printf("./ebench maxn = %d f(0-100) d[2-6]hmpsf t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];

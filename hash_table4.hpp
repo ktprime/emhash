@@ -210,14 +210,14 @@ public:
 
         iterator& operator++()
         {
-            this->goto_next_element();
+            goto_next_element();
             return *this;
         }
 
         iterator operator++(int)
         {
             auto old_index = _bucket;
-            this->goto_next_element();
+            goto_next_element();
             return {_map, old_index};
         }
 
@@ -233,12 +233,12 @@ public:
 
         bool operator==(const iterator& rhs) const
         {
-            return this->_bucket == rhs._bucket;
+            return _bucket == rhs._bucket;
         }
 
         bool operator!=(const iterator& rhs) const
         {
-            return this->_bucket != rhs._bucket;
+            return _bucket != rhs._bucket;
         }
 
     private:
@@ -270,14 +270,14 @@ public:
 
         const_iterator& operator++()
         {
-            this->goto_next_element();
+            goto_next_element();
             return *this;
         }
 
         const_iterator operator++(int)
         {
             auto old_index = _bucket;
-            this->goto_next_element();
+            goto_next_element();
             return {_map, old_index};
         }
 
@@ -293,12 +293,12 @@ public:
 
         bool operator==(const const_iterator& rhs) const
         {
-            return this->_bucket == rhs._bucket;
+            return _bucket == rhs._bucket;
         }
 
         bool operator!=(const const_iterator& rhs) const
         {
-            return this->_bucket != rhs._bucket;
+            return _bucket != rhs._bucket;
         }
 
     private:
@@ -370,7 +370,7 @@ public:
 
     HashMap& operator=(HashMap&& other)
     {
-        this->swap(other);
+        swap(other);
         return *this;
     }
 
