@@ -33,7 +33,7 @@ private:
 
 	using PairT = std::pair<KeyT, ValueT>;
 public:
-	using size_type       = size_t;
+	using size_t          = uint32_t;
 	using value_type      = PairT;
 	using reference       = PairT&;
 	using const_reference = const PairT&;
@@ -295,7 +295,7 @@ public:
 	/// Returns average number of elements per bucket.
 	float load_factor() const
 	{
-		return static_cast<float>(_num_filled) / static_cast<float>(_num_buckets);
+		return _num_filled / static_cast<float>(_num_buckets);
 	}
 
 	void max_load_factor(float lf)
@@ -307,34 +307,25 @@ public:
 	template<typename KeyLike>
 	iterator find(const KeyLike& key)
 	{
-		auto bucket = find_filled_bucket(key);
-		if (bucket == (size_t)-1) {
-			return end();
-		}
-		return iterator(this, bucket);
+		return iterator(this, find_filled_bucket(key));
 	}
 
 	template<typename KeyLike>
 	const_iterator find(const KeyLike& key) const
 	{
-		auto bucket = find_filled_bucket(key);
-		if (bucket == (size_t)-1)
-		{
-			return end();
-		}
-		return const_iterator(this, bucket);
+		return const_iterator(this, find_filled_bucket(key));
 	}
 
 	template<typename KeyLike>
 	bool contains(const KeyLike& k) const
 	{
-		return find_filled_bucket(k) != (size_t)-1;
+		return find_filled_bucket(k) != _num_buckets;
 	}
 
 	template<typename KeyLike>
 	size_t count(const KeyLike& k) const
 	{
-		return find_filled_bucket(k) != (size_t)-1 ? 1 : 0;
+		return find_filled_bucket(k) != _num_buckets;
 	}
 
 	/// Returns the matching ValueT or nullptr if k isn't found.
@@ -342,7 +333,7 @@ public:
 	ValueT* try_get(const KeyLike& k)
 	{
 		auto bucket = find_filled_bucket(k);
-		if (bucket != (size_t)-1) {
+		if (bucket != _num_buckets) {
 			return &_pairs[bucket].second;
 		} else {
 			return nullptr;
@@ -351,10 +342,10 @@ public:
 
 	/// Const version of the above
 	template<typename KeyLike>
-	const ValueT* try_get(const KeyLike& k) const
+	ValueT* try_get(const KeyLike& k) const
 	{
 		auto bucket = find_filled_bucket(k);
-		if (bucket != (size_t)-1) {
+		if (bucket != _num_buckets) {
 			return &_pairs[bucket].second;
 		} else {
 			return nullptr;
@@ -363,7 +354,7 @@ public:
 
 	/// Convenience function.
 	template<typename KeyLike>
-	const ValueT get_or_return_default(const KeyLike& k) const
+	ValueT get_or_return_default(const KeyLike& k) const
 	{
 		const ValueT* ret = try_get(k);
 		if (ret) {
@@ -415,7 +406,6 @@ public:
 	/// Same as above, but contains(key) MUST be false
 	void insert_unique(KeyT&& key, ValueT&& value)
 	{
-		DCHECK_F(!contains(key));
 		check_expand_need();
 		auto bucket = find_empty_bucket(key);
 		_states[bucket] = State::FILLED;
@@ -488,7 +478,7 @@ public:
 	bool erase(const KeyT& key)
 	{
 		auto bucket = find_filled_bucket(key);
-		if (bucket != (size_t)-1) {
+		if (bucket != _num_buckets) {
 			_states[bucket] = State::ACTIVE;
 			_pairs[bucket].~PairT();
 			_num_filled -= 1;
@@ -590,7 +580,6 @@ private:
 	template<typename KeyLike>
 	size_t find_filled_bucket(const KeyLike& key) const
 	{
-
 		auto hash_value = _hasher(key);
 		for (int offset=0; offset<=_max_probe_length; ++offset) {
 			auto bucket = (hash_value + offset) & _mask;
@@ -599,10 +588,10 @@ private:
 					return bucket;
 				}
 			} else if (_states[bucket] == State::INACTIVE) {
-				return (size_t)-1; // End of the chain!
+				return _num_buckets; // End of the chain!
 			}
 		}
-		return (size_t)-1;
+		return _num_buckets;
 	}
 
 	// Find the bucket with this key, or return a good empty bucket to place the key in.

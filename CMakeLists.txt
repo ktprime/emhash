@@ -15,8 +15,8 @@ message("  CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR} ")
 message("  CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 
 include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/emhash)
-include_directories(${PROJECT_SOURCE_DIR}/emhash/bench)
+#include_directories(${PROJECT_SOURCE_DIR}/emhash)
+include_directories(${PROJECT_SOURCE_DIR}/bench)
 
 add_definitions(-DET=1 -DTKey=1 -DTVal=1)
 
@@ -30,7 +30,7 @@ elseif()
     set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -march=native -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
 endif()
 
-add_executable(ebench ${PROJECT_SOURCE_DIR}/emhash/bench/ebench.cpp)
-add_executable(mbench ${PROJECT_SOURCE_DIR}/emhash/bench/martin_bench.cpp)
-add_executable(hbench ${PROJECT_SOURCE_DIR}/emhash/bench/hbench.cpp)
+add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)
+add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martin_bench.cpp)
+add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hbench.cpp)
 

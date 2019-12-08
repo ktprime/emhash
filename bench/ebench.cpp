@@ -150,12 +150,12 @@ struct RankItem;
 emhash6::HashMap<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
 
-//    {"emhash2", "emhash72"},
-//    {"emhash4", "emhash4"},
-//    {"emhash3",  "emhash62"},
-//    {"emhash5", "emhash5"},
-    {"emhash7", "emhash7"},
+    {"emhash2", "emhash2"},
+    {"emhash3",  "emhash3"},
+    {"emhash4", "emhash4"},
+    {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
+    {"emhash7", "emhash7"},
     {"emilib", "emilib"},
 //    {"hrdset",   "hrd set"},
 //    {"lru_time", "lru_time"},

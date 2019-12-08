@@ -48,6 +48,7 @@
 #include <utility>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 
 #if EMHASH_TAF_LOG
     #include "servant/AutoLog.h"
@@ -89,7 +90,7 @@
 #endif
 
 #define GET_KEY(p,n)      p[n].first
-#define NEXT_BUCKET(s,n)  s[n].second
+#define NEXT_BUCKET(p,n) p[n].second
 
 namespace emhash7 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
@@ -114,16 +115,12 @@ public:
     public:
         typedef std::forward_iterator_tag iterator_category;
         typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
         typedef KeyT                      value_type;
         typedef value_type*               pointer;
         typedef value_type&               reference;
 
         iterator() { }
-
-        iterator(htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket)
-        {
-        }
+        iterator(htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { }
 
         iterator& operator++()
         {
@@ -176,7 +173,6 @@ public:
     public:
         typedef std::forward_iterator_tag iterator_category;
         typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
         typedef const KeyT                value_type;
         typedef value_type*               pointer;
         typedef value_type&               reference;
@@ -1303,12 +1299,15 @@ private:
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return static_cast<size_t>(h);
-#elif 1
-        uint64_t x = key;
-        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
-        x = x ^ (x >> 31);
-        return x;
+#elif __SIZEOF_INT128__
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        __uint128_t r = key; r *= k;
+        return (uint32_t)(r >> 64) + r;
+#else
+        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
+        const uint32_t h = static_cast<uint32_t>(r >> 32);
+        const uint32_t l = static_cast<uint32_t>(r);
+        return h + l;
 #endif
     }
 
