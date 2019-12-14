@@ -84,19 +84,19 @@
     #define GET_KEY(p,n)     p[n].second.first
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first
-    #define GET_PKV(s,n)    s[n].second
+    #define GET_PKV(p,n)     p[n].second
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
     #define NEXT_BUCKET(p,n) p[n].second
-    #define GET_PKV(s,n)    s[n].first
+    #define GET_PKV(p,n)     p[n].first
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
     #define NEXT_BUCKET(p,n) p[n].bucket
-    #define GET_PKV(s,n)    s[n]
+    #define GET_PKV(p,n)     p[n]
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
 #endif
 
@@ -391,6 +391,7 @@ public:
     void clone(const HashMap& other)
     {
         _hasher      = other._hasher;
+        _eq          = other._eq;
         _num_buckets = other._num_buckets;
         _num_filled  = other._num_filled;
         _mask        = other._mask;
@@ -399,13 +400,12 @@ public:
         auto opairs = other._pairs;
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value) {
+        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value)
 #else
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
+        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value)
 #endif
             memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
-        } else {
-
+        else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(opairs, bucket);
                 if (next_bucket != INACTIVE)
@@ -418,6 +418,7 @@ public:
     void swap(HashMap& other)
     {
         std::swap(_hasher, other._hasher);
+        std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -619,7 +620,7 @@ public:
         }
 
         uint32_t sumb = 0, collision = 0, sumc = 0, finds = 0, sumn = 0;
-        puts("============== buckets size ration =========");
+        puts("============== buckets size ration ========");
         for (uint32_t i = 0; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
             const auto bucketsi = buckets[i];
             if (bucketsi == 0)
@@ -628,7 +629,7 @@ public:
             sumn += bucketsi * i;
             collision += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
-            printf("  %2u  %8u  %.2lf  %.2lf\n", i, bucketsi, bucketsi * 100.0 * i / _num_filled, sumn * 100.0 / _num_filled);
+            printf("  %2u  %8u  %0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, sumn * 100.0 / _num_filled);
         }
 
         puts("========== collision miss ration ===========");
@@ -636,14 +637,15 @@ public:
             sumc += steps[i];
             if (steps[i] <= 2)
                 continue;
-            printf("  %2u  %8u  %.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
+            printf("  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_found = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
+        printf("    _num_filled/aver_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
                 _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumn == _num_filled);
         assert(sumc == collision);
+        puts("============== buckets size end =============");
     }
 #endif
 
@@ -669,7 +671,7 @@ public:
         return (size_type)(find_filled_bucket(key) != _num_buckets);
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key)
+    std::pair<iterator, iterator> equal_range(const KeyT& key) noexcept
     {
         iterator found = find(key);
         if (found == end())
@@ -1059,7 +1061,7 @@ private:
         }
 
 #if EMHASH_REHASH_LOG
-        if (_num_filled > 100) {
+        if (_num_filled > EMHASH_REHASH_LOG) {
             uint32_t collision = 0;
             auto mbucket = _num_filled - collision;
             char buff[255] = {0};
@@ -1082,13 +1084,6 @@ private:
     // Can we fit another element?
     inline bool check_expand_need()
     {
-#if 0
-        if (EMHASH_UNLIKELY(_num_main * 2 < _num_filled && _num_filled > 100)) {
-            rehash(_num_filled + 2);
-            return true;
-        }
-#endif
-
         return reserve(_num_filled);
     }
 

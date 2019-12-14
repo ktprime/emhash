@@ -84,13 +84,13 @@
     #define GET_KEY(p,n)     p[n].second.first
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first
-    #define GET_PKV(s,n)     s[n].second
+    #define GET_PKV(p,n)     p[n].second
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
     #define NEXT_BUCKET(p,n) p[n].second
-    #define GET_PKV(s,n)     s[n].first
+    #define GET_PKV(p,n)     p[n].first
     #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
 #else
     #define GET_KEY(p,n)     p[n].first
@@ -385,8 +385,8 @@ public:
 
     HashMap(HashMap&& other)
     {
-        init(1);
-        *this = std::move(other);
+        init(0);
+        swap(other);
     }
 
     HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
@@ -713,7 +713,7 @@ public:
 
     std::pair<iterator, iterator> equal_range(const KeyT& key) noexcept
     {
-        iterator found = find(key);
+        const auto found = find(key);
         if (found == end())
             return { found, found };
         else
@@ -1074,7 +1074,7 @@ private:
     void rehash(uint32_t required_buckets)
     {
         if (required_buckets < _num_filled)
-            return ;
+            return;
 
         uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
@@ -1369,28 +1369,34 @@ private:
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
+#if 0
+        const auto bucket2 = bucket_from + 2;
+        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
+            return bucket2;
+#endif
+
         //fast find by bit
         const auto boset = bucket_from % 8;
         const auto bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
         if (bmask != 0)
             return bucket_from + CTZ64(bmask) - 0;
 
-#ifndef QS
+#ifndef QC
         const auto bmask2 = *((uint64_t*)_bitmask + _last);
         if (bmask2 != 0)
             return _last * 64 + CTZ64(bmask2);
 #endif
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
-#ifndef QS
-        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-#else
-        for (uint32_t step = _last + 1; ; step = ++step & qmask) {
-#endif
+//        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
+        for (uint32_t last = 3, step = (bucket_from + 2 * 64) & qmask; ;step = (step + ++last) & qmask) {
+//        for (uint32_t step = _last + 1; ; step = ++step & qmask) {
             const auto next2 = step;
             const auto bmask2 = *((uint64_t*)_bitmask + next2);
             if (bmask2 != 0) {
+#ifdef QC
                 _last = next2;
+#endif
                 return next2 * 64 + CTZ64(bmask2);
             }
         }

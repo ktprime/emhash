@@ -25,6 +25,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
+/****************
+    under random hashCodes, the frequency of nodes in bins follows a Poisson 
+distribution(http://en.wikipedia.org/wiki/Poisson_distribution) with a parameter of about 0.5 
+on average for the default resizing threshold of 0.75, although with a large variance because 
+of resizing granularity. Ignoring variance, the expected occurrences of list size k are 
+(exp(-0.5) * pow(0.5, k)/factorial(k)). The first values are:
+0: 0.60653066
+1: 0.30326533
+2: 0.07581633
+3: 0.01263606
+4: 0.00157952
+5: 0.00015795
+6: 0.00001316
+7: 0.00000094
+8: 0.00000006
+****************/
 
 // From
 // NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
@@ -83,22 +99,22 @@
     #define GET_KEY(p,n)     p[n].second.first
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first / 2
-    #define GET_PKV(s,n)     s[n].second
+    #define GET_PKV(p,n)     p[n].second
     #define NEW_BUCKET(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)), _num_filled ++; SET_BIT(bucket)
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
     #define NEXT_BUCKET(p,n) p[n].second / 2
     #define ADDR_BUCKET(p,n) p[n].second
-    #define ISEMPTY_BUCKET(s,n) (int)s[n].second < 0
-    #define GET_PKV(s,n)     s[n].first
+    #define ISEMPTY_BUCKET(p,n) (int)p[n].second < 0
+    #define GET_PKV(p,n)     p[n].first
     #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), next), _num_filled ++; SET_BIT(bucket)
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
     #define NEXT_BUCKET(p,n) p[n].bucket / 2
     #define ADDR_BUCKET(p,n) p[n].bucket
-    #define ISEMPTY_BUCKET(s,n) 0 > (int)s[n].bucket
+    #define ISEMPTY_BUCKET(p,n) 0 > (int)p[n].bucket
     #define GET_PKV(p,n)     p[n]
     #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; SET_BIT(bucket)
 #endif
@@ -595,8 +611,8 @@ public:
 
     int get_cache_info(uint32_t bucket, uint32_t next_bucket) const
     {
-        auto pbucket = reinterpret_cast<size_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<size_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<std::ptrdiff_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<std::ptrdiff_t>(&_pairs[next_bucket]);
         if (pbucket / 64 == pnext / 64)
             return 0;
         auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
@@ -644,7 +660,7 @@ public:
         }
 
         uint32_t sumb = 0, collision = 0, sumc = 0, finds = 0, sumn = 0;
-        puts("============== buckets size ration =========");
+        puts("============== buckets size ration ========");
         for (uint32_t i = 0; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
             const auto bucketsi = buckets[i];
             if (bucketsi == 0)
@@ -653,7 +669,7 @@ public:
             sumn += bucketsi * i;
             collision += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
-            printf("  %2u  %8u  %.2lf  %.2lf\n", i, bucketsi, bucketsi * 100.0 * i / _num_filled, sumn * 100.0 / _num_filled);
+            printf("  %2u  %8u  %0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, sumn * 100.0 / _num_filled);
         }
 
         puts("========== collision miss ration ===========");
@@ -661,14 +677,15 @@ public:
             sumc += steps[i];
             if (steps[i] <= 2)
                 continue;
-            printf("  %2u  %8u  %.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
+            printf("  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
+        printf("    _num_filled/aver_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
                 _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumn == _num_filled);
         assert(sumc == collision);
+        puts("============== buckets size end =============");
     }
 #endif
 
@@ -694,7 +711,7 @@ public:
         return (size_type)(find_filled_bucket(key) != _num_buckets);
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT & key)
+    std::pair<iterator, iterator> equal_range(const KeyT& key) noexcept
     {
         const auto found = find(key);
         if (found == end())
@@ -1040,7 +1057,7 @@ public:
     void rehash(uint32_t required_buckets)
     {
         if (required_buckets < _num_filled)
-            return ;
+            return;
 
         uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
@@ -1405,65 +1422,36 @@ private:
         const auto bucket1 = bucket_from + 1;
         if (ISEMPTY_BUCKET(_pairs, bucket1))
             return bucket1;
-
-#if BF
+#if 0
         const auto bucket2 = bucket_from + 2;
         if (ISEMPTY_BUCKET(_pairs, bucket2))
             return bucket2;
-
-        uint32_t empty_bucket = 0;
-        //12, 10, 7
-        constexpr uint32_t rand_find = sizeof(_pairs[0]) < EMHASH_CACHE_LINE_SIZE / 2 ? (2 * EMHASH_CACHE_LINE_SIZE / sizeof(_pairs[0])) + 1 : 5;
-
-        //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, ...
-        //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t last = 2, slot = 3; ; slot += ++last) {
-            const auto next = (bucket_from + slot) & _mask;
-            const auto bucket1 = next + 0, bucket2 = next + 1;
-            if (ISEMPTY_BUCKET(_pairs, bucket1))
-                return bucket1;
-
-            else if (ISEMPTY_BUCKET(_pairs, bucket2))
-                return bucket2;
-#if BF > 1
-            else if (slot > rand_find) {
-                const auto next2 = (bucket_from + _num_filled + slot / 4) & _mask;
-                const auto bucket3 = next2 + 0;
-                if (ISEMPTY_BUCKET(_pairs, bucket3)) {
-                    empty_bucket = bucket3;
-                    break;
-                }
-            }
 #endif
-        }
 
-        return empty_bucket;
-#else
         const auto boset = bucket_from % 8;
         const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
         if (bmask != 0)
             return bucket_from + CTZ(bmask) - 0;
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
-#ifndef QS
-        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
         //for (uint32_t last = qmask > 2 ? qmask / 2 + 2 : 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
-#else
-        for (uint32_t last = 2, step = (bucket_from + 2 * 64) & qmask; ; step = (step + ++last) & qmask) {
-#endif
-            const auto next2 = step;
+        //for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
+        //for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
+        for (uint32_t last = 3, step = (bucket_from + 2 * 64) & qmask; ;step = (step + ++last) & qmask) {
+            const auto next2 = step + 0;
             const auto bmask2 = *((uint64_t*)_bitmask + next2);
             if (bmask2 != 0)
                 return next2 * 64 + CTZ(bmask2);
 
-            const auto next = (next2 + 1) & qmask;
-            const auto bmask = *((uint64_t*)_bitmask + next);
-            if (bmask != 0)
-                return next * 64 + CTZ(bmask);
+#if 0
+            const auto next1 = step + 1;
+            const auto bmask1 = *((uint64_t*)_bitmask + next1);
+            if (bmask1 != 0)
+                return next1 * 64 + CTZ(bmask1);
+#endif
         }
 
         return 0;
-#endif
     }
 
     uint32_t find_last_bucket(uint32_t main_bucket) const
@@ -1569,7 +1557,7 @@ private:
         h ^= h >> 33;
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
-        return static_cast<size_t>(h);
+        return h;
 #elif 1
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);

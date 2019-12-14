@@ -476,13 +476,13 @@ void insert_no_reserve(hash_type& ahash, const std::string& hash_name, const std
 }
 
 template<class hash_type>
-void insert_reserve(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_reserve(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
         hash_type tmp(vList.size());
-        tmp.max_load_factor(0.99);
+        tmp.max_load_factor(0.94);
 
         auto ts1 = getTime();
         for (const auto& v : vList)
@@ -517,15 +517,15 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, con
 }
 
 template<class hash_type>
-void insert_small_size(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_small_size(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
-        auto ts1 = getTime();
         size_t sum = 0;
         const auto smalls = 100 + vList.size() % 1000;
         hash_type tmp, empty;
 
+        auto ts1 = getTime();
         for (const auto& v : vList)
         {
             sum += tmp.emplace(v, TO_VAL(0)).second;
@@ -535,6 +535,7 @@ void insert_small_size(const hash_type& ahash, const std::string& hash_name, con
                     tmp.clear();
                 else
                     tmp = empty;
+                tmp.max_load_factor(0.8);
             }
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -543,31 +544,46 @@ void insert_small_size(const hash_type& ahash, const std::string& hash_name, con
 }
 
 template<class hash_type>
-void insert_high_load(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_high_load(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
-        hash_type tmp(ahash);
+        size_t pow2 = 2 << ilog(vList.size(), 2);
+        hash_type tmp;
+        tmp.max_load_factor(0.99);
+        tmp.reserve(pow2 / 2);
+        int minn = 0.75f * pow2, maxn = 0.99 * pow2;
+        int i = 0;
+
+        for (; i < minn; i++) {
+            if (i < vList.size())
+                tmp.emplace(vList[i], TO_VAL(0));
+            else {
+                auto v = vList[i - vList.size()];
+#if KEY_INT
+                auto v2 = v + (v / 11) + i;
+#else
+                auto v2 = v; v2[0] += '2';
+#endif
+                tmp.emplace(v2, TO_VAL(0));
+            }
+        }
 
         auto ts1 = getTime();
-        for (const auto& v : vList) {
+        for (; i  < maxn; i++) {
+            auto v = vList[i - minn];
 #if KEY_INT
-            auto v2 = v + (v % 2);
-#if TVal < 2
-            sum += tmp[v2] = TO_VAL(0);
-#else
-            tmp[v2] = TO_VAL(0);
-#endif
+            auto v2 = (v / 7) + 4 * v;
 #else
             auto v2 = v; v2[0] += '1';
-            tmp[v2] = TO_VAL(0);
 #endif
+            tmp[v2] = TO_VAL(0);
             sum += tmp.count(v2);
         }
 
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %122s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+        printf("             %122s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
     }
 }
 
@@ -576,9 +592,9 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
 {
     if (show_name.count(hash_name) != 0)
     {
-        auto n = ahash.size() * 3 / 2;
-        size_t pow2 = 2 << ilog(n, 2);
-        auto ts1 = getTime(); size_t sum = 0;
+        auto n = ahash.size();
+        size_t pow2 = 2 << ilog(n, 2), sum = 0;
+        auto ts1 = getTime();
         for (size_t v = 1; v < pow2; v++)
             sum += ahash.count(TO_KEY(v));
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -956,10 +972,10 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         hash.max_load_factor(load_factor / 100.0);
         hash.clear();
 
-        insert_reserve(hash, hash_name, oList);
+        insert_reserve <hash_type>(hash_name, oList);
+        insert_high_load <hash_type>(hash_name, oList);
+        insert_small_size <hash_type>(hash_name, oList);
         insert_no_reserve(hash, hash_name, oList);
-        insert_high_load(hash, hash_name, oList);
-        insert_small_size(hash, hash_name, oList);
 
         find_hit_all (hash, hash_name, oList);
         find_miss_all(hash, hash_name);
