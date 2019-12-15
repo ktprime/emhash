@@ -50,11 +50,6 @@
 #include <functional>
 #include <iterator>
 
-#if EMHASH_TAF_LOG
-    #include "servant/AutoLog.h"
-    #include "servant/RollLogHelper.h"
-#endif
-
 #ifdef  GET_KEY
     #undef  GET_KEY
     #undef  GET_VAL
@@ -616,7 +611,7 @@ public:
         if (pbucket / 64 == pnext / 64)
             return 0;
         auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
-        if (diff < 127 * 64)
+        if (diff / 64 < 127)
             return diff / 64 + 1;
         return 127;
     }
@@ -649,43 +644,63 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statis(bool show_cache) const
     {
-        uint32_t buckets[129] = {0};
-        uint32_t steps[129]   = {0};
+        uint32_t buckets[256] = {0};
+        uint32_t steps[256]   = {0};
+        char buff[1024 * 16];
         for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
             auto bsize = get_bucket_info(bucket, steps, 128);
-            if (bsize > 0)
+            if (bsize > 0 && bsize < 128)
                 buckets[bsize] ++;
         }
 
-        uint32_t sumb = 0, collision = 0, sumc = 0, finds = 0, sumn = 0;
-        puts("============== buckets size ration ========");
-        for (uint32_t i = 0; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
+        uint32_t sumb = 0, collision = 0, sumc = 0, finds = 0, sumn = 0, fact = 1;
+        double lf = load_factor(), fk = 1.0 / pow(2.71828, lf), sum_coll = 0;
+        int bsize = sprintf (buff, "== slot   size   ration|poisson collision  =====\n");
+        for (uint32_t i = 1; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
+            double poisson = fk / fact; fact *= i; fk *= lf;
+            sum_coll += poisson * 100.0 * (i - 1) / i;
+
             const auto bucketsi = buckets[i];
             if (bucketsi == 0)
                 continue;
+
             sumb += bucketsi;
             sumn += bucketsi * i;
             collision += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
-            printf("  %2u  %8u  %0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, sumn * 100.0 / _num_filled);
+            //(exp(-0.5) * pow(0.5, k)/factorial(k))
+            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.8lf|%0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, poisson, bucketsi * (i - 1) * 100.0 / _num_filled);
+            if (sumn == _num_filled)
+                break;
         }
 
-        puts("========== collision miss ration ===========");
-        for (uint32_t i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
+        bsize += sprintf(buff + bsize, "========== collision miss ration ===========\n");
+        for (uint32_t i = 0; show_cache && i < sizeof(steps) / sizeof(steps[0]) && sumc < collision; i++) {
             sumc += steps[i];
             if (steps[i] <= 2)
                 continue;
-            printf("  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
+            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/aver_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
-                _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
+
+        bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n", _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
+        bsize += sprintf(buff + bsize, "  collision|possion_miss cache_miss hit_find load_factor = %.2lf%%|%.2lf%% %.2lf%%, %.2lf, %.2lf\n",
+                 (collision * 100.0 / _num_filled), sum_coll, (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled, _num_filled * 1.0 / _num_buckets);
+
         assert(sumn == _num_filled);
-        assert(sumc == collision);
-        puts("============== buckets size end =============");
+        assert(sumc == collision || !show_cache);
+
+        bsize += sprintf(buff + bsize, "============== buckets size end =============\n");
+        buff[bsize + 1] = 0;
+
+#if EMHASH_TAF_LOG
+        FDLOG() << __FUNCTION__ << "|" << buff << endl;
+#else
+        puts(buff);
+#endif
     }
 #endif
 
@@ -757,16 +772,16 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), std::move(value));
-    }
-
     std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
         return do_insert(key, value);
+    }
+
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
+    {
+        check_expand_need();
+        return do_insert(std::move(key), std::move(value));
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
@@ -1066,7 +1081,13 @@ public:
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
+    #ifdef EMHASH_STATIS
+        //if (_num_filled > 1000'000) dump_statis(0);
+    #endif
         rehash(required_buckets + 2);
+    #ifdef EMHASH_STATIS
+        if (_num_filled > 1000'000) dump_statis(1);
+    #endif
         return true;
     }
 
@@ -1114,7 +1135,7 @@ private:
             old_pairs[src_bucket].~PairT();
         }
 
-#if EMHASH_REHASH_LOG
+#if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
         if (_num_filled > EMHASH_REHASH_LOG) {
             auto mbucket = _num_filled;
             char buff[255] = {0};
@@ -1125,9 +1146,6 @@ private:
             FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
-#endif
-#ifdef EMHASH_STATIS
-            dump_statis();
 #endif
         }
 #endif

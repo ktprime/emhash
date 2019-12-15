@@ -720,15 +720,15 @@ public:
             return { found, std::next(found) };
     }
 
-    /// Returns the matching ValueT or nullptr if k isn't found.
-    bool try_get(const KeyT& key, ValueT& val) const
+    /// Returns false if key isn't found.
+    bool try_get(const KeyT& key, ValueT& val) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        const auto find = bucket != _num_buckets;
-        if (find) {
+        const auto found = bucket != _num_buckets;
+        if (found) {
             val = GET_VAL(_pairs, bucket);
         }
-        return find;
+        return found;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
@@ -775,7 +775,7 @@ public:
         return do_insert(key, std::move(value));
     }
 
-    std::pair<iterator, bool> insert(KeyT& key, const ValueT& value)
+    std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
     {
         check_expand_need();
         return do_insert(std::move(key), value);
@@ -784,14 +784,13 @@ public:
     template<typename K, typename V>
     std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
-        check_expand_need();
         const auto bucket = find_or_allocate(key);
         const auto next   = bucket / 2;
-        const auto find = ISEMPTY_BUCKET(_pairs, next);
-        if (find) {
+        const auto found = ISEMPTY_BUCKET(_pairs, next);
+        if (found) {
             NEW_BUCKET(std::forward<K>(key), std::forward<V>(value), next, bucket);
         }
-        return { {this, next}, find };
+        return { {this, next}, found };
     }
 
     inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
@@ -1429,9 +1428,9 @@ private:
 #endif
 
         const auto boset = bucket_from % 8;
-        const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
+        const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8);
         if (bmask != 0)
-            return bucket_from + CTZ(bmask) - 0;
+            return bucket_from + CTZ(bmask) - boset;
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
         //for (uint32_t last = qmask > 2 ? qmask / 2 + 2 : 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
