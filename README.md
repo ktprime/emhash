@@ -198,7 +198,7 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
     auto old = myref ;  // myref maybe changed
 ```
 
-- on some platform it'll be hanged compiled by some g++ with -O2, set compile flag with **-fno-stirct-aliasing** is a work around, it'll be fixed soon
+- some platform it'll be hanged by g++ version > 8.0 with -O2, set compile flag with **-fno-stirct-aliasing** is a work around, it'll be fixed soon
 
 - for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
 ```  
