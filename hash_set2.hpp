@@ -77,7 +77,7 @@
 #define GET_KEY(p,n)     p[n].first
 #define NEXT_BUCKET(p,n) p[n].second
 
-namespace emhash7 {
+namespace emhash8 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashSet

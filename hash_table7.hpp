@@ -1,7 +1,7 @@
 
 // emhash7::HashMap for C++11/14/17
-// version 1.7.2
-// https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
+// version 1.7.3
+// https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -38,6 +38,40 @@
 // LINEAR COLLISION RES.
 //    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
 //    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
+/** lf = 1
+0    0.368
+1    0.368
+2    0.184
+3    0.061
+4    0.015
+5    0.003
+6    0.0005
+============== buckets size ration poisson total ========
+   1    766939  0.40633735|0.40656868  40.634
+   2    344735  0.36529296|0.36591304  77.163
+   3    103682  0.16479747|0.16466142  93.643
+   4     23548  0.04990453|0.04939859  98.633
+   5      4275  0.01132484|0.01111472  99.766
+   6       625  0.00198681|0.00200066  99.964
+   7        89  0.00033008|0.00030010  99.997
+   8         5  0.00002119|0.00003858  100.000
+   9         1  0.00000477|0.00000434  100.000
+========== collision miss ration ===========
+  _num_filled aver_size k.v size_kv = 1887444, 1.52, __int64.__int64 24
+  collision,possion,cache_miss hit_find|hit_miss, load_factor = 34.10%,34.06%,27.11%  1.45|1.81, 0.90
+========== collision miss ration =======================
+   0    422679  57.54  57.54
+   1    238081  32.41  89.95
+   2     64649  8.80  98.75
+   3      7527  1.02  99.77
+   4      1336  0.18  99.95
+   5       271  0.04  99.99
+   6        47  0.01  100.00
+   7        19  0.00  100.00
+   8         5  0.00  100.00
+  _num_filled aver_size k.v size_kv = 3774888, 1.24, l.i 16
+  collision|possion_miss cache_miss hit_find load_factor = 19.46%|19.47% 8.26%, 1.22, 0.45
+*******************************************************/
 
 #pragma once
 
@@ -229,8 +263,8 @@ public:
     typedef KeyT   key_type;
     typedef ValueT mapped_type;
 
-    typedef  size_t       size_type;
-    typedef std::pair<KeyT,ValueT>        value_type;
+    typedef  uint32_t       size_type;
+    typedef  std::pair<KeyT,ValueT>        value_type;
     typedef  PairT&       reference;
     typedef  const PairT& const_reference;
 
@@ -380,7 +414,9 @@ public:
 
     HashMap(HashMap&& other)
     {
-        init(0);
+//        init(0);
+        _num_filled = 0;
+        _pairs = nullptr;
         swap(other);
     }
 
@@ -577,9 +613,8 @@ public:
         if (next_bucket == INACTIVE)
             return 0;
 
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
-        next_bucket = hash_bucket(bucket_key);
-        uint32_t ibucket_size = 1;
+        next_bucket = hash_bucket(GET_KEY(_pairs, bucket));
+        uint32_t bucket_size = 1;
 
         //iterator each item in current main bucket
         while (true) {
@@ -587,10 +622,10 @@ public:
             if (nbucket == next_bucket) {
                 break;
             }
-            ibucket_size ++;
+            bucket_size++;
             next_bucket = nbucket;
         }
-        return ibucket_size;
+        return bucket_size;
     }
 
     size_type get_main_bucket(const uint32_t bucket) const
@@ -604,15 +639,15 @@ public:
         return main_bucket;
     }
 
-    size_type get_cache_info(uint32_t bucket, uint32_t next_bucket) const
+    size_type get_diss(uint32_t bucket, uint32_t next_bucket) const
     {
-        auto pbucket = reinterpret_cast<std::uintptr_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<std::uintptr_t>(&_pairs[next_bucket]);
-        if (pbucket / 64 == pnext / 64)
+        auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
+        if (pbucket / EMHASH_CACHE_LINE_SIZE == pnext / EMHASH_CACHE_LINE_SIZE)
             return 0;
-        auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
-        if (diff / 64 < 127)
-            return diff / 64 + 1;
+        uint32_t diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
+        if (diff / EMHASH_CACHE_LINE_SIZE < 127)
+            return diff / EMHASH_CACHE_LINE_SIZE + 1;
         return 127;
     }
 
@@ -622,45 +657,47 @@ public:
         if (next_bucket == INACTIVE)
             return -1;
 
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
-        const auto main_bucket = hash_bucket(bucket_key);
-        if (main_bucket != bucket)
+        if (hash_bucket(GET_KEY(_pairs, bucket)) != bucket)
             return 0;
         else if (next_bucket == bucket)
             return 1;
 
-        steps[get_cache_info(bucket, next_bucket) % slots] ++;
-        uint32_t ibucket_size = 2;
-        //find a new empty and linked it to tail
+        steps[get_diss(bucket, next_bucket) % slots] ++;
+        uint32_t bucket_size = 2;
         while (true) {
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
                 break;
+            else if (nbucket == INACTIVE)
+                break;
 
-            steps[get_cache_info(nbucket, next_bucket) % slots] ++;
-            ibucket_size ++;
+            steps[get_diss(nbucket, next_bucket) % slots] ++;
+            bucket_size ++;
             next_bucket = nbucket;
         }
-        return ibucket_size;
+        return bucket_size;
     }
 
     void dump_statis(bool show_cache) const
     {
         uint32_t buckets[256] = {0};
         uint32_t steps[256]   = {0};
-        char buff[1024 * 16];
+        char buff[1024 * 8];
         for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
             auto bsize = get_bucket_info(bucket, steps, 128);
-            if (bsize > 0 && bsize < 128)
+            if (bsize >= 0)
                 buckets[bsize] ++;
         }
 
-        uint32_t sumb = 0, collision = 0, sumc = 0, finds = 0, sumn = 0, fact = 1;
-        double lf = load_factor(), fk = 1.0 / pow(2.71828, lf), sum_coll = 0;
-        int bsize = sprintf (buff, "== slot   size   ration|poisson collision  =====\n");
-        for (uint32_t i = 1; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
-            double poisson = fk / fact; fact *= i; fk *= lf;
-            sum_coll += poisson * 100.0 * (i - 1) / i;
+        uint32_t sumb = 0, sums = 0, sumn = 0;
+        uint32_t miss = 0, finds = 0, bucket_coll = 0;
+        double lf = load_factor(), fk = 1.0 / pow(2.71828, lf), sum_poisson = 0;
+        int bsize = sprintf (buff, "============== buckets size ration ========\n");
+
+        miss += _num_buckets - _num_filled;
+        for (uint32_t i = 1, factorial = 1; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
+            double poisson = fk / factorial; factorial *= i; fk *= lf;
+            sum_poisson += poisson * 100.0 * (i - 1) / i;
 
             const auto bucketsi = buckets[i];
             if (bucketsi == 0)
@@ -668,30 +705,33 @@ public:
 
             sumb += bucketsi;
             sumn += bucketsi * i;
-            collision += bucketsi * (i - 1);
+            bucket_coll += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
-            //(exp(-0.5) * pow(0.5, k)/factorial(k))
-            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.8lf|%0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, poisson, bucketsi * (i - 1) * 100.0 / _num_filled);
-            if (sumn == _num_filled)
+            miss  += bucketsi * i * i;
+            //(exp(-lf) * pow(lf, k)/factorial(k))
+            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.8lf|%0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, poisson, sumn * 100.0 / _num_filled);
+            if (sumn >= _num_filled)
                 break;
         }
 
         bsize += sprintf(buff + bsize, "========== collision miss ration ===========\n");
-        for (uint32_t i = 0; show_cache && i < sizeof(steps) / sizeof(steps[0]) && sumc < collision; i++) {
-            sumc += steps[i];
+        for (uint32_t i = 0; show_cache && i < sizeof(steps) / sizeof(steps[0]); i++) {
+            sums += steps[i];
             if (steps[i] <= 2)
                 continue;
-            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
+            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / bucket_coll, sums * 100.0 / bucket_coll);
         }
 
         if (sumb == 0)  return;
 
-        bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n", _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
-        bsize += sprintf(buff + bsize, "  collision|possion_miss cache_miss hit_find load_factor = %.2lf%%|%.2lf%% %.2lf%%, %.2lf, %.2lf\n",
-                 (collision * 100.0 / _num_filled), sum_coll, (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled, _num_filled * 1.0 / _num_buckets);
+        bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n", 
+                _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
+        bsize += sprintf(buff + bsize, "  collision,possion,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%%  %.2lf|%.2lf, %.2lf\n",
+                 (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
 
+        assert(sums == bucket_coll || !show_cache);
+        assert(bucket_coll == buckets[0]);
         assert(sumn == _num_filled);
-        assert(sumc == collision || !show_cache);
 
         bsize += sprintf(buff + bsize, "============== buckets size end =============\n");
         buff[bsize + 1] = 0;
@@ -772,16 +812,16 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
-    {
-        check_expand_need();
-        return do_insert(key, value);
-    }
-
     std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
         return do_insert(std::move(key), std::move(value));
+    }
+
+    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
+    {
+        check_expand_need();
+        return do_insert(key, value);
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
@@ -1277,14 +1317,26 @@ private:
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
-
         if (next_bucket == INACTIVE)
             return _num_buckets;
+#if 1
+        if (_eq(key, GET_KEY(_pairs, bucket)))
+            return bucket;
+        else if (next_bucket == bucket)
+            return _num_buckets;
+#elif 0
         else if (_eq(key, GET_KEY(_pairs, bucket)))
             return bucket;
         else if (next_bucket == bucket)
             return _num_buckets;
-#if 0
+
+        else if (_eq(key, GET_KEY(_pairs, next_bucket)))
+            return next_bucket;
+        const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
+        if (nbucket == next_bucket)
+            return _num_buckets;
+        next_bucket = nbucket;
+#elif 0
         const auto bucket = hash_bucket(key);
         if (IS_SET(bucket))
             return _num_buckets;

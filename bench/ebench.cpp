@@ -471,7 +471,7 @@ void insert_no_reserve(hash_type& ahash, const std::string& hash_name, const std
         for (const auto& v : vList)
             sum += ahash.emplace(v, TO_VAL(0)).second;
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("    %12s  %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), ahash.load_factor());
+        printf("    %12s  %8s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), ahash.load_factor());
     }
 }
 
@@ -539,7 +539,7 @@ void insert_small_size(const std::string& hash_name, const std::vector<keyType>&
             }
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+        printf("             %62s    %8s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
@@ -583,7 +583,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         }
 
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %122s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
+        printf("             %122s    %8s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
     }
 }
 

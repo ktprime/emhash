@@ -53,7 +53,8 @@
 #ifdef  GET_KEY
     #undef  NEXT_BUCKET
     #undef  GET_KEY
-    #undef NEW_KEY
+    #undef  NEW_KEY
+    #undef  hash_bucket
 #endif
 
 // likely/unlikely
@@ -72,7 +73,7 @@
 #endif
 
 #define GET_KEY(p,n)     p[n].first
-#define NEXT_BUCKET(s,n) s[n].second
+#define NEXT_BUCKET(p,n) p[n].second
 
 
 #define MASK_BIT         32
@@ -255,7 +256,7 @@ public:
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
-        max_load_factor(0.90f);
+        max_load_factor(0.95f);
         reserve(bucket);
     }
 
@@ -1038,16 +1039,16 @@ private:
             return bucket2;
 
         const auto boset = bucket_from % 8;
-        const uint64_t bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
+        const uint64_t bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8);
         if (bmask != 0) {
-            return bucket_from + CTZ64(bmask);
+            return bucket_from + CTZ64(bmask) - boset;
         }
 
-        const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
-        for (uint32_t last = 2, next2 = (bucket_from + _num_filled) & qmask; ; last ++, next2 = (next2 + last) & qmask) {
-            const auto bmask2 = *((uint64_t*)_bitmask + next2);
+        const auto qmask = (_num_buckets + 64 - 1) / 64 - 1;
+        for (uint32_t last = 2, step = (bucket_from + _num_filled) & qmask; ; step = (step + last ++) & qmask) {
+            const auto bmask2 = *((uint64_t*)_bitmask + step);
             if (bmask2 != 0) {
-                return next2 * 64 + CTZ64(bmask2);
+                return step * 64 + CTZ64(bmask2);
             }
         }
 

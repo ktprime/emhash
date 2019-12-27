@@ -240,7 +240,7 @@ public:
         _main_mask = 0;
         _coll_mask = 0;
         _pairs = nullptr;
-        max_load_factor(0.8f);
+        max_load_factor(0.9f);
     }
 
     HashSet(uint32_t bucket = 4)
@@ -257,11 +257,9 @@ public:
 
     void clone(const HashSet& other)
     {
-        _hasher      = other._hasher;
-        _eq          = other._eq;
-        _loadlf      = other._loadlf;
-        _main_mask        = other._main_mask;
-        _coll_mask        = other._coll_mask;
+        _hasher        = other._hasher;
+        _main_mask     = other._main_mask;
+        _coll_mask     = other._coll_mask;
 
         _colls_buckets = other._colls_buckets;
         _mains_buckets = other._mains_buckets;
@@ -306,7 +304,7 @@ public:
         if (!std::is_pod<KeyT>::value)
             clearkv();
 
-        if (_total_buckets < other._total_buckets) {
+        if (_total_buckets != other._total_buckets) {
             free(_pairs);
             _pairs = (PairT*)malloc((1 + other._total_buckets) * sizeof(PairT));
         }
@@ -405,9 +403,9 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        //return static_cast<float>(size()) / static_cast<float>(_total_buckets);
+        return ((float)size()) / _total_buckets;
         //return (_num_colls / static_cast<float>(_colls_buckets));
-        return (_num_mains / static_cast<float>(_mains_buckets + 1));
+        //return (_num_mains / static_cast<float>(_mains_buckets + 1));
     }
 
     HashT hash_function() const
@@ -878,21 +876,21 @@ public:
         if (required_buckets < _num_colls)
             return ;
 
-        uint32_t num_buckets = _num_colls > 1024 ? 512 : 8;
+        uint32_t num_buckets = _num_colls > 1 << 16 ? 1 << 16 : 8;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
-        //assert(num_buckets > _num_colls);
-        auto new_pairs = (PairT*)malloc((1 + num_buckets + num_buckets) * sizeof(PairT));
+        const auto main_bucket = num_buckets;
+        auto new_pairs = (PairT*)malloc((1 + num_buckets + main_bucket) * sizeof(PairT));
         auto old_pairs = _pairs;
 
         const auto old_num_mains   = _num_mains;
         const auto old_num_colls   = _num_colls;
-        const auto old_main_bucket = _mains_buckets;
-        const auto old_total_bucket= _total_buckets;
+        const auto old_main_buckets  = _mains_buckets;
+        const auto old_total_buckets = _total_buckets;
         const auto old_colls_buckets = _colls_buckets;
 
         _colls_buckets  = num_buckets;
-        _mains_buckets  = num_buckets;
+        _mains_buckets  = main_bucket;
         _total_buckets  = _colls_buckets + _mains_buckets;
 
         _main_mask        = _mains_buckets - 1;
@@ -911,9 +909,9 @@ public:
 
         uint32_t collision = 0;
         //set all main bucket first
-        for (uint32_t src_bucket = 0; src_bucket < old_total_bucket; src_bucket++) {
+        for (uint32_t src_bucket = 0; src_bucket < old_total_buckets; src_bucket++) {
             auto bucket_size = NEXT_BUCKET(old_pairs, src_bucket);
-            if (bucket_size == INACTIVE || (bucket_size % 2 == 0 && bucket_size < old_main_bucket))
+            if (bucket_size == INACTIVE || (bucket_size % 2 == 0 && bucket_size < old_main_buckets))
                 continue;
 
             auto& old_pair = old_pairs[src_bucket];
@@ -967,13 +965,13 @@ public:
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         }
 
-#if EMHASH_REHASH_LOG == 0
-        if (_num_colls > 100000) {
+#if EMHASH_REHASH_LOG
+        if (_num_colls > EMHASH_REHASH_LOG) {
             auto mbucket = size() - collision;
             char buff[255] = {0};
-            sprintf(buff, "    _num_colls/_num_mains/filled_ration/K/pack/collision = %u/%.2lf/%.2lf/%s/%zd/%.2lf%%",
-                    _num_colls, _num_mains * 100.0 / size(), 100.0 * _num_colls / _colls_buckets, typeid(KeyT).name(), sizeof(_pairs[0]), (collision * 100.0 / size()));
-#if EMHASH_TAF_LOG
+            sprintf(buff, "    _num_colls/main_factor/coll_factor/K/pack/collision = %u/%.2lf%%/%.2lf%%/%s/%zd/%.2lf%%",
+                    _num_colls, old_num_mains * 100.0 / old_main_buckets, 100.0 * _num_colls / _colls_buckets, typeid(KeyT).name(), sizeof(_pairs[0]), _num_colls * 100.0 / size());
+#ifdef EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else

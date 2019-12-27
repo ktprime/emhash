@@ -66,17 +66,13 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #include <functional>
 #include <iterator>
 
-#if EMHASH_TAF_LOG
-    #include "servant/AutoLog.h"
-    #include "servant/RollLogHelper.h"
-#endif
-
 #ifdef GET_KEY
     #undef  GET_KEY
     #undef  GET_VAL
-    #undef  NEXT_BUCKET
     #undef  GET_PKV
     #undef  NEW_BUCKET
+    #undef  NEW_KVALUE
+    #undef  NEXT_BUCKET
 #endif
 
 // likely/unlikely
@@ -225,6 +221,8 @@ private:
     typedef entry<KeyT, ValueT>            PairT;
     typedef entry<KeyT, ValueT>            value_pair;
 #endif
+
+    static const bool bInCacheLine = sizeof(value_pair) < EMHASH_CACHE_LINE_SIZE / 2;
 
 public:
     typedef KeyT   key_type;
@@ -793,13 +791,13 @@ public:
         return { {this, next}, found };
     }
 
-    inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
     {
         check_expand_need();
         return do_insert(p.first, p.second);
     }
 
-    inline std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p)
+    std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p)
     {
         check_expand_need();
         return do_insert(std::move(p.first), std::move(p.second));
@@ -1025,7 +1023,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_notriviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 4)
+        if (is_notriviall_destructable() || !bInCacheLine || _num_filled < _num_buckets / 4)
             clearkv();
         else {
             memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * _num_buckets);
@@ -1098,12 +1096,12 @@ public:
         _num_main = 0;
 #endif
 
-        if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
-            memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * num_buckets);
+        if (bInCacheLine)
+            memset((char*)_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * num_buckets);
         else
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
                 ADDR_BUCKET(_pairs, bucket) = INACTIVE;
-        memset(_pairs + num_buckets, 0, sizeof(PairT) * 2); //set two tombstones
+        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2); //set two tombstones
 
         /***************** ----------------------**/
         memset(_bitmask, 0xFFFFFFFF, num_buckets / 8);
@@ -1162,8 +1160,8 @@ private:
         CLS_BIT(bucket);
     }
 
-#if EMHASH_ERASE_SMALL
-    uint32_t erase_key(const KeyT& key)
+    template<class K = uint32_t> typename std::enable_if <!bInCacheLine, K>::type
+    erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
@@ -1205,8 +1203,9 @@ private:
 
         return INACTIVE;
     }
-#else
-    uint32_t erase_key(const KeyT& key)
+
+    template<class K = uint32_t> typename std::enable_if<bInCacheLine, K>::type
+    erase_key(const KeyT& key)
     {
         const auto empty_bucket = INACTIVE;
         const auto bucket = hash_bucket(key);
@@ -1247,7 +1246,6 @@ private:
 
         return find_bucket;
     }
-#endif
 
     uint32_t erase_bucket(const uint32_t bucket)
     {
@@ -1422,9 +1420,11 @@ private:
         if (ISEMPTY_BUCKET(_pairs, bucket1))
             return bucket1;
 #if 0
-        const auto bucket2 = bucket_from + 2;
-        if (ISEMPTY_BUCKET(_pairs, bucket2))
-            return bucket2;
+        if (bInCacheLine) {
+            const auto bucket2 = bucket_from + 2;
+            if (ISEMPTY_BUCKET(_pairs, bucket2))
+                return bucket2;
+        }
 #endif
 
         const auto boset = bucket_from % 8;
@@ -1435,12 +1435,11 @@ private:
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
         //for (uint32_t last = qmask > 2 ? qmask / 2 + 2 : 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
         //for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
-        //for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-        for (uint32_t last = 3, step = (bucket_from + 2 * 64) & qmask; ;step = (step + ++last) & qmask) {
-            const auto next2 = step + 0;
-            const auto bmask2 = *((uint64_t*)_bitmask + next2);
+        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
+        //for (uint32_t last = 3, step = (bucket_from + 2 * 64) & qmask; ;step = (step + ++last) & qmask) {
+            const auto bmask2 = *((uint64_t*)_bitmask + step);
             if (bmask2 != 0)
-                return next2 * 64 + CTZ(bmask2);
+                return step * 64 + CTZ(bmask2);
 
 #if 0
             const auto next1 = step + 1;
@@ -1528,7 +1527,7 @@ private:
 #endif
     }
 
-    static inline uint64_t hash64(uint64_t key)
+    static inline uint32_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__ && _MPCLMUL
         //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j)

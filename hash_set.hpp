@@ -77,7 +77,7 @@
 #define GET_KEY(p,n)     p[n].first
 #define NEXT_BUCKET(s,n) s[n].second
 
-namespace emhash9 {
+namespace emhash6 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashSet
@@ -174,7 +174,7 @@ public:
             return {_set, old_index};
         }
 
-        const reference operator*() const
+        reference operator*() const
         {
             return _set->GET_KEY(_pairs, _bucket);
         }
@@ -215,7 +215,7 @@ public:
         _mask = 0;
         _pairs = nullptr;
         _num_filled = 0;
-        max_load_factor(0.8f);
+        max_load_factor(0.9f);
         reserve(bucket);
     }
 
@@ -774,7 +774,7 @@ public:
     }
 
     /// Make room for this many elements
-    void rehash(uint32_t required_buckets) noexcept
+    void rehash(uint32_t required_buckets)
     {
         if (required_buckets < _num_filled)
             return ;
@@ -957,7 +957,7 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    uint32_t find_or_allocate(const KeyT& key) noexcept
+    uint32_t find_or_allocate(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         const auto& bucket_key = GET_KEY(_pairs, bucket);
