@@ -183,8 +183,8 @@ private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>          value_pair;
-    typedef std::pair<uint32_t, value_pair > PairT;
+    typedef std::pair<KeyT, ValueT>         value_pair;
+    typedef std::pair<uint32_t, value_pair> PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
     typedef std::pair<value_pair, uint32_t> PairT;
@@ -198,7 +198,7 @@ public:
     typedef ValueT mapped_type;
 
     typedef  size_t       size_type;
-    typedef std::pair<KeyT,ValueT>        value_type;
+    typedef  std::pair<KeyT,ValueT>        value_type;
     typedef  PairT&       reference;
     typedef  const PairT& const_reference;
 

@@ -212,14 +212,14 @@ private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>          value_pair;
-    typedef std::pair<uint32_t, value_pair > PairT;
+    typedef std::pair<KeyT, ValueT>         value_pair;
+    typedef std::pair<uint32_t, value_pair> PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
     typedef std::pair<value_pair, uint32_t> PairT;
 #else
-    typedef entry<KeyT, ValueT>            PairT;
-    typedef entry<KeyT, ValueT>            value_pair;
+    typedef entry<KeyT, ValueT>             value_pair;
+    typedef entry<KeyT, ValueT>             PairT;
 #endif
 
     static const bool bInCacheLine = sizeof(value_pair) < EMHASH_CACHE_LINE_SIZE / 2;
@@ -387,11 +387,11 @@ public:
         swap(other);
     }
 
-    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
+    HashMap(std::initializer_list<value_type> il)
     {
         init((uint32_t)il.size());
         for (auto begin = il.begin(); begin != il.end(); ++begin)
-            insert(*begin);
+            do_insert(begin->first, begin->second);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -455,7 +455,7 @@ public:
     void swap(HashMap& other)
     {
         std::swap(_hasher, other._hasher);
-        std::swap(_eq, other._eq);
+//      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_main, other._num_main);
@@ -803,22 +803,20 @@ public:
         return do_insert(std::move(p.first), std::move(p.second));
     }
 
+    void insert(std::initializer_list<value_type> ilist)
+    {
+        reserve(ilist.size() + _num_filled);
+        for (auto begin = ilist.begin(); begin != end; ++begin)
+            do_insert(begin->first, begin->second);
+    }
+
 #if 0
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
         reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin) {
-            emplace(*begin);
-        }
-    }
-
-    void insert(std::initializer_list<value_type> ilist)
-    {
-        reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != end; ++begin) {
-            emplace(*begin);
-        }
+        for (; begin != end; ++begin)
+            do_insert(*begin);
     }
 
     template <typename Iter>
@@ -836,9 +834,7 @@ public:
         for (; citbeg != citend; ++citbeg)
             insert(*citbeg);
     }
-#endif
 
-    ///////////////////////////////////////////////////////////
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
@@ -847,6 +843,7 @@ public:
             do_insert_unqiue(*begin);
         }
     }
+#endif
 
     /// Same as above, but contains(key) MUST be false
     uint32_t insert_unique(KeyT&& key, ValueT&& value)
@@ -1074,9 +1071,10 @@ public:
 
         _bitmask = (uint32_t*)(new_pairs + 2 + num_buckets);
         const auto bitmask_pack = ((size_t)_bitmask) % sizeof(uint64_t);
-        if (bitmask_pack != 0)
+        if (bitmask_pack != 0) {
             _bitmask = (uint32_t*)((char*)_bitmask + sizeof(uint64_t) - bitmask_pack);
-        assert(0 == ((size_t)_bitmask) % sizeof(uint64_t));
+            assert(0 == ((size_t)_bitmask) % sizeof(uint64_t));
+        }
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
@@ -1101,14 +1099,16 @@ public:
         else
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
                 ADDR_BUCKET(_pairs, bucket) = INACTIVE;
-        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2); //set two tombstones
 
-        /***************** ----------------------**/
+        //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
+        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
+
+        /***************** init bitmask ---------------------- ***********/
         memset(_bitmask, 0xFFFFFFFF, num_buckets / 8);
-        memset((char*)_bitmask + num_buckets / 8, 0, sizeof(uint64_t) + 1);
-        //pack last dword to bit 0
+        memset((char*)_bitmask + num_buckets / 8, 0, sizeof(uint64_t) + sizeof(uint8_t));
+        //pack last position to bit 0
         _bitmask[num_buckets / MASK_BIT] &= (1 << num_buckets % MASK_BIT) - 1;
-        /***************** ----------------------**/
+        /**************** -------------------------------- *************/
 
         for (uint32_t src_bucket = 0; src_bucket < old_num_buckets; src_bucket++) {
             if (ISEMPTY_BUCKET(old_pairs, src_bucket))

@@ -168,8 +168,8 @@ private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>          value_pair;
-    typedef std::pair<uint32_t, value_pair > PairT;
+    typedef std::pair<KeyT, ValueT>         value_pair;
+    typedef std::pair<uint32_t, value_pair> PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
     typedef std::pair<value_pair, uint32_t> PairT;
@@ -182,18 +182,16 @@ public:
     typedef KeyT   key_type;
     typedef ValueT mapped_type;
 
-    typedef  size_t       size_type;
-    typedef std::pair<KeyT,ValueT>        value_type;
-    typedef  PairT&       reference;
-    typedef  const PairT& const_reference;
+    typedef uint32_t     size_type;
+    typedef PairT&       reference;
+    typedef std::pair<KeyT,ValueT>         value_type;
+    typedef const PairT&                   const_reference;
 
     class iterator
     {
     public:
        //typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
-
+        typedef std::ptrdiff_t            difference_type;
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
@@ -250,9 +248,7 @@ public:
     {
     public:
         //typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
-        typedef size_t                    distance_type;
-
+        typedef std::ptrdiff_t            difference_type;
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
@@ -379,6 +375,7 @@ public:
         _mask        = other._mask;
         _loadlf      = other._loadlf;
         _last        = other._last;
+
         auto opairs = other._pairs;
         if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
             memcpy(_pairs, opairs, other._num_buckets * sizeof(PairT));
@@ -488,12 +485,12 @@ public:
 
     constexpr size_type max_size() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
 #ifdef EMHASH_STATIS
@@ -547,8 +544,8 @@ public:
 
     int get_cache_info(uint32_t bucket, uint32_t next_bucket) const
     {
-        auto pbucket = reinterpret_cast<size_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<size_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<std::uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<std::uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / 64 == pnext / 64)
             return 0;
         auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
@@ -648,7 +645,7 @@ public:
 
     std::pair<iterator, iterator> equal_range(const KeyT& key)
     {
-        iterator found = find(key);
+        const iterator found = find(key);
         if (found == end())
             return { found, found };
         else
@@ -696,22 +693,22 @@ public:
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        const auto find = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
-        if (find) {
+        const auto found = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
+        if (found) {
             NEW_KVALUE(key, value, bucket);
         }
-        return { {this, bucket}, find };
+        return { {this, bucket}, found };
     }
 
     std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        const auto find = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
-        if (find) {
+        const auto found = NEXT_BUCKET(_pairs, bucket) == INACTIVE;
+        if (found) {
             NEW_KVALUE(std::move(key), std::move(value), bucket);
         }
-        return { {this, bucket}, find };
+        return { {this, bucket}, found };
     }
 
     inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)

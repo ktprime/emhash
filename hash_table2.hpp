@@ -184,8 +184,8 @@ private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>          value_pair;
-    typedef std::pair<uint32_t, value_pair > PairT;
+    typedef std::pair<KeyT, ValueT>         value_pair;
+    typedef std::pair<uint32_t, value_pair> PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
     typedef std::pair<value_pair, uint32_t> PairT;
@@ -512,12 +512,12 @@ public:
 
     constexpr size_type max_size() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
 #ifdef EMHASH_STATIS
@@ -673,7 +673,7 @@ public:
 
     std::pair<iterator, iterator> equal_range(const KeyT& key) noexcept
     {
-        iterator found = find(key);
+        const iterator found = find(key);
         if (found == end())
             return { found, found };
         else

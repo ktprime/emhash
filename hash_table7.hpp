@@ -249,14 +249,14 @@ private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>          value_pair;
-    typedef std::pair<uint32_t, value_pair > PairT;
+    typedef std::pair<KeyT, ValueT>         value_pair;
+    typedef std::pair<uint32_t, value_pair> PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
     typedef std::pair<value_pair, uint32_t> PairT;
 #else
-    typedef entry<KeyT, ValueT>             PairT;
     typedef entry<KeyT, ValueT>             value_pair;
+    typedef entry<KeyT, ValueT>             PairT;
 #endif
 
 public:
@@ -420,11 +420,11 @@ public:
         swap(other);
     }
 
-    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
+    HashMap(std::initializer_list<value_type> ilist)
     {
-        init((uint32_t)il.size());
-        for (auto begin = il.begin(); begin != il.end(); ++begin)
-            insert(*begin);
+        init((uint32_t)ilist.size());
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
+            do_insert(begin->first, begin->second);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -859,20 +859,19 @@ public:
         return do_insert(std::move(p.first), std::move(p.second));
     }
 
+    void insert(std::initializer_list<value_type> ilist)
+    {
+        reserve(ilist.size() + _num_filled);
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
+            do_insert(begin->first, begin->second);
+    }
+
 #if 0
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
         reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
-            emplace(*begin);
-        }
-    }
-
-    void insert(std::initializer_list<value_type> ilist)
-    {
-        reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != end; ++begin) {
             emplace(*begin);
         }
     }
@@ -898,9 +897,8 @@ public:
     void insert_unique(Iter begin, Iter end)
     {
         reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin) {
+        for (; begin != end; ++begin)
             do_insert_unqiue(*begin);
-        }
     }
 
     /// Same as above, but contains(key) MUST be false
@@ -1182,7 +1180,7 @@ private:
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #if EMHASH_TAF_LOG
-            static size_type ihashs = 0;
+            static uint32_t ihashs = 0;
             FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
