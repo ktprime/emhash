@@ -1,11 +1,10 @@
-
 // emhash7::HashMap for C++11/14/17
 // version 1.7.3
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2019-2019 Huang Yuanbing & bailuzhou AT 163.com
+// Copyright (c) 2019-2020 Huang Yuanbing & bailuzhou AT 163.com
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal

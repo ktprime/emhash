@@ -1,12 +1,28 @@
-// By Huang Yuanbing 2019-2020
-// bailuzhou AT 163.com
-// version 1.0.3
-
-
-// LICENSE:
-//   This software is dual-licensed to the public domain and under the following
-//   license: you are granted a perpetual, irrevocable license to copy, modify,
-//   publish, and distribute this file as you see fit.
+// emhash5::HashMap for C++11
+// version 1.5.4
+// https://github.com/ktprime/ktprime/blob/master/hash_table4.hpp
+//
+// Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2019-2020 Huang Yuanbing & bailuzhou AT 163.com
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE
 
 
 // From
@@ -725,7 +741,7 @@ public:
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
-        reserve(end - begin + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
             emplace(*begin);
         }
@@ -849,7 +865,6 @@ public:
     ValueT set_get(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
-
         const auto bucket = find_or_allocate(key);
 
         // Check if inserting a new value rather than overwriting an old entry
@@ -906,7 +921,6 @@ public:
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
-
     iterator erase(const_iterator cit)
     {
         iterator it(this, cit._bucket);

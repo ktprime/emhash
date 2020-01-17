@@ -9,7 +9,7 @@
 
 //#include "wyhash.h"
 #define ET                     1
-#define HOOD_HASH              1
+//#define HOOD_HASH              1
 //#define  FL1                 1
 //#define EMHASH_BUCKET_INDEX  1
 
@@ -102,7 +102,7 @@
     #include <sys/resource.h>
 #endif
 
-struct SturctValue;
+struct StructValue;
 
 #if TKey == 0
     typedef unsigned int         keyType;
@@ -136,10 +136,10 @@ struct SturctValue;
     #define TO_SUM(i)   i.size()
     #define sValueType  "string"
 #else
-    typedef SturctValue    valueType;
+    typedef StructValue    valueType;
     #define TO_VAL(i)   i
     #define TO_SUM(i)   i.lScore
-    #define sValueType  "SturctValue"
+    #define sValueType  "StructValue"
 #endif
 
 emhash6::HashMap<std::string, std::string> show_name = {
@@ -697,16 +697,16 @@ void hash_copy(hash_type& ahash, const std::string& hash_name)
 #ifndef PACK
 #define PACK 1024
 #endif
-struct SturctValue
+struct StructValue
 {
-    SturctValue()
+    StructValue()
     {
         lScore = 0;
         lUid = iRank = 0;
         iUpdateTime = 0;
     }
 
-    SturctValue(int64_t lUid1, int64_t lScore1 = 0, int iTime = 0)
+    StructValue(int64_t lUid1, int64_t lScore1 = 0, int iTime = 0)
     {
         lUid   = lUid1;
         lScore = lScore1;
@@ -732,7 +732,7 @@ struct SturctValue
 };
 
 #if PACK >= 24
-static_assert(sizeof(SturctValue) == PACK, "PACK >=24");
+static_assert(sizeof(StructValue) == PACK, "PACK >=24");
 #endif
 
 #include <chrono>
@@ -1075,7 +1075,7 @@ static int benchHashMap(int n)
         { ska::flat_hash_map <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "flat", vList); }
         { tsl::hopscotch_map <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hopsco", vList); }
         { tsl::robin_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "robin", vList); }
-        { hrd7::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
+        //{ hrd7::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
 #endif
 
         { emhash7::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash7", vList); }
@@ -1106,7 +1106,7 @@ static int benchHashMap(int n)
 #endif
 
 #if _CPP11_HASH
-        { hrd7::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
+        //{ hrd7::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
         { phmap::flat_hash_map <keyType, valueType, hash_func> ohash;      benOneHash(ohash, "phmap", vList); }
         { robin_hood::unordered_map <keyType, valueType, hash_func> ohash; benOneHash(ohash, "martin", vList); }
         { ska::flat_hash_map <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "flat", vList); }
@@ -1281,7 +1281,7 @@ int main(int argc, char* argv[])
     auto minn = (1024 * 1024 * 16) / (sizeof(keyType) + sizeof(valueType) + 8);
 
     double load_factor = 0.0945;
-    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-6hmpsf] t(n)\n", (int)maxn);
+    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-6hmpsfu] t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
