@@ -85,7 +85,7 @@ class HashSet
     constexpr static uint32_t INACTIVE = 0xFFFFFFFF;
 
 private:
-    typedef  HashSet<KeyT, HashT> htype;
+    typedef  HashSet<KeyT, HashT, EqT> htype;
     typedef  std::pair<KeyT, uint32_t> PairT;
 
 public:

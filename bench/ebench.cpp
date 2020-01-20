@@ -1277,8 +1277,8 @@ int main(int argc, char* argv[])
     bool auto_set = false;
     auto tn = 0;
     auto maxc = 500;
-    auto maxn = (1024 * 1024 * 64) / (sizeof(keyType) + sizeof(valueType) + 8);
-    auto minn = (1024 * 1024 * 16) / (sizeof(keyType) + sizeof(valueType) + 8);
+    auto maxn = (1024 * 1024 * 128) / (sizeof(keyType) + sizeof(valueType) + 8);
+    auto minn = (1024 * 1024 * 8) / (sizeof(keyType) + sizeof(valueType) + 8);
 
     double load_factor = 0.0945;
     printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-6hmpsfu] t(n)\n", (int)maxn);
