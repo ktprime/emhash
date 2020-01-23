@@ -4,12 +4,15 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#if __cplusplus > 201402L
+#include <string_view>
+#endif
 #include <algorithm>
 #include <array>
 
 //#include "wyhash.h"
 #define ET                     1
-//#define HOOD_HASH              1
+#define HOOD_HASH              1
 //#define  FL1                 1
 //#define EMHASH_BUCKET_INDEX  1
 
@@ -98,8 +101,8 @@
     # include <windows.h>
 #else
     # define CONSOLE "/dev/tty"
-    #include <unistd.h>
-    #include <sys/resource.h>
+    # include <unistd.h>
+    # include <sys/resource.h>
 #endif
 
 struct StructValue;
@@ -114,10 +117,14 @@ struct StructValue;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int64_t"
     #define KEY_INT     1
-#else
+#elif TKey == 2
     typedef std::string keyType;
     #define TO_KEY(i)   std::to_string(i)
     #define sKeyType    "string"
+#else
+    typedef std::string_view keyType;
+    #define TO_KEY(i)   std::to_string(i)
+    #define sKeyType    "string_view"
 #endif
 
 #if TVal == 0
@@ -132,9 +139,14 @@ struct StructValue;
     #define sValueType  "int64_t"
 #elif TVal == 2
     typedef std::string valueType;
-    #define TO_VAL(i)   std::to_string(i)
+    #define TO_VAL(i)   #i
     #define TO_SUM(i)   i.size()
     #define sValueType  "string"
+#elif TValue == 3
+    typedef std::string_view valueType;
+    #define TO_VAL(i)   #i
+    #define TO_SUM(i)   i.size()
+    #define sValueType  "string_view"
 #else
     typedef StructValue    valueType;
     #define TO_VAL(i)   i
@@ -152,7 +164,7 @@ emhash6::HashMap<std::string, std::string> show_name = {
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
 
-    {"emilib", "emilib"},
+//    {"emilib", "emilib"},
 //    {"hrdset",   "hrdset"},
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
@@ -950,13 +962,13 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
     //for (int i = 0; i < max_loop; i += (int)oList.size())
     {
         hash_type hash;
-        load_factor = 90;
+        load_factor = 87;
         hash.max_load_factor(load_factor / 100.0);
         hash.clear();
 
         insert_reserve <hash_type>(hash_name, oList);
         insert_high_load <hash_type>(hash_name, oList);
-        const uint32_t l1_size = (32 * 1024)   / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
+        const uint32_t l1_size = (64 * 1024)   / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
         const uint32_t l3_size = (2048 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
 
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", 100, l1_size);
@@ -1332,7 +1344,11 @@ int main(int argc, char* argv[])
 #endif
 
     auto nows = time(0);
+#if 1
     sfc64 srng(nows);
+#else
+    sfc64 srng(1);
+#endif
 
     while (true) {
         auto n = 0;

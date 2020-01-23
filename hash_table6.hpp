@@ -1,5 +1,5 @@
 // emhash6::HashMap for C++11/14/17
-// version 1.6.5
+// version 1.6.6
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -805,7 +805,7 @@ public:
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != end; ++begin)
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
             do_insert(begin->first, begin->second);
     }
 
@@ -1415,10 +1415,11 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
+#if 0
         const auto bucket1 = bucket_from + 1;
         if (ISEMPTY_BUCKET(_pairs, bucket1))
             return bucket1;
-#if 0
+
         if (bInCacheLine) {
             const auto bucket2 = bucket_from + 2;
             if (ISEMPTY_BUCKET(_pairs, bucket2))
@@ -1427,9 +1428,9 @@ private:
 #endif
 
         const auto boset = bucket_from % 8;
-        const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8);
+        const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
         if (bmask != 0)
-            return bucket_from + CTZ(bmask) - boset;
+            return bucket_from + CTZ(bmask);
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
         //for (uint32_t last = qmask > 2 ? qmask / 2 + 2 : 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
@@ -1439,7 +1440,6 @@ private:
             const auto bmask2 = *((uint64_t*)_bitmask + step);
             if (bmask2 != 0)
                 return step * 64 + CTZ(bmask2);
-
 #if 0
             const auto next1 = step + 1;
             const auto bmask1 = *((uint64_t*)_bitmask + next1);
@@ -1526,7 +1526,7 @@ private:
 #endif
     }
 
-    static inline uint32_t hash64(uint64_t key)
+    static inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__ && _MPCLMUL
         //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j)
@@ -1543,9 +1543,7 @@ private:
         return (uint32_t)(r >> 64) + (uint32_t)r;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
+        return (r >> 32) + r;
 #elif 1
         //MurmurHash3Mixer
         uint64_t h = key;
@@ -1571,13 +1569,13 @@ private:
         if (sizeof(UType) <= sizeof(uint32_t))
             return hash32(key) & _mask;
         else
-            return uint32_t(hash64(key) & _mask);
+            return (uint32_t)hash64(key) & _mask;
 #elif EMHASH_SAFE_HASH
         if (_hash_inter > 0) {
             if (sizeof(UType) <= sizeof(uint32_t))
                 return hash32(key) & _mask;
             else
-                return uint32_t(hash64(key) & _mask);
+                return (uint32_t)hash64(key) & _mask;
         }
         return _hasher(key) & _mask;
 #elif EMHASH_IDENTITY_HASH

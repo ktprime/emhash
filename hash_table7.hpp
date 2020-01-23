@@ -1432,11 +1432,11 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
+#if 0
         const auto bucket1 = bucket_from + 1;
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
-#if 0
         const auto bucket2 = bucket_from + 2;
         if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
             return bucket2;
@@ -1456,7 +1456,7 @@ private:
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-        for (uint32_t last = 3, step = (bucket_from + 2 * 64) & qmask; ;step = (step + ++last) & qmask) {
+        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
 //        for (uint32_t step = _last + 1; ; step = ++step & qmask) {
             const auto next2 = step;
             const auto bmask2 = *((uint64_t*)_bitmask + next2);

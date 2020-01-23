@@ -198,7 +198,7 @@ public:
     typedef ValueT mapped_type;
 
     typedef std::pair<KeyT,ValueT>        value_type;
-    typedef size_t                        size_type;
+    typedef uint32_t                      size_type;
     typedef PairT&                        reference;
     typedef const PairT&                  const_reference;
 
@@ -328,7 +328,7 @@ public:
         _pairs = nullptr;
         _num_filled = 0;
         _hash_inter = 0;
-        max_load_factor(0.90f);
+        max_load_factor(0.95f);
         reserve(bucket);
     }
 
@@ -383,14 +383,13 @@ public:
     {
         if (is_notriviall_destructable())
             clearkv();
-
         free(_pairs);
     }
 
     void clone(const HashMap& other)
     {
         _hasher      = other._hasher;
-        _eq          = other._eq;
+//        _eq          = other._eq;
         _num_buckets = other._num_buckets;
         _num_filled  = other._num_filled;
         _mask        = other._mask;
@@ -417,7 +416,7 @@ public:
     void swap(HashMap& other)
     {
         std::swap(_hasher, other._hasher);
-        std::swap(_eq, other._eq);
+//        std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -505,7 +504,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.95f && value > 0.2f)
+        if (value < 0.995f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 17) / value);
     }
 
@@ -568,7 +567,7 @@ public:
         return main_bucket;
     }
 
-    size_type get_cache_info(uint32_t bucket, uint32_t next_bucket) const
+    int get_cache_info(uint32_t bucket, uint32_t next_bucket) const
     {
         auto pbucket = reinterpret_cast<std::uintptr_t>(&_pairs[bucket]);
         auto pnext   = reinterpret_cast<std::uintptr_t>(&_pairs[next_bucket]);
@@ -619,7 +618,7 @@ public:
         }
 
         uint32_t sumb = 0, collision = 0, sumc = 0, finds = 0, sumn = 0;
-        puts("============== buckets size ration ========");
+        puts("============== buckets size ration =========");
         for (uint32_t i = 0; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
             const auto bucketsi = buckets[i];
             if (bucketsi == 0)
@@ -628,7 +627,7 @@ public:
             sumn += bucketsi * i;
             collision += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
-            printf("  %2u  %8u  %0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, sumn * 100.0 / _num_filled);
+            printf("  %2u  %8u  %.2lf  %.2lf\n", i, bucketsi, bucketsi * 100.0 * i / _num_filled, sumn * 100.0 / _num_filled);
         }
 
         puts("========== collision miss ration ===========");
@@ -636,15 +635,14 @@ public:
             sumc += steps[i];
             if (steps[i] <= 2)
                 continue;
-            printf("  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
+            printf("  %2u  %8u  %.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / collision, sumc * 100.0 / collision);
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/aver_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
+        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
                 _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumn == _num_filled);
         assert(sumc == collision);
-        puts("============== buckets size end =============");
     }
 #endif
 
@@ -667,10 +665,10 @@ public:
 
     size_type count(const KeyT& key) const noexcept
     {
-        return (size_type)(find_filled_bucket(key) != _num_buckets);
+        return find_filled_bucket(key) == _num_buckets ? 0 : 1;
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key) noexcept
+    std::pair<iterator, iterator> equal_range(const KeyT& key)
     {
         const iterator found = find(key);
         if (found == end())
@@ -776,7 +774,7 @@ public:
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != end; ++begin) {
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
             emplace(*begin);
         }
     }
@@ -821,6 +819,13 @@ public:
         check_expand_need();
         auto bucket = find_unique_bucket(key);
         NEW_KVALUE(std::move(key), std::move(value), bucket);
+        return bucket;
+    }
+
+    uint32_t insert_unique(entry<KeyT, ValueT>&& pair)
+    {
+        auto bucket = find_unique_bucket(pair.first);
+        NEW_KVALUE(std::move(pair.first), std::move(pair.second), bucket);
         return bucket;
     }
 
@@ -947,7 +952,6 @@ public:
         return (bucket == it._bucket) ? ++it : it;
     }
 
-     /// No need return next iterator for performace issuse in some case
     void _erase(const_iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
@@ -1016,7 +1020,6 @@ private:
         uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
-        //assert(num_buckets > _num_filled);
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
         auto old_num_buckets = _num_buckets;
         auto old_num_filled  = _num_filled;
@@ -1207,11 +1210,10 @@ private:
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
 
         if (next_bucket == INACTIVE)
             return _num_buckets;
-        else if (_eq(key, bucket_key))
+        else if (_eq(key, GET_KEY(_pairs, bucket)))
             return bucket;
         else if (next_bucket == bucket)
             return _num_buckets;
@@ -1300,21 +1302,13 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from) const
     {
-        const auto bucket1 = bucket_from + 1;
-        if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
-            return bucket1;
-
-        const auto bucket2 = bucket_from + 2;
-        if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-            return bucket2;
+        const auto bucket = bucket_from + 1;
+        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
+            return bucket;
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
-#ifndef QS
         //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t last = 2, slot = 3 + bucket_from; ; slot = (slot + ++last)) {
-#else
-        for (uint32_t last = _mask / 2 + 2, slot = 3 + bucket_from; ; slot += last) {
-#endif
+        for (uint32_t last = 2, slot = bucket + 1; ; slot = (slot + ++last)) {
             const auto next = slot & _mask;
             const auto bucket1 = next + 0;
             if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
@@ -1324,7 +1318,7 @@ private:
             if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
                 return bucket2;
 #ifdef QS
-            else if (slot > 8) {
+            else if (last > 5) {
                 const auto next2 = (slot + _num_filled) & _mask;
                 const auto bucket3 = next2 + 0;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
@@ -1421,9 +1415,7 @@ private:
         return (uint32_t)(r >> 64) + (uint32_t)r;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
+        return (r >> 32) + r;
 #elif 1
         //MurmurHash3Mixer
         uint64_t h = key;

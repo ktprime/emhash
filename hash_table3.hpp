@@ -773,7 +773,7 @@ public:
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != end; ++begin) {
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
             emplace(*begin);
         }
     }
