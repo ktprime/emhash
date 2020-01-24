@@ -4,11 +4,12 @@
 #include <cassert>
 #include <iostream>
 #include <string>
-#if __cplusplus > 201402L
-#include <string_view>
-#endif
 #include <algorithm>
 #include <array>
+
+#if __cplusplus > 201402L
+    #include <string_view>
+#endif
 
 //#include "wyhash.h"
 #define ET                     1
@@ -154,7 +155,8 @@ struct StructValue;
     #define sValueType  "StructValue"
 #endif
 
-emhash6::HashMap<std::string, std::string> show_name = {
+emhash5::HashMap<std::string, std::string> show_name =
+{
 //    {"stl_hash", "unordered_map"},
 //    {"emhash2", "emhash2"},
 //    {"emhash4", "emhash4"},
@@ -170,6 +172,8 @@ emhash6::HashMap<std::string, std::string> show_name = {
 //    {"lru_size", "lru_size"},
 
 #if ET > 0
+    {"emilib2", "emilib2"},
+    {"emilib3", "emilib3"},
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
 #if ET > 1
@@ -428,7 +432,6 @@ void hash_iter(const hash_type& ahash, const std::string& hash_name)
         for (auto it = ahash.cbegin(); it != ahash.cend(); ++it)
             sum += it->first;
 #endif
-
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
     }
 }
@@ -441,7 +444,7 @@ void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<
         size_t sum = 0;
         auto ts1 = getTime();
         for (const auto& v : vList) {
-            ahash[v] = TO_VAL(1);
+            ahash[v] = TO_VAL(0);
 #if TVal < 2
             sum += ahash[v];
 #else
@@ -560,9 +563,11 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         size_t sum = 0;
         size_t pow2 = 2 << ilog(vList.size(), 2);
         hash_type tmp;
-        tmp.max_load_factor(0.99);
+
+        const auto max_loadf = 0.995f;
+        tmp.max_load_factor(max_loadf);
         tmp.reserve(pow2 / 2);
-        int minn = 0.75f * pow2, maxn = 0.95 * pow2;
+        int minn = (max_loadf - 0.3f) * pow2, maxn = max_loadf * pow2;
         int i = 0;
 
         for (; i < minn; i++) {
@@ -590,7 +595,6 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
             tmp[v2] = TO_VAL(0);
             sum += tmp.count(v2);
         }
-
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
         printf("             %122s    %8s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
     }
@@ -798,7 +802,6 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     return 0;
 #else
 
-    auto flag = rand() % 5 + 1;
 #if AR > 0
     const auto iRation = AR;
 #else
@@ -811,7 +814,8 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     std::mt19937_64 srng; srng.seed(size);
 #endif
 
-    if (rand() % 100 > iRation)
+    auto flag = 0;
+    if (srng() % 100 > iRation)
     {
         emhash6::HashMap<keyType, int> ehash(size);
         for (int i = 0; ; i++) {
@@ -822,10 +826,10 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
                     break;
             }
         }
-        flag = 0;
     }
     else
     {
+        flag = srng() % 5 + 1;
         const int pow2 = 2 << ilog(size, 2);
         auto k = srng();
         for (int i = 1; i <= size; i ++) {
@@ -857,7 +861,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
     emhash6::HashMap <keyType, int> ehash2;
     emhash7::HashMap <keyType, int> ehash5;
 
-    sfc64 srng;
+    sfc64 srng(n);
 #if 0
     emhash::HashMap <keyType, int> unhash;
 #else
@@ -1054,7 +1058,7 @@ static int benchHashMap(int n)
     if (n < 10000)
         n = 123456;
 
-    printf("%s n = %d, keyType = %s, valueType = %s(%d)\n", __FUNCTION__, n, sKeyType, sValueType, sizeof(valueType));
+    printf("%s n = %d, keyType = %s, valueType = %s(%zd)\n", __FUNCTION__, n, sKeyType, sValueType, sizeof(valueType));
 
 #ifdef HOOD_HASH
     using hash_func = robin_hood::hash<keyType>;
@@ -1344,7 +1348,7 @@ int main(int argc, char* argv[])
 #endif
 
     auto nows = time(0);
-#if 1
+#ifndef RD
     sfc64 srng(nows);
 #else
     sfc64 srng(1);

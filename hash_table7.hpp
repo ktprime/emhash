@@ -576,7 +576,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.995f && value > 0.2f)
+        if (value < 0.999f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 17) / value);
     }
 
@@ -1003,12 +1003,10 @@ public:
     /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key)
     {
+        EMHASH_UNLIKELY(check_expand_need());
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
-            if (EMHASH_UNLIKELY(check_expand_need()))
-                bucket = find_unique_bucket(key);
-
             NEW_KVALUE(key, std::move(ValueT()), bucket);
         }
 
@@ -1122,7 +1120,7 @@ public:
         //if (_num_filled > 1000'000) dump_statis(0);
     #endif
         rehash(required_buckets + 2);
-    #ifdef EMHASH_STATIS
+    #if EMHASH_STATIS == 2
         if (_num_filled > 1000'000) dump_statis(1);
     #endif
         return true;
@@ -1445,26 +1443,18 @@ private:
         //fast find by bit
         const auto boset = bucket_from % 8;
         const auto bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
-        if (bmask != 0)
+        if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ64(bmask) - 0;
-
-#ifndef QC
-        const auto bmask2 = *((uint64_t*)_bitmask + _last);
-        if (bmask2 != 0)
-            return _last * 64 + CTZ64(bmask2);
-#endif
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
-//        for (uint32_t step = _last + 1; ; step = ++step & qmask) {
-            const auto next2 = step;
-            const auto bmask2 = *((uint64_t*)_bitmask + next2);
-            if (bmask2 != 0) {
-#ifdef QC
-                _last = next2;
+//        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
+        for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
+            const auto bmask = *((uint64_t*)_bitmask + step);
+            if (bmask != 0) {
+#ifndef EMHASH_HIGH_LOAD
 #endif
-                return next2 * 64 + CTZ64(bmask2);
+                return step * 64 + CTZ64(bmask);
             }
         }
 
@@ -1517,10 +1507,98 @@ private:
         return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
-    //the first cache line packed
-    inline uint32_t hash_bucket(const KeyT& key) const
+    static inline uint32_t hash32(uint32_t key)
     {
+#if 0
+        key = ((key >> 16) ^ key) * 0x45d9f3b;
+        key = ((key >> 16) ^ key) * 0x45d9f3b; //0x119de1f3
+//        key = ((key >> 13) ^ key) * 0xc2b2ae35;
+        key = (key >> 16) ^ key;
+        return key;
+#elif 1
+        uint64_t const r = key * UINT64_C(2654435769);
+        const uint32_t h = static_cast<uint32_t>(r >> 32);
+        const uint32_t l = static_cast<uint32_t>(r);
+        return h + l;
+#elif 1
+        key += ~(key << 15);
+        key ^= (key >> 10);
+        key += (key << 3);
+        key ^= (key >> 6);
+        key += ~(key << 11);
+        key ^= (key >> 16);
+        return key;
+#endif
+    }
+
+    static inline uint64_t hash64(uint64_t key)
+    {
+#if __SIZEOF_INT128__ && _MPCLMUL
+        //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j)
+        __m128i I{}; I[0] ^= key;
+        __m128i J{}; J[0] ^= UINT64_C(0xde5fb9d2630458e9);
+        __m128i M{}; M[0] ^= 0xb000000000000000ull;
+        __m128i X = _mm_clmulepi64_si128(I,J,0);
+        __m128i A = _mm_clmulepi64_si128(X,M,0);
+        __m128i B = _mm_clmulepi64_si128(A,M,0);
+        return A[0]^A[1]^B[1]^X[0]^X[1];
+#elif __SIZEOF_INT128__
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        __uint128_t r = key; r *= k;
+        return (uint32_t)(r >> 64) + (uint32_t)r;
+#elif 1
+        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#elif 1
+        //MurmurHash3Mixer
+        uint64_t h = key;
+        h ^= h >> 33;
+        h *= 0xff51afd7ed558ccd;
+        h ^= h >> 33;
+        h *= 0xc4ceb9fe1a85ec53;
+        h ^= h >> 33;
+        return h;
+#elif 1
+        uint64_t x = key;
+        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+        x = x ^ (x >> 31);
+        return x;
+#endif
+    }
+
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType key) const
+    {
+#ifdef EMHASH_FIBONACCI_HASH
+        if (sizeof(UType) <= sizeof(uint32_t))
+            return hash32(key) & _mask;
+        else
+            return (uint32_t)hash64(key) & _mask;
+#elif EMHASH_IDENTITY_HASH
+        return (key) & _mask;
+#else
         return _hasher(key) & _mask;
+#endif
+    }
+
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef EMHASH_FIBONACCI_HASH
+        return (_hasher(key) * 11400714819323198485ull) & _mask;
+#elif EMHASH_STD_STRING
+        uint32_t hash = 0;
+        if (key.size() < 32) {
+            for (const auto c : key) hash = c + hash * 131;
+        } else {
+            for (int i = 0, j = 1; i < key.size(); i += j++)
+                hash = key[i] + hash * 131;
+        }
+        return hash & _mask;
+#else
+        return _hasher(key) & _mask;
+#endif
     }
 
 private:

@@ -544,7 +544,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.995f && value > 0.2f)
+        if (value < 0.999f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 17) / value);
     }
 
@@ -921,15 +921,11 @@ public:
 
     ValueT& operator[](const KeyT& key)
     {
+        check_expand_need();
         auto bucket = find_or_allocate(key);
         auto next   = bucket / 2;
         /* Check if inserting a new value rather than overwriting an old entry */
         if (ISEMPTY_BUCKET(_pairs, next)) {
-            if (EMHASH_UNLIKELY(check_expand_need())) {
-                bucket = find_unique_bucket(key);
-                next = bucket / 2;
-            }
-
             NEW_BUCKET(key, std::move(ValueT()), next, bucket);
         }
 
@@ -1429,23 +1425,21 @@ private:
 
         const auto boset = bucket_from % 8;
         const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
-        if (bmask != 0)
+        if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
-        //for (uint32_t last = qmask > 2 ? qmask / 2 + 2 : 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
-        //for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
         for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
+        //for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
         //for (uint32_t last = 3, step = (bucket_from + 2 * 64) & qmask; ;step = (step + ++last) & qmask) {
             const auto bmask2 = *((uint64_t*)_bitmask + step);
             if (bmask2 != 0)
                 return step * 64 + CTZ(bmask2);
-#if 0
+
             const auto next1 = step + 1;
             const auto bmask1 = *((uint64_t*)_bitmask + next1);
             if (bmask1 != 0)
                 return next1 * 64 + CTZ(bmask1);
-#endif
         }
 
         return 0;
