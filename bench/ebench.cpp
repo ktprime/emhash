@@ -114,7 +114,7 @@ struct StructValue;
     #define sKeyType    "int"
     #define KEY_INT     1
 #elif TKey == 1
-    typedef int64_t       keyType;
+    typedef int64_t      keyType;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int64_t"
     #define KEY_INT     1
@@ -134,7 +134,7 @@ struct StructValue;
     #define TO_SUM(i)   i
     #define sValueType  "int"
 #elif TVal == 1
-    typedef int64_t       valueType;
+    typedef int64_t     valueType;
     #define TO_VAL(i)   i
     #define TO_SUM(i)   i
     #define sValueType  "int64_t"
@@ -149,7 +149,7 @@ struct StructValue;
     #define TO_SUM(i)   i.size()
     #define sValueType  "string_view"
 #else
-    typedef StructValue    valueType;
+    typedef StructValue valueType;
     #define TO_VAL(i)   i
     #define TO_SUM(i)   i.lScore
     #define sValueType  "StructValue"
@@ -475,32 +475,32 @@ void hash_insert2(hash_type& ahash, const std::string& hash_name, const std::vec
 template<class hash_type>
 void insert_no_reserve(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    if (show_name.count(hash_name) != 0)
-    {
-        size_t sum = 0;
-        auto ts1 = getTime();
-        for (const auto& v : vList)
-            sum += ahash.emplace(v, TO_VAL(0)).second;
-        check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        //printf("    %12s  %8s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), ahash.load_factor());
-    }
+    if (show_name.count(hash_name) == 0)
+        return;
+
+    auto ts1 = getTime();
+    size_t sum = 0;
+    for (const auto& v : vList)
+        sum += ahash.emplace(v, TO_VAL(0)).second;
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+    //printf("    %12s  %8s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), ahash.load_factor());
 }
 
 template<class hash_type>
 void insert_reserve(const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    if (show_name.count(hash_name) != 0)
-    {
-        size_t sum = 0;
-        hash_type tmp(vList.size());
-        tmp.max_load_factor(0.94);
+    if (show_name.count(hash_name) == 0)
+        return;
 
-        auto ts1 = getTime();
-        for (const auto& v : vList)
-            sum += tmp.emplace(v, TO_VAL(0)).second;
-        check_func_result(hash_name, __FUNCTION__, sum, ts1);
-//        printf("    %12s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
-    }
+    auto ts1 = getTime();
+    size_t sum = 0;
+    hash_type tmp(vList.size());
+    tmp.max_load_factor(0.99);
+
+    for (const auto& v : vList)
+        sum += tmp.emplace(v, TO_VAL(0)).second;
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+    //        printf("    %12s    %s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
 }
 
 template<class hash_type>
@@ -508,10 +508,10 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, con
 {
     if (show_name.count(hash_name) != 0)
     {
+        auto ts1 = getTime();
         size_t sum = 0;
         hash_type tmp(ahash);
 
-        auto ts1 = getTime();
         for (const auto& v : vList) {
 #if KEY_INT
             auto v2 = v + v / 7;
@@ -532,13 +532,13 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
 {
     if (show_name.count(hash_name) != 0)
     {
+        auto ts1 = getTime();
         size_t sum = 0;
         const auto smalls = min_size + vList.size() % cache_size;
         hash_type tmp, empty;
         empty.max_load_factor(0.8);
         tmp = empty;
 
-        auto ts1 = getTime();
         for (const auto& v : vList)
         {
             sum += tmp.emplace(v, TO_VAL(0)).second;
@@ -564,7 +564,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         size_t pow2 = 2 << ilog(vList.size(), 2);
         hash_type tmp;
 
-        const auto max_loadf = 0.995f;
+        const auto max_loadf = 0.998f;
         tmp.max_load_factor(max_loadf);
         tmp.reserve(pow2 / 2);
         int minn = (max_loadf - 0.3f) * pow2, maxn = max_loadf * pow2;
@@ -606,9 +606,9 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
 {
     if (show_name.count(hash_name) != 0)
     {
+        auto ts1 = getTime();
         auto n = ahash.size();
         size_t pow2 = 2u << ilog(n, 2), sum = 0;
-        auto ts1 = getTime();
         for (size_t v = 1; v < pow2; v++) {
 #if FL1
             l1_cache[v % sizeof(l1_cache)] = 0;
@@ -634,6 +634,7 @@ void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::ve
             sum += ahash.count(v);
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
+        //printf("    %12s  %8s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), ahash.load_factor());
     }
 }
 
@@ -805,7 +806,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #if AR > 0
     const auto iRation = AR;
 #else
-    const auto iRation = 10;
+    const auto iRation = 1;
 #endif
 
 #if 1
@@ -959,7 +960,7 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
     if (show_name.find(hash_name) == show_name.end())
         return 0;
 
-    int load_factor = 0;
+    float load_factor = 0;
     check_flag = true;// max_loop < oList.size();
 
     //pack for small packet

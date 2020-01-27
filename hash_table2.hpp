@@ -321,20 +321,20 @@ public:
         uint32_t  _bucket;
     };
 
-    void init(uint32_t bucket)
+    void init(uint32_t bucket, float load_factor = 0.90)
     {
         _num_buckets = 0;
         _mask = 0;
         _pairs = nullptr;
         _num_filled = 0;
         _hash_inter = 0;
-        max_load_factor(0.95f);
+        max_load_factor(load_factor);
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4)
+    HashMap(uint32_t bucket = 4, float load_factor = 0.90)
     {
-        init(bucket);
+        init(bucket, load_factor);
     }
 
     HashMap(const HashMap& other)

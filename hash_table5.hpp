@@ -321,20 +321,20 @@ public:
         uint32_t  _bucket;
     };
 
-    void init(uint32_t bucket)
+    void init(uint32_t bucket, float load_factor = 0.95f)
     {
         _num_buckets = 0;
         _last = 0;
         _mask = 0;
         _pairs = nullptr;
         _num_filled = 0;
-        max_load_factor(0.95f);
+        max_load_factor(load_factor);
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4)
+    HashMap(uint32_t bucket = 4, float load_factor = 0.95f)
     {
-        init(bucket);
+        init(bucket, load_factor);
     }
 
     HashMap(const HashMap& other)
@@ -397,9 +397,14 @@ public:
         _last        = other._last;
 
         auto opairs = other._pairs;
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
+
+#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
+        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value)
+#else
+        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value)
+#endif
             memcpy(_pairs, opairs, other._num_buckets * sizeof(PairT));
-        } else {
+        else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(opairs, bucket);
                 if (next_bucket != INACTIVE)
@@ -639,6 +644,7 @@ public:
                 _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumn == _num_filled);
         assert(sumc == collision);
+        puts("============== buckets size end =============");
     }
 #endif
 
@@ -1234,8 +1240,8 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-       auto bucket = bucket_from + 1;
-#if 1
+       auto bucket = bucket_from;
+#if 0
        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
             return bucket;
        bucket = bucket_from + 2;

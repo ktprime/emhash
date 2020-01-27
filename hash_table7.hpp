@@ -24,12 +24,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-
 // From
 // NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
-// Quadratic collision resolution   1 - ln(1-L) - L/2    1/(1-L) - L - ln(1-L)
+// Quadratic collision resolution  1 - ln(1-L) - L/2     1/(1-L) - L - ln(1-L)
 // Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-//
+// separator chain resolution      1 + L / 2             1 + L
+
 // -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
 // QUADRATIC COLLISION RES.
 //    probes/successful lookup    1.05  1.44  1.62  2.01  2.21  2.85  5.11
@@ -37,39 +37,25 @@
 // LINEAR COLLISION RES.
 //    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
 //    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
-/** lf = 1
-0    0.368
-1    0.368
-2    0.184
-3    0.061
-4    0.015
-5    0.003
-6    0.0005
-============== buckets size ration poisson total ========
-   1    766939  0.40633735|0.40656868  40.634
-   2    344735  0.36529296|0.36591304  77.163
-   3    103682  0.16479747|0.16466142  93.643
-   4     23548  0.04990453|0.04939859  98.633
-   5      4275  0.01132484|0.01111472  99.766
-   6       625  0.00198681|0.00200066  99.964
-   7        89  0.00033008|0.00030010  99.997
-   8         5  0.00002119|0.00003858  100.000
-   9         1  0.00000477|0.00000434  100.000
+// SEPARATE CHAN RES.
+//    probes/successful lookup    1.05  1.25  1.3   1.25  1.4   1.45  1.50
+//    probes/unsuccessful lookup  1.00  1.11  1.15  1.22  1.25  1.31  1.37
+
+/***
+  ============== buckets size ration ========
+   1   1543981  0.36884964|0.36861421  36.885
+   2    768655  0.36725597|0.36787871  73.611
+   3    256236  0.18364065|0.18357234  91.975
+   4     64126  0.06127757|0.06106868  98.102
+   5     12907  0.01541710|0.01523671  99.644
+   6      2050  0.00293841|0.00304126  99.938
+   7       310  0.00051840|0.00050587  99.990
+   8        49  0.00009365|0.00007212  99.999
+   9         4  0.00000860|0.00000900  100.000
 ========== collision miss ration ===========
-  _num_filled aver_size k.v size_kv = 1887444, 1.52, __int64.__int64 24
-  collision,possion,cache_miss hit_find|hit_miss, load_factor = 34.10%,34.06%,27.11%  1.45|1.81, 0.90
-========== collision miss ration =======================
-   0    422679  57.54  57.54
-   1    238081  32.41  89.95
-   2     64649  8.80  98.75
-   3      7527  1.02  99.77
-   4      1336  0.18  99.95
-   5       271  0.04  99.99
-   6        47  0.01  100.00
-   7        19  0.00  100.00
-   8         5  0.00  100.00
-  _num_filled aver_size k.v size_kv = 3774888, 1.24, l.i 16
-  collision|possion_miss cache_miss hit_find load_factor = 19.46%|19.47% 8.26%, 1.22, 0.45
+  _num_filled aver_size k.v size_kv = 4185936, 1.58, x.x 24
+  collision,possion,cache_miss hit_find|hit_miss, load_factor = 36.73%,36.74%,31.31%  1.50|2.00, 1.00
+============== buckets size ration ========
 *******************************************************/
 
 #pragma once
@@ -87,9 +73,9 @@
     #undef  GET_KEY
     #undef  GET_VAL
     #undef  GET_PKV
-    #undef  hash_bucket
     #undef  NEXT_BUCKET
     #undef  NEW_KVALUE
+    #undef  hash_bucket
 #endif
 
 // likely/unlikely
@@ -113,13 +99,13 @@
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first
     #define GET_PKV(p,n)     p[n].second
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
+    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++; SET_BIT(bucket)
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
     #define NEXT_BUCKET(p,n) p[n].second
     #define GET_PKV(p,n)     p[n].first
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
+    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++; SET_BIT(bucket)
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
@@ -141,7 +127,7 @@
 namespace emhash7 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
-inline static uint32_t CTZ64(const uint64_t n)
+inline static uint32_t CTZ(const uint64_t n)
 {
 #if _MSC_VER > 1400 || _WIN32
     unsigned long index;
@@ -258,14 +244,16 @@ private:
     typedef entry<KeyT, ValueT>             PairT;
 #endif
 
+    static const bool bInCacheLine = sizeof(value_pair) < EMHASH_CACHE_LINE_SIZE * 2 / 3;
+
 public:
     typedef KeyT   key_type;
     typedef ValueT mapped_type;
 
-    typedef  uint32_t       size_type;
-    typedef  std::pair<KeyT,ValueT>        value_type;
-    typedef  PairT&       reference;
-    typedef  const PairT& const_reference;
+    typedef uint32_t     size_type;
+    typedef std::pair<KeyT,ValueT>        value_type;
+    typedef PairT&       reference;
+    typedef const PairT& const_reference;
 
     class iterator
     {
@@ -324,7 +312,7 @@ public:
 
     public:
         htype* _map;
-        uint32_t  _bucket;
+        uint32_t _bucket;
     };
 
     class const_iterator
@@ -385,10 +373,10 @@ public:
 
     public:
         const htype* _map;
-        uint32_t  _bucket;
+        uint32_t _bucket;
     };
 
-    void init(uint32_t bucket)
+    void init(uint32_t bucket, float load_factor = 0.95f)
     {
         _num_buckets = 0;
         _last = 0;
@@ -396,13 +384,13 @@ public:
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
-        max_load_factor(0.95f);
+        max_load_factor(load_factor);
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4)
+    HashMap(uint32_t bucket = 4, float load_factor = 0.95f)
     {
-        init(bucket);
+        init(bucket, load_factor);
     }
 
     HashMap(const HashMap& other)
@@ -413,7 +401,8 @@ public:
 
     HashMap(HashMap&& other)
     {
-//        init(0);
+        //init(0);
+        //*this = std::move(other);
         _num_filled = 0;
         _pairs = nullptr;
         swap(other);
@@ -466,7 +455,7 @@ public:
         _loadlf      = other._loadlf;
         _last        = other._last;
         _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
-        auto opairs = other._pairs;
+        auto opairs  = other._pairs;
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
         if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value)
@@ -487,7 +476,7 @@ public:
     void swap(HashMap& other)
     {
         std::swap(_hasher, other._hasher);
-        std::swap(_eq, other._eq);
+//      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -591,10 +580,11 @@ public:
     }
 
 #ifdef EMHASH_STATIS
+#include <cmath>
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
             return 0;
@@ -602,7 +592,7 @@ public:
             return bucket + 1;
 
         const auto& bucket_key = GET_KEY(_pairs, bucket);
-        return hash_bucket(bucket_key) + 1;
+        return hash_bucket(bucket_key) & _mask + 1;
     }
 
     //Returns the number of elements in bucket n.
@@ -612,7 +602,7 @@ public:
         if (next_bucket == INACTIVE)
             return 0;
 
-        next_bucket = hash_bucket(GET_KEY(_pairs, bucket));
+        next_bucket = hash_bucket(GET_KEY(_pairs, bucket)) & _mask;
         uint32_t bucket_size = 1;
 
         //iterator each item in current main bucket
@@ -634,7 +624,7 @@ public:
             return INACTIVE;
 
         const auto& bucket_key = GET_KEY(_pairs, bucket);
-        const auto main_bucket = hash_bucket(bucket_key);
+        const auto main_bucket = hash_bucket(bucket_key) & _mask;
         return main_bucket;
     }
 
@@ -656,7 +646,7 @@ public:
         if (next_bucket == INACTIVE)
             return -1;
 
-        if (hash_bucket(GET_KEY(_pairs, bucket)) != bucket)
+        if (hash_bucket(GET_KEY(_pairs, bucket)) & _mask != bucket)
             return 0;
         else if (next_bucket == bucket)
             return 1;
@@ -667,13 +657,13 @@ public:
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
                 break;
-            else if (nbucket == INACTIVE)
-                break;
 
+            assert(nbucket != INACTIVE);
             steps[get_diss(nbucket, next_bucket) % slots] ++;
             bucket_size ++;
             next_bucket = nbucket;
         }
+
         return bucket_size;
     }
 
@@ -690,7 +680,7 @@ public:
 
         uint32_t sumb = 0, sums = 0, sumn = 0;
         uint32_t miss = 0, finds = 0, bucket_coll = 0;
-        double lf = load_factor(), fk = 1.0 / pow(2.71828, lf), sum_poisson = 0;
+        double lf = load_factor(), fk = 1.0 / exp(lf), sum_poisson = 0;
         int bsize = sprintf (buff, "============== buckets size ration ========\n");
 
         miss += _num_buckets - _num_filled;
@@ -708,7 +698,8 @@ public:
             finds += bucketsi * i * (i + 1) / 2;
             miss  += bucketsi * i * i;
             //(exp(-lf) * pow(lf, k)/factorial(k))
-            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.8lf|%0.8lf  %2.3lf\n", i, bucketsi, bucketsi * 1.0 * i / _num_filled, poisson, sumn * 100.0 / _num_filled);
+            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.8lf|%0.8lf  %2.3lf\n",
+                    i, bucketsi, bucketsi * 1.0 * i / _num_filled, poisson, sumn * 100.0 / _num_filled);
             if (sumn >= _num_filled)
                 break;
         }
@@ -723,10 +714,11 @@ public:
 
         if (sumb == 0)  return;
 
-        bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n", 
+        bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n",
                 _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
         bsize += sprintf(buff + bsize, "  collision,possion,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%%  %.2lf|%.2lf, %.2lf\n",
-                 (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
+                 (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled,
+                 finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
 
         assert(sums == bucket_coll || !show_cache);
         assert(bucket_coll == buckets[0]);
@@ -744,6 +736,17 @@ public:
 #endif
 
     // ------------------------------------------------------------
+    template<typename K>
+    iterator find(const K& key, size_t hash_v) noexcept
+    {
+        return {this, find_filled_hash(key, hash_v)};
+    }
+
+    template<typename K>
+    const_iterator find(const K& key, size_t hash_v) const noexcept
+    {
+        return {this, find_filled_hash(key, hash_v)};
+    }
 
     iterator find(const KeyT& key) noexcept
     {
@@ -765,7 +768,7 @@ public:
         return (size_type)(find_filled_bucket(key) != _num_buckets);
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key) noexcept
+    std::pair<iterator, iterator> equal_range(const KeyT& key) const noexcept
     {
         const auto found = find(key);
         if (found == end())
@@ -974,7 +977,7 @@ public:
 
     uint32_t try_insert_mainbucket(const KeyT& key, const ValueT& value)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket != INACTIVE)
             return INACTIVE;
@@ -1000,12 +1003,11 @@ public:
         }
     }
 
-    /// Like std::map<KeyT,ValueT>::operator[].
+    /* Check if inserting a new value rather than overwriting an old entry */
     ValueT& operator[](const KeyT& key)
     {
-        EMHASH_UNLIKELY(check_expand_need());
+        reserve(_num_filled);
         auto bucket = find_or_allocate(key);
-        /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
             NEW_KVALUE(key, std::move(ValueT()), bucket);
         }
@@ -1015,12 +1017,9 @@ public:
 
     ValueT& operator[](KeyT&& key)
     {
+        reserve(_num_filled);
         auto bucket = find_or_allocate(key);
-        /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
-            if (EMHASH_UNLIKELY(check_expand_need()))
-                bucket = find_unique_bucket(key);
-
             NEW_KVALUE(std::move(key), std::move(ValueT()), bucket);
         }
 
@@ -1117,11 +1116,11 @@ public:
             return false;
 
     #ifdef EMHASH_STATIS
-        //if (_num_filled > 1000'000) dump_statis(0);
+        if (_num_filled > 4000'000) dump_statis(0);
     #endif
         rehash(required_buckets + 2);
-    #if EMHASH_STATIS == 2
-        if (_num_filled > 1000'000) dump_statis(1);
+    #if EMHASH_STATIS
+        if (_num_filled > 4000'000) dump_statis(1);
     #endif
         return true;
     }
@@ -1204,10 +1203,10 @@ private:
         CLS_BIT(bucket);
     }
 
-#if 1
-    uint32_t erase_key(const KeyT& key)
+    template<class K = uint32_t> typename std::enable_if<bInCacheLine, K>::type
+    erase_key(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
             return INACTIVE;
@@ -1223,7 +1222,7 @@ private:
 
             NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
-        }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(GET_KEY(_pairs, bucket))))
+        }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(GET_KEY(_pairs, bucket)) & _mask))
             return INACTIVE;
         */
 
@@ -1243,10 +1242,11 @@ private:
 
         return INACTIVE;
     }
-#else
-    uint32_t erase_key(const KeyT& key)
+
+    template<class K = uint32_t> typename std::enable_if<!bInCacheLine, K>::type
+    erase_key(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
             return INACTIVE;
@@ -1254,8 +1254,8 @@ private:
         const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
         if (next_bucket == bucket)
             return eqkey ? bucket : INACTIVE;
-        else if (bucket != hash_bucket(GET_KEY(_pairs, bucket)))
-            return INACTIVE;
+//        else if (bucket != hash_bucket(GET_KEY(_pairs, bucket)))
+//            return INACTIVE;
 
         //find erase key and swap to last bucket
         uint32_t prev_bucket = bucket, find_bucket = INACTIVE;
@@ -1284,12 +1284,11 @@ private:
 
         return find_bucket;
     }
-#endif
 
     uint32_t erase_bucket(const uint32_t bucket)
     {
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
-        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
+        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket)) & _mask;
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
@@ -1308,9 +1307,36 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
+    template<typename K>
+    uint32_t find_filled_hash(const K& key, const size_t hashv) const
+    {
+        const auto bucket = hashv & _mask;
+        auto next_bucket = NEXT_BUCKET(_pairs, bucket);
+        if (next_bucket == INACTIVE)
+            return _num_buckets;
+
+        if (_eq(key, GET_KEY(_pairs, bucket)))
+            return bucket;
+        else if (next_bucket == bucket)
+            return _num_buckets;
+
+        while (true) {
+            if (_eq(key, GET_KEY(_pairs, next_bucket)))
+                return next_bucket;
+
+            const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
+            if (nbucket == next_bucket)
+                break;
+            next_bucket = nbucket;
+        }
+
+        return _num_buckets;
+    }
+
+    // Find the bucket with this key, or return bucket size
     uint32_t find_filled_bucket(const KeyT& key) const
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
             return _num_buckets;
@@ -1332,7 +1358,7 @@ private:
             return _num_buckets;
         next_bucket = nbucket;
 #elif 0
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         if (IS_SET(bucket))
             return _num_buckets;
         else if (_eq(key, GET_KEY(_pairs, bucket)))
@@ -1342,7 +1368,7 @@ private:
         if (next_bucket == bucket)
             return _num_buckets;
 #endif
-//        else if (bucket != hash_bucket(bucket_key))
+//        else if (bucket != hash_bucket(bucket_key) & _mask)
 //            return _num_buckets;
 
         while (true) {
@@ -1385,14 +1411,14 @@ private:
 */
     uint32_t find_or_allocate(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         const auto& bucket_key = GET_KEY(_pairs, bucket);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE || _eq(key, bucket_key))
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(bucket_key);
+        const auto main_bucket = hash_bucket(bucket_key) & _mask;
         if (main_bucket != bucket)
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket == bucket)
@@ -1434,30 +1460,24 @@ private:
         const auto bucket1 = bucket_from + 1;
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
-
         const auto bucket2 = bucket_from + 2;
         if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
             return bucket2;
 #endif
-
         //fast find by bit
         const auto boset = bucket_from % 8;
         const auto bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
         if (EMHASH_LIKELY(bmask != 0))
-            return bucket_from + CTZ64(bmask) - 0;
+            return bucket_from + CTZ(bmask) - 0;
 
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
 //        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
         for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
             const auto bmask = *((uint64_t*)_bitmask + step);
-            if (bmask != 0) {
-#ifndef EMHASH_HIGH_LOAD
-#endif
-                return step * 64 + CTZ64(bmask);
-            }
+            if (bmask != 0)
+                return step * 64 + CTZ(bmask);
         }
-
         return 0;
     }
 
@@ -1491,13 +1511,13 @@ private:
 
     uint32_t find_unique_bucket(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
+        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket)) & _mask;
         if (main_bucket != bucket)
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket != bucket)
@@ -1517,9 +1537,7 @@ private:
         return key;
 #elif 1
         uint64_t const r = key * UINT64_C(2654435769);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
+        return (uint32_t)(r >> 32) + (uint32_t)r;
 #elif 1
         key += ~(key << 15);
         key ^= (key >> 10);
@@ -1572,13 +1590,13 @@ private:
     {
 #ifdef EMHASH_FIBONACCI_HASH
         if (sizeof(UType) <= sizeof(uint32_t))
-            return hash32(key) & _mask;
+            return hash32(key);
         else
-            return (uint32_t)hash64(key) & _mask;
+            return (uint32_t)hash64(key);
 #elif EMHASH_IDENTITY_HASH
-        return (key) & _mask;
+        return key + (key >> 20);
 #else
-        return _hasher(key) & _mask;
+        return _hasher(key);
 #endif
     }
 
@@ -1586,7 +1604,7 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef EMHASH_FIBONACCI_HASH
-        return (_hasher(key) * 11400714819323198485ull) & _mask;
+        return _hasher(key) * 11400714819323198485ull;
 #elif EMHASH_STD_STRING
         uint32_t hash = 0;
         if (key.size() < 32) {
@@ -1595,9 +1613,9 @@ private:
             for (int i = 0, j = 1; i < key.size(); i += j++)
                 hash = key[i] + hash * 131;
         }
-        return hash & _mask;
+        return hash;
 #else
-        return _hasher(key) & _mask;
+        return _hasher(key);
 #endif
     }
 

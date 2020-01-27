@@ -11,7 +11,7 @@
 #include <array>
 
 
-#define HOOD_HASH         1
+//#define HOOD_HASH         1
 #define ET         1
 //#define EMHASH_LRU_SET    1
 //#define EMHASH_IDENTITY_HASH 1
@@ -21,7 +21,7 @@
 //#define EMHASH_HIGH_LOAD 1
 
 #ifndef TKey
-    #define TKey  0
+    #define TKey  1
 #endif
 
 #include "hash_set.hpp" //
@@ -52,10 +52,11 @@ constexpr int max_loop = 1000000;
 #endif
 
 #if ET
+    #include "./hrd/hash_set7.h"
     #include "./phmap/phmap.h"
     #include "./tsl/robin_set.h"        //https://github.com/tessil/robin-map
     #include "./tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
-    #include "./martin/robin_hood.h"       //https://github.com/martinus/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "./martin/robin_hood.h"    //https://github.com/martinus/robin-hood-hashing/blob/master/src/include/robin_hood.h
     #include "./ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
     #include "./ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
@@ -68,8 +69,8 @@ constexpr int max_loop = 1000000;
     # include <windows.h>
 #else
     # define CONSOLE "/dev/tty"
-    #include <unistd.h>
-    #include <sys/resource.h>
+    # include <unistd.h>
+    # include <sys/resource.h>
 #endif
 
 struct RankItem;
@@ -81,7 +82,7 @@ struct RankItem;
     #define KEY_INT
     #define TO_SUM(i)   i
 #elif TKey == 1
-    typedef int64_t       keyType;
+    typedef int64_t     keyType;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int64"
     #define KEY_INT
@@ -99,11 +100,14 @@ struct RankItem;
 #endif
 
 static std::unordered_map<std::string, std::string> show_name = {
-    {"stl_hash", "unordered_map"},
-    {"emhash6", "emhash6"},
-    {"emhash7", "emhash7"},
-    {"emhash9", "emhash9"},
+//    {"stl_hash", "unordered_map"},
+//    {"emhash7", "emhash7"},
+//    {"emhash6", "emhash6"},
+
     {"emhash8", "emhash8"},
+    {"emhash9", "emhash9"},
+    {"hrdhash", "hrd7 hash"},
+
 #if ET > 0
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
@@ -356,7 +360,7 @@ void hash_reinsert(MAP& amap, const std::string& map_name, std::vector<keyType>&
             sum += amap.insert(v).second;
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-//        printf("    %12s    reinsert  %5lld ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
+//        printf("    %12s    reinsert  %5ld ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
     }
 }
 
@@ -376,7 +380,6 @@ void insert_reserve(MAP& amap, const std::string& map_name, std::vector<keyType>
 #endif
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-        printf("    %12s    %s %5lld ns, factor = %.2f\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
     }
 }
 
@@ -406,7 +409,7 @@ void hash_emplace(MAP& amap, const std::string& map_name, std::vector<keyType>& 
             sum += amap.emplace(v).second;
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-//      printf("    %12s    %s  %5lld ns, factor = %.2f\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
+//      printf("    %12s    %s  %5ld ns, factor = %.2f\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
     }
 }
 
@@ -416,7 +419,7 @@ void insert_small_size(const std::string& hash_name, const std::vector<keyType>&
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
-        const auto smalls = 100 + vList.size() % 1000;
+        const auto smalls = 100 + vList.size() % (256 * 1024);
         hash_type tmp, empty;
 
         auto ts1 = getTime();
@@ -433,7 +436,7 @@ void insert_small_size(const std::string& hash_name, const std::vector<keyType>&
             }
         }
         check_mapfunc_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+        printf("             %62s    %s  %5lu ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
@@ -445,9 +448,10 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         size_t sum = 0;
         size_t pow2 = 2 << ilog(vList.size(), 2);
         hash_type tmp;
-        tmp.max_load_factor(0.99);
+        auto max_loadf = 0.990;
+        tmp.max_load_factor(max_loadf);
         tmp.reserve(pow2 / 2);
-        int minn = 0.75f * pow2, maxn = 0.95 * pow2;
+        int minn = (max_loadf - 0.2) * pow2, maxn = max_loadf * pow2;
         int i = 0;
 
         for (; i < minn; i++) {
@@ -468,7 +472,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         for (; i  < maxn; i++) {
             auto v = vList[i - minn];
 #ifdef KEY_INT
-            auto v2 = (v / 7) + 4 * v;
+            auto v2 = (v / 7) + 7 * v;
 #else
             auto v2 = v; v2[0] += '1';
 #endif
@@ -477,12 +481,12 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         }
 
         check_mapfunc_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %122s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
+        printf("             %122s    %s  %5ld ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
     }
 }
 
 template<class MAP>
-void hash_miss(MAP& amap, const std::string& map_name, std::vector<keyType>& vList)
+void find_miss(MAP& amap, const std::string& map_name, std::vector<keyType>& vList)
 {
     if (show_name.find(map_name) != show_name.end())
     {
@@ -493,6 +497,7 @@ void hash_miss(MAP& amap, const std::string& map_name, std::vector<keyType>& vLi
             sum += amap.count(TO_KEY(v));
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
+        printf("    %12s    %s %5ld ns, factor = %.2f\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
     }
 }
 
@@ -533,7 +538,7 @@ void insert_find_erase(hash_type& ahash, const std::string& hash_name, std::vect
             sum += tmp.erase(v2);
         }
         check_mapfunc_result(hash_name, __FUNCTION__, sum, ts1);
-        //printf("             %82s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+        //printf("             %82s    %s  %5ld ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
@@ -552,12 +557,12 @@ void hash_erase(MAP& amap, const std::string& map_name, std::vector<keyType>& vL
 //        }
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-        //printf("    %12s    %s  %5lld ns, size = %zd\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), sum);
+        //printf("    %12s    %s  %5ld ns, size = %zd\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), sum);
     }
 }
 
 template<class MAP>
-void hash_find(MAP& amap, const std::string& map_name, std::vector<keyType>& vList)
+void find_hit(MAP& amap, const std::string& map_name, std::vector<keyType>& vList)
 {
     if (show_name.find(map_name) != show_name.end())
     {
@@ -610,7 +615,7 @@ void hash_clear(MAP& amap, const std::string& map_name, std::vector<keyType>& vL
         sum = amap.size();
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-        //printf("    %12s    erase    %5lld ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
+        //printf("    %12s    erase    %5ld ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
     }
 }
 
@@ -629,7 +634,7 @@ void hash_copy(MAP& amap, const std::string& map_name, std::vector<keyType>& vLi
     }
 }
 
-#define FUNC_RANK() func_time.clear();//for (auto& v : func_time) printf("   %-4lld     %-49s\n",  v.first, v.second.c_str()); putchar('\n');
+#define FUNC_RANK() func_time.clear();//for (auto& v : func_time) printf("   %-4ld     %-49s\n",  v.first, v.second.c_str()); putchar('\n');
 
 #ifndef PACK
 #define PACK 128
@@ -650,39 +655,6 @@ struct RankItem
         iUpdateTime = iTime;
     }
 
-/*:
-    bool operator < (const RankItem& r) const
-    {
-        if (lScore != r.lScore)
-            return lScore > r.lScore;
-        else if (iUpdateTime != r.iUpdateTime)
-            return iUpdateTime < r.iUpdateTime;
-        return lUid < r.lUid;
-    }
-
-    bool operator == (const RankItem &r) const
-    {
-        if (lUid == r.lUid) {
-            return true;
-        }
-
-        return false;
-    }
-
-    RankItem& operator += (const RankItem& r)
-    {
-        lScore += r.lScore;
-        iRank   = r.iRank;
-        //        iUpdateTime = time(0);
-        return *this;
-    }
-
-    RankItem& operator += (int64_t r)
-    {
-        lScore += r;
-        return *this;
-    }
-**/
     int64_t operator ()()
     {
         return lScore;
@@ -725,6 +697,7 @@ static const std::int64_t SEED = 0;
 static std::mt19937_64 generator(SEED);
 std::uniform_int_distribution<std::size_t> rd_uniform(0, ALPHANUMERIC_CHARS.size() - 1);
 
+#ifndef KEY_INT
 static std::string get_random_alphanum_string(std::size_t size) {
     std::string str(size, '\0');
     for(std::size_t i = 0; i < size; i++) {
@@ -733,6 +706,7 @@ static std::string get_random_alphanum_string(std::size_t size) {
 
     return str;
 }
+#endif
 
 template<class RandomIt>
 void shuffle(RandomIt first, RandomIt last)
@@ -762,23 +736,19 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
     return 0;
 #else
 
-    sfc64 srng;
-    auto flag = (int)rand() % 5 + 1;
+    sfc64 srng(size);
 #if AR > 0
     const auto iRation = AR;
 #else
     const auto iRation = 10;
 #endif
 
-    if (rand() % 100 > iRation)
+    auto flag = (int)srng() % 5 + 1;
+    if (srng() % 100 > iRation)
     {
         emhash9::HashSet<keyType> eset(size);
         for (int i = 0; ; i++) {
-#if 1
             auto key = TO_KEY(srng());
-#else
-            auto key = (keyType)get64rand();
-#endif
             if (eset.insert(key).second) {
                 rankdata.emplace_back(key);
                 if (rankdata.size() >= size)
@@ -796,8 +766,8 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
             if (flag == 2)
                 k += (1 << 8) - 1;
             else if (flag == 3) {
-                k += pow2 + 32 - rand() % 64;
-                if (rand() % 64 == 0)
+                k += pow2 + 32 - srng() % 64;
+                if (srng() % 64 == 0)
                     k += 80;
             }
             else if (flag == 4) {
@@ -806,7 +776,6 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
             } else if (flag == 5) {
                 k = i * (uint64_t)pow2 + srng() % (pow2 / 8);
             }
-
             rankdata.emplace_back(k);
         }
     }
@@ -923,15 +892,15 @@ void benOneSet(MAP& hmap, const std::string& map_name, std::vector<keyType> vLis
     func_time.clear();
 
     insert_noreserve(hmap, map_name, vList);
-    insert_high_load <MAP>(map_name, vList);
+    //insert_high_load <MAP>(map_name, vList);
     insert_small_size<MAP>(map_name, vList);
     insert_reserve(hmap, map_name, vList);
 
     //  shuffle(vList.begin(), vList.end());
-    hash_find(hmap, map_name, vList);
+    find_hit(hmap, map_name, vList);
     find_half(hmap, map_name, vList);
     //shuffle(vList.begin(), vList.end());
-    hash_miss(hmap, map_name, vList);
+    find_miss(hmap, map_name, vList);
 
 #ifdef KEY_INT
     for (int v = 0; v < (int)vList.size() / 2; v ++)
@@ -962,10 +931,9 @@ static void benchHashSet(int n)
 {
     if (n < 10000)
         n = 123456;
+
     printf("%s n = %d, keyType = %s\n", __FUNCTION__, n, sKeyType);
-
     typedef std::hash<keyType>        std_func;
-
 #ifdef HOOD_HASH
     typedef robin_hood::hash<keyType> hood_func;
     using hash_func = hood_func;
@@ -973,13 +941,13 @@ static void benchHashSet(int n)
      typedef std_func hash_func;
 #endif
 
-    float lf = 0.94f;
+    float lf = 0.87f;
     map_time.clear();
     check_result.clear();
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-    if (rand() % 2 == 0)
+    if (n % 2 == 0)
     {
         { emhash8::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash8", vList); }
         { emhash6::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash6", vList); }
@@ -995,15 +963,18 @@ static void benchHashSet(int n)
     }
 
 #if 0
-    { std::unordered_set<keyType, hash_func> umap; umap.max_load_factor(lf);        benOneSet(umap, "stl_hash", vList); }
+    { std::unordered_set<keyType, hash_func> umap; umap.max_load_factor(lf);     benOneSet(umap, "stl_hash", vList); }
 #endif
 
 #ifdef ET
-    { phmap::flat_hash_set <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "phmap", vList); }
+    { robin_hood::unordered_flat_set <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "martin", vList); }
+    { phmap::flat_hash_set <keyType, hash_func> eset; eset.max_load_factor(lf);   benOneSet(eset, "phmap", vList); }
+    { hrd7::hash_set <keyType, hash_func> eset; eset.max_load_factor(lf);         benOneSet(eset, "hrdhash", vList); }
+
 #if ET > 1
-    { ska::bytell_hash_set <keyType, hash_func > bmap; bmap.max_load_factor(lf);        benOneSet(bmap, "byte", vList); }
-    { ska::flat_hash_set <keyType, hash_func> fmap; fmap.max_load_factor(lf);        benOneSet(fmap, "flat", vList); }
-    { tsl::hopscotch_set <keyType, hash_func> hmap; hmap.max_load_factor(lf);        benOneSet(hmap, "hopsco", vList); }
+    { ska::bytell_hash_set <keyType, hash_func > bmap; bmap.max_load_factor(lf);  benOneSet(bmap, "byte", vList); }
+    { ska::flat_hash_set <keyType, hash_func> fmap; fmap.max_load_factor(lf);     benOneSet(fmap, "flat", vList); }
+    { tsl::hopscotch_set <keyType, hash_func> hmap; hmap.max_load_factor(lf);     benOneSet(hmap, "hopsco", vList); }
     { tsl::robin_set  <keyType, hash_func> rmap; rmap.max_load_factor(lf);        benOneSet(rmap, "robin", vList); }
 #endif
 #endif
@@ -1062,7 +1033,7 @@ static void benchHashSet(int n)
         dump_all(func_rank_time);
         puts("======== map  top1  top2  top3 =======================");
         for (auto& v : rank)
-            printf("%13s %4.1lf %4.1lf %4lld\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (v.second % (base2 / 2)));
+            printf("%13s %4.1lf %4.1lf %4ld\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (v.second % (base2 / 2)));
         puts("======== map    score ================================");
         for (auto& v : rank_time)
             printf("%13s %4ld\n", v.first.c_str(), v.second / tcase);
@@ -1140,9 +1111,9 @@ int main(int argc, char* argv[])
         }
     }
 
-
     if (tn > 100000)
         HashSetTest(tn, 434567);
+
     sfc64 srng;
     auto nows = time(0);
 

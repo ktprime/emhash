@@ -90,7 +90,7 @@
 #endif
 
 #define GET_KEY(p,n)      p[n].first
-#define NEXT_BUCKET(p,n) p[n].second
+#define NEXT_BUCKET(p,n)  p[n].second
 
 namespace emhash7 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
@@ -420,12 +420,12 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 13) / _loadlf;
+        return (float)(1 << 13) / _loadlf;
     }
 
     void max_load_factor(float value)
     {
-        if (value < 0.95 && value > 0.2)
+        if (value < 0.99 && value > 0.2)
             _loadlf = (uint32_t)((1 << 13) / value);
     }
 
@@ -893,8 +893,8 @@ public:
         _mains_buckets  = main_bucket;
         _total_buckets  = _colls_buckets + _mains_buckets;
 
-        _main_mask        = _mains_buckets - 1;
-        _coll_mask        = _colls_buckets - 1;
+        _main_mask      = _mains_buckets - 1;
+        _coll_mask      = _colls_buckets - 1;
         _pairs       = new_pairs;
         _num_mains   = 0;
         _num_colls   = 0;

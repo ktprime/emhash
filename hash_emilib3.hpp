@@ -23,7 +23,7 @@ struct HashMapEqualTo
 	}
 };
 
-constexpr uint32_t probe_limit = (1 << (sizeof(uint16_t) * 8) - 2) - 1;
+constexpr uint32_t probe_limit = (1 << (sizeof(uint16_t) * 8 - 2)) - 1;
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = HashMapEqualTo<KeyT>>
@@ -94,7 +94,7 @@ public:
 			//DCHECK_LT_F(_bucket, _map->_num_buckets);
 			do {
 				_bucket++;
-			} while (_map->_states[_bucket].get_flag() != State::FILLED);
+			} while (_map->_states[_bucket].flag_probe.flag != State::FILLED);
 		}
 
 	//private:
@@ -163,7 +163,7 @@ public:
 			//DCHECK_LT_F(_bucket, _map->_num_buckets);
 			do {
 				_bucket++;
-			} while (_map->_states[_bucket].get_flag() != State::FILLED);
+			} while (_map->_states[_bucket].flag_probe.flag != State::FILLED);
 		}
 
 	//private:
@@ -302,32 +302,22 @@ public:
 
 	inline void set_empty(size_t bucket)
 	{
-		_states[bucket].set_flag(State::INACTIVE);
+		_states[bucket].flag_probe.flag = State::INACTIVE;
 	}
 
 	inline bool is_empty(size_t bucket) const
 	{
-		return _states[bucket].get_flag() == State::INACTIVE;
+		return _states[bucket].flag_probe.flag == State::INACTIVE;
 	}
 
 	inline void set_filled(size_t bucket)
 	{
-		_states[bucket].set_flag(State::FILLED);
+		_states[bucket].flag_probe.flag = State::FILLED;
 	}
 
 	inline bool is_filled(size_t bucket) const
 	{
-		return _states[bucket].get_flag() == State::FILLED;
-	}
-
-	inline void set_active(size_t bucket)
-	{
-		_states[bucket].set_flag(State::ACTIVE);
-	}
-
-	inline bool is_active(size_t bucket) const
-	{
-		return _states[bucket] == State::ACTIVE;
+		return _states[bucket].flag_probe.flag == State::FILLED;
 	}
 
 	// ------------------------------------------------------------
@@ -510,7 +500,7 @@ public:
 			if (_states[bucket].get_probe() == 1)
 				_states[bucket].clear();
 			else
-				set_active(bucket);
+				set_empty(bucket);
 			return true;
 		} else {
 			return false;
@@ -527,7 +517,7 @@ public:
 		if (_states[it._bucket].get_probe() == 1)
 			_states[it._bucket].clear();
 		else
-			set_active(it._bucket);
+			set_empty(it._bucket);
 
 		_num_filled -= 1;
 		return ++it;
@@ -579,7 +569,7 @@ public:
 		set_filled(num_buckets);
 
 		for (size_t src_bucket=0; src_bucket<old_num_buckets; src_bucket++) {
-			if (old_states[src_bucket].get_flag() == State::FILLED) {
+			if (old_states[src_bucket].flag_probe.flag == State::FILLED) {
 				auto& src_pair = old_pairs[src_bucket];
 
 				auto dst_bucket = find_empty_bucket(src_pair.first);
@@ -610,16 +600,12 @@ private:
 	// Find the bucket with this key, or return (size_t)-1
 	size_t find_filled_bucket(const KeyT& key) const
 	{
-		auto hash_value = _hasher(key);
-		uint32_t cur_probe = _states[hash_value & _mask].get_probe();
-		for (int offset=0; offset < cur_probe; ++offset) {
-			auto bucket = (hash_value + offset) & _mask;
-			if (is_filled(bucket)) {
-				if (_eq(_pairs[bucket].first, key)) {
-					return bucket;
-				}
-			} else if (is_empty(bucket)) {
-				return _num_buckets; // End of the chain!
+		const size_t main_bucket = _hasher(key) & _mask;
+		uint32_t offset = _states[main_bucket].get_probe();
+		while (offset > 0) {
+			const auto bucket = (main_bucket + --offset) & _mask;
+			if (is_filled(bucket) && _eq(_pairs[bucket].first, key)) {
+				return bucket;
 			}
 		}
 		return _num_buckets;
@@ -629,35 +615,37 @@ private:
 	// In the latter case, the bucket is expected to be filled.
 	size_t find_or_allocate(const KeyT& key)
 	{
-		auto hash_value = _hasher(key);
-		auto main_bucket = hash_value & _mask;
-		size_t hole = (size_t)-1;
-		int offset=0;
-		uint32_t cur_probe = _states[main_bucket].get_probe();
+		const size_t main_bucket = _hasher(key) & _mask;
+		const uint32_t cur_probe = _states[main_bucket].get_probe();
+		if (cur_probe == 0 && !is_filled(main_bucket)) {
+			_states[main_bucket].set_probe(1);
+			return main_bucket;
+		}
+#if 0
+		if (cur_probe == 0) {
+			assert (!is_filled(main_bucket));
+			_states[main_bucket].set_probe(1);
+			return main_bucket;
+		} else if (_eq(_pairs[main_bucket].first, key))
+			return main_bucket;
+#endif
 
+		size_t hole = (size_t)-1, offset = 0;
 		for (; offset < cur_probe; ++offset) {
-			auto bucket = (hash_value + offset) & _mask;
-
+			const auto bucket = (main_bucket + offset) & _mask;
 			if (is_filled(bucket)) {
-				if (_eq(_pairs[bucket].first, key)) {
+				if (_eq(_pairs[bucket].first, key))
 					return bucket;
-				}
-			} else if (is_empty(bucket)) {
-//				_states[main_bucket].set_probe(offset);
-				return bucket;
-			} else if (hole == (size_t)-1) {
+			} else if (hole == (size_t)-1)
 				hole = bucket;
-			}
 		}
 
 		if (hole != (size_t)-1) {
-//			_states[main_bucket].set_probe(offset);
 			return hole;
 		}
 
-		for (; ; ++offset) {
-			auto bucket = (hash_value + offset) & _mask;
-
+		while (true) {
+			const auto bucket = (main_bucket + offset ++) & _mask;
 			if (!is_filled(bucket)) {
 				_states[main_bucket].set_probe(offset);
 				return bucket;
@@ -668,11 +656,11 @@ private:
 	// key is not in this map. Find a place to put it.
 	size_t find_empty_bucket(const KeyT& key)
 	{
-		auto hash_value = _hasher(key);
-		for (int offset=0; ; ++offset) {
-			auto bucket = (hash_value + offset) & _mask;
+		const size_t main_bucket = _hasher(key) & _mask;
+		for (size_t offset=_states[main_bucket].get_probe(); ; ) {
+			const auto bucket = (main_bucket + offset++) & _mask;
 			if (!is_filled(bucket)) {
-				_states[hash_value & _mask].set_probe(offset);
+				_states[main_bucket].set_probe(offset);
 				return bucket;
 			}
 		}
@@ -682,25 +670,22 @@ private:
 
 	struct FLAG_PROBE
 	{
-		uint8_t  flag : 2;
-		uint16_t probe : 14;
+		uint8_t  flag : 1;
+		uint16_t probe : 15;
 	};
 
 	struct State
 	{
-		enum
+		enum uint8_t
 		{
 			INACTIVE = 0, // Never been touched
-			ACTIVE = 2,   // Is inside a search-chain, but is empty
-			FILLED = 3    // Is set with key/value
+			FILLED = 1    // Is set with key/value
 		};
 
 		FLAG_PROBE flag_probe;
-		void set_probe(uint32_t offset)
+		void set_probe(uint32_t probe)
 		{
-			assert(offset < probe_limit);
-			if (offset >= flag_probe.probe)
-				flag_probe.probe = offset + 1;
+			flag_probe.probe = probe;
 		}
 
 		uint32_t get_probe() const
@@ -708,19 +693,9 @@ private:
 			return flag_probe.probe;
 		}
 
-		void set_flag(uint8_t flag)
-		{
-			flag_probe.flag = flag;
-		}
-
-		uint8_t get_flag() const
-		{
-			return flag_probe.flag;
-		}
-		
 		void clear()
 		{
-			flag_probe.flag = ACTIVE;
+			flag_probe.flag = INACTIVE;
 			flag_probe.probe = 0;
 		}
 	};
