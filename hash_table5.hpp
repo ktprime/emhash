@@ -776,7 +776,7 @@ public:
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != end; ++begin) {
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
             emplace(*begin);
         }
     }
@@ -907,12 +907,10 @@ public:
     /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key)
     {
-        auto bucket = find_or_allocate(key);
+        check_expand_need();
+        const auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
-            if (EMHASH_UNLIKELY(check_expand_need()))
-                bucket = find_unique_bucket(key);
-
             NEW_KVALUE(key, std::move(ValueT()), bucket);
         }
 

@@ -1111,7 +1111,11 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
+#if EMHASH_HIGH_LOAD
+        const auto required_buckets = num_elems;
+#else
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 17);
+#endif
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 

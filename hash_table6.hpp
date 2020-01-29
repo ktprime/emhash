@@ -45,7 +45,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 // NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
 // Quadratic collision resolution   1 - ln(1-L) - L/2    1/(1-L) - L - ln(1-L)
 // Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-//
+// separator chain resolution      1 + L / 2             e^-L + L
 // -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
 // QUADRATIC COLLISION RES.
 //    probes/successful lookup    1.05  1.44  1.62  2.01  2.21  2.85  5.11
@@ -53,6 +53,10 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 // LINEAR COLLISION RES.
 //    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
 //    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
+// SEPARATE CHAN RES.
+//    probes/successful lookup    1.05  1.25  1.3   1.25  1.4   1.45  1.50
+//    probes/unsuccessful lookup  1.00  1.11  1.15  1.22  1.25  1.31  1.37
+
 
 #pragma once
 
@@ -72,6 +76,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #undef  NEW_BUCKET
     #undef  NEW_KVALUE
     #undef  NEXT_BUCKET
+    #undef  hash_bucket
 #endif
 
 // likely/unlikely
@@ -1033,7 +1038,11 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
+#if EMHASH_HIGH_LOAD
+        const auto required_buckets = num_elems;
+#else
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 17);
+#endif
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
