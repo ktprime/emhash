@@ -191,7 +191,7 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
 # some bad
 - it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
 ```
-    emhash2:HashMap<int,int> myhash(10);
+    emhash7:HashMap<int,int> myhash(10);
     myhash[1] = 1;
     auto& myref = myhash[1];//**wrong used here**,  can not keep reference stable
      ....
@@ -200,16 +200,16 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
 
 - for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
 ```  
-  emhash2:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
+  emhash7:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
 
-  emhash2:HashMap<keyT,*valueT> myhash2; //new valueT, or use std::shared_ptr<valueT>.
+  emhash7:HashMap<keyT,*valueT> myhash2; //new valueT, or use std::shared_ptr<valueT>.
   
 ```
 
 - the only known bug as follow if erase not current key/iterator during iteration without break. some key will be iteraored twice or missed.to fix it can desearse performance 20％ or even much more.
 
 ```
-    emhash2:HashMap<int,int> myhash;
+    emhash7:HashMap<int,int> myhash;
     int key = some_key;
     //dome some init
     for (const auto& it : myhash)
