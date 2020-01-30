@@ -349,11 +349,11 @@ public:
         *this = std::move(other);
     }
 
-    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
+    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> ilist)
     {
-        init((uint32_t)il.size());
-        for (auto begin = il.begin(); begin != il.end(); ++begin)
-            insert(*begin);
+        init((uint32_t)ilist.size());
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
+            do_insert(begin->first, begin->second);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -361,7 +361,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (is_notrivially())
+        if (is_triviall_destructable())
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -381,7 +381,7 @@ public:
 
     ~HashMap()
     {
-        if (is_notrivially())
+        if (is_triviall_destructable())
             clearkv();
         free(_pairs);
     }
@@ -396,7 +396,7 @@ public:
         _loadlf      = other._loadlf;
         _last        = other._last;
 
-        auto opairs = other._pairs;
+        auto opairs  = other._pairs;
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
         if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value)
@@ -568,15 +568,15 @@ public:
         return main_bucket;
     }
 
-    int get_cache_info(uint32_t bucket, uint32_t next_bucket) const
+    size_type get_diss(uint32_t bucket, uint32_t next_bucket) const
     {
-        auto pbucket = reinterpret_cast<std::uintptr_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<std::uintptr_t>(&_pairs[next_bucket]);
-        if (pbucket / 64 == pnext / 64)
+        auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
+        if (pbucket / EMHASH_CACHE_LINE_SIZE == pnext / EMHASH_CACHE_LINE_SIZE)
             return 0;
-        auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
-        if (diff < 127 * 64)
-            return diff / 64 + 1;
+        uint32_t diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
+        if (diff / EMHASH_CACHE_LINE_SIZE < 127)
+            return diff / EMHASH_CACHE_LINE_SIZE + 1;
         return 127;
     }
 
@@ -965,10 +965,19 @@ public:
         clear_bucket(bucket);
     }
 
-    constexpr bool is_notrivially() noexcept
+    static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+#else
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+#endif
+    }
+
+    static constexpr bool is_copy_trivially()
+    {
+#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
+        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
@@ -985,7 +994,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_notrivially() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _num_buckets / 4)
+        if (is_triviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
             clearkv();
         else
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
@@ -1010,11 +1019,11 @@ public:
         return true;
     }
 
-    /// Make room for this many elements
+private:
     void rehash(uint32_t required_buckets)
     {
         if (required_buckets < _num_filled)
-            return ;
+            return;
 
         uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
@@ -1074,7 +1083,8 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        _pairs[bucket].~PairT();
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT();
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
     }
@@ -1091,7 +1101,7 @@ private:
             return eqkey ? bucket : INACTIVE;
          } else if (eqkey) {
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
-            if (is_notrivially())
+            if (is_copy_trivially())
                 GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
             else
                 GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
@@ -1126,7 +1136,7 @@ private:
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
-                if (is_notrivially())
+                if (!std::is_trivially_copyable<KeyT>::value || !std::is_trivially_copyable<ValueT>::value)
                     GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
                 else
                     GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
@@ -1168,7 +1178,10 @@ private:
         return _num_buckets;
     }
 
-    //main --> prev --> bucekt -->next --> new
+    //kick out bucket and find empty to occpuy
+    //it will break the orgin link and relnik again.
+    //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
+    //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
     uint32_t kickout_bucket(const uint32_t main_bucket, const uint32_t bucket)
     {
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -1178,7 +1191,9 @@ private:
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
-        _pairs[bucket].~PairT(); NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT(); 
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         return bucket;
     }
 

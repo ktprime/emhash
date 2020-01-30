@@ -408,12 +408,12 @@ public:
 
     constexpr size_type max_size() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1 << 31) / sizeof(PairT);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 30) / sizeof(PairT);
+        return (1 << 31) / sizeof(PairT);
     }
 
 #ifdef EMHASH_STATIS
@@ -994,7 +994,9 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _pairs[bucket].~PairT();
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); 
+        if (!std::is_pod<KeyT>::value)
+            _pairs[bucket].~PairT();
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;

@@ -406,7 +406,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (is_notriviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -426,7 +426,7 @@ public:
 
     ~HashMap()
     {
-        if (is_notriviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
         free(_pairs);
     }
@@ -434,6 +434,7 @@ public:
     void clone(const HashMap& other)
     {
         _hasher      = other._hasher;
+//        _eq          = other._eq;
         _num_buckets = other._num_buckets;
 #if EMHASH_SAFE_HASH
         _num_main    = other._num_main;
@@ -720,7 +721,7 @@ public:
         return (size_type)(find_filled_bucket(key) != _num_buckets);
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key) noexcept
+    std::pair<iterator, iterator> equal_range(const KeyT& key) const noexcept
     {
         const auto found = find(key);
         if (found == end())
@@ -998,7 +999,7 @@ public:
         clear_bucket(bucket);
     }
 
-    static constexpr bool is_notriviall_destructable()
+    static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -1010,7 +1011,7 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copy_assignable<KeyT>::value && std::is_trivially_copy_assignable<ValueT>::value);
+        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
@@ -1028,7 +1029,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_notriviall_destructable() || !bInCacheLine || _num_filled < _num_buckets / 4)
+        if (is_triviall_destructable() || !bInCacheLine || _num_filled < _num_buckets / 4)
             clearkv();
         else {
             memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * _num_buckets);
@@ -1131,7 +1132,8 @@ public:
             auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_BUCKET(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
-            old_pairs[src_bucket].~PairT();
+            if (is_triviall_destructable())
+                old_pairs[src_bucket].~PairT();
         }
 
 #if EMHASH_REHASH_LOG
@@ -1196,10 +1198,10 @@ private:
          } else if (eqkey) {
             next_bucket /= 2;
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
-            //if (is_copy_trivially())
-            GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
-            //else
-            //    GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+            if (is_copy_trivially())
+                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
+            else
+                GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
             ADDR_BUCKET(_pairs, bucket) = next_bucket == nbucket ? bucket * 2 : nbucket * 2;
             return next_bucket;
         }
@@ -1330,17 +1332,15 @@ private:
     //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
     uint32_t kickout_bucket(const uint32_t bucket)
     {
-        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket)) & _mask;
-        const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
-
-        ADDR_BUCKET(_pairs, prev_bucket) += (new_bucket - bucket) * 2;
+        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket)) & _mask;
+        const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); SET_BIT(new_bucket);
-
         if (next_bucket == bucket)
             ADDR_BUCKET(_pairs, new_bucket) = new_bucket * 2 + 1;
 
+        ADDR_BUCKET(_pairs, prev_bucket) += (new_bucket - bucket) * 2;
 #if EMHASH_SAFE_HASH
         _num_main ++;
 #endif

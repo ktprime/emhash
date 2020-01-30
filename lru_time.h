@@ -56,7 +56,7 @@
 #define GET_KEY(p,n)     p[n].first
 #define GET_VAL(p,n)     p[n].second
 #define NEXT_BUCKET(p,n) p[n].bucket
-#define GET_PKV(s,n)     s[n]
+#define GET_PKV(p,n)     p[n]
 #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket, _time_out), _num_filled ++
 
 namespace emlru_time {

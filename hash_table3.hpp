@@ -983,7 +983,7 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copy_assignable<KeyT>::value && std::is_trivially_copy_assignable<ValueT>::value);
+        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif

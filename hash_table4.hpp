@@ -183,8 +183,8 @@ private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<uint32_t, value_pair> PairT;
+    typedef std::pair<KeyT, ValueT>          value_pair;
+    typedef std::pair<uint32_t, value_pair > PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
     typedef std::pair<value_pair, uint32_t> PairT;
@@ -198,7 +198,7 @@ public:
     typedef ValueT mapped_type;
 
     typedef  size_t       size_type;
-    typedef  std::pair<KeyT,ValueT>        value_type;
+    typedef std::pair<KeyT,ValueT>        value_type;
     typedef  PairT&       reference;
     typedef  const PairT& const_reference;
 
@@ -363,7 +363,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (is_notriviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -383,7 +383,7 @@ public:
 
     ~HashMap()
     {
-        if (is_notriviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
 
         free(_pairs);
@@ -974,7 +974,7 @@ public:
         return (bucket == it._bucket) ? ++it : it;
     }
 
-    constexpr bool is_notriviall_destructable()
+    constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -986,7 +986,7 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copy_assignable<KeyT>::value && std::is_trivially_copy_assignable<ValueT>::value);
+        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
@@ -1005,7 +1005,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_notriviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _max_bucket / 4)
+        if (is_triviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _max_bucket / 4)
             clearkv();
         else
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _max_bucket);
@@ -1022,7 +1022,7 @@ public:
     bool reserve(size_t num_elems)
     {
 #ifdef EMHASH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)(num_elems * 9 / 8); //f = 8.0 / 9
+        const auto required_buckets = (uint32_t)(num_elems * 10 / 9); //f = 8.0 / 9
 #else
         const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 17);
 #endif
@@ -1046,7 +1046,7 @@ public:
         const auto old_max_bucket = _max_bucket;
 
 #ifdef EMHASH_HIGH_LOAD
-        _max_bucket = num_buckets * 8 / 7 + 2;
+        _max_bucket = num_buckets * 10 / 9 + 2;
 #else
         _max_bucket = num_buckets;
 #endif
@@ -1164,7 +1164,8 @@ private:
 
     void clear_bucket(uint32_t bucket) 
     {
-        _pairs[bucket].~PairT(); 
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT(); 
         NEXT_BUCKET(_pairs, bucket) = INACTIVE; 
         _num_filled --;
     }
@@ -1265,11 +1266,13 @@ private:
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
-        NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _pairs[bucket].~PairT();
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT();
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+        NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
         return bucket;
     }
 

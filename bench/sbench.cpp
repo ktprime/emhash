@@ -419,8 +419,10 @@ void insert_small_size(const std::string& hash_name, const std::vector<keyType>&
     if (show_name.count(hash_name) != 0)
     {
         size_t sum = 0;
-        const auto smalls = 100 + vList.size() % (256 * 1024);
+        const auto smalls = 1000 + vList.size() % (64 * 1024);
         hash_type tmp, empty;
+        tmp.max_load_factor(0.8);
+        empty.max_load_factor(0.8);
 
         auto ts1 = getTime();
         for (const auto& v : vList)
@@ -428,11 +430,10 @@ void insert_small_size(const std::string& hash_name, const std::vector<keyType>&
             sum += tmp.emplace(v).second;
             sum += tmp.count(v);
             if (tmp.size() > smalls) {
-                if (smalls % 2 == 0)
+                if (sum % 2 == 0)
                     tmp.clear();
                 else
                     tmp = empty;
-                tmp.max_load_factor(0.8);
             }
         }
         check_mapfunc_result(hash_name, __FUNCTION__, sum, ts1);
@@ -472,7 +473,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         for (; i  < maxn; i++) {
             auto v = vList[i - minn];
 #ifdef KEY_INT
-            auto v2 = (v / 7) + 7 * v;
+            auto v2 = (v / 7) + 7 * v + i;
 #else
             auto v2 = v; v2[0] += '1';
 #endif
@@ -892,7 +893,7 @@ void benOneSet(MAP& hmap, const std::string& map_name, std::vector<keyType> vLis
     func_time.clear();
 
     insert_noreserve(hmap, map_name, vList);
-    //insert_high_load <MAP>(map_name, vList);
+    insert_high_load <MAP>(map_name, vList);
     insert_small_size<MAP>(map_name, vList);
     insert_reserve(hmap, map_name, vList);
 

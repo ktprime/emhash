@@ -50,11 +50,6 @@
 #include <functional>
 #include <iterator>
 
-#if EMHASH_TAF_LOG
-    #include "servant/AutoLog.h"
-    #include "servant/RollLogHelper.h"
-#endif
-
 #ifdef  GET_KEY
     #undef  NEXT_BUCKET
     #undef  GET_KEY
@@ -623,13 +618,13 @@ public:
         auto& bucket_size = NEXT_BUCKET(_pairs, main_bucket);
         //assert(bucket_size != INACTIVE);
 
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         bucket_size -= 2;
         _num_colls -= 1;
 
         if ((int)bucket_size == 0)
             bucket_size = INACTIVE;
         _pairs[bucket].~PairT();
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
     }
 
     void del_main(uint32_t main_bucket, uint32_t& bucket_size)
@@ -834,14 +829,16 @@ public:
         for (uint32_t bucket = _mains_buckets; bucket < _total_buckets && _num_colls > 0; ++bucket) {
             auto& next_bucket = NEXT_BUCKET(_pairs, bucket);
             if (next_bucket != INACTIVE) {
-                next_bucket = INACTIVE; _pairs[bucket].~PairT(); _num_colls -= 1;
+                _pairs[bucket].~PairT(); _num_colls -= 1;
+                next_bucket = INACTIVE;
             }
         }
 
         for (uint32_t bucket = 0; bucket < _mains_buckets && _num_mains > 0; ++bucket) {
             auto& next_bucket = NEXT_BUCKET(_pairs, bucket);
             if (next_bucket != INACTIVE && next_bucket % 2 > 0) {
-                next_bucket = INACTIVE; _pairs[bucket].~PairT(); _num_mains -= 1;
+                _pairs[bucket].~PairT(); _num_mains -= 1;
+                next_bucket = INACTIVE; 
             }
         }
         assert(_num_colls == 0 && _num_mains == 0);

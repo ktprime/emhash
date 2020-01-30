@@ -245,7 +245,7 @@ private:
     typedef entry<KeyT, ValueT>             PairT;
 #endif
 
-    static const bool bInCacheLine = sizeof(value_pair) < EMHASH_CACHE_LINE_SIZE * 2 / 3;
+    static constexpr bool bInCacheLine = sizeof(value_pair) < EMHASH_CACHE_LINE_SIZE * 2 / 3;
 
 public:
     typedef KeyT   key_type;
@@ -421,7 +421,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (is_notriviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -441,7 +441,7 @@ public:
 
     ~HashMap()
     {
-        if (is_notriviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
         free(_pairs);
     }
@@ -814,16 +814,16 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), std::move(value));
-    }
-
     std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
         return do_insert(key, value);
+    }
+
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
+    {
+        check_expand_need();
+        return do_insert(std::move(key), std::move(value));
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
@@ -1062,7 +1062,7 @@ public:
         clear_bucket(bucket);
     }
 
-    static constexpr bool is_notriviall_destructable()
+    static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -1074,7 +1074,7 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copy_assignable<KeyT>::value && std::is_trivially_copy_assignable<ValueT>::value);
+        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
@@ -1091,7 +1091,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_notriviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 4)
+        if (is_triviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
             clearkv();
         else {
             memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * _num_buckets);
@@ -1169,7 +1169,8 @@ private:
             auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
-            old_pairs[src_bucket].~PairT();
+            if (is_triviall_destructable())
+                old_pairs[src_bucket].~PairT();
         }
 
 #if EMHASH_REHASH_LOG
@@ -1200,7 +1201,8 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        _pairs[bucket].~PairT();
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT();
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
         CLS_BIT(bucket);
@@ -1394,14 +1396,16 @@ private:
     {
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
+        const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT(); 
+
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
 
-        const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-
-        _pairs[bucket].~PairT(); NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         SET_BIT(new_bucket);
         return bucket;
     }

@@ -1,5 +1,3 @@
-
-// emhash6::HashSet for C++11
 // version 1.4.1
 // https://github.com/ktprime/ktprime/blob/master/hash_set4.hpp
 //
@@ -741,7 +739,8 @@ public:
 
     void clear_bucket(uint32_t bucket)
     {
-        _pairs[bucket].~PairT();
+        if (!std::is_pod<KeyT>::value)
+            _pairs[bucket].~PairT();
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
         CLS_BIT(bucket);
@@ -860,8 +859,9 @@ private:
 
             auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
-            NEW_KEY(std::move(key), bucket);
-            old_pairs[src_bucket].~PairT();
+            NEW_KEY(std::move(key), bucket); 
+            if (!std::is_pod<KeyT>::value)
+                old_pairs[src_bucket].~PairT();
         }
 
 #if EMHASH_REHASH_LOG
@@ -986,11 +986,12 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
-        SET_BIT(new_bucket);
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); SET_BIT(new_bucket);
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
-         _pairs[bucket].~PairT(); NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+        if (!std::is_pod<KeyT>::value)
+            _pairs[bucket].~PairT();
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         return bucket;
     }
 
