@@ -2,9 +2,9 @@
 
 A quite fast and memory efficient *open address c++ flat hash map*, it is easy to be benched/tested/compared with other's hash map.
 
-    some feature is not enabled by default and it also can be used by set the compile marco but may loss some tiny performance if necessary needed, some featue is conflicted each other or difficlut to be merged and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
+    some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- default load factor is **0.95 and can be set 0.99** by enable compile marco *emhash_HIGH_LOAD* (*15% performance loss in hash_table7.hpp*)
+- default load factor is **0.95 and can be set 0.99** by enable compile marco *EMHASH_HIGH_LOAD* (in hash_table6/7.hpp*)
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
     - _erase :  without return next iterator after erasion
@@ -12,9 +12,9 @@ A quite fast and memory efficient *open address c++ flat hash map*, it is easy t
     - insert_unqiue : insert unique key into hash without search
     - try_find : check or get key/value without use iterator
 
-- more **efficient** than other's hash map implemention if key.value is some aligned (sizeof(key) % 8 != sizeof(value) % 8) for example hash_map<uint64_t, uint32_t> can save 1/3 total memoery than hash_map<uint64_t, uint64_t>.
+- more **efficient** than other's hash map implemention if key&value is some aligned (ex sizeof(key) % 8 != sizeof(value) % 8),  hash_map<uint64_t, uint32_t> can save 1/3 memoery than hash_map<uint64_t, uint64_t>.
 
-- **lru** can be used if compile marco emhash_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be probed only once during next access.
+- **lru** can be used if compile marco EMHASH_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be founded/probed only once during next access.
 
 - **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
     
@@ -23,7 +23,7 @@ for example some case pay attention on finding hot, some focus on finding cold(m
 
 - it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion. at present from 6 different benchmark(4 of them in my bench dir) by my bench
 
-- It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, Arm).
+- It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel).
 
 - many optimization with *integer* key, some new feature is underdeveloping if it's stable to release.
 
