@@ -206,9 +206,6 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
   
 ```
 
-
-- some bucket function is not supported just like other falt hash map do, load factor is always less than 1.0.
-
 - the only known bug as follow if erase not current key/iterator during iteration without break. some key will be iteraored twice or missed.to fix it can desearse performance 20％ or even much more.
 
 ```
