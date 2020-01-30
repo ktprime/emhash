@@ -1222,8 +1222,8 @@ private:
 
     void clear_bucket(uint32_t bucket) 
     {
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE; 
         _pairs[bucket].~PairT(); 
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE; 
         _num_filled --;
     }
 

@@ -931,8 +931,8 @@ public:
         NEXT_BUCKET(_pairs, bucket) = last_next != last_bucket ? last_next : bucket;
 
         NEXT_BUCKET(_pairs, prev_bucket) = bucket;
-        NEXT_BUCKET(_pairs, last_bucket) = INACTIVE;
         _pairs[last_bucket].~PairT();
+        NEXT_BUCKET(_pairs, last_bucket) = INACTIVE;
     }
 
     /// Erase an element from the hash table.
@@ -1164,8 +1164,8 @@ private:
 
     void clear_bucket(uint32_t bucket) 
     {
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE; 
         _pairs[bucket].~PairT(); 
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE; 
         _num_filled --;
     }
 

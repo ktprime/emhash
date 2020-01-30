@@ -12,7 +12,7 @@
 #endif
 
 //#include "wyhash.h"
-#define ET                     1
+//#define ET                     1
 #define HOOD_HASH              1
 //#define  FL1                 1
 //#define EMHASH_BUCKET_INDEX  1
@@ -158,20 +158,19 @@ struct StructValue;
 emhash5::HashMap<std::string, std::string> show_name =
 {
 //    {"stl_hash", "unordered_map"},
-//    {"emhash2", "emhash2"},
-//    {"emhash4", "emhash4"},
-//    {"emhash3",  "emhash3"},
+    {"emhash2", "emhash2"},
+    {"emhash4", "emhash4"},
+    {"emhash3",  "emhash3"},
 
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
 
-//    {"emilib", "emilib"},
-//    {"hrdset",   "hrdset"},
-//    {"lru_time", "lru_time"},
-//    {"lru_size", "lru_size"},
-
 #if ET > 0
+    {"emilib", "emilib"},
+    {"hrdset",   "hrdset"},
+    {"lru_time", "lru_time"},
+    {"lru_size", "lru_size"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
     {"martin", "martin flat"},

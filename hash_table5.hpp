@@ -403,7 +403,7 @@ public:
 #else
         if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value)
 #endif
-            memcpy(_pairs, opairs, other._num_buckets * sizeof(PairT));
+            memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
         else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(opairs, bucket);
@@ -417,7 +417,7 @@ public:
     void swap(HashMap& other)
     {
         std::swap(_hasher, other._hasher);
-//        std::swap(_eq, other._eq);
+//      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -672,7 +672,7 @@ public:
 
     std::pair<iterator, iterator> equal_range(const KeyT& key)
     {
-        const iterator found = find(key);
+        const auto found = find(key);
         if (found == end())
             return { found, found };
         else
@@ -763,20 +763,18 @@ public:
         return do_insert(std::move(p.first), std::move(p.second));
     }
 
+    void insert(std::initializer_list<value_type> ilist)
+    {
+        reserve(ilist.size() + _num_filled);
+        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
+            do_insert(begin->first, begin->second);
+    }
 #if 0
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
         reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin) {
-            emplace(*begin);
-        }
-    }
-
-    void insert(std::initializer_list<value_type> ilist)
-    {
-        reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
             emplace(*begin);
         }
     }
@@ -907,7 +905,7 @@ public:
     /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key)
     {
-        check_expand_need();
+        reserve(_num_filled);
         const auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
@@ -1076,8 +1074,8 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _pairs[bucket].~PairT();
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
     }
 
@@ -1239,9 +1237,9 @@ private:
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
        auto bucket = bucket_from;
-#if 0
-       if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
+       if (NEXT_BUCKET(_pairs, ++bucket) == INACTIVE)
             return bucket;
+#if 0
        bucket = bucket_from + 2;
        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
            return bucket;
@@ -1251,13 +1249,13 @@ private:
             const auto next = step & _mask;
             const auto bucket1 = next + 0;
             if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE) {
-                _last = bucket1;
+                //_last = bucket1;
                 return bucket1;
             }
 
             const auto bucket2 = next + 1;
             if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE) {
-                _last = bucket2;
+                //_last = bucket2;
                 return bucket2;
             }
 

@@ -99,8 +99,10 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define GET_KEY(p,n)     p[n].second.first
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first / 2
+    #define ADDR_BUCKET(p,n) p[n].first
+    #define ISEMPTY_BUCKET(p,n) (int)p[n].first < 0
     #define GET_PKV(p,n)     p[n].second
-    #define NEW_BUCKET(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)), _num_filled ++; SET_BIT(bucket)
+    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_pair(key, value)), _num_filled ++; SET_BIT(bucket)
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
@@ -108,7 +110,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define ADDR_BUCKET(p,n) p[n].second
     #define ISEMPTY_BUCKET(p,n) (int)p[n].second < 0
     #define GET_PKV(p,n)     p[n].first
-    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), next), _num_filled ++; SET_BIT(bucket)
+    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(value_pair(key, value), next), _num_filled ++; SET_BIT(bucket)
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
@@ -361,12 +363,13 @@ public:
     void init(uint32_t bucket, float load_factor = 0.95f)
     {
         _num_buckets = 0;
-        _num_main = 0;
+#if EMHASH_SAFE_HASH
+        _num_main = _hash_inter = 0;
+#endif
         _mask = 0;
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
-        _hash_inter = 0;
         max_load_factor(load_factor);
         reserve(bucket);
     }
@@ -432,11 +435,13 @@ public:
     {
         _hasher      = other._hasher;
         _num_buckets = other._num_buckets;
+#if EMHASH_SAFE_HASH
         _num_main    = other._num_main;
+        _hash_inter  = other._hash_inter;
+#endif
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
-        _hash_inter  = other._hash_inter;
         _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
         auto opairs  = other._pairs;
 
@@ -462,11 +467,13 @@ public:
 //      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
+#if EMHASH_SAFE_HASH
         std::swap(_num_main, other._num_main);
+        std::swap(_hash_inter, other._hash_inter);
+#endif
         std::swap(_num_filled, other._num_filled);
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
-        std::swap(_hash_inter, other._hash_inter);
         std::swap(_bitmask, other._bitmask);
     }
 
@@ -912,7 +919,9 @@ public:
         const auto bucket = hash_bucket(key) & _mask;
         if (ISEMPTY_BUCKET(_pairs, bucket))
         {
+#if EMHASH_SAFE_HASH
             _num_main ++;
+#endif
             NEW_BUCKET(key, value, bucket, bucket * 2);
             return bucket;
         }
@@ -926,8 +935,8 @@ public:
     ValueT& operator[](const KeyT& key)
     {
         check_expand_need();
-        auto bucket = find_or_allocate(key);
-        auto next   = bucket / 2;
+        const auto bucket = find_or_allocate(key);
+        const auto next   = bucket / 2;
         /* Check if inserting a new value rather than overwriting an old entry */
         if (ISEMPTY_BUCKET(_pairs, next)) {
             NEW_BUCKET(key, std::move(ValueT()), next, bucket);
@@ -1027,7 +1036,9 @@ public:
             _bitmask[_num_buckets / MASK_BIT] &= (1 << _num_buckets % MASK_BIT) - 1;
         }
         _num_filled = 0;
-        _num_main = 0;
+#if EMHASH_SAFE_HASH
+        _num_main = _hash_inter = 0;
+#endif
     }
 
     void shrink_to_fit()
@@ -1125,6 +1136,10 @@ public:
 
 #if EMHASH_REHASH_LOG
         if (_num_filled > EMHASH_REHASH_LOG) {
+#ifndef EMHASH_SAFE_HASH
+            auto _num_main = _num_filled/2;
+            auto _hash_inter = 0;
+#endif
             uint32_t collision = _num_filled - _num_main;
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/_hash_inter/aver_size/K.V/pack/collision = %u/%u/%.2lf/%s.%s/%zd/%.2lf%%",
@@ -1157,8 +1172,8 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        ADDR_BUCKET(_pairs, bucket) = INACTIVE;
         _pairs[bucket].~PairT();
+        ADDR_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
         CLS_BIT(bucket);
     }
@@ -1598,7 +1613,7 @@ private:
         return _hasher(key) * 11400714819323198485ull;
 #elif EMHASH_STD_STRING
         uint32_t hash = 0;
-        if (key.size() < 32) {
+        if (key.size() < 256) {
             for (const auto c : key) hash = c + hash * 131;
         } else {
             for (int i = 0, j = 1; i < key.size(); i += j++)
@@ -1620,8 +1635,11 @@ private:
     uint32_t  _num_filled;
     uint32_t  _loadlf;
 
+#if EMHASH_SAFE_HASH
     uint32_t  _num_main;
     uint32_t  _hash_inter;
+#endif
+
     uint32_t  _last;
 
     PairT*    _pairs;
