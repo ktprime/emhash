@@ -11,9 +11,10 @@
     #include <string_view>
 #endif
 
-//#include "wyhash.h"
-//#define ET                     1
+//#define ET                   1
 #define HOOD_HASH              1
+#define EMHASH_WY_HASH         1
+
 //#define  FL1                 1
 //#define EMHASH_BUCKET_INDEX  1
 
@@ -37,7 +38,9 @@
     #define TVal  1
 #endif
 
-#include "hash_emilib.hpp"
+#include "../thirdparty/hash_emilib.hpp"
+#include "../thirdparty/wyhash.h"
+
 #include "hash_table2.hpp"
 #include "hash_table3.hpp"
 #include "hash_table4.hpp"
@@ -796,9 +799,15 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 {
     randdata.reserve(size);
 
+#if 1
+    sfc64 srng(size);
+#else
+    std::mt19937_64 srng; srng.seed(size);
+#endif
+
 #ifndef KEY_INT
     for (int i = 0; i < size; i++)
-        randdata.emplace_back(get_random_alphanum_string(rand() % 10 + 6));
+        randdata.emplace_back(get_random_alphanum_string(srng() % 24 + 6));
     return 0;
 #else
 
@@ -808,16 +817,11 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     const auto iRation = 1;
 #endif
 
-#if 1
-    sfc64 srng(size);
-#else
-    std::mt19937_64 srng; srng.seed(size);
-#endif
 
     auto flag = 0;
     if (srng() % 100 > iRation)
     {
-        emhash6::HashMap<keyType, int> ehash(size);
+        emhash7::HashMap<keyType, int> ehash(size);
         for (int i = 0; ; i++) {
             auto key = TO_KEY(srng());
             if (ehash.emplace(key, 0).second) {
@@ -1012,8 +1016,8 @@ struct StrHasher
 {
   std::size_t operator()(const std::string& str) const
   {
-#if BKR
-      return wyhash(str.c_str(), str.size(), 131);
+#ifdef wyhash_version_4
+      return wyhash(str.c_str(), str.size(), 12345677);
 #else
       size_t hash = 0;
       for (const auto c : str)
@@ -1122,7 +1126,7 @@ static int benchHashMap(int n)
 #endif
 
 #if _CPP11_HASH
-        //{ hrd7::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
+        { hrd7::hash_map     <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "hrdset", vList); }
         { phmap::flat_hash_map <keyType, valueType, hash_func> ohash;      benOneHash(ohash, "phmap", vList); }
         { robin_hood::unordered_map <keyType, valueType, hash_func> ohash; benOneHash(ohash, "martin", vList); }
         { ska::flat_hash_map <keyType, valueType, hash_func> ohash;        benOneHash(ohash, "flat", vList); }
@@ -1205,35 +1209,48 @@ static int readFile(std::string fileName, int size)
     } else if (size == 6) {
         int items = 0;
         while (scanf("%ld %ld %d %ld %d %d", &uid, &pid, &items, &score, &items, &items) == size)
-            vList.emplace_back(pid + uid);
+            vList.emplace_back(pid + uid + score + items);
     }
     freopen(CONSOLE, "r", stdin);
 
     //    std::sort(vList.begin(), vList.end());
     int n = (int)vList.size();
-    printf("\nread file %s  %ld ms, size = %zd\n", fileName.c_str(), getTime() - ts1, vList.size());
+    printf("\nread file %s  %ld ms, size = %zd\n", fileName.c_str(), (getTime() - ts1) / 1000, vList.size());
 
-    emhash2::HashMap<int64_t, int> ehash2(n);
-    emhash6::HashMap<int64_t, int> ehash6(n);
-    emhash5::HashMap<int64_t, int> ehash5(n);
+#if HOOD_HASH
+    using hash_func = robin_hood::hash<int64_t>;
+#else
+    using hash_func = std::hash<int64_t>;
+#endif
+    n = 25 * 10000 * 2;
+
+    emhash2::HashMap<int64_t, int, hash_func> ehash2(n);
+    emhash6::HashMap<int64_t, int, hash_func> ehash6(n);
+    emhash7::HashMap<int64_t, int, hash_func> ehash7(n);
+    emhash5::HashMap<int64_t, int, hash_func> ehash5(n);
 
 #if _CPP11_HASH
-    ska::flat_hash_map  <int64_t, int> fmap(n);
-    tsl::robin_map      <int64_t, int> rmap(n);
-    phmap::flat_hash_map<int64_t, int> pmap(n);
-    robin_hood::unordered_map<int64_t, int> mmap(n);
+    ska::flat_hash_map <int64_t, int, hash_func> fmap(n); fmap.max_load_factor(7.0/8);
+    tsl::robin_map     <int64_t, int, hash_func> rmap(n); rmap.max_load_factor(7.0/8);
+    hrd7::hash_map     <int64_t, int, hash_func> hmap(n); hmap.max_load_factor(7.0/8);
+    phmap::flat_hash_map<int64_t, int, hash_func> pmap(n);
+    robin_hood::unordered_map<int64_t, int, hash_func> mmap(n);
+    emilib3::HashMap   <int64_t, int, hash_func> emap(n);
 #endif
 
-    ts1 = getTime();    for (auto v : vList)        ehash2[v] = 1; printf("emhash2   insert  %4ld ms, size = %zd\n", getTime() - ts1, ehash2.size());
-    ts1 = getTime();    for (auto v : vList)        ehash6[v] = 1; printf("emhash6   insert  %4ld ms, size = %zd\n", getTime() - ts1, ehash6.size());
-    ts1 = getTime();    for (auto v : vList)        ehash5[v] = 1; printf("emhash5   insert  %4ld ms, size = %zd\n", getTime() - ts1, ehash5.size());
+    ts1 = getTime();    for (auto v : vList)        ehash6[v] = 1; printf("emhash6   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash6.size(), ehash6.load_factor());
+    ts1 = getTime();    for (auto v : vList)        ehash2[v] = 1; printf("emhash2   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash2.size(), ehash2.load_factor());
 
 #if _CPP11_HASH
-    ts1 = getTime();    for (auto v : vList)        fmap[v] = 1;  printf("ska    insert  %4ld ms, size = %zd\n", getTime() - ts1, fmap.size());
-    ts1 = getTime();    for (auto v : vList)        rmap[v] = 1;  printf("tsl    insert  %4ld ms, size = %zd\n", getTime() - ts1, rmap.size());
-    ts1 = getTime();    for (auto v : vList)        pmap[v] = 1;  printf("pmap    insert  %4ld ms, size = %zd\n", getTime() - ts1, pmap.size());
-    ts1 = getTime();    for (auto v : vList)        mmap[v] = 1;  printf("martin    insert  %4ld ms, size = %zd\n", getTime() - ts1, mmap.size());
+    ts1 = getTime();    for (auto v : vList)        fmap[v] = 1;   printf("ska       insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, fmap.size(), fmap.load_factor());
+    ts1 = getTime();    for (auto v : vList)        rmap[v] = 1;   printf("tsl       insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, rmap.size(), rmap.load_factor());
+    ts1 = getTime();    for (auto v : vList)        pmap[v] = 1;   printf("pmap      insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, pmap.size(), pmap.load_factor());
+    ts1 = getTime();    for (auto v : vList)        mmap[v] = 1;   printf("martin    insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, mmap.size(), mmap.load_factor());
+    ts1 = getTime();    for (auto v : vList)        emap[v] = 1;   printf("emilib3   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, emap.size(), emap.load_factor());
+    ts1 = getTime();    for (auto v : vList)        hmap[v] = 1;   printf("hrd7      insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, hmap.size(), hmap.load_factor());
 #endif
+    ts1 = getTime();    for (auto v : vList)        ehash7[v] = 1; printf("emhash7   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash7.size(), ehash7.load_factor());
+    ts1 = getTime();    for (auto v : vList)        ehash5[v] = 1; printf("emhash5   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash5.size(), ehash5.load_factor());
 
     printf("\n");
     return 0;
@@ -1304,7 +1321,7 @@ int main(int argc, char* argv[])
         if (isdigit(cmd))
             maxn = atoi(argv[i]) + 1000;
         else if (cmd == 'f' && isdigit(argv[i][1]))
-            load_factor = atoi(&argv[i][0] + 1) / 100.0;
+            load_factor = atof(&argv[i][0] + 1) / 100.0;
         else if (cmd == 't' && isdigit(argv[i][1]))
             tn = atoi(&argv[i][0] + 1);
         else if (cmd == 'c' && isdigit(argv[i][1]))

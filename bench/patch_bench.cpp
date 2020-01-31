@@ -11,6 +11,14 @@
 #ifdef PATCHMAP
 #include "ordered_patch_map.hpp"
 #endif
+
+#ifdef TINT
+using value_type = uint32_t;
+#else
+using value_type = uint64_t;
+#endif
+
+
 //https://1ykos.github.io/patchmap/
 //#include "doubling_patchmap.hpp"
 //#include "unordered_map.hpp"
@@ -35,13 +43,16 @@
 #ifdef KHASH
 #include "khash.h"
 #endif
-#if EMHASH == 7
-#include "hash_table7.hpp"
-#elif EMHASH == 6
-#include "hash_table6.hpp"
+#if EMHASH == 6
+#include "hash_table56.hpp"
+#elif EMHASH == 7
+#define EMHASH_HIGH_LOAD  100000
+#include "hash_table57.hpp"
+#elif EMHASH == 5
+#include "hash_table55.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
-#elif PHMAP_FLAT
+#elif PHMAP
 #include "phmap/phmap.h"
 #elif TSL
 
@@ -240,37 +251,37 @@ int main(int argc, char** argv)
     base_time/=N;
   }
 #ifdef PATCHMAP
-  wmath::ordered_patch_map<uint32_t,uint32_t> test;
+  wmath::ordered_patch_map<uint32_t,value_type> test;
 #endif
 #ifdef SPARSE_PATCHMAP
-  wmath::sparse_patchmap<uint32_t,uint32_t> test;
+  wmath::sparse_patchmap<uint32_t,value_type> test;
 #endif
 #ifdef WMATH_ROBIN_MAP
-  wmath::robin_map<uint32_t,uint32_t> test;
+  wmath::robin_map<uint32_t,value_type> test;
 #endif
 #ifdef MARTIN
-  robin_hood::unordered_map<uint32_t,uint32_t> test;
+  robin_hood::unordered_map<uint32_t,value_type> test;
 #endif
 #ifdef SPARSEPP
-  spp::sparse_hash_map<uint32_t,uint32_t> test;
+  spp::sparse_hash_map<uint32_t,value_type> test;
 #endif
 #ifdef UNORDERED_MAP
-  std::unordered_map<uint32_t,uint32_t> test;
+  std::unordered_map<uint32_t,value_type> test;
 #endif
 #ifdef MAP
-  std::map<size_t,size_t> test;
+  std::map<uint32_t,value_type> test;
 #endif
 #ifdef SKA
-  ska::flat_hash_map<uint32_t,uint32_t> test;
+  ska::flat_hash_map<uint32_t,value_type> test;
 #endif
 #ifdef BYTELL
-  ska::bytell_hash_map<uint32_t,uint32_t> test;
+  ska::bytell_hash_map<uint32_t,value_type> test;
 #endif
 #ifdef SPARSEMAP
-  google::sparse_hash_map<uint32_t,uint32_t> test;
+  google::sparse_hash_map<uint32_t,value_type> test;
 #endif
 #ifdef DENSEMAP
-  google::dense_hash_map<uint32_t,uint32_t> test;
+  google::dense_hash_map<uint32_t,value_type> test;
   test.set_empty_key(0);
   test.set_deleted_key(~uint32_t(0));
 
@@ -279,14 +290,16 @@ int main(int argc, char** argv)
   int ret, is_missing;
   khiter_t k;
 
-#elif EMHASH == 7
-   emhash7::HashMap<uint32_t, uint32_t> test;
 #elif EMHASH == 6
-   emhash6::HashMap<uint32_t, uint32_t> test;
+   emhash6::HashMap<uint32_t,value_type> test;
+#elif EMHASH == 7
+   emhash7::HashMap<uint32_t,value_type> test;
+#elif EMHASH == 5
+   emhash5::HashMap<uint32_t,value_type> test;
 #elif TSL
-   tsl::robin_map<uint32_t,uint32_t> test;
-#elif PHMAP_FLAT
-  phmap::flat_hash_map<uint32_t, uint32_t> test;
+   tsl::robin_map<uint32_t,value_type> test;
+#elif PHMAP
+  phmap::flat_hash_map<uint32_t,value_type> test;
 #endif
 
   std::uniform_int_distribution<size_t> distr;

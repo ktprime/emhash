@@ -63,12 +63,17 @@
 #include <cstdint>
 #include <functional>
 #include <cstring>
+#include <string>
 #include <cmath>
 #include <cstdlib>
 #include <cassert>
 #include <utility>
 #include <iterator>
 #include <type_traits>
+
+#if EMHASH_WY_HASH
+#include "wyhash.h"
+#endif
 
 #ifdef  GET_KEY
     #undef  GET_KEY
@@ -458,11 +463,7 @@ public:
         _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
         auto opairs  = other._pairs;
 
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value)
-#else
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value)
-#endif
+        if (is_copy_trivially())
             memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
         else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
@@ -1074,9 +1075,9 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
+        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1222,9 +1223,9 @@ private:
          } else if (eqkey) {
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (is_copy_trivially())
-                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
-            else
                 GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+            else
+                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
 
             NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
@@ -1297,9 +1298,9 @@ private:
             if (bucket != next_bucket) {
                 const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
                 if (is_copy_trivially())
-                    GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
-                else
                     GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+                else
+                    GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
                 NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             }
             return next_bucket;
@@ -1399,7 +1400,7 @@ private:
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
         if (is_triviall_destructable())
-            _pairs[bucket].~PairT(); 
+            _pairs[bucket].~PairT();
 
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
@@ -1608,15 +1609,16 @@ private:
 #endif
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef EMHASH_FIBONACCI_HASH
-        return _hasher(key) * 11400714819323198485ull;
-#elif EMHASH_STD_STRING
+#if EMHASH_WY_HASH
+        return wyhash(key.c_str(), key.size(), key.size() + key[0]);
+#elif EMHASH_BKR_HASH
         uint32_t hash = 0;
-        if (key.size() < 32) {
-            for (const auto c : key) hash = c + hash * 131;
+        if (key.size() < 64) {
+            for (const auto c : key)
+                hash = c + hash * 131;
         } else {
             for (int i = 0, j = 1; i < key.size(); i += j++)
                 hash = key[i] + hash * 131;
@@ -1627,6 +1629,15 @@ private:
 #endif
     }
 
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef EMHASH_FIBONACCI_HASH
+        return _hasher(key) * 11400714819323198485ull;
+#else
+        return _hasher(key);
+#endif
+    }
 private:
     HashT     _hasher;
     EqT       _eq;

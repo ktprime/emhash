@@ -305,11 +305,6 @@ public:
 		_states[bucket].flag_probe.flag = State::INACTIVE;
 	}
 
-	inline bool is_empty(size_t bucket) const
-	{
-		return _states[bucket].flag_probe.flag == State::INACTIVE;
-	}
-
 	inline void set_filled(size_t bucket)
 	{
 		_states[bucket].flag_probe.flag = State::FILLED;
@@ -523,15 +518,28 @@ public:
 		return ++it;
 	}
 
+	static constexpr bool is_triviall_destructable()
+	{
+#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
+		return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+#else
+		return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+#endif
+	}
+
 	/// Remove all elements, keeping full capacity.
 	void clear()
 	{
-		for (size_t bucket=0; _num_filled; ++bucket) {
-			if (is_filled(bucket)) {
-				_pairs[bucket].~PairT();
-				_num_filled --;
+		if (!is_triviall_destructable()) {
+			for (size_t bucket=0; _num_filled; ++bucket) {
+				if (is_filled(bucket)) {
+					_pairs[bucket].~PairT();
+					_num_filled --;
+				}
 			}
 		}
+
+		_num_filled = 0;
 		memset(_states, 0, sizeof(_states[0]) * _num_buckets);
 	}
 
@@ -539,7 +547,7 @@ public:
 	void reserve(size_t num_elems)
 	{
 		size_t required_buckets = num_elems + num_elems / 7 + 2;
-		if (required_buckets <= _num_buckets) {
+		if (required_buckets < _num_buckets) {
 			return;
 		}
 		size_t num_buckets = 4;
@@ -685,6 +693,8 @@ private:
 		FLAG_PROBE flag_probe;
 		void set_probe(uint32_t probe)
 		{
+			//bug here if probe is very big, move new item to near possion and swap out
+			assert(probe < (1 << 15) - 1);
 			flag_probe.probe = probe;
 		}
 
