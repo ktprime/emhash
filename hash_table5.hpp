@@ -84,13 +84,13 @@
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first
     #define GET_PKV(p,n)     p[n].second
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
+    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, value)); _num_filled ++
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
     #define NEXT_BUCKET(p,n) p[n].second
     #define GET_PKV(p,n)     p[n].first
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
+    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(value_type(key, value), bucket); _num_filled ++
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
@@ -181,13 +181,14 @@ class HashMap
 {
 private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
+    typedef std::pair<KeyT,ValueT>            value_type;
 
 #if EMHASH_BUCKET_INDEX == 0
     typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<uint32_t, value_pair> PairT;
+    typedef std::pair<uint32_t, value_type>   PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<value_pair, uint32_t> PairT;
+    typedef std::pair<value_type, uint32_t>   PairT;
 #else
     typedef entry<KeyT, ValueT>             PairT;
     typedef entry<KeyT, ValueT>             value_pair;
@@ -199,7 +200,6 @@ public:
 
     typedef uint32_t     size_type;
     typedef PairT&       reference;
-    typedef std::pair<KeyT,ValueT>         value_type;
     typedef const PairT&                   const_reference;
 
     class iterator
@@ -349,7 +349,7 @@ public:
         *this = std::move(other);
     }
 
-    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> ilist)
+    HashMap(std::initializer_list<value_type> ilist)
     {
         init((uint32_t)ilist.size());
         for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
@@ -751,13 +751,13 @@ public:
         return { {this, bucket}, found };
     }
 
-    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(const value_type& p)
     {
         check_expand_need();
         return do_insert(p.first, p.second);
     }
 
-    std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p)
+    std::pair<iterator, bool> insert(value_type && p)
     {
         check_expand_need();
         return do_insert(std::move(p.first), std::move(p.second));
@@ -829,12 +829,12 @@ public:
         return bucket;
     }
 
-    inline uint32_t insert_unique(std::pair<KeyT, ValueT>&& p)
+    inline uint32_t insert_unique(value_type && p)
     {
         return insert_unique(std::move(p.first), std::move(p.second));
     }
 
-    inline uint32_t insert_unique(std::pair<KeyT, ValueT>& p)
+    inline uint32_t insert_unique(value_type& p)
     {
         return insert_unique(p.first, p.second);
     }
@@ -1256,26 +1256,26 @@ private:
             return bucket;
 #if 0
        bucket = bucket_from + 2;
-       if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
+        if (INACTIVE == NEXT_BUCKET(_pairs, bucket))
            return bucket;
 #endif
 
         for (uint32_t last = 2, step = bucket + 1; ; step += ++last) {
             const auto next = step & _mask;
             const auto bucket1 = next + 0;
-            if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE) {
+            if (INACTIVE == NEXT_BUCKET(_pairs, bucket1)) {
                 //_last = bucket1;
                 return bucket1;
             }
 
             const auto bucket2 = next + 1;
-            if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE) {
+            if (INACTIVE == NEXT_BUCKET(_pairs, bucket2)) {
                 //_last = bucket2;
                 return bucket2;
             }
 
             if (last > 3) {
-                if (NEXT_BUCKET(_pairs, ++_last) == INACTIVE)
+                if (INACTIVE == NEXT_BUCKET(_pairs, ++_last))
                     return _last;
                 _last &= _mask;
             }

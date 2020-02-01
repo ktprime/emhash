@@ -1,5 +1,5 @@
 // emhash6::HashMap for C++11/14/17
-// version 1.6.6
+// version 1.6.7
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -60,14 +60,24 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 #pragma once
 
-#include <cstring>
-#include <cstdlib>
-#include <type_traits>
-#include <cassert>
-#include <utility>
 #include <cstdint>
 #include <functional>
+#include <cstring>
+#include <string>
+#include <cmath>
+#include <cstdlib>
+#include <cassert>
+#include <utility>
 #include <iterator>
+#include <type_traits>
+
+#ifdef __has_include
+    #if __has_include("wyhash.h")
+    #include "wyhash.h"
+    #endif
+#elif EMHASH_WY_HASH
+    #include "wyhash.h"
+#endif
 
 #ifdef GET_KEY
     #undef  GET_KEY
@@ -102,7 +112,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define ADDR_BUCKET(p,n) p[n].first
     #define ISEMPTY_BUCKET(p,n) (int)p[n].first < 0
     #define GET_PKV(p,n)     p[n].second
-    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_pair(key, value)), _num_filled ++; SET_BIT(bucket)
+    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_type(key, value)), _num_filled ++; SET_BIT(bucket)
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
@@ -110,7 +120,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define ADDR_BUCKET(p,n) p[n].second
     #define ISEMPTY_BUCKET(p,n) (int)p[n].second < 0
     #define GET_PKV(p,n)     p[n].first
-    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(value_pair(key, value), next), _num_filled ++; SET_BIT(bucket)
+    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(value_type(key, value), next), _num_filled ++; SET_BIT(bucket)
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
@@ -121,11 +131,8 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; SET_BIT(bucket)
 #endif
 
-#define MASK_BIT         32
-#define MASK_N(n)        1 << (n % MASK_BIT)
-#define SET_BIT(bucket)  _bitmask[bucket / MASK_BIT] &= ~(MASK_N(bucket))
-#define CLS_BIT(bucket)  _bitmask[bucket / MASK_BIT] |= MASK_N(bucket)
-#define IS_SET(bucket)   _bitmask[bucket / MASK_BIT] & (MASK_N(bucket))
+#define SET_BIT(bucket)  _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
+#define IS_SET(bucket)   _bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))
 
 #if _WIN32 || _MSC_VER > 1400
     #include <intrin.h>
@@ -133,6 +140,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 namespace emhash6 {
 
+constexpr uint8_t MASK_BIT  = 32;
 constexpr uint32_t INACTIVE = (0 - 1u);
 constexpr uint32_t BIT_PACK = sizeof(uint64_t) * 2 + sizeof(uint8_t);
 static_assert(INACTIVE % 2 == 1, "INACTIVE must be even");
@@ -146,12 +154,12 @@ inline static uint32_t CTZ(const uint64_t n)
 #else
     _BitScanForward(&index, n);
 #endif
-#elif __GNUC__ || __clang__
+#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
     uint64_t index;
 #if __GNUC__ || __clang__
-    __asm__ ("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
+    __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
 #else
     __asm
     {
@@ -216,13 +224,14 @@ class HashMap
 {
 //private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
+    typedef std::pair<KeyT,ValueT>            value_type;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<uint32_t, value_pair> PairT;
+    typedef value_type                        value_pair;
+    typedef std::pair<uint32_t, value_type>   PairT;
 #elif EMHASH_BUCKET_INDEX == 2
-    typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<value_pair, uint32_t> PairT;
+    typedef value_type                        value_pair;
+    typedef std::pair<value_type, uint32_t>   PairT;
 #else
     typedef entry<KeyT, ValueT>             value_pair;
     typedef entry<KeyT, ValueT>             PairT;
@@ -232,12 +241,11 @@ class HashMap
 
 public:
     typedef KeyT   key_type;
-    typedef ValueT mapped_type;
+    typedef ValueT val_type;
 
     typedef uint32_t     size_type;
     typedef PairT&       reference;
     typedef const PairT& const_reference;
-    typedef std::pair<KeyT,ValueT>        value_type;
 
     class iterator
     {
@@ -374,7 +382,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4, float load_factor = 0.95)
+    HashMap(uint32_t bucket = 4, float load_factor = 0.95f)
     {
         init(bucket, load_factor);
     }
@@ -563,12 +571,12 @@ public:
 
     constexpr size_type max_size() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
 #ifdef EMHASH_STATIS
@@ -587,7 +595,7 @@ public:
     }
 
     //Returns the number of elements in bucket n.
-    size_type bucket_size(const size_type bucket) const
+    size_type bucket_size(const uint32_t bucket) const
     {
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
         if ((int)next_bucket < 0)
@@ -700,6 +708,17 @@ public:
 #endif
 
     // ------------------------------------------------------------
+    template<typename K>
+    iterator find(const K& key, size_t hash_v) noexcept
+    {
+        return {this, find_filled_hash(key, hash_v)};
+    }
+
+    template<typename K>
+    const_iterator find(const K& key, size_t hash_v) const noexcept
+    {
+        return {this, find_filled_hash(key, hash_v)};
+    }
 
     iterator find(const KeyT& key) noexcept
     {
@@ -803,13 +822,13 @@ public:
         return { {this, next}, found };
     }
 
-    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(const value_type& p)
     {
         check_expand_need();
         return do_insert(p.first, p.second);
     }
 
-    std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p)
+    std::pair<iterator, bool> insert(value_type && p)
     {
         check_expand_need();
         return do_insert(std::move(p.first), std::move(p.second));
@@ -869,13 +888,13 @@ public:
         return do_insert_unqiue(key, value);
     }
 
-    uint32_t insert_unique(std::pair<KeyT, ValueT>&& p)
+    uint32_t insert_unique(value_type&& p)
     {
         check_expand_need();
         return do_insert_unqiue(std::move(p.first), std::move(p.second));
     }
 
-    uint32_t insert_unique(const std::pair<KeyT, ValueT>& p)
+    uint32_t insert_unique(const value_type& p)
     {
         check_expand_need();
         return do_insert_unqiue(p.first, p.second);
@@ -1177,7 +1196,7 @@ private:
         _pairs[bucket].~PairT();
         ADDR_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
-        CLS_BIT(bucket);
+        _bitmask[bucket / MASK_BIT] |= 1 << (bucket % MASK_BIT);
     }
 
     template<class K = uint32_t> typename std::enable_if <!bInCacheLine, K>::type
@@ -1606,12 +1625,12 @@ private:
 #endif
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef EMHASH_FIBONACCI_HASH
-        return _hasher(key) * 11400714819323198485ull;
-#elif EMHASH_STD_STRING
+#ifdef wyhash_version_4
+        return wyhash(key.c_str(), key.size(), key.size());
+#elif EMHASH_BKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {
             for (const auto c : key) hash = c + hash * 131;

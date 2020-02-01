@@ -1,5 +1,5 @@
 // emhash7::HashMap for C++11/14/17
-// version 1.7.3
+// version 1.7.4
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -28,7 +28,7 @@
 // NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
 // Quadratic collision resolution  1 - ln(1-L) - L/2     1/(1-L) - L - ln(1-L)
 // Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-// separator chain resolution      1 + L / 2             1 + L
+// separator chain resolution      1 + L / 2             exp(-L) + L
 
 // -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
 // QUADRATIC COLLISION RES.
@@ -71,8 +71,12 @@
 #include <iterator>
 #include <type_traits>
 
-#if EMHASH_WY_HASH
-#include "wyhash.h"
+#ifdef __has_include
+    #if __has_include("wyhash.h")
+    #include "wyhash.h"
+    #endif
+#elif EMHASH_WY_HASH
+    #include "wyhash.h"
 #endif
 
 #ifdef  GET_KEY
@@ -81,7 +85,7 @@
     #undef  GET_PKV
     #undef  NEXT_BUCKET
     #undef  NEW_KVALUE
-    #undef  hash_bucket
+    #undef  NEW_BUCKET
 #endif
 
 // likely/unlikely
@@ -105,26 +109,28 @@
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first
     #define GET_PKV(p,n)     p[n].second
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++; SET_BIT(bucket)
+    #define NEW_KVALUE(key, value, bucket)\
+            new(_pairs + bucket) PairT(bucket, value_type(key, value));\
+            _num_filled ++; _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
     #define NEXT_BUCKET(p,n) p[n].second
     #define GET_PKV(p,n)     p[n].first
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++; SET_BIT(bucket)
+    #define NEW_KVALUE(key, value, bucket)\
+            new(_pairs + bucket) PairT(value_type(key, value), bucket);\
+            _num_filled ++; _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
     #define NEXT_BUCKET(p,n) p[n].bucket
     #define GET_PKV(p,n)     p[n]
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++; SET_BIT(bucket)
+    #define NEW_KVALUE(key, value, bucket)\
+            new(_pairs + bucket) PairT(key, value, bucket);\
+            _num_filled ++; _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
 #endif
 
-#define MASK_BIT         32
-#define MASK_N(n)        1 << (n % MASK_BIT)
-#define SET_BIT(bucket) _bitmask[bucket / MASK_BIT] &= ~(MASK_N(bucket))
-#define CLS_BIT(bucket) _bitmask[bucket / MASK_BIT] |= MASK_N(bucket)
-#define IS_SET(bucket)  _bitmask[bucket / MASK_BIT] & (MASK_N(bucket))
+#define IS_SET(bucket)  _bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))
 
 #if _WIN32 || _MSC_VER > 1400
     #include <intrin.h>
@@ -137,24 +143,24 @@ inline static uint32_t CTZ(const uint64_t n)
 {
 #if _MSC_VER > 1400 || _WIN32
     unsigned long index;
-#if __x86_64__ || __amd64__ || _M_X64
+    #if __x86_64__ || __amd64__ || _M_X64
     _BitScanForward64(&index, n);
-#else
+    #else
     _BitScanForward(&index, n);
-#endif
-#elif __GNUC__ || __clang__
+    #endif
+#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
     uint64_t index;
-#if __GNUC__ || __clang__
+    #if __GNUC__ || __clang__
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-#else
+    #else
     __asm
     {
         bsfq eax, n
         mov index, eax
     }
-#endif
+    #endif
 #endif
 
     return (uint32_t)index;
@@ -193,23 +199,23 @@ struct entry {
         bucket = INACTIVE;
     }
 
-    entry(const entry& pairT)
-        :second(pairT.second),first(pairT.first)
+    entry(const entry& pairt)
+        :second(pairt.second),first(pairt.first)
     {
-        bucket = pairT.bucket;
+        bucket = pairt.bucket;
     }
 
-    entry(entry&& pairT)
-        :second(std::move(pairT.second)),first(std::move(pairT.first))
+    entry(entry&& pairt)
+        :second(std::move(pairt.second)),first(std::move(pairt.first))
     {
-        bucket = pairT.bucket;
+        bucket = pairt.bucket;
     }
 
-    entry& operator = (entry&& pairT)
+    entry& operator = (entry&& pairt)
     {
-        second = std::move(pairT.second);
-        bucket = pairT.bucket;
-        first = std::move(pairT.first);
+        second = std::move(pairt.second);
+        bucket = pairt.bucket;
+        first = std::move(pairt.first);
         return *this;
     }
 
@@ -227,37 +233,43 @@ struct entry {
         std::swap(first, o.first);
     }
 
+#if 1
     Second second;//int
     uint32_t bucket;
     First first; //long
+#else
+    First first; //long
+    uint32_t bucket;
+    Second second;//int
+#endif
 };// __attribute__ ((packed));
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
 {
-private:
+public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
+    typedef std::pair<KeyT,ValueT>            value_type;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<uint32_t, value_pair> PairT;
+    typedef value_type                        value_pair;
+    typedef std::pair<uint32_t, value_type>   PairT;
 #elif EMHASH_BUCKET_INDEX == 2
-    typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<value_pair, uint32_t> PairT;
+    typedef value_type                        value_pair;
+    typedef std::pair<value_type, uint32_t>   PairT;
 #else
-    typedef entry<KeyT, ValueT>             value_pair;
-    typedef entry<KeyT, ValueT>             PairT;
+    typedef entry<KeyT, ValueT>               value_pair;
+    typedef entry<KeyT, ValueT>               PairT;
 #endif
 
+    static constexpr uint32_t MASK_BIT  = 32;
     static constexpr bool bInCacheLine = sizeof(value_pair) < EMHASH_CACHE_LINE_SIZE * 2 / 3;
 
-public:
     typedef KeyT   key_type;
-    typedef ValueT mapped_type;
+    typedef ValueT val_type;
 
     typedef uint32_t     size_type;
-    typedef std::pair<KeyT,ValueT>        value_type;
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
@@ -850,13 +862,13 @@ public:
         return { {this, bucket}, found };
     }
 
-    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(const value_type& p)
     {
         check_expand_need();
         return do_insert(p.first, p.second);
     }
 
-    std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p)
+    std::pair<iterator, bool> insert(value_type && p)
     {
         check_expand_need();
         return do_insert(std::move(p.first), std::move(p.second));
@@ -917,13 +929,13 @@ public:
         return do_insert_unqiue(key, value);
     }
 
-    uint32_t insert_unique(std::pair<KeyT, ValueT>&& p)
+    uint32_t insert_unique(value_type && p)
     {
         check_expand_need();
         return do_insert_unqiue(std::move(p.first), std::move(p.second));
     }
 
-    uint32_t insert_unique(const std::pair<KeyT, ValueT>& p)
+    uint32_t insert_unique(const value_type& p)
     {
         check_expand_need();
         return do_insert_unqiue(p.first, p.second);
@@ -1095,7 +1107,7 @@ public:
         if (is_triviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
             clearkv();
         else {
-            memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * _num_buckets);
+            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
             memset(_bitmask, 0xFFFFFFFF, _num_buckets / 8);
             _bitmask[_num_buckets / MASK_BIT] &= (1 << _num_buckets % MASK_BIT) - 1;
         }
@@ -1206,7 +1218,7 @@ private:
             _pairs[bucket].~PairT();
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
-        CLS_BIT(bucket);
+        _bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
     }
 
     template<class K = uint32_t> typename std::enable_if<bInCacheLine, K>::type
@@ -1407,7 +1419,8 @@ private:
 
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        SET_BIT(new_bucket);
+        //set bit
+        _bitmask[new_bucket / MASK_BIT] &= ~(1 << (new_bucket % MASK_BIT));
         return bucket;
     }
 
@@ -1612,8 +1625,8 @@ private:
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#if EMHASH_WY_HASH
-        return wyhash(key.c_str(), key.size(), key.size() + key[0]);
+#ifdef wyhash_version_4
+        return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;
         if (key.size() < 64) {
@@ -1638,6 +1651,7 @@ private:
         return _hasher(key);
 #endif
     }
+
 private:
     HashT     _hasher;
     EqT       _eq;
@@ -1645,12 +1659,22 @@ private:
     uint32_t  _num_buckets;
 
     uint32_t  _num_filled;
-    uint32_t  _last;
     uint32_t  _loadlf;
+    uint32_t  _last;
     PairT*    _pairs;
     uint32_t* _bitmask;
 };
 } // namespace emhash
-#if __cplusplus > 199711
-//template <class Key, class Val> using emihash = emhash1::HashMap<Key, Val, std::hash<Key>>;
+#if __cplusplus >= 201103L
+//template <class Key, class Val> using emhash7 = emhash7::HashMap<Key, Val, std::hash<Key>, std::equal_to<Key>>;
 #endif
+
+//TODO 
+//1. remove marco GETXXX
+//2. improve rehash performance
+//3. dump or seriv
+//4. node hash map support
+//5. support load_factor > 1.0
+//6. add grow ration
+//7. safe hash
+//8. ...
