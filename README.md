@@ -188,9 +188,8 @@ txt file result [martin_bench.txt](https://github.com/ktprime/emhash/blob/master
 the benchmark code is some tiny changed for injecting new hash map, the result is not final beacuse it depends on os, cpu, compiler and dataset input.
 
 my ebench result:
-[kv = int int64_t] (https://github.com/ktprime/emhash/blob/master/int_int64_t.png)
-
-[kv = int64_t int64_t] (https://github.com/ktprime/emhash/blob/master/int64_t_int64_t.png)
+![](int_int64_t.png)
+![](int64_t_int64_t.png)
 
 # some bad
 - it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
