@@ -190,6 +190,8 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
 my ebench result:
 ![](int_int64_t.png)
 ![](int64_t_int64_t.png)
+![](string_int64_t.png)
+![](string_Struct.png)
 
 # some bad
 - it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
