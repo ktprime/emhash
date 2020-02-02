@@ -1057,13 +1057,15 @@ private:
         if (bmask != 0)
             return bucket_from + CTZ(bmask) - 0;
 
-        const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
+        constexpr auto SIZE_BITS = sizeof(size_t) * 8;
+        const auto qmask = (SIZE_BITS + _num_buckets - 1) / SIZE_BITS - 1;
+
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
 //        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
         for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
             const auto bmask = *((uint64_t*)_bitmask + step);
             if (bmask != 0)
-                return step * 64 + CTZ(bmask);
+                return step * SIZE_BITS + CTZ(bmask);
         }
 
         return 0;

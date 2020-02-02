@@ -83,10 +83,8 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #undef  GET_KEY
     #undef  GET_VAL
     #undef  GET_PKV
-    #undef  NEW_BUCKET
     #undef  NEW_KVALUE
     #undef  NEXT_BUCKET
-    #undef  hash_bucket
 #endif
 
 // likely/unlikely
@@ -112,7 +110,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define ADDR_BUCKET(p,n) p[n].first
     #define ISEMPTY_BUCKET(p,n) (int)p[n].first < 0
     #define GET_PKV(p,n)     p[n].second
-    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_type(key, value)), _num_filled ++; SET_BIT(bucket)
+    #define NEW_KVALUE(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_type(key, value)), _num_filled ++; SET_BIT(bucket)
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
@@ -120,7 +118,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define ADDR_BUCKET(p,n) p[n].second
     #define ISEMPTY_BUCKET(p,n) (int)p[n].second < 0
     #define GET_PKV(p,n)     p[n].first
-    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(value_type(key, value), next), _num_filled ++; SET_BIT(bucket)
+    #define NEW_KVALUE(key, value, bucket, next) new(_pairs + bucket) PairT(value_type(key, value), next), _num_filled ++; SET_BIT(bucket)
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
@@ -128,7 +126,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define ADDR_BUCKET(p,n) p[n].bucket
     #define ISEMPTY_BUCKET(p,n) 0 > (int)p[n].bucket
     #define GET_PKV(p,n)     p[n]
-    #define NEW_BUCKET(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; SET_BIT(bucket)
+    #define NEW_KVALUE(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; SET_BIT(bucket)
 #endif
 
 #define SET_BIT(bucket)  _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
@@ -145,27 +143,26 @@ constexpr uint32_t INACTIVE = (0 - 1u);
 constexpr uint32_t BIT_PACK = sizeof(uint64_t) * 2 + sizeof(uint8_t);
 static_assert(INACTIVE % 2 == 1, "INACTIVE must be even");
 
-inline static uint32_t CTZ(const uint64_t n)
+inline static uint32_t CTZ(const size_t n)
 {
 #if _MSC_VER > 1400 || _WIN32
     unsigned long index;
-#if __x86_64__ || __amd64__ || _M_X64
+    #if defined(_WIN64) || defined(__LP64__) || defined(__x86_64__) || _M_X64
     _BitScanForward64(&index, n);
 #else
     _BitScanForward(&index, n);
 #endif
-#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#elif defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
-    uint64_t index;
-#if __GNUC__ || __clang__
+    uint32_t index = __builtin_ctzl(n);
+#elif 1
+    #if defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
+    uint32_t index;
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
 #else
-    __asm
-    {
-        bsfq eax, n
-        mov index, eax
-    }
+    uint32_t index;
+    __asm__("bsf %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
 #endif
 #endif
 
@@ -817,7 +814,7 @@ public:
         const auto next   = bucket / 2;
         const auto found = ISEMPTY_BUCKET(_pairs, next);
         if (found) {
-            NEW_BUCKET(std::forward<K>(key), std::forward<V>(value), next, bucket);
+            NEW_KVALUE(std::forward<K>(key), std::forward<V>(value), next, bucket);
         }
         return { {this, next}, found };
     }
@@ -904,7 +901,7 @@ public:
     inline uint32_t do_insert_unqiue(K&& key, V&& value)
     {
         auto bucket = find_unique_bucket(key);
-        NEW_BUCKET(std::forward<K>(key), std::forward<V>(value), bucket / 2, bucket);
+        NEW_KVALUE(std::forward<K>(key), std::forward<V>(value), bucket / 2, bucket);
         return bucket;
     }
 
@@ -942,7 +939,7 @@ public:
 #if EMHASH_SAFE_HASH
             _num_main ++;
 #endif
-            NEW_BUCKET(key, value, bucket, bucket * 2);
+            NEW_KVALUE(key, value, bucket, bucket * 2);
             return bucket;
         }
 
@@ -959,7 +956,7 @@ public:
         const auto next   = bucket / 2;
         /* Check if inserting a new value rather than overwriting an old entry */
         if (ISEMPTY_BUCKET(_pairs, next)) {
-            NEW_BUCKET(key, std::move(ValueT()), next, bucket);
+            NEW_KVALUE(key, std::move(ValueT()), next, bucket);
         }
 
         //bugs here if return local reference rehash happens
@@ -976,7 +973,7 @@ public:
                 next = bucket / 2;
             }
 
-            NEW_BUCKET(std::move(key), std::move(ValueT()), next, bucket);
+            NEW_KVALUE(std::move(key), std::move(ValueT()), next, bucket);
         }
 
         return GET_VAL(_pairs, next);
@@ -1150,7 +1147,7 @@ public:
 
             auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
-            NEW_BUCKET(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
+            NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
             if (is_triviall_destructable())
                 old_pairs[src_bucket].~PairT();
         }
@@ -1465,7 +1462,7 @@ private:
 #endif
 
         const auto boset = bucket_from % 8;
-        const auto bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
+        const auto bmask = *(size_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
         if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 
@@ -1484,11 +1481,12 @@ private:
                 return next1 * 64 + CTZ(bmask1);
         }
 #endif
-        const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
+        constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
+        const auto qmask = (SIZE_BIT + _num_buckets - 1) / SIZE_BIT - 1;
         for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
-            const auto bmask = *((uint64_t*)_bitmask + step);
+            const auto bmask = *((size_t*)_bitmask + step);
             if (bmask != 0)
-                return step * 64 + CTZ(bmask);
+                return step * SIZE_BIT + CTZ(bmask);
         }
         return 0;
     }
@@ -1632,8 +1630,9 @@ private:
         return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;
-        if (key.size() < 256) {
-            for (const auto c : key) hash = c + hash * 131;
+        if (key.size() < 64) {
+            for (const auto c : key)
+                hash = c + hash * 131;
         } else {
             for (int i = 0, j = 1; i < key.size(); i += j++)
                 hash = key[i] + hash * 131;
@@ -1644,13 +1643,23 @@ private:
 #endif
     }
 
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef EMHASH_FIBONACCI_HASH
+        return _hasher(key) * 11400714819323198485ull;
+#else
+        return _hasher(key);
+#endif
+    }
+
 private:
     //8 * 3 + 4 + 4 + 4 * 3 = 32 + 12 = 44
     HashT     _hasher;
     EqT       _eq;
-
     uint32_t  _mask;
     uint32_t  _num_buckets;
+
     uint32_t  _num_filled;
     uint32_t  _loadlf;
 
@@ -1660,7 +1669,6 @@ private:
 #endif
 
     uint32_t  _last;
-
     PairT*    _pairs;
     uint32_t* _bitmask;
 };

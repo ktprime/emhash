@@ -85,7 +85,6 @@
     #undef  GET_PKV
     #undef  NEXT_BUCKET
     #undef  NEW_KVALUE
-    #undef  NEW_BUCKET
 #endif
 
 // likely/unlikely
@@ -139,27 +138,26 @@
 namespace emhash7 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
-inline static uint32_t CTZ(const uint64_t n)
+inline static uint32_t CTZ(const size_t n)
 {
 #if _MSC_VER > 1400 || _WIN32
     unsigned long index;
-    #if __x86_64__ || __amd64__ || _M_X64
+    #if defined(_WIN64) || defined(__LP64__) || defined(__x86_64__) || _M_X64
     _BitScanForward64(&index, n);
     #else
     _BitScanForward(&index, n);
     #endif
-#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#elif defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
-    uint64_t index;
-    #if __GNUC__ || __clang__
+    uint32_t index = __builtin_ctzl(n);
+#elif 1
+    #if defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
+    uint32_t index;
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
     #else
-    __asm
-    {
-        bsfq eax, n
-        mov index, eax
-    }
+    uint32_t index;
+    __asm__("bsf %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
     #endif
 #endif
 
@@ -1104,7 +1102,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
+        if (is_triviall_destructable() || !bInCacheLine || _num_filled < _num_buckets / 2)
             clearkv();
         else {
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
@@ -1161,7 +1159,7 @@ private:
         _last = 0;
         _bitmask     = (uint32_t*)(new_pairs + 2 + num_buckets);
 
-        if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
+        if (bInCacheLine)
             memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         else
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
@@ -1488,17 +1486,18 @@ private:
 #endif
         //fast find by bit
         const auto boset = bucket_from % 8;
-        const auto bmask = *(uint64_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
+        const auto bmask = *(size_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
         if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask) - 0;
 
-        const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
+        constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
+        const auto qmask = (SIZE_BIT + _num_buckets - 1) / SIZE_BIT - 1;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
 //        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
-        for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
-            const auto bmask = *((uint64_t*)_bitmask + step);
+        for (auto step = _last & qmask; ; step = ++_last & qmask) {
+            const auto bmask = *((size_t*)_bitmask + step);
             if (bmask != 0)
-                return step * 64 + CTZ(bmask);
+                return step * SIZE_BIT + CTZ(bmask);
         }
         return 0;
     }
@@ -1669,10 +1668,10 @@ private:
 //template <class Key, class Val> using emhash7 = emhash7::HashMap<Key, Val, std::hash<Key>, std::equal_to<Key>>;
 #endif
 
-//TODO 
+//TODO
 //1. remove marco GETXXX
-//2. improve rehash performance
-//3. dump or seriv
+//2. improve rehash and find miss performance
+//3. dump or Serialization interface 
 //4. node hash map support
 //5. support load_factor > 1.0
 //6. add grow ration
