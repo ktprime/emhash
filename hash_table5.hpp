@@ -57,9 +57,8 @@
 #ifdef GET_KEY
     #undef  GET_KEY
     #undef  GET_VAL
-    #undef  NEXT_BUCKET
     #undef  GET_PKV
-    #undef  hash_bucket
+    #undef  NEXT_BUCKET
     #undef  NEW_KVALUE
 #endif
 
@@ -184,23 +183,23 @@ private:
     typedef std::pair<KeyT,ValueT>            value_type;
 
 #if EMHASH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>         value_pair;
+    typedef std::pair<KeyT, ValueT>           value_pair;
     typedef std::pair<uint32_t, value_type>   PairT;
 #elif EMHASH_BUCKET_INDEX == 2
-    typedef std::pair<KeyT, ValueT>         value_pair;
+    typedef std::pair<KeyT, ValueT>           value_pair;
     typedef std::pair<value_type, uint32_t>   PairT;
 #else
-    typedef entry<KeyT, ValueT>             PairT;
-    typedef entry<KeyT, ValueT>             value_pair;
+    typedef entry<KeyT, ValueT>               PairT;
+    typedef entry<KeyT, ValueT>               value_pair;
 #endif
 
 public:
     typedef KeyT   key_type;
-    typedef ValueT mapped_type;
+    typedef ValueT val_type;
 
     typedef uint32_t     size_type;
     typedef PairT&       reference;
-    typedef const PairT&                   const_reference;
+    typedef const PairT& const_reference;
 
     class iterator
     {
@@ -485,7 +484,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return static_cast<float>(_num_filled) / (_num_buckets + 1);
+        return static_cast<float>(_num_filled) / (_mask + 1);
     }
 
     HashT& hash_function() const
@@ -716,16 +715,16 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), std::move(value));
-    }
-
     std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
         return do_insert(key, value);
+    }
+
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
+    {
+        check_expand_need();
+        return do_insert(std::move(key), std::move(value));
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
@@ -977,9 +976,9 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
+        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1052,7 +1051,8 @@ private:
             auto&& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
-            old_pairs[src_bucket].~PairT();
+            if (is_triviall_destructable())
+                old_pairs[src_bucket].~PairT();
         }
 
 #if EMHASH_REHASH_LOG
@@ -1102,9 +1102,9 @@ private:
          } else if (eqkey) {
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (is_copy_trivially())
-                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
-            else
                 GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+            else
+                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
 
             NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
@@ -1192,7 +1192,7 @@ private:
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         if (is_triviall_destructable())
-            _pairs[bucket].~PairT(); 
+            _pairs[bucket].~PairT();
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         return bucket;
     }
@@ -1255,9 +1255,9 @@ private:
        if (NEXT_BUCKET(_pairs, ++bucket) == INACTIVE)
             return bucket;
 #if 0
-       bucket = bucket_from + 2;
+        bucket = bucket_from + 2;
         if (INACTIVE == NEXT_BUCKET(_pairs, bucket))
-           return bucket;
+            return bucket;
 #endif
 
         for (uint32_t last = 2, step = bucket + 1; ; step += ++last) {
@@ -1337,15 +1337,16 @@ private:
     }
 
 private:
+    PairT*    _pairs;
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
+    uint32_t  _last;
+
     uint32_t  _num_buckets;
     uint32_t  _mask;
 
     uint32_t  _num_filled;
-    uint32_t  _last;
-    PairT*    _pairs;
 };
 } // namespace emhash
 #if __cplusplus > 199711

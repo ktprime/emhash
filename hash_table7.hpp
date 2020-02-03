@@ -43,15 +43,15 @@
 
 /***
   ============== buckets size ration ========
-   1   1543981  0.36884964|0.36861421  36.885
-   2    768655  0.36725597|0.36787871  73.611
-   3    256236  0.18364065|0.18357234  91.975
-   4     64126  0.06127757|0.06106868  98.102
-   5     12907  0.01541710|0.01523671  99.644
-   6      2050  0.00293841|0.00304126  99.938
-   7       310  0.00051840|0.00050587  99.990
-   8        49  0.00009365|0.00007212  99.999
-   9         4  0.00000860|0.00000900  100.000
+   1   1543981  0.36884964|0.36787944  36.885
+   2    768655  0.36725597|0.36787944  73.611
+   3    256236  0.18364065|0.18393972  91.975
+   4     64126  0.06127757|0.06131324  98.102
+   5     12907  0.01541710|0.01532831  99.644
+   6      2050  0.00293841|0.00306566  99.938
+   7       310  0.00051840|0.00051094  99.990
+   8        49  0.00009365|0.00007299  99.999
+   9         4  0.00000860|0.00000913  100.000
 ========== collision miss ration ===========
   _num_filled aver_size k.v size_kv = 4185936, 1.58, x.x 24
   collision,possion,cache_miss hit_find|hit_miss, load_factor = 36.73%,36.74%,31.31%  1.50|2.00, 1.00
@@ -557,7 +557,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return static_cast<float>(_num_filled) / (_num_buckets + 1);
+        return static_cast<float>(_num_filled) / (_mask + 1);
     }
 
     HashT& hash_function() const
@@ -657,7 +657,7 @@ public:
         if (next_bucket == INACTIVE)
             return -1;
 
-        if (hash_bucket(GET_KEY(_pairs, bucket)) & _mask != bucket)
+        if ((hash_bucket(GET_KEY(_pairs, bucket)) & _mask) != bucket)
             return 0;
         else if (next_bucket == bucket)
             return 1;
@@ -697,6 +697,7 @@ public:
         miss += _num_buckets - _num_filled;
         for (uint32_t i = 1, factorial = 1; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
             double poisson = fk / factorial; factorial *= i; fk *= lf;
+            if (poisson > 1e-13)
             sum_poisson += poisson * 100.0 * (i - 1) / i;
 
             const auto bucketsi = buckets[i];
@@ -731,9 +732,6 @@ public:
                  (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled,
                  finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
 
-        assert(sums == bucket_coll || !show_cache);
-        assert(bucket_coll == buckets[0]);
-        assert(sumn == _num_filled);
 
         bsize += sprintf(buff + bsize, "============== buckets size end =============\n");
         buff[bsize + 1] = 0;
@@ -743,6 +741,9 @@ public:
 #else
         puts(buff);
 #endif
+        assert(sums == bucket_coll || !show_cache);
+        assert(sumn == _num_filled);
+        assert(bucket_coll == buckets[0]);
     }
 #endif
 
@@ -1134,7 +1135,7 @@ public:
     #endif
         rehash(required_buckets + 2);
     #if EMHASH_STATIS
-        if (_num_filled > 4000'000) dump_statis(1);
+//        if (_num_filled > 1000'000) dump_statis(1);
     #endif
         return true;
     }
@@ -1219,7 +1220,7 @@ private:
         _bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
     }
 
-    template<class K = uint32_t> typename std::enable_if<bInCacheLine, K>::type
+    template<class K = uint32_t> typename std::enable_if<!bInCacheLine, K>::type
     erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
@@ -1260,7 +1261,7 @@ private:
         return INACTIVE;
     }
 
-    template<class K = uint32_t> typename std::enable_if<!bInCacheLine, K>::type
+    template<class K = uint32_t> typename std::enable_if<bInCacheLine, K>::type
     erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
@@ -1491,7 +1492,7 @@ private:
             return bucket_from + CTZ(bmask) - 0;
 
         constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-        const auto qmask = (SIZE_BIT + _num_buckets - 1) / SIZE_BIT - 1;
+        const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
 //        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
         for (auto step = _last & qmask; ; step = ++_last & qmask) {

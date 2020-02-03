@@ -6,8 +6,8 @@
 #include <string>
 #include <algorithm>
 #include <array>
-
-#if __cplusplus > 201402L
+#include <fstream>
+#if __cplusplus > 201402L || _MSC_VER >= 1600
     #include <string_view>
 #endif
 
@@ -32,10 +32,10 @@
 //#define EMHASH_HIGH_LOAD 201000
 
 #ifndef TKey
-    #define TKey  1
+    #define TKey              1
 #endif
 #ifndef TVal
-    #define TVal  1
+    #define TVal              1
 #endif
 
 #include "../thirdparty/hash_emilib.hpp"
@@ -155,38 +155,36 @@ struct StructValue;
     typedef StructValue valueType;
     #define TO_VAL(i)   i
     #define TO_SUM(i)   i.lScore
-    #define sValueType  "StructValue"
+    #define sValueType  "Struct"
 #endif
 
 emhash5::HashMap<std::string, std::string> show_name =
 {
 //    {"stl_hash", "unordered_map"},
-    {"emhash2", "emhash2"},
-    {"emhash4", "emhash4"},
-    {"emhash3",  "emhash3"},
+
+//    {"emhash2", "emhash2"},
+//    {"emhash3",  "emhash3"},
+//    {"emhash4", "emhash4"},
 
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
 
-#if ET > 0
-    {"emilib", "emilib"},
-    {"hrdset",   "hrdset"},
+//    {"emhash9", "emhash9"},
     {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
     {"emilib2", "emilib2"},
+
     {"emilib3", "emilib3"},
-    {"martin", "martin flat"},
-    {"phmap", "phmap flat"},
-#if ET > 1
-    {"robin", "tessil robin"},
-    {"flat", "skarupk flat"},
-#endif
-#if ET > 2
-    {"hopsco", "tessil hopsco"},
-    {"byte", "skarupk byte"},
-#endif
-#endif
+    {"martin", "martin_flat"},
+    {"phmap", "phmap_flat"},
+    {"hrdset",   "hrdset"},
+
+    {"robin", "tessil_robin"},
+    {"flat", "skarupk_flat"},
+
+    {"hopsco", "tessil_hopsco"},
+    {"byte", "skarupk_byte"},
 };
 
 static int64_t getTime()
@@ -369,7 +367,7 @@ static std::map<std::string, std::map<std::string, int64_t>> once_func_hash_time
 
 #define AVE_TIME(ts, n)             int(1000 * (getTime() - ts) / (n))
 
-static void check_func_result(const std::string& hash_name, const std::string& func, size_t sum, int64_t ts1)
+static void check_func_result(const std::string& hash_name, const std::string& func, size_t sum, int64_t ts1, int weigh = 1)
 {
     if (check_result.find(func) == check_result.end()) {
         check_result[func] = sum;
@@ -379,7 +377,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     }
 
     auto& showname = show_name[hash_name];
-    once_func_hash_time[func][showname] += (getTime() - ts1);
+    once_func_hash_time[func][showname] += (getTime() - ts1) / weigh;
 }
 
 static void add_hash_func_time(std::map<std::string, std::map<std::string, int64_t>>& func_hash_time, std::multimap <int64_t, std::string>& once_time_hash)
@@ -397,7 +395,8 @@ static void add_hash_func_time(std::map<std::string, std::map<std::string, int64
     once_func_hash_time.clear();
 }
 
-static void dump_func(const std::string& func, const std::map<std::string, int64_t >& map_rtime, std::map<std::string, int64_t>& hash_score)
+static void dump_func(const std::string& func, const std::map<std::string, int64_t >& map_rtime,
+        std::map<std::string, int64_t>& hash_score, std::map<std::string, std::map<std::string, int64_t>>& hash_func_score)
 {
     std::multimap <int64_t, std::string> functime;
     for (const auto& v : map_rtime)
@@ -410,15 +409,97 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
 #ifndef TM
         hash_score[v.second] += (int)((min * 100) / (v.first + 1));
 #endif
+        //hash_func_score[v.second][func] = (int)((min * 100) / (v.first + 1));
+        hash_func_score[v.second][func] = v.first / 10000;
         printf("   %-8d     %-21s   %02d\n", (int)(v.first / 10000), v.second.c_str(), (int)((min * 100) / (v.first + 1)));
     }
     putchar('\n');
 }
 
-static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func_rtime, std::map<std::string, int64_t>& hash_score)
+static void printInfo(char* out);
+static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func_rtime, std::map<std::string, int64_t>& hash_score, int tcase)
 {
-    for (const auto& v : func_rtime)
-        dump_func(v.first, v.second, hash_score);
+    std::string pys =
+    "import numpy as np\n"
+    "import matplotlib.pyplot as plt\n\n"
+    "def autolabel(rects):\n"
+        "\tfor rect in rects:\n"
+        "\t\twidth = rect.get_width()\n"
+        "\t\tplt.text(width + 1.0, rect.get_y(), '%s' % int(width))\n\n";
+
+    pys.reserve(2000);
+    pys += "divisions = [";
+
+    std::map<std::string, std::map<std::string, int64_t>> hash_func_score;
+    for (const auto& v : func_rtime) {
+        dump_func(v.first, v.second, hash_score, hash_func_score);
+        pys += "\"" + v.first + "\",";
+    }
+    pys.back() = ']';
+    pys += "\n\n";
+
+    auto map_size  = hash_func_score.size();
+    auto func_size = func_rtime.size();
+
+    pys += "plt.figure(figsize=(14," + std::to_string(func_size) + "))\n";
+    pys += "index = np.arange(" + std::to_string(func_size) + ")\n";
+    if (map_size > 4)
+        pys += "width = " + std::to_string(0.8 / map_size) + "\n\n";
+    else
+        pys += "width = 0.20\n\n";
+
+    std::string plt;
+    int id = 0;
+    static std::vector<std::string> colors = {
+        "cyan", "magenta",
+        "green", "red", "blue", "yellow", "black", "orange", "brown", "grey", "pink",
+        "#eeefff", "burlywood",
+    };
+
+    for (auto& kv : hash_func_score) {
+        pys += kv.first + "= [";
+        for (auto& vk : kv.second) {
+            pys += std::to_string(vk.second) + ",";
+        }
+        pys.back() = ']';
+        pys += "\n";
+
+        plt += "a" + std::to_string(id + 1) + " = plt.barh(index + width * " + std::to_string(id) + "," + kv.first +
+            ",width, label = \"" + kv.first + "\")\n";
+        plt += "autolabel(a" + std::to_string(id + 1) + ")\n\n";
+        id ++;
+    }
+
+    //os
+    char os_info[2048]; printInfo(os_info);
+
+    pys += "\n" + plt + "\n";
+    auto file = std::string(sKeyType) + "_" + sValueType;
+    pys += std::string("file = \"") + file + ".png\"\n\n";
+    pys += std::string("plt.title(\"") + file + "-" + std::to_string(tcase) + "\")\n";
+    pys +=
+        "plt.xlabel(\"performance\")\n"
+        "plt.xlabel(\"" + std::string(os_info) + "\")\n" 
+        "plt.yticks(index + width / 2, divisions)\n"
+        "plt.legend()\n"
+        "plt.show()\n"
+        "plt.savefig(file)\n";
+
+    pys += std::string("\n\n# ") + os_info; 
+
+    if (tcase % 10 != 0)
+        return;
+
+    puts(pys.c_str());
+    std::ofstream  outfile;
+    auto full_file = file + ".py";
+    outfile.open("./" + full_file, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    if (outfile.is_open())
+        outfile << pys;
+    else
+        printf("\n\n =============== can not open %s ==============\n\n", full_file.c_str());
+
+    outfile.close();
 }
 
 template<class hash_type>
@@ -506,7 +587,28 @@ void insert_reserve(const std::string& hash_name, const std::vector<keyType>& vL
 }
 
 template<class hash_type>
-void insert_find_erase(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_multihash(const std::string& hash_name, const std::vector<keyType>& vList)
+{
+    if (show_name.count(hash_name) == 0)
+        return;
+
+#if KEY_INT
+    auto ts1 = getTime();
+    size_t sum = 0;
+    std::array<hash_type, 1024> mh;
+
+    for (const auto v : vList) {
+        auto hash_id = ((uint64_t)v) % 1024;
+        sum += mh[hash_id].emplace(v / 1024, TO_VAL(0)).second;
+    }
+
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+    printf("    %62s    %s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), mh[0].load_factor());
+#endif
+}
+
+template<class hash_type>
+void insert_find_erase(const hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) != 0)
     {
@@ -514,18 +616,19 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, con
         size_t sum = 0;
         hash_type tmp(ahash);
 
-        for (const auto& v : vList) {
+        for (auto & v : vList) {
 #if KEY_INT
-            auto v2 = v + v / 7;
+            auto v2 = v + v / 101;
 #else
-            auto v2 = v + "1";
+            v += char(128 + (int)v[0]);
+            const auto &v2 = v;
 #endif
             sum += tmp.emplace(v2, TO_VAL(0)).second;
             sum += tmp.count(v2);
             sum += tmp.erase(v2);
         }
-        check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        //printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+        check_func_result(hash_name, __FUNCTION__, sum, ts1, 3);
+        //printf("             %122s    %s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
@@ -553,7 +656,7 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
             }
         }
         check_func_result(hash_name, level, sum, ts1);
-        printf("             %62s    %8s  %5d ns, factor = %.2f\n", level, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
+//        printf("             %62s    %8s  %5d ns, factor = %.3f\n", level, hash_name.c_str(), AVE_TIME(ts1, vList.size()), tmp.load_factor());
     }
 }
 
@@ -569,7 +672,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         const auto max_loadf = 0.998f;
         tmp.max_load_factor(max_loadf);
         tmp.reserve(pow2 / 2);
-        int minn = (max_loadf - 0.3f) * pow2, maxn = max_loadf * pow2;
+        int minn = (max_loadf - 0.2f) * pow2, maxn = max_loadf * pow2;
         int i = 0;
 
         for (; i < minn; i++) {
@@ -598,7 +701,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
             sum += tmp.count(v2);
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %122s    %8s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
+        printf("             %122s    %8s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, maxn - minn), tmp.load_factor());
     }
 }
 
@@ -618,7 +721,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
             sum += ahash.count(TO_KEY(v));
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("    %12s  %8s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, pow2), ahash.load_factor());
+       printf("    %12s  %8s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, pow2), ahash.load_factor());
     }
 }
 
@@ -648,7 +751,7 @@ void find_hit_all(const hash_type& ahash, const std::string& hash_name, const st
         auto ts1 = getTime();
         size_t sum = 0;
         for (const auto& v : vList) {
-#if KEY_INT 
+#if KEY_INT
             sum += ahash.count(v) + v;
     #if FL1
             if (v % (1024 * 64) == 0)
@@ -970,12 +1073,13 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
     //for (int i = 0; i < max_loop; i += (int)oList.size())
     {
         hash_type hash;
-        load_factor = 87;
+        load_factor = 50 + oList.size() % 50;
         hash.max_load_factor(load_factor / 100.0);
         hash.clear();
 
         insert_reserve <hash_type>(hash_name, oList);
         insert_high_load <hash_type>(hash_name, oList);
+        insert_multihash <hash_type>(hash_name, oList);
         const uint32_t l1_size = (64 * 1024)   / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
         const uint32_t l3_size = (2048 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
 
@@ -1160,7 +1264,7 @@ static int benchHashMap(int n)
     constexpr int dis_input = 5;
     if (tcase++ % dis_input == 0) {
         printf("--------------------------------%s load_factor = %d--------------------------------\n", __FUNCTION__, iload);
-        dump_all(func_hash_time, hash_score);
+        dump_all(func_hash_time, hash_score, tcase - 1);
 
         if (top3.size() >= 3)
             puts("======== hash  top1   top2  top3 =======================");
@@ -1303,10 +1407,106 @@ void testSynax()
 }
 #endif
 
+static void cpuidInfo(int regs[4], int id, int ext)
+{
+#if _MSC_VER >= 1600 //2010
+    __cpuidex(regs, id, ext);
+#elif __GNUC__ || __TINYC__
+    __asm__ (
+        "cpuid\n"
+        : "=a"(regs[0]), "=b"(regs[1]), "=c"(regs[2]), "=d"(regs[3])
+        : "a"(id), "c"(ext)
+    );
+#elif ASM_X86
+    __asm
+    {
+        mov eax, id
+        mov ecx, ext
+        cpuid
+        mov edi, regs
+        mov dword ptr [edi + 0], eax
+        mov dword ptr [edi + 4], ebx
+        mov dword ptr [edi + 8], ecx
+        mov dword ptr [edi +12], edx
+    }
+#endif
+}
+
+
+static void printInfo(char* out)
+{
+    const char* sepator =
+        "------------------------------------------------------------------------------------------------------------";
+
+    puts(sepator);
+    //    puts("Copyright (C) by 2019-2020 Huang Yuanbing bailuzhou at 163.com\n");
+
+    char cbuff[512] = {0};
+    char* info = cbuff;
+#ifdef __clang__
+    info += sprintf(info, "clang %s", __clang_version__); //vc/gcc/llvm
+#if __llvm__
+    info += sprintf(info, " on llvm/");
+#endif
+#endif
+
+#if _MSC_VER
+    info += sprintf(info, "ms vc++  %d", _MSC_VER);
+#elif __GNUC__
+    info += sprintf(info, "gcc %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+#elif __INTEL_COMPILER
+    info += sprintf(info, "intel c++ %d", __INTEL_COMPILER);
+#endif
+
+#if __cplusplus > 199711L
+    info += sprintf(info, " __cplusplus = %d", static_cast<int>(__cplusplus));
+#endif
+
+#if __x86_64__ || __amd64__ || _M_X64 || __amd64 || __x86_64
+    info += sprintf(info, " x86-64");
+#elif __i386__ || _M_IX86 || _X86_ || __i386
+    info += sprintf(info, " x86");
+#elif __arm64__
+    info += sprintf(info, " arm64");
+#elif __arm__
+    info += sprintf(info, " arm");
+#else
+    info += sprintf(info, " unknow");
+#endif
+
+#if _WIN32
+    info += sprintf(info, " OS = Win");
+#elif __linux__
+    info += sprintf(info, " OS = linux");
+#elif __MAC__
+    info += sprintf(info, " OS = MAC");
+#elif __unix__
+    info += sprintf(info, " OS = unix");
+#elif
+    info += sprintf(info, " OS = unknow");
+#endif
+
+    info += sprintf(info, ", cpu = ");
+    int regs[4] = {0};
+    char vendor[0x40] = {0};
+    int (*pTmp)[4] = (int(*)[4])vendor;
+    cpuidInfo(*pTmp ++, 0x80000002, 0);
+    cpuidInfo(*pTmp ++, 0x80000003, 0);
+    cpuidInfo(*pTmp ++, 0x80000004, 0);
+
+    info += sprintf(info, vendor);
+
+    puts(cbuff);
+    if (out)
+        strcpy(out, cbuff);
+    puts(sepator);
+}
+
 int main(int argc, char* argv[])
 {
     srand((unsigned)time(0));
 
+    printInfo(nullptr);
     bool auto_set = false;
     auto tn = 0;
     auto maxc = 500;
@@ -1314,7 +1514,7 @@ int main(int argc, char* argv[])
     auto minn = (1024 * 1024 * 8) / (sizeof(keyType) + sizeof(valueType) + 8);
 
     double load_factor = 0.0945;
-    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-6hmpsfu] t(n)\n", (int)maxn);
+    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u h e] t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
@@ -1330,7 +1530,7 @@ int main(int argc, char* argv[])
             auto_set = atoi(&argv[i][0] + 1) != 0;
         else if (cmd == 'd') {
             for (char c = argv[i][0], j = 0; c != '\0'; c = argv[i][j++]) {
-                if (c >= '2' && c < '8') {
+                if (c >= '2' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;
                     if (show_name.contains(hash_name))
@@ -1350,6 +1550,8 @@ int main(int argc, char* argv[])
                     show_name.erase("flat");
                 else if (c == 'u')
                     show_name.insert("stl_hash", "unordered_map");
+                else if (c == 'e')
+                    show_name.insert("emilib3", "emilib3");
             }
         }
     }
@@ -1365,10 +1567,10 @@ int main(int argc, char* argv[])
 #endif
 
     auto nows = time(0);
-#ifndef RD
+#ifdef RD
     sfc64 srng(nows);
 #else
-    sfc64 srng(1);
+    sfc64 srng(123);
 #endif
 
     while (true) {

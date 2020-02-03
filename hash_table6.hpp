@@ -149,9 +149,9 @@ inline static uint32_t CTZ(const size_t n)
     unsigned long index;
     #if defined(_WIN64) || defined(__LP64__) || defined(__x86_64__) || _M_X64
     _BitScanForward64(&index, n);
-#else
+    #else
     _BitScanForward(&index, n);
-#endif
+    #endif
 #elif defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
@@ -160,10 +160,10 @@ inline static uint32_t CTZ(const size_t n)
     #if defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
     uint32_t index;
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-#else
+    #else
     uint32_t index;
     __asm__("bsf %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-#endif
+    #endif
 #endif
 
     return (uint32_t)index;
