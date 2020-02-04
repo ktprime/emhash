@@ -1617,7 +1617,9 @@ private:
         }
         return _hasher(key);
 #elif EMHASH_IDENTITY_HASH
-        return key + (key >> 20);
+        return key + (key >> (sizeof(UType) * 4));
+#elif EMHASH_WYHASH64
+        return wyhash64(key, _num_buckets);
 #else
         return _hasher(key);
 #endif
@@ -1626,7 +1628,7 @@ private:
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef wyhash_version_4
+#ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;

@@ -447,7 +447,7 @@ public:
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         const auto next_bucket = _pairs[bucket].second;
         if (next_bucket == INACTIVE)
             return 0;
@@ -455,7 +455,7 @@ public:
             return bucket + 1;
 
         const auto& bucket_key = _pairs[bucket].first;
-        return hash_bucket(bucket_key) + 1;
+        return (hash_bucket(bucket_key) & _mask) + 1;
     }
 
     //Returns the number of elements in bucket n.
@@ -465,7 +465,7 @@ public:
         if (next_bucket == INACTIVE)
             return 0;
 
-        next_bucket = hash_bucket(_pairs[bucket].first);
+        next_bucket = hash_bucket(_pairs[bucket].first) & _mask;
         uint32_t bucket_size = 1;
 
         //iterator each item in current main bucket
@@ -487,7 +487,7 @@ public:
             return INACTIVE;
 
         const auto& bucket_key = _pairs[bucket].first;
-        const auto main_bucket = hash_bucket(bucket_key);
+        const auto main_bucket = hash_bucket(bucket_key) & _mask;
         return main_bucket;
     }
 
@@ -510,7 +510,7 @@ public:
             return -1;
 
         const auto& bucket_key = _pairs[bucket].first;
-        const auto main_bucket = hash_bucket(bucket_key);
+        const auto main_bucket = hash_bucket(bucket_key) & _mask;
         if (main_bucket != bucket)
             return 0;
         else if (next_bucket == bucket)
@@ -710,7 +710,7 @@ public:
 
     uint32_t try_insert_mainbucket(const KeyT& key)
     {
-        auto bucket = hash_bucket(key);
+        auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = _pairs[bucket].second;
         if (next_bucket == INACTIVE) {
             NEW_KEY(key, bucket);
@@ -888,7 +888,7 @@ private:
 
     uint32_t erase_key(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = _pairs[bucket].second;
         if (next_bucket == INACTIVE)
             return INACTIVE;
@@ -904,7 +904,7 @@ private:
                 std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
             _pairs[bucket].second = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
-        }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(_pairs[bucket].first)))
+        }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(_pairs[bucket].first)) & _mask)
             return INACTIVE;
 **/
         auto prev_bucket = bucket;
@@ -927,7 +927,7 @@ private:
     uint32_t erase_bucket(const uint32_t bucket)
     {
         const auto next_bucket = _pairs[bucket].second;
-        const auto main_bucket = hash_bucket(_pairs[bucket].first);
+        const auto main_bucket = hash_bucket(_pairs[bucket].first) & _mask;
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = _pairs[next_bucket].second;
@@ -948,7 +948,7 @@ private:
     // Find the bucket with this key, or return bucket size
     uint32_t find_filled_bucket(const KeyT& key) const
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = _pairs[bucket].second;
         const auto& bucket_key = _pairs[bucket].first;
         if (next_bucket == INACTIVE)
@@ -957,7 +957,7 @@ private:
             return bucket;
         else if (next_bucket == bucket)
             return _num_buckets;
-//        else if (bucket != (hash_bucket(bucket_key)))
+//        else if (bucket != (hash_bucket(bucket_key) & _mask))
 //            return _num_buckets;
 
         while (true) {
@@ -1004,14 +1004,14 @@ private:
 */
     uint32_t find_or_allocate(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         const auto& bucket_key = _pairs[bucket].first;
         auto next_bucket = _pairs[bucket].second;
         if (next_bucket == INACTIVE || _eq(key, bucket_key))
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(bucket_key);
+        const auto main_bucket = hash_bucket(bucket_key) & _mask;
         if (main_bucket != bucket)
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket == bucket)
@@ -1101,13 +1101,13 @@ private:
 
     uint32_t find_unique_bucket(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key);
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = _pairs[bucket].second;
         if (next_bucket == INACTIVE)
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(_pairs[bucket].first);
+        const auto main_bucket = hash_bucket(_pairs[bucket].first) & _mask;
         if (main_bucket != bucket)
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket != bucket)
@@ -1182,21 +1182,21 @@ private:
     {
 #ifdef EMHASH_FIBONACCI_HASH
         if (sizeof(UType) <= sizeof(uint32_t))
-            return hash32(key) & _mask;
+            return hash32(key);
         else
-            return (uint32_t)hash64(key) & _mask;
+            return (uint32_t)hash64(key);
 #elif EMHASH_IDENTITY_HASH
-        return (key + (key >> 20)) & _mask;
+        return (key + (key >> 20));
 #else
-        return _hasher(key) & _mask;
+        return _hasher(key);
 #endif
     }
 
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef wyhash_version_4
-        return wyhash(key.c_str(), key.size(), key.size()) & _mask;
+#ifdef WYHASH_LITTLE_ENDIAN
+        return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {
@@ -1206,9 +1206,9 @@ private:
             for (int i = 0, j = 1; i < key.size(); i += j++)
                 hash = key[i] + hash * 131;
         }
-        return hash & _mask;
+        return hash;
 #else
-        return _hasher(key) & _mask;
+        return _hasher(key);
 #endif
     }
 
@@ -1216,9 +1216,9 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef EMHASH_FIBONACCI_HASH
-        return (_hasher(key) * 11400714819323198485ull) & _mask;
+        return (_hasher(key) * 11400714819323198485ull);
 #else
-        return _hasher(key) & _mask;
+        return _hasher(key);
 #endif
     }
 
@@ -1238,5 +1238,5 @@ private:
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
-//template <class Key, typename Hash = std::hash<Key>> using ktprime_hashset = emhash6::HashSet<Key, Hash>;
+template <class Key, typename Hash = std::hash<Key>> using em_hash_set = emhash9::HashSet<Key, Hash>;
 #endif

@@ -1,7 +1,11 @@
-#pragma once
+#ifndef APP_SFC64_H
+#define APP_SFC64_H
+
+#include "randomseed.h"
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <random>
 #include <utility>
@@ -12,6 +16,31 @@ class sfc64 {
 public:
     using result_type = uint64_t;
 
+    sfc64()
+        : sfc64(randomseed()) {}
+
+    sfc64(uint64_t a, uint64_t b, uint64_t c, uint64_t counter)
+        : m_a{a}
+        , m_b{b}
+        , m_c{c}
+        , m_counter{counter} {}
+
+    sfc64(std::array<uint64_t, 4> const& st)
+        : m_a{st[0]}
+        , m_b{st[1]}
+        , m_c{st[2]}
+        , m_counter{st[3]} {}
+
+    explicit sfc64(uint64_t s)
+        : m_a(s)
+        , m_b(s)
+        , m_c(s)
+        , m_counter(1) {
+        for (int i = 0; i < 12; ++i) {
+            operator()();
+        }
+    }
+
     // no copy ctors so we don't accidentally get the same random again
     sfc64(sfc64 const&) = delete;
     sfc64& operator=(sfc64 const&) = delete;
@@ -19,11 +48,7 @@ public:
     sfc64(sfc64&&) = default;
     sfc64& operator=(sfc64&&) = default;
 
-    sfc64(std::array<uint64_t, 4> const& state)
-        : m_a(state[0])
-        , m_b(state[1])
-        , m_c(state[2])
-        , m_counter(state[3]) {}
+    ~sfc64() = default;
 
     static constexpr uint64_t(min)() {
         return (std::numeric_limits<uint64_t>::min)();
@@ -32,21 +57,12 @@ public:
         return (std::numeric_limits<uint64_t>::max)();
     }
 
-    sfc64()
-        : sfc64(UINT64_C(0x853c49e6748fea9b)) {}
-
-    sfc64(uint64_t seed)
-        : m_a(seed)
-        , m_b(seed)
-        , m_c(seed)
-        , m_counter(1) {
-        for (int i = 0; i < 12; ++i) {
-            operator()();
-        }
+    void seed() {
+        seed(randomseed());
     }
 
-    void seed() {
-        *this = sfc64{std::random_device{}()};
+    void seed(uint64_t s) {
+        state(sfc64{s}.state());
     }
 
     uint64_t operator()() noexcept {
@@ -57,15 +73,30 @@ public:
         return tmp;
     }
 
-    // this is a bit biased, but for our use case that's not important.
+    template <typename T>
+    T uniform(T input) {
+        return static_cast<T>(operator()(static_cast<uint64_t>(input)));
+    }
+
+    template <typename T>
+    T uniform() {
+        return static_cast<T>(operator()());
+    }
+
+    // Uses the java method. A bit slower than 128bit magic from
+    // https://arxiv.org/pdf/1805.10941.pdf, but produces the exact same results in both 32bit and
+    // 64 bit.
     uint64_t operator()(uint64_t boundExcluded) noexcept {
-#ifdef __SIZEOF_INT128__
-        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#endif
+        uint64_t x, r;
+        do {
+            x = operator()();
+            r = x % boundExcluded;
+        } while (x - r > (UINT64_C(0) - boundExcluded));
+        return r;
     }
 
     std::array<uint64_t, 4> state() const {
-        return {m_a, m_b, m_c, m_counter};
+        return {{m_a, m_b, m_c, m_counter}};
     }
 
     void state(std::array<uint64_t, 4> const& s) {
@@ -75,17 +106,46 @@ public:
         m_counter = s[3];
     }
 
+    // see http://prng.di.unimi.it/
+    double uniform01() noexcept {
+        auto i = (UINT64_C(0x3ff) << 52U) | (operator()() >> 12U);
+        // can't use union in c++ here for type puning, it's undefined behavior.
+        // std::memcpy is optimized away anyways.
+        double d;
+        std::memcpy(&d, &i, sizeof(double));
+        return d - 1.0;
+    }
+
 private:
     template <typename T>
-    T rotl(T const x, int k) {
+    T rotl(T const x, size_t k) {
         return (x << k) | (x >> (8 * sizeof(T) - k));
     }
 
-    static constexpr int rotation = 24;
-    static constexpr int right_shift = 11;
-    static constexpr int left_shift = 3;
+    static constexpr size_t rotation = 24;
+    static constexpr size_t right_shift = 11;
+    static constexpr size_t left_shift = 3;
     uint64_t m_a;
     uint64_t m_b;
     uint64_t m_c;
     uint64_t m_counter;
 };
+
+class RandomBool {
+public:
+    template <typename Rng>
+    bool operator()(Rng& rng) {
+        if (1 == m_rand) {
+            m_rand = std::uniform_int_distribution<size_t>{}(rng) | s_mask_left1;
+        }
+        bool const ret = m_rand & 1;
+        m_rand >>= 1;
+        return ret;
+    }
+
+private:
+    static constexpr const size_t s_mask_left1 = size_t(1) << (sizeof(size_t) * 8 - 1);
+    size_t m_rand = 1;
+};
+
+#endif
