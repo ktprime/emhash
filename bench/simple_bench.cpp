@@ -1,20 +1,29 @@
 #include <string>
 #include <chrono>
 #include <unordered_map>
+#include <random>
+#include <iostream>
+
+//#define EMHASH_HIGH_LOAD 201000
+//#define EMHASH_FIBONACCI_HASH  1
+
+#include "sfc64.h"
 
 #define EMHASH_HIGH_LOAD 201000
 
 #include "tsl/robin_map.h"
 #include "ska/flat_hash_map.hpp"
 #include "martin/robin_hood.h"
-#include "hash_table52.hpp"
-#include "hash_table56.hpp"
-#include "hash_table55.hpp"
-#include "hash_table57.hpp"
+#include "hash_table2.hpp"
+#include "hash_table6.hpp"
+#include "hash_table5.hpp"
+#include "hash_table7.hpp"
 #include "phmap/phmap.h"
 #include "hrd/hash_set7.h"
 #include "hash_table232.hpp"
 
+#include "hash_set4.hpp"
+#include "hash_set3.hpp"
 using my_clock = std::chrono::high_resolution_clock;
 
 
@@ -94,6 +103,41 @@ int main()
 
     for (int i = 0; i < 10000; i ++)
         mmap[rand()] = mmap[rand()];
+    size_t maxSize = 1U << 28;
+    size_t numReps = 100;
+
+    std::random_device rd;
+    auto rng = std::mt19937{rd()};
+    auto dis = std::uniform_int_distribution<uint32_t>{0, (1U << 31) - 1};
+    sfc64 srng(rd());
+
+    for (size_t rep = 0; rep < numReps; ++rep) {
+        auto start = my_clock::now();
+#ifndef ET
+        emhash9::HashSet<uint32_t> set;
+#else
+        ska::bytell_hash_set<uint32_t> set;
+        //phmap::flat_hash_set<uint32_t> set;
+        //robin_hood::unordered_set<uint32_t> set;
+#endif
+        set.max_load_factor(0.97f);
+
+        while (set.size() < maxSize) {
+            //auto key = dis(rng);
+            auto key = srng();
+
+            size_t prevSize = set.size();
+            size_t prevCap = set.bucket_count();
+            set.insert(key);
+            if (set.bucket_count() > prevCap && prevCap > 0) {
+                auto lf = static_cast<double>(prevSize) / prevCap;
+                std::cout << prevCap << " " << prevSize << " " << lf << "\n";
+            }
+        }
+
+        double time_use = std::chrono::duration_cast<std::chrono::duration<double>>(my_clock::now() - start).count();
+        std::cout << " time = " << time_use << " sec\n\n";
+    }
 
     return 0;
 }

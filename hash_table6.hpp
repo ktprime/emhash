@@ -1482,7 +1482,7 @@ private:
         }
 #endif
         constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-        const auto qmask = (SIZE_BIT + _num_buckets - 1) / SIZE_BIT - 1;
+        const auto qmask = _mask / SIZE_BIT;
         for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
             const auto bmask = *((size_t*)_bitmask + step);
             if (bmask != 0)
@@ -1579,6 +1579,10 @@ private:
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         __uint128_t r = key; r *= k;
         return (uint32_t)(r >> 64) + (uint32_t)r;
+#elif _WIN32
+        uint64_t high;
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        return _umul128(key, k, &high) + high;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;

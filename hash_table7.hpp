@@ -133,6 +133,7 @@
 
 #if _WIN32 || _MSC_VER > 1400
     #include <intrin.h>
+    #pragma  intrinsic(_umul128)
 #endif
 
 namespace emhash7 {
@@ -147,12 +148,12 @@ inline static uint32_t CTZ(const size_t n)
     #else
     _BitScanForward(&index, n);
     #endif
-#elif defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
+#elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
     uint32_t index = __builtin_ctzl(n);
 #elif 1
-    #if defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
+    #if defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index;
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
     #else
@@ -1492,7 +1493,7 @@ private:
             return bucket_from + CTZ(bmask) - 0;
 
         constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-        const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
+        const auto qmask = _mask / SIZE_BIT;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
 //        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
         for (auto step = _last & qmask; ; step = ++_last & qmask) {
@@ -1586,6 +1587,10 @@ private:
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         __uint128_t r = key; r *= k;
         return (uint32_t)(r >> 64) + (uint32_t)r;
+#elif _WIN32
+        uint64_t high;
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        return _umul128(key, k, &high) + high;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
@@ -1628,7 +1633,7 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size());
+        return madhash(key.c_str(), key.size());
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;
         if (key.size() < 64) {

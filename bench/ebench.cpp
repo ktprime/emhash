@@ -965,8 +965,8 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 static int TestHashMap(int n, int max_loops = 1234567)
 {
-    emhash6::HashMap <keyType, int> ehash2;
-    emhash7::HashMap <keyType, int> ehash5;
+    emhash7::HashMap <keyType, int> ehash2;
+    emhash5::HashMap <keyType, int> ehash5;
 
     sfc64 srng(n);
 #if 0
@@ -1389,8 +1389,8 @@ void testSynax()
         //mymap.emplace(std::move(item));
     }
     decltype(mymap) mymap2;
-    mymap2.insert2(kv.begin(), kv.end());
-    mymap2.insert2(kv.begin(), kv.end());
+    //mymap2.insert2(kv.begin(), kv.end());
+    //mymap2.insert2(kv.begin(), kv.end());
     mymap2 = mymap;
     //mymap2.reserve(mymap.bucket_count() * mymap.max_load_factor());
 
