@@ -16,7 +16,7 @@ A quite fast and memory efficient *open address c++ flat hash map*, it is easy t
 
 - **lru** can be used if compile marco EMHASH_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be founded/probed only once during next access.
 
-- **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
+- **no tombstones** in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
     
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in some case
 for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
@@ -38,7 +38,7 @@ for example some case pay attention on finding hot, some focus on finding cold(m
    - quadratic probing start work after limited linear probing
    - random probing used with a very bad hash
 
-- use the **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *emhash_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
+- use the **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *EMHASH_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be showed from dump info.
  
