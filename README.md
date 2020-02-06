@@ -199,13 +199,12 @@ my ebench result: low is best
     myhash[1] = 1;
     auto& myref = myhash[1];//**wrong used here**,  can not keep reference stable
      ....
-    auto old = myref ;  // myref maybe changed
-    
-   
-    emhash7:HashMap<int,int> myhash(10);
-	for (int i = 0; i < 10000; i ++)
-		myhash[rand()] = myhash[rand()]; // it will be crashed because of rehash.
-```
+    auto old = myref ;  // myref maybe be changed and not invalid.
+       
+    emhash7:HashMap<int,int> myhash2;
+    for (int i = 0; i < 10000; i ++)
+        myhash2[rand()] = myhash2[rand()]; // it will be crashed because of rehash, call reserve before or use insert.
+ ```
 
 - for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
 ```  
