@@ -200,6 +200,11 @@ my ebench result: low is best
     auto& myref = myhash[1];//**wrong used here**,  can not keep reference stable
      ....
     auto old = myref ;  // myref maybe changed
+    
+   
+    emhash7:HashMap<int,int> myhash(10);
+	for (int i = 0; i < 10000; i ++)
+		myhash[rand()] = myhash[rand()]; // it will be crashed because of rehash.
 ```
 
 - for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
@@ -210,15 +215,14 @@ my ebench result: low is best
   
 ```
 
-- the only known bug as follow if erase not current key/iterator during iteration without break. some key will be iteraored twice or missed.to fix it can desearse performance 20％ or even much more.
+- the only known bug as follow example, if erase key/iterator during iteration. one key will be iteraored twice or missed. and fix it can desearse performance 20% or even much more and no good way to fix.
 
 ```
     emhash7:HashMap<int,int> myhash;
-    int key = some_key;
-    //dome some init
+    //dome some init ...
     for (const auto& it : myhash)
     {
-        if (key = it.first) {
+        if (some_key = it.first) {
             myhash.erase(key);  //no any break
        }
        ...
