@@ -187,11 +187,10 @@ txt file result [martin_bench.txt](https://github.com/ktprime/emhash/blob/master
 
 the benchmark code is some tiny changed for injecting new hash map, the result is not final beacuse it depends on os, cpu, compiler and dataset input.
 
-my ebench result:
-![](int_int64_t.png)
-![](int64_t_int64_t.png)
-![](string_int64_t.png)
-![](string_Struct.png)
+my ebench result: low is best
+![](int64_int.png)
+![](string_int.png)
+![](int64_t_Struct.png)
 
 # some bad
 - it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
