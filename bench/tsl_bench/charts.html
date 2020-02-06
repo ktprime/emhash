@@ -1,0 +1,592 @@
+<html>
+    <head>
+        <!--[if IE]><script language="javascript" type="text/javascript" src="./excanvas.min.js"></script><![endif]-->
+        <script language="javascript" type="text/javascript" src="./jquery.js"></script>
+        <script language="javascript" type="text/javascript" src="./jquery.flot.js"></script>
+    </head>
+    <body>
+
+<script>
+    $("<div id='tooltip'></div>").css({
+                                    position: "absolute",
+                                    display: "none",
+                                    border: "1px solid #fdd",
+                                    padding: "2px",
+                                    "background-color": "#fee",
+                                    opacity: 0.80
+                                  }).appendTo("body");
+                
+    series_settings = {
+        lines: { show: true },
+        points: { show: true }
+    };
+
+    grid_settings = { tickColor: '#ddd', hoverable: true };
+
+    xaxis_settings = {
+        tickFormatter: function(num, obj) { 
+                           if(num >= 1000*1000) {
+                               return parseFloat(num/(1000*1000)).toFixed(2) + 'M'; 
+                           }
+                           else {
+                               return parseInt(num/1000) + 'k'; 
+                           }
+                       }
+    };
+
+    yaxis_runtime_settings = {
+        tickFormatter: function(num, obj) { return (+num.toFixed(2)) + ' sec.'; }
+    };
+
+    yaxis_memory_settings = {
+        tickFormatter: function(num, obj) { return parseInt(num/1024/1024) + 'MiB'; }
+    };
+
+    legend_settings = {
+        position: 'nw',
+        backgroundOpacity: 0
+    };
+
+    runtime_settings = {
+        series: series_settings,
+        grid: grid_settings,
+        xaxis: xaxis_settings,
+        yaxis: yaxis_runtime_settings,
+        legend: legend_settings
+    };
+
+    memory_settings = {
+        series: series_settings,
+        grid: grid_settings,
+        xaxis: xaxis_settings,
+        yaxis: yaxis_memory_settings,
+        legend: legend_settings
+    };
+
+    chart_data = {"read_miss_random_full_runtime": [{"program": "hood_map", "data": [[500000, 0.005011, 0.48], [1000000, 0.010632, 0.48], [1500000, 0.022965, 0.72], [2000000, 0.021779, 0.48], [2500000, 0.034519, 0.6], [3000000, 0.05043, 0.72], [3500000, 0.093387, 0.83], [4000000, 0.044043, 0.48], [4500000, 0.052013, 0.54], [5000000, 0.07139, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.005509, 0.48], [1000000, 0.01154, 0.48], [1500000, 0.023378, 0.72], [2000000, 0.02414, 0.48], [2500000, 0.033993, 0.6], [3000000, 0.049462, 0.72], [3500000, 0.092807, 0.83], [4000000, 0.05121, 0.48], [4500000, 0.059265, 0.54], [5000000, 0.069487, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.009319, 0.48], [1000000, 0.020904, 0.48], [1500000, 0.034263, 0.72], [2000000, 0.044484, 0.48], [2500000, 0.06038, 0.6], [3000000, 0.074363, 0.72], [3500000, 0.090731, 0.83], [4000000, 0.091628, 0.48], [4500000, 0.108948, 0.54], [5000000, 0.124287, 0.6]], "label": "emhash7::HashMap"}], 
+"iteration_random_full_runtime": [{"program": "hood_map", "data": [[500000, 0.002863, 0.48], [1000000, 0.005823, 0.48], [1500000, 0.008369, 0.72], [2000000, 0.011712, 0.48], [2500000, 0.014188, 0.6], [3000000, 0.016721, 0.72], [3500000, 0.019319, 0.83], [4000000, 0.023277, 0.48], [4500000, 0.025739, 0.54], [5000000, 0.028263, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.004138, 0.48], [1000000, 0.008368, 0.48], [1500000, 0.007091, 0.72], [2000000, 0.016719, 0.48], [2500000, 0.016516, 0.6], [3000000, 0.014189, 0.72], [3500000, 0.011095, 0.83], [4000000, 0.033321, 0.48], [4500000, 0.033786, 0.54], [5000000, 0.032963, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.006357, 0.48], [1000000, 0.0128, 0.48], [1500000, 0.009986, 0.72], [2000000, 0.025498, 0.48], [2500000, 0.023694, 0.6], [3000000, 0.020058, 0.72], [3500000, 0.015744, 0.83], [4000000, 0.050836, 0.48], [4500000, 0.049902, 0.54], [5000000, 0.047453, 0.6]], "label": "emhash7::HashMap"}], 
+"delete_random_full_runtime": [{"program": "hood_map", "data": [[500000, 0.010387, 0.0], [1000000, 0.024749, 0.0], [1500000, 0.047041, 0.0], [2000000, 0.055275, 0.0], [2500000, 0.075384, 0.0], [3000000, 0.10415, 0.0], [3500000, 0.149837, 0.0], [4000000, 0.117552, 0.0], [4500000, 0.138919, 0.0], [5000000, 0.165489, 0.0]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.015963, 0.0], [1000000, 0.038817, 0.0], [1500000, 0.059879, 0.0], [2000000, 0.083934, 0.0], [2500000, 0.106513, 0.0], [3000000, 0.129545, 0.0], [3500000, 0.154787, 0.0], [4000000, 0.184448, 0.0], [4500000, 0.201629, 0.0], [5000000, 0.22439, 0.0]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.012066, 0.0], [1000000, 0.02942, 0.0], [1500000, 0.051694, 0.0], [2000000, 0.065683, 0.0], [2500000, 0.088755, 0.0], [3000000, 0.11429, 0.0], [3500000, 0.14483, 0.0], [4000000, 0.136955, 0.0], [4500000, 0.160221, 0.0], [5000000, 0.185594, 0.0]], "label": "emhash7::HashMap"}], 
+"insert_random_full_reserve_runtime": [{"program": "hood_map", "data": [[500000, 0.020477, 0.48], [1000000, 0.067861, 0.48], [1500000, 0.100631, 0.72], [2000000, 0.166826, 0.48], [2500000, 0.203439, 0.6], [3000000, 0.242415, 0.72], [3500000, 0.297923, 0.83], [4000000, 0.365294, 0.48], [4500000, 0.402675, 0.54], [5000000, 0.443335, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.021168, 0.48], [1000000, 0.075221, 0.48], [1500000, 0.108636, 0.72], [2000000, 0.188233, 0.48], [2500000, 0.231629, 0.6], [3000000, 0.271795, 0.72], [3500000, 0.31376, 0.83], [4000000, 0.41327, 0.48], [4500000, 0.460712, 0.54], [5000000, 0.507957, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.023996, 0.48], [1000000, 0.06025, 0.48], [1500000, 0.09071, 0.72], [2000000, 0.135078, 0.48], [2500000, 0.167525, 0.6], [3000000, 0.20245, 0.72], [3500000, 0.241822, 0.83], [4000000, 0.283443, 0.48], [4500000, 0.317875, 0.54], [5000000, 0.351461, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_random_full_memory": [{"program": "hood_map", "data": [[500000, 18296832, 0.48], [1000000, 36208640, 0.48], [1500000, 36036608, 0.72], [2000000, 71770112, 0.48], [2500000, 71852032, 0.6], [3000000, 71802880, 0.72], [3500000, 71680000, 0.83], [4000000, 142991360, 0.48], [4500000, 143159296, 0.54], [5000000, 142966784, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 18300928, 0.48], [1000000, 36143104, 0.48], [1500000, 36024320, 0.72], [2000000, 71630848, 0.48], [2500000, 71778304, 0.6], [3000000, 71598080, 0.72], [3500000, 71598080, 0.83], [4000000, 143065088, 0.48], [4500000, 143151104, 0.54], [5000000, 142901248, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 25767936, 0.48], [1000000, 51167232, 0.48], [1500000, 50978816, 0.72], [2000000, 101519360, 0.48], [2500000, 101666816, 0.6], [3000000, 101756928, 0.72], [3500000, 101564416, 0.83], [4000000, 202838016, 0.48], [4500000, 202657792, 0.54], [5000000, 202665984, 0.6]], "label": "emhash7::HashMap"}], 
+"delete_small_string_runtime": [{"program": "hood_map", "data": [[500000, 0.042443, 0.0], [1000000, 0.093574, 0.0], [1500000, 0.155232, 0.0], [2000000, 0.200378, 0.0], [2500000, 0.262191, 0.0], [3000000, 0.336145, 0.0], [3500000, 0.457049, 0.0], [4000000, 0.429736, 0.0], [4500000, 0.491807, 0.0], [5000000, 0.557376, 0.0]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.064527, 0.0], [1000000, 0.139613, 0.0], [1500000, 0.2068, 0.0], [2000000, 0.290477, 0.0], [2500000, 0.364351, 0.0], [3000000, 0.432475, 0.0], [3500000, 0.508721, 0.0], [4000000, 0.635697, 0.0], [4500000, 0.719411, 0.0], [5000000, 0.784996, 0.0]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.030113, 0.0], [1000000, 0.064871, 0.0], [1500000, 0.106328, 0.0], [2000000, 0.134966, 0.0], [2500000, 0.178223, 0.0], [3000000, 0.220934, 0.0], [3500000, 0.27055, 0.0], [4000000, 0.27876, 0.0], [4500000, 0.317223, 0.0], [5000000, 0.359045, 0.0]], "label": "emhash7::HashMap"}], 
+"insert_small_string_runtime": [{"program": "hood_map", "data": [[500000, 0.12673, 0.48], [1000000, 0.277875, 0.48], [1500000, 0.374172, 0.72], [2000000, 0.59623, 0.48], [2500000, 0.692189, 0.6], [3000000, 0.793904, 0.72], [3500000, 0.942798, 0.83], [4000000, 1.2648, 0.48], [4500000, 1.3567, 0.54], [5000000, 1.46544, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.08533, 0.48], [1000000, 0.188648, 0.48], [1500000, 0.245377, 0.72], [2000000, 0.404474, 0.48], [2500000, 0.464512, 0.6], [3000000, 0.523613, 0.72], [3500000, 0.587399, 0.83], [4000000, 0.848871, 0.48], [4500000, 0.915036, 0.54], [5000000, 0.98258, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.091523, 0.48], [1000000, 0.204332, 0.48], [1500000, 0.260649, 0.72], [2000000, 0.438098, 0.48], [2500000, 0.498713, 0.6], [3000000, 0.558086, 0.72], [3500000, 0.628908, 0.83], [4000000, 0.927721, 0.48], [4500000, 0.98305, 0.54], [5000000, 1.04263, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_small_string_reserve_runtime": [{"program": "hood_map", "data": [[500000, 0.083073, 0.48], [1000000, 0.177825, 0.48], [1500000, 0.27356, 0.72], [2000000, 0.375118, 0.48], [2500000, 0.469719, 0.6], [3000000, 0.572354, 0.72], [3500000, 0.724856, 0.83], [4000000, 0.823103, 0.48], [4500000, 0.91623, 0.54], [5000000, 1.01994, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.06155, 0.48], [1000000, 0.131459, 0.48], [1500000, 0.188422, 0.72], [2000000, 0.278074, 0.48], [2500000, 0.339054, 0.6], [3000000, 0.40085, 0.72], [3500000, 0.463487, 0.83], [4000000, 0.597533, 0.48], [4500000, 0.659715, 0.54], [5000000, 0.72733, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.049863, 0.48], [1000000, 0.107008, 0.48], [1500000, 0.163852, 0.72], [2000000, 0.22289, 0.48], [2500000, 0.279011, 0.6], [3000000, 0.340697, 0.72], [3500000, 0.411071, 0.83], [4000000, 0.452271, 0.48], [4500000, 0.508636, 0.54], [5000000, 0.568681, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_string_reserve_runtime": [{"program": "hood_map", "data": [[500000, 0.119908, 0.48], [1000000, 0.256518, 0.48], [1500000, 0.380668, 0.72], [2000000, 0.538664, 0.48], [2500000, 0.660376, 0.6], [3000000, 0.821824, 0.72], [3500000, 1.01386, 0.83], [4000000, 1.20404, 0.48], [4500000, 1.35462, 0.54], [5000000, 1.51539, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.115274, 0.48], [1000000, 0.245037, 0.48], [1500000, 0.360365, 0.72], [2000000, 0.514534, 0.48], [2500000, 0.635253, 0.6], [3000000, 0.760853, 0.72], [3500000, 0.914838, 0.83], [4000000, 1.14028, 0.48], [4500000, 1.28606, 0.54], [5000000, 1.41783, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.136918, 0.48], [1000000, 0.290059, 0.48], [1500000, 0.456882, 0.72], [2000000, 0.598304, 0.48], [2500000, 0.764934, 0.6], [3000000, 0.968471, 0.72], [3500000, 1.19931, 0.83], [4000000, 1.28566, 0.48], [4500000, 1.46717, 0.54], [5000000, 1.63856, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_string_reserve_memory": [{"program": "hood_map", "data": [[500000, 75325440, 0.48], [1000000, 150245376, 0.48], [1500000, 182382592, 0.72], [2000000, 299974656, 0.48], [2500000, 332210176, 0.6], [3000000, 364224512, 0.72], [3500000, 396038144, 0.83], [4000000, 600129536, 0.48], [4500000, 632066048, 0.54], [5000000, 664174592, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 75231232, 0.48], [1000000, 150073344, 0.48], [1500000, 182243328, 0.72], [2000000, 300085248, 0.48], [2500000, 332189696, 0.6], [3000000, 364089344, 0.72], [3500000, 396365824, 0.83], [4000000, 600219648, 0.48], [4500000, 632004608, 0.54], [5000000, 664227840, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 82657280, 0.48], [1000000, 165060608, 0.48], [1500000, 197160960, 0.72], [2000000, 329994240, 0.48], [2500000, 362237952, 0.6], [3000000, 394010624, 0.72], [3500000, 426192896, 0.83], [4000000, 659968000, 0.48], [4500000, 691748864, 0.54], [5000000, 723910656, 0.6]], "label": "emhash7::HashMap"}], 
+"read_miss_string_runtime": [{"program": "hood_map", "data": [[500000, 0.020859, 0.48], [1000000, 0.042043, 0.48], [1500000, 0.086042, 0.72], [2000000, 0.106768, 0.48], [2500000, 0.141707, 0.6], [3000000, 0.20879, 0.72], [3500000, 0.343208, 0.83], [4000000, 0.230605, 0.48], [4500000, 0.29978, 0.54], [5000000, 0.344674, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.023692, 0.48], [1000000, 0.04858, 0.48], [1500000, 0.088567, 0.72], [2000000, 0.12169, 0.48], [2500000, 0.161407, 0.6], [3000000, 0.216738, 0.72], [3500000, 0.314635, 0.83], [4000000, 0.281746, 0.48], [4500000, 0.371934, 0.54], [5000000, 0.378744, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.044174, 0.48], [1000000, 0.091891, 0.48], [1500000, 0.192677, 0.72], [2000000, 0.211752, 0.48], [2500000, 0.302336, 0.6], [3000000, 0.394831, 0.72], [3500000, 0.520177, 0.83], [4000000, 0.431316, 0.48], [4500000, 0.519881, 0.54], [5000000, 0.612029, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_small_string_reserve_memory": [{"program": "hood_map", "data": [[500000, 43200512, 0.48], [1000000, 86122496, 0.48], [1500000, 86159360, 0.72], [2000000, 172167168, 0.48], [2500000, 172089344, 0.6], [3000000, 172400640, 0.72], [3500000, 172056576, 0.83], [4000000, 344145920, 0.48], [4500000, 343965696, 0.54], [5000000, 344125440, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 43130880, 0.48], [1000000, 86274048, 0.48], [1500000, 86335488, 0.72], [2000000, 172228608, 0.48], [2500000, 172421120, 0.6], [3000000, 172150784, 0.72], [3500000, 172089344, 0.83], [4000000, 344051712, 0.48], [4500000, 344051712, 0.54], [5000000, 344190976, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 50757632, 0.48], [1000000, 101199872, 0.48], [1500000, 101261312, 0.72], [2000000, 201936896, 0.48], [2500000, 201875456, 0.6], [3000000, 201998336, 0.72], [3500000, 201936896, 0.83], [4000000, 403943424, 0.48], [4500000, 403943424, 0.54], [5000000, 403558400, 0.6]], "label": "emhash7::HashMap"}], 
+"read_random_full_after_delete_runtime": [{"program": "hood_map", "data": [[500000, 0.008947, 0.24], [1000000, 0.021423, 0.24], [1500000, 0.034717, 0.36], [2000000, 0.045851, 0.24], [2500000, 0.059305, 0.3], [3000000, 0.072306, 0.36], [3500000, 0.091392, 0.42], [4000000, 0.095602, 0.24], [4500000, 0.107242, 0.27], [5000000, 0.122885, 0.3]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.010983, 0.24], [1000000, 0.025393, 0.24], [1500000, 0.042079, 0.36], [2000000, 0.053568, 0.24], [2500000, 0.068395, 0.3], [3000000, 0.087145, 0.36], [3500000, 0.124539, 0.42], [4000000, 0.113125, 0.24], [4500000, 0.125526, 0.27], [5000000, 0.140777, 0.3]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.009599, 0.24], [1000000, 0.022638, 0.24], [1500000, 0.03665, 0.36], [2000000, 0.047931, 0.24], [2500000, 0.061765, 0.3], [3000000, 0.077245, 0.36], [3500000, 0.094011, 0.42], [4000000, 0.098427, 0.24], [4500000, 0.112546, 0.27], [5000000, 0.127279, 0.3]], "label": "emhash7::HashMap"}], 
+"read_miss_small_string_runtime": [{"program": "hood_map", "data": [[500000, 0.014509, 0.48], [1000000, 0.030756, 0.48], [1500000, 0.05985, 0.72], [2000000, 0.060582, 0.48], [2500000, 0.089657, 0.6], [3000000, 0.123059, 0.72], [3500000, 0.209229, 0.83], [4000000, 0.12383, 0.48], [4500000, 0.143469, 0.54], [5000000, 0.183456, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.015827, 0.48], [1000000, 0.03304, 0.48], [1500000, 0.060053, 0.72], [2000000, 0.067351, 0.48], [2500000, 0.09014, 0.6], [3000000, 0.123946, 0.72], [3500000, 0.201657, 0.83], [4000000, 0.137871, 0.48], [4500000, 0.161268, 0.54], [5000000, 0.18246, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.022859, 0.48], [1000000, 0.048829, 0.48], [1500000, 0.08173, 0.72], [2000000, 0.101148, 0.48], [2500000, 0.135935, 0.6], [3000000, 0.169331, 0.72], [3500000, 0.214724, 0.83], [4000000, 0.204918, 0.48], [4500000, 0.242503, 0.54], [5000000, 0.275913, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_random_shuffle_range_runtime": [{"program": "hood_map", "data": [[500000, 0.053562, 0.48], [1000000, 0.124919, 0.48], [1500000, 0.175447, 0.72], [2000000, 0.248143, 0.48], [2500000, 0.271849, 0.6], [3000000, 0.294889, 0.72], [3500000, 0.326543, 0.83], [4000000, 0.426636, 0.48], [4500000, 0.488884, 0.54], [5000000, 0.541781, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.034206, 0.48], [1000000, 0.078237, 0.48], [1500000, 0.117077, 0.72], [2000000, 0.191754, 0.48], [2500000, 0.237699, 0.6], [3000000, 0.282541, 0.72], [3500000, 0.32733, 0.83], [4000000, 0.44501, 0.48], [4500000, 0.491079, 0.54], [5000000, 0.539194, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.030616, 0.48], [1000000, 0.067992, 0.48], [1500000, 0.100196, 0.72], [2000000, 0.150329, 0.48], [2500000, 0.205884, 0.6], [3000000, 0.226365, 0.72], [3500000, 0.239963, 0.83], [4000000, 0.323244, 0.48], [4500000, 0.391031, 0.54], [5000000, 0.448893, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_random_full_runtime": [{"program": "hood_map", "data": [[500000, 0.048442, 0.48], [1000000, 0.10211, 0.48], [1500000, 0.13629, 0.72], [2000000, 0.222858, 0.48], [2500000, 0.259835, 0.6], [3000000, 0.298799, 0.72], [3500000, 0.355005, 0.83], [4000000, 0.483574, 0.48], [4500000, 0.522354, 0.54], [5000000, 0.562742, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.036622, 0.48], [1000000, 0.082857, 0.48], [1500000, 0.116972, 0.72], [2000000, 0.194525, 0.48], [2500000, 0.236436, 0.6], [3000000, 0.277201, 0.72], [3500000, 0.317215, 0.83], [4000000, 0.438361, 0.48], [4500000, 0.486486, 0.54], [5000000, 0.533563, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.044203, 0.48], [1000000, 0.09782, 0.48], [1500000, 0.128047, 0.72], [2000000, 0.221615, 0.48], [2500000, 0.254098, 0.6], [3000000, 0.28934, 0.72], [3500000, 0.32798, 0.83], [4000000, 0.486466, 0.48], [4500000, 0.51887, 0.54], [5000000, 0.553107, 0.6]], "label": "emhash7::HashMap"}], 
+"read_random_full_runtime": [{"program": "hood_map", "data": [[500000, 0.008949, 0.48], [1000000, 0.020586, 0.48], [1500000, 0.042777, 0.72], [2000000, 0.044333, 0.48], [2500000, 0.063543, 0.6], [3000000, 0.089497, 0.72], [3500000, 0.134894, 0.83], [4000000, 0.096954, 0.48], [4500000, 0.112672, 0.54], [5000000, 0.135814, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.01021, 0.48], [1000000, 0.025278, 0.48], [1500000, 0.039039, 0.72], [2000000, 0.054437, 0.48], [2500000, 0.067834, 0.6], [3000000, 0.081251, 0.72], [3500000, 0.097481, 0.83], [4000000, 0.117028, 0.48], [4500000, 0.130628, 0.54], [5000000, 0.143836, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.007294, 0.48], [1000000, 0.018054, 0.48], [1500000, 0.031549, 0.72], [2000000, 0.03949, 0.48], [2500000, 0.053421, 0.6], [3000000, 0.068928, 0.72], [3500000, 0.086803, 0.83], [4000000, 0.082737, 0.48], [4500000, 0.09623, 0.54], [5000000, 0.110979, 0.6]], "label": "emhash7::HashMap"}], 
+"read_small_string_runtime": [{"program": "hood_map", "data": [[500000, 0.040993, 0.48], [1000000, 0.08861, 0.48], [1500000, 0.151271, 0.72], [2000000, 0.184999, 0.48], [2500000, 0.245457, 0.6], [3000000, 0.316352, 0.72], [3500000, 0.40523, 0.83], [4000000, 0.394907, 0.48], [4500000, 0.452438, 0.54], [5000000, 0.517082, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.047552, 0.48], [1000000, 0.10166, 0.48], [1500000, 0.153577, 0.72], [2000000, 0.211814, 0.48], [2500000, 0.266952, 0.6], [3000000, 0.318743, 0.72], [3500000, 0.378014, 0.83], [4000000, 0.45616, 0.48], [4500000, 0.517701, 0.54], [5000000, 0.572972, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.023257, 0.48], [1000000, 0.049602, 0.48], [1500000, 0.086941, 0.72], [2000000, 0.101893, 0.48], [2500000, 0.137983, 0.6], [3000000, 0.180169, 0.72], [3500000, 0.230777, 0.83], [4000000, 0.208772, 0.48], [4500000, 0.243287, 0.54], [5000000, 0.283807, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_string_memory": [{"program": "hood_map", "data": [[500000, 75329536, 0.48], [1000000, 150040576, 0.48], [1500000, 182308864, 0.72], [2000000, 300068864, 0.48], [2500000, 332214272, 0.6], [3000000, 364142592, 0.72], [3500000, 396267520, 0.83], [4000000, 600231936, 0.48], [4500000, 632266752, 0.54], [5000000, 664281088, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 75206656, 0.48], [1000000, 150155264, 0.48], [1500000, 182091776, 0.72], [2000000, 300195840, 0.48], [2500000, 332320768, 0.6], [3000000, 364126208, 0.72], [3500000, 396247040, 0.83], [4000000, 600227840, 0.48], [4500000, 632356864, 0.54], [5000000, 664309760, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 82706432, 0.48], [1000000, 165011456, 0.48], [1500000, 197197824, 0.72], [2000000, 330006528, 0.48], [2500000, 362143744, 0.6], [3000000, 394084352, 0.72], [3500000, 426115072, 0.83], [4000000, 660000768, 0.48], [4500000, 691892224, 0.54], [5000000, 723959808, 0.6]], "label": "emhash7::HashMap"}], 
+"read_string_runtime": [{"program": "hood_map", "data": [[500000, 0.102526, 0.48], [1000000, 0.221219, 0.48], [1500000, 0.351501, 0.72], [2000000, 0.50758, 0.48], [2500000, 0.612394, 0.6], [3000000, 0.799175, 0.72], [3500000, 0.984918, 0.83], [4000000, 1.0409, 0.48], [4500000, 1.18634, 0.54], [5000000, 1.36558, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.113184, 0.48], [1000000, 0.246254, 0.48], [1500000, 0.359577, 0.72], [2000000, 0.599535, 0.48], [2500000, 0.692604, 0.6], [3000000, 0.834549, 0.72], [3500000, 0.955889, 0.83], [4000000, 1.22888, 0.48], [4500000, 1.36372, 0.54], [5000000, 1.52954, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.072855, 0.48], [1000000, 0.155171, 0.48], [1500000, 0.258814, 0.72], [2000000, 0.386115, 0.48], [2500000, 0.45726, 0.6], [3000000, 0.619593, 0.72], [3500000, 0.736753, 0.83], [4000000, 0.749969, 0.48], [4500000, 0.906341, 0.54], [5000000, 0.934693, 0.6]], "label": "emhash7::HashMap"}], 
+"insert_string_runtime": [{"program": "hood_map", "data": [[500000, 0.227396, 0.48], [1000000, 0.503262, 0.48], [1500000, 0.634609, 0.72], [2000000, 1.08808, 0.48], [2500000, 1.24377, 0.6], [3000000, 1.39899, 0.72], [3500000, 1.5906, 0.83], [4000000, 2.37657, 0.48], [4500000, 2.53583, 0.54], [5000000, 2.66265, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.201944, 0.48], [1000000, 0.455293, 0.48], [1500000, 0.572797, 0.72], [2000000, 0.9941, 0.48], [2500000, 1.13947, 0.6], [3000000, 1.27656, 0.72], [3500000, 1.42423, 0.83], [4000000, 2.20011, 0.48], [4500000, 2.33832, 0.54], [5000000, 2.46838, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.25173, 0.48], [1000000, 0.586713, 0.48], [1500000, 0.720349, 0.72], [2000000, 1.31563, 0.48], [2500000, 1.45752, 0.6], [3000000, 1.61647, 0.72], [3500000, 1.79827, 0.83], [4000000, 2.84017, 0.48], [4500000, 2.96708, 0.54], [5000000, 3.15707, 0.6]], "label": "emhash7::HashMap"}], 
+"delete_string_runtime": [{"program": "hood_map", "data": [[500000, 0.151316, 0.0], [1000000, 0.323756, 0.0], [1500000, 0.50484, 0.0], [2000000, 0.710308, 0.0], [2500000, 0.881943, 0.0], [3000000, 1.07615, 0.0], [3500000, 1.35411, 0.0], [4000000, 1.46036, 0.0], [4500000, 1.63582, 0.0], [5000000, 1.84778, 0.0]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.170413, 0.0], [1000000, 0.365729, 0.0], [1500000, 0.549453, 0.0], [2000000, 0.822042, 0.0], [2500000, 1.00634, 0.0], [3000000, 1.21056, 0.0], [3500000, 1.42378, 0.0], [4000000, 1.73132, 0.0], [4500000, 1.93966, 0.0], [5000000, 2.13649, 0.0]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.151478, 0.0], [1000000, 0.322336, 0.0], [1500000, 0.504502, 0.0], [2000000, 0.68715, 0.0], [2500000, 0.869335, 0.0], [3000000, 1.06709, 0.0], [3500000, 1.24033, 0.0], [4000000, 1.43654, 0.0], [4500000, 1.65398, 0.0], [5000000, 1.8004, 0.0]], "label": "emhash7::HashMap"}], 
+"insert_small_string_memory": [{"program": "hood_map", "data": [[500000, 43397120, 0.48], [1000000, 86450176, 0.48], [1500000, 86450176, 0.72], [2000000, 172498944, 0.48], [2500000, 172552192, 0.6], [3000000, 172294144, 0.72], [3500000, 172425216, 0.83], [4000000, 344326144, 0.48], [4500000, 344465408, 0.54], [5000000, 344440832, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 43384832, 0.48], [1000000, 86437888, 0.48], [1500000, 86491136, 0.72], [2000000, 172486656, 0.48], [2500000, 172539904, 0.6], [3000000, 172347392, 0.72], [3500000, 172277760, 0.83], [4000000, 344383488, 0.48], [4500000, 344350720, 0.54], [5000000, 344399872, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 50782208, 0.48], [1000000, 101376000, 0.48], [1500000, 101388288, 0.72], [2000000, 202379264, 0.48], [2500000, 202113024, 0.6], [3000000, 202244096, 0.72], [3500000, 202240000, 0.83], [4000000, 404090880, 0.48], [4500000, 404086784, 0.54], [5000000, 404205568, 0.6]], "label": "emhash7::HashMap"}], 
+"read_random_shuffle_range_runtime": [{"program": "hood_map", "data": [[500000, 0.014805, 0.48], [1000000, 0.028658, 0.48], [1500000, 0.052538, 0.72], [2000000, 0.029353, 0.48], [2500000, 0.036761, 0.6], [3000000, 0.044355, 0.72], [3500000, 0.052114, 0.83], [4000000, 0.065504, 0.48], [4500000, 0.073226, 0.54], [5000000, 0.082517, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.007768, 0.48], [1000000, 0.018767, 0.48], [1500000, 0.027132, 0.72], [2000000, 0.03889, 0.48], [2500000, 0.048471, 0.6], [3000000, 0.058134, 0.72], [3500000, 0.066396, 0.83], [4000000, 0.082984, 0.48], [4500000, 0.093515, 0.54], [5000000, 0.106534, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.002691, 0.48], [1000000, 0.010362, 0.48], [1500000, 0.017763, 0.72], [2000000, 0.024825, 0.48], [2500000, 0.031873, 0.6], [3000000, 0.038842, 0.72], [3500000, 0.046039, 0.83], [4000000, 0.052784, 0.48], [4500000, 0.05982, 0.54], [5000000, 0.066724, 0.6]], "label": "emhash7::HashMap"}], 
+"read_string_after_delete_runtime": [{"program": "hood_map", "data": [[500000, 0.085792, 0.24], [1000000, 0.182691, 0.24], [1500000, 0.315951, 0.36], [2000000, 0.373817, 0.24], [2500000, 0.497605, 0.3], [3000000, 0.74053, 0.36], [3500000, 0.754292, 0.42], [4000000, 0.787804, 0.24], [4500000, 0.927741, 0.27], [5000000, 1.04205, 0.3]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.091064, 0.24], [1000000, 0.19595, 0.24], [1500000, 0.298037, 0.36], [2000000, 0.407337, 0.24], [2500000, 0.528274, 0.3], [3000000, 0.622375, 0.36], [3500000, 0.797599, 0.42], [4000000, 0.869412, 0.24], [4500000, 1.00463, 0.27], [5000000, 1.1067, 0.3]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.062332, 0.24], [1000000, 0.13179, 0.24], [1500000, 0.249473, 0.36], [2000000, 0.270121, 0.24], [2500000, 0.3487, 0.3], [3000000, 0.435652, 0.36], [3500000, 0.561068, 0.42], [4000000, 0.546963, 0.24], [4500000, 0.629753, 0.27], [5000000, 0.710793, 0.3]], "label": "emhash7::HashMap"}], 
+"insert_random_full_reserve_memory": [{"program": "hood_map", "data": [[500000, 18108416, 0.48], [1000000, 35909632, 0.48], [1500000, 35782656, 0.72], [2000000, 71479296, 0.48], [2500000, 71540736, 0.6], [3000000, 71581696, 0.72], [3500000, 71471104, 0.83], [4000000, 142737408, 0.48], [4500000, 142749696, 0.54], [5000000, 142675968, 0.6]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 18006016, 0.48], [1000000, 35831808, 0.48], [1500000, 35831808, 0.72], [2000000, 71413760, 0.48], [2500000, 71684096, 0.6], [3000000, 71352320, 0.72], [3500000, 71352320, 0.83], [4000000, 142786560, 0.48], [4500000, 142848000, 0.54], [5000000, 142577664, 0.6]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 25640960, 0.48], [1000000, 50896896, 0.48], [1500000, 50753536, 0.72], [2000000, 101199872, 0.48], [2500000, 101531648, 0.6], [3000000, 101531648, 0.72], [3500000, 101261312, 0.83], [4000000, 202407936, 0.48], [4500000, 202477568, 0.54], [5000000, 202407936, 0.6]], "label": "emhash7::HashMap"}], 
+"read_small_string_after_delete_runtime": [{"program": "hood_map", "data": [[500000, 0.034449, 0.24], [1000000, 0.072168, 0.24], [1500000, 0.11068, 0.36], [2000000, 0.148856, 0.24], [2500000, 0.192778, 0.3], [3000000, 0.228316, 0.36], [3500000, 0.28224, 0.42], [4000000, 0.310138, 0.24], [4500000, 0.349834, 0.27], [5000000, 0.393609, 0.3]], "label": "robin_hood::flat_map"}, {"program": "phmap_map", "data": [[500000, 0.037676, 0.24], [1000000, 0.079748, 0.24], [1500000, 0.123738, 0.36], [2000000, 0.16495, 0.24], [2500000, 0.209957, 0.3], [3000000, 0.257425, 0.36], [3500000, 0.326732, 0.42], [4000000, 0.350942, 0.24], [4500000, 0.391366, 0.27], [5000000, 0.438406, 0.3]], "label": "phmap_map"}, {"program": "emhash_hash_map3", "data": [[500000, 0.023686, 0.24], [1000000, 0.049582, 0.24], [1500000, 0.079969, 0.36], [2000000, 0.102566, 0.24], [2500000, 0.13339, 0.3], [3000000, 0.166426, 0.36], [3500000, 0.2012, 0.42], [4000000, 0.208204, 0.24], [4500000, 0.239355, 0.27], [5000000, 0.270255, 0.3]], "label": "emhash7::HashMap"}]};
+
+programs = {
+ "std_unordered_map": "std::unordered_map", 
+ "hood_map": "robin_hood::flat_map", 
+ "hrd_hash_map": "hrd7::hash_map", 
+ "tsl_hopscotch_map": "tsl::hopscotch_map", 
+ "phmap_map": "phmap_map", 
+ "dense_hash_map": "google:dense_hash_map", 
+ "tsl_robin_map": "tsl::robin_map", 
+ "tsl_hopscotch_map_store_hash": "tsl::hopscotch_map (with StoreHash)", 
+ "tsl_robin_map_store_hash": "tsl::robin_map (with StoreHash)", 
+ "tsl_hopscotch_map_mlf_0_5": "tsl::hopscotch_map (0.5 mlf)", 
+ "tsl_robin_map_mlf_0_9": "tsl::robin_map (0.9 mlf)", 
+ "tsl_ordered_map": "tsl::ordered_map", 
+ "tsl_robin_pg_map": "tsl::robin_pg_map", 
+ "ska_flat_hash_map": "ska::flat_hash_map", 
+ "ska_flat_hash_map_power_of_two": "ska::flat_hash_map (power of two)", 
+ "boost_unordered_map": "boost::unordered_map", 
+ "emhash_hash_map": "emhash5::HashMap", 
+ "emhash_hash_map2": "emhash6::HashMap", 
+ "emhash_hash_map3": "emhash7::HashMap", 
+ "tsl_sparse_map": "tsl::sparse_map", 
+ "tsl_array_map": "tsl::array_map", 
+ "tsl_array_map_mlf_1_0": "tsl::array_map (1.0 mlf)"
+};
+
+default_programs_show = ['hrd_hash_map', 'emhash_hash_map', 'emhash_hash_map2', 'emhash_hash_map3', 'ska_flat_hash_map', 'hood_map', 'phmap_map', 'tsl_robin_map'];
+
+
+    function plot_chart(dataset, chart_container, choices_container, chart_settings, redraw_only = false) {
+        if(!redraw_only) {
+            // Set colors
+            var color = 0;
+            $.each(dataset, function(key, val) {
+                val.color = color;
+                color++;
+            });
+            
+            // Insert checkboxes 
+            $.each(dataset, function(key, val) {
+                checked = '';
+                if(default_programs_show.indexOf(val.program) > -1) {
+                    checked = 'checked';
+                }
+                
+                $(choices_container).append(
+                    "<li><input type='checkbox' value='" + key +"' name='" + val.program + "' " + checked + "></input>" +
+                    "<label for='id" + key + "'>" + val.label + "</label></li>");
+            });
+            
+            $(choices_container).find("input").change(plot_according_to_choices);
+        }
+        
+        function plot_according_to_choices() {
+            var data = [];
+            $(choices_container).find("input:checked").each(
+                function () {
+                    var key = $(this).attr("value");
+                    if (key && dataset[key]) {
+                        data.push(dataset[key]);
+                    }
+                }
+            );
+
+            $.plot(chart_container, data, chart_settings);
+            
+
+            $(chart_container).bind("plothover", function (event, pos, item) {
+                if (item) {
+                    var x = item.datapoint[0];
+                    var y = item.datapoint[1].toFixed(4) + "s";
+                    if(chart_settings == memory_settings) {
+                        y = (item.datapoint[1]/1024/1024).toFixed(2) + " MiB";
+                    }
+
+                    var load_factor = item.series.data[item.dataIndex][2]
+                    if(load_factor == 0.0) {
+                        load_factor = "unknown"
+                    }
+                    
+                    $("#tooltip").html("" + y + " ; " + x + 
+                                        "<br\>" + load_factor + " load factor" +
+                                        "<br\>" + item.series.label)
+                                    .css({top: item.pageY+5, left: item.pageX+5})
+                                    .fadeIn(200);
+                } else {
+                    $("#tooltip").hide();
+                }        
+            });
+        }
+
+        plot_according_to_choices();
+    }
+    
+    
+    function plot_all_charts(redraw_only = false) {
+        plot_chart(chart_data['insert_random_shuffle_range_runtime'], '#insert_random_shuffle_range_runtime', '#insert_random_shuffle_range_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_random_shuffle_range_runtime'], '#read_random_shuffle_range_runtime', '#read_random_shuffle_range_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['insert_random_full_runtime'], '#insert_random_full_runtime', '#insert_random_full_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['insert_random_full_reserve_runtime'], '#insert_random_full_reserve_runtime', '#insert_random_full_reserve_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_random_full_runtime'], '#read_random_full_runtime', '#read_random_full_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_miss_random_full_runtime'], '#read_miss_random_full_runtime', '#read_miss_random_full_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_random_full_after_delete_runtime'], '#read_random_full_after_delete_runtime', '#read_random_full_after_delete_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['iteration_random_full_runtime'], '#iteration_random_full_runtime', '#iteration_random_full_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['delete_random_full_runtime'], '#delete_random_full_runtime', '#delete_random_full_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['insert_random_full_memory'], '#insert_random_full_memory', '#insert_random_full_memory_choices', memory_settings, redraw_only);
+        plot_chart(chart_data['insert_random_full_reserve_memory'], '#insert_random_full_reserve_memory', '#insert_random_full_reserve_memory_choices', memory_settings, redraw_only);
+        
+        plot_chart(chart_data['insert_small_string_runtime'], '#insert_small_string_runtime', '#insert_small_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['insert_small_string_reserve_runtime'], '#insert_small_string_reserve_runtime', '#insert_small_string_reserve_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_small_string_runtime'], '#read_small_string_runtime', '#read_small_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_miss_small_string_runtime'], '#read_miss_small_string_runtime', '#read_miss_small_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_small_string_after_delete_runtime'], '#read_small_string_after_delete_runtime', '#read_small_string_after_delete_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['delete_small_string_runtime'], '#delete_small_string_runtime', '#delete_small_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['insert_small_string_memory'], '#insert_small_string_memory', '#insert_small_string_memory_choices', memory_settings, redraw_only);
+        plot_chart(chart_data['insert_small_string_reserve_memory'], '#insert_small_string_reserve_memory', '#insert_small_string_reserve_memory_choices', memory_settings, redraw_only);
+
+        plot_chart(chart_data['insert_string_runtime'], '#insert_string_runtime', '#insert_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['insert_string_reserve_runtime'], '#insert_string_reserve_runtime', '#insert_string_reserve_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_string_runtime'], '#read_string_runtime', '#read_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_miss_string_runtime'], '#read_miss_string_runtime', '#read_miss_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['read_string_after_delete_runtime'], '#read_string_after_delete_runtime', '#read_string_after_delete_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['delete_string_runtime'], '#delete_string_runtime', '#delete_string_runtime_choices', runtime_settings, redraw_only);
+        plot_chart(chart_data['insert_string_memory'], '#insert_string_memory', '#insert_string_memory_choices', memory_settings, redraw_only);
+        plot_chart(chart_data['insert_string_reserve_memory'], '#insert_string_reserve_memory', '#insert_string_reserve_memory_choices', memory_settings, redraw_only);
+    }
+
+    $(function () {
+        // Set global choices boxes
+        var i = 0;
+        for(var program in programs) {
+            checked = '';
+            if(default_programs_show.indexOf(program) > -1) {
+                checked = 'checked';
+            }
+            
+            $("#global_choices").append("<li><input type='checkbox' id='global_choice_" + i + "' " + 
+                                        checked + "></input>" + programs[program] + "</li>");
+            $("#global_choice_" + i).change({name: program}, function(event) {
+                $("input[name='" + event.data.name + "']").prop('checked', this.checked).change();
+            });
+            i++;
+        }
+        
+        // Set select all link
+        $("#global_select_all_none").append("<a href='javascript:void(0);' id='global_select_all'>all</a> ");
+        $("#global_select_all").click(function() {
+            $("input").prop('checked', true);
+            plot_all_charts(true);
+        });
+
+        // Set select none link
+        $("#global_select_all_none").append(" <a href='javascript:void(0);' id='global_select_none'>none</a>");
+        $("#global_select_none").click(function() {
+            $("input").prop('checked', false);
+            plot_all_charts(true);
+        });
+        
+        // Draw charts
+        plot_all_charts();
+    });
+    
+</script>
+
+<style>
+    div.global {
+        margin: auto;
+        width: 800px;
+    }
+    div.global_select_all_none {
+        text-align: center;
+    }
+    div.chart {
+        width: 750px;
+        height: 500px;
+    }
+    div.xaxis-title {
+        width: 750px;
+        text-align: center;
+        font-style: italic;
+        font-size: small;
+        color: #666;
+    }
+    .choices li {
+        margin-left: 5%;
+        display: inline-block;
+        width: 45%;
+    }
+</style>
+
+
+<div class="global">
+
+<h2>Global selection</h2>
+<ul class="choices" id="global_choices"></ul>
+<div class="global_select_all_none" id="global_select_all_none"></div>
+
+<h2>Integers</h2>
+
+<p>For the integers tests, we use hash maps with int64_t as key and int64_t as value.</p>
+
+
+
+<h3>Random shuffle inserts: execution time (integers)</h3>
+
+<p>Before the test, we generate a vector with the values [0, nb_entries) and shuffle this vector. 
+Then for each value k in the vector, we insert the key-value pair (k, 1) in the hash map.</p>
+
+<div class="chart" id="insert_random_shuffle_range_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_random_shuffle_range_runtime_choices"></ul>
+
+
+<h3>Random full inserts: execution time (integers)</h3>
+
+<p>Before the test, we generate a vector of nb_entries size where each value is randomly taken from an uniform random number generator from all possible positive values an int64_t can hold. 
+Then for each value k in the vector, we insert the key-value pair (k, 1) in the hash map.</p>
+
+<div class="chart" id="insert_random_full_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_random_full_runtime_choices"></ul>
+
+
+<h3>Random full inserts with reserve: execution time (integers)</h3>
+
+<p>Same as the random full inserts test but the reserve method of the hash map is called beforehand to avoid any rehash during the insertion. 
+It provides a fair comparison even if the growth factor of each hash map is different.</p>
+
+<div class="chart" id="insert_random_full_reserve_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_random_full_reserve_runtime_choices"></ul>
+
+
+<h3>Random full deletes: execution time (integers)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the random full insert test. 
+We then delete each key one by one in a different and random order than the one they were inserted.</p>
+
+<div class="chart" id="delete_random_full_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="delete_random_full_runtime_choices"></ul>
+
+
+<h3>Random shuffle reads: execution time (integers)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the random shuffle inserts test. 
+We then read each key-value pair in a different and random order than the one they were inserted.</p>
+
+<div class="chart" id="read_random_shuffle_range_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_random_shuffle_range_runtime_choices"></ul>
+
+
+<h3>Random full reads: execution time (integers)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the random full inserts test. 
+We then read each key-value pair in a different and random order than the one they were inserted.</p>
+
+<div class="chart" id="read_random_full_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_random_full_runtime_choices"></ul>
+
+<h3>Random full reads misses: execution time (integers)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the random full inserts test. 
+We then generate another vector of nb_entries random elements different from the inserted elements and 
+we try to search for these unknown elements in the hash map.</p>
+
+<div class="chart" id="read_miss_random_full_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_miss_random_full_runtime_choices"></ul>
+
+
+<h3>Random full reads after deleting half: execution time (integers)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the random full inserts test 
+before deleting half of these values randomly. We then try to read all the original values in a 
+different order which will lead to 50% hits and 50% misses.</p>
+
+<div class="chart" id="read_random_full_after_delete_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_random_full_after_delete_runtime_choices"></ul>
+
+
+
+<h3>Random full iteration: execution time (integers)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the random full inserts test. 
+We then use the hash map iterators to read all the key-value pairs.</p>
+
+<div class="chart" id="iteration_random_full_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="iteration_random_full_runtime_choices"></ul>
+
+
+
+<h3>Memory usage of random full inserts (integers)</h3>
+
+<p>Before the random full inserts benchmark finishes, we measure the memory that the hash map is using.</p>
+
+<div class="chart" id="insert_random_full_memory"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_random_full_memory_choices"></ul>
+
+
+<h3>Memory usage of random full inserts with reserve (integers)</h3>
+
+<p>Before the random full inserts with reserve benchmark finishes, we measure the memory that the hash map is using. 
+The benchmark is similar to the one above but without measuring the memory fragmentation that the rehash process
+may cause.</p>
+
+<div class="chart" id="insert_random_full_reserve_memory"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_random_full_reserve_memory_choices"></ul>
+
+
+
+
+
+
+
+
+
+<h2>Small strings</h2>
+<p>For the small string tests, we use hash maps with std::string as key and int64_t as value.</p>
+
+<p>Each string is a random generated string of 15 alphanumeric characters (+1 for the null terminator). A generated key may look like "ju1AOoeWT3LdJxL".<p>
+
+<h3>Inserts: execution time (small strings)</h3>
+
+<p>For each entry in the range [0, nb_entries), we generate a string as key and insert it with the value 1.</p>
+
+<div class="chart" id="insert_small_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_small_string_runtime_choices"></ul>
+
+
+<h3>Inserts with reserve: execution time (small strings)</h3>
+
+<p>Same as the inserts test but the reserve method of the hash map is called beforehand to avoid any rehash during the insertion. 
+It provides a fair comparison even if the growth factor of each hash map is different.</p>
+
+<div class="chart" id="insert_small_string_reserve_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_small_string_reserve_runtime_choices"></ul>
+
+
+<h3>Deletes: execution time (small strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the hash map as in the inserts test. 
+We then delete each key one by one in a different and random order than the one they were inserted.</p>
+
+<div class="chart" id="delete_small_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="delete_small_string_runtime_choices"></ul>
+
+
+<h3>Reads: execution time (small strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the hash map as in the inserts test. 
+We then read each key-value pair in a different and random order than the one they were inserted.</p>
+
+<div class="chart" id="read_small_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_small_string_runtime_choices"></ul>
+
+
+<h3>Reads misses: execution time (small strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the inserts test. 
+We then generate nb_entries strings different from the inserted elements and 
+we try to search for these unknown elements in the hash map.</p>
+
+<div class="chart" id="read_miss_small_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_miss_small_string_runtime_choices"></ul>
+
+
+<h3>Reads after deleting half: execution time (small strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the inserts test before 
+deleting half of these values randomly. We then try to read all the original values in a 
+different order which will lead to 50% hits and 50% misses.</p>
+
+<div class="chart" id="read_small_string_after_delete_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_small_string_after_delete_runtime_choices"></ul>
+
+
+<h3>Memory usage of inserts (small strings)</h3>
+
+<p>Before the inserts benchmark finishes, we measure the memory that the hash map is using.</p>
+
+<div class="chart" id="insert_small_string_memory"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_small_string_memory_choices"></ul>
+
+
+<h3>Memory usage of inserts with reserve (small strings)</h3>
+
+<p>Before the inserts with reserve benchmark finishes, we measure the memory that the hash map is using.
+The benchmark is similar to the one above but without measuring the memory fragmentation that the rehash process
+may cause.</p>
+
+<div class="chart" id="insert_small_string_reserve_memory"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_small_string_reserve_memory_choices"></ul>
+
+
+
+
+
+<h2>Strings</h2>
+<p>For the string tests, we use hash maps with std::string as key and int64_t as value.</p>
+
+<p>Each string is a random generated string of 50 alphanumeric characters (+1 for the null terminator). A generated key may look like "nv46iTRp7ur6UMbdgEkCHpoq7Qx7UU9Ta0u1ETdAvUb4LG6Xu6".<p>
+
+<h3>Inserts: execution time (strings)</h3>
+
+<p>For each entry in the range [0, nb_entries), we generate a string as key and insert it with the value 1.</p>
+
+<div class="chart" id="insert_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_string_runtime_choices"></ul>
+
+
+<h3>Inserts with reserve: execution time (strings)</h3>
+
+<p>Same as the inserts test but the reserve method of the hash map is called beforehand to avoid any rehash during the insertion. 
+It provides a fair comparison even if the growth factor of each hash map is different.</p>
+
+<div class="chart" id="insert_string_reserve_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_string_reserve_runtime_choices"></ul>
+
+
+<h3>Deletes: execution time (strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the hash map as in the inserts test. 
+We then delete each key one by one in a different and random order than the one they were inserted.</p>
+
+<div class="chart" id="delete_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="delete_string_runtime_choices"></ul>
+
+
+<h3>Reads: execution time (strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the hash map as in the inserts test. 
+We then read each key-value pair in a different and random order than the one they were inserted.</p>
+
+<div class="chart" id="read_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_string_runtime_choices"></ul>
+
+
+<h3>Reads misses: execution time (strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the inserts test. 
+We then generate nb_entries strings different from the inserted elements and 
+we try to search for these unknown elements in the hash map.</p>
+
+<div class="chart" id="read_miss_string_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_miss_string_runtime_choices"></ul>
+
+
+<h3>Reads after deleting half: execution time (strings)</h3>
+
+<p>Before the test, we insert nb_entries elements in the same way as in the inserts test before deleting half of these values randomly. 
+We then try to read all the original values in a different order which will lead to 50% hits and 50% misses.</p>
+
+<div class="chart" id="read_string_after_delete_runtime"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="read_string_after_delete_runtime_choices"></ul>
+
+
+<h3>Memory usage of inserts (strings)</h3>
+
+<p>Before the inserts benchmark finishes, we measure the memory that the hash map is using.</p>
+
+<div class="chart" id="insert_string_memory"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_string_memory_choices"></ul>
+
+
+<h3>Memory usage of inserts with reserve (strings)</h3>
+
+<p>Before the inserts with reserve benchmark finishes, we measure the memory that the hash map is using.
+The benchmark is similar to the one above but without measuring the memory fragmentation that the rehash process
+may cause.</p>
+
+<div class="chart" id="insert_string_reserve_memory"></div>
+<div class="xaxis-title">number of entries in hash table</div>
+<ul class="choices" id="insert_string_reserve_memory_choices"></ul>
+
+</div>
+
+</body>
+</html>

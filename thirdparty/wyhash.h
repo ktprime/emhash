@@ -18,8 +18,8 @@
 static	inline	uint64_t	_wyrotr(uint64_t v, unsigned k) {	return	(v>>k)|(v<<(64-k));	}
 static	inline	uint64_t	_wymum(uint64_t	A,	uint64_t	B) {
 #ifdef	WYHASH32
-	uint64_t    hh=(A>>32)*(B>>32), hl=(A>>32)*(unsigned)B, lh=(unsigned)A*(B>>32), ll=(uint64_t)(unsigned)A*(unsigned)B;
-	return  _wyrotr(hl,32)^_wyrotr(lh,32)^hh^ll;
+	uint64_t hh=(A>>32)*(B>>32), hl=(A>>32)*(unsigned)B, lh=(unsigned)A*(B>>32), ll=(uint64_t)(unsigned)A*(unsigned)B;
+	return _wyrotr(hl,32)^_wyrotr(lh,32)^hh^ll;
 #else
 	#ifdef __SIZEOF_INT128__
 		__uint128_t	r=A;	r*=B;	return	(r>>64)^r;
@@ -41,15 +41,15 @@ static	inline	uint64_t	wyrand(uint64_t	*seed) {	*seed+=0xa0761d6478bd642full;	re
 	#endif
 #endif
 #if(WYHASH_LITTLE_ENDIAN)
-static	inline	uint64_t	_wyr8(const	uint8_t	*p)	{	uint64_t	v;	memcpy(&v,  p,  8);	return v;	}
-static	inline	uint64_t	_wyr4(const	uint8_t	*p)	{	unsigned	v;	memcpy(&v,  p,  4);	return v;	}
+static	inline	uint64_t	_wyr8(const	uint8_t	*p)	{	return *((uint64_t*)p);	}
+static	inline	uint64_t	_wyr4(const	uint8_t	*p)	{	return *((uint32_t*)p);	}
 #else
 	#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
-static	inline	uint64_t	_wyr8(const	uint8_t	*p)	{	uint64_t	v;	memcpy(&v,  p,  8);	return __builtin_bswap64(v);	}
-static	inline	uint64_t	_wyr4(const	uint8_t	*p)	{	unsigned	v;	memcpy(&v,  p,  4);	return __builtin_bswap32(v);	}
+static	inline	uint64_t	_wyr8(const	uint8_t	*p)	{	uint64_t	v;	memcpy(&v, p, 8);	return __builtin_bswap64(v);	}
+static	inline	uint64_t	_wyr4(const	uint8_t	*p)	{	unsigned	v;	memcpy(&v, p, 4);	return __builtin_bswap32(v);	}
 	#elif	defined(_MSC_VER)
-static	inline	uint64_t	_wyr8(const	uint8_t	*p)	{	uint64_t	v;	memcpy(&v,  p,  8);	return _byteswap_uint64(v);}
-static	inline	uint64_t	_wyr4(const	uint8_t	*p)	{	unsigned	v;	memcpy(&v,  p,  4);	return _byteswap_ulong(v);	}
+static	inline	uint64_t	_wyr8(const	uint8_t	*p)	{	uint64_t	v;	memcpy(&v, p, 8);	return _byteswap_uint64(v);}
+static	inline	uint64_t	_wyr4(const	uint8_t	*p)	{	unsigned	v;	memcpy(&v, p, 4);	return _byteswap_ulong(v);	}
 	#endif
 #endif
 static	inline	uint64_t	_wyr3(const	uint8_t	*p,	unsigned	k) {	return	(((uint64_t)p[0])<<16)|(((uint64_t)p[k>>1])<<8)|p[k-1];	}
@@ -68,13 +68,13 @@ static	inline	uint64_t	_wyhash(const void* key,	uint64_t	len,	uint64_t	seed,	con
 	const	uint8_t	*p=(const	uint8_t*)key;	uint64_t	i=len;	seed^=secret[4];
 	if(_like_(i<=64)){
 		label:
-		if(_like_(i>=8)){
-			if(_like_(i<=16))	return  _wymum(_wyr8(p)^secret[0],_wyr8(p+i-8)^seed);
-			else	if(_like_(i<=32))	return  _wymum(_wyr8(p)^secret[0],_wyr8(p+8)^seed)^_wymum(_wyr8(p+i-16)^secret[1],_wyr8(p+i-8)^seed);
+		if(i>=8){
+			if(_like_(i<=16))	return _wymum(_wyr8(p)^secret[0],_wyr8(p+i-8)^seed);
+			else	if(_like_(i<=32))	return _wymum(_wyr8(p)^secret[0],_wyr8(p+8)^seed)^_wymum(_wyr8(p+i-16)^secret[1],_wyr8(p+i-8)^seed);
 			else	return	_wymum(_wyr8(p)^secret[0],_wyr8(p+8)^seed)^_wymum(_wyr8(p+16)^secret[1],_wyr8(p+24)^seed)^_wymum(_wyr8(p+i-32)^secret[2],_wyr8(p+i-24)^seed)^_wymum(_wyr8(p+i-16)^secret[3],_wyr8(p+i-8)^seed);
 		}
 		else{
-			if(_like_(i>=4))	return  _wymum(_wyr4(p)^secret[0],_wyr4(p+i-4)^seed);
+			if(_like_(i>=4))	return _wymum(_wyr4(p)^secret[0],_wyr4(p+i-4)^seed);
 			else	return	_wymum((_like_(i)?_wyr3(p,i):0)^secret[0],seed);
 		}
 	}
