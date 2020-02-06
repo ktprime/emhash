@@ -42,9 +42,11 @@ for example some case pay attention on finding hot, some focus on finding cold(m
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be showed from dump info.
  
-- A new cache friendly algorithm of finding multi empty bucket base on cpu bitscanf(ctz) instruction(x86). it filters *64* bucket at once than other's implemention.
+- A new cache friendly algorithm of finding multi empty bucket base on cpu bit scanf(ctz) instruction(x86). it filters *64* bucket at once than other's implemention.
  
-- choose *different* hash algorithm by set compile marco *emhash_FIBONACCI_HASH* or *emhash_IDENTITY_HASH* depend on use case.
+- choose *different* hash algorithm by set compile marco *EMHASH_FIBONACCI_HASH* or *EMHASH_IDENTITY_HASH* depend on use case.
+
+- the thirdy party string hash algorithm is used for string key[wyhash](https://github.com/wangyi-fudan/wyhash), which is 3 times faste than std::hash<std::string> implementation 
 
 # insert example
 
@@ -206,7 +208,7 @@ my ebench result: low is best
         myhash2[rand()] = myhash2[rand()]; // it will be crashed because of rehash, call reserve before or use insert.
  ```
 
-- for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
+- for very large key-value, use pointer instead of value if you care about memory usage with high frequency of insertion or erasion
 ```  
   emhash7:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
 
