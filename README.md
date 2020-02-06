@@ -188,7 +188,7 @@ txt file result [martin_bench.txt](https://github.com/ktprime/emhash/blob/master
 the benchmark code is some tiny changed for injecting new hash map, the result is not final beacuse it depends on os, cpu, compiler and dataset input.
 
 my ebench result: low is best
-![](int64_int.png)
+![](int64_t_int.png)
 ![](string_int.png)
 ![](int64_t_Struct.png)
 
