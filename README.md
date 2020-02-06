@@ -46,14 +46,14 @@ for example some case pay attention on finding hot, some focus on finding cold(m
  
 - choose *different* hash algorithm by set compile marco *EMHASH_FIBONACCI_HASH* or *EMHASH_IDENTITY_HASH* depend on use case.
 
-- the thirdy party string hash algorithm is used for string key[wyhash](https://github.com/wangyi-fudan/wyhash), which is 3 times faste than std::hash<std::string> implementation 
+- the thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is 3 times faster than std::hash<std::string> implementation 
 
 # insert example
 
 ```
 static void basic_test(int n)
 {
-    printf("2. random_shuffle 1 - %d\n", n);
+    printf("2. random_shuffle 1 - %d\n", n); 
     {
         std::vector <int> data(n);
         for (int i = 0; i < n; i ++)
