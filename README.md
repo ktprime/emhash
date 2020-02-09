@@ -16,7 +16,7 @@ A quite fast and memory efficient *open address c++ flat hash map*, it is easy t
 
 - **lru** can be used if compile marco EMHASH_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be founded/probed only once during next access.
 
-- **no tombstones** is used in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
+- **no tombstones** in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
     
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in some case
 for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
@@ -38,20 +38,22 @@ for example some case pay attention on finding hot, some focus on finding cold(m
    - quadratic probing start work after limited linear probing
    - random probing used with a very bad hash
 
-- use the **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *emhash_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
+- use the **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *EMHASH_SAFE_HASH* is set to defend hash attack(average 10% performance descrease)
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be showed from dump info.
  
-- A new cache friendly algorithm of finding multi empty bucket base on cpu bitscanf(ctz) instruction(x86). it filters *64* bucket at once than other's implemention.
+- A new cache friendly algorithm of finding multi empty bucket base on cpu bit scanf(ctz) instruction(x86). it filters *64* bucket at once than other's implemention.
  
-- choose *different* hash algorithm by set compile marco *emhash_FIBONACCI_HASH* or *emhash_IDENTITY_HASH* depend on use case.
+- choose *different* hash algorithm by set compile marco *EMHASH_FIBONACCI_HASH* or *EMHASH_IDENTITY_HASH* depend on use case.
+
+- the thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is 3 times faster than std::hash<std::string> implementation 
 
 # insert example
 
 ```
 static void basic_test(int n)
 {
-    printf("2. random_shuffle 1 - %d\n", n);
+    printf("2. random_shuffle 1 - %d\n", n); 
     {
         std::vector <int> data(n);
         for (int i = 0; i < n; i ++)
@@ -206,7 +208,7 @@ my ebench result: low is best
         myhash2[rand()] = myhash2[rand()]; // it will be crashed because of rehash, call reserve before or use insert.
  ```
 
-- for very large key-value, use pointer instead of value if you care about memory usage with high frequcncy of insertion or erasion
+- for very large key-value, use pointer instead of value if you care about memory usage with high frequency of insertion or erasion
 ```  
   emhash7:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
 
