@@ -131,7 +131,7 @@
 
 #define IS_SET(bucket)  _bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))
 
-#if _WIN32 || _MSC_VER > 1400
+#if _WIN32
     #include <intrin.h>
     #pragma  intrinsic(_umul128)
 #endif
@@ -139,11 +139,24 @@
 namespace emhash7 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
-inline static uint32_t CTZ(const size_t n)
+
+//count the leading zero bit
+inline static uint32_t CTZ(size_t n)
 {
-#if _MSC_VER > 1400 || _WIN32
+#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+
+#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+    n = __builtin_bswap64(n);
+#else
+    static uint32_t endianness = 0xdeadbeef;
+    const auto is_big = *(const char *)&endianness == 0xde;
+    if (is_big)
+    n = __builtin_bswap64(n);
+#endif
+
+#if _WIN32
     unsigned long index;
-    #if defined(_WIN64) || defined(__LP64__) || defined(__x86_64__) || _M_X64
+    #if defined(_WIN64)
     _BitScanForward64(&index, n);
     #else
     _BitScanForward(&index, n);
@@ -152,7 +165,7 @@ inline static uint32_t CTZ(const size_t n)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
     uint32_t index = __builtin_ctzl(n);
-#elif 1
+#else
     #if defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index;
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
@@ -262,13 +275,13 @@ public:
     typedef entry<KeyT, ValueT>               PairT;
 #endif
 
-    static constexpr uint32_t MASK_BIT  = 32;
-    static constexpr bool bInCacheLine = sizeof(value_pair) < EMHASH_CACHE_LINE_SIZE * 2 / 3;
+    static constexpr uint32_t MASK_BIT = 8 * sizeof(uint32_t);
+    static constexpr bool bInCacheLine = sizeof(PairT) < EMHASH_CACHE_LINE_SIZE * 2 / 3;
 
     typedef KeyT   key_type;
     typedef ValueT val_type;
 
-    typedef uint32_t     size_type;
+    typedef uint64_t     size_type;
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
@@ -471,7 +484,7 @@ public:
         _mask        = other._mask;
         _loadlf      = other._loadlf;
         _last        = other._last;
-        _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
+        _bitmask     = decltype(_bitmask)((uint8_t*)_pairs + ((uint8_t*)other._bitmask - (uint8_t*)other._pairs));
         auto opairs  = other._pairs;
 
         if (is_copy_trivially())
@@ -519,32 +532,32 @@ public:
         return {this, bucket};
     }
 
-    const_iterator begin() const
+    inline const_iterator begin() const
     {
         return cbegin();
     }
 
-    iterator end()
+    inline iterator end()
     {
         return {this, _num_buckets};
     }
 
-    const_iterator cend() const
+    inline const_iterator cend() const
     {
         return {this, _num_buckets};
     }
 
-    const_iterator end() const
+    inline const_iterator end() const
     {
         return {this, _num_buckets};
     }
 
-    size_type size() const
+    inline size_type size() const
     {
         return _num_filled;
     }
 
-    bool empty() const
+    inline bool empty() const
     {
         return _num_filled == 0;
     }
@@ -761,22 +774,22 @@ public:
         return {this, find_filled_hash(key, hash_v)};
     }
 
-    iterator find(const KeyT& key) noexcept
+    inline iterator find(const KeyT& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    const_iterator find(const KeyT& key) const noexcept
+    inline const_iterator find(const KeyT& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    bool contains(const KeyT& key) const noexcept
+    inline bool contains(const KeyT& key) const noexcept
     {
         return find_filled_bucket(key) != _num_buckets;
     }
 
-    size_type count(const KeyT& key) const noexcept
+    inline size_type count(const KeyT& key) const noexcept
     {
         return (size_type)(find_filled_bucket(key) != _num_buckets);
     }
@@ -827,27 +840,27 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
+    inline std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(key, value);
     }
 
     std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(std::move(key), std::move(value));
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(key, std::move(value));
     }
 
     std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(std::move(key), value);
     }
 
@@ -1077,7 +1090,7 @@ public:
 
     static constexpr bool is_triviall_destructable()
     {
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
+#if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -1086,7 +1099,7 @@ public:
 
     static constexpr bool is_copy_trivially()
     {
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
+#if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -1131,13 +1144,13 @@ public:
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
-    #ifdef EMHASH_STATIS
-        if (_num_filled > 4000'000) dump_statis(0);
-    #endif
+#ifdef EMHASH_STATIS
+        if (_num_filled > 2000'000) dump_statis(0);
+#endif
         rehash(required_buckets + 2);
-    #if EMHASH_STATIS
+#if EMHASH_STATIS
 //        if (_num_filled > 1000'000) dump_statis(1);
-    #endif
+#endif
         return true;
     }
 
@@ -1152,14 +1165,15 @@ private:
 
         const auto num_byte = num_buckets / 8;
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_byte + sizeof(uint64_t));
+        //TODO: throwOverflowError
         auto old_num_filled  = _num_filled;
         auto old_pairs = _pairs;
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-        _last = 0;
-        _bitmask     = (uint32_t*)(new_pairs + 2 + num_buckets);
+        _last        = 0;
+        _bitmask     = decltype(_bitmask)(new_pairs + 2 + num_buckets);
 
         if (bInCacheLine)
             memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
@@ -1487,15 +1501,19 @@ private:
             return bucket2;
 #endif
         //fast find by bit
+#if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
-        const auto bmask = *(size_t*)((unsigned char*)_bitmask + bucket_from / 8) >> boset;
+        const auto bmask = *(size_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
+#else
+        const auto boset = bucket_from % 64;
+        const auto bmask = *(size_t*)((uint64_t*)_bitmask + bucket_from / 64) >> boset;
+#endif
         if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask) - 0;
 
         constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
         const auto qmask = _mask / SIZE_BIT;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-//        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
         for (auto step = _last & qmask; ; step = ++_last & qmask) {
             const auto bmask = *((size_t*)_bitmask + step);
             if (bmask != 0)
@@ -1550,49 +1568,17 @@ private:
         return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
-    static inline uint32_t hash32(uint32_t key)
-    {
-#if 0
-        key = ((key >> 16) ^ key) * 0x45d9f3b;
-        key = ((key >> 16) ^ key) * 0x45d9f3b; //0x119de1f3
-//        key = ((key >> 13) ^ key) * 0xc2b2ae35;
-        key = (key >> 16) ^ key;
-        return key;
-#elif 1
-        uint64_t const r = key * UINT64_C(2654435769);
-        return (uint32_t)(r >> 32) + (uint32_t)r;
-#elif 1
-        key += ~(key << 15);
-        key ^= (key >> 10);
-        key += (key << 3);
-        key ^= (key >> 6);
-        key += ~(key << 11);
-        key ^= (key >> 16);
-        return key;
-#endif
-    }
-
+    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__ && _MPCLMUL
-        //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j)
-        __m128i I{}; I[0] ^= key;
-        __m128i J{}; J[0] ^= UINT64_C(0xde5fb9d2630458e9);
-        __m128i M{}; M[0] ^= 0xb000000000000000ull;
-        __m128i X = _mm_clmulepi64_si128(I,J,0);
-        __m128i A = _mm_clmulepi64_si128(X,M,0);
-        __m128i B = _mm_clmulepi64_si128(A,M,0);
-        return A[0]^A[1]^B[1]^X[0]^X[1];
-#elif __SIZEOF_INT128__
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        __uint128_t r = key; r *= k;
-        return (uint32_t)(r >> 64) + (uint32_t)r;
+#if __SIZEOF_INT128__
+        __uint128_t r = key; r *= KC;
+        return (uint64_t)(r >> 64) + (uint64_t)r;
 #elif _WIN32
         uint64_t high;
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        return _umul128(key, k, &high) + high;
+        return _umul128(key, KC, &high) ^ high;
 #elif 1
-        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
 #elif 1
         //MurmurHash3Mixer
@@ -1613,13 +1599,10 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline uint32_t hash_bucket(const UType key) const
+    inline size_type hash_bucket(const UType key) const
     {
 #ifdef EMHASH_FIBONACCI_HASH
-        if (sizeof(UType) <= sizeof(uint32_t))
-            return hash32(key);
-        else
-            return (uint32_t)hash64(key);
+        return hash64(key);
 #elif EMHASH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #elif EMHASH_WYHASH64
@@ -1630,17 +1613,17 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
-    inline uint32_t hash_bucket(const UType& key) const
+    inline size_type hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return madhash(key.c_str(), key.size());
-#elif EMHASH_BKR_HASH
-        uint32_t hash = 0;
-        if (key.size() < 64) {
+#elif EMHASH_BKDR_HASH
+        size_type hash = 0;
+        if (key.size() < 256) {
             for (const auto c : key)
                 hash = c + hash * 131;
         } else {
-            for (int i = 0, j = 1; i < key.size(); i += j++)
+            for (size_t i = 0, j = 1; i < key.size(); i += j++)
                 hash = key[i] + hash * 131;
         }
         return hash;
@@ -1650,7 +1633,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
-    inline uint32_t hash_bucket(const UType& key) const
+    inline size_type hash_bucket(const UType& key) const
     {
 #ifdef EMHASH_FIBONACCI_HASH
         return _hasher(key) * 11400714819323198485ull;
