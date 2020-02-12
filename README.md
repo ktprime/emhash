@@ -191,6 +191,7 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
 
 my ebench result: low is best
 ![](int64_t_int.png)
+![](int_string.png)
 ![](string_int.png)
 ![](int64_t_Struct.png)
 
