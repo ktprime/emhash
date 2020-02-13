@@ -28,7 +28,6 @@
 #include "hash_set2.hpp" //
 #include "hash_set3.hpp" //
 #include "hash_set4.hpp" //
-#include "hash_set.hpp" //
 constexpr int max_loop = 1000000;
 
 ////some others
@@ -107,13 +106,12 @@ static std::unordered_map<std::string, std::string> show_name = {
     {"emhash8", "emhash8"},
     {"emhash9", "emhash9"},
     {"hrdhash", "hrd7 hash"},
+    {"emhash7", "emhash7"},
 
-    {"emhash6", "emhash6"},
 #if ET > 0
     {"martin", "martin flat"},
     {"phmap", "phmap flat"},
 #if ET > 1
-    {"emhash7", "emhash7"},
     {"robin", "tessil robin"},
     {"flat", "skarupk flat"},
 #endif
@@ -964,7 +962,6 @@ static void benchHashSet(int n)
     if (n % 2 == 0)
     {
         { emhash8::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash8", vList); }
-        { emhash6::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash6", vList); }
         { emhash9::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash9", vList); }
         { emhash7::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash7", vList); }
     }
@@ -972,7 +969,6 @@ static void benchHashSet(int n)
     {
         { emhash7::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash7", vList); }
         { emhash9::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash9", vList); }
-        { emhash6::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash6", vList); }
         { emhash8::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash8", vList); }
     }
 
