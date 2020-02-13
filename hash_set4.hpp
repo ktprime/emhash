@@ -41,6 +41,7 @@
 
 #include <cstring>
 #include <string>
+#include <cmath>
 #include <cstdlib>
 #include <type_traits>
 #include <cassert>
@@ -58,7 +59,7 @@
 #endif
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
+#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
 #    define EMHASH_LIKELY(condition) __builtin_expect(condition, 1)
 #    define EMHASH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
@@ -66,8 +67,11 @@
 #    define EMHASH_UNLIKELY(condition) condition
 #endif
 
-#if _WIN32 || _MSC_VER > 1400
-    #include <intrin.h>
+#if _WIN32
+#include <intrin.h>
+#if _WIN64
+#pragma	intrinsic(_umul128)
+#endif
 #endif
 
 namespace emhash9 {
@@ -82,8 +86,8 @@ inline static uint32_t CTZ(size_t n)
 #elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
     n = __builtin_bswap64(n);
 #else
-    static uint32_t endianness = 0xdeadbeef;
-    const auto is_big = *(const char *)&endianness == 0xde;
+    static uint32_t endianness = 0x12345678;
+    const auto is_big = *(const char *)&endianness == 0x12;
     if (is_big)
     n = __builtin_bswap64(n);
 #endif
@@ -267,14 +271,15 @@ public:
 
     HashSet(const HashSet& other)
     {
-        _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(uint64_t));
+        _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(size_t));
         clone(other);
     }
 
     HashSet(HashSet&& other)
     {
-        init(1);
-        *this = std::move(other);
+        _num_filled = 0;
+        _pairs = nullptr;
+        swap(other);
     }
 
     HashSet(std::initializer_list<value_type> il, size_t n = 8)
@@ -288,13 +293,14 @@ public:
     {
         if (this == &other)
             return *this;
+//            htype(other).swap(*this);
 
-        if (isno_triviall_destructable())
+        if (!std::is_pod<KeyT>::value)
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
             free(_pairs);
-            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(uint64_t));
+            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(size_t));
         }
 
         clone(other);
@@ -303,7 +309,8 @@ public:
 
     HashSet& operator=(HashSet&& other)
     {
-        swap(other);
+        if (this != &other)
+            swap(other);
         return *this;
     }
 
@@ -339,7 +346,7 @@ public:
                     new(_pairs + bucket) PairT(opairs[bucket]);
             }
         }
-        memcpy(_pairs + _num_buckets, opairs + _num_buckets, 2 * sizeof(PairT) + _num_buckets / 8 + sizeof(uint64_t));
+        memcpy(_pairs + _num_buckets, opairs + _num_buckets, 2 * sizeof(PairT) + _num_buckets / 8 + sizeof(size_t));
     }
 
     void swap(HashSet& other)
@@ -358,6 +365,9 @@ public:
 
     iterator begin()
     {
+        if (empty())
+            return {this, _num_buckets};
+
         uint32_t bucket = 0;
         while (_bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))) {
             ++bucket;
@@ -367,6 +377,9 @@ public:
 
     const_iterator cbegin() const
     {
+        if (empty())
+            return {this, _num_buckets};
+
         uint32_t bucket = 0;
         while (_bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))) {
             ++bucket;
@@ -428,23 +441,23 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 17) / (float)_loadlf;
+        return (1 << 27) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
         if (value < 0.9999f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 17) / value);
+            _loadlf = (uint32_t)((1 << 27) / value);
     }
 
     constexpr size_type max_size() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1u << 31) / sizeof(PairT);
     }
 
 #ifdef EMHASH_STATIS
@@ -785,7 +798,6 @@ public:
         return 1;
     }
 
-    //iterator erase(const_iterator begin_it, const_iterator end_it)
     iterator erase(const_iterator cit)
     {
         iterator it(this, cit._bucket);
@@ -847,7 +859,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 17);
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 
@@ -865,7 +877,7 @@ private:
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto num_byte = num_buckets / 8;
-        auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_byte + sizeof(uint64_t));
+        auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_byte + sizeof(size_t));
         //TODO: throwOverflowError
         auto old_num_filled  = _num_filled;
         auto old_pairs = _pairs;
@@ -875,21 +887,21 @@ private:
         _mask        = num_buckets - 1;
         _last        = 0;
 
-        _bitmask     = decltype(_bitmask)(new_pairs + 2 + num_buckets);
-
         if (bInCacheLine)
             memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         else
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
                 new_pairs[bucket].second = INACTIVE;
+        memset(new_pairs + _num_buckets, 0, sizeof(PairT) * 2);
 
-        /***************** ----------------------**/
+        //set bit mask
+        _bitmask     = decltype(_bitmask)(new_pairs + 2 + num_buckets);
         memset(_bitmask, INACTIVE, num_byte);
-        memset((char*)_bitmask + num_byte, 0, sizeof(uint64_t));
+        memset((char*)_bitmask + num_byte, 0, sizeof(size_t));
         //set high bit to zero
         _bitmask[num_buckets / MASK_BIT] &= (1 << num_buckets % MASK_BIT) - 1;
-        /***************** ----------------------**/
-        memset(new_pairs + _num_buckets, 0, sizeof(PairT) * 2);
+
+
         _pairs       = new_pairs;
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             auto&& opair = old_pairs[src_bucket];
@@ -994,12 +1006,12 @@ private:
         const auto& bucket_key = _pairs[bucket].first;
         if (next_bucket == INACTIVE)
             return _num_buckets;
+//        else if (bucket != (hash_bucket(bucket_key) & _mask))
+//            return _num_buckets;
         else if (_eq(key, bucket_key))
             return bucket;
         else if (next_bucket == bucket)
             return _num_buckets;
-//        else if (bucket != (hash_bucket(bucket_key) & _mask))
-//            return _num_buckets;
 
         while (true) {
             if (_eq(key, _pairs[next_bucket].first))
@@ -1086,7 +1098,6 @@ private:
     {
         if (_pairs[++bucket_from].second == INACTIVE)
             return bucket_from;
-
         if (_pairs[++bucket_from].second == INACTIVE)
             return bucket_from;
 
@@ -1100,7 +1111,7 @@ private:
             const auto bucket2 = bucket1 + 1;
             if (_pairs[bucket2].second == INACTIVE)
                 return bucket2;
-#if 0
+#if 1
             else if (last > 4) {
                 const auto next = (bucket1 + _num_filled) & _mask;
                 const auto bucket3 = next;
@@ -1128,23 +1139,22 @@ private:
             return bucket2;
 #endif
 
+        constexpr auto SIZE_BITS = sizeof(size_t) * 8;
 #if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
-        const uint64_t bmask = *(uint64_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
+        const auto bmask = *(size_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
 #else
-        const auto boset = bucket_from % 64;
-        const uint64_t bmask = *((uint64_t*)_bitmask + bucket_from / 64) >> boset;
+        const auto boset = bucket_from % SIZE_BITS;
+        const auto bmask = *((size_t*)_bitmask + bucket_from / SIZE_BITS) >> boset;
 #endif
-        if (bmask != 0)
+        if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask) - 0;
 
-        constexpr auto SIZE_BITS = sizeof(size_t) * 8;
         const auto qmask = _mask / SIZE_BITS;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-//        for (uint32_t last = 3, step = (bucket_from + 4 * 64) & qmask; ;step = (step + ++last) & qmask) {
         for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
-            const auto bmask = *((uint64_t*)_bitmask + step);
-            if (bmask != 0)
+            const auto bmask = *((size_t*)_bitmask + step);
+            if (EMHASH_LIKELY(bmask != 0))
                 return step * SIZE_BITS + CTZ(bmask);
         }
 
@@ -1203,7 +1213,7 @@ private:
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         __uint128_t r = key; r *= k;
         return (uint32_t)(r >> 64) + (uint32_t)r;
-#elif _WIN32
+#elif _WIN64
         uint64_t high;
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         return _umul128(key, k, &high) + high;
@@ -1245,7 +1255,7 @@ private:
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return madhash(key.c_str(), key.size());
-#elif EMHASH_BKR_HASH
+#elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {
             for (const auto c : key)
@@ -1273,6 +1283,8 @@ private:
 private:
 
     //the first cache line packed
+    PairT*    _pairs;
+    uint8_t*  _bitmask;
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
@@ -1281,10 +1293,9 @@ private:
     uint32_t  _mask;
 
     uint32_t  _num_filled;
-    PairT*    _pairs;
-    uint8_t*  _bitmask;
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
 template <class Key, typename Hash = std::hash<Key>> using em_hash_set = emhash9::HashSet<Key, Hash>;
 #endif
+

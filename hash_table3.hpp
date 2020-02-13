@@ -516,7 +516,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.95f && value > 0.2f)
+        if (value < 0.99f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 17) / value);
     }
 
@@ -1491,9 +1491,7 @@ private:
         return key;
 #elif 1
         uint64_t const r = key * UINT64_C(2654435769);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
+        return (uint32_t)(r >> 32) + (uint32_t)r;
 #elif 1
         key += ~(key << 15);
         key ^= (key >> 10);
@@ -1507,16 +1505,17 @@ private:
 
     static inline uint64_t hash64(uint64_t key)
     {
-//       return (key >> 33 ^ key ^ key << 11);
-#ifdef __SIZEOF_INT128__
-        constexpr uint64_t k = UINT64_C(0xde5fb9d2630458e9);
+#if __SIZEOF_INT128__
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
         __uint128_t r = key; r *= k;
-        return (uint32_t)(r >> 64) + r;
+        return (uint32_t)(r >> 64) + (uint32_t)r;
+#elif _WIN32
+        uint64_t high;
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        return _umul128(key, k, &high) + high;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
+        return (r >> 32) + r;
 #elif 1
         //MurmurHash3Mixer
         uint64_t h = key;
@@ -1525,7 +1524,7 @@ private:
         h ^= h >> 33;
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
-        return static_cast<size_t>(h);
+        return h;
 #elif 1
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);

@@ -323,7 +323,6 @@ public:
     void init(uint32_t bucket, float load_factor = 0.95f)
     {
         _num_buckets = 0;
-        _last = 0;
         _mask = 0;
         _pairs = nullptr;
         _num_filled = 0;
@@ -393,7 +392,6 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
-        _last        = other._last;
 
         auto opairs  = other._pairs;
 
@@ -422,7 +420,6 @@ public:
         std::swap(_num_filled, other._num_filled);
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
-        std::swap(_last, other._last);
     }
 
     // -------------------------------------------------------------
@@ -999,7 +996,6 @@ public:
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 
         _num_filled = 0;
-        _last = 0;
     }
 
     void shrink_to_fit()
@@ -1034,7 +1030,6 @@ private:
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-        _last = 0;
 
         if (sizeof(PairT) <= EMHASH_CACHE_LINE_SIZE / 2)
             memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
@@ -1264,20 +1259,18 @@ private:
             const auto next = step & _mask;
             const auto bucket1 = next + 0;
             if (INACTIVE == NEXT_BUCKET(_pairs, bucket1)) {
-                //_last = bucket1;
                 return bucket1;
             }
 
             const auto bucket2 = next + 1;
             if (INACTIVE == NEXT_BUCKET(_pairs, bucket2)) {
-                //_last = bucket2;
                 return bucket2;
             }
 
             if (last > 3) {
-                if (INACTIVE == NEXT_BUCKET(_pairs, ++_last))
+                _last = ++_last & _mask;
+                if (INACTIVE == NEXT_BUCKET(_pairs, _last))
                     return _last;
-                _last &= _mask;
             }
         }
 
@@ -1345,7 +1338,6 @@ private:
 
     uint32_t  _num_buckets;
     uint32_t  _mask;
-
     uint32_t  _num_filled;
 };
 } // namespace emhash

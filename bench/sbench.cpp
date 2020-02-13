@@ -18,17 +18,17 @@
 //#define EMHASH_REHASH_LOG   1
 //#define EMHASH_SAFE_HASH      1
 //#define EMHASH_STATIS    1
-//#define EMHASH_HIGH_LOAD 1
+#define EMHASH_HIGH_LOAD 1
 //#define EMHASH_FIBONACCI_HASH 1
 
 #ifndef TKey
     #define TKey  1
 #endif
 
-#include "hash_set.hpp" //
 #include "hash_set2.hpp" //
 #include "hash_set3.hpp" //
 #include "hash_set4.hpp" //
+#include "hash_set.hpp" //
 constexpr int max_loop = 1000000;
 
 ////some others
@@ -48,7 +48,7 @@ constexpr int max_loop = 1000000;
 //http://www.ilikebigbits.com/2016_08_28_hash_table.html
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 
-#if __cplusplus >= 201103L && HOOD_HASH
+#if (__cplusplus >= 201103L || _MSC_VER > 1600) && HOOD_HASH
     #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
@@ -352,7 +352,7 @@ void hash_iter(htype& amap, const std::string& map_name, std::vector<keyType>& v
 }
 
 template<class htype>
-void hash_reinsert(htype& amap, const std::string& map_name, std::vector<keyType>& vList)
+void erase_reinsert(htype& amap, const std::string& map_name, std::vector<keyType>& vList)
 {
     if (show_name.find(map_name) != show_name.end())
     {
@@ -375,15 +375,16 @@ void insert_multihash(const std::string& hash_name, const std::vector<keyType>& 
 
     auto ts1 = getTime();
     size_t sum = 0;
-    std::array<hash_type, 1024> mh;
+    constexpr auto hash_size = 1024 * 128;
+    std::vector<hash_type> mh(hash_size);
 
     for (const auto v : vList) {
-        auto hash_id = ((uint64_t)v) % 1024;
-        sum += mh[hash_id].emplace(v / 1024).second;
+        auto hash_id = (uint32_t)v % hash_size;
+        sum += mh[hash_id].emplace(v / hash_size).second;
     }
 
     check_mapfunc_result(hash_name, __FUNCTION__, sum, ts1);
-    printf("    %12s    reinsert  %5d ns, factor = %.2f\n", hash_name.c_str(), AVE_TIME(ts1, vList.size()), mh[0].load_factor());
+    printf("    %62s    insert_multihash  %5d ns, factor = %.2f\n", hash_name.c_str(), AVE_TIME(ts1, vList.size()), mh[0].load_factor());
 #endif
 }
 
@@ -460,7 +461,7 @@ void insert_small_size(const std::string& hash_name, const std::vector<keyType>&
             }
         }
         check_mapfunc_result(hash_name, __FUNCTION__, sum, ts1);
-        printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), (float)tmp.load_factor());
+        //printf("             %62s    %s  %5d ns, factor = %.2f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), (float)tmp.load_factor());
     }
 }
 
@@ -518,7 +519,7 @@ void find_miss(htype& amap, const std::string& map_name, std::vector<keyType>& v
         auto n = vList.size();
         auto ts1 = getTime();
         for (size_t v = 1; v < 2*n; v++)
-            sum += amap.count(TO_KEY(v));
+            sum += amap.count(TO_KEY(v * 131));
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
         printf("    %12s    %s %5d ns, factor = %.2f\n", __FUNCTION__, map_name.c_str(), AVE_TIME(ts1, vList.size()), (float)amap.load_factor());
@@ -567,7 +568,7 @@ void insert_find_erase(hash_type& ahash, const std::string& hash_name, std::vect
 }
 
 template<class htype>
-void hash_erase(htype& amap, const std::string& map_name, std::vector<keyType>& vList)
+void erase_half(htype& amap, const std::string& map_name, std::vector<keyType>& vList)
 {
     if (show_name.find(map_name) != show_name.end())
     {
@@ -600,7 +601,7 @@ void find_hit(htype& amap, const std::string& map_name, std::vector<keyType>& vL
 }
 
 template<class htype>
-void find_erase(htype& amap, const std::string& map_name, std::vector<keyType>& vList)
+void erase_find(htype& amap, const std::string& map_name, std::vector<keyType>& vList)
 {
     if (show_name.find(map_name) != show_name.end())
     {
@@ -755,7 +756,7 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
     const auto iRation = 10;
 #endif
 
-    auto flag = (int)srng() % 5 + 1;
+    auto flag = ((size_t)srng() % 5) + 1;
     if (srng() % 100 > iRation)
     {
         emhash9::HashSet<keyType> eset(size);
@@ -926,11 +927,11 @@ void benOneSet(htype& hmap, const std::string& map_name, std::vector<keyType> vL
     insert_find_erase(hmap, map_name, vList);
 
     //    shuffle(vList.begin(), vList.end());
-    hash_erase(hmap, map_name, vList);
-    find_erase(hmap, map_name, vList);
+    erase_half(hmap, map_name, vList);
+    erase_find(hmap, map_name, vList);
 
     //    shuffle(vList.begin(), vList.end());
-    hash_reinsert(hmap, map_name, vList);
+    erase_reinsert(hmap, map_name, vList);
 
 #if UF
     hash_iter(hmap, map_name, vList);
@@ -1049,7 +1050,7 @@ static void benchHashSet(int n)
         puts("======== map  top1  top2  top3 =======================");
         for (auto& v : rank)
             printf("%13s %4.1lf %4.1lf %4d\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (int)(v.second % (base2 / 2)));
-        puts("======== map    score ================================");
+        puts("======== hash    score ================================");
         for (auto& v : rank_time)
             printf("%13s %4d\n", v.first.c_str(), int(v.second / tcase));
 
@@ -1111,11 +1112,11 @@ int main(int argc, char* argv[])
         else if (cmd == 'i' && isdigit(argv[i][1]))
             auto_set = atoi(&argv[i][0] + 1) != 0;
         else if (cmd == 'd') {
-            for (char c = argv[i][0], j = 0; c != '\0'; c = argv[i][j++]) {
+            for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][j++]) {
                 if (c >= '2' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;
-                    if (show_name.count(hash_name) == 0)
+                    if (show_name.count(hash_name) > 0)
                         show_name.erase(hash_name);
                     else
                         show_name[hash_name] = hash_name;
@@ -1136,6 +1137,8 @@ int main(int argc, char* argv[])
         }
     }
 
+    HashSetTest(1234567, 1234567);
+
     auto nows = time(0);
 #ifdef RD
     sfc64 srng(nows);
@@ -1145,7 +1148,7 @@ int main(int argc, char* argv[])
 
     while (true) {
         auto n = 0;
-        n = (srng() % maxn) + minn;
+        n = (int)(srng() % maxn) + minn;
         if (auto_set) {
             printf(">> "); scanf("%d", &n);
             if (n <= 0)
@@ -1161,8 +1164,8 @@ int main(int argc, char* argv[])
         benchHashSet(n);
         if (tcase >= maxc)
             break;
-//        if (time(0) % 1001 == 0)
-//            TestHashMap(n, (rand() * rand()) % 123457 + 10000);
     }
     return 0;
 }
+
+

@@ -51,9 +51,9 @@
 #include <iterator>
 
 #ifdef  GET_KEY
-    #undef  hash_bucket
-    #undef  NEXT_BUCKET
-    #undef  GET_KEY
+    #undef hash_bucket
+    #undef NEXT_BUCKET
+    #undef GET_KEY
     #undef NEW_KEY
 #endif
 

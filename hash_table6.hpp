@@ -24,40 +24,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-/****************
-    under random hashCodes, the frequency of nodes in bins follows a Poisson
-distribution(http://en.wikipedia.org/wiki/Poisson_distribution) with a parameter of about 0.5
-on average for the default resizing threshold of 0.75, although with a large variance because
-of resizing granularity. Ignoring variance, the expected occurrences of list size k are
-(exp(-0.5) * pow(0.5, k)/factorial(k)). The first values are:
-0: 0.60653066
-1: 0.30326533
-2: 0.07581633
-3: 0.01263606
-4: 0.00157952
-5: 0.00015795
-6: 0.00001316
-7: 0.00000094
-8: 0.00000006
-****************/
-
-// From
-// NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
-// Quadratic collision resolution   1 - ln(1-L) - L/2    1/(1-L) - L - ln(1-L)
-// Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-// separator chain resolution      1 + L / 2             e^-L + L
-// -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
-// QUADRATIC COLLISION RES.
-//    probes/successful lookup    1.05  1.44  1.62  2.01  2.21  2.85  5.11
-//    probes/unsuccessful lookup  1.11  2.19  2.82  4.64  5.81  11.4  103.6
-// LINEAR COLLISION RES.
-//    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
-//    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
-// SEPARATE CHAN RES.
-//    probes/successful lookup    1.05  1.25  1.3   1.25  1.4   1.45  1.50
-//    probes/unsuccessful lookup  1.00  1.11  1.15  1.22  1.25  1.31  1.37
-
-
 #pragma once
 
 #include <cstdint>
@@ -143,21 +109,32 @@ constexpr uint32_t INACTIVE = (0 - 1u);
 constexpr uint32_t BIT_PACK = sizeof(uint64_t) * 2 + sizeof(uint8_t);
 static_assert(INACTIVE % 2 == 1, "INACTIVE must be even");
 
-inline static uint32_t CTZ(const size_t n)
+inline static uint32_t CTZ(size_t n)
 {
-#if _MSC_VER > 1400 || _WIN32
+#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+
+#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+    n = __builtin_bswap64(n);
+#else
+    static uint32_t endianness = 0x12345678;
+    const auto is_big = *(const char *)&endianness == 0x12;
+    if (is_big)
+    n = __builtin_bswap64(n);
+#endif
+
+#if _WIN32
     unsigned long index;
-    #if defined(_WIN64) || defined(__LP64__) || defined(__x86_64__) || _M_X64
+    #if defined(_WIN64)
     _BitScanForward64(&index, n);
     #else
     _BitScanForward(&index, n);
     #endif
-#elif defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
+#elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
 #elif 1
     uint32_t index = __builtin_ctzl(n);
-#elif 1
-    #if defined (__LP64__) || (INTPTR_MAX == INT64_MAX) || defined (__x86_64__)
+#else
+    #if defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index;
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
     #else
@@ -847,6 +824,21 @@ public:
             do_insert(*begin);
     }
 
+    uint32_t try_insert_mainbucket(const KeyT& key, const ValueT& value)
+    {
+        const auto bucket = hash_bucket(key) & _mask;
+        if (ISEMPTY_BUCKET(_pairs, bucket))
+        {
+#if EMHASH_SAFE_HASH
+            _num_main ++;
+#endif
+            NEW_KVALUE(key, value, bucket, bucket * 2);
+            return bucket;
+        }
+
+        return -1u;
+    }
+
     template <typename Iter>
     void insert2(Iter begin, Iter end)
     {
@@ -931,20 +923,6 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    uint32_t try_insert_mainbucket(const KeyT& key, const ValueT& value)
-    {
-        const auto bucket = hash_bucket(key) & _mask;
-        if (ISEMPTY_BUCKET(_pairs, bucket))
-        {
-#if EMHASH_SAFE_HASH
-            _num_main ++;
-#endif
-            NEW_KVALUE(key, value, bucket, bucket * 2);
-            return bucket;
-        }
-
-        return -1u;
-    }
 
     std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) { return insert(key, std::move(value)); }
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return insert(std::move(key), std::move(value)); }
@@ -1017,7 +995,7 @@ public:
 
     static constexpr bool is_triviall_destructable()
     {
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
+#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -1026,7 +1004,7 @@ public:
 
     static constexpr bool is_copy_trivially()
     {
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
+#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -1542,40 +1520,9 @@ private:
         return ADDR_BUCKET(_pairs, last_bucket) = find_empty_bucket(last_bucket) * 2 + 1;
     }
 
-    static inline uint32_t hash32(uint32_t key)
-    {
-#if 0
-        key = ((key >> 16) ^ key) * 0x45d9f3b;
-        key = ((key >> 16) ^ key) * 0x45d9f3b; //0x119de1f3
-//        key = ((key >> 13) ^ key) * 0xc2b2ae35;
-        key = (key >> 16) ^ key;
-        return key;
-#elif 1
-        uint64_t const r = key * UINT64_C(2654435769);
-        return (uint32_t)(r >> 32) + (uint32_t)r;
-#elif 1
-        key += ~(key << 15);
-        key ^= (key >> 10);
-        key += (key << 3);
-        key ^= (key >> 6);
-        key += ~(key << 11);
-        key ^= (key >> 16);
-        return key;
-#endif
-    }
-
     static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__ && _MPCLMUL
-        //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j)
-        __m128i I{}; I[0] ^= key;
-        __m128i J{}; J[0] ^= UINT64_C(0xde5fb9d2630458e9);
-        __m128i M{}; M[0] ^= 0xb000000000000000ull;
-        __m128i X = _mm_clmulepi64_si128(I,J,0);
-        __m128i A = _mm_clmulepi64_si128(X,M,0);
-        __m128i B = _mm_clmulepi64_si128(A,M,0);
-        return A[0]^A[1]^B[1]^X[0]^X[1];
-#elif __SIZEOF_INT128__
+#if __SIZEOF_INT128__
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         __uint128_t r = key; r *= k;
         return (uint32_t)(r >> 64) + (uint32_t)r;
@@ -1608,9 +1555,6 @@ private:
     inline uint32_t hash_bucket(const UType key) const
     {
 #ifdef EMHASH_FIBONACCI_HASH
-        if (sizeof(UType) <= sizeof(uint32_t))
-            return hash32(key);
-        else
             return (uint32_t)hash64(key);
 #elif EMHASH_SAFE_HASH
         if (_hash_inter > 0) {
@@ -1660,7 +1604,9 @@ private:
     }
 
 private:
-    //8 * 3 + 4 + 4 + 4 * 3 = 32 + 12 = 44
+    PairT*    _pairs;
+    uint32_t* _bitmask;
+    //8 * 2 + 4 * 5 = 16 + 20 = 32
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _mask;
@@ -1675,8 +1621,6 @@ private:
 #endif
 
     uint32_t  _last;
-    PairT*    _pairs;
-    uint32_t* _bitmask;
 };
 } // namespace emhash
 #if __cplusplus >= 201103L

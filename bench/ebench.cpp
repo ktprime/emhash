@@ -587,22 +587,28 @@ void insert_reserve(const std::string& hash_name, const std::vector<keyType>& vL
 }
 
 template<class hash_type>
-void insert_multihash(const std::string& hash_name, const std::vector<keyType>& vList)
+void find_insert_multi(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     if (show_name.count(hash_name) == 0)
         return;
 
 #if KEY_INT
-    auto ts1 = getTime();
     size_t sum = 0;
-    std::array<hash_type, 1024> mh;
+    constexpr auto hash_size = 1024 * 128;
+    std::vector<hash_type> mh(hash_size);
 
+    auto ts1 = getTime();
     for (const auto v : vList) {
-        auto hash_id = ((uint64_t)v) % 1024;
-        sum += mh[hash_id].emplace(v / 1024, TO_VAL(0)).second;
+        auto hash_id = ((uint64_t)v) % hash_size;
+        sum += mh[hash_id].emplace(v / hash_size, TO_VAL(0)).second;
     }
 
-    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+    for (const auto v : vList) {
+        auto hash_id = ((uint64_t)v) % hash_size;
+        sum += mh[hash_id].count(v / hash_size + v % 2);
+    }
+
+    check_func_result(hash_name, __FUNCTION__, sum, ts1, 2);
     printf("    %62s    %s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), mh[0].load_factor());
 #endif
 }
@@ -718,7 +724,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
 #if FL1
             l1_cache[v % sizeof(l1_cache)] = 0;
 #endif
-            sum += ahash.count(TO_KEY(v));
+            sum += ahash.count(TO_KEY(v * 0xa0761d6478bd642full));
         }
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
        printf("    %12s  %8s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, pow2), ahash.load_factor());
@@ -1079,7 +1085,6 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
 
         insert_reserve <hash_type>(hash_name, oList);
         insert_high_load <hash_type>(hash_name, oList);
-        insert_multihash <hash_type>(hash_name, oList);
         const uint32_t l1_size = (64 * 1024)   / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
         const uint32_t l3_size = (2048 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
 
@@ -1087,6 +1092,7 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size, l3_size);
         insert_no_reserve(hash, hash_name, oList);
 
+        find_insert_multi <hash_type>(hash_name, oList);
         find_hit_all (hash, hash_name, oList);
         find_miss_all(hash, hash_name);
 
@@ -1529,7 +1535,7 @@ int main(int argc, char* argv[])
         else if (cmd == 'i' && isdigit(argv[i][1]))
             auto_set = atoi(&argv[i][0] + 1) != 0;
         else if (cmd == 'd') {
-            for (char c = argv[i][0], j = 0; c != '\0'; c = argv[i][j++]) {
+            for (char c = argv[i][0], j = 1; c != '\0'; c = argv[i][j++]) {
                 if (c >= '2' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;
