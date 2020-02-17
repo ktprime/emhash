@@ -931,8 +931,8 @@ void benOneSet(htype& hmap, const std::string& map_name, std::vector<keyType> vL
     //    shuffle(vList.begin(), vList.end());
     erase_reinsert(hmap, map_name, vList);
 
-#if UF
     hash_iter(hmap, map_name, vList);
+#if UF
     hash_copy(hmap, map_name, vList);
     hash_clear(hmap, map_name, vList);
 #endif

@@ -70,13 +70,14 @@
 #if _WIN32
 #include <intrin.h>
 #if _WIN64
-#pragma	intrinsic(_umul128)
+#pragma intrinsic(_umul128)
 #endif
 #endif
 
 namespace emhash9 {
 
 constexpr uint32_t MASK_BIT = sizeof(uint8_t) * 8;
+constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 
 inline static uint32_t CTZ(size_t n)
@@ -141,7 +142,18 @@ public:
         typedef value_type&               reference;
 
         iterator() { }
-        iterator(htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { }
+        iterator(htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { init(); }
+        void init()
+        {
+            _from = (_bucket / SIZE_BIT) * SIZE_BIT;
+            if (_bucket < _set->bucket_count()) {
+                _bmask = *(size_t*)((size_t*)_set->_bitmask + _from / SIZE_BIT);
+                _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
+                _bmask = ~_bmask;
+            } else {
+                _bmask = 0;
+            }
+        }
 
         iterator& operator++()
         {
@@ -179,15 +191,34 @@ public:
     private:
         void goto_next_element()
         {
+#ifdef EM_SAFE_ITER
             auto bitmask = _set->_bitmask;
+
             do {
                 _bucket++;
             } while (bitmask[_bucket / MASK_BIT] & (1 << (_bucket % MASK_BIT)));
+#else
+            _bmask &= _bmask - 1;
+            if (_bmask != 0) {
+                _bucket = _from + CTZ(_bmask);
+                return;
+            }
+
+            while (_bmask == 0 && _from < _set->bucket_count())
+                _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+
+            if (_bmask != 0) {
+                _bucket = _from + CTZ(_bmask);
+            } else
+                _bucket = _set->bucket_count();
+#endif
         }
 
     public:
-        htype* _set;
+        htype*   _set;
+        size_t   _bmask;
         uint32_t _bucket;
+        uint32_t _from;
     };
 
     class const_iterator
@@ -200,8 +231,20 @@ public:
         typedef value_type&               reference;
 
         const_iterator() { }
-        const_iterator(iterator proto) : _set(proto._set), _bucket(proto._bucket) { }
-        const_iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { }
+        const_iterator(const iterator& it) : _set(it._set), _bucket(it._bucket) { init(); }
+        const_iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { init(); }
+
+        void init()
+        {
+            _from = (_bucket / SIZE_BIT) * SIZE_BIT;
+            if (_bucket < _set->bucket_count()) {
+                _bmask = *(size_t*)((size_t*)_set->_bitmask + _from / SIZE_BIT);
+                _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
+                _bmask = ~_bmask;
+            } else {
+                _bmask = 0;
+            }
+        }
 
         const_iterator& operator++()
         {
@@ -239,15 +282,34 @@ public:
     private:
         void goto_next_element()
         {
+#ifdef EM_SAFE_ITER
             auto bitmask = _set->_bitmask;
+
             do {
                 _bucket++;
             } while (bitmask[_bucket / MASK_BIT] & (1 << (_bucket % MASK_BIT)));
+#else
+            _bmask &= _bmask - 1;
+            if (_bmask != 0) {
+                _bucket = _from + CTZ(_bmask);
+                return;
+            }
+
+            while (_bmask == 0 && _from < _set->bucket_count())
+                _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+
+            if (_bmask != 0) {
+                _bucket = _from + CTZ(_bmask);
+            } else
+                _bucket = _set->bucket_count();
+#endif
         }
 
     public:
         const htype* _set;
+        size_t   _bmask;
         uint32_t _bucket;
+        uint32_t _from;
     };
 
     // ------------------------------------------------------------------------
@@ -277,7 +339,7 @@ public:
 
     HashSet(HashSet&& other)
     {
-        _num_filled = 0;
+        _num_buckets = _num_filled = 0;
         _pairs = nullptr;
         swap(other);
     }
@@ -845,7 +907,6 @@ public:
         else {
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
             memset(_bitmask, INACTIVE, _num_buckets / 8);
-            _bitmask[_num_buckets / MASK_BIT] &= (1 << _num_buckets % MASK_BIT) - 1;
         }
         _last = 0;
         _num_filled = 0;
@@ -873,7 +934,7 @@ private:
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
+        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 8u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto num_byte = num_buckets / 8;
@@ -898,9 +959,6 @@ private:
         _bitmask     = decltype(_bitmask)(new_pairs + 2 + num_buckets);
         memset(_bitmask, INACTIVE, num_byte);
         memset((char*)_bitmask + num_byte, 0, sizeof(size_t));
-        //set high bit to zero
-        _bitmask[num_buckets / MASK_BIT] &= (1 << num_buckets % MASK_BIT) - 1;
-
 
         _pairs       = new_pairs;
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
@@ -1139,23 +1197,22 @@ private:
             return bucket2;
 #endif
 
-        constexpr auto SIZE_BITS = sizeof(size_t) * 8;
 #if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
         const auto bmask = *(size_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
 #else
-        const auto boset = bucket_from % SIZE_BITS;
-        const auto bmask = *((size_t*)_bitmask + bucket_from / SIZE_BITS) >> boset;
+        const auto boset = bucket_from % SIZE_BIT;
+        const auto bmask = *((size_t*)_bitmask + bucket_from / SIZE_BIT) >> boset;
 #endif
         if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask) - 0;
 
-        const auto qmask = _mask / SIZE_BITS;
+        const auto qmask = _mask / SIZE_BIT;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
         for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
             const auto bmask = *((size_t*)_bitmask + step);
             if (EMHASH_LIKELY(bmask != 0))
-                return step * SIZE_BITS + CTZ(bmask);
+                return step * SIZE_BIT + CTZ(bmask);
         }
 
         return 0;
@@ -1254,7 +1311,7 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return madhash(key.c_str(), key.size());
+        return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {

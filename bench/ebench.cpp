@@ -1112,8 +1112,8 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         insert_find_erase(hash, hash_name, vList);
         load_factor = (int)(hash.load_factor() * 100);
 
-#ifdef UF
         hash_iter(hash, hash_name);
+#ifdef UF
         hash_copy(hash, hash_name);
         hash_clear(hash, hash_name);
 #endif
