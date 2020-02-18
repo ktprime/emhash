@@ -1,4 +1,3 @@
-
 // emhash8::HashSet for C++11
 // version 1.3.2
 // https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
@@ -61,7 +60,7 @@
 
 #ifdef NEW_KEY
     #undef  NEW_KEY
-    #undef  CLEAR_BUCKET
+    #undef  CLS_BUCKET
 #endif
 
 // likely/unlikely
@@ -74,7 +73,7 @@
 #endif
 
 #define NEW_KEY(key, bucket) new(_pairs + bucket) PairT(key, bucket), _num_filled ++
-#define CLEAR_BUCKET(_bucket) _pairs[bucket].~PairT(); _num_filled --; _pairs[bucket].second = INACTIVE
+#define CLS_BUCKET(_bucket) _pairs[bucket].~PairT(); _num_filled --; _pairs[bucket].second = INACTIVE
 
 namespace emhash8 {
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
@@ -238,10 +237,9 @@ public:
 
     HashSet(HashSet&& other)
     {
-        //init(1);
         _pairs = nullptr;
-        _num_buckets = _num_filled = 0;
-        *this = std::move(other);
+        _max_bucket = _num_filled = 0;
+        swap(other);
     }
 
     HashSet(std::initializer_list<value_type> il, size_t n = 8)
@@ -309,13 +307,14 @@ public:
     void swap(HashSet& other)
     {
         std::swap(_hasher, other._hasher);
+//      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
-        std::swap(_max_bucket, other._max_bucket);
-        std::swap(_last_colls, other._last_colls);
         std::swap(_num_filled, other._num_filled);
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
+        std::swap(_max_bucket, other._max_bucket);
+        std::swap(_last_colls, other._last_colls);
     }
 
     // -------------------------------------------------------------
@@ -409,6 +408,16 @@ public:
     constexpr size_type max_bucket_count() const
     {
         return (1u << 31) / sizeof(PairT);
+    }
+
+    size_type bucket_main() const
+    {
+        auto bucket_size = 0;
+        for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
+            if (_pairs[bucket].second == bucket)
+                bucket_size ++;
+        }
+        return bucket_size;
     }
 
 #ifdef EMHASH_STATIS
@@ -713,11 +722,11 @@ public:
         auto& key = _pairs[last_bucket].first;
         const auto main_bucket = hash_bucket(key);
         const auto prev_bucket = find_prev_bucket(main_bucket, last_bucket);
-
         new(_pairs + bucket) PairT(std::move(key), last_next != last_bucket ? last_next : bucket);
 
+        if (!std::is_pod<KeyT>::value)
+            _pairs[last_bucket].~PairT();
         _pairs[prev_bucket].second = bucket;
-        _pairs[last_bucket].~PairT();
         _pairs[last_bucket].second = INACTIVE;
     }
 
@@ -729,7 +738,8 @@ public:
         if (bucket == INACTIVE)
             return 0;
 
-        CLEAR_BUCKET(bucket);
+        CLS_BUCKET(bucket);
+
 #if EMHASH_HIGH_LOAD
         if (bucket >= _last_colls)
             erase_coll(bucket);
@@ -748,7 +758,7 @@ public:
     iterator erase(iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        CLS_BUCKET(bucket);
         //move last bucket to current
 #if EMHASH_HIGH_LOAD
         if (bucket >= _last_colls)
@@ -763,7 +773,8 @@ public:
     void _erase(iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
-        CLEAR_BUCKET(bucket);
+        CLS_BUCKET(bucket);
+
  #if EMHASH_HIGH_LOAD
         if (bucket >= _last_colls)
             erase_coll(bucket);
@@ -774,7 +785,7 @@ public:
     {
         for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
             if (_pairs[bucket].second != INACTIVE) {
-                CLEAR_BUCKET(bucket);
+                CLS_BUCKET(bucket);
             }
         }
         _last_colls = _max_bucket - 1;
@@ -818,11 +829,10 @@ private:
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
+        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 8u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto old_max_bucket = _max_bucket;
-
 #if EMHASH_HIGH_LOAD
         _max_bucket = num_buckets + num_buckets / 5;
 #else
@@ -837,8 +847,6 @@ private:
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-
-        _last_colls  = _num_buckets;
         _pairs       = new_pairs;
 
         if (sizeof(PairT) <= 48) {
@@ -847,8 +855,8 @@ private:
             for (uint32_t bucket = 0; bucket < _max_bucket; bucket++)
                 _pairs[bucket].second = INACTIVE;
         }
-        _pairs[_max_bucket].second = _pairs[_max_bucket + 1].second = 0;
-        _pairs[_last_colls].second = 0;
+        _pairs[_max_bucket + 0].second = _pairs[_max_bucket + 1].second = 0;
+        _pairs[_last_colls = num_buckets].second = 0;
 
         //set all main bucket first
         for (uint32_t src_bucket = 0; src_bucket < old_max_bucket && old_num_filled > 0; src_bucket++) {
@@ -862,17 +870,18 @@ private:
         }
 
 #if EMHASH_HIGH_LOAD
+        if (_last_colls != _max_bucket)
         _pairs[_last_colls].second = INACTIVE;
         _last_colls = _max_bucket - 1;
 #endif
 
 #if EMHASH_REHASH_LOG
         if (_num_filled > EMHASH_REHASH_LOG) {
-            uint32_t collision = 0;
-            auto mbucket = _num_filled - collision;
+            const auto mbucket = bucket_main();
+            const auto collision = _num_filled - mbucket;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K/pack/collision = %u/%.2lf/%s/%zd/%.2lf%%",
-                    _num_filled, (double)_num_filled / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_filled));
+            sprintf(buff, "    _num_filled/aver_size/type/sizeof/collision/load_factor = %u/%.2lf/%s/%zd/%2.lf%%|%.2f",
+            _num_filled, (double)_num_filled / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_filled), load_factor());
 #if EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
@@ -1054,28 +1063,27 @@ private:
             return bucket2;
 
 #if EMHASH_HIGH_LOAD
-        //if (bucket_from > _num_buckets && INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
-        if (INACTIVE == _pairs[_last_colls].second) 
+        //if (bucket_from > _num_buckets && INACTIVE == _pairs[_last_colls].second) return _last_colls --;
+        if (INACTIVE == _pairs[_last_colls].second && _last_colls > _num_buckets)
             return _last_colls --;
 #endif
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
         //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t last = 2, slot = bucket_from + 2; ;slot += ++last) {
-            const auto bucket = slot & _mask;
-            if (_pairs[bucket].second == INACTIVE)
-                return bucket;
+        for (uint32_t last = 2, slot = bucket_from + 4; ;slot += ++last) {
+            const auto bucket1 = slot & _mask;
+            if (_pairs[bucket1].second == INACTIVE)
+                return bucket1;
 
-            const auto bucket2 = bucket + 1;
+            const auto bucket2 = bucket1 + 1;
             if (_pairs[bucket2].second == INACTIVE)
                 return bucket2;
-#if 1
+
             if (last > 3) {
                 const auto bucket3 = (bucket_from + _num_filled + last) & _mask;
                 if (_pairs[bucket3].second == INACTIVE)
                     return bucket3;
             }
-#endif
         }
     }
 
@@ -1172,7 +1180,7 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return madhash(key.c_str(), key.size()) & _mask;
+        return wyhash(key.c_str(), key.size(), key.size()) & _mask;
 #elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {

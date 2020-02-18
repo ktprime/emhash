@@ -365,10 +365,7 @@ public:
             while (_bmask == 0 && _from < _map->bucket_count())
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
 
-            if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask);
-            } else
-                _bucket = _map->bucket_count();
+            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
 #endif
         }
 
@@ -456,10 +453,7 @@ public:
             while (_bmask == 0 && _from < _map->bucket_count())
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
 
-            if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask);
-            } else
-                _bucket = _map->bucket_count();
+            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
 #endif
         }
 
@@ -668,6 +662,17 @@ public:
     {
         return (1u << 31) / sizeof(PairT);
     }
+
+    size_type bucket_main() const
+    {
+        auto main_size = 0;
+        for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
+            if (NEXT_BUCKET(_pairs, bucket) == bucket)
+                main_size ++;
+        }
+        return main_size;
+    }
+
 
 #ifdef EMHASH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -1263,7 +1268,7 @@ private:
 
 #if EMHASH_REHASH_LOG
         if (_num_filled > EMHASH_REHASH_LOG) {
-            auto mbucket = _num_filled;
+            auto mbucket = bucket_main();
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));

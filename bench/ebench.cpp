@@ -13,7 +13,7 @@
 
 //#define ET                   1
 #define HOOD_HASH              1
-#define EMHASH_WY_HASH         1
+//#define EMHASH_WY_HASH         1
 
 //#define  FL1                 1
 //#define EMHASH_BUCKET_INDEX  1
@@ -1535,7 +1535,7 @@ int main(int argc, char* argv[])
         else if (cmd == 'i' && isdigit(argv[i][1]))
             auto_set = atoi(&argv[i][0] + 1) != 0;
         else if (cmd == 'd') {
-            for (char c = argv[i][0], j = 1; c != '\0'; c = argv[i][j++]) {
+            for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
                 if (c >= '2' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;

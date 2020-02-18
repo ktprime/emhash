@@ -199,18 +199,15 @@ public:
             } while (bitmask[_bucket / MASK_BIT] & (1 << (_bucket % MASK_BIT)));
 #else
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMHASH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && _from < _set->bucket_count())
+            while (_bmask == 0 && EMHASH_LIKELY(_from < _set->bucket_count()))
                 _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
 
-            if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask);
-            } else
-                _bucket = _set->bucket_count();
+            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _set->bucket_count();
 #endif
         }
 
@@ -290,18 +287,15 @@ public:
             } while (bitmask[_bucket / MASK_BIT] & (1 << (_bucket % MASK_BIT)));
 #else
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMHASH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && _from < _set->bucket_count())
+            while (_bmask == 0 && EMHASH_LIKELY(_from < _set->bucket_count()))
                 _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
 
-            if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask);
-            } else
-                _bucket = _set->bucket_count();
+            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _set->bucket_count();
 #endif
         }
 
@@ -520,6 +514,16 @@ public:
     constexpr size_type max_bucket_count() const
     {
         return (1u << 31) / sizeof(PairT);
+    }
+
+    size_type bucket_main() const
+    {
+        auto bucket_size = 0;
+        for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
+            if (_pairs[bucket].second == bucket)
+                bucket_size ++;
+        }
+        return bucket_size;
     }
 
 #ifdef EMHASH_STATIS
@@ -973,10 +977,11 @@ private:
         }
 
 #if EMHASH_REHASH_LOG
-        if (_num_filled > 100000) {
+        if (_num_filled > EMHASH_REHASH_LOG) {
+            const auto mbucket = bucket_main();
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/K/pack= %u/%s/%zd/",
-                    _num_filled, typeid(KeyT).name(), sizeof(_pairs[0]));
+            sprintf(buff, "    _num_filled/type/sizeof/coll|load_factor = %u/%s/%zd/%.2lf%%|%.2f",
+                    _num_filled, typeid(value_type).name(), sizeof(PairT), 100. - 100.0 * mbucket / _num_filled, load_factor());
 #if EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;

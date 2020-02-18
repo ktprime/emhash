@@ -11,7 +11,7 @@
 #include <array>
 
 
-//#define HOOD_HASH         1
+#define HOOD_HASH         1
 //#define ET         1
 //#define EMHASH_LRU_SET    1
 //#define EMHASH_IDENTITY_HASH 1
@@ -104,9 +104,9 @@ struct StructValue;
 static std::unordered_map<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
     {"emhash8", "emhash8"},
+    {"emhash7", "emhash7"},
     {"emhash9", "emhash9"},
     {"hrdhash", "hrd7 hash"},
-    {"emhash7", "emhash7"},
 
 #if ET > 0
     {"martin", "martin flat"},
@@ -299,11 +299,11 @@ static void check_mapfunc_result(const std::string& map_name, const std::string&
     func_map_time[func][showname] += timeuse;
 }
 
-static void set_func_time(std::map<std::string, std::map<std::string, int64_t>>& func_rank_time)
+static void set_func_time(std::map<std::string, std::map<std::string, int64_t>>& hash_score)
 {
     for (auto& v : func_map_time) {
         for (auto& f : v.second) {
-            func_rank_time[v.first][f.first] += f.second;
+            hash_score[v.first][f.first] += f.second;
         }
     }
     func_map_time.clear();
@@ -335,7 +335,7 @@ void hash_iter(htype& amap, const std::string& map_name, std::vector<keyType>& v
     {
         int64_t sum = 0;
         auto ts1 = getTime();
-        for (auto it = amap.begin(); it != amap.end(); ++it)
+        for (auto it = amap.cbegin(); it != amap.cend(); ++it)
 #ifdef KEY_INT
             sum += *it;
 #else
@@ -360,7 +360,7 @@ void erase_reinsert(htype& amap, const std::string& map_name, std::vector<keyTyp
             sum += amap.insert(v).second;
 
         check_mapfunc_result(map_name, __FUNCTION__, sum, ts1);
-        printf("    %12s    reinsert  %5d ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
+        //printf("    %12s    reinsert  %5d ns, factor = %.2f\n", map_name.c_str(), AVE_TIME(ts1, vList.size()), amap.load_factor());
     }
 }
 
@@ -754,7 +754,7 @@ static int buildTestData(int size, std::vector<keyType>& rankdata)
     const auto iRation = 10;
 #endif
 
-    auto flag = ((size_t)srng() % 5) + 1;
+    auto flag = (int)srng() % 5 + 1;
     if (srng() % 100 > iRation)
     {
         emhash9::HashSet<keyType> eset(size);
@@ -938,6 +938,37 @@ void benOneSet(htype& hmap, const std::string& map_name, std::vector<keyType> vL
 #endif
 }
 
+constexpr auto base1 = 300000000;
+constexpr auto base2 =      20000;
+void reset_top3(std::map<std::string, int64_t>& top3, const std::multimap <int64_t, std::string>& once_time_hash)
+{
+    auto it0 = once_time_hash.begin();
+    auto it1 = *(it0++);
+    auto it2 = *(it0++);
+    auto it3 = *(it0++);
+
+    //the top 3 func map
+    if (it1.first == it3.first) {
+        top3[it1.second] += base1 / 3;
+        top3[it2.second] += base1 / 3;
+        top3[it3.second] += base1 / 3;
+    } else if (it1.first == it2.first) {
+        top3[it1.second] += base1 / 2;
+        top3[it2.second] += base1 / 2;
+        top3[it3.second] += 1;
+    } else {
+        top3[it1.second] += base1;
+        if (it2.first == it3.first) {
+            top3[it2.second] += base2 / 2;
+            top3[it3.second] += base2 / 2;
+        } else {
+            top3[it2.second] += base2;
+            top3[it3.second] += 1;
+        }
+    }
+}
+
+
 static int tcase = 0;
 static void benchHashSet(int n)
 {
@@ -986,65 +1017,42 @@ static void benchHashSet(int n)
     { ska::flat_hash_set <keyType, hash_func> fmap; fmap.max_load_factor(lf);     benOneSet(fmap, "flat", vList); }
     { hrd7::hash_set <keyType, hash_func> eset; eset.max_load_factor(lf);         benOneSet(eset, "hrdhash", vList); }
 #endif
+
     { tsl::hopscotch_set <keyType, hash_func> hmap; hmap.max_load_factor(lf);     benOneSet(hmap, "hopsco", vList); }
     { tsl::robin_set  <keyType, hash_func> rmap; rmap.max_load_factor(lf);        benOneSet(rmap, "robin", vList); }
 #endif
 #endif
 
-    std::multimap <int64_t, std::string> time_map;
+    std::multimap <int64_t, std::string> once_time_hash;
     for (auto& v : map_time)
-        time_map.insert(std::pair<int64_t, std::string>(v.second, v.first));
+        once_time_hash.insert(std::pair<int64_t, std::string>(v.second, v.first));
 
     printf("\n %d ======== n = %d, --------  flag = %d  ========\n", 1 + tcase, n, flag);
-    const auto last  = time_map.rbegin()->first;
-    const auto first = time_map.begin()->first;
+    const auto last  = once_time_hash.rbegin()->first;
+    const auto first = once_time_hash.begin()->first;
     if (first + last < 20) {
         return;
     }
 
-    static std::map<std::string,int64_t> rank;
+    static std::map<std::string,int64_t> top3;
     static std::map<std::string,int64_t> rank_time;
-    static std::map<std::string, std::map<std::string, int64_t>> func_rank_time;
+    static std::map<std::string, std::map<std::string, int64_t>> hash_score;
 
-    auto it0 = time_map.begin();
-    auto it1 = *(it0++);
-    auto it2 = *(it0++);
-    auto it3 = *(it0++);
-
-    constexpr auto base1 = 300000000;
-    constexpr auto base2 =      20000;
-
-    //the top 3 func map
-    if (it1.first == it3.first) {
-        rank[it1.second] += base1 / 3;
-        rank[it2.second] += base1 / 3;
-        rank[it3.second] += base1 / 3;
-    } else if (it1.first == it2.first) {
-        rank[it1.second] += base1 / 2;
-        rank[it2.second] += base1 / 2;
-        rank[it3.second] += 1;
-    } else {
-        rank[it1.second] += base1;
-        if (it2.first == it3.first) {
-            rank[it2.second] += base2 / 2;
-            rank[it3.second] += base2 / 2;
-        } else {
-            rank[it2.second] += base2;
-            rank[it3.second] += 1;
-        }
+    if (once_time_hash.size() >= 3) {
+        reset_top3(top3, once_time_hash);
     }
 
-    set_func_time(func_rank_time);
-    for (auto& v : time_map) {
+    set_func_time(hash_score);
+    for (auto& v : once_time_hash) {
         rank_time[v.second] += (int)(first * 100 / v.first);
         printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first * 1000l / n), v.second.c_str(), last * 1.0 / v.first, first * 100.0 / v.first);
     }
 
     if ((++tcase) % 5 == 0) {
         printf("\n------------------------- %d one ----------------------------------\n", tcase);
-        dump_all(func_rank_time);
-        puts("======== map  top1  top2  top3 =======================");
-        for (auto& v : rank)
+        dump_all(hash_score);
+        puts("======== hash  top1  top2  top3 =======================");
+        for (auto& v : top3)
             printf("%13s %4.1lf %4.1lf %4d\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (int)(v.second % (base2 / 2)));
         puts("======== hash    score ================================");
         for (auto& v : rank_time)
@@ -1108,7 +1116,7 @@ int main(int argc, char* argv[])
         else if (cmd == 'i' && isdigit(argv[i][1]))
             auto_set = atoi(&argv[i][0] + 1) != 0;
         else if (cmd == 'd') {
-            for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][j++]) {
+            for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
                 if (c >= '2' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;
@@ -1133,7 +1141,9 @@ int main(int argc, char* argv[])
         }
     }
 
-    HashSetTest(1234567, 1234567);
+    benchHashSet(2163330);
+    if (tn > 10000)
+        HashSetTest(tn, 1234567);
 
     auto nows = time(0);
 #ifdef RD
@@ -1163,5 +1173,4 @@ int main(int argc, char* argv[])
     }
     return 0;
 }
-
 
