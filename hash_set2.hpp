@@ -714,6 +714,11 @@ public:
     //reset last_bucket collision bucket to bucket
     void erase_coll(uint32_t bucket)
     {
+        if (_last_colls < _num_buckets) {
+            //printf("error = %20d\n", _num_buckets - _last_colls);
+            _last_colls = _num_buckets;
+        }
+
         const auto last_bucket = ++ _last_colls;
         if (bucket == last_bucket)
             return;
@@ -810,11 +815,10 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
 #if EMHASH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27) + 2;
         if (EMHASH_LIKELY(required_buckets < _max_bucket))
 #else
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMHASH_LIKELY(required_buckets < _mask))
 #endif
             return false;
@@ -848,8 +852,9 @@ private:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
         _pairs       = new_pairs;
+        _last_colls  = _max_bucket - 1;
 
-        if (sizeof(PairT) <= 48) {
+        if (bInCacheLine) {
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _max_bucket);
         } else {
             for (uint32_t bucket = 0; bucket < _max_bucket; bucket++)
@@ -870,7 +875,6 @@ private:
         }
 
 #if EMHASH_HIGH_LOAD
-        if (_last_colls != _max_bucket)
         _pairs[_last_colls].second = INACTIVE;
         _last_colls = _max_bucket - 1;
 #endif
@@ -1064,7 +1068,7 @@ private:
 
 #if EMHASH_HIGH_LOAD
         //if (bucket_from > _num_buckets && INACTIVE == _pairs[_last_colls].second) return _last_colls --;
-        if (INACTIVE == _pairs[_last_colls].second && _last_colls > _num_buckets)
+        if (INACTIVE == _pairs[_last_colls].second)
             return _last_colls --;
 #endif
 

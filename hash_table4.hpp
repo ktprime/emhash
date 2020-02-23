@@ -321,7 +321,7 @@ public:
         uint32_t  _bucket;
     };
 
-    void init(uint32_t bucket, float load_factor = 0.90f)
+    void init(uint32_t bucket, float load_factor = 0.95f)
     {
         _num_buckets = 0;
         _max_bucket = 0;
@@ -334,7 +334,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4, float load_factor = 0.90f)
+    HashMap(uint32_t bucket = 4, float load_factor = 0.95f)
     {
         init(bucket, load_factor);
     }
@@ -363,7 +363,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (is_triviall_destructable())
+        if (is_notriviall_destructable())
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -383,7 +383,7 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable())
+        if (is_notriviall_destructable())
             clearkv();
 
         free(_pairs);
@@ -507,13 +507,13 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 17) / (float)_loadlf;
+        return (1 << 27) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
-        if (value < 0.95f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 17) / value);
+        if (value < 0.99f && value > 0.2f)
+            _loadlf = (uint32_t)((1 << 27) / value);
     }
 
     constexpr size_type max_size() const
@@ -918,6 +918,10 @@ public:
     //reset last_bucket collision bucket to bucket
     void erase_coll(uint32_t bucket)
     {
+        if (_last_colls < _num_buckets) {
+            _last_colls = _num_buckets;
+        }
+
         const auto last_bucket = ++ _last_colls;
         if (bucket == last_bucket)
             return;
@@ -929,9 +933,10 @@ public:
 
         new(_pairs + bucket) PairT(_pairs[last_bucket]);
         NEXT_BUCKET(_pairs, bucket) = last_next != last_bucket ? last_next : bucket;
-
         NEXT_BUCKET(_pairs, prev_bucket) = bucket;
-        _pairs[last_bucket].~PairT();
+
+        if (is_notriviall_destructable())
+            _pairs[last_bucket].~PairT();
         NEXT_BUCKET(_pairs, last_bucket) = INACTIVE;
     }
 
@@ -974,7 +979,7 @@ public:
         return (bucket == it._bucket) ? ++it : it;
     }
 
-    constexpr bool is_triviall_destructable()
+    constexpr bool is_notriviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -986,7 +991,7 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
+        return !(std::is_trivially_copy_assignable<KeyT>::value && std::is_trivially_copy_assignable<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
@@ -1005,7 +1010,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _max_bucket / 4)
+        if (is_notriviall_destructable() || sizeof(PairT) > EMHASH_CACHE_LINE_SIZE || _num_filled < _max_bucket / 4)
             clearkv();
         else
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _max_bucket);
@@ -1021,13 +1026,12 @@ public:
     /// Make room for this many elements
     bool reserve(size_t num_elems)
     {
-#ifdef EMHASH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)(num_elems * 10 / 9); //f = 8.0 / 9
-#else
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 17);
-#endif
-
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
+#if EMHASH_HIGH_LOAD
         if (EMHASH_LIKELY(required_buckets < _max_bucket))
+#else
+        if (EMHASH_LIKELY(required_buckets < _mask))
+#endif
             return false;
 
         rehash(required_buckets + 2);
@@ -1040,13 +1044,13 @@ public:
         if (required_buckets < _num_filled)
             return ;
 
-        uint32_t num_buckets = _num_filled > 65536 ? (1 << 16) : 4;
+        uint32_t num_buckets = _num_filled > 65536 ? (1 << 16) : 8;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto old_max_bucket = _max_bucket;
 
 #ifdef EMHASH_HIGH_LOAD
-        _max_bucket = num_buckets * 10 / 9 + 2;
+        _max_bucket = num_buckets * 5 / 4;
 #else
         _max_bucket = num_buckets;
 #endif
@@ -1099,7 +1103,6 @@ public:
                 continue;
 
             const auto& key = GET_KEY(old_pairs, src_bucket);
-
 #if 0
             if (try_insert_mainbucket(key, GET_VAL(old_pairs, src_bucket)) == INACTIVE) {
                 NEXT_BUCKET(old_pairs, collision++) = src_bucket;
@@ -1109,7 +1112,9 @@ public:
             const auto main_bucket = hash_bucket(key);
             auto& next_bucket = NEXT_BUCKET(_pairs, main_bucket);
             if (next_bucket == INACTIVE) {
-                new(_pairs + main_bucket) PairT(std::move(old_pair)); old_pair.~PairT();
+                new(_pairs + main_bucket) PairT(std::move(old_pair)); 
+                if (is_notriviall_destructable())
+                    old_pair.~PairT();
                 next_bucket = main_bucket;
                 _num_filled ++;
             } else {
@@ -1132,7 +1137,9 @@ public:
                 next_bucket = find_last_bucket(next_bucket);
             //find a new empty and link it to tail
             auto new_bucket = NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
-            new(_pairs + new_bucket) PairT(std::move(old_pair)); old_pair.~PairT();
+            new(_pairs + new_bucket) PairT(std::move(old_pair));
+            if (is_notriviall_destructable())
+                old_pair.~PairT();
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
         }
 
@@ -1162,11 +1169,11 @@ private:
         return reserve(_num_filled);
     }
 
-    void clear_bucket(uint32_t bucket) 
+    void clear_bucket(uint32_t bucket)
     {
-        if (is_triviall_destructable())
-            _pairs[bucket].~PairT(); 
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE; 
+        if (is_notriviall_destructable())
+            _pairs[bucket].~PairT();
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
     }
 
@@ -1267,7 +1274,7 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
-        if (is_triviall_destructable())
+        if (is_notriviall_destructable())
             _pairs[bucket].~PairT();
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
@@ -1341,9 +1348,8 @@ private:
         //constexpr bool is_big = sizeof(PairT) > EMHASH_CACHE_LINE_SIZE / 2;
         //if (bucket_from > _num_buckets && INACTIVE == NEXT_BUCKET(_pairs, _last_colls)) return _last_colls --;
 #ifdef EMHASH_HIGH_LOAD
-//        if (is_big)
-//        if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls))
-//          if (_last_colls > _num_buckets) return _last_colls --;
+        if (INACTIVE == NEXT_BUCKET(_pairs, _last_colls))
+            return _last_colls --;
 #endif
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
@@ -1357,23 +1363,11 @@ private:
             if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
                 return bucket2;
 
-#ifdef EMHASH_HIGH_LOAD
-            if (_last_colls > _num_buckets) 
-                return _last_colls --;
-#endif
-
-#if 0
-            if (slot > 5) {
-                const auto next = (bucket + last * last) & _mask;
-                const auto bucket3 = next2 + 0;
+            if (last > 4) {
+                const auto bucket3 = (step + _num_filled) & _mask;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
                     return bucket3;
-
-                const auto bucket4 = next2 + 1;
-                if (NEXT_BUCKET(_pairs, bucket4) == INACTIVE)
-                    return bucket4;
             }
-#endif
         }
     }
 
@@ -1520,6 +1514,7 @@ private:
 
 private:
 
+    PairT*    _pairs;
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
@@ -1530,7 +1525,6 @@ private:
     uint32_t  _last_colls;
     uint32_t  _num_filled;
     uint32_t  _hash_inter;
-    PairT*    _pairs;
 };
 } // namespace emhash
 #if __cplusplus > 199711
