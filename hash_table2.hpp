@@ -41,22 +41,30 @@
 
 #pragma once
 
-#include <cstring>
-#include <cstdlib>
-#include <type_traits>
-#include <cassert>
-#include <utility>
 #include <cstdint>
 #include <functional>
+#include <cstring>
+#include <string>
+#include <cmath>
+#include <cstdlib>
+#include <cassert>
+#include <utility>
 #include <iterator>
+#include <type_traits>
+#ifdef __has_include
+    #if __has_include("wyhash.h")
+    #include "wyhash.h"
+    #endif
+#elif EMHASH_WY_HASH
+    #include "wyhash.h"
+#endif
 
 #ifdef GET_KEY
     #undef  GET_KEY
     #undef  GET_VAL
-    #undef  NEXT_BUCKET
     #undef  GET_PKV
-    #undef  hash_bucket
     #undef  NEW_KVALUE
+    #undef  NEXT_BUCKET
 #endif
 
 // likely/unlikely
@@ -80,13 +88,13 @@
     #define GET_VAL(p,n)     p[n].second.second
     #define NEXT_BUCKET(p,n) p[n].first
     #define GET_PKV(p,n)     p[n].second
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
+    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, value)); _num_filled ++
 #elif EMHASH_BUCKET_INDEX == 2
     #define GET_KEY(p,n)     p[n].first.first
     #define GET_VAL(p,n)     p[n].first.second
     #define NEXT_BUCKET(p,n) p[n].second
     #define GET_PKV(p,n)     p[n].first
-    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
+    #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(value_type(key, value), bucket); _num_filled ++
 #else
     #define GET_KEY(p,n)     p[n].first
     #define GET_VAL(p,n)     p[n].second
@@ -177,13 +185,14 @@ class HashMap
 {
 private:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
+    typedef std::pair<KeyT,ValueT>          value_type;
 
 #if EMHASH_BUCKET_INDEX == 0
     typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<uint32_t, value_pair> PairT;
+    typedef std::pair<uint32_t, value_type> PairT;
 #elif EMHASH_BUCKET_INDEX == 2
     typedef std::pair<KeyT, ValueT>         value_pair;
-    typedef std::pair<value_pair, uint32_t> PairT;
+    typedef std::pair<value_type, uint32_t> PairT;
 #else
     typedef entry<KeyT, ValueT>             PairT;
     typedef entry<KeyT, ValueT>             value_pair;
@@ -191,10 +200,9 @@ private:
 
 public:
     typedef KeyT   key_type;
-    typedef ValueT mapped_type;
+    typedef ValueT val_type;
 
     typedef uint32_t     size_type;
-    typedef std::pair<KeyT,ValueT>        value_type;
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
@@ -416,10 +424,10 @@ public:
 //      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
+        std::swap(_hash_inter, other._hash_inter);
         std::swap(_num_filled, other._num_filled);
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
-        std::swap(_hash_inter, other._hash_inter);
     }
 
     // -------------------------------------------------------------
@@ -739,16 +747,16 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), std::move(value));
-    }
-
     std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
         check_expand_need();
         return do_insert(key, value);
+    }
+
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
+    {
+        check_expand_need();
+        return do_insert(std::move(key), std::move(value));
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
@@ -774,13 +782,13 @@ public:
         return { {this, bucket}, found };
     }
 
-    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(const value_type& p)
     {
         check_expand_need();
         return do_insert(p.first, p.second);
     }
 
-    std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p)
+    std::pair<iterator, bool> insert(value_type&& p)
     {
         check_expand_need();
         return do_insert(std::move(p.first), std::move(p.second));
@@ -841,13 +849,13 @@ public:
         return do_insert_unqiue(key, value);
     }
 
-    uint32_t insert_unique(std::pair<KeyT, ValueT>&& p)
+    uint32_t insert_unique(value_type&& p)
     {
         check_expand_need();
         return do_insert_unqiue(std::move(p.first), std::move(p.second));
     }
 
-    uint32_t insert_unique(const std::pair<KeyT, ValueT>& p)
+    uint32_t insert_unique(const value_type& p)
     {
         check_expand_need();
         return do_insert_unqiue(p.first, p.second);
@@ -1336,11 +1344,11 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from) const
     {
-#if 0
         const auto bucket1 = bucket_from + 1;
         if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
             return bucket1;
 
+#if 0
         const auto bucket2 = bucket_from + 2;
         if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
             return bucket2;
@@ -1348,7 +1356,7 @@ private:
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
         //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t last = 2, slot = 3 + bucket_from; ; slot = (slot + ++last)) {
+        for (uint32_t last = 2, slot = 2 + bucket_from; ; slot = (slot + ++last)) {
         //for (uint32_t last = _mask / 2 + 2, slot = 3 + bucket_from; ; slot += last) {
             const auto next = slot & _mask;
             const auto bucket1 = next + 0;
@@ -1358,14 +1366,12 @@ private:
             const auto bucket2 = next + 1;
             if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
                 return bucket2;
-#ifdef QS
-            else if (slot > 8) {
-                const auto next2 = (slot + _num_filled) & _mask;
-                const auto bucket3 = next2 + 0;
+
+            else if (last > 3) {
+                const auto bucket3 = (slot + _num_filled) & _mask;
                 if (NEXT_BUCKET(_pairs, bucket3) == INACTIVE)
                     return bucket3;
             }
-#endif
         }
     }
 
@@ -1439,19 +1445,14 @@ private:
 
     static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__ && _MPCLMUL
-        //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j)
-        __m128i I{}; I[0] ^= key;
-        __m128i J{}; J[0] ^= UINT64_C(0xde5fb9d2630458e9);
-        __m128i M{}; M[0] ^= 0xb000000000000000ull;
-        __m128i X = _mm_clmulepi64_si128(I,J,0);
-        __m128i A = _mm_clmulepi64_si128(X,M,0);
-        __m128i B = _mm_clmulepi64_si128(A,M,0);
-        return A[0]^A[1]^B[1]^X[0]^X[1];
-#elif __SIZEOF_INT128__
+#if __SIZEOF_INT128__
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         __uint128_t r = key; r *= k;
         return (uint32_t)(r >> 64) + (uint32_t)r;
+#elif _WIN32
+        uint64_t high;
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        return _umul128(key, k, &high) + high;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
@@ -1486,25 +1487,28 @@ private:
             if (sizeof(UType) <= sizeof(uint32_t))
                 return hash32(key);
             else
-                return hash64(key);
+                return (uint32_t)hash64(key);
         }
         return _hasher(key);
 #elif EMHASH_IDENTITY_HASH
-        return key + (key >> 20);
+        return key + (key >> (sizeof(UType) * 4));
+#elif WYHASH_LITTLE_ENDIAN_
+        return wyhash64(key, _num_buckets);
 #else
         return _hasher(key);
 #endif
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef EMHASH_FIBONACCI_HASH
-        return _hasher(key) * 11400714819323198485ull;
-#elif EMHASH_STD_STRING
+#ifdef WYHASH_LITTLE_ENDIAN
+        return wyhash(key.c_str(), key.size(), key.size());
+#elif EMHASH_BKR_HASH
         uint32_t hash = 0;
-        if (key.size() < 32) {
-            for (const auto c : key) hash = c + hash * 131;
+        if (key.size() < 64) {
+            for (const auto c : key)
+                hash = c + hash * 131;
         } else {
             for (int i = 0, j = 1; i < key.size(); i += j++)
                 hash = key[i] + hash * 131;
@@ -1515,6 +1519,15 @@ private:
 #endif
     }
 
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef EMHASH_FIBONACCI_HASH
+        return _hasher(key) * 11400714819323198485ull;
+#else
+        return _hasher(key);
+#endif
+    }
 private:
     HashT     _hasher;
     EqT       _eq;

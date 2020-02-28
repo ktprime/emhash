@@ -1,5 +1,5 @@
 // emhash8::HashSet for C++11
-// version 1.3.2
+// version 1.3.3
 // https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -73,10 +73,10 @@
 #endif
 
 #define NEW_KEY(key, bucket) new(_pairs + bucket) PairT(key, bucket), _num_filled ++
-#define CLS_BUCKET(_bucket) _pairs[bucket].~PairT(); _num_filled --; _pairs[bucket].second = INACTIVE
+#define CLS_BUCKET(_bucket)  _pairs[bucket].~PairT(); _num_filled --; _pairs[bucket].second = INACTIVE
 
 namespace emhash8 {
-constexpr uint32_t INACTIVE = 0xFFFFFFFF;
+
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashSet
@@ -85,6 +85,7 @@ public:
     typedef  HashSet<KeyT, HashT, EqT> htype;
     typedef  std::pair<KeyT, uint32_t> PairT;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
+    static constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 
     typedef size_t   size_type;
     typedef KeyT     value_type;
@@ -224,7 +225,7 @@ public:
         reserve(bucket);
     }
 
-    HashSet(uint32_t bucket = 4, float load_factor = 0.95f)
+    HashSet(uint32_t bucket = 4, float load_factor = 0.99f)
     {
         init(bucket, load_factor);
     }
@@ -269,7 +270,7 @@ public:
     HashSet& operator=(HashSet&& other)
     {
         if (this != &other)
-        swap(other);
+            swap(other);
         return *this;
     }
 
@@ -290,6 +291,7 @@ public:
         _last_colls  = other._last_colls;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
+        _last_bucket = other._last_bucket;
 
         if (std::is_pod<KeyT>::value) {
             memcpy(_pairs, other._pairs, _max_bucket * sizeof(PairT));
@@ -307,7 +309,6 @@ public:
     void swap(HashSet& other)
     {
         std::swap(_hasher, other._hasher);
-//      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -315,6 +316,7 @@ public:
         std::swap(_loadlf, other._loadlf);
         std::swap(_max_bucket, other._max_bucket);
         std::swap(_last_colls, other._last_colls);
+        std::swap(_last_bucket, other._last_bucket);
     }
 
     // -------------------------------------------------------------
@@ -396,7 +398,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.99 && value > 0.2f)
+        if (value < 0.999 && value > 0.2f)
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 
@@ -714,11 +716,6 @@ public:
     //reset last_bucket collision bucket to bucket
     void erase_coll(uint32_t bucket)
     {
-        if (_last_colls < _num_buckets) {
-            //printf("error = %20d\n", _num_buckets - _last_colls);
-            _last_colls = _num_buckets;
-        }
-
         const auto last_bucket = ++ _last_colls;
         if (bucket == last_bucket)
             return;
@@ -804,6 +801,7 @@ public:
         else
             clearkv();
         _num_filled = 0;
+        _last_bucket = 0;
         _last_colls = _max_bucket - 1;
     }
 
@@ -815,10 +813,11 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
 #if EMHASH_HIGH_LOAD
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMHASH_LIKELY(required_buckets < _max_bucket))
 #else
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMHASH_LIKELY(required_buckets < _mask))
 #endif
             return false;
@@ -852,7 +851,7 @@ private:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
         _pairs       = new_pairs;
-        _last_colls  = _max_bucket - 1;
+        _last_bucket = 0;
 
         if (bInCacheLine) {
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _max_bucket);
@@ -861,7 +860,7 @@ private:
                 _pairs[bucket].second = INACTIVE;
         }
         _pairs[_max_bucket + 0].second = _pairs[_max_bucket + 1].second = 0;
-        _pairs[_last_colls = num_buckets].second = 0;
+        _last_colls = num_buckets;
 
         //set all main bucket first
         for (uint32_t src_bucket = 0; src_bucket < old_max_bucket && old_num_filled > 0; src_bucket++) {
@@ -875,7 +874,6 @@ private:
         }
 
 #if EMHASH_HIGH_LOAD
-        _pairs[_last_colls].second = INACTIVE;
         _last_colls = _max_bucket - 1;
 #endif
 
@@ -1058,23 +1056,18 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-        const auto bucket1 = bucket_from + 1;
-        if (_pairs[bucket1].second == INACTIVE)
-            return bucket1;
-
-        const auto bucket2 = bucket_from + 2;
-        if (_pairs[bucket2].second == INACTIVE)
-            return bucket2;
+        const auto bucket = (bucket_from + 1) & _mask;
+        if (_pairs[bucket].second == INACTIVE)
+            return bucket;
 
 #if EMHASH_HIGH_LOAD
         //if (bucket_from > _num_buckets && INACTIVE == _pairs[_last_colls].second) return _last_colls --;
-        if (INACTIVE == _pairs[_last_colls].second)
+        if (_last_colls > _num_buckets)
             return _last_colls --;
 #endif
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
-        //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t last = 2, slot = bucket_from + 4; ;slot += ++last) {
+        for (uint32_t step = 2, slot = bucket + 2; ;slot += ++step) {
             const auto bucket1 = slot & _mask;
             if (_pairs[bucket1].second == INACTIVE)
                 return bucket1;
@@ -1083,10 +1076,10 @@ private:
             if (_pairs[bucket2].second == INACTIVE)
                 return bucket2;
 
-            if (last > 3) {
-                const auto bucket3 = (bucket_from + _num_filled + last) & _mask;
-                if (_pairs[bucket3].second == INACTIVE)
-                    return bucket3;
+            if (step > 3) {
+                if (_pairs[++_last_bucket].second == INACTIVE)
+                    return _last_bucket;
+                _last_bucket &= _mask;
             }
         }
     }
@@ -1223,8 +1216,10 @@ private:
     uint32_t  _loadlf;
     uint32_t  _last_colls;
     uint32_t  _num_buckets;
+    uint32_t  _last_bucket;
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
-template <class Key, typename Hash = std::hash<Key>> using ktprime_hashset_v8 = emhash8::HashSet<Key, Hash>;
+//template <class Key, typename Hash = std::hash<Key>> using ktprime_hashset_v8 = emhash8::HashSet<Key, Hash>;
 #endif
+

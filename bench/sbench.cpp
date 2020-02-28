@@ -106,8 +106,8 @@ struct StructValue;
 static std::unordered_map<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
     {"emhash8", "emhash8"},
-    {"emhash7", "emhash7"},
-//    {"emhash9", "emhash9"},
+//    {"emhash7", "emhash7"},
+    {"emhash9", "emhash9"},
     {"hrdhash", "hrd7_hash"},
 
 #if ET > 0
@@ -409,7 +409,7 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 
     puts(pys.c_str());
     std::ofstream  outfile;
-    auto full_file = file + ".py";
+    auto full_file = file + "_set.py";
     outfile.open("./" + full_file, std::fstream::out | std::fstream::trunc | std::fstream::binary);
     if (outfile.is_open())
         outfile << pys;
