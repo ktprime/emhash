@@ -4,13 +4,14 @@ A quite fast and memory efficient *open address c++ flat hash map*, it is easy t
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- default load factor is **0.95 and can be set 0.99** by enable compile marco *EMHASH_HIGH_LOAD* (in hash_table6/7.hpp*)
+- default load factor is **0.95 and can be set 0.99** by enable compile marco *EMHASH_HIGH_LOAD* (in hash_table6/7.hpp)
 
-- **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue if needed.
+- **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue.
     - _erase :  without return next iterator after erasion
     - shrink_to_fit : shrink memory to fit for saving memory
     - insert_unqiue : insert unique key into hash without search
-    - try_find : check or get key/value without use iterator
+    - try_find : check or get key/value without return iterator
+    - set_get : only once find/insert combind.
 
 - more **efficient** than other's hash map implemention if key&value is some aligned (ex sizeof(key) % 8 != sizeof(value) % 8),  hash_map<uint64_t, uint32_t> can save 1/3 memoery than hash_map<uint64_t, uint64_t>.
 
@@ -21,17 +22,17 @@ A quite fast and memory efficient *open address c++ flat hash map*, it is easy t
 - more than **5 different** implementation to choose, each of them is some tiny different can be used in some case
 for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
 
-- it's the **fastest** hash map for find performance(100% hit), and fast inserting performacne if no rehash (**reserve before inserting**) and effficient erassion. at present from 6 different benchmark(4 of them in my bench dir) by my bench
+- it's the **fastest** hash map for find performance(100% hit) at present, and fast inserting performacne if no rehash (**reserve before insertsion**) and effficient erasion. At present from 6 different benchmark(4 of them in my bench dir) by my bench
 
 - It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel).
 
-- many optimization with *integer* key, some new feature is underdeveloping if it's stable to release.
+- many optimization with *integer* key, some new and interesting feature is underdeveloping if it's stable to release.
 
 # emhash design
 
 - only *one array* allocted, each node/bucket contains a struct (keyT key, int bucket, ValueT value), bucket is not awalys in the middle between key and value, depend on struct align pack.
 
-- a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index(bucket) just like std unordered_map. main bucket can not be occupyed and all opertion starts from it. 
+- a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index(bucket). main bucket can not be occupyed and all opertion starts from it. 
 
 - **three different ways** of probe is used to seach the empty bucket from array. it's not suffered heavily performance loss by primary and secondary clustering.
    - linear probing search the first cpu cacheline
