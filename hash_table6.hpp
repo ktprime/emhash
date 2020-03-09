@@ -467,8 +467,10 @@ public:
 
     HashMap& operator=(HashMap&& other)
     {
-        if (this != &other)
+        if (this != &other) {
             swap(other);
+            other.clear();
+        }
         return *this;
     }
 
@@ -866,6 +868,20 @@ public:
         return { {this, next}, found };
     }
 
+    template<typename K, typename V>
+    inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
+    {
+        const auto bucket = find_or_allocate(key);
+        const auto next   = bucket / 2;
+        const auto found = ISEMPTY_BUCKET(_pairs, next);
+        if (found) {
+            NEW_KVALUE(std::forward<K>(key), std::forward<V>(value), next, bucket);
+        } else {
+            GET_VAL(_pairs, next) = std::move(value);
+        }
+        return { {this, next}, found };
+    }
+
     std::pair<iterator, bool> insert(const value_type& p)
     {
         check_expand_need();
@@ -988,14 +1004,19 @@ public:
     std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args) { return insert(std::move(k), std::forward<Args>(args)...).first; }
 
     template <class... Args>
-    inline std::pair<iterator, bool> emplace_unique(Args&&... args)
+    inline std::pair<iterator, bool> emplace_unique(Args&&... args) { return insert_unique(std::forward<Args>(args)...); }
+
+
+    std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) 
     {
-        return insert_unique(std::forward<Args>(args)...);
+        check_expand_need();
+        return do_assign(key, std::move(value));
     }
-
-
-    std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) { return insert(key, std::move(value)); }
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return insert(std::move(key), std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) 
+    { 
+        check_expand_need();
+        return do_assign(std::move(key), std::move(value)); 
+    }
 
     ValueT& operator[](const KeyT& key)
     {

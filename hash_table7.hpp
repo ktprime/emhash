@@ -520,8 +520,10 @@ public:
 
     HashMap& operator=(HashMap&& other)
     {
-        if (this != &other)
+        if (this != &other) {
             swap(other);
+            other.clear();
+        }
         return *this;
     }
 

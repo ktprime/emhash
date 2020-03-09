@@ -310,7 +310,10 @@ public:
 
     HashSet& operator=(HashSet&& other)
     {
-        swap(other);
+        if (this == &other) {
+            swap(other);
+            other.clear();
+        }
         return *this;
     }
 

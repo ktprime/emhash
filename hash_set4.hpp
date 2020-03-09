@@ -312,7 +312,6 @@ public:
     {
         _num_buckets = 0;
         _mask = 0;
-        _last = 0;
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
@@ -365,8 +364,10 @@ public:
 
     HashSet& operator=(HashSet&& other)
     {
-        if (this != &other)
+        if (this != &other) {
             swap(other);
+            other.clear();
+        }
         return *this;
     }
 
@@ -386,6 +387,7 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
+        _last        = other._last;
         _bitmask     = decltype(_bitmask)((uint8_t*)_pairs + ((uint8_t*)other._bitmask - (uint8_t*)other._pairs));
         auto opairs  = other._pairs;
 
@@ -405,7 +407,7 @@ public:
         memcpy(_pairs + _num_buckets, opairs + _num_buckets, 2 * sizeof(PairT) + _num_buckets / 8 + sizeof(size_t));
     }
 
-    void swap(HashSet& other)
+    inline void swap(HashSet& other)
     {
         std::swap(_hasher, other._hasher);
 //      std::swap(_eq, other._eq);
@@ -413,6 +415,7 @@ public:
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
         std::swap(_mask, other._mask);
+        std::swap(_last, other._last);
         std::swap(_loadlf, other._loadlf);
         std::swap(_bitmask, other._bitmask);
     }
@@ -925,7 +928,7 @@ public:
     bool reserve(uint64_t num_elems)
     {
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-        if (EMHASH_LIKELY(required_buckets < _mask))
+        if (EMHASH_LIKELY(required_buckets < _num_buckets))
             return false;
 
         rehash(required_buckets + 2);
@@ -941,6 +944,12 @@ private:
         uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 8u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
+        _mask        = num_buckets - 1;
+#if EMHASH_HIGH_LOAD
+        if (num_buckets % 64 == 0)
+            num_buckets += num_buckets / 8;
+#endif
+
         const auto num_byte = num_buckets / 8;
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_byte + sizeof(size_t));
         //TODO: throwOverflowError
@@ -949,7 +958,6 @@ private:
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
-        _mask        = num_buckets - 1;
         _last        = 0;
 
         if (bInCacheLine)
@@ -957,7 +965,7 @@ private:
         else
             for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
                 new_pairs[bucket].second = INACTIVE;
-        memset(new_pairs + _num_buckets, 0, sizeof(PairT) * 2);
+        memset(new_pairs + num_buckets, 0, sizeof(PairT) * 2);
 
         //set bit mask
         _bitmask     = decltype(_bitmask)(new_pairs + 2 + num_buckets);
@@ -1166,7 +1174,7 @@ private:
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
 //        for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t last = 2, slot = 1; ; slot += ++last ) {
+        for (uint32_t last = 2, slot = 2; ; slot += ++last ) {
             const auto bucket1 = (bucket_from + slot) & _mask;
             if (_pairs[bucket1].second == INACTIVE)
                 return bucket1;
@@ -1175,7 +1183,7 @@ private:
             if (_pairs[bucket2].second == INACTIVE)
                 return bucket2;
 #if 1
-            else if (last > 4) {
+            else if (last > 3) {
                 const auto next = (bucket1 + _num_filled) & _mask;
                 const auto bucket3 = next;
                 if (_pairs[bucket3].second == INACTIVE)
@@ -1212,13 +1220,22 @@ private:
         if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask) - 0;
 
-        const auto qmask = _mask / SIZE_BIT;
-//        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-        for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
+#if EMHASH_HIGH_LOAD
+        for (uint32_t step = _last; ; step = ++_last) {
+            const auto bmask = *((size_t*)_bitmask + step);
+            if (EMHASH_LIKELY(bmask != 0))
+                return step * SIZE_BIT + CTZ(bmask);
+
+            else if (EMHASH_UNLIKELY(step >= _num_buckets / SIZE_BIT))
+                _last = 0 - 1;
+        }
+#else
+        for (uint32_t step = _last; ; step = ++_last & (_mask / SIZE_BIT)) {
             const auto bmask = *((size_t*)_bitmask + step);
             if (EMHASH_LIKELY(bmask != 0))
                 return step * SIZE_BIT + CTZ(bmask);
         }
+#endif
 
         return 0;
     }

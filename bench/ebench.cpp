@@ -39,7 +39,7 @@
 #endif
 
 #include "../thirdparty/hash_emilib.hpp"
-#include "../thirdparty/wyhash.h"
+//#include "../thirdparty/wyhash.h"
 
 #include "hash_table2.hpp"
 #include "hash_table3.hpp"
@@ -162,15 +162,14 @@ emhash5::HashMap<std::string, std::string> show_name =
 {
 //    {"stl_hash", "unordered_map"},
 
-//    {"emhash2", "emhash2"},
-//    {"emhash3",  "emhash3"},
-//    {"emhash4", "emhash4"},
+    {"emhash2", "emhash2"},
+    {"emhash3",  "emhash3"},
+    {"emhash4", "emhash4"},
 
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
 
-//    {"emhash9", "emhash9"},
     {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
     {"emilib2", "emilib2"},
@@ -817,6 +816,7 @@ void hash_copy(hash_type& ahash, const std::string& hash_name)
         auto ts1 = getTime();
         hash_type thash = ahash;
         ahash = thash;
+        ahash = std::move(thash);
         sum  = thash.size();
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
     }

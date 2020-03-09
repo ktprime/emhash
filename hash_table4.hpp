@@ -377,7 +377,10 @@ public:
 
     HashMap& operator=(HashMap&& other)
     {
-        swap(other);
+        if (this != &other) {
+            swap(other);
+            other.clear();
+        }
         return *this;
     }
 
