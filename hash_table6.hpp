@@ -1034,14 +1034,10 @@ public:
 
     ValueT& operator[](KeyT&& key)
     {
-        auto bucket = find_or_allocate(key);
-        auto next   = bucket / 2;
+        check_expand_need();
+        const auto bucket = find_or_allocate(key);
+        const auto next   = bucket / 2;
         if (ISEMPTY_BUCKET(_pairs, next)) {
-            if (EMHASH_UNLIKELY(check_expand_need())) {
-                bucket = find_unique_bucket(key);
-                next = bucket / 2;
-            }
-
             NEW_KVALUE(std::move(key), std::move(ValueT()), next, bucket);
         }
 

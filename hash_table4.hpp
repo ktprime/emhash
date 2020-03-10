@@ -1031,7 +1031,7 @@ public:
     {
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
 #if EMHASH_HIGH_LOAD
-        if (EMHASH_LIKELY(required_buckets < _max_bucket))
+        if (EMHASH_LIKELY(required_buckets + 1 < _max_bucket))
 #else
         if (EMHASH_LIKELY(required_buckets < _mask))
 #endif

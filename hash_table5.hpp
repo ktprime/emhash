@@ -914,12 +914,10 @@ public:
 
     ValueT& operator[](KeyT&& key)
     {
-        auto bucket = find_or_allocate(key);
+        reserve(_num_filled);
+        const auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (IS_EMPTY(_pairs, bucket)) {
-            if (EMHASH_UNLIKELY(check_expand_need()))
-                bucket = find_unique_bucket(key);
-
             NEW_KVALUE(std::move(key), std::move(ValueT()), bucket);
         }
 
