@@ -1,7 +1,7 @@
 
 // emhash6::HashSet for C++11
 // version 1.2.0
-// https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
+// https://github.com/ktprime/ktprime/blob/master/hash_set3.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT

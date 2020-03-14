@@ -466,12 +466,9 @@ public:
 
     void init(uint32_t bucket, float load_factor = 0.95f)
     {
-        _num_buckets = 0;
-        _last = 0;
-        _mask = 0;
+        _num_buckets = _num_filled = 0;
         _pairs = nullptr;
         _bitmask = nullptr;
-        _num_filled = 0;
         max_load_factor(load_factor);
         reserve(bucket);
     }
@@ -542,6 +539,7 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
+        _last        = other._last;
         _bitmask     = decltype(_bitmask)((uint8_t*)_pairs + ((uint8_t*)other._bitmask - (uint8_t*)other._pairs));
         auto opairs  = other._pairs;
 
@@ -567,6 +565,7 @@ public:
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_bitmask, other._bitmask);
+        std::swap(_last, other._last);
     }
 
     // -------------------------------------------------------------
@@ -1206,12 +1205,8 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-#if EMHASH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)num_elems;
-#else
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-#endif
-        if (EMHASH_LIKELY(required_buckets < _mask))
+        if (EMHASH_LIKELY(required_buckets < _num_buckets))
             return false;
 
 #ifdef EMHASH_STATIS
@@ -1579,12 +1574,13 @@ private:
         if (EMHASH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask) - 0;
 
-        const auto qmask = _mask / SIZE_BIT;
+//        const auto qmask = _mask / SIZE_BIT;
 //        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-        for (auto step = _last & qmask; ; step = ++_last & qmask) {
-            const auto bmask = *((size_t*)_bitmask + step);
+        for (; ; ) {
+            const auto bmask = *((size_t*)_bitmask + _last);
             if (bmask != 0)
-                return step * SIZE_BIT + CTZ(bmask);
+                return _last * SIZE_BIT + CTZ(bmask);
+            _last = (_last + 1) & (_mask / SIZE_BIT);
         }
         return 0;
     }
@@ -1683,7 +1679,7 @@ private:
     inline size_type hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size() + UINT64_C(0xbf58476d1ce4e5b9));
+        return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BKDR_HASH
         size_type hash = 0;
         if (key.size() < 256) {

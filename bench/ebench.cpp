@@ -172,9 +172,8 @@ emhash5::HashMap<std::string, std::string> show_name =
 
     {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
-    {"emilib2", "emilib2"},
-
-    {"emilib3", "emilib3"},
+//    {"emilib2", "emilib2"},
+//    {"emilib3", "emilib3"},
     {"martin", "martin_flat"},
     {"phmap", "phmap_flat"},
     {"hrdset",   "hrdset"},
@@ -1285,10 +1284,10 @@ static int benchHashMap(int n)
             printf("%13s %4d\n", v.first.c_str(), (int)(v.second / (tcase - 1)));
 #endif
 #if _WIN32
-        Sleep(1000*6);
+        Sleep(1000*2);
         //        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 #else
-        usleep(1000*6000);
+        usleep(1000*2000);
 #endif
         printf("--------------------------------------------------------------------\n\n");
         return tcase;

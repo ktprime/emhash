@@ -493,6 +493,7 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
+        _last        = other._last;
         _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
         auto opairs  = other._pairs;
 
@@ -526,6 +527,7 @@ public:
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_bitmask, other._bitmask);
+        std::swap(_last, other._last);
     }
 
     // -------------------------------------------------------------
@@ -1130,12 +1132,8 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-#if EMHASH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)num_elems;
-#else
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-#endif
-        if (EMHASH_LIKELY(required_buckets < _mask))
+        if (EMHASH_LIKELY(required_buckets < _num_buckets))
             return false;
 
         rehash(required_buckets + 2);
@@ -1175,6 +1173,7 @@ public:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
         _pairs       = new_pairs;
+        _last        = 0;
 
 #if EMHASH_SAFE_HASH
         if (_hash_inter == 0 && old_num_filled > 100) {
@@ -1543,11 +1542,11 @@ private:
                 return next1 * SIZE_BIT + CTZ(bmask1);
         }
 #endif
-        const auto qmask = _mask / SIZE_BIT;
-        for (uint32_t step = _last & qmask; ; step = ++_last & qmask) {
-            const auto bmask = *((size_t*)_bitmask + step);
+        for (; ; ) {
+            const auto bmask = *((size_t*)_bitmask + _last);
             if (bmask != 0)
-                return step * SIZE_BIT + CTZ(bmask);
+                return _last * SIZE_BIT + CTZ(bmask);
+            _last = (_last + 1) & (_mask / SIZE_BIT);
         }
         return 0;
     }
@@ -1657,7 +1656,7 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size() + UINT64_C(0x12345678abcedef));
+        return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;
         if (key.size() < 64) {
