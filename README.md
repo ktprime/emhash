@@ -4,12 +4,12 @@ A quite fast and memory efficient *open address c++ flat hash map*, it is easy t
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- default load factor is **0.95 and can be set 0.99** by enable compile marco *EMHASH_HIGH_LOAD* (in hash_table6/7.hpp)
+- default load factor is 0.95 and can be set to **0.999** by enable compile marco *EMHASH_HIGH_LOAD* (in hash_table6/7.hpp)
 
 - **head only** support by c++0x/11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue.
     - _erase :  without return next iterator after erasion
     - shrink_to_fit : shrink memory to fit for saving memory
-    - insert_unqiue : insert unique key into hash without search
+    - insert_unqiue : insert unique key into hash without find and compare
     - try_find : check or get key/value without return iterator
     - set_get : only once find/insert combind.
 
@@ -47,7 +47,7 @@ for example some case pay attention on finding hot, some focus on finding cold(m
  
 - choose *different* hash algorithm by set compile marco *EMHASH_FIBONACCI_HASH* or *EMHASH_IDENTITY_HASH* depend on use case.
 
-- the thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is 3 times faster than std::hash<std::string> implementation 
+- the thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is 3 times faster than std::hash string implementation 
 
 # insert example
 
