@@ -1,6 +1,6 @@
 // emhash8::HashSet for C++11
 // version 1.3.2
-// https://github.com/ktprime/ktprime/blob/master/hash_set2.hpp
+// https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -73,8 +73,7 @@
 
 #define NEW_KEY(key, bucket) new(_pairs + bucket) PairT(key, bucket), _num_filled ++
 
-
-namespace emhash8 {
+namespace emhash2 {
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -288,6 +287,7 @@ public:
         _last_colls  = other._last_colls;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
+        _last_bucket = other._last_bucket;
 
         if (std::is_pod<KeyT>::value) {
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(PairT));
@@ -312,6 +312,7 @@ public:
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_last_colls, other._last_colls);
+        std::swap(_last_bucket, other._last_bucket);
     }
 
     // -------------------------------------------------------------
@@ -685,10 +686,7 @@ public:
     }
 
     // -------------------------------------------------------
-    //reset last_bucket collision buc
-    //1. bucket <= _last_colls
-    //2. bucket <= _mask set _last_colls
-    //3. reset
+    //reset last_bucket collision bucket to bucket
     void clear_bucket(uint32_t bucket)
     {
         _pairs[bucket].~PairT(); _num_filled --; _pairs[bucket].second = INACTIVE;
@@ -702,7 +700,6 @@ public:
         }
         else if (_last_colls <= _mask)
             _last_colls = _mask;
-
         if (bucket == ++ _last_colls)
             return;
 
@@ -772,6 +769,7 @@ public:
             clearkv();
 
         _num_filled = 0;
+        _last_bucket = 0;
         _last_colls = _num_buckets - 1;
     }
 
@@ -814,6 +812,7 @@ private:
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _pairs       = new_pairs;
+        _last_bucket = 0;
         _last_colls  = num_buckets - 1;
 
         if (bInCacheLine) {
@@ -1018,24 +1017,34 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-        for (uint32_t step = 2, slot = bucket_from + 1; ; slot = (slot + ++step) & _mask) {
-            const auto bucket1 = slot;
+        const auto bucket1 = bucket_from + 1;
+        if (_pairs[bucket1].second == INACTIVE)
+            return bucket1;
+
+#if EMHASH_HIGH_LOAD
+        const auto bucket2 = bucket_from + 2;
+        if (_pairs[bucket2].second == INACTIVE)
+            return bucket2;
+
+        if (INACTIVE == _pairs[_last_colls --].second)
+            return _last_colls + 1;
+#endif
+
+        //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
+        //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+        for (uint32_t step = 2, slot = bucket1 + 2; ;slot += ++step) {
+            const auto bucket1 = slot & _mask;
             if (_pairs[bucket1].second == INACTIVE)
                 return bucket1;
 
-            const auto bucket2 = bucket1 + 1;
+            const auto bucket2 = bucket1 + 2;
             if (_pairs[bucket2].second == INACTIVE)
                 return bucket2;
 
             if (step > 3) {
-#if EMHASH_HIGH_LOAD
-                if (INACTIVE == _pairs[_last_colls--].second)
-                    return _last_colls + 1;
-#else
-                if (INACTIVE == _pairs[_last_colls].second)
-                    return _last_colls ++;
-                _last_colls = (_last_colls + 1) & _mask;
-#endif
+                if (_pairs[_last_bucket].second == INACTIVE)
+                    return _last_bucket++;
+                _last_bucket = (_last_bucket + 1) & _mask;
             }
         }
     }
@@ -1171,9 +1180,9 @@ private:
     uint32_t  _loadlf;
     uint32_t  _last_colls;
     uint32_t  _num_buckets;
+    uint32_t  _last_bucket;
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
-template <class Key, typename Hash = std::hash<Key>> using ktprime_hashset_v8 = emhash8::HashSet<Key, Hash>;
+//template <class Key, typename Hash = std::hash<Key>> using ktprime_hashset_v8 = emhash8::HashSet<Key, Hash>;
 #endif
-

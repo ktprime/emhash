@@ -303,10 +303,7 @@ public:
             while (_bmask == 0 && _from < _map->bucket_count())
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
 
-            if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask);
-            } else
-                _bucket = _map->bucket_count();
+            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
 #endif
         }
 
@@ -395,10 +392,7 @@ public:
             while (_bmask == 0 && _from < _map->bucket_count())
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
 
-            if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask);
-            } else
-                _bucket = _map->bucket_count();
+            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
 #endif
         }
 
@@ -536,6 +530,7 @@ public:
     {
         if (0 == _num_filled)
             return {this, _num_buckets};
+
         uint32_t bucket = 0;
         while (EM_EMPTY(bucket)) {
             ++bucket;
@@ -547,6 +542,7 @@ public:
     {
         if (0 == _num_filled)
             return {this, _num_buckets};
+
         uint32_t bucket = 0;
         while (EM_EMPTY(bucket)) {
             ++bucket;
@@ -873,6 +869,7 @@ public:
     template<typename K, typename V>
     inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
+        check_expand_need();
         const auto bucket = find_or_allocate(key);
         const auto next   = bucket / 2;
         const auto found = ISEMPTY_BUCKET(_pairs, next);
@@ -1011,12 +1008,10 @@ public:
 
     std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) 
     {
-        check_expand_need();
         return do_assign(key, std::move(value));
     }
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) 
     { 
-        check_expand_need();
         return do_assign(std::move(key), std::move(value)); 
     }
 
@@ -1524,9 +1519,17 @@ private:
 #endif
 
         const auto boset = bucket_from % 8;
-        const auto bmask = *(size_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
-        if (EMHASH_LIKELY(bmask != 0))
-            return bucket_from + CTZ(bmask);
+        const auto begin = (uint8_t*)_bitmask + bucket_from / 8;
+        const auto bmask = *(size_t*)begin >> boset;
+        if (EMHASH_LIKELY(bmask != 0)) {
+            const auto offset = CTZ(bmask);
+            if (EMHASH_LIKELY(offset < 256 / sizeof(PairT)) || begin[0] == 0)
+                return bucket_from + offset;
+
+            //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
+            //return bucket_from - boset + 7 - CTZ(rerverse_bit);
+            return bucket_from - boset + CTZ(begin[0]);
+        }
 
 #if 0
         const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
@@ -1542,6 +1545,7 @@ private:
                 return next1 * SIZE_BIT + CTZ(bmask1);
         }
 #endif
+
         for (; ; ) {
             const auto bmask = *((size_t*)_bitmask + _last);
             if (bmask != 0)

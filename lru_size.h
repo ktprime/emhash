@@ -38,6 +38,14 @@
     #include "servant/RollLogHelper.h"
 #endif
 
+#ifdef __has_include
+    #if __has_include("wyhash.h")
+    #include "wyhash.h"
+    #endif
+#elif EMHASH_WY_HASH
+    #include "wyhash.h"
+#endif
+
 #ifdef  GET_KEY
     #undef  GET_KEY
     #undef  GET_VAL
@@ -66,9 +74,10 @@ namespace emlru_size {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 
-inline static uint32_t nowts()
+inline static uint32_t nextid()
 {
-    return time(0);
+    static uint32_t id = 1;
+    return ++id;
 }
 
 template <typename First, typename Second>
@@ -77,14 +86,14 @@ struct entry {
         :second(value),first(key)
     {
         bucket = ibucket;
-        timeout = nowts();
+        timeout = nextid();
     }
 
     entry(First&& key, Second&& value, uint32_t ibucket)
         :second(std::move(value)), first(std::move(key))
     {
         bucket = ibucket;
-        timeout = nowts();
+        timeout = nextid();
     }
 
     template<typename K, typename V>
@@ -92,21 +101,21 @@ struct entry {
         :second(std::forward<V>(value)), first(std::forward<K>(key))
     {
         bucket = ibucket;
-        timeout = nowts();
+        timeout = nextid();
     }
 
     entry(const std::pair<First,Second>& pair)
         :second(pair.second),first(pair.first)
     {
         bucket = INACTIVE;
-        timeout = nowts();
+        timeout = nextid();
     }
 
     entry(std::pair<First, Second>&& pair)
         :second(std::move(pair.second)),first(std::move(pair.first))
     {
         bucket = INACTIVE;
-        timeout = nowts();
+        timeout = nextid();
     }
 
     entry(const entry& pairT)
@@ -293,20 +302,19 @@ public:
 
     // ------------------------------------------------------------------------
 
-    void init()
+    void init(uint32_t max_bucket = 1 << 10)
     {
         _num_buckets = 0;
         _mask = 0;
         _pairs = nullptr;
         _num_filled = 0;
-        _max_buckets = 1 << 28;
+        _max_buckets = max_bucket;
         max_load_factor(0.8f);
     }
 
     lru_cache(uint32_t bucket = 8, uint32_t max_bucket = 1 << 28)
     {
-        init();
-        _max_buckets = max_bucket;
+        init(max_bucket);
         reserve(bucket);
     }
 
@@ -318,18 +326,19 @@ public:
 
     lru_cache(lru_cache&& other)
     {
-        init();
+        init(other._max_bucket);
         reserve(1);
         *this = std::move(other);
     }
 
+    /**
     lru_cache(std::initializer_list<std::pair<KeyT, ValueT>> il)
     {
-        init();
+        init(il.size() * 2);
         reserve((uint32_t)il.size());
         for (auto begin = il.begin(); begin != il.end(); ++begin)
             insert(*begin);
-    }
+    }*/
 
     lru_cache& operator=(const lru_cache& other)
     {
@@ -471,23 +480,23 @@ public:
 
     constexpr float max_load_factor() const
     {
-        return (1 << 17) / (float)_loadlf;
+        return (1 << 27) / (float)_loadlf;
     }
 
     void max_load_factor(float value)
     {
         if (value < 0.95f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 17) / value);
+            _loadlf = (uint32_t)((1 << 27) / value);
     }
 
     constexpr size_type max_size() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1 << 30);
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1 << 31) / sizeof(PairT);
+        return (1 << 30);
     }
 
 #ifdef EMHASH_STATIS
@@ -642,7 +651,7 @@ public:
 
     std::pair<iterator, iterator> equal_range(const KeyT& key)
     {
-        iterator found = find(key);
+        const auto found = find(key);
         if (found == end())
             return { found, found };
         else
@@ -694,7 +703,7 @@ public:
         if (found) {
             NEW_KVALUE(key, value, bucket);
         } else {
-            _pairs[bucket].timeout = nowts();
+            _pairs[bucket].timeout = nextid();
         }
         return { {this, bucket}, found };
     }
@@ -707,7 +716,7 @@ public:
         if (found) {
             NEW_KVALUE(std::move(key), std::move(value), bucket);
         } else {
-            _pairs[bucket].timeout = nowts();
+            _pairs[bucket].timeout = nextid();
         }
         return { {this, bucket}, found };
     }
@@ -857,7 +866,7 @@ public:
 
             NEW_KVALUE(key, std::move(ValueT()), bucket);
         } else {
-            _pairs[bucket].timeout = nowts();
+            _pairs[bucket].timeout = nextid();
         }
         return GET_VAL(_pairs, bucket);
     }
@@ -872,7 +881,7 @@ public:
 
             NEW_KVALUE(std::move(key), std::move(ValueT()), bucket);
         } else {
-            _pairs[bucket].timeout = nowts();
+            _pairs[bucket].timeout = nextid();
         }
         return GET_VAL(_pairs, bucket);
     }
@@ -947,10 +956,10 @@ public:
     }
 
     /// Make room for this many elements
-    bool reserve(uint32_t num_elems)
+    bool reserve(uint64_t num_elems)
     {
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 17) + 2;
-        if (EMHASH_LIKELY(required_buckets < _mask) && _num_filled < _max_buckets * 2)
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27) + 2;
+        if (EMHASH_LIKELY(required_buckets < _num_buckets) && _num_filled < _max_buckets * 2)
             return false;
 
         rehash(required_buckets + 2);
@@ -990,8 +999,10 @@ public:
                     time_out.emplace_back(old_pairs[src_bucket].timeout);
             }
             if (time_out.size() > _max_buckets) {
-                std::partial_sort(time_out.begin(), time_out.begin() + time_out.size() - _max_buckets, time_out.end());
-                min_ts = time_out[time_out.size() - _max_buckets - 1];
+                std::nth_element(time_out.begin(), time_out.begin() + time_out.size() - _max_buckets, time_out.end());
+                min_ts = *std::max(time_out.begin(), time_out.begin() + time_out.size() - _max_buckets - 1);
+                //std::partial_sort(time_out.begin(), time_out.begin() + time_out.size() - _max_buckets, time_out.end());
+                //min_ts = time_out[time_out.size() - _max_buckets - 1];
             }
         }
 
@@ -1013,7 +1024,7 @@ public:
         if (_num_filled > 10000) {
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/K.V/pack/min_ts = %u/%s.%s/%zd/%u",
-                    _num_filled, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), nowts() - min_ts);
+                    _num_filled, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), nextid() - min_ts);
 #if EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG("lru_size") << __FUNCTION__ << " rhashs = " << ihashs ++ << "|" << buff << endl;
@@ -1111,14 +1122,18 @@ private:
 
         if (next_bucket == INACTIVE)
             return _num_buckets;
-        else if (_eq(key, GET_KEY(_pairs, bucket)))
+        else if (_eq(key, GET_KEY(_pairs, bucket))) {
+            _pairs[bucket].timeout = nextid();
             return bucket;
+        }
         else if (next_bucket == bucket)
             return _num_buckets;
 
         while (true) {
-            if (_eq(key, GET_KEY(_pairs, next_bucket)))
+            if (_eq(key, GET_KEY(_pairs, next_bucket))) {
+                _pairs[next_bucket].timeout = nextid();
                 return next_bucket;
+            }
 
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
@@ -1259,12 +1274,54 @@ private:
     }
 
     //the first cache line packed
-    inline uint32_t hash_bucket(const KeyT& key) const
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType key) const
+    {
+#if 0
+        return (uint32_t)hash64(key) & _mask;
+#elif EMHASH_SAFE_HASH
+        if (_hash_inter > 0)
+            return (uint32_t)hash64(key) & _mask;
+
+        return _hasher(key);
+#elif EMHASH_IDENTITY_HASH
+        return (key + (key >> (sizeof(UType) * 4))) & _mask;
+#elif WYHASH_LITTLE_ENDIAN0
+        return wyhash64(key, _num_buckets) & _mask;
+#else
+        return _hasher(key) & _mask;
+#endif
+    }
+
+    template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef WYHASH_LITTLE_ENDIAN
+        return wyhash(key.c_str(), key.size(), 0x123456789101213ull) & _mask;
+#elif EMHASH_BKR_HASH
+        uint32_t hash = 0;
+        if (key.size() < 64) {
+            for (const auto c : key)
+                hash = c + hash * 131;
+        } else {
+            for (int i = 0, j = 1; i < key.size(); i += j++)
+                hash = key[i] + hash * 131;
+        }
+        return hash & _mask;
+#else
+        return _hasher(key) & _mask;
+#endif
+    }
+
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
     {
         return _hasher(key) & _mask;
     }
 
 private:
+
+    PairT*    _pairs;
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
@@ -1273,7 +1330,6 @@ private:
 
     uint32_t  _max_buckets;
     uint32_t  _num_filled;
-    PairT*    _pairs;
 };
 } // namespace emhash
 #if __cplusplus > 199711
