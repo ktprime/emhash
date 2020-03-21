@@ -49,6 +49,14 @@
 #include <functional>
 #include <iterator>
 
+#ifdef __has_include
+    #if __has_include("wyhash.h")
+    #include "wyhash.h"
+    #endif
+#elif EMHASH_WY_HASH
+    #include "wyhash.h"
+#endif
+
 #ifdef GET_KEY
     #undef  GET_KEY
     #undef  GET_VAL
@@ -848,20 +856,23 @@ public:
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(std::forward<Args>(args)...);
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...);
     }
 
     //no any optimize for position
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
-        return insert(std::forward<Args>(args)...).first;
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...).first;
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args)
     {
-        return insert(k, std::forward<Args>(args)...).first;
+        check_expand_need();
+        return do_insert(k, std::forward<Args>(args)...);
     }
 
     template <class... Args>
@@ -1317,10 +1328,51 @@ private:
         return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
-    //the first cache line packed
-    inline uint32_t hash_bucket(const KeyT& key) const
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType key) const
     {
+#ifdef EMHASH_FIBONACCI_HASH
+        return (uint32_t)hash64(key) && _mask;
+#elif EMHASH_SAFE_HASH
+        if (_hash_inter > 0) {
+            return (uint32_t)hash64(key);
+        }
         return _hasher(key) & _mask;
+#elif EMHASH_IDENTITY_HASH
+        return (key + (key >> (sizeof(UType) * 4))) & _mask;
+#else
+        return _hasher(key) & _mask;
+#endif
+    }
+
+    template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef WYHASH_LITTLE_ENDIAN
+        return wyhash(key.c_str(), key.size(),0x12345678) & _mask;
+#elif EMHASH_BKR_HASH
+        uint32_t hash = 0;
+        if (key.size() < 64) {
+            for (const auto c : key)
+                hash = c + hash * 131;
+        } else {
+            for (int i = 0, j = 1; i < key.size(); i += j++)
+                hash = key[i] + hash * 131;
+        }
+        return hash & _mask;
+#else
+        return _hasher(key) & _mask;
+#endif
+    }
+
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef EMHASH_FIBONACCI_HASH
+        return _hasher(key) * 11400714819323198485ull;
+#else
+        return _hasher(key) & _mask;
+#endif
     }
 
 private:

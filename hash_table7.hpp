@@ -660,12 +660,12 @@ public:
 
     constexpr size_type max_size() const
     {
-        return (1u << 31) / sizeof(PairT);
+        return (1ull << (sizeof(size_type) * 8 - 2));
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1u << 31) / sizeof(PairT);
+        return max_size();
     }
 
     size_type bucket_main() const
@@ -1049,7 +1049,8 @@ public:
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(std::forward<Args>(args)...);
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...);
     }
 #else
     template <class Key, class Val>

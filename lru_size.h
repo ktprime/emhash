@@ -86,14 +86,14 @@ struct entry {
         :second(value),first(key)
     {
         bucket = ibucket;
-        timeout = nextid();
+        orderid = nextid();
     }
 
     entry(First&& key, Second&& value, uint32_t ibucket)
         :second(std::move(value)), first(std::move(key))
     {
         bucket = ibucket;
-        timeout = nextid();
+        orderid = nextid();
     }
 
     template<typename K, typename V>
@@ -101,35 +101,35 @@ struct entry {
         :second(std::forward<V>(value)), first(std::forward<K>(key))
     {
         bucket = ibucket;
-        timeout = nextid();
+        orderid = nextid();
     }
 
     entry(const std::pair<First,Second>& pair)
         :second(pair.second),first(pair.first)
     {
         bucket = INACTIVE;
-        timeout = nextid();
+        orderid = nextid();
     }
 
     entry(std::pair<First, Second>&& pair)
         :second(std::move(pair.second)),first(std::move(pair.first))
     {
         bucket = INACTIVE;
-        timeout = nextid();
+        orderid = nextid();
     }
 
     entry(const entry& pairT)
         :second(pairT.second),first(pairT.first)
     {
         bucket = pairT.bucket;
-        timeout = pairT.timeout;
+        orderid = pairT.orderid;
     }
 
     entry(entry&& pairT)
         :second(std::move(pairT.second)),first(std::move(pairT.first))
     {
         bucket = pairT.bucket;
-        timeout= pairT.timeout;
+        orderid= pairT.orderid;
     }
 
     entry& operator = (entry&& pairT)
@@ -137,7 +137,7 @@ struct entry {
         second = std::move(pairT.second);
         first = std::move(pairT.first);
         bucket = pairT.bucket;
-        timeout = pairT.timeout;
+        orderid = pairT.orderid;
         return *this;
     }
 
@@ -146,7 +146,7 @@ struct entry {
         second = o.second;
         first  = o.first;
         bucket = o.bucket;
-        timeout = o.timeout;
+        orderid = o.orderid;
         return *this;
     }
 
@@ -154,12 +154,12 @@ struct entry {
     {
         std::swap(second, o.second);
         std::swap(first, o.first);
-        std::swap(timeout, o.timeout);
+        std::swap(orderid, o.orderid);
     }
 
     Second second;//int
     uint32_t bucket;
-    uint32_t timeout;
+    uint32_t orderid;
     First first; //long
 };// __attribute__ ((packed));
 
@@ -703,7 +703,7 @@ public:
         if (found) {
             NEW_KVALUE(key, value, bucket);
         } else {
-            _pairs[bucket].timeout = nextid();
+            _pairs[bucket].orderid = nextid();
         }
         return { {this, bucket}, found };
     }
@@ -716,7 +716,7 @@ public:
         if (found) {
             NEW_KVALUE(std::move(key), std::move(value), bucket);
         } else {
-            _pairs[bucket].timeout = nextid();
+            _pairs[bucket].orderid = nextid();
         }
         return { {this, bucket}, found };
     }
@@ -748,7 +748,6 @@ public:
             emplace(*begin);
         }
     }
-#endif
 
     template <typename Iter>
     void insert2(Iter begin, Iter end)
@@ -765,6 +764,18 @@ public:
         for (; citbeg != citend; ++citbeg)
             insert(*citbeg);
     }
+
+    uint32_t try_insert_mainbucket(const KeyT& key, const ValueT& value)
+    {
+        const auto bucket = hash_bucket(key);
+        auto next_bucket = NEXT_BUCKET(_pairs, bucket);
+        if (next_bucket != INACTIVE)
+            return INACTIVE;
+
+        NEW_KVALUE(key, value, bucket);
+        return bucket;
+    }
+#endif
 
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
@@ -834,17 +845,6 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    uint32_t try_insert_mainbucket(const KeyT& key, const ValueT& value)
-    {
-        const auto bucket = hash_bucket(key);
-        auto next_bucket = NEXT_BUCKET(_pairs, bucket);
-        if (next_bucket != INACTIVE)
-            return INACTIVE;
-
-        NEW_KVALUE(key, value, bucket);
-        return bucket;
-    }
-
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value)
     {
         return insert(key, std::move(value));
@@ -858,30 +858,26 @@ public:
     /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key)
     {
+        check_expand_need();
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
-            if (EMHASH_UNLIKELY(check_expand_need()))
-                bucket = find_unique_bucket(key);
-
             NEW_KVALUE(key, std::move(ValueT()), bucket);
         } else {
-            _pairs[bucket].timeout = nextid();
+            _pairs[bucket].orderid = nextid();
         }
         return GET_VAL(_pairs, bucket);
     }
 
     ValueT& operator[](KeyT&& key)
     {
+        check_expand_need();
         auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
-            if (EMHASH_UNLIKELY(check_expand_need()))
-                bucket = find_unique_bucket(key);
-
             NEW_KVALUE(std::move(key), std::move(ValueT()), bucket);
         } else {
-            _pairs[bucket].timeout = nextid();
+            _pairs[bucket].orderid = nextid();
         }
         return GET_VAL(_pairs, bucket);
     }
@@ -985,18 +981,18 @@ public:
         _mask        = num_buckets - 1;
         for (uint32_t bucket = 0; bucket < num_buckets; bucket++) {
             NEXT_BUCKET(_pairs, bucket) = INACTIVE;
-            _pairs[bucket].timeout = 0;
+            _pairs[bucket].orderid = 0;
         }
         NEXT_BUCKET(_pairs, _num_buckets) = NEXT_BUCKET(_pairs, _num_buckets + 1) = 0;
 
-        //remove the timeout bucket
+        //remove the orderid bucket
         uint32_t min_ts = 0;
         if (old_num_filled > _max_buckets) {
             std::vector<uint32_t> time_out;
             time_out.reserve(old_num_filled);
             for (uint32_t src_bucket = 0; src_bucket < old_num_buckets; src_bucket++) {
                 if (NEXT_BUCKET(old_pairs, src_bucket) != INACTIVE)
-                    time_out.emplace_back(old_pairs[src_bucket].timeout);
+                    time_out.emplace_back(old_pairs[src_bucket].orderid);
             }
             if (time_out.size() > _max_buckets) {
                 std::nth_element(time_out.begin(), time_out.begin() + time_out.size() - _max_buckets, time_out.end());
@@ -1011,11 +1007,11 @@ public:
                 continue;
 
             old_num_filled -- ;
-            if (old_pairs[src_bucket].timeout > min_ts && _num_filled < _max_buckets) {
+            if (old_pairs[src_bucket].orderid > min_ts && _num_filled < _max_buckets) {
                 auto&& key = GET_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
                 NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
-                _pairs[bucket].timeout = old_pairs[src_bucket].timeout;
+                _pairs[bucket].orderid = old_pairs[src_bucket].orderid;
             }
             old_pairs[src_bucket].~PairT();
         }
@@ -1050,7 +1046,7 @@ private:
         _pairs[bucket].~PairT();
         NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
-        _pairs[bucket].timeout = 0;
+        _pairs[bucket].orderid = 0;
     }
 
     uint32_t erase_key(const KeyT& key)
@@ -1123,7 +1119,7 @@ private:
         if (next_bucket == INACTIVE)
             return _num_buckets;
         else if (_eq(key, GET_KEY(_pairs, bucket))) {
-            _pairs[bucket].timeout = nextid();
+            _pairs[bucket].orderid = nextid();
             return bucket;
         }
         else if (next_bucket == bucket)
@@ -1131,7 +1127,7 @@ private:
 
         while (true) {
             if (_eq(key, GET_KEY(_pairs, next_bucket))) {
-                _pairs[next_bucket].timeout = nextid();
+                _pairs[next_bucket].orderid = nextid();
                 return next_bucket;
             }
 

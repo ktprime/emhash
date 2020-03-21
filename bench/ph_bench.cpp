@@ -1,13 +1,14 @@
 #include <inttypes.h>
-#define THR 1
+#include "wyhash.h"
+//#define THR 1
 
 #if EMHASH == 7
     #include "hash_table7.hpp"
-    #define MAPNAME emhash2::HashMap
+    #define MAPNAME emhash7::HashMap
     #define EXTRAARGS
-#elif EMHASH == 6
-    #include "hash_table6.hpp"
-    #define MAPNAME emhash6::HashMap
+#elif EMHASH == 2
+    #include "hash_table2.hpp"
+    #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
 #elif EMHASH == 5
     #include "hash_table5.hpp"
@@ -38,12 +39,12 @@
     #include "absl/container/flat_hash_map.h"
     #define MAPNAME absl::flat_hash_map
     #define EXTRAARGS
-#elif defined(PHMAP_FLAT)
+#elif defined(PHMAP)
     #include "phmap/phmap.h"
     #define MAPNAME phmap::flat_hash_map
     #define NMSP phmap
     #define EXTRAARGS
-#elif defined(ABSEIL_PARALLEL_FLAT) || defined(PHMAP)
+#elif defined(ABSEIL_PARALLEL_FLAT)
     #if defined(ABSEIL_PARALLEL_FLAT)
         #include "absl/container/parallel_flat_hash_map.h"
         #define MAPNAME absl::parallel_flat_hash_map
@@ -106,7 +107,6 @@ const char *program_slug = xstr(MAPNAME); // "_4";
 #include <thread>
 #include <chrono>
 #include <ostream>
-#include "phmap/meminfo.h"
 #include <vector>
 using std::vector;
 
@@ -233,16 +233,16 @@ Timer _fill_random(vector<T> &v, HT &hash)
 // --------------------------------------------------------------------------
 void out(const char* test, int64_t cnt, const Timer &t)
 {
-//    printf("%s,time,%lld,%s,%f\n", test, cnt, program_slug, (float)((double)t.elapsed().count() / 1000));
+//    printf("%s,time,%ld,%s,%f\n", test, cnt, program_slug, (float)((double)t.elapsed().count() / 1000));
 }
 
 // --------------------------------------------------------------------------
 void outmem(const char* test, int64_t cnt, uint64_t mem)
 {
   if (mem < 1024 * 1024)
-      printf("%s,memory,%lld,%s,%lld KB\r", test, cnt, program_slug, mem / 1024);
+      printf("%s,memory,%ld,%s,%ld KB\r", test, cnt, program_slug, mem / 1024);
   else
-      printf("%s,memory,%lld,%s,%.2lf MB\r", test, cnt, program_slug, mem / (1024 * 1024.0));
+      printf("%s,memory,%ld,%s,%.2lf MB\r", test, cnt, program_slug, mem / (1024 * 1024.0));
 }
 
 static bool all_done = false;
@@ -326,13 +326,13 @@ Timer _fill_random2(int64_t cnt, HT &hash)
     unsigned int seed = 76687;
     RSU rsu(seed, seed + 1);
 
-    Timer timer(true);
     const int64_t num_loops = 10;
     inner_cnt = cnt / num_loops;
 
     for (int i=0; i<16; ++i)
         num_keys[i] = 0;
 
+    Timer timer(true);
     for (loop_idx=0; loop_idx<num_loops; ++loop_idx)
     {
 #if 1 && MT_SUPPORT
@@ -343,7 +343,7 @@ Timer _fill_random2(int64_t cnt, HT &hash)
 #endif
         out(test, total_num_keys(), timer);
     }
-    fprintf(stderr, "emplaceed %.2lfM\n", (double)hash.size() / 1000000);
+//    fprintf(stderr, "emplaceed %.2lfM\n", (double)hash.size() / 1000000);
     return timer;
 }
 
@@ -360,7 +360,7 @@ Timer _lookup(vector<T> &v, HT &hash, size_t &num_present)
     for (size_t i = 0, sz = v.size(); i < sz; ++i)
     {
         num_present += (size_t)(hash.find(v[i]) != hash.end());
-        num_present += (size_t)(hash.find((T)(rand() + max_val)) != hash.end());
+        num_present += (size_t)(hash.find((T)(1 + max_val)) != hash.end());
     }
     return timer;
 }
@@ -382,7 +382,7 @@ Timer _delete(vector<T> &v, HT &hash)
 // --------------------------------------------------------------------------
 void memlog()
 {
-#if THR
+#if 0
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     uint64_t nbytes_old_out = spp::GetProcessMemoryUsed();
     uint64_t nbytes_old     = spp::GetProcessMemoryUsed(); // last non outputted mem measurement
@@ -422,17 +422,14 @@ int main(int argc, char ** argv)
     int i, value = 0;
     const char * benchs[] = {"sequential", "random", "lookup", "delete", "sequentialstring", "randomstring", "deletestring"};
 
-    hash_t     hash;
-    str_hash_t str_hash;
-    if (argc <= 1) {
+    if (argc > 2) {
         printf("pro type[1-7] n(100k-10000k)\n");
         for (int i = 0; i < 7; i++)
             printf("%d %s\n", i + 1, benchs[i]);
-//        return 0;
     }
 
-    const char* bench = argc > 1 ? benchs[atoi(argv[1]) - 1] : benchs[3];
-    int num_keys      = argc > 2 ? atoi(argv[2]) : 103456789 + (time(0) * 1234567) % 12345678;
+    const char* bench = benchs[0];
+    int num_keys      = argc > 1 ? atoi(argv[1]) : 2345678 + (time(0) * 1234567) % 1234567;
 
     srand(1); // for a fair/deterministic comparison
     Timer timer(true);
@@ -446,66 +443,83 @@ int main(int argc, char ** argv)
 #endif
 
 #if THR
+	#include "phmap/meminfo.h"
     std::thread t1(memlog);
 #endif
 
     try
     {
-        if(!strcmp(bench, "sequential"))
+        if(1)
         {
+            bench = "sequential"; timer.reset(); hash_t     hash;
             for(i = 0; i < num_keys; i++)
                 hash.emplace(i, value);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
-#if 0
-        else if(!strcmp(bench, "random"))
+#if 1
+        if(1)
         {
+            bench = "random"; hash_t     hash;
             vector<int64_t> v(num_keys);
             timer = _fill_random(v, hash);
-            out("random", num_keys, timer);
+            //out("random", num_keys, timer);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
-#endif
-        else if(!strcmp(bench, "random"))
+#else
+        if(1)
         {
+            timer.reset();
+            hash_t     hash;
             fprintf(stderr, "size = %zd\n", sizeof(hash));
             timer = _fill_random2(num_keys, hash);
             //out("random", num_keys, timer);
-            //fprintf(stderr, "emplaceed %llu\n", hash.size());
+            //fprintf(stderr, "emplaceed %lu\n", hash.size());
         }
-        else if(!strcmp(bench, "lookup"))
+#endif
+        if(1)
         {
+            bench = "lookup"; timer.reset(); hash_t     hash;
             vector<int64_t> v(num_keys);
             size_t num_present;
 
             timer = _lookup(v, hash, num_present);
-            //fprintf(stderr, "found %llu\n", num_present);
+            //fprintf(stderr, "found %lu\n", num_present);
+            printf("%.2lf %-10s %-10s %d %zd\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, num_present);
         }
-        else if(!strcmp(bench, "delete"))
+        if(1)
         {
+            bench = "delete"; timer.reset(); hash_t     hash;
             vector<int64_t> v(num_keys);
             timer = _delete(v,  hash);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
-        else if(!strcmp(bench, "sequentialstring"))
+        if(1)
         {
+            bench = "sequentialstring"; str_hash_t str_hash; timer.reset();
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
-        else if(!strcmp(bench, "randomstring"))
+        if(1)
         {
+            bench = "randomstring"; str_hash_t str_hash; timer.reset();
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer((int)rand()), value);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
-        else if(!strcmp(bench, "deletestring"))
+        if(1)
         {
+            bench = "deletestring"; str_hash_t str_hash;
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
             timer.reset();
             ts = getTime();
             for(i = 0; i < num_keys; i++)
                 str_hash.erase(new_string_from_integer(i));
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
 
-        printf("%.2lf %-10s %-10s %d %.2lf\n\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
-        fflush(stdout);
+        puts("");
         //std::this_thread::sleep_for(std::chrono::seconds(1000));
     }
     catch (...)
@@ -518,3 +532,4 @@ int main(int argc, char ** argv)
 #endif
     return 0;
 }
+
