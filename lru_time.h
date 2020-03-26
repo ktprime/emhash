@@ -179,14 +179,14 @@ public:
 
         iterator& operator++()
         {
-            this->goto_next_element();
+            goto_next_element();
             return *this;
         }
 
         iterator operator++(int)
         {
             auto old_index = _bucket;
-            this->goto_next_element();
+            goto_next_element();
             return {_map, old_index};
         }
 
@@ -202,12 +202,12 @@ public:
 
         bool operator==(const iterator& rhs) const
         {
-            return this->_bucket == rhs._bucket;
+            return _bucket == rhs._bucket;
         }
 
         bool operator!=(const iterator& rhs) const
         {
-            return this->_bucket != rhs._bucket;
+            return _bucket != rhs._bucket;
         }
 
     private:
@@ -239,14 +239,14 @@ public:
 
         const_iterator& operator++()
         {
-            this->goto_next_element();
+            goto_next_element();
             return *this;
         }
 
         const_iterator operator++(int)
         {
             auto old_index = _bucket;
-            this->goto_next_element();
+            goto_next_element();
             return {_map, old_index};
         }
 
@@ -262,12 +262,12 @@ public:
 
         bool operator==(const const_iterator& rhs) const
         {
-            return this->_bucket == rhs._bucket;
+            return _bucket == rhs._bucket;
         }
 
         bool operator!=(const const_iterator& rhs) const
         {
-            return this->_bucket != rhs._bucket;
+            return _bucket != rhs._bucket;
         }
 
     private:
@@ -344,7 +344,7 @@ public:
 
     lru_cache& operator=(lru_cache&& other)
     {
-        this->swap(other);
+        swap(other);
         return *this;
     }
 
@@ -1083,8 +1083,8 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _pairs[bucket].~PairT();
+        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
         _pairs[bucket].timeout = 0;
     }
@@ -1210,7 +1210,7 @@ private:
         if (main_bucket != bucket) {
             return kickout_bucket(main_bucket, bucket);
         } else if (next_bucket == bucket) {
-            if (time_bucket != INACTIVE) 
+            if (time_bucket != INACTIVE)
                 return time_bucket;
             return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
         }
@@ -1229,7 +1229,7 @@ private:
             next_bucket = nbucket;
         }
 
-        if (time_bucket != INACTIVE) 
+        if (time_bucket != INACTIVE)
             return time_bucket;
 
         //find a new empty and link it to tail
