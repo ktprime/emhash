@@ -195,6 +195,7 @@ my ebench result: low is best
 ![](int_string.png)
 ![](string_int.png)
 ![](int64_t_Struct.png)
+![](int64_t_int64_t.png)
 
 # some bad
 - it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
