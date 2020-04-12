@@ -399,11 +399,7 @@ public:
 
         auto opairs  = other._pairs;
 
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value)
-#else
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value)
-#endif
+        if (is_copy_trivially())
             memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
         else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
@@ -422,9 +418,9 @@ public:
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
-        std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_last, other._last);
+        std::swap(_mask, other._mask);
     }
 
     // -------------------------------------------------------------
@@ -1050,9 +1046,11 @@ private:
             if (IS_EMPTY(old_pairs, src_bucket))
                 continue;
 
-            auto&& key = GET_KEY(old_pairs, src_bucket);
+            auto& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
-            NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
+            new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
+            NEXT_BUCKET(_pairs, bucket) = bucket;
+
             if (is_triviall_destructable())
                 old_pairs[src_bucket].~PairT();
         }
@@ -1190,12 +1188,11 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _num_filled ++;
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
-        if (is_triviall_destructable())
-            _pairs[bucket].~PairT();
-        NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+
+        clear_bucket(bucket);
         return bucket;
     }
 
@@ -1328,14 +1325,44 @@ private:
         return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
+    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
+    static inline uint64_t hash64(uint64_t key)
+    {
+#if __SIZEOF_INT128__
+        __uint128_t r = key; r *= KC;
+        return (uint64_t)(r >> 64) + (uint64_t)r;
+#elif _WIN64
+        uint64_t high;
+        return _umul128(key, KC, &high) + high;
+#elif 1
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#elif 1
+        //MurmurHash3Mixer
+        uint64_t h = key;
+        h ^= h >> 33;
+        h *= 0xff51afd7ed558ccd;
+        h ^= h >> 33;
+        h *= 0xc4ceb9fe1a85ec53;
+        h ^= h >> 33;
+        return h;
+#elif 1
+        uint64_t x = key;
+        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+        x = x ^ (x >> 31);
+        return x;
+#endif
+    }
+
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType key) const
     {
 #ifdef EMHASH_FIBONACCI_HASH
-        return (uint32_t)hash64(key) && _mask;
+        return (uint32_t)hash64(key) & _mask;
 #elif EMHASH_SAFE_HASH
         if (_hash_inter > 0) {
-            return (uint32_t)hash64(key);
+            return (uint32_t)hash64(key) & _mask;
         }
         return _hasher(key) & _mask;
 #elif EMHASH_IDENTITY_HASH

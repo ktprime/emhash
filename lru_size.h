@@ -62,7 +62,7 @@
 #define GET_VAL(p,n)     p[n].second
 #define NEXT_BUCKET(p,n) p[n].bucket
 #define GET_PKV(p,n)     p[n]
-#define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
+#define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket); _num_filled ++
 
 namespace emlru_size {
 
@@ -72,10 +72,10 @@ static uint32_t _sid = 0;
 
 inline static constexpr uint32_t incid()
 {
-#if EMHASH_LRU_TIME > 1
+#if EMHASH_LRU_TIME
     return EMHASH_LRU_TIME;
 #else
-    return 10;
+    return 1;
 #endif
 }
 
@@ -84,7 +84,7 @@ struct entry {
     inline static uint32_t nextid()
     {
 #if EMHASH_LRU_TIME
-        return time(0) + ++_sid;
+        return time(0);
 #else
         return ++_sid; //overflow
 #endif
@@ -166,9 +166,9 @@ struct entry {
     }
 
     Second second;//int
+    First first; //long
     uint32_t bucket;
     uint32_t orderid;
-    First first; //long
 };// __attribute__ ((packed));
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
@@ -184,10 +184,10 @@ public:
     typedef KeyT   key_type;
     typedef ValueT mapped_type;
 
-    typedef  size_t       size_type;
+    typedef size_t       size_type;
     typedef std::pair<KeyT,ValueT>        value_type;
-    typedef  PairT&       reference;
-    typedef  const PairT& const_reference;
+    typedef PairT&       reference;
+    typedef const PairT& const_reference;
 
     class iterator
     {
@@ -317,7 +317,7 @@ public:
         _pairs = nullptr;
         _num_filled = 0;
         _max_buckets = max_bucket;
-        max_load_factor(0.9f);
+        max_load_factor(0.85f);
     }
 
     lru_cache(uint32_t bucket = 8, uint32_t max_bucket = 1 << 28)
@@ -473,7 +473,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return static_cast<float>(_num_filled) / (_num_buckets + 1);
+        return static_cast<float>(_num_filled) / (_mask + 1);
     }
 
     HashT& hash_function() const
@@ -956,12 +956,12 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-        if (EMHASH_UNLIKELY(_num_filled >= _max_buckets * 2))
-            return remove_half();
-
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27) + 2;
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMHASH_LIKELY(required_buckets < _num_buckets))
             return false;
+
+        if (_num_filled >= _max_buckets * 2)
+            return remove_half();
 
         rehash(required_buckets + 2);
         return true;
@@ -970,56 +970,65 @@ public:
     bool remove_half()
     {
         auto ts = clock();
-        uint32_t erase_ids = 0;
-        uint64_t sumd = 0;
+        uint32_t erase_ids = _num_filled;
+        uint64_t sumid = 0;
 
 #ifdef EMHASH_SAFE_REMOVE
         std::vector<uint32_t> order_ids;
-        order_ids.reserve(_num_filled);
+        order_ids.reserve(_num_filled + 1);
 
         for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++) {
+            auto orderid = _pairs[src_bucket].orderid;
             if (NEXT_BUCKET(_pairs, src_bucket) != INACTIVE) {
-                order_ids.push_back(_pairs[src_bucket].orderid);
-                sumd += _pairs[src_bucket].orderid;
+                order_ids.push_back(orderid);
+                sumid += orderid;
             }
         }
 
-        uint32_t averge_id = uint32_t(sumd / order_ids.size());
         assert (order_ids.size() == _num_filled);
-        assert (order_ids.size() > _max_buckets);
 
+        auto sorted_end = order_ids.begin() + order_ids.size() / 2;
         //TODO: BFPRT find the median element in O(n) or evaulate the medium by average
-        std::nth_element(order_ids.begin(), order_ids.begin() + order_ids.size() - _max_buckets, order_ids.end());
-        auto medium_id = *std::max(order_ids.begin(), order_ids.begin() + order_ids.size() - _max_buckets - 1) + 0;
+        std::nth_element(order_ids.begin(), sorted_end, order_ids.end());
+        const auto medium_id = *sorted_end;
 #else
         for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++)
-            sumd += _pairs[src_bucket].orderid;
-
-        uint32_t averge_id = uint32_t(sumd / _num_filled);
-        auto medium_id = averge_id + 1;
+            sumid += _pairs[src_bucket].orderid;
+        const auto medium_id = uint32_t(sumid / _num_filled);
 #endif
 
-        auto max_id = medium_id;
+        const auto tnows = entry<KeyT, ValueT>::nextid();
+        const auto averge_id = uint32_t(sumid / _num_filled);
+        uint32_t max_id = 1;
         for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++) {
-            auto orderid = _pairs[src_bucket].orderid;
-            if (orderid == 0 || NEXT_BUCKET(_pairs, src_bucket) == INACTIVE)
-                continue;
-
+        //for (int src_bucket = _num_buckets - 1; src_bucket >= 0; src_bucket--) {
+            auto& orderid = _pairs[src_bucket].orderid;
             if (orderid > medium_id) {
                 if (orderid > max_id)
                     max_id = orderid;
+#if EMHASH_TIME_DELAY
+                if (tnows + EMHASH_TIME_DELAY < orderid) {
+                    orderid = tnows + EMHASH_TIME_DELAY;
+                    continue;
+                } else if (tnows < orderid + EMHASH_TIME_DELAY)
+                    continue;
+#else
                 continue;
-            }
+#endif
+            } else if (orderid == 0)
+                continue;
 
-            erase_ids ++;
             const auto bucket = erase_bucket(src_bucket);
             clear_bucket(bucket);
+            if (bucket != src_bucket)
+                src_bucket --;
         }
 
 #if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
         char buff[256] = {0};
-        snprintf(buff, sizeof(buff), "    _num_filled medium_id.nextid.erase_ids load_factor|diff = %u %u %u %u %.3f | %.3lf%%, time_use = %d ms",
-                _num_filled, medium_id, entry<KeyT, ValueT>::nextid(), erase_ids, load_factor(), (100.0*averge_id - 100.0*medium_id) / (1 + max_id - medium_id), (int)(clock() - ts));
+        snprintf(buff, sizeof(buff), "_num_filled now-med.max-now.erase_ids load_factor|diff = %u %d %d %u %.2f | %.2lf%%, time_use = %d us",
+                _num_filled, int(tnows - medium_id), int(max_id - tnows), erase_ids - _num_filled, load_factor(), (100.0*averge_id - 100.0*medium_id) / (1 + max_id - medium_id), (int)(clock() - ts));
+
 #if EMHASH_TAF_LOG
         static uint32_t iremoves = 0;
         FDLOG("lru_size") << __FUNCTION__ << " removes = " << iremoves ++ << "|" << buff << endl;
@@ -1058,9 +1067,10 @@ public:
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
                 continue;
 
-            auto&& key = GET_KEY(old_pairs, src_bucket);
+            const auto& key = GET_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
-            NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
+            new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
+            NEXT_BUCKET(_pairs, bucket) = bucket;
             if (is_notrivially())
                 old_pairs[src_bucket].~PairT();
         }
@@ -1145,14 +1155,18 @@ private:
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
         if (bucket == main_bucket) {
-            if (bucket != next_bucket) {
-                const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
-                if (is_notrivially())
-                    GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
-                else
-                    GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
-                NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
+            if (bucket == next_bucket)
+                return bucket;
+
+            const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
+            if (is_notrivially())
+                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
+            else {
+                const auto orderid = _pairs[bucket].orderid;
+                GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+                _pairs[next_bucket].orderid = orderid;
             }
+            NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
         }
 
@@ -1176,13 +1190,13 @@ private:
         else if (next_bucket == bucket)
             return _num_buckets;
 
-#if EMHASH_LRU_SET
+#if EMHASH_LRU_GET
         auto prev_bucket = bucket;
 #endif
         while (true) {
             if (_eq(key, GET_KEY(_pairs, next_bucket))) {
                 _pairs[next_bucket].orderid += incid();
-#if EMHASH_LRU_SET
+#if EMHASH_LRU_GET
                 GET_PKV(_pairs, next_bucket).swap(GET_PKV(_pairs, prev_bucket));
                 return prev_bucket;
 #else
@@ -1190,7 +1204,7 @@ private:
 #endif
             }
 
-#if EMHASH_LRU_SET
+#if EMHASH_LRU_GET
             prev_bucket = next_bucket;
 #endif
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
@@ -1209,10 +1223,11 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         NEXT_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
+        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); _num_filled ++;
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
-        _pairs[bucket].~PairT(); NEXT_BUCKET(_pairs, bucket) = INACTIVE;
+
+        clear_bucket(bucket);
         return bucket;
     }
 
@@ -1225,14 +1240,14 @@ private:
 */
     uint32_t find_or_allocate(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_bucket(key);
         const auto& bucket_key = GET_KEY(_pairs, bucket);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE || _eq(key, bucket_key))
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(bucket_key) & _mask;
+        const auto main_bucket = hash_bucket(bucket_key);
         if (main_bucket != bucket)
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket == bucket)
@@ -1284,7 +1299,7 @@ private:
             if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
                 return bucket1;
 
-            const auto bucket2 = bucket1 + 1;
+            const auto bucket2 = bucket1 + 2;
             if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
                 return bucket2;
 
@@ -1343,11 +1358,41 @@ private:
         return NEXT_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
+    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
+    static inline uint64_t hash64(uint64_t key)
+    {
+#if __SIZEOF_INT128__
+        __uint128_t r = key; r *= KC;
+        return (uint64_t)(r >> 64) + (uint64_t)r;
+#elif _WIN64
+        uint64_t high;
+        return _umul128(key, KC, &high) + high;
+#elif 1
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#elif 1
+        //MurmurHash3Mixer
+        uint64_t h = key;
+        h ^= h >> 33;
+        h *= 0xff51afd7ed558ccd;
+        h ^= h >> 33;
+        h *= 0xc4ceb9fe1a85ec53;
+        h ^= h >> 33;
+        return h;
+#elif 1
+        uint64_t x = key;
+        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+        x = x ^ (x >> 31);
+        return x;
+#endif
+    }
+
     //the first cache line packed
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType key) const
     {
-#if 0
+#if 1
         return (uint32_t)hash64(key) & _mask;
 #elif EMHASH_SAFE_HASH
         if (_hash_inter > 0)
@@ -1391,9 +1436,9 @@ private:
     EqT       _eq;
     uint32_t  _loadlf;
     uint32_t  _num_buckets;
+    uint32_t  _max_buckets;
     uint32_t  _mask;
 
-    uint32_t  _max_buckets;
     uint32_t  _num_filled;
 };
 } // namespace emhash

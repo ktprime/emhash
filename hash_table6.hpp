@@ -1663,7 +1663,7 @@ private:
         return wyhash(key.c_str(), key.size(), key.size());
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;
-        if (key.size() < 64) {
+        if (key.size() < 256) {
             for (const auto c : key)
                 hash = c + hash * 131;
         } else {

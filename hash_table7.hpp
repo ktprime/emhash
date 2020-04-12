@@ -145,7 +145,7 @@ namespace emhash7 {
 
 static constexpr uint32_t MASK_BIT = sizeof(uint8_t) * 8;
 static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-static constexpr uint32_t INACTIVE = 0 - 0x7;
+static constexpr uint32_t INACTIVE = 0 - 0x1;
 static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
 
 //count the leading zero bit
@@ -552,7 +552,7 @@ public:
         else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = NEXT_BUCKET(_pairs, bucket) = NEXT_BUCKET(opairs, bucket);
-                if (next_bucket != INACTIVE)
+                if ((int)next_bucket >= 0)
                     new(_pairs + bucket) PairT(opairs[bucket]);
             }
         }
@@ -769,7 +769,7 @@ public:
     {
         uint32_t buckets[256] = {0};
         uint32_t steps[256]   = {0};
-        char buff[1024 * 8];
+        char buff[1024 * 16];
         for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
             auto bsize = get_bucket_info(bucket, steps, 128);
             if (bsize >= 0)
