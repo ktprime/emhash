@@ -1505,7 +1505,7 @@ private:
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.c_str(), key.size(), key.size());
-#elif EMHASH_BKR_HASH
+#elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 64) {
             for (const auto c : key)

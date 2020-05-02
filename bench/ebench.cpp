@@ -71,6 +71,8 @@
 //https://martin.ankerl.com/2019/04/01/hashmap-benchmarks-01-overview/
 //https://martin.ankerl.com/2016/09/21/very-fast-hashmap-in-c-part-3/
 
+//https://attractivechaos.wordpress.com/2018/01/13/revisiting-hash-table-performance/
+//https://attractivechaos.wordpress.com/2019/12/28/deletion-from-hash-tables-without-tombstones/#comment-9548
 //https://attractivechaos.wordpress.com/2008/08/28/comparison-of-hash-table-libraries/
 //https://en.wikipedia.org/wiki/Hash_table
 //https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html
@@ -78,6 +80,8 @@
 //https://andre.arko.net/2017/08/24/robin-hood-hashing/
 //http://www.ilikebigbits.com/2016_08_28_hash_table.html
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
+//https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
+//https://bigdata.uni-saarland.de/publications/p249-richter.pdf
 
 #if HOOD_HASH
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
@@ -645,7 +649,7 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
         size_t sum = 0;
         const auto smalls = min_size + vList.size() % cache_size;
         hash_type tmp, empty;
-        empty.max_load_factor(0.8);
+        empty.max_load_factor(0.875);
         tmp = empty;
 
         for (const auto& v : vList)
@@ -673,7 +677,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         size_t pow2 = 2 << ilog(vList.size(), 2);
         hash_type tmp;
 
-        const auto max_loadf = 0.998f;
+        const auto max_loadf = 0.99f;
         tmp.max_load_factor(max_loadf);
         tmp.reserve(pow2 / 2);
         int minn = (max_loadf - 0.2f) * pow2, maxn = max_loadf * pow2;
@@ -1085,13 +1089,13 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         insert_reserve <hash_type>(hash_name, oList);
         insert_high_load <hash_type>(hash_name, oList);
         const uint32_t l1_size = (64 * 1024)   / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
-        const uint32_t l3_size = (2048 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
+        const uint32_t l3_size = (4096 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
 
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", 100, l1_size);
+        insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", 1000, l1_size+1000);
         insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size, l3_size);
-        insert_no_reserve(hash, hash_name, oList);
-
         find_insert_multi <hash_type>(hash_name, oList);
+
+        insert_no_reserve(hash, hash_name, oList);
         find_hit_all (hash, hash_name, oList);
         find_miss_all(hash, hash_name);
 

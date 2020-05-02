@@ -11,7 +11,7 @@
 #include <utility>
 #include <cstring>
 
-namespace emilib3 {
+namespace emilib2 {
 
 /// like std::equal_to but no need to #include <functional>
 template<typename T>
@@ -23,7 +23,7 @@ struct HashMapEqualTo
 	}
 };
 
-constexpr uint32_t probe_limit = (1 << (sizeof(uint16_t) * 8 - 2)) - 1;
+constexpr uint32_t probe_limit = (1 << (sizeof(uint16_t) * 8) - 2) - 1;
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = HashMapEqualTo<KeyT>>
@@ -538,12 +538,12 @@ public:
 	void clear()
 	{
 		if (!is_triviall_destructable()) {
-			for (size_t bucket=0; _num_filled; ++bucket) {
-				if (is_filled(bucket)) {
-					_pairs[bucket].~PairT();
-					_num_filled --;
-				}
+		for (size_t bucket=0; _num_filled; ++bucket) {
+			if (is_filled(bucket)) {
+				_pairs[bucket].~PairT();
+				_num_filled --;
 			}
+		}
 		}
 
 		_num_filled = 0;
@@ -554,7 +554,7 @@ public:
 	void reserve(size_t num_elems)
 	{
 		size_t required_buckets = num_elems + num_elems / 7 + 2;
-		if (required_buckets < _num_buckets) {
+		if (required_buckets <= _num_buckets) {
 			return;
 		}
 		size_t num_buckets = 4;
@@ -700,8 +700,6 @@ private:
 		FLAG_PROBE flag_probe;
 		void set_probe(uint32_t probe)
 		{
-			//bug here if probe is very big, move new item to near possion and swap out
-			assert(probe < (1 << 15) - 1);
 			flag_probe.probe = probe;
 		}
 
@@ -722,8 +720,8 @@ private:
 	EqT     _eq;
 	State*  _states           = nullptr;
 	PairT*  _pairs            = nullptr;
-	size_t  _num_buckets      =  0;
-	size_t  _num_filled       =  0;
+	size_t  _num_buckets      = 0;
+	size_t  _num_filled       = 0;
 	size_t  _mask             = 0;  // _num_buckets minus one
 };
 

@@ -1171,15 +1171,8 @@ public:
         _last        = 0;
 
 #if EMHASH_SAFE_HASH
-        if (_hash_inter == 0 && old_num_filled > 100) {
-            //adjust hash function if bad hash function, alloc more memory
-            uint32_t mbucket = 0;
-            for (uint32_t src_bucket = 0; src_bucket < old_num_buckets; src_bucket++) {
-                if (ADDR_BUCKET(old_pairs, src_bucket) % 2 == 0)
-                    mbucket ++;
-            }
-            if (mbucket * 2 < old_num_filled) { _hash_inter = old_num_buckets / mbucket; }
-        }
+        if (old_num_filled > 100)
+            _hash_inter = old_num_filled / _num_main / 2;
         _num_main = 0;
 #endif
 
@@ -1523,7 +1516,7 @@ private:
         const auto bmask = *(size_t*)begin >> boset;
         if (EMHASH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
-            if (EMHASH_LIKELY(offset < 256 / sizeof(PairT)) || begin[0] == 0)
+            if (EMHASH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
                 return bucket_from + offset;
 
             //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
@@ -1643,10 +1636,7 @@ private:
 #ifdef EMHASH_FIBONACCI_HASH
         return hash64(key);
 #elif EMHASH_SAFE_HASH
-        if (_hash_inter > 0)
-            return hash64(key);
-
-        return _hasher(key);
+        return _hash_inter == 0 ? _hasher(key) : hash64(key);
 #elif EMHASH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #elif EMHASH_WYHASH64
@@ -1661,7 +1651,7 @@ private:
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.c_str(), key.size(), key.size());
-#elif EMHASH_BKR_HASH
+#elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {
             for (const auto c : key)

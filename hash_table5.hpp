@@ -680,11 +680,11 @@ public:
     bool try_get(const KeyT& key, ValueT& val) const
     {
         const auto bucket = find_filled_bucket(key);
-        const auto find = bucket != _num_buckets;
-        if (find) {
+        const auto found = bucket != _num_buckets;
+        if (found) {
             val = GET_VAL(_pairs, bucket);
         }
-        return find;
+        return found;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
@@ -1259,7 +1259,7 @@ private:
             return bucket;
 #endif
 
-        constexpr auto linear = sizeof(value_type) > EMHASH_CACHE_LINE_SIZE ? 2 : 3;
+        constexpr auto linear = sizeof(value_type) > EMHASH_CACHE_LINE_SIZE ? 3 : 4;
         for (uint32_t step = 2, slot = bucket + 1; ; slot += ++step) {
             const auto bucket1 = slot & _mask;
             if (IS_EMPTY(_pairs, bucket1))
@@ -1270,8 +1270,8 @@ private:
                 return bucket2;
 
             if (step > linear) {
-                if (IS_EMPTY(_pairs, ++_last))
-                    return _last;
+                if (IS_EMPTY(_pairs, ++_last)) return _last;
+                if (IS_EMPTY(_pairs, ++_last)) return _last;
                 _last &= _mask;
             }
         }
@@ -1377,7 +1377,7 @@ private:
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.c_str(), key.size(),0x12345678) & _mask;
-#elif EMHASH_BKR_HASH
+#elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 64) {
             for (const auto c : key)
