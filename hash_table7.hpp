@@ -1,5 +1,5 @@
 // emhash7::HashMap for C++11/14/17
-// version 1.7.4
+// version 1.7.5
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1578,7 +1578,7 @@ private:
         const auto bmask = *(size_t*)(begin) >> boset;
         if (EMHASH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
-            if (EMHASH_LIKELY(offset < 256 / sizeof(PairT)) || begin[0] == 0)
+            if (EMHASH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
                 return bucket_from + offset;
 
             //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
@@ -1625,7 +1625,7 @@ private:
 
     uint32_t find_unique_bucket(const KeyT& key)
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const uint32_t bucket = hash_bucket(key) & _mask;
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if ((int)next_bucket < 0)
             return bucket;

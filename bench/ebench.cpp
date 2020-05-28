@@ -32,7 +32,7 @@
 //#define EMHASH_HIGH_LOAD 201000
 
 #ifndef TKey
-    #define TKey              1
+    #define TKey              0
 #endif
 #ifndef TVal
     #define TVal              1
@@ -596,8 +596,8 @@ void find_insert_multi(const std::string& hash_name, const std::vector<keyType>&
 
 #if KEY_INT
     size_t sum = 0;
-    constexpr auto hash_size = 1024 * 128;
-    std::vector<hash_type> mh(hash_size);
+    constexpr auto hash_size = 65437;
+    auto mh = new hash_type[hash_size];
 
     auto ts1 = getTime();
     for (const auto v : vList) {
@@ -610,8 +610,10 @@ void find_insert_multi(const std::string& hash_name, const std::vector<keyType>&
         sum += mh[hash_id].count(v / hash_size + v % 2);
     }
 
+    int last =(int)mh[0].size();
+    delete []mh;
     check_func_result(hash_name, __FUNCTION__, sum, ts1, 2);
-    printf("    %62s    %s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), mh[0].load_factor());
+    printf("%132s    %8s  %5d ns, size = %3d\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), last);
 #endif
 }
 
@@ -919,7 +921,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 #ifndef KEY_INT
     for (int i = 0; i < size; i++)
-        randdata.emplace_back(get_random_alphanum_string(srng() % 24 + 6));
+        randdata.emplace_back(get_random_alphanum_string(srng() % 64 + 6));
     return 0;
 #else
 
@@ -1129,8 +1131,8 @@ struct StrHasher
 {
   std::size_t operator()(const std::string& str) const
   {
-#ifdef wyhash_version_4
-      return wyhash(str.c_str(), str.size(), 12345677);
+#ifdef WYHASH_LITTLE_ENDIAN
+      return wyhash(str.c_str(), str.size(), 0x1234 + str.size());
 #else
       size_t hash = 0;
       for (const auto c : str)
@@ -1473,9 +1475,9 @@ static void printInfo(char* out)
 
 #if __x86_64__ || __amd64__ || _M_X64 || __amd64 || __x86_64
     info += sprintf(info, " x86-64");
-#elif __i386__ || _M_IX86 || _X86_ || __i386
+#elif __i386__ || _M_IX86 || __i386
     info += sprintf(info, " x86");
-#elif __arm64__
+#elif __arm64__ || __aarch64__
     info += sprintf(info, " arm64");
 #elif __arm__
     info += sprintf(info, " arm");

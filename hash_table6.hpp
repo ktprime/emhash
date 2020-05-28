@@ -1,5 +1,5 @@
 // emhash6::HashMap for C++11/14/17
-// version 1.6.7
+// version 1.6.8
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -90,7 +90,7 @@
     #define GET_VAL(p,n)     p[n].second
     #define NEXT_BUCKET(p,n) p[n].bucket / 2
     #define ADDR_BUCKET(p,n) p[n].bucket
-    #define ISEMPTY_BUCKET(p,n) 0 > (int)p[n].bucket
+    #define ISEMPTY_BUCKET(p,n) (0 > (int)p[n].bucket)
     #define GET_PKV(p,n)     p[n]
     #define NEW_KVALUE(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; EM_SET(bucket)
 #endif
@@ -405,7 +405,6 @@ public:
 
     void init(uint32_t bucket, float load_factor = 0.95f)
     {
-        _num_buckets = 0;
 #if EMHASH_SAFE_HASH
         _num_main = _hash_inter = 0;
 #endif
@@ -424,13 +423,13 @@ public:
 
     HashMap(const HashMap& other)
     {
-        _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + BIT_PACK);
+        _pairs = (PairT*)malloc((3 + other._mask) * sizeof(PairT) + (other._mask + 1) / 8 + BIT_PACK);
         clone(other);
     }
 
     HashMap(HashMap&& other)
     {
-        _num_buckets = _num_filled = 0;
+        _mask = _num_filled = 0;
         _pairs = nullptr;
         swap(other);
     }
@@ -450,9 +449,9 @@ public:
         if (is_triviall_destructable())
             clearkv();
 
-        if (_num_buckets != other._num_buckets) {
+        if (_mask != other._mask) {
             free(_pairs);
-            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + BIT_PACK);
+            _pairs = (PairT*)malloc((3 + other._mask) * sizeof(PairT) + (other._mask + 1) / 8 + BIT_PACK);
         }
 
         clone(other);
@@ -470,8 +469,14 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable())
-            clearkv();
+        if (is_triviall_destructable()) {
+            for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
+                if (!(ISEMPTY_BUCKET(_pairs, bucket))) {
+                    _num_filled--;
+                    _pairs[bucket].~PairT();
+                }
+            }
+        }
         free(_pairs);
     }
 
@@ -479,7 +484,6 @@ public:
     {
         _hasher      = other._hasher;
 //        _eq          = other._eq;
-        _num_buckets = other._num_buckets;
 #if EMHASH_SAFE_HASH
         _num_main    = other._num_main;
         _hash_inter  = other._hash_inter;
@@ -487,15 +491,11 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
-        _last        = other._last;
         _bitmask     = (uint32_t*)((char*)_pairs + ((char*)other._bitmask - (char*)other._pairs));
         auto opairs  = other._pairs;
 
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
-        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value)
-#else
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value)
-#endif
+        auto _num_buckets = _mask + 1;
+        if (is_copy_trivially())
             memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
         else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
@@ -512,7 +512,6 @@ public:
         std::swap(_hasher, other._hasher);
 //      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
-        std::swap(_num_buckets, other._num_buckets);
 #if EMHASH_SAFE_HASH
         std::swap(_num_main, other._num_main);
         std::swap(_hash_inter, other._hash_inter);
@@ -521,7 +520,6 @@ public:
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_bitmask, other._bitmask);
-        std::swap(_last, other._last);
     }
 
     // -------------------------------------------------------------
@@ -529,7 +527,7 @@ public:
     iterator begin()
     {
         if (0 == _num_filled)
-            return {this, _num_buckets};
+            return {this, _mask + 1};
 
         uint32_t bucket = 0;
         while (EM_EMPTY(bucket)) {
@@ -541,7 +539,7 @@ public:
     const_iterator cbegin() const
     {
         if (0 == _num_filled)
-            return {this, _num_buckets};
+            return {this, _mask + 1};
 
         uint32_t bucket = 0;
         while (EM_EMPTY(bucket)) {
@@ -557,17 +555,17 @@ public:
 
     iterator end()
     {
-        return {this, _num_buckets};
+        return {this, _mask + 1};
     }
 
     const_iterator cend() const
     {
-        return {this, _num_buckets};
+        return {this, _mask + 1};
     }
 
     const_iterator end() const
     {
-        return {this, _num_buckets};
+        return {this, _mask + 1};
     }
 
     size_type size() const
@@ -583,7 +581,7 @@ public:
     // Returns the number of buckets.
     size_type bucket_count() const
     {
-        return _num_buckets;
+        return _mask + 1;
     }
 
     /// Returns average number of elements per bucket.
@@ -609,18 +607,18 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.9999f && value > 0.2f)
+        if (value < 0.999f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 
     constexpr size_type max_size() const
     {
-        return (1u << 31) / sizeof(PairT);
+        return (1ull << (sizeof(size_type) * 8 - 2));
     }
 
     constexpr size_type max_bucket_count() const
     {
-        return (1u << 31) / sizeof(PairT);
+        return max_size();
     }
 
 #ifdef EMHASH_STATIS
@@ -715,7 +713,7 @@ public:
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};
-        for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
+        for (uint32_t bucket = 0; bucket <= _mask; ++bucket) {
             auto bsize = get_bucket_info(bucket, steps, 128);
             if (bsize > 0)
                 buckets[bsize] ++;
@@ -776,12 +774,12 @@ public:
 
     bool contains(const KeyT& key) const noexcept
     {
-        return find_filled_bucket(key) != _num_buckets;
+        return find_filled_bucket(key) <= _mask;
     }
 
     size_type count(const KeyT& key) const noexcept
     {
-        return find_filled_bucket(key) != _num_buckets ? 1 : 0;
+        return find_filled_bucket(key) <= _mask ? 1 : 0;
     }
 
     std::pair<iterator, iterator> equal_range(const KeyT& key) const noexcept
@@ -797,7 +795,7 @@ public:
     bool try_get(const KeyT& key, ValueT& val) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        const auto found = bucket != _num_buckets;
+        const auto found = bucket <= _mask;
         if (found) {
             val = GET_VAL(_pairs, bucket);
         }
@@ -808,21 +806,21 @@ public:
     ValueT* try_get(const KeyT& key) noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
+        return bucket > _mask ? nullptr : &GET_VAL(_pairs, bucket);
     }
 
     /// Const version of the above
     ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
+        return bucket > _mask ? nullptr : &GET_VAL(_pairs, bucket);
     }
 
     /// Convenience function.
     ValueT get_or_return_default(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? ValueT() : GET_VAL(_pairs, bucket);
+        return bucket > _mask ? ValueT() : GET_VAL(_pairs, bucket);
     }
 
     // -----------------------------------------------------
@@ -832,25 +830,25 @@ public:
     /// and a bool denoting whether the insertion took place.
     std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(key, value);
     }
 
     std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(std::move(key), std::move(value));
     }
 
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(key, std::move(value));
     }
 
     std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
     {
-        check_expand_need();
+        reserve(_num_filled);
         return do_insert(std::move(key), value);
     }
 
@@ -993,7 +991,8 @@ public:
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
-        return insert(std::forward<Args>(args)...).first;
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...).first;
     }
 
     template<class... Args>
@@ -1003,17 +1002,13 @@ public:
     std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args) { return insert(std::move(k), std::forward<Args>(args)...).first; }
 
     template <class... Args>
-    inline std::pair<iterator, bool> emplace_unique(Args&&... args) { return insert_unique(std::forward<Args>(args)...); }
-
-
-    std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) 
+    inline std::pair<iterator, bool> emplace_unique(Args&&... args)
     {
-        return do_assign(key, std::move(value));
+        return insert_unique(std::forward<Args>(args)...);
     }
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) 
-    { 
-        return do_assign(std::move(key), std::move(value)); 
-    }
+
+    std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) { return do_assign(key, std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
 
     ValueT& operator[](const KeyT& key)
     {
@@ -1089,9 +1084,9 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
+        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1107,11 +1102,11 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable() || !bInCacheLine || _num_filled < _num_buckets / 4)
+        if (is_triviall_destructable() || !bInCacheLine || _num_filled < _mask / 4)
             clearkv();
         else {
-            memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * _num_buckets);
-            memset(_bitmask, 0xFFFFFFFF, _num_buckets / 8);
+            memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * (_mask + 1));
+            memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
         }
         _num_filled = 0;
 #if EMHASH_SAFE_HASH
@@ -1128,7 +1123,7 @@ public:
     bool reserve(uint64_t num_elems)
     {
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-        if (EMHASH_LIKELY(required_buckets < _num_buckets))
+        if (EMHASH_LIKELY(required_buckets <= _mask))
             return false;
 
         rehash(required_buckets + 2);
@@ -1140,12 +1135,18 @@ public:
     {
         if (required_buckets < _num_filled)
             return;
-
-        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 8u;
+#if (__GNUC__ >= 4 || __clang__)
+        uint32_t num_buckets = 1ul << (sizeof(required_buckets) * 8 - __builtin_clz(required_buckets));
+        if (num_buckets < sizeof(uint64_t))
+            num_buckets = sizeof(uint64_t);
+#else
+        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : sizeof(uint64_t);
         while (num_buckets < required_buckets) { num_buckets *= 2; }
+        //assert(num_buckets == (2 << CTZ(required_buckets)));
+#endif
 
         //assert(num_buckets > _num_filled);
-        auto old_num_buckets = _num_buckets;
+        auto old_num_buckets = _mask > 0 ? _mask + 1 : 0;
         auto old_num_filled  = _num_filled;
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_buckets / 8 + BIT_PACK);
 #if 0
@@ -1165,10 +1166,8 @@ public:
         }
 
         _num_filled  = 0;
-        _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
         _pairs       = new_pairs;
-        _last        = 0;
 
 #if EMHASH_SAFE_HASH
         if (old_num_filled > 100)
@@ -1176,11 +1175,13 @@ public:
         _num_main = 0;
 #endif
 
-        if (bInCacheLine)
-            memset((char*)_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * num_buckets);
-        else
-            for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
+        if (bInCacheLine) {
+            memset(_pairs, 0xFFFFFFFF, sizeof(_pairs[0]) * num_buckets);
+        } else {
+            for (uint32_t bucket = 0; bucket < num_buckets; bucket++) {
                 ADDR_BUCKET(_pairs, bucket) = INACTIVE;
+            }
+        }
 
         //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
@@ -1211,7 +1212,7 @@ public:
             uint32_t collision = _num_filled - _num_main;
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/_hash_inter/aver_size/K.V/pack/collision = %u/%u/%.2lf/%s.%s/%zd/%.2lf%%",
-                    _num_filled, _hash_inter, (double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_buckets));
+                    _num_filled, _hash_inter, (double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _mask));
 #if EMHASH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "EMHASH_BUCKET_INDEX = " << EMHASH_BUCKET_INDEX << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
@@ -1240,34 +1241,37 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        _pairs[bucket].~PairT();
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT();
         ADDR_BUCKET(_pairs, bucket) = INACTIVE;
         _num_filled --;
         _bitmask[bucket / MASK_BIT] |= 1 << (bucket % MASK_BIT);
     }
 
-    template<class K = uint32_t> typename std::enable_if <!bInCacheLine, K>::type
+    template<class K = uint32_t> typename std::enable_if <bInCacheLine, K>::type
     erase_key(const KeyT& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
-        if (next_bucket % 2 > 0)
-            return INACTIVE;
 
-        const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
         if (next_bucket == bucket * 2) {
+            const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
+            if (eqkey)
 #if EMHASH_SAFE_HASH
             return eqkey ? (_num_main --, bucket) : INACTIVE;
 #else
             return eqkey ? bucket : INACTIVE;
 #endif
-         } else if (eqkey) {
+        }
+        else if (next_bucket % 2 > 0)
+            return INACTIVE;
+        else if (_eq(key, GET_KEY(_pairs, bucket))) {
             next_bucket /= 2;
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (is_copy_trivially())
-                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
-            else
                 GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+            else
+                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
             ADDR_BUCKET(_pairs, bucket) = next_bucket == nbucket ? bucket * 2 : nbucket * 2;
             return next_bucket;
         }
@@ -1290,20 +1294,25 @@ private:
         return INACTIVE;
     }
 
-    template<class K = uint32_t> typename std::enable_if<bInCacheLine, K>::type
+    template<class K = uint32_t> typename std::enable_if<!bInCacheLine, K>::type
     erase_key(const KeyT& key)
     {
         const auto empty_bucket = INACTIVE;
         const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
-        if (next_bucket % 2 > 0)
-            return empty_bucket;
-        else if (next_bucket == bucket * 2) //only one main bucket
+
+        if (next_bucket == bucket * 2) { //only one main bucket
+            const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
+            if (eqkey) {
 #if EMHASH_SAFE_HASH
-            return _eq(key, GET_KEY(_pairs, bucket)) ? (_num_main --, bucket) : empty_bucket;
-#else
-            return _eq(key, GET_KEY(_pairs, bucket)) ? bucket : empty_bucket;
+                _num_main --;
 #endif
+                return bucket;
+            }
+            return empty_bucket;
+        }
+        else if (next_bucket % 2 > 0)
+            return empty_bucket;
 
         //find erase key and swap to last bucket
         uint32_t prev_bucket = bucket, find_bucket = empty_bucket;
@@ -1370,6 +1379,7 @@ private:
     {
         const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
+        const auto _num_buckets = _mask + 1;
 
         if (next_bucket % 2 > 0)
             return _num_buckets;
@@ -1423,7 +1433,7 @@ private:
 
     uint32_t find_or_allocate(const KeyT& key)
     {
-        auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = ADDR_BUCKET(_pairs, bucket);
 #if EMHASH_SAFE_HASH
         if ((int)next_bucket < 0)
@@ -1540,6 +1550,7 @@ private:
 #endif
 
         for (; ; ) {
+            auto &_last = ADDR_BUCKET(_pairs, _mask + 1);
             const auto bmask = *((size_t*)_bitmask + _last);
             if (bmask != 0)
                 return _last * SIZE_BIT + CTZ(bmask);
@@ -1640,7 +1651,7 @@ private:
 #elif EMHASH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #elif EMHASH_WYHASH64
-        return wyhash64(key, _num_buckets);
+        return wyhash64(key, 11400714819323198485ull);
 #else
         return _hasher(key);
 #endif
@@ -1649,8 +1660,8 @@ private:
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size());
+#if WYHASH_LITTLE_ENDIAN
+        return wyhash(key.c_str(), key.size(), 0x123456789);
 #elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {
@@ -1683,7 +1694,6 @@ private:
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _mask;
-    uint32_t  _num_buckets;
 
     uint32_t  _num_filled;
     uint32_t  _loadlf;
@@ -1692,8 +1702,6 @@ private:
     uint32_t  _num_main;
     uint32_t  _hash_inter;
 #endif
-
-    uint32_t  _last;
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
