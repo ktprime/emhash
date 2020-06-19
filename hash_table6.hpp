@@ -212,8 +212,8 @@ public:
     typedef value_type                        value_pair;
     typedef std::pair<value_type, uint32_t>   PairT;
 #else
-    typedef entry<KeyT, ValueT>             value_pair;
-    typedef entry<KeyT, ValueT>             PairT;
+    typedef entry<KeyT, ValueT>               value_pair;
+    typedef entry<KeyT, ValueT>               PairT;
 #endif
 
     static constexpr bool bInCacheLine = sizeof(value_pair) < (2 * EMHASH_CACHE_LINE_SIZE) / 3;
@@ -295,7 +295,7 @@ public:
             } while (EM_EMPTY(_bucket));
 #else
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMHASH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -384,7 +384,7 @@ public:
 
 #else
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMHASH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -1170,8 +1170,8 @@ public:
         _pairs       = new_pairs;
 
 #if EMHASH_SAFE_HASH
-        if (old_num_filled > 100)
-            _hash_inter = old_num_filled / _num_main / 2;
+        if (old_num_filled > 100 && _hash_inter == 0)
+            _hash_inter = old_num_filled / (_num_main * 3);
         _num_main = 0;
 #endif
 
@@ -1206,7 +1206,7 @@ public:
 #if EMHASH_REHASH_LOG
         if (_num_filled > EMHASH_REHASH_LOG) {
 #ifndef EMHASH_SAFE_HASH
-            auto _num_main = _num_filled/2;
+            auto _num_main = _num_filled / 2;
             auto _hash_inter = 0;
 #endif
             uint32_t collision = _num_filled - _num_main;
@@ -1231,7 +1231,7 @@ private:
     inline bool check_expand_need()
     {
 #if EMHASH_SAFE_HASH > 1
-        if (_num_main * 2 < _num_filled && _num_filled > 100 && _hash_inter == 0) {
+        if (_num_main * 3 < _num_filled && _num_filled > 100) {
             rehash(_num_filled);
             return true;
         }
@@ -1395,11 +1395,11 @@ private:
 
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
-                break;
+                return _num_buckets;
             next_bucket = nbucket;
         }
 
-        return _num_buckets;
+        return 0;
     }
 
     //kick out bucket and find empty to occpuy
@@ -1470,40 +1470,8 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(next_bucket);
+        const auto new_bucket = find_empty_bucket(bucket);
         return ADDR_BUCKET(_pairs, next_bucket) = new_bucket * 2 + 1;
-    }
-
-    uint32_t find_cacheline_bucket(const uint32_t bucket_from) const
-    {
-        //try find a near in the same cache line
-        auto empty_bucket = 0;
-        for (int i = 6; i > 2; i--) {
-#if 1
-            const auto near_bucket = (bucket_from + i) & _mask;
-            const auto next_bucket = ADDR_BUCKET(_pairs, near_bucket);
-            if (next_bucket % 2 == 0)
-                continue;
-
-            //assert(ADDR_BUCKET(_pairs, near_bucket) != INACTIVE);
-            const auto main_bucket = hash_bucket(GET_KEY(_pairs, near_bucket)) & _mask;
-            if (main_bucket + 10 > near_bucket)
-                continue;
-
-            const auto prev_bucket = find_prev_bucket(main_bucket, near_bucket);
-            ADDR_BUCKET(_pairs, prev_bucket) += (empty_bucket - near_bucket) * 2;
-            new(_pairs + empty_bucket) PairT(std::move(_pairs[near_bucket])); _pairs[near_bucket].~PairT();
-            if (next_bucket / 2 == near_bucket)
-                ADDR_BUCKET(_pairs, empty_bucket) = empty_bucket * 2 + 1;
-            EM_SET(empty_bucket);
-
-            empty_bucket = near_bucket;
-            ADDR_BUCKET(_pairs, near_bucket) = INACTIVE;
-            break;
-#endif
-        }
-
-        return empty_bucket;
     }
 
     // key is not in this map. Find a place to put it.
@@ -1534,10 +1502,9 @@ private:
             return bucket_from - boset + CTZ(begin[0]);
         }
 
-#if 0
-        const auto qmask = (64 + _num_buckets - 1) / 64 - 1;
-        for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + ++last) & qmask) {
-        //for (uint32_t last = 3, step = (bucket_from + _num_filled) & qmask; ;step = (step + last) & qmask) {
+        {
+            const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
+            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask; 
             const auto bmask2 = *((size_t*)_bitmask + step);
             if (bmask2 != 0)
                 return step * SIZE_BIT + CTZ(bmask2);
@@ -1545,9 +1512,8 @@ private:
             const auto next1 = step + 1;
             const auto bmask1 = *((size_t*)_bitmask + next1);
             if (bmask1 != 0)
-                return next1 * SIZE_BIT + CTZ(bmask1);
+               return next1 * SIZE_BIT + CTZ(bmask1);
         }
-#endif
 
         for (; ; ) {
             auto &_last = ADDR_BUCKET(_pairs, _mask + 1);
@@ -1661,7 +1627,9 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), 0x123456789);
+        return wyhash(key.c_str(), key.size(), 11400714819323198485ull);
+#elif EMHASH_SAFE_HASH
+        return _hash_inter == 0 ?  _hasher(key) : wyhash(key.c_str(), key.size(), 0x123456789);
 #elif EMHASH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {
@@ -1694,7 +1662,6 @@ private:
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _mask;
-
     uint32_t  _num_filled;
     uint32_t  _loadlf;
 

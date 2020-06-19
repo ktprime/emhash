@@ -1,5 +1,5 @@
 // emhash5::HashMap for C++11
-// version 1.5.5
+// version 1.5.6
 // https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -260,7 +260,7 @@ public:
 
     public:
         htype* _map;
-        uint32_t  _bucket;
+        uint32_t _bucket;
     };
 
     class const_iterator
@@ -318,7 +318,7 @@ public:
 
     public:
         const htype* _map;
-        uint32_t  _bucket;
+        uint32_t _bucket;
     };
 
     void init(uint32_t bucket, float lf = 0.95f)
@@ -1177,7 +1177,7 @@ private:
 
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
-                break;
+                return _num_buckets;
             next_bucket = nbucket;
         }
 
@@ -1256,27 +1256,57 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-       auto bucket = bucket_from;
-       if (NEXT_BUCKET(_pairs, ++bucket) == INACTIVE)
+        auto bucket = bucket_from;
+        if (IS_EMPTY(_pairs, ++bucket))
             return bucket;
-
+#if EMFS
         for (uint32_t last = 2, mask = _num_buckets - 1, step = bucket + 1; ; step += ++last) {
             const auto next = step & mask;
             const auto bucket1 = next + 0;
-            if (INACTIVE == NEXT_BUCKET(_pairs, bucket1))
+            if (IS_EMPTY(_pairs, bucket1))
                 return bucket1;
 
             const auto bucket2 = next + 1;
-            if (INACTIVE == NEXT_BUCKET(_pairs, bucket2))
+            if (IS_EMPTY(_pairs, bucket2))
                 return bucket2;
 
-            if (last > 3) {
+            if (last > 5) {
                 auto& _last = NEXT_BUCKET(_pairs, _num_buckets);
-                if (INACTIVE == NEXT_BUCKET(_pairs, ++_last))
-                    return _last;
+                if (IS_EMPTY(_pairs, ++_last)) return _last;
+                if (IS_EMPTY(_pairs, ++_last)) return _last;
                 _last &= mask;
             }
         }
+#else
+        constexpr auto max_probe_length = (unsigned int)(128 / sizeof(PairT)) + 1;//cpu cache line 64 byte,2-3 cache line miss
+        auto offset = 1u, _mask = _num_buckets - 1;
+        for (; offset < max_probe_length; offset += 2) {
+            const auto bucket1 = (bucket + offset) & _mask;
+            if (IS_EMPTY(_pairs, bucket1))
+                return bucket1;
+
+            const auto bucket2 = bucket1 + 1;
+            if (IS_EMPTY(_pairs, bucket2))
+                return bucket2;
+        }
+
+        for (auto next = offset; ; next += ++offset) {
+            const auto bucket3 = (bucket_from + next) & _mask;
+            if (IS_EMPTY(_pairs, bucket3))
+                return bucket3;
+
+            const auto bucket4 = (bucket3 + 1);
+            if (IS_EMPTY(_pairs, bucket4))
+                return bucket4;
+
+            if (offset > 8) {
+                auto& _last = NEXT_BUCKET(_pairs, _num_buckets);
+                if (IS_EMPTY(_pairs, ++_last)) return _last;
+                if (IS_EMPTY(_pairs, ++_last)) return _last;
+                _last &= _mask;
+            }
+        }
+#endif
 
         return 0;
     }
@@ -1330,7 +1360,7 @@ private:
     //the first cache line packed
     inline uint32_t hash_bucket(const KeyT& key) const
     {
-        return hash_key(key) & (_num_buckets - 1);
+        return (uint32_t)hash_key(key) & (_num_buckets - 1);
     }
 
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
@@ -1371,7 +1401,7 @@ private:
 #elif EMHASH_IDENTITY_HASH
         return (key + (key >> (sizeof(UType) * 4)));
 #else
-        return _hasher(key);
+        return (uint32_t)_hasher(key);
 #endif
     }
 
