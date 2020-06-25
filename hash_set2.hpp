@@ -54,7 +54,7 @@
     #if __has_include("wyhash.h")
     #include "wyhash.h"
     #endif
-#elif EMHASH_WY_HASH
+#elif EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -64,11 +64,11 @@
 
 // likely/unlikely
 #if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
-#    define EMHASH_LIKELY(condition) __builtin_expect(condition, 1)
-#    define EMHASH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#    define EMH_LIKELY(condition) __builtin_expect(condition, 1)
+#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
-#    define EMHASH_LIKELY(condition) condition
-#    define EMHASH_UNLIKELY(condition) condition
+#    define EMH_LIKELY(condition) condition
+#    define EMH_UNLIKELY(condition) condition
 #endif
 
 #define NEW_KEY(key, bucket) new(_pairs + bucket) PairT(key, bucket), _num_filled ++
@@ -418,7 +418,7 @@ public:
         return bucket_size;
     }
 
-#ifdef EMHASH_STATIS
+#ifdef EMH_STATIS
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
@@ -691,7 +691,7 @@ public:
     {
         _pairs[bucket].~PairT(); _num_filled --; _pairs[bucket].second = INACTIVE;
 
-#if EMHASH_HIGH_LOAD
+#if EMH_HIGH_LOAD
         if (bucket <= _last_colls)
             return;
         else if (bucket <= _mask) {
@@ -782,7 +782,7 @@ public:
     bool reserve(uint64_t num_elems)
     {
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-        if (EMHASH_LIKELY(required_buckets < _num_buckets))
+        if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
         rehash(required_buckets + 2);
@@ -799,7 +799,7 @@ private:
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         _mask        = num_buckets - 1;
-#if EMHASH_HIGH_LOAD
+#if EMH_HIGH_LOAD
         num_buckets += num_buckets / 5;
 #endif
 
@@ -835,14 +835,14 @@ private:
                 opairs.~PairT();
         }
 
-#if EMHASH_REHASH_LOG
-        if (_num_filled > EMHASH_REHASH_LOG) {
+#if EMH_REHASH_LOG
+        if (_num_filled > EMH_REHASH_LOG) {
             const auto mbucket = bucket_main();
             const auto collision = _num_filled - mbucket;
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/type/sizeof/collision/load_factor = %u/%.2lf/%s/%zd/%2.lf%%|%.2f",
             _num_filled, (double)_num_filled / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_filled), load_factor());
-#if EMHASH_TAF_LOG
+#if EMH_TAF_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
@@ -880,7 +880,7 @@ private:
                 std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
             _pairs[bucket].second = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
-        }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(_pairs[bucket].first)))
+        }/* else if (EMH_UNLIKELY(bucket != hash_bucket(_pairs[bucket].first)))
             return INACTIVE;
 **/
         auto prev_bucket = bucket;
@@ -995,7 +995,7 @@ private:
         //find next linked bucket and check key
         while (true) {
             if (_eq(key, _pairs[next_bucket].first)) {
-#if EMHASH_LRU_SET
+#if EMH_LRU_SET
                 std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
                 return bucket;
 #else
@@ -1021,7 +1021,7 @@ private:
         if (_pairs[bucket1].second == INACTIVE)
             return bucket1;
 
-#if EMHASH_HIGH_LOAD
+#if EMH_HIGH_LOAD
         const auto bucket2 = bucket_from + 2;
         if (_pairs[bucket2].second == INACTIVE)
             return bucket2;
@@ -1129,9 +1129,9 @@ private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType key) const
     {
-#ifdef EMHASH_FIBONACCI_HASH
+#ifdef EMH_FIBONACCI_HASH
         return hash64(key) & _mask;
-#elif EMHASH_IDENTITY_HASH
+#elif EMH_IDENTITY_HASH
         return (key + (key >> (sizeof(UType) * 4))) & _mask;
 #else
         return _hasher(key) & _mask;
@@ -1143,7 +1143,7 @@ private:
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.c_str(), key.size(), key.size()) & _mask;
-#elif EMHASH_BDKR_HASH
+#elif EMH_BDKR_HASH
         uint32_t hash = 0;
         if (key.size() < 256) {
             for (const auto c : key)
@@ -1161,7 +1161,7 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef EMHASH_FIBONACCI_HASH
+#ifdef EMH_FIBONACCI_HASH
         return (_hasher(key) * 11400714819323198485ull) & _mask;
 #else
         return _hasher(key) & _mask;

@@ -3,9 +3,9 @@
 #include <set>
 #include <unordered_map>
 
-//#define EMHASH_REHASH_LOG 123457
-//#define EMHASH_LRU_TIME      10
-//#define EMHASH_SAFE_REMOVE   1
+//#define EMH__REHASH_LOG 123457
+//#define EMH__LRU_TIME      10
+//#define EMH__SAFE_REMOVE   1
 
 #include "lru_size.h"
 #include "lru_map.h"

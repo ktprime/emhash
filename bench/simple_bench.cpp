@@ -4,12 +4,12 @@
 #include <random>
 #include <iostream>
 
-//#define EMHASH_HIGH_LOAD 201000
-//#define EMHASH_FIBONACCI_HASH  1
+//#define EMH__HIGH_LOAD 201000
+//#define EMH__FIBONACCI_HASH  1
 
 #include "sfc64.h"
 
-#define EMHASH_HIGH_LOAD 201000
+#define EMH__HIGH_LOAD 201000
 
 #include "tsl/robin_map.h"
 #include "ska/flat_hash_map.hpp"

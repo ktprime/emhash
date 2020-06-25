@@ -17,9 +17,9 @@
 
 using namespace std;
 
-//#define EMHASH_STATIS 1
+//#define EMH__STATIS 1
 #define HOOD_HASH     1
-#define EMHASH_HIGH_LOAD 123456
+#define EMH__HIGH_LOAD 123456
 
 #include "hash_table2.hpp"
 #include "hash_table3.hpp"

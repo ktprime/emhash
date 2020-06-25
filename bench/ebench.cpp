@@ -19,57 +19,45 @@
     #endif
 #endif
 
+#ifndef TKey
+    #define TKey              1
+#endif
+#ifndef TVal
+    #define TVal              1
+#endif
+
 static void printInfo(char* out);
 
 #define ET                     1
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 #define PHMAP_HAVE_SSSE3       1
 #endif
-
 //#define HOOD_HASH              1
-//#define EMHASH_WY_HASH         1
+//#define EMH_WY_HASH         1
 //#define FL1                    1
-//#define EMHASH_BUCKET_INDEX    0
+//#define EMH_BUCKET_INDEX    0
 
-//#define EMHASH_REHASH_LOG  10345
-//#define EMHASH_AVX_MEMCPY     1
-//#define EMHASH_STATIS         1
+//#define EMH_REHASH_LOG  10345
+//#define EMH_AVX_MEMCPY     1
+//#define EMH_STATIS         1
 
-//#define EMHASH_FIBONACCI_HASH  1
-//#define EMHASH_SAFE_HASH        1
-//#define EMHASH_IDENTITY_HASH   1
+//#define EMH_FIBONACCI_HASH  1
+//#define EMH_SAFE_ITER         1
+//#define EMH_SAFE_HASH        1
+//#define EMH_IDENTITY_HASH   1
 
-//#define EMHASH_LRU_SET          1
-//#define EMHASH_STD_STRING     1
-//#define EMHASH_ERASE_SMALL    1
-//#define EMHASH_HIGH_LOAD        201000
+//#define EMH_LRU_SET          1
+//#define EMH_STD_STRING     1
+//#define EMH_ERASE_SMALL    1
+//#define EMH_HIGH_LOAD        201000
 
-#ifndef TKey
-    #define TKey              4
-#endif
-#ifndef TVal
-    #define TVal              0
-#endif
-
-//#include "hash_table572.hpp"
-#include "ktprime_hash.hpp"
 //
-#include "hash_table52.hpp"
-//#include "hash_table532.hpp"
-//#include "hash_table56_.hpp"
-
-//#include "hash_table53.hpp"
-#include "hash_table553.hpp"
-//#include "hash_table60.hpp"
-
-//#include "hash_table554.hpp"
-#include "hash_table62.hpp"
-//#include "hash_table54.hpp"
-#include "hash_table555.hpp"
-
-#include "hash_table56.hpp"
-#include "hash_table57.hpp"
-//#include "hash_table59.hpp"
+#include "hash_table2.hpp"
+#include "hash_table3.hpp"
+#include "hash_table4.hpp"
+#include "hash_table5.hpp"
+#include "hash_table6.hpp"
+#include "hash_table7.hpp"
 
 
 
@@ -110,16 +98,15 @@ static void printInfo(char* out);
 #if ET
     #define  _CPP11_HASH    1
 
+    #include "hash_table232.hpp"
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
     #include "hash_table234.hpp"
-    #include "hash_table232.hpp"
     #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 #endif
     #include "lru_size2.h"
     #include "lru_time.h"
-
     #include "phmap/btree.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 #if ET > 1
     #include "tsl/robin_map.h"        //https://github.com/tessil/robin-map
@@ -169,7 +156,7 @@ struct StructValue
     int  iRank;
 
 #if PACK >= 24
-    //char data[(PACK - 24) / 8 * 8];
+    char data[(PACK - 24) / 8 * 8];
 #endif
 
 #if COMP
@@ -183,7 +170,7 @@ struct StuHasher
 {
     std::size_t operator()(const StructValue& v) const
     {
-        return v.lScore;
+        return v.lScore * 11400714819323198485ull;
     }
 };
 
@@ -217,7 +204,7 @@ struct StrHasher
     typedef std::string keyType;
     #define TO_KEY(i)   std::to_string(i)
     #define sKeyType    "string"
-#elif TKey == 4
+#elif TKey == 3
     #define KEY_SUC    1
     typedef StructValue keyType;
     #define TO_KEY(i)   StructValue((int64_t)i)
@@ -262,13 +249,12 @@ emhash2::HashMap<std::string, std::string> show_name =
 //    {"stl_map", "stl_map"},
     {"btree", "btree_map"},
 
-//    {"emhash2", "emhash2"},
+    {"emhash2", "emhash2"},
     {"emhash3",  "emhash3"},
-//    {"emhash4", "emhash4"},
-
+    {"emhash4", "emhash4"},
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
-//    {"emhash7", "emhash7"},
+    {"emhash7", "emhash7"},
 
 //    {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
@@ -279,7 +265,7 @@ emhash2::HashMap<std::string, std::string> show_name =
 //    {"ktprime", "ktprime"},
 
 
-#if 1
+#if ET
     {"martin", "martin_flat"},
     {"phmap", "phmap_flat"},
     {"hrdset",   "hrdset"},
@@ -459,8 +445,8 @@ static void check_func_result(const std::string& hash_name, const std::string& f
 {
     if (check_result.find(func) == check_result.end()) {
         check_result[func] = sum;
-    } else if (sum != check_result[func] && true) {
-        printf("%s %s %zd != %zd\n", hash_name.c_str(), func.c_str(), sum, check_result[func]);
+    } else if (sum != check_result[func]) {
+        printf("%s %s %zd != %zd (o)\n", hash_name.c_str(), func.c_str(), sum, check_result[func]);
     }
 
     auto& showname = show_name[hash_name];
@@ -623,7 +609,7 @@ void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<
         for (const auto& v : vList) {
             ahash[v] = TO_VAL(0);
 #if TVal < 2
-            sum += ahash[v];
+            sum += ahash.count(v);
 #else
             sum += TO_SUM(ahash[v]);
 #endif
@@ -767,7 +753,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         int i = 0;
 
         for (; i < minn; i++) {
-            if (i < vList.size())
+            if (i < (int)vList.size())
                 tmp.emplace(vList[i], TO_VAL(0));
             else {
                 auto& v = vList[i - vList.size()];
@@ -800,7 +786,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     }
 }
 
-static uint8_t l1_cache[32 * 1024];
+//static uint8_t l1_cache[32 * 1024];
 template<class hash_type>
 void find_miss_all(hash_type& ahash, const std::string& hash_name)
 {
@@ -878,9 +864,16 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
 {
     if (show_name.count(hash_name) != 0)
     {
+        auto tmp = ahash;
         auto ts1 = getTime(); size_t sum = 0;
         for (const auto& v : vList)
             sum += ahash.erase(v);
+
+        for (auto it = tmp.begin(); it != tmp.end(); ) {
+            it = tmp.erase(it);
+            sum += 1;
+        }
+
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
         //printf("    %12s  %8s  %5d ns, factor = %.3f\n", __FUNCTION__, hash_name.c_str(), AVE_TIME(ts1, vList.size()), ahash.load_factor());
     }
@@ -926,11 +919,18 @@ static const std::array<char, 62> ALPHANUMERIC_CHARS = {
 
 std::uniform_int_distribution<std::size_t> rd_uniform(0, ALPHANUMERIC_CHARS.size() - 1);
 
-#ifndef KEY_INT
+#ifdef KEY_STR
 static std::mt19937_64 generator(time(0));
 static std::string get_random_alphanum_string(std::size_t size) {
     std::string str(size, '\0');
-    for(std::size_t i = 0; i < size; i++) {
+
+//    assert(size < 4096);
+    const auto comm_head = size % 4;
+    //test common head
+    for(std::size_t i = 0; i < comm_head; i++) {
+        str[i] = ALPHANUMERIC_CHARS[i];
+    }
+    for(std::size_t i = comm_head; i < size; i++) {
         str[i] = ALPHANUMERIC_CHARS[rd_uniform(generator)];
     }
 
@@ -999,7 +999,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     else
     {
         flag = srng() % 5 + 1;
-        const int pow2 = 2 << ilog(size, 2);
+        const auto pow2 = 2u << ilog(size, 2);
         auto k = srng();
         for (int i = 1; i <= size; i ++) {
             k ++;
@@ -1028,8 +1028,8 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 static int TestHashMap(int n, int max_loops = 1234567)
 {
 #ifndef KEY_SUC
-    emhash5::HashMap <keyType, int> ehash2;
-    emhash7::HashMap <keyType, int> ehash5;
+    emhash5::HashMap <keyType, int> ehash5;
+    emhash3::HashMap <keyType, int> ehash2;
 
     sfc64 srng(n);
 #if 1
@@ -1132,11 +1132,13 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
 
     float load_factor = 0;
 
+    if (tcase == 0)
+        printf("bench %s:%zd\n", hash_name.data(), sizeof(hash_type));
     //pack for small packet
     //for (int i = 0; i < max_loop; i += (int)oList.size())
     {
         hash_type hash;
-        load_factor = 50 + oList.size() % 49;
+//        load_factor = 50 + oList.size() % 49;
 //        hash.max_load_factor(load_factor / 100.0);
         hash.clear();
 
@@ -1156,7 +1158,7 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         auto vList = oList;
         for (size_t v = 0; v < vList.size() / 2; v ++)
 #if KEY_INT
-            vList[v] += v * v;
+            vList[v] += v * v + v;
 #elif KEY_SUC
             vList[v].lScore += v * v;
 #else
@@ -1167,10 +1169,10 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
         erase_half(hash, hash_name, vList);
         erase_find_half(hash, hash_name, vList);
         erase_reinsert(hash, hash_name, vList);
-
         insert_find_erase(hash, hash_name, vList);
+
 #ifndef SMAP
-        load_factor = (int)(hash.load_factor() * 100);
+        load_factor = hash.load_factor() * 100.0;
 #endif
         hash_iter(hash, hash_name);
 
@@ -1182,7 +1184,6 @@ int benOneHash(hash_type& tmp, const std::string& hash_name, const std::vector<k
 
     return load_factor;
 }
-
 
 constexpr auto base1 = 300000000;
 constexpr auto base2 =      20000;
@@ -1258,7 +1259,6 @@ static void printResult(int vsize)
 
 #if _WIN32
     Sleep(1000*2);
-    //        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 #else
     usleep(1000*2000);
 #endif
@@ -1275,7 +1275,7 @@ static int benchHashMap(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if KEY_STR == 2 && EMHASH_WY_HASH
+#if KEY_STR == 2 && EMH_WY_HASH
    using ehash_func = StrHasher;
 #elif KEY_SUC
    using ehash_func = StuHasher;
@@ -1296,8 +1296,8 @@ static int benchHashMap(int n)
            sum += v.size();
 #endif
        loop_vector_time = getTime() - ts;
-       printf("%s n = %d, keyType = %s, valueType = %s(%zd), loop = %ld ns:%d\n",
-               __FUNCTION__, n, sKeyType, sValueType, sizeof(valueType), loop_vector_time * 1000 / vList.size(), (int)sum);
+       printf("%s n = %d, keyType = %s, valueType = %s(%zd), loop = %d ns:%d\n",
+               __FUNCTION__, n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time * 1000 / vList.size()), (int)sum);
    }
 
    {
@@ -1319,10 +1319,11 @@ static int benchHashMap(int n)
 
 #ifdef SMAP
        { std::map<keyType, valueType> smap;       benOneHash(smap, "stl_map", vList); }
-       { phmap::btree_map<keyType, valueType> bmap;   benOneHash( bmap, "btree", vList); }
+#if ET
+        { phmap::btree_map<keyType, valueType> bmap;   benOneHash( bmap, "btree", vList); }
 #endif
-
-//       { std::unordered_map<keyType, valueType, ehash_func> unhash;        benOneHash(unhash, "stl_hash", vList); }
+#endif
+       { std::unordered_map<keyType, valueType, ehash_func> unhash;        benOneHash(unhash, "stl_hash", vList); }
 #if ET
        //        { emilib3::HashMap <keyType, valueType, ehash_func> ehash;          benOneHash(ehash, "emilib3", vList); }
        //        { emilib4::HashMap <keyType, valueType, ehash_func> ehash;         benOneHash(ehash, "emilib4", vList); }
@@ -1334,12 +1335,12 @@ static int benchHashMap(int n)
        //        { emlru_time::lru_cache <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "lru_time", vList); }
 #endif
 
-       //        { emhash2::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash2", vList); }
-//       { emhash3::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash3", vList); }
-//       { emhash4::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash4", vList); }
-//       { emhash5::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash5", vList); }
+       { emhash2::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash2", vList); }
+       { emhash3::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash3", vList); }
+       { emhash4::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash4", vList); }
+       { emhash5::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash5", vList); }
        { emhash6::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash6", vList); }
-//       { emhash7::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash7", vList); }
+       { emhash7::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "emhash7", vList); }
        //        { emilib1::HashMap <keyType, valueType, ehash_func> ehash;  benOneHash(ehash, "ktprime", vList); }
    }
 
@@ -1547,7 +1548,6 @@ static void printInfo(char* out)
 #endif
 
     info += sprintf(info, ", cpu = ");
-    int regs[4] = {0};
     char vendor[0x40] = {0};
     int (*pTmp)[4] = (int(*)[4])vendor;
     cpuidInfo(*pTmp ++, 0x80000002, 0);
@@ -1609,23 +1609,26 @@ int main(int argc, char* argv[])
                     show_name.erase("robin");
                 else if (c == 's')
                     show_name.erase("flat");
-                else if (c == 'u')
-                    show_name.insert("stl_hash", "unordered_map");
                 else if (c == 'e')
                     show_name.insert("emilib2", "emilib2");
-                else if (c == 'l')
+                else if (c == 'l') {
                     show_name.insert("lru_size", "lru_size");
-                else if (c == 'l')
                     show_name.insert("lru_time", "lru_time");
+                }
                 else if (c == 'k')
                     show_name.insert("ktprime", "ktprime");
+               else if (c == 'b') {
+                    show_name.insert("btree", "btree_map");
+                    show_name.insert("smap", "stl_map");
+                } else if (c == 'u')
+                    show_name.insert("stl_hash", "unordered_map");
             }
         }
     }
 
 #ifndef KEY_SUC
     if (tn > 100000)
-        TestHashMap(tn, 434567);
+        TestHashMap(tn);
 #endif
 
 #ifdef TREAD
@@ -1638,13 +1641,16 @@ int main(int argc, char* argv[])
 #if RD
     sfc64 srng(RD);
 #else
-    sfc64 srng(time(0));
+    sfc64 srng(time(0) + rand());
 #endif
+    for (auto& m : show_name) {
+        printf("  %s\n", m.first.data());
+    }
 
     while (true) {
         int n = (srng() % maxn) + minn;
         if (auto_set) {
-            printf(">> "); scanf("%d", &n);
+            printf(">> "); scanf("%u", &n);
             if (n <= 0)
                 auto_set = false;
         }

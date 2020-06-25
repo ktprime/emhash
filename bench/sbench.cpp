@@ -15,13 +15,13 @@
 
 //#define HOOD_HASH         1
 //#define ET         1
-//#define EMHASH_LRU_SET    1
-//#define EMHASH_IDENTITY_HASH 1
-//#define EMHASH_REHASH_LOG   1234567
-//#define EMHASH_SAFE_HASH      1
-//#define EMHASH_STATIS    1
-//#define EMHASH_HIGH_LOAD 1
-//#define EMHASH_FIBONACCI_HASH 1
+//#define EMH__LRU_SET    1
+//#define EMH__IDENTITY_HASH 1
+//#define EMH__REHASH_LOG   1234567
+//#define EMH__SAFE_HASH      1
+//#define EMH__STATIS    1
+//#define EMH__HIGH_LOAD 1
+//#define EMH__FIBONACCI_HASH 1
 
 #ifndef TKey
     #define TKey  1

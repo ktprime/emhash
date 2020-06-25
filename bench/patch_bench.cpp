@@ -43,12 +43,12 @@ using value_type = uint64_t;
 #ifdef KHASH
 #include "khash.h"
 #endif
-#if EMHASH == 6
+#if EMH_ == 6
 #include "hash_table56.hpp"
-#elif EMHASH == 7
-#define EMHASH_HIGH_LOAD  100000
+#elif EMH_ == 7
+#define EMH__HIGH_LOAD  100000
 #include "hash_table57.hpp"
-#elif EMHASH == 5
+#elif EMH_ == 5
 #include "hash_table55.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
@@ -290,11 +290,11 @@ int main(int argc, char** argv)
   int ret, is_missing;
   khiter_t k;
 
-#elif EMHASH == 6
+#elif EMH_ == 6
    emhash6::HashMap<uint32_t,value_type> test;
-#elif EMHASH == 7
+#elif EMH_ == 7
    emhash7::HashMap<uint32_t,value_type> test;
-#elif EMHASH == 5
+#elif EMH_ == 5
    emhash5::HashMap<uint32_t,value_type> test;
 #elif TSL
    tsl::robin_map<uint32_t,value_type> test;

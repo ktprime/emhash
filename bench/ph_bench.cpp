@@ -2,15 +2,15 @@
 #include "wyhash.h"
 //#define THR 1
 
-#if EMHASH == 7
+#if EMH_ == 7
     #include "hash_table7.hpp"
     #define MAPNAME emhash7::HashMap
     #define EXTRAARGS
-#elif EMHASH == 2
+#elif EMH_ == 2
     #include "hash_table2.hpp"
     #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
-#elif EMHASH == 5
+#elif EMH_ == 5
     #include "hash_table5.hpp"
     #define MAPNAME emhash5::HashMap
     #define EXTRAARGS
