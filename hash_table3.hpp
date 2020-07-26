@@ -59,7 +59,7 @@
     #undef  EMH_VAL
     #undef  EMH_BUCKET
     #undef  EMH_PKV
-    #undef  EMH_NEWKV
+    #undef  EMH_NEW
 #endif
 
 // likely/unlikely
@@ -83,19 +83,19 @@
     #define EMH_VAL(p,n)     p[n].second.second
     #define EMH_BUCKET(p,n) p[n].first
     #define EMH_PKV(p,n)     p[n].second
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(bucket, std::pair<KeyT, ValueT>(key, value)); _num_filled ++
 #elif EMH_BUCKET_INDEX == 2
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
     #define EMH_BUCKET(p,n) p[n].second
     #define EMH_PKV(p,n)     p[n].first
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(std::pair<KeyT, ValueT>(key, value), bucket); _num_filled ++
 #else
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n) p[n].bucket
     #define EMH_PKV(p,n)     p[n]
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
 #endif
 
 namespace emhash3 {
@@ -736,7 +736,7 @@ public:
         const auto bucket = find_or_allocate(key);
         const auto find = EMH_BUCKET(_pairs, bucket) == INACTIVE;
         if (find) {
-            EMH_NEWKV(key, value, bucket);
+            EMH_NEW(key, value, bucket);
         }
         return { {this, bucket}, find };
     }
@@ -748,7 +748,7 @@ public:
         const auto bucket = find_or_allocate(key);
         const auto find = EMH_BUCKET(_pairs, bucket) == INACTIVE;
         if (find) {
-            EMH_NEWKV(std::move(key), std::move(value), bucket);
+            EMH_NEW(std::move(key), std::move(value), bucket);
         }
         return { {this, bucket}, find };
     }
@@ -812,7 +812,7 @@ public:
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
-        EMH_NEWKV(key, value, bucket);
+        EMH_NEW(key, value, bucket);
         return bucket;
     }
 
@@ -820,7 +820,7 @@ public:
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
-        EMH_NEWKV(std::move(key), std::move(value), bucket);
+        EMH_NEW(std::move(key), std::move(value), bucket);
         return bucket;
     }
 
@@ -866,14 +866,12 @@ public:
         if (next_bucket != INACTIVE)
             return INACTIVE;
 
-        EMH_NEWKV(key, value, bucket);
+        EMH_NEW(key, value, bucket);
         return bucket;
     }
 
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value)
-    {
-        return insert(std::forward<KeyT>(key), std::forward<ValueT>(value));
-    }
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return insert(key, std::forward<ValueT>(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return insert(std::move(key), std::forward<ValueT>(value)); }
 
     /// Return the old value or ValueT() if it didn't exist.
     ValueT set_get(const KeyT& key, const ValueT& value)
@@ -883,7 +881,7 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (EMH_BUCKET(_pairs, bucket) == INACTIVE) {
-            EMH_NEWKV(key, value, bucket);
+            EMH_NEW(key, value, bucket);
             return ValueT();
         } else {
             ValueT old_value(value);
@@ -901,7 +899,7 @@ public:
             if (EMH_UNLIKELY(check_expand_need()))
                 bucket = find_unique_bucket(key);
 
-            EMH_NEWKV(key, std::move(ValueT()), bucket);
+            EMH_NEW(key, std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);
@@ -915,7 +913,7 @@ public:
             if (EMH_UNLIKELY(check_expand_need()))
                 bucket = find_unique_bucket(key);
 
-            EMH_NEWKV(std::move(key), std::move(ValueT()), bucket);
+            EMH_NEW(std::move(key), std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);

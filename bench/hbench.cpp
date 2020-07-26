@@ -1,11 +1,15 @@
-#include "hrd/hash_set.h"
+#include "hrd/hash_set7.h"
 #include "martin/robin_hood.h"
 #include "tsl/robin_map.h"
-
-#include "hash_table2.hpp"
-#include "hash_table6.hpp"
-#include "hash_emilib.hpp"
+#include "ska/flat_hash_map.hpp"
+#include "ska/bytell_hash_map.hpp"
 #include "phmap/phmap.h"
+#include "emilib/hash_emilib3.hpp"
+
+#include "hash_table6.hpp"
+#include "hash_table7.hpp"
+#include "hash_table5.hpp"
+#include "hash_table2.hpp"
 
 #include <random>
 #include <iostream>
@@ -43,7 +47,7 @@ public:
 
         //milliseconds
         double msec = double((end.tv_sec - _start.tv_sec) * 1000ULL) + double(end.tv_nsec - _start.tv_nsec)*0.000001;
-        
+
         printf("%12s: %u\n", _msg, (unsigned)msec);
     }
 private:
@@ -52,20 +56,37 @@ private:
 };
 #endif //_WIN32
 
-typedef uint64_t Key;
 //typedef std::string Value;
-typedef uint64_t Value;
+#if TVal == 0
+using Value = uint32_t;
+#elif TVal == 1
+using Value = uint64_t;
+#else
+using Value = std::string;
+#endif
 
-const uint64_t MAX_ELEMENTS = 5000000;
-uint64_t* ELEMENTS;
+static const uint64_t MAX_ELEMENTS = 300'0000;
+static const uint32_t LOOPS = 30;
+static uint64_t* ELEMENTS;
 
 
-static HRD_ALWAYS_INLINE uint64_t make_value(uint64_t v, const Value*) {
-    return v;
+static inline Value make_value(uint64_t v, const Value*) {
+#if TVal < 2
+    return (Value)v;
+#else
+    return "0";
+#endif
 }
 
-static HRD_ALWAYS_INLINE std::string make_value(uint64_t v, const std::string*) {
-    return std::to_string(v);
+template<class T>
+static void iterator(T& m, const char* msg = nullptr) 
+{
+    Timer t("iterator", msg);
+    for (int n = LOOPS; n--;) {
+        int sum = 0;
+        for(auto v: m) sum += v.first;
+        m[sum] = make_value(sum, 0);
+    }
 }
 
 template<class T>
@@ -74,20 +95,35 @@ static void insert_operator(T& m, const char* msg = nullptr)
     Timer t("insert[]", msg);
 
     const uint64_t* end = ELEMENTS + MAX_ELEMENTS;
-    for (uint64_t n = 20; n--;)
-        for (const uint64_t* p = ELEMENTS; p != end; ++p)
-            m[*p] = make_value(*p, (const Value*)0);
+    const Value v = make_value(1, (const Value*)0);
+    for (int n = LOOPS; n--;)
+    for (const uint64_t* p = ELEMENTS; p != end; ++p)
+        m[*p] = v;
 }
 
 template<class T>
 static void insert(T& m, const char* msg = nullptr)
 {
-    Timer t("insert", msg);
+    Timer t("insert_pair", msg);
 
     const uint64_t* end = ELEMENTS + MAX_ELEMENTS;
-    for (uint64_t n = 20; n--;)
-        for (const uint64_t* p = ELEMENTS; p != end; ++p)
-            m.insert(T::value_type(*p, make_value(*p, (const Value*)0)));
+    for (int n = LOOPS; n--;)
+    for (const uint64_t* p = ELEMENTS; p != end; ++p)
+        if (!m.count(*p))
+        m.emplace(*p, make_value(*p, (const Value*)0));
+}
+
+template<class T>
+static void insert_assign(T& m, const char* msg = nullptr)
+{
+    Timer t("insert_assign", msg);
+
+    const uint64_t* end = ELEMENTS + MAX_ELEMENTS;
+    for (int n = LOOPS; n--;)
+        for (const uint64_t* p = ELEMENTS; p != end; ++p) {
+            Value v = make_value(*p, (const Value*)0);
+            m.insert_or_assign(*p, std::move(v));
+        }
 }
 
 template<class T>
@@ -96,9 +132,10 @@ static void emplace(T& m, const char* msg = nullptr)
     Timer t("emplace", msg);
 
     const uint64_t* end = ELEMENTS + MAX_ELEMENTS;
-    for (uint64_t n = 20; n--;)
-        for (const uint64_t* p = ELEMENTS; p != end; ++p)
-            m.emplace(*p, make_value(*p,(const Value*)0));
+    const Value v = make_value(1, (const Value*)0);
+    for (int n = LOOPS; n--;)
+    for (const uint64_t* p = ELEMENTS; p != end; ++p)
+       m.emplace(*p, v);
 }
 
 template<class T>
@@ -106,6 +143,7 @@ static void erase(T& m, const char* msg = nullptr)
 {
     Timer t("erase", msg);
 
+    for (int n = LOOPS; n--;)
     for (const uint64_t* p = ELEMENTS, *end = ELEMENTS + MAX_ELEMENTS; p != end; ++p)
         m.erase(*p);
 }
@@ -115,10 +153,10 @@ static void find_erase(T& m, const char* msg = nullptr)
 {
     Timer t("find_erase", msg);
 
+    for (int n = LOOPS; n--;)
     for (const uint64_t* p = ELEMENTS, *end = ELEMENTS + MAX_ELEMENTS; p != end; ++p) {
-        auto it = m.find(*p);
-        if (it != m.end())
-            m.erase(it);
+        if (m.count(*p))
+            m.erase(*p);
     }
 }
 
@@ -129,6 +167,7 @@ static uint64_t find(const T& m, const char* msg = nullptr)
 
     Timer t("find", msg);
 
+    for (int n = LOOPS; n--;)
     for (const uint64_t* p = ELEMENTS, *end = ELEMENTS + MAX_ELEMENTS; p != end; ++p) {
         ret += (m.find(*p) != m.end());
     }
@@ -143,6 +182,7 @@ static uint64_t count(const T& m, const char* msg = nullptr)
 
     Timer t("count", msg);
 
+    for (int n = LOOPS; n--;)
     for (const uint64_t* p = ELEMENTS, *end = ELEMENTS + MAX_ELEMENTS; p != end; ++p) {
         ret += m.count(*p);
     }
@@ -157,7 +197,7 @@ static uint64_t copy_ctor(const T& m, const char* msg = nullptr)
 
     Timer t("copy_ctor", msg);
 
-    for (uint64_t n = 20; n--;) {
+    for (int n = LOOPS; n--;) {
         T tmp(m);
         ret += tmp.size();
     }
@@ -173,7 +213,8 @@ static uint64_t copy_operator(const T& m, const char* msg = nullptr)
     Timer t("copy_operator", msg);
 
     T tmp;
-    for (uint64_t n = 20; n--;) {
+    tmp.max_load_factor(0.88f);
+    for (int n = LOOPS; n--;) {
         tmp = m;
         ret += tmp.size();
     }
@@ -213,6 +254,7 @@ static uint64_t ctor_initlist(T& m, const char* msg = nullptr)
 {
     Timer t("ctor_initlist", msg);
 
+	for (int n = 100000; n--;)
     m = T({ { 10,make_value(20,(const Value*)0) }, {20,make_value(30,(const Value*)0)}, { 11, make_value(20,(const Value*)0) }, { 21,make_value(30,(const Value*)0) } });
 
     return m.size();
@@ -227,7 +269,7 @@ static uint64_t TEST(const T& m, const char* msg = nullptr)
 
     const size_t SIZE = 320 * 1024 * 1024;
     void* b = malloc(SIZE);
-    for (uint64_t n = 20; n--;) {
+    for (int n = LOOPS; n--;) {
         void* a = malloc(SIZE);
         memmove(a, b, SIZE);
         ret += *(uint64_t*)((char*)a + SIZE/2);
@@ -243,39 +285,25 @@ template<class T>
 static uint64_t test(T& m, const char* name)
 {
     uint64_t ret = 0;
+
     puts(name);
-
     //TEST(m);
-    //return 0;
+    m.max_load_factor(0.88f);
+    insert_assign(m);
+    printf("load_factor = %.2lf\n", m.load_factor());
 
-/*
-    m.clear();
-    insert_operator(m);
-    m.clear();
-    emplace(m);
-
-    m.clear();
-    insert_operator(m);
-    m.clear();
-    emplace(m);
-*/
-
-    m.clear();
-    insert_operator(m);
-//    system("pause");
     erase(m);
-
     m.clear();
-    //insert(m, "insert(clear)");
+
     insert_operator(m);
     find_erase(m);
+
     insert_operator(m);
-    //insert(m, "insert(erase)"); // a lot of DELETED elements
-
     m.clear();
-    emplace(m, "emplace(clear)");
 
-    //insert(m, "insert(neg)");
+    emplace(m, "emplace");
+    m.clear();
+
     insert_operator(m);
     ret = find(m);
     ret += count(m);
@@ -284,10 +312,11 @@ static uint64_t test(T& m, const char* name)
     m.clear();
     //ctor_iterators(m);
 
-    insert_operator(m);
-    copy_ctor(m);
-    copy_operator(m);
-
+    insert(m);
+    ret += copy_ctor(m);
+    ret += copy_operator(m);
+    iterator(m);
+    printf("load_factor = %.2lf %ld\n\n", m.load_factor(), ret);
     m.clear();
 
     return ret;
@@ -298,72 +327,50 @@ static uint64_t xorshift(uint64_t n, uint64_t i) {
 }
 static uint64_t rnd(uint64_t n) {
     uint64_t p = 0x5555555555555555; // pattern of alternating 0 and 1
-    uint64_t c = 17316035218449499591ull;// random uneven integer constant; 
+    uint64_t c = 17316035218449499591ull;// random uneven integer constant;
     return c * xorshift(p * xorshift(n, 32), 32);
 }
 
 int main()
 {
     ELEMENTS = new uint64_t[MAX_ELEMENTS];
-    
-    //fill input data
-    { 
-/*
-        std::random_device rd;
-        std::mt19937_64 gen(rd());
-        std::uniform_int_distribution<uint64_t> dis;
-*/
-        uint64_t offset = 1;
 
+    //fill input data
+    {
+           std::random_device rd;
+           std::mt19937_64 gen(rd());
+           std::uniform_int_distribution<uint64_t> dis;
+
+        uint64_t offset = time(0);
         for (uint64_t i = 0; i != MAX_ELEMENTS; ++i) {
             offset = rnd(i + offset);
-            ELEMENTS[i] = offset;
-            //ELEMENTS[i] = dis(gen);
+            //ELEMENTS[i] = offset;
+            ELEMENTS[i] = dis(gen);
         }
     }
 
-    //ska::flat_hash_map<uint64_t, Value> m0;
-    hrd::hash_map<uint64_t, Value> m1;
-//    hrd2::hash_map<uint64_t, Value> m12;
-    //google::dense_hash_map<uint64_t, Value> m2;
-    //m2.set_empty_key(0);
-    //m2.set_deleted_key(-1);
-    std::unordered_map<uint64_t, Value> m3;
-    robin_hood::unordered_map<uint64_t, Value> m4;
-    tsl::robin_map<uint64_t, Value> m5;
-    emhash2::HashMap<uint64_t, Value> m7;
-    emhash6::HashMap<uint64_t, Value> m6;
-    emilib::HashMap<uint64_t, Value> me;
-    phmap::flat_hash_map<uint64_t, Value> m8;
+#ifdef HOOD_HASH
+    using hash_t = robin_hood::hash<int64_t>;
+#else
+    using hash_t = std::hash<int64_t>;
+#endif
 
-//    m7.max_load_factor(0.5f);
-//    m6.max_load_factor(0.5f);
-
-    const size_t ROUNDS = 1;
     uint64_t ret = 0;
-    //ret -= test(m0, "ska::flat_hash_map");
-    //for (size_t i = 0; i != ROUNDS; ++i)
-        ret -= test(m1, "\nhrd::hash_map");
-    //for (size_t i = 0; i != ROUNDS; ++i)
-       ret -= test(m6, "\nemhash6::HashMap");
-       ret -= test(m7, "\nemhash2::HashMap");
-       ret -= test(me, "\nemilib ::HashMap");
+    { robin_hood::unordered_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_map"); }
+//    { emhash4::HashMap<uint64_t, Value, hash_t> m7; ret -= test(m7, "\nemhash4::HashMap"); }
+//    { emilib3::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib3::HashMap"); }
+    { hrd7::hash_map<uint64_t, Value, hash_t> m1; ret -= test(m1, "\nhrd::hash_map"); }
+    { emhash5::HashMap<uint64_t, Value, hash_t> m5; ret -= test(m5, "\nemhash5::HashMap"); }
+    { tsl::robin_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\ntsl::robin_map"); }
+    { ska::flat_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::flat_hash_map"); }
+    { ska::bytell_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::bytell_hash_map"); }
+ //   { emhash2::HashMap<uint64_t, Value, hash_t> m2; ret -= test(m2, "\nemhash2::HashMap"); }
+    { emhash7::HashMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nemhash6::HashMap"); }
 
-    //ret -= test(m12, "\nhrd2::hash_map");
-    //for (int i = 0; i != 3; ++i)
-    //    ret -= test(m12, "\nhrd2::hash_map");
-    //ret -= test(m2, "\ngoogle::dense_hash_map");
-    //ret -= test(m3, "\nstd::unordered_map");
-    for (size_t i = 0; i != ROUNDS; ++i)
-        ret -= test(m4, "\nrobin_hood::unordered_map");
-
-    for (size_t i = 0; i != ROUNDS; ++i)
-        ret -= test(m5, "\ntsl::robin_map");
-
-    for (size_t i = 0; i != ROUNDS; ++i)
-        ret -= test(m8, "\nparallel-hashmap::flat_map");
+    //std::unordered_map<uint64_t, Value, hash_t> m3; ret -= test(m3, "\nstd::unordered_map");
+    //google::dense_hash_map<uint64_t, Value, hash_t> m2;ret -= test(m2, "\ngoogle::dense_hash_map");
+    { phmap::flat_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::flat_map"); }
 
     delete[] ELEMENTS;
-
     return (int)ret;
 }

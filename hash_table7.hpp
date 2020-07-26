@@ -1,5 +1,5 @@
 // emhash7::HashMap for C++11/14/17
-// version 1.7.5
+// version 1.7.4
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -40,8 +40,24 @@
 // SEPARATE CHAN RES.
 //    probes/successful lookup    1.05  1.25  1.3   1.25  1.4   1.45  1.50
 //    probes/unsuccessful lookup  1.00  1.11  1.15  1.22  1.25  1.31  1.37
+//    clacul/unsuccessful lookup  1.01  1.25  1.36, 1.56, 1.64, 1.81, 1.97
 
-/***
+/****************
+    under random hashCodes, the frequency of nodes in bins follows a Poisson
+distribution(http://en.wikipedia.org/wiki/Poisson_distribution) with a parameter of about 0.5
+on average for the default resizing threshold of 0.75, although with a large variance because
+of resizing granularity. Ignoring variance, the expected occurrences of list size k are
+(exp(-0.5) * pow(0.5, k)/factorial(k)). The first values are:
+0: 0.60653066
+1: 0.30326533
+2: 0.07581633
+3: 0.01263606
+4: 0.00157952
+5: 0.00015795
+6: 0.00001316
+7: 0.00000094
+8: 0.00000006
+
   ============== buckets size ration ========
     1   1543981  0.36884964|0.36787944  36.885
     2    768655  0.36725597|0.36787944  73.611
@@ -84,7 +100,8 @@
     #undef  EMH_VAL
     #undef  EMH_PKV
     #undef  EMH_BUCKET
-    #undef  EMH_NEWKV
+    #undef  EMH_NEW
+    #undef  EMH_EMPTY
 #endif
 
 // likely/unlikely
@@ -109,7 +126,7 @@
     #define EMH_BUCKET(p,n) p[n].first
     #define EMH_EMPTY(p,n) (int)p[n].first < 0
     #define EMH_PKV(p,n)     p[n].second
-    #define EMH_NEWKV(key, value, bucket)\
+    #define EMH_NEW(key, value, bucket)\
             new(_pairs + bucket) PairT(bucket, value_type(key, value));\
             _num_filled ++; _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
 #elif EMH_BUCKET_INDEX == 2
@@ -118,7 +135,7 @@
     #define EMH_BUCKET(p,n) p[n].second
     #define EMH_EMPTY(p,n) (int)p[n].second < 0
     #define EMH_PKV(p,n)     p[n].first
-    #define EMH_NEWKV(key, value, bucket)\
+    #define EMH_NEW(key, value, bucket)\
             new(_pairs + bucket) PairT(value_type(key, value), bucket);\
             _num_filled ++; _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
 #else
@@ -127,7 +144,7 @@
     #define EMH_BUCKET(p,n) p[n].bucket
     #define EMH_EMPTY(p,n) (0 > (int)p[n].bucket)
     #define EMH_PKV(p,n)     p[n]
-    #define EMH_NEWKV(key, value, bucket)\
+    #define EMH_NEW(key, value, bucket)\
             new(_pairs + bucket) PairT(key, value, bucket);\
             _num_filled ++; _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
 #endif
@@ -145,7 +162,7 @@ namespace emhash7 {
 
 static constexpr uint32_t MASK_BIT = sizeof(uint8_t) * 8;
 static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-static constexpr uint32_t INACTIVE = 0 - 0x1;
+static constexpr uint32_t INACTIVE = 0 - 0x17;
 static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
 
 //count the leading zero bit
@@ -289,7 +306,7 @@ public:
     typedef ValueT mapped_type;
     typedef HashT  hasher;
     typedef EqT    key_equal;
-    typedef uint64_t     size_type;
+    typedef uint32_t     size_type;
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
@@ -530,7 +547,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (isno_triviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -553,7 +570,7 @@ public:
 
     ~HashMap()
     {
-        if (isno_triviall_destructable())
+        if (is_triviall_destructable())
             clearkv();
         free(_pairs);
     }
@@ -851,8 +868,8 @@ public:
 #else
         puts(buff);
 #endif
-        assert(sums == bucket_coll || !show_cache);
         assert(sumn == _num_filled);
+        assert(sums == bucket_coll || !show_cache);
         assert(bucket_coll == buckets[0]);
     }
 
@@ -960,12 +977,25 @@ public:
     }
 
     template<typename K, typename V>
+    inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
+    {
+        const auto bucket = find_or_allocate(key);
+        const auto found = EMH_EMPTY(_pairs,bucket);
+        if (found) {
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
+        } else {
+            EMH_VAL(_pairs, bucket) = std::move(value);
+        }
+        return { {this, bucket}, found };
+    }
+
+    template<typename K, typename V>
     inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto bucket = find_or_allocate(key);
         const auto found = EMH_EMPTY(_pairs,bucket);
         if (found) {
-            EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), bucket);
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         }
         return { {this, bucket}, found };
     }
@@ -1022,7 +1052,7 @@ public:
         if ((int)next_bucket >= 0)
             return INACTIVE;
 
-        EMH_NEWKV(key, value, bucket);
+        EMH_NEW(key, value, bucket);
         return bucket;
     }
 #endif
@@ -1064,9 +1094,12 @@ public:
     inline uint32_t do_insert_unqiue(K&& key, V&& value)
     {
         auto bucket = find_unique_bucket(key);
-        EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), bucket);
+        EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         return bucket;
     }
+
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
 
 #if 1
     template <class... Args>
@@ -1116,7 +1149,7 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (EMH_EMPTY(_pairs,bucket)) {
-            EMH_NEWKV(key, value, bucket);
+            EMH_NEW(key, value, bucket);
             return ValueT();
         } else {
             ValueT old_value(value);
@@ -1131,7 +1164,7 @@ public:
         reserve(_num_filled);
         const auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_pairs,bucket)) {
-            EMH_NEWKV(key, std::move(ValueT()), bucket);
+            EMH_NEW(key, std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);
@@ -1142,7 +1175,7 @@ public:
         reserve(_num_filled);
         const auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_pairs,bucket)) {
-            EMH_NEWKV(std::move(key), std::move(ValueT()), bucket);
+            EMH_NEW(std::move(key), std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);
@@ -1185,12 +1218,12 @@ public:
         clear_bucket(bucket);
     }
 
-    static constexpr bool isno_triviall_destructable()
+    static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
-        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1214,7 +1247,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (isno_triviall_destructable() || !bInCacheLine || _num_filled < _num_buckets / 2)
+        if (is_triviall_destructable() || !bInCacheLine || _num_filled < _num_buckets / 2)
             clearkv();
         else {
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
@@ -1283,8 +1316,8 @@ private:
 
             auto&& key = EMH_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
-            EMH_NEWKV(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
-            if (isno_triviall_destructable())
+            EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
+            if (is_triviall_destructable())
                 old_pairs[src_bucket].~PairT();
         }
 
@@ -1316,7 +1349,7 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        if (isno_triviall_destructable())
+        if (is_triviall_destructable())
             _pairs[bucket].~PairT();
         EMH_BUCKET(_pairs, bucket) = INACTIVE;
 
@@ -1514,7 +1547,7 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
-        if (isno_triviall_destructable())
+        if (is_triviall_destructable())
             _pairs[bucket].~PairT();
 
         if (next_bucket == bucket)
@@ -1583,7 +1616,7 @@ private:
     {
 #if 0
         const auto bucket1 = bucket_from + 1;
-        if (EMH_EMPTY(_pairs, bucket1) )
+        if (EMH_EMPTY(_pairs, bucket1))
             return bucket1;
         const auto bucket2 = bucket_from + 2;
         if (EMH_EMPTY(_pairs, bucket2))
@@ -1612,7 +1645,7 @@ private:
 
         {
             const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
-            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask; 
+            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
             if (bmask2 != 0)
                 return step * SIZE_BIT + CTZ(bmask2);
@@ -1748,7 +1781,7 @@ private:
 #ifdef EMH_FIBONACCI_HASH
         return _hasher(key) * 11400714819323198485ull;
 #else
-        return _hasher(key);
+        return (uint32_t)_hasher(key);
 #endif
     }
 

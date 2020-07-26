@@ -50,18 +50,18 @@ constexpr int max_loop = 1000000;
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 
 #if (__cplusplus >= 201103L || _MSC_VER > 1600) && HOOD_HASH
-    #include "./martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "martin/robin_hood.h"       //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
 #if ET
-    #include "./phmap/phmap.h"
-    #include "./tsl/robin_set.h"        //https://github.com/tessil/robin-map
-    #include "./tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
-    #include "./martin/robin_hood.h"    //https://github.com/martinus/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "phmap/phmap.h"
+    #include "tsl/robin_set.h"        //https://github.com/tessil/robin-map
+    #include "tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
+    #include "martin/robin_hood.h"    //https://github.com/martinus/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #if __LP64__ || __x86_64__
-    #include "./hrd/hash_set7.h"
-    #include "./ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
-    #include "./ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
+    #include "hrd/hash_set7.h"
+    #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
+    #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
 #endif
 
@@ -105,7 +105,7 @@ struct StructValue;
 
 static std::unordered_map<std::string, std::string> show_name = {
 //    {"stl_hash", "unordered_map"},
-    {"emhash8", "emhash8"},
+    {"emhash2", "emhash2"},
 //    {"emhash7", "emhash7"},
     {"emhash9", "emhash9"},
     {"hrdhash", "hrd7_hash"},
@@ -891,7 +891,7 @@ static int HashSetTest(int n, int max_loops = 1234567)
     emhash7::HashSet <keyType> eset;
     emhash9::HashSet <keyType> eset2;
     //std::unordered_set <keyType> uset;
-    emhash8::HashSet <keyType> uset;
+    emhash2::HashSet <keyType> uset;
 
     const auto step = 1;// rand() % 64 + 1;
     eset.reserve(n);
@@ -1080,7 +1080,7 @@ static int benchHashSet(int n)
 
     if (n % 2 == 0)
     {
-        { emhash8::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash8", vList); }
+        { emhash2::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash2", vList); }
         { emhash9::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash9", vList); }
         { emhash7::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash7", vList); }
     }
@@ -1088,7 +1088,7 @@ static int benchHashSet(int n)
     {
         { emhash7::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash7", vList); }
         { emhash9::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash9", vList); }
-        { emhash8::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash8", vList); }
+        { emhash2::HashSet <keyType, hash_func> eset; eset.max_load_factor(lf);  benOneSet(eset, "emhash2", vList); }
     }
 
 #if 0

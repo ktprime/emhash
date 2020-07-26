@@ -63,7 +63,7 @@
     #undef  EMH_KEY
     #undef  EMH_VAL
     #undef  EMH_PKV
-    #undef  EMH_NEWKV
+    #undef  EMH_NEW
     #undef  EMH_BUCKET
 #endif
 
@@ -88,19 +88,19 @@
     #define EMH_VAL(p,n)     p[n].second.second
     #define EMH_BUCKET(p,n) p[n].first
     #define EMH_PKV(p,n)     p[n].second
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, value)); _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, value)); _num_filled ++
 #elif EMH_BUCKET_INDEX == 2
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
     #define EMH_BUCKET(p,n) p[n].second
     #define EMH_PKV(p,n)     p[n].first
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(value_type(key, value), bucket); _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(value_type(key, value), bucket); _num_filled ++
 #else
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n) p[n].bucket
     #define EMH_PKV(p,n)     p[n]
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket), _num_filled ++
 #endif
 
 namespace emhash2 {
@@ -146,7 +146,7 @@ struct entry {
         bucket = pairT.bucket;
     }
 
-    entry(entry&& pairT)
+    entry(entry&& pairT) noexcept
         :second(std::move(pairT.second)),first(std::move(pairT.first))
     {
         bucket = pairT.bucket;
@@ -183,7 +183,7 @@ struct entry {
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
 {
-private:
+public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
     typedef std::pair<KeyT,ValueT>          value_type;
 
@@ -775,12 +775,25 @@ public:
     }
 
     template<typename K, typename V>
+    inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
+    {
+        const auto bucket = find_or_allocate(key);
+        const auto empty = EMH_BUCKET(_pairs, bucket) == INACTIVE;
+        if (empty) {
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
+        } else {
+            EMH_VAL(_pairs, bucket) = std::move(value);
+        }
+        return { {this, bucket}, empty };
+    }
+
+    template<typename K, typename V>
     inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto bucket = find_or_allocate(key);
         const auto found = EMH_BUCKET(_pairs, bucket) == INACTIVE;
         if (found) {
-            EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), bucket);
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         }
         return { {this, bucket}, found };
     }
@@ -868,7 +881,7 @@ public:
     inline uint32_t do_insert_unqiue(K&& key, V&& value)
     {
         auto bucket = find_unique_bucket(key);
-        EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), bucket);
+        EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         return bucket;
     }
 
@@ -911,6 +924,18 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value)
+    {
+        check_expand_need();
+        return do_assign(key, std::move(value));
+    }
+
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value)
+    {
+        check_expand_need();
+        return do_assign(std::move(key), std::move(value));
+    }
+
     uint32_t try_insert_mainbucket(const KeyT& key, const ValueT& value)
     {
         const auto bucket = hash_bucket(key) & _mask;
@@ -918,7 +943,7 @@ public:
         if (next_bucket != INACTIVE)
             return INACTIVE;
 
-        EMH_NEWKV(key, value, bucket);
+        EMH_NEW(key, value, bucket);
         return bucket;
     }
 
@@ -930,7 +955,7 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (EMH_BUCKET(_pairs, bucket) == INACTIVE) {
-            EMH_NEWKV(key, value, bucket);
+            EMH_NEW(key, value, bucket);
             return ValueT();
         } else {
             ValueT old_value(value);
@@ -946,7 +971,7 @@ public:
         const auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (EMH_BUCKET(_pairs, bucket) == INACTIVE) {
-            EMH_NEWKV(key, std::move(ValueT()), bucket);
+            EMH_NEW(key, std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);
@@ -954,11 +979,13 @@ public:
 
     ValueT& operator[](KeyT&& key)
     {
-        reserve(_num_filled);
-        const auto bucket = find_or_allocate(key);
+        auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (EMH_BUCKET(_pairs, bucket) == INACTIVE) {
-            EMH_NEWKV(std::move(key), std::move(ValueT()), bucket);
+            if (EMH_UNLIKELY(check_expand_need()))
+                bucket = find_unique_bucket(key);
+
+            EMH_NEW(std::move(key), std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);
@@ -1100,7 +1127,7 @@ private:
 
             auto&& key = EMH_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
-            EMH_NEWKV(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
+            EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
             if (is_triviall_destructable())
                 old_pairs[src_bucket].~PairT();
         }
@@ -1368,10 +1395,11 @@ private:
             if (EMH_BUCKET(_pairs, bucket2) == INACTIVE)
                 return bucket2;
 
-            else if (last > 3) {
-                const auto bucket3 = (slot + _num_filled) & _mask;
-                if (EMH_BUCKET(_pairs, bucket3) == INACTIVE)
-                    return bucket3;
+            else if (last > 4) {
+                auto& _last = EMH_BUCKET(_pairs, _num_buckets);
+                if (INACTIVE == EMH_BUCKET(_pairs, ++_last))
+                    return _last;
+               _last &= _mask;
             }
         }
     }
@@ -1526,7 +1554,7 @@ private:
 #ifdef EMH_FIBONACCI_HASH
         return _hasher(key) * 11400714819323198485ull;
 #else
-        return _hasher(key);
+        return (uint32_t)_hasher(key);
 #endif
     }
 private:

@@ -43,13 +43,13 @@ using value_type = uint64_t;
 #ifdef KHASH
 #include "khash.h"
 #endif
-#if EMH_ == 6
-#include "hash_table56.hpp"
-#elif EMH_ == 7
+#if EMH == 6
+#include "hash_table6.hpp"
+#elif EMH == 7
 #define EMH__HIGH_LOAD  100000
-#include "hash_table57.hpp"
-#elif EMH_ == 5
-#include "hash_table55.hpp"
+#include "hash_table7.hpp"
+#elif EMH == 5
+#include "hash_table5.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
 #elif PHMAP
@@ -385,11 +385,12 @@ int main(int argc, char** argv)
                 typical_not_find_time/(i*4096) );
     }
   }
-  cout << typical_memory/N        << " "
-       << typical_insert_time/N   << " "
-       << typical_delete_time/N   << " "
-       << typical_find_time/N     << " "
-       << typical_not_find_time/N << endl;
+  cout << typical_memory/N        << "M, "
+       << typical_insert_time/N   << "i, "
+       << typical_delete_time/N   << "d, "
+       << typical_find_time/N     << "f, "
+       << typical_not_find_time/N << "n, "
+       << (typical_insert_time + typical_delete_time + typical_find_time + typical_not_find_time)/N << endl;
 #ifdef KHASH
   kh_destroy(32, h);
 #endif

@@ -49,7 +49,7 @@
     #undef  EMH_KEY
     #undef  EMH_VAL
     #undef  EMH_PKV
-    #undef  EMH_NEWKV
+    #undef  EMH_NEW
     #undef  EMH_BUCKET
 #endif
 
@@ -76,7 +76,7 @@
     #define EMH_ADDR(p,n) p[n].first
     #define EMH_EMPTY(p,n) (int)p[n].first < 0
     #define EMH_PKV(p,n)     p[n].second
-    #define EMH_NEWKV(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_type(key, value)), _num_filled ++; EMH_SET(bucket)
+    #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_type(key, value)), _num_filled ++; EMH_SET(bucket)
 #elif EMH_BUCKET_INDEX == 2
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
@@ -84,7 +84,7 @@
     #define EMH_ADDR(p,n) p[n].second
     #define EMH_EMPTY(p,n) (int)p[n].second < 0
     #define EMH_PKV(p,n)     p[n].first
-    #define EMH_NEWKV(key, value, bucket, next) new(_pairs + bucket) PairT(value_type(key, value), next), _num_filled ++; EMH_SET(bucket)
+    #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(value_type(key, value), next), _num_filled ++; EMH_SET(bucket)
 #else
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
@@ -92,7 +92,7 @@
     #define EMH_ADDR(p,n) p[n].bucket
     #define EMH_EMPTY(p,n) (0 > (int)p[n].bucket)
     #define EMH_PKV(p,n)     p[n]
-    #define EMH_NEWKV(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; EMH_SET(bucket)
+    #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; EMH_SET(bucket)
 #endif
 
 #define EMH_SET(bucket)   _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
@@ -238,7 +238,7 @@ public:
         typedef value_pair&               reference;
 
         iterator() { }
-        iterator(htype* hash_map, uint32_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
+        iterator(const htype* hash_map, uint32_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init()
         {
@@ -330,7 +330,7 @@ public:
         }
 
     public:
-        htype*   _map;
+        const htype* _map;
         size_t   _bmask;
         uint32_t _bucket;
         uint32_t _from;
@@ -548,26 +548,26 @@ public:
 
     iterator begin()
     {
-        if (0 == _num_filled)
+        const auto bmask = ~(*(size_t*)_bitmask);
+        if (bmask != 0)
+            return {this,  CTZ(bmask)};
+        else if (0 == _num_filled)
             return {this, _mask + 1};
 
-        uint32_t bucket = 0;
-        while (EMH_BTS(bucket)) {
-            ++bucket;
-        }
-        return {this, bucket};
+        iterator it(this, sizeof(bmask) * 8 - 1);
+        return it.next();
     }
 
     const_iterator cbegin() const
     {
-        if (0 == _num_filled)
+        const auto bmask = ~(*(size_t*)_bitmask);
+        if (bmask != 0)
+            return {this,  CTZ(bmask)};
+        else if (0 == _num_filled)
             return {this, _mask + 1};
 
-        uint32_t bucket = 0;
-        while (EMH_BTS(bucket)) {
-            ++bucket;
-        }
-        return {this, bucket};
+        iterator it(this, sizeof(bmask) * 8 - 1);
+        return it.next();
     }
 
     const_iterator begin() const
@@ -877,7 +877,7 @@ public:
         const auto next   = bucket / 2;
         const auto found = EMH_EMPTY(_pairs, next);
         if (found) {
-            EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), next, bucket);
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), next, bucket);
         }
         return { {this, next}, found };
     }
@@ -890,7 +890,7 @@ public:
         const auto next   = bucket / 2;
         const auto found = EMH_EMPTY(_pairs, next);
         if (found) {
-            EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), next, bucket);
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), next, bucket);
         } else {
             EMH_VAL(_pairs, next) = std::move(value);
         }
@@ -933,7 +933,7 @@ public:
 #if EMH_SAFE_HASH
             _num_main ++;
 #endif
-            EMH_NEWKV(key, value, bucket, bucket * 2);
+            EMH_NEW(key, value, bucket, bucket * 2);
             return bucket;
         }
 
@@ -994,7 +994,7 @@ public:
     inline uint32_t do_insert_unqiue(K&& key, V&& value)
     {
         auto bucket = find_unique_bucket(key);
-        EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), bucket / 2, bucket);
+        EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket / 2, bucket);
         return bucket;
     }
 
@@ -1025,7 +1025,7 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> insert_or_assign(const KeyT&& key, ValueT&& value) { return do_assign(key, std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
 
     ValueT& operator[](const KeyT& key)
@@ -1035,7 +1035,7 @@ public:
         const auto next   = bucket / 2;
         /* Check if inserting a new value rather than overwriting an old entry */
         if (EMH_EMPTY(_pairs, next)) {
-            EMH_NEWKV(key, std::move(ValueT()), next, bucket);
+            EMH_NEW(key, std::move(ValueT()), next, bucket);
         }
 
         //bugs here if return local reference rehash happens
@@ -1048,7 +1048,7 @@ public:
         const auto bucket = find_or_allocate(key);
         const auto next   = bucket / 2;
         if (EMH_EMPTY(_pairs, next)) {
-            EMH_NEWKV(std::move(key), std::move(ValueT()), next, bucket);
+            EMH_NEW(std::move(key), std::move(ValueT()), next, bucket);
         }
 
         return EMH_VAL(_pairs, next);
@@ -1094,7 +1094,7 @@ public:
 
     static constexpr bool is_triviall_destructable()
     {
-#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
+#if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -1103,7 +1103,7 @@ public:
 
     static constexpr bool is_copy_trivially()
     {
-#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
+#if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -1218,7 +1218,7 @@ public:
 
             auto&& key = EMH_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
-            EMH_NEWKV(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
+            EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
             if (is_triviall_destructable())
                 old_pairs[src_bucket].~PairT();
         }
@@ -1251,7 +1251,7 @@ private:
     inline bool check_expand_need()
     {
 #if EMH_SAFE_HASH > 1
-        if (_num_main * 3 < _num_filled && _num_filled > 100) {
+        if (EMH_UNLIKELY(_num_main * 3 < _num_filled) && _num_filled > 100 && _hash_inter == 0) {
             rehash(_num_filled);
             return true;
         }

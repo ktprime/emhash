@@ -62,7 +62,8 @@
     #undef  EMH_VAL
     #undef  EMH_PKV
     #undef  EMH_BUCKET
-    #undef  EMH_NEWKV
+    #undef  EMH_NEW
+    #undef  EMH_EMPTY
 #endif
 
 // likely/unlikely
@@ -81,26 +82,26 @@
     #define EMH_CACHE_LINE_SIZE 64
 #endif
 
-#define EMH_EMPTY(p, b) (int) EMH_BUCKET(p, b) < 0
+#define EMH_EMPTY(p, b) (0 > (int)EMH_BUCKET(p, b))
 
 #if EMH_BUCKET_INDEX == 0
     #define EMH_KEY(p,n)     p[n].second.first
     #define EMH_VAL(p,n)     p[n].second.second
     #define EMH_BUCKET(p,n) p[n].first
     #define EMH_PKV(p,n)     p[n].second
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, value)); _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, value)); _num_filled ++
 #elif EMH_BUCKET_INDEX == 2
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
     #define EMH_BUCKET(p,n) p[n].second
     #define EMH_PKV(p,n)     p[n].first
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(value_type(key, value), bucket); _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(value_type(key, value), bucket); _num_filled ++
 #else
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n) p[n].bucket
     #define EMH_PKV(p,n)     p[n]
-    #define EMH_NEWKV(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket); _num_filled ++
+    #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket); _num_filled ++
 #endif
 
 namespace emhash5 {
@@ -183,7 +184,7 @@ struct entry {
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
 {
-private:
+public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
     typedef std::pair<KeyT,ValueT>            value_type;
 
@@ -201,6 +202,7 @@ private:
 public:
     typedef KeyT   key_type;
     typedef ValueT val_type;
+    typedef ValueT mapped_type;
 
     typedef uint32_t     size_type;
     typedef PairT&       reference;
@@ -741,7 +743,7 @@ public:
         const auto bucket = find_or_allocate(key);
         const auto empty = EMH_EMPTY(_pairs, bucket);
         if (empty) {
-            EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), bucket);
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         }
         return { {this, bucket}, empty };
     }
@@ -752,7 +754,7 @@ public:
         const auto bucket = find_or_allocate(key);
         const auto empty = EMH_EMPTY(_pairs, bucket);
         if (empty) {
-            EMH_NEWKV(std::forward<K>(key), std::forward<V>(value), bucket);
+            EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         } else {
             EMH_VAL(_pairs, bucket) = std::move(value);
         }
@@ -818,7 +820,7 @@ public:
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
-        EMH_NEWKV(key, value, bucket);
+        EMH_NEW(key, value, bucket);
         return bucket;
     }
 
@@ -826,14 +828,14 @@ public:
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
-        EMH_NEWKV(std::move(key), std::move(value), bucket);
+        EMH_NEW(std::move(key), std::move(value), bucket);
         return bucket;
     }
 
     uint32_t insert_unique(entry<KeyT, ValueT>&& pair)
     {
         auto bucket = find_unique_bucket(pair.first);
-        EMH_NEWKV(std::move(pair.first), std::move(pair.second), bucket);
+        EMH_NEW(std::move(pair.first), std::move(pair.second), bucket);
         return bucket;
     }
 
@@ -894,7 +896,7 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (EMH_EMPTY(_pairs, bucket)) {
-            EMH_NEWKV(key, value, bucket);
+            EMH_NEW(key, value, bucket);
             return ValueT();
         } else {
             ValueT old_value(value);
@@ -910,7 +912,7 @@ public:
         const auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (EMH_EMPTY(_pairs, bucket)) {
-            EMH_NEWKV(key, std::move(ValueT()), bucket);
+            EMH_NEW(key, std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);
@@ -922,7 +924,7 @@ public:
         const auto bucket = find_or_allocate(key);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (EMH_EMPTY(_pairs, bucket)) {
-            EMH_NEWKV(std::move(key), std::move(ValueT()), bucket);
+            EMH_NEW(std::move(key), std::move(ValueT()), bucket);
         }
 
         return EMH_VAL(_pairs, bucket);
@@ -1218,9 +1220,9 @@ private:
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(bucket_key);
-        if (main_bucket != bucket)
-            return kickout_bucket(main_bucket, bucket);
+        const auto obmain = hash_bucket(bucket_key);
+        if (obmain != bucket)
+            return kickout_bucket(obmain, bucket);
         else if (next_bucket == bucket)
             return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
 
@@ -1261,9 +1263,9 @@ private:
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(EMH_KEY(_pairs, bucket));
-        if (main_bucket != bucket)
-            return kickout_bucket(main_bucket, bucket);
+        const auto obmain = hash_bucket(EMH_KEY(_pairs, bucket));
+        if (obmain != bucket)
+            return kickout_bucket(obmain, bucket);
         else if (next_bucket != bucket)
             next_bucket = find_last_bucket(next_bucket);
 

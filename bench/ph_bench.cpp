@@ -2,15 +2,15 @@
 #include "wyhash.h"
 //#define THR 1
 
-#if EMH_ == 7
+#if EMH == 7
     #include "hash_table7.hpp"
     #define MAPNAME emhash7::HashMap
     #define EXTRAARGS
-#elif EMH_ == 2
+#elif EMH == 2
     #include "hash_table2.hpp"
     #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
-#elif EMH_ == 5
+#elif EMH == 5
     #include "hash_table5.hpp"
     #define MAPNAME emhash5::HashMap
     #define EXTRAARGS
@@ -84,7 +84,10 @@
     #else
         #define EXTRAARGS
     #endif
-
+#else
+    #include "hash_table5.hpp"
+    #define MAPNAME emhash5::HashMap
+    #define EXTRAARGS
 #endif
 
 #define xstr(s) str(s)
@@ -432,9 +435,6 @@ int main(int argc, char ** argv)
     int num_keys      = argc > 1 ? atoi(argv[1]) : 2345678 + (time(0) * 1234567) % 1234567;
 
     srand(1); // for a fair/deterministic comparison
-    Timer timer(true);
-
-    auto ts = getTime();
 
 #if MT_SUPPORT
     if (!strcmp(program_slug,"absl::parallel_flat_hash_map") ||
@@ -447,13 +447,16 @@ int main(int argc, char ** argv)
     std::thread t1(memlog);
 #endif
 
-    try
-    {
+	Timer timer(true);
+	auto ts = getTime();
+	long sums = 0;
+
         if(1)
         {
             bench = "sequential"; timer.reset(); hash_t     hash;
             for(i = 0; i < num_keys; i++)
                 hash.emplace(i, value);
+		sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
 #if 1
@@ -463,6 +466,7 @@ int main(int argc, char ** argv)
             vector<int64_t> v(num_keys);
             timer = _fill_random(v, hash);
             //out("random", num_keys, timer);
+		sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
 #else
@@ -483,6 +487,7 @@ int main(int argc, char ** argv)
             size_t num_present;
 
             timer = _lookup(v, hash, num_present);
+		sums += timer.elapsed().count();
             //fprintf(stderr, "found %lu\n", num_present);
             printf("%.2lf %-10s %-10s %d %zd\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, num_present);
         }
@@ -491,6 +496,7 @@ int main(int argc, char ** argv)
             bench = "delete"; timer.reset(); hash_t     hash;
             vector<int64_t> v(num_keys);
             timer = _delete(v,  hash);
+		sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
         if(1)
@@ -498,6 +504,7 @@ int main(int argc, char ** argv)
             bench = "sequentialstring"; str_hash_t str_hash; timer.reset();
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
+		sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
         if(1)
@@ -505,6 +512,7 @@ int main(int argc, char ** argv)
             bench = "randomstring"; str_hash_t str_hash; timer.reset();
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer((int)rand()), value);
+		sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
         if(1)
@@ -513,18 +521,15 @@ int main(int argc, char ** argv)
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
             timer.reset();
-            ts = getTime();
+		auto ts1 = getTime();
             for(i = 0; i < num_keys; i++)
                 str_hash.erase(new_string_from_integer(i));
-            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
-        }
+		sums += timer.elapsed().count();
+		printf("%.2lf %-10s %-10s %d %.2lf ",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, (getTime() - ts1) / 1000.0);
+		printf("\nall %.2lf %.2lf ms\n", sums / 1000.0, (getTime() - ts) / 1000.0);
+	}
 
-        puts("");
         //std::this_thread::sleep_for(std::chrono::seconds(1000));
-    }
-    catch (...)
-    {
-    }
 
     all_done = true;
 #if THR
