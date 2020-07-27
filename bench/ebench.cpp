@@ -320,7 +320,7 @@ static int64_t getTime()
     long sec  = rup.ru_utime.tv_sec  + rup.ru_stime.tv_sec;
     long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
     return sec * 1000000 + usec;
-#elif LINUX_TICK
+#elif LINUX_TICK || __APPLE__
     return clock();
 #elif __linux__ || __unix__
     struct timeval start;
@@ -489,7 +489,6 @@ static std::map<std::string, size_t> check_result;
 //func --> hash time
 static std::map<std::string, std::map<std::string, int64_t>> once_func_hash_time;
 
-#define AVE_TIME(ts, n)             int(1000 * (getTime() - ts - loop_vector_time / 8) / (n))
 
 static void check_func_result(const std::string& hash_name, const std::string& func, size_t sum, int64_t ts1, int weigh = 1)
 {
@@ -503,15 +502,15 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     once_func_hash_time[func][showname] += (getTime() - ts1 - loop_vector_time / 8) / weigh;
     func_index ++;
 
-    long ts = (getTime() - ts1) / 1000;
+    int ts = (getTime() - ts1) / 1000;
     if (func_index == func_print)
-        printf("%8s: %8s %4ld, ",hash_name.data(), func.c_str(), ts);
+        printf("%8s: %8s %4d, ",hash_name.data(), func.c_str(), ts);
     else if (func_index == func_print + 1)
-        printf("%8s %4ld, ", func.c_str(), ts);
+        printf("%8s %4d, ", func.c_str(), ts);
     else if (func_index == func_print + 2)
-        printf("%8s %4ld, ", func.c_str(), ts);
+        printf("%8s %4d, ", func.c_str(), ts);
     else if (func_index == func_print + 3)
-        printf("%8s %4ld\n", func.c_str(), ts);
+        printf("%8s %4d\n", func.c_str(), ts);
 }
 
 static void inline hash_convert(const std::map<std::string, int64_t>& hash_time, std::multimap <int64_t, std::string>& time_hash)
@@ -1489,7 +1488,7 @@ static void printInfo(char* out)
     info += sprintf(info, " OS = MAC");
 #elif __unix__
     info += sprintf(info, " OS = unix");
-#elif
+#else
     info += sprintf(info, " OS = unknow");
 #endif
 

@@ -168,7 +168,7 @@ protected:
         return fnv_1a((const char*)ptr, SIZE);
     }
 
-    constexpr static HRD_ALWAYS_INLINE uint32_t fnv_1a(const char* key, size_t len, uint32_t hash32 = OFFSET_BASIS) noexcept
+    static HRD_ALWAYS_INLINE uint32_t fnv_1a(const char* key, const size_t len, uint32_t hash32 = OFFSET_BASIS) noexcept
     {
         constexpr const uint32_t PRIME = 1607;
 
@@ -274,7 +274,7 @@ HRD_ALWAYS_INLINE uint32_t hash_utils::hash_1<16>(const void* ptr) noexcept
 template<>
 struct hash_utils::hash_<std::string> {
     HRD_ALWAYS_INLINE size_t operator()(const std::string& val) const noexcept {
-        return fnv_1a(val.c_str(), val.size());
+        return fnv_1a(val.data(), val.size());
     }
 };
 

@@ -508,7 +508,7 @@ public:
         uint32_t _from;
     };
 
-    void init(uint32_t bucket, float lf = 0.95f)
+    void init(uint32_t bucket, float lf = 0.90f)
     {
         _num_buckets = _num_filled = 0;
         _pairs = nullptr;
@@ -517,7 +517,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4, float lf = 0.95f)
+    HashMap(uint32_t bucket = 4, float lf = 0.90f)
     {
         init(bucket, lf);
     }
@@ -979,6 +979,7 @@ public:
     template<typename K, typename V>
     inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
+        reserve(_num_filled);
         const auto bucket = find_or_allocate(key);
         const auto found = EMH_EMPTY(_pairs,bucket);
         if (found) {

@@ -27,6 +27,7 @@
 #include <sys/resource.h>
 #endif
 
+#include "thirdparty/wyhash.h"
 using namespace std;
 
 //#define EMH_STATIS 1
@@ -36,6 +37,7 @@ using namespace std;
 
 #include "hash_table2.hpp"
 #include "hash_table3.hpp"
+#include "hash_table4.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
 #include "hash_table5.hpp"
@@ -53,7 +55,7 @@ using namespace std;
 #include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 #endif
 
-static int RND = 123; //time(0);
+static int RND = time(0);
 
 
 std::unordered_map<std::string, std::string> show_name =
@@ -67,7 +69,7 @@ std::unordered_map<std::string, std::string> show_name =
 	{"emhash5", "emhash5"},
 	{"emhash6", "emhash6"},
 	{"emhash7", "emhash7"},
-	{"emilib3", "emilib3"},
+//	{"emilib3", "emilib3"},
 
 #if ET
 	{"phmap", "phmap flat"},
@@ -223,7 +225,7 @@ static int64_t now2ms()
 	return sec * 1000 + usec / 1000;
 #else
 	auto tp = std::chrono::steady_clock::now();
-	return std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count()
+	return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
 #endif
 }
 
