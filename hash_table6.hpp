@@ -435,7 +435,7 @@ public:
         _bitmask = nullptr;
         _num_filled = 0;
         max_load_factor(load_factor);
-        reserve(bucket);
+        reserve(bucket + 1);
     }
 
     HashMap(uint32_t bucket = 4, float load_factor = 0.95f)
