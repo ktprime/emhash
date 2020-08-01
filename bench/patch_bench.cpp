@@ -290,11 +290,11 @@ int main(int argc, char** argv)
   int ret, is_missing;
   khiter_t k;
 
-#elif EMH_ == 6
+#elif EMH == 6
    emhash6::HashMap<uint32_t,value_type> test;
-#elif EMH_ == 7
+#elif EMH == 7
    emhash7::HashMap<uint32_t,value_type> test;
-#elif EMH_ == 5
+#elif EMH == 5
    emhash5::HashMap<uint32_t,value_type> test;
 #elif TSL
    tsl::robin_map<uint32_t,value_type> test;

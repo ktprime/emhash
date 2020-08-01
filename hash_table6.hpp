@@ -51,6 +51,7 @@
     #undef  EMH_PKV
     #undef  EMH_NEW
     #undef  EMH_BUCKET
+    #undef  EMH_EMPTY
 #endif
 
 // likely/unlikely

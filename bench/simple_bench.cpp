@@ -84,7 +84,7 @@ void bench(char const* title)
     double t_find = std::chrono::duration_cast<std::chrono::duration<double>>(my_clock::now() - start).count();
     double t_all = std::chrono::duration_cast<std::chrono::duration<double>>(my_clock::now() - now).count();
 
-    printf("%6.2f %6.2f insert %6.2f iter %6.2f find %lld result: %s|%.2f|map size %zd\n", 
+    printf("%6.2f %6.2f insert %6.2f iter %6.2f find %zd result: %s|%.2f|map size %zd\n", 
             t_all, t_insert, t_iter, t_find, result, title, map.load_factor(), sizeof(Map));
 }
 

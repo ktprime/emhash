@@ -74,7 +74,7 @@
 
 namespace phmap {
 
-namespace container_internal {
+namespace priv {
 
 // --------------------------------------------------------------------------
 template <size_t Width>
@@ -137,18 +137,19 @@ constexpr bool IsNoThrowSwappable() {
 // --------------------------------------------------------------------------
 template <typename T>
 int TrailingZeros(T x) {
-  return sizeof(T) == 8 ? base_internal::CountTrailingZerosNonZero64(
-                              static_cast<uint64_t>(x))
-                        : base_internal::CountTrailingZerosNonZero32(
-                              static_cast<uint32_t>(x));
+    PHMAP_IF_CONSTEXPR(sizeof(T) == 8)
+        return base_internal::CountTrailingZerosNonZero64(static_cast<uint64_t>(x));
+    else
+        return base_internal::CountTrailingZerosNonZero32(static_cast<uint32_t>(x));
 }
 
 // --------------------------------------------------------------------------
 template <typename T>
 int LeadingZeros(T x) {
-  return sizeof(T) == 8
-             ? base_internal::CountLeadingZeros64(static_cast<uint64_t>(x))
-             : base_internal::CountLeadingZeros32(static_cast<uint32_t>(x));
+    PHMAP_IF_CONSTEXPR(sizeof(T) == 8)
+        return base_internal::CountLeadingZeros64(static_cast<uint64_t>(x));
+    else
+        return base_internal::CountLeadingZeros32(static_cast<uint32_t>(x));
 }
 
 // --------------------------------------------------------------------------
@@ -182,10 +183,10 @@ public:
     explicit operator bool() const { return mask_ != 0; }
     int operator*() const { return LowestBitSet(); }
     int LowestBitSet() const {
-        return container_internal::TrailingZeros(mask_) >> Shift;
+        return priv::TrailingZeros(mask_) >> Shift;
     }
     int HighestBitSet() const {
-        return (sizeof(T) * CHAR_BIT - container_internal::LeadingZeros(mask_) -
+        return (sizeof(T) * CHAR_BIT - priv::LeadingZeros(mask_) -
                 1) >>
             Shift;
     }
@@ -194,13 +195,13 @@ public:
     BitMask end() const { return BitMask(0); }
 
     int TrailingZeros() const {
-        return container_internal::TrailingZeros(mask_) >> Shift;
+        return priv::TrailingZeros(mask_) >> Shift;
     }
 
     int LeadingZeros() const {
         constexpr int total_significant_bits = SignificantBits << Shift;
         constexpr int extra_bits = sizeof(T) * 8 - total_significant_bits;
-        return container_internal::LeadingZeros(mask_ << extra_bits) >> Shift;
+        return priv::LeadingZeros(mask_ << extra_bits) >> Shift;
     }
 
 private:
@@ -795,7 +796,7 @@ private:
     auto KeyTypeCanBeHashed(const Hash& h, const key_type& k) -> decltype(h(k));
     auto KeyTypeCanBeEq(const Eq& eq, const key_type& k) -> decltype(eq(k, k));
 
-    using Layout = phmap::container_internal::Layout<ctrl_t, slot_type>;
+    using Layout = phmap::priv::Layout<ctrl_t, slot_type>;
 
     static Layout MakeLayout(size_t capacity) {
         assert(IsValidCapacity(capacity));
@@ -1208,9 +1209,8 @@ public:
     // TODO(romanp): Once we stop supporting gcc 5.1 and below, replace
     // RequiresInsertable<T> with RequiresInsertable<const T&>.
     // We are hitting this bug: https://godbolt.org/g/1Vht4f.
-    template <
-        class T, RequiresInsertable<T> = 0,
-        typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
+    template <class T, RequiresInsertable<T> = 0,
+              typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
     std::pair<iterator, bool> insert(const T& value) {
         return emplace(value);
     }
@@ -1234,9 +1234,8 @@ public:
     // TODO(romanp): Once we stop supporting gcc 5.1 and below, replace
     // RequiresInsertable<T> with RequiresInsertable<const T&>.
     // We are hitting this bug: https://godbolt.org/g/1Vht4f.
-    template <
-        class T, RequiresInsertable<T> = 0,
-        typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
+    template <class T, RequiresInsertable<T> = 0,
+              typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
     iterator insert(const_iterator, const T& value) {
         return insert(value).first;
     }
@@ -1245,9 +1244,36 @@ public:
         return insert(std::move(value)).first;
     }
 
-    template <class InputIt>
+    template <typename It>
+    using IsRandomAccess = std::is_same<typename std::iterator_traits<It>::iterator_category,
+                                        std::random_access_iterator_tag>;
+
+
+    template<typename T>
+    struct has_difference_operator
+    {
+    private:
+        using yes = std::true_type;
+        using no  = std::false_type;
+ 
+        template<typename U> static auto test(int) -> decltype(std::declval<U>() - std::declval<U>() == 1, yes());
+        template<typename>   static no   test(...);
+ 
+    public:
+        static constexpr bool value = std::is_same<decltype(test<T>(0)), yes>::value;
+    };
+
+    template <class InputIt, typename phmap::enable_if_t<has_difference_operator<InputIt>::value, int> = 0>
     void insert(InputIt first, InputIt last) {
-        for (; first != last; ++first) insert(*first);
+        this->reserve(this->size() + (last - first));
+        for (; first != last; ++first) 
+            insert(*first);
+    }
+
+    template <class InputIt, typename phmap::enable_if_t<!has_difference_operator<InputIt>::value, int> = 0>
+    void insert(InputIt first, InputIt last) {
+        for (; first != last; ++first) 
+            insert(*first);
     }
 
     template <class T, RequiresNotInit<T> = 0, RequiresInsertable<const T&> = 0>
@@ -1432,7 +1458,12 @@ public:
 
     // This overload is necessary because otherwise erase<K>(const K&) would be
     // a better match if non-const iterator is passed as an argument.
-    iterator erase(iterator it) { _erase(it++); return it; }
+    iterator erase(iterator it) {
+        auto res = it;
+        ++res;
+        _erase(it);
+        return res;
+    }
 
     iterator erase(const_iterator first, const_iterator last) {
         while (first != last) {
@@ -1646,7 +1677,7 @@ public:
 
 private:
     template <class Container, typename Enabler>
-    friend struct phmap::container_internal::hashtable_debug_internal::HashtableDebugAccess;
+    friend struct phmap::priv::hashtable_debug_internal::HashtableDebugAccess;
 
     struct FindElement 
     {
@@ -2094,7 +2125,7 @@ private:
     size_t size_ = 0;                // number of full slots
     size_t capacity_ = 0;            // total number of slots
     HashtablezInfoHandle infoz_;
-    phmap::container_internal::CompressedTuple<size_t /* growth_left */, hasher,
+    phmap::priv::CompressedTuple<size_t /* growth_left */, hasher,
                                               key_equal, allocator_type>
     settings_{0, hasher{}, key_equal{}, allocator_type{}};
 };
@@ -3118,7 +3149,7 @@ public:
 
 private:
     template <class Container, typename Enabler>
-    friend struct phmap::container_internal::hashtable_debug_internal::HashtableDebugAccess;
+    friend struct phmap::priv::hashtable_debug_internal::HashtableDebugAccess;
 
     struct FindElement 
     {
@@ -3221,7 +3252,7 @@ protected:
     }
 
     static size_t subidx(size_t hashval) {
-        return (hashval ^ (hashval >> N)) & mask;
+        return ((hashval >> 8) ^ (hashval >> 16) ^ (hashval >> 24)) & mask;
     }
 
     template <class K>
@@ -3577,10 +3608,10 @@ struct FlatHashSetPolicy
     static T& element(slot_type* slot) { return *slot; }
 
     template <class F, class... Args>
-    static decltype(phmap::container_internal::DecomposeValue(
+    static decltype(phmap::priv::DecomposeValue(
                         std::declval<F>(), std::declval<Args>()...))
     apply(F&& f, Args&&... args) {
-        return phmap::container_internal::DecomposeValue(
+        return phmap::priv::DecomposeValue(
             std::forward<F>(f), std::forward<Args>(args)...);
     }
 
@@ -3592,7 +3623,7 @@ struct FlatHashSetPolicy
 template <class K, class V>
 struct FlatHashMapPolicy 
 {
-    using slot_policy = container_internal::map_slot_policy<K, V>;
+    using slot_policy = priv::map_slot_policy<K, V>;
     using slot_type = typename slot_policy::slot_type;
     using key_type = K;
     using mapped_type = V;
@@ -3615,10 +3646,10 @@ struct FlatHashMapPolicy
     }
 
     template <class F, class... Args>
-    static decltype(phmap::container_internal::DecomposePair(
+    static decltype(phmap::priv::DecomposePair(
                         std::declval<F>(), std::declval<Args>()...))
     apply(F&& f, Args&&... args) {
-        return phmap::container_internal::DecomposePair(std::forward<F>(f),
+        return phmap::priv::DecomposePair(std::forward<F>(f),
                                                         std::forward<Args>(args)...);
     }
 
@@ -3674,7 +3705,7 @@ struct node_hash_policy {
 // --------------------------------------------------------------------------
 template <class T>
 struct NodeHashSetPolicy
-    : phmap::container_internal::node_hash_policy<T&, NodeHashSetPolicy<T>> 
+    : phmap::priv::node_hash_policy<T&, NodeHashSetPolicy<T>> 
 {
     using key_type = T;
     using init_type = T;
@@ -3701,10 +3732,10 @@ struct NodeHashSetPolicy
     }
 
     template <class F, class... Args>
-        static decltype(phmap::container_internal::DecomposeValue(
+        static decltype(phmap::priv::DecomposeValue(
                             std::declval<F>(), std::declval<Args>()...))
         apply(F&& f, Args&&... args) {
-        return phmap::container_internal::DecomposeValue(
+        return phmap::priv::DecomposeValue(
             std::forward<F>(f), std::forward<Args>(args)...);
     }
 
@@ -3715,7 +3746,7 @@ struct NodeHashSetPolicy
 // --------------------------------------------------------------------------
 template <class Key, class Value>
 class NodeHashMapPolicy
-    : public phmap::container_internal::node_hash_policy<
+    : public phmap::priv::node_hash_policy<
           std::pair<const Key, Value>&, NodeHashMapPolicy<Key, Value>> 
 {
     using value_type = std::pair<const Key, Value>;
@@ -3747,10 +3778,10 @@ public:
     }
 
     template <class F, class... Args>
-        static decltype(phmap::container_internal::DecomposePair(
+        static decltype(phmap::priv::DecomposePair(
                             std::declval<F>(), std::declval<Args>()...))
         apply(F&& f, Args&&... args) {
-        return phmap::container_internal::DecomposePair(std::forward<F>(f),
+        return phmap::priv::DecomposePair(std::forward<F>(f),
                                                         std::forward<Args>(args)...);
     }
 
@@ -3875,8 +3906,8 @@ struct HashtableDebugAccess<Set, phmap::void_t<typename Set::raw_hash_set>>
         size_t hash = typename Set::HashElement{set.hash_ref()}(key); 
         auto seq = set.probe(hash);
         while (true) {
-            container_internal::Group g{set.ctrl_ + seq.offset()};
-            for (int i : g.Match(container_internal::H2(hash))) {
+            priv::Group g{set.ctrl_ + seq.offset()};
+            for (int i : g.Match(priv::H2(hash))) {
                 if (Traits::apply(
                         typename Set::template EqualElement<typename Set::key_type>{
                             key, set.eq_ref()},
@@ -3901,7 +3932,7 @@ struct HashtableDebugAccess<Set, phmap::void_t<typename Set::raw_hash_set>>
             m += per_slot * c.size();
         } else {
             for (size_t i = 0; i != capacity; ++i) {
-                if (container_internal::IsFull(c.ctrl_[i])) {
+                if (priv::IsFull(c.ctrl_[i])) {
                     m += Traits::space_used(c.slots_ + i);
                 }
             }
@@ -3923,7 +3954,7 @@ struct HashtableDebugAccess<Set, phmap::void_t<typename Set::raw_hash_set>>
 };
 
 }  // namespace hashtable_debug_internal
-}  // namespace container_internal
+}  // namespace priv
 
 // -----------------------------------------------------------------------------
 // phmap::flat_hash_set
@@ -3944,8 +3975,8 @@ struct HashtableDebugAccess<Set, phmap::void_t<typename Set::raw_hash_set>>
 // -----------------------------------------------------------------------------
 template <class T, class Hash, class Eq, class Alloc> // default values in phmap_fwd_decl.h
 class flat_hash_set
-    : public phmap::container_internal::raw_hash_set<
-          phmap::container_internal::FlatHashSetPolicy<T>, Hash, Eq, Alloc> 
+    : public phmap::priv::raw_hash_set<
+          phmap::priv::FlatHashSetPolicy<T>, Hash, Eq, Alloc> 
 {
     using Base = typename flat_hash_set::raw_hash_set;
 
@@ -4005,8 +4036,8 @@ public:
 // * Returns `void` from the `_erase(iterator)` overload.
 // -----------------------------------------------------------------------------
 template <class K, class V, class Hash, class Eq, class Alloc> // default values in phmap_fwd_decl.h
-class flat_hash_map : public phmap::container_internal::raw_hash_map<
-                          phmap::container_internal::FlatHashMapPolicy<K, V>,
+class flat_hash_map : public phmap::priv::raw_hash_map<
+                          phmap::priv::FlatHashMapPolicy<K, V>,
                           Hash, Eq, Alloc> {
     using Base = typename flat_hash_map::raw_hash_map;
 
@@ -4068,8 +4099,8 @@ public:
 // -----------------------------------------------------------------------------
 template <class T, class Hash, class Eq, class Alloc> // default values in phmap_fwd_decl.h
 class node_hash_set
-    : public phmap::container_internal::raw_hash_set<
-          phmap::container_internal::NodeHashSetPolicy<T>, Hash, Eq, Alloc> 
+    : public phmap::priv::raw_hash_set<
+          phmap::priv::NodeHashSetPolicy<T>, Hash, Eq, Alloc> 
 {
     using Base = typename node_hash_set::raw_hash_set;
 
@@ -4130,8 +4161,8 @@ public:
 // -----------------------------------------------------------------------------
 template <class Key, class Value, class Hash, class Eq, class Alloc>  // default values in phmap_fwd_decl.h
 class node_hash_map
-    : public phmap::container_internal::raw_hash_map<
-          phmap::container_internal::NodeHashMapPolicy<Key, Value>, Hash, Eq,
+    : public phmap::priv::raw_hash_map<
+          phmap::priv::NodeHashMapPolicy<Key, Value>, Hash, Eq,
           Alloc> 
 {
     using Base = typename node_hash_map::raw_hash_map;
@@ -4184,9 +4215,9 @@ public:
 // -----------------------------------------------------------------------------
 template <class T, class Hash, class Eq, class Alloc, size_t N, class Mtx_> // default values in phmap_fwd_decl.h
 class parallel_flat_hash_set
-    : public phmap::container_internal::parallel_hash_set<
-         N, phmap::container_internal::raw_hash_set, Mtx_,
-         phmap::container_internal::FlatHashSetPolicy<T>, 
+    : public phmap::priv::parallel_hash_set<
+         N, phmap::priv::raw_hash_set, Mtx_,
+         phmap::priv::FlatHashSetPolicy<T>, 
          Hash, Eq, Alloc> 
 {
     using Base = typename parallel_flat_hash_set::parallel_hash_set;
@@ -4235,9 +4266,9 @@ public:
 // phmap::parallel_flat_hash_map - default values in phmap_fwd_decl.h
 // -----------------------------------------------------------------------------
 template <class K, class V, class Hash, class Eq, class Alloc, size_t N, class Mtx_>
-class parallel_flat_hash_map : public phmap::container_internal::parallel_hash_map<
-                N, phmap::container_internal::raw_hash_set, Mtx_,
-                phmap::container_internal::FlatHashMapPolicy<K, V>,
+class parallel_flat_hash_map : public phmap::priv::parallel_hash_map<
+                N, phmap::priv::raw_hash_set, Mtx_,
+                phmap::priv::FlatHashMapPolicy<K, V>,
                 Hash, Eq, Alloc> 
 {
     using Base = typename parallel_flat_hash_map::parallel_hash_map;
@@ -4291,9 +4322,9 @@ public:
 // -----------------------------------------------------------------------------
 template <class T, class Hash, class Eq, class Alloc, size_t N, class Mtx_>
 class parallel_node_hash_set
-    : public phmap::container_internal::parallel_hash_set<
-             N, phmap::container_internal::raw_hash_set, Mtx_,
-             phmap::container_internal::NodeHashSetPolicy<T>, Hash, Eq, Alloc> 
+    : public phmap::priv::parallel_hash_set<
+             N, phmap::priv::raw_hash_set, Mtx_,
+             phmap::priv::NodeHashSetPolicy<T>, Hash, Eq, Alloc> 
 {
     using Base = typename parallel_node_hash_set::parallel_hash_set;
 
@@ -4344,9 +4375,9 @@ public:
 // -----------------------------------------------------------------------------
 template <class Key, class Value, class Hash, class Eq, class Alloc, size_t N, class Mtx_>
 class parallel_node_hash_map
-    : public phmap::container_internal::parallel_hash_map<
-          N, phmap::container_internal::raw_hash_set, Mtx_,
-          phmap::container_internal::NodeHashMapPolicy<Key, Value>, Hash, Eq,
+    : public phmap::priv::parallel_hash_map<
+          N, phmap::priv::raw_hash_set, Mtx_,
+          phmap::priv::NodeHashMapPolicy<Key, Value>, Hash, Eq,
           Alloc> 
 {
     using Base = typename parallel_node_hash_map::parallel_hash_map;
