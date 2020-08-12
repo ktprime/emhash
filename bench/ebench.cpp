@@ -502,15 +502,15 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     once_func_hash_time[func][showname] += (getTime() - ts1 - loop_vector_time / 8) / weigh;
     func_index ++;
 
-    int ts = (getTime() - ts1) / 1000;
+    long ts = (getTime() - ts1) / 1000;
     if (func_index == func_print)
-        printf("%8s: %8s %4d, ",hash_name.data(), func.c_str(), ts);
+        printf("%8s: %8s %4ld, ",hash_name.data(), func.c_str(), ts);
     else if (func_index == func_print + 1)
-        printf("%8s %4d, ", func.c_str(), ts);
+        printf("%8s %4ld, ", func.c_str(), ts);
     else if (func_index == func_print + 2)
-        printf("%8s %4d, ", func.c_str(), ts);
+        printf("%8s %4ld, ", func.c_str(), ts);
     else if (func_index == func_print + 3)
-        printf("%8s %4d\n", func.c_str(), ts);
+        printf("%8s %4ld\n", func.c_str(), ts);
 }
 
 static void inline hash_convert(const std::map<std::string, int64_t>& hash_time, std::multimap <int64_t, std::string>& time_hash)
@@ -833,7 +833,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
     std::string skey = get_random_alphanum_string(40);
 #endif
 
-    for (size_t v = 1; v < pow2; v++) {
+    for (size_t v = 0; v < pow2; v++) {
 #if FL1
         l1_cache[v % sizeof(l1_cache)] = 0;
 #endif
@@ -1016,7 +1016,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
 {
 #ifndef KEY_SUC
     emhash5::HashMap <keyType, int> ehash5;
-    emhash6::HashMap <keyType, int> ehash2;
+    emhash2::HashMap <keyType, int> ehash2;
 
     sfc64 srng(time(NULL));
 #if ET
@@ -1112,12 +1112,11 @@ static int TestHashMap(int n, int max_loops = 1234567)
 }
 
 template<class hash_type>
-int benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
+void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 {
     if (hash_tables.find(hash_name) == hash_tables.end())
-        return 0;
+        return;
 
-    float load_factor = 0;
 
     if (tcase == 0)
         printf("bench %s:%zd\n", hash_name.data(), sizeof(hash_type));
@@ -1158,9 +1157,6 @@ int benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         erase_reinsert<hash_type>(hash, hash_name, vList);
         insert_find_erase<hash_type>(hash, hash_name, vList);
 
-#ifndef SMAP
-        load_factor = hash.load_factor() * 100.0;
-#endif
         hash_iter<hash_type>(hash, hash_name);
 
 #ifdef UF
@@ -1168,8 +1164,6 @@ int benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         hash_clear<hash_type>(hash, hash_name);
 #endif
     }
-
-    return load_factor;
 }
 
 constexpr auto base1 = 300000000;
@@ -1484,7 +1478,7 @@ static void printInfo(char* out)
     SetThreadAffinityMask(GetCurrentThread(), 0x1);
 #elif __linux__
     info += sprintf(info, " OS = linux");
-#elif __MAC__
+#elif __MAC__ || __APPLE__
     info += sprintf(info, " OS = MAC");
 #elif __unix__
     info += sprintf(info, " OS = unix");
@@ -1579,8 +1573,8 @@ int main(int argc, char* argv[])
             tn = atoi(&argv[i][0] + 1);
         else if (cmd == 'c' && isdigit(argv[i][1]))
             maxc = atoi(&argv[i][0] + 1);
-        else if (cmd == 'i' && isdigit(argv[i][1]))
-            auto_set = atoi(&argv[i][0] + 1) != 0;
+        else if (cmd == 'a')
+            auto_set = !auto_set;
         else if (cmd == 'r' && isdigit(argv[i][1]))
             rnd = atoi(&argv[i][0] + 1);
 
@@ -1652,7 +1646,7 @@ int main(int argc, char* argv[])
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
         }
         if (n < 1000 || n > 1234567890)
-            n = 1234567;
+            n = 1234567 + rand() % 1234567;
 
         int tc = benchHashMap(n);
         if (tc >= maxc)

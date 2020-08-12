@@ -73,17 +73,17 @@
 #if EMH_BUCKET_INDEX == 0
     #define EMH_KEY(p,n)     p[n].second.first
     #define EMH_VAL(p,n)     p[n].second.second
-    #define EMH_BUCKET(p,n) p[n].first / 2
-    #define EMH_ADDR(p,n) p[n].first
-    #define EMH_EMPTY(p,n) (int)p[n].first < 0
+    #define EMH_BUCKET(p,n)  p[n].first / 2
+    #define EMH_ADDR(p,n)    p[n].first
+    #define EMH_EMPTY(p,n)   ((int)p[n].first < 0)
     #define EMH_PKV(p,n)     p[n].second
     #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(next, value_type(key, value)), _num_filled ++; EMH_SET(bucket)
 #elif EMH_BUCKET_INDEX == 2
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
-    #define EMH_BUCKET(p,n) p[n].second / 2
-    #define EMH_ADDR(p,n) p[n].second
-    #define EMH_EMPTY(p,n) (int)p[n].second < 0
+    #define EMH_BUCKET(p,n)  p[n].second / 2
+    #define EMH_ADDR(p,n)    p[n].second
+    #define EMH_EMPTY(p,n)   ((int)p[n].second < 0)
     #define EMH_PKV(p,n)     p[n].first
     #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(value_type(key, value), next), _num_filled ++; EMH_SET(bucket)
 #else
@@ -162,7 +162,7 @@ struct entry {
     entry(std::pair<First, Second>&& pair) :second(std::move(pair.second)),first(std::move(pair.first)) { bucket = INACTIVE; }
 
     entry(const entry& pairT) :second(pairT.second),first(pairT.first) { bucket = pairT.bucket; }
-    entry(entry&& pairT) :second(std::move(pairT.second)),first(std::move(pairT.first)) { bucket = pairT.bucket; }
+    entry(entry&& pairT) noexcept :second(std::move(pairT.second)),first(std::move(pairT.first)) { bucket = pairT.bucket; }
 
     template<typename K, typename V>
     entry(K&& key, V&& value, uint32_t ibucket)
@@ -404,7 +404,6 @@ public:
             do {
                 _bucket++;
             } while (EMH_BTS(_bucket));
-
 #else
             _bmask &= _bmask - 1;
             if (EMH_LIKELY(_bmask != 0)) {
@@ -969,31 +968,28 @@ public:
     /// Same as above, but contains(key) MUST be false
     uint32_t insert_unique(KeyT&& key, ValueT&& value)
     {
-        check_expand_need();
         return do_insert_unqiue(std::move(key), std::move(value));
     }
 
     uint32_t insert_unique(const KeyT& key, const ValueT& value)
     {
-        check_expand_need();
         return do_insert_unqiue(key, value);
     }
 
     uint32_t insert_unique(value_type&& p)
     {
-        check_expand_need();
         return do_insert_unqiue(std::move(p.first), std::move(p.second));
     }
 
     uint32_t insert_unique(const value_type& p)
     {
-        check_expand_need();
         return do_insert_unqiue(p.first, p.second);
     }
 
     template<typename K, typename V>
     inline uint32_t do_insert_unqiue(K&& key, V&& value)
     {
+        check_expand_need();
         auto bucket = find_unique_bucket(key);
         EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket / 2, bucket);
         return bucket;
@@ -1591,7 +1587,6 @@ private:
         else if (next_bucket % 2 > 0)
             return kickout_bucket(bucket);
 
-
         const auto last_bucket = find_last_bucket(next_bucket / 2);
         //find a new empty and link it to tail
         return EMH_ADDR(_pairs, last_bucket) = find_empty_bucket(last_bucket) * 2 + 1;
@@ -1628,13 +1623,13 @@ private:
 #endif
     }
 
-    inline uint32_t hash_bucket(const uint32_t bucket) const
+    inline uint64_t hash_bucket(const uint32_t bucket) const
     {
         return hash_key(EMH_KEY(_pairs, bucket)) & _mask;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline uint32_t hash_key(const UType key) const
+    inline uint64_t hash_key(const UType key) const
     {
 #ifdef EMH_FIBONACCI_HASH
         return hash64(key);
@@ -1650,21 +1645,16 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
-    inline uint32_t hash_key(const UType& key) const
+    inline uint64_t hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
         return wyhash(key.c_str(), key.size(), 11400714819323198485ull);
 #elif EMH_SAFE_HASH
         return _hash_inter == 0 ?  _hasher(key) : wyhash(key.c_str(), key.size(), 0x123456789);
 #elif EMH_BDKR_HASH
-        uint32_t hash = 0;
-        if (key.size() < 256) {
-            for (const auto c : key)
-                hash = c + hash * 131;
-        } else {
-            for (int i = 0, j = 1; i < key.size(); i += j++)
-                hash = key[i] + hash * 131;
-        }
+        uint64_t hash = 0;
+        for (uint32_t i = 0, j = 1; i < size; i += j++)
+            hash = key[i] + hash * 131;
         return hash;
 #else
         return _hasher(key);
@@ -1672,12 +1662,12 @@ private:
     }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
-    inline uint32_t hash_key(const UType& key) const
+    inline uint64_t hash_key(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
         return _hasher(key) * 11400714819323198485ull;
 #else
-        return (uint32_t)_hasher(key);
+        return _hasher(key);
 #endif
     }
 
