@@ -1111,7 +1111,7 @@ static int benchHashSet(int n)
 #endif
 #endif
 
-    auto iload = 50 + vList.size() % 50;
+    int iload = 50 + vList.size() % 50;
     static int tcase = 0;
     printf("\n %d ======== n = %d, load_factor = %.2lf, data_type = %d ========\n", tcase + 1, n, iload / 100.0, flag);
     std::multimap <int64_t, std::string> once_time_hash;

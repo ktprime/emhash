@@ -1017,9 +1017,9 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-        const auto bucket1 = bucket_from + 1;
-        if (_pairs[bucket1].second == INACTIVE)
-            return bucket1;
+        const auto bucket = bucket_from + 1;
+        if (_pairs[bucket].second == INACTIVE)
+            return bucket;
 
 #if EMH_HIGH_LOAD
         const auto bucket2 = bucket_from + 2;
@@ -1032,7 +1032,7 @@ private:
 
         //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
         //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t step = 2, slot = bucket1 + 2; ;slot += ++step) {
+        for (uint32_t step = 2, slot = bucket + 1; ;slot += ++step) {
             const auto bucket1 = slot & _mask;
             if (_pairs[bucket1].second == INACTIVE)
                 return bucket1;
@@ -1041,10 +1041,13 @@ private:
             if (_pairs[bucket2].second == INACTIVE)
                 return bucket2;
 
-            if (step > 3) {
-                if (_pairs[_last_bucket].second == INACTIVE)
-                    return _last_bucket++;
-                _last_bucket = (_last_bucket + 1) & _mask;
+            if (step > 4) {
+                if (_pairs[_last_bucket ++].second == INACTIVE || _pairs[_last_bucket ++].second == INACTIVE)
+                    return _last_bucket - 1;
+                _last_bucket &= _mask;
+                auto tail = _mask - _last_bucket;
+                if (_pairs[tail].second == INACTIVE || _pairs[++tail].second == INACTIVE)
+                    return tail;
             }
         }
     }

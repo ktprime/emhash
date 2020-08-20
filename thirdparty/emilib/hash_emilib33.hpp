@@ -18,7 +18,7 @@
 #endif
 #endif
 
-namespace emilib3 {
+namespace emilib4 {
 
 inline static uint32_t CTZ(uint64_t n)
 {

@@ -1,6 +1,5 @@
 CXX=g++
-CXXFLAGS=-O3 -march=native -fwhole-program -mavx2 -I.. -I../thirdparty
-
+CXXFLAGS=-O3 -march=native -fwhole-program -mavx -I.. -I../thirdparty
 
 K=INT64
 V=INT32
@@ -17,17 +16,18 @@ RFR=0.3
 EMH=5
 
 all:
-	$(CXX) $(CXXFLAGS) fht_bench.cpp -DK_$(K) -DV_$(V) -DK_LEN=$(K_LEN) -DV_LEN=$(V_LEN) -DINIT_SIZE=$(ISIZE) -DTEST_LEN=$(LEN) -DQUERY_RATE=$(QR) -DREMOVE_RATE=$(RR) -DINSERT_FAILURE_RATE=$(IFR) -DQUERY_FAILURE_RATE=$(QFR) -DREMOVE_FAILURE_RATE=$(RFR) -c
-	$(CXX) $(CXXFLAGS) fht_bench.o -o fht_bench
-	$(CXX) $(CXXFLAGS) ebench.cpp  -o ebench
-	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o  mbench
-	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
+#	$(CXX) $(CXXFLAGS) fbench.cpp -DK_$(K) -DV_$(V) -DK_LEN=$(K_LEN) -DV_LEN=$(V_LEN) -DINIT_SIZE=$(ISIZE) -DTEST_LEN=$(LEN) -DQUERY_RATE=$(QR) -DREMOVE_RATE=$(RR) -DINSERT_FAILURE_RATE=$(IFR) -DQUERY_FAILURE_RATE=$(QFR) -DREMOVE_FAILURE_RATE=$(RFR) -c
+	$(CXX) $(CXXFLAGS) -DET=1 ebench.cpp -o ebench
+	$(CXX) $(CXXFLAGS) -DET=1 sbench.cpp -o setbench
+	$(CXX) $(CXXFLAGS) -DET martin_bench.cpp -lpthread -o mbench
+	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) fbench.cpp -o fbench
+	$(CXX) $(CXXFLAGS)  hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) ph_bench.cpp -o phbench
 	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 
-fb:fht_bench.o
-	./fht_bench
+fb:
+	./fbench
 
 hb:
 	./hbench
@@ -38,5 +38,8 @@ eb:
 mb:
 	./mbench
 
+sb:
+	./simbench
+
 clean:
-	rm -rf ebench mbench hbench simble_bench pabench phbench fht_bench *~ *#* *.o driver-K=*-V=* my_table/*~
+	rm -rf ebench mbench hbench setbench simbench pabench phbench fbench *~ *#* *.o driver-K=*-V=* my_table/*~
