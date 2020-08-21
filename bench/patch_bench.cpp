@@ -64,7 +64,9 @@ using value_type = uint64_t;
 #include <x86intrin.h>
 #endif
 
+#if __x86_64__
 #include <emmintrin.h>
+#endif
 
 
 //#include <proc/readproc.h>

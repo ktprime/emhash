@@ -104,7 +104,7 @@
 
 #define EMH_EMPTY(p, b) (0 > (int)EMH_BUCKET(p, b))
 
-namespace emhash7 {
+namespace emhash5 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 

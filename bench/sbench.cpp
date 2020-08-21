@@ -58,7 +58,7 @@ constexpr int max_loop = 1000000;
     #include "tsl/robin_set.h"        //https://github.com/tessil/robin-map
     #include "tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
     #include "martin/robin_hood.h"    //https://github.com/martinus/robin-hood-hashing/blob/master/src/include/robin_hood.h
-#if __LP64__ || __x86_64__
+#if __x86_64__ || _M_X64
     #include "hrd/hash_set7.h"
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
     #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
@@ -1101,7 +1101,7 @@ static int benchHashSet(int n)
     { phmap::flat_hash_set <keyType, hash_func> eset; eset.max_load_factor(lf);   benOneSet(eset, "phmap", vList); }
 
 #if ET > 1
-#if __LP64__ || __x86_64__
+#if __x86_64__ || _M_X64
     { ska::bytell_hash_set <keyType, hash_func > bmap; bmap.max_load_factor(lf);  benOneSet(bmap, "byte", vList); }
     { ska::flat_hash_set <keyType, hash_func> fmap; fmap.max_load_factor(lf);     benOneSet(fmap, "flat", vList); }
     { hrd7::hash_set <keyType, hash_func> eset; eset.max_load_factor(lf);         benOneSet(eset, "hrdhash", vList); }
@@ -1183,6 +1183,7 @@ void testHashSet8(int n)
 
 static void cpuidInfo(int regs[4], int id, int ext)
 {
+#if __x86_64__ || _M_X64
 #if _MSC_VER >= 1600 //2010
     __cpuidex(regs, id, ext);
 #elif __GNUC__ || __TINYC__
@@ -1203,6 +1204,7 @@ static void cpuidInfo(int regs[4], int id, int ext)
         mov dword ptr [edi + 8], ecx
         mov dword ptr [edi +12], edx
     }
+#endif
 #endif
 }
 

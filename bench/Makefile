@@ -22,9 +22,9 @@ all:
 	$(CXX) $(CXXFLAGS) -DET martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) fbench.cpp -o fbench
 	$(CXX) $(CXXFLAGS)  hbench.cpp -o hbench
-	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) ph_bench.cpp -o phbench
-	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
+	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) patch_bench.cpp -o pabench
+	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) ph_bench.cpp -o phbench
 
 fb:
 	./fbench
