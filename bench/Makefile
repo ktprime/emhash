@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-O3 -march=native -fwhole-program -mavx -I.. -I../thirdparty
+CXXFLAGS=-O3 -march=native -fwhole-program -std=c++17 -I.. -I../thirdparty
 
 K=INT64
 V=INT32
