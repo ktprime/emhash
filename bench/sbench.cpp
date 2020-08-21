@@ -645,7 +645,8 @@ void insert_find_erase(hash_type& ahash, const std::string& hash_name, std::vect
 #ifdef KEY_INT
             auto v2 = v + 1;
 #else
-            auto v2 = v + "1";
+            auto v2 = v;
+            v2.back() += 1;
 #endif
             sum += tmp.emplace(v2).second;
             sum += tmp.count(v2);

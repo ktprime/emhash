@@ -1,6 +1,10 @@
-#include "hrd/hash_set7.h"
+#if __x86_64__
+//#include "hrd/hash_set7.h"
+#endif
+
 #include "martin/robin_hood.h"
 #include "tsl/robin_map.h"
+#include "tsl/hopscotch_map.h"
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
 #include "phmap/phmap.h"
@@ -356,12 +360,14 @@ int main()
 #endif
 
     uint64_t ret = 0;
-    { robin_hood::unordered_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_map"); }
+    { robin_hood::unordered_flat_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_flat_map"); }
+    { robin_hood::unordered_node_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_node_map"); }
 //    { emhash4::HashMap<uint64_t, Value, hash_t> m7; ret -= test(m7, "\nemhash4::HashMap"); }
 //    { emilib3::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib3::HashMap"); }
-    { hrd7::hash_map<uint64_t, Value, hash_t> m1; ret -= test(m1, "\nhrd::hash_map"); }
+//    { hrd7::hash_map<uint64_t, Value, hash_t> m1; ret -= test(m1, "\nhrd::hash_map"); }
     { emhash5::HashMap<uint64_t, Value, hash_t> m5; ret -= test(m5, "\nemhash5::HashMap"); }
     { tsl::robin_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\ntsl::robin_map"); }
+    { tsl::hopscotch_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\ntsl::hopscotch_map"); }
     { ska::flat_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::flat_hash_map"); }
     { ska::bytell_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::bytell_hash_map"); }
  //   { emhash2::HashMap<uint64_t, Value, hash_t> m2; ret -= test(m2, "\nemhash2::HashMap"); }
@@ -370,6 +376,7 @@ int main()
     //std::unordered_map<uint64_t, Value, hash_t> m3; ret -= test(m3, "\nstd::unordered_map");
     //google::dense_hash_map<uint64_t, Value, hash_t> m2;ret -= test(m2, "\ngoogle::dense_hash_map");
     { phmap::flat_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::flat_map"); }
+    { phmap::node_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::node_map"); }
 
     delete[] ELEMENTS;
     return (int)ret;

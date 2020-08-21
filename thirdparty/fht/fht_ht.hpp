@@ -561,12 +561,12 @@ struct fht_table {
     }
     inline constexpr uint64_t
     max_size() const {
-        return (1UL) << this->log_size;
+        return (1UL) << this->log_incr;
     }
 
     inline constexpr double
     load_factor() const {
-        return ((double)this->size()) / ((double)this->max_size());
+        return ((double)this->size()) / max_size();
     }
 
     // aint gunna do anything about this
