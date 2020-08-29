@@ -1269,7 +1269,7 @@ static void printInfo(char* out)
     cpuidInfo(*pTmp ++, 0x80000003, 0);
     cpuidInfo(*pTmp ++, 0x80000004, 0);
 
-    info += sprintf(info, vendor);
+    info += sprintf(info, "%s", vendor);
 
     puts(cbuff);
     if (out)
@@ -1347,8 +1347,8 @@ int main(int argc, char* argv[])
         auto n = 0;
         n = (int)(srng() % maxn) + minn;
         if (auto_set) {
-            printf(">> "); scanf("%d", &n);
-            if (n <= 0)
+            printf(">> ");
+            if (scanf("%d", &n) == 1 && n <= 0)
                 auto_set = false;
         }
         if (load_factor > 0.4 && load_factor < 1) {

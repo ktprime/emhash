@@ -6,11 +6,14 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <random>
 
-#if __linux__ && __x86_64__ && AVX2
+#if __linux__ && AVX2
 #include <sys/mman.h>
 #include "fht/fht_ht.hpp"
 #endif
+
+//#define EMH_FIBONACCI_HASH 1
 
 #include "martin/robin_hood.h"
 #include "phmap/phmap.h"
@@ -18,12 +21,15 @@
 #include "ska/bytell_hash_map.hpp"
 #include "tsl/robin_map.h"
 #include "tsl/hopscotch_map.h"
+#include "patchmap/patchmap.hpp"
 //#include "emilib/emilib33.hpp"
 
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"
 #include "hash_table6.hpp"
 
+static std::random_device rd;
+static std::mt19937_64 rnd(rd());
 
 /*
     Key Types:
@@ -63,12 +69,12 @@
  */
 
 // expect either INT32, INT64 or STRING to be defined
-#if defined K_INT64
+#if not defined K_INT64
     const char* key_name = "uint64_t";
     typedef uint64_t test_key_t;
     #define KEY_LEN sizeof(test_key_t)
     test_key_t gen_key() {
-        return rand() * rand() + rand();
+        return rnd() * rnd() + rnd();
     }
 
 #elif defined K_STRING
@@ -82,7 +88,7 @@
     test_key_t gen_key() {
         test_key_t new_key = "";
         for (uint32_t i = 0; i < KEY_LEN; i++) {
-            new_key += rand() % 256;
+            new_key += rnd() % 256;
         }
         return new_key;
 }
@@ -92,7 +98,7 @@
     typedef uint32_t test_key_t;
     #define KEY_LEN sizeof(test_key_t)
     test_key_t gen_key() {
-        return rand();
+        return rnd();
     }
 //static_assert( 0, "Make with either \"K=INT32\", \"K=INT64\", or \"K=STRING\". If Using " "\"K=STRING\" also be sure to set \"K_LEN=<desired length of string " "keys\"");
 #endif
@@ -103,7 +109,7 @@
     typedef test_val_t val_sink_t;
     #define VAL_LEN sizeof(test_val_t)
     test_val_t gen_val() {
-        return rand() * rand() + rand();
+        return rnd() * rnd() + rnd();
     }
 
 #elif defined V_STRING
@@ -120,7 +126,7 @@
     test_val_t gen_val() {
         test_val_t new_val = "";
         for (uint32_t i = 0; i < VAL_LEN; i++) {
-            new_val += rand() % 256;
+            new_val += rnd() % 256;
         }
         return new_val;
     }
@@ -132,7 +138,7 @@
     #define VAL_LEN sizeof(test_val_t)
 
     test_val_t gen_val() {
-        return rand() * rand();
+        return rnd();
     }
 
 //static_assert(0, "Make with either \"V=INT32\", \"V=INT64\", or " "\"V=STRING\". If Using \"V=STRING\" also be sure to set " "\"V_LEN=<desired length of string keys\"");
@@ -151,7 +157,7 @@ static int QUERY_RATE = 2;
 #endif
 
 #ifndef REMOVE_RATE
-static double REMOVE_RATE = 0.2;
+static double REMOVE_RATE = 0.5;
 #endif
 
 #ifndef INSERT_FAILURE_RATE
@@ -166,14 +172,13 @@ static double QUERY_FAILURE_RATE = 0.3;
 static double REMOVE_FAILURE_RATE = 0.25;
 #endif
 
-static int64_t now2ms()
+static int64_t now2ns()
 {
     auto tp = std::chrono::steady_clock::now();
     return std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
 }
 
 static void init_keys(std::vector<test_key_t> & insert_keys);
-static void init_vals(std::vector<test_val_t> & insert_vals);
 static void init_query_keys(std::vector<test_key_t> & insert_keys,
                             std::vector<test_key_t> & query_keys);
 static void init_remove_keys(std::vector<test_key_t> & insert_keys,
@@ -191,14 +196,17 @@ static void report(double,
                    const char *      header, float lf,  int sum);
 
 static void clear_cache();
+//std::uniform_int_distribution<uint64_t> dis;
+
 
 inline static uint32_t
-rand_above_perc(int rd) {
-    return rand() < rd;
+rnd_above_perc(int r) {
+    return rnd() % RAND_MAX > r;
 }
 
 static void
 init_keys(std::vector<test_key_t> & insert_keys) {
+    insert_keys.clear();
     for (uint32_t i = 0; i < TEST_LEN; i++) {
         // duplicates here mean nothing...
         insert_keys.push_back(gen_key());
@@ -206,45 +214,31 @@ init_keys(std::vector<test_key_t> & insert_keys) {
 }
 
 static void
-init_vals(std::vector<test_val_t> & insert_vals) {
-    uint32_t insert_fail = INSERT_FAILURE_RATE * RAND_MAX;
-    for (uint32_t i = 0; i < TEST_LEN; i++) {
-        if (rand_above_perc(insert_fail) || (!i)) {
-            insert_vals.push_back(gen_val());
+init_query_keys(std::vector<test_key_t> & insert_keys, std::vector<test_key_t> & query_keys) {
+    query_keys.clear();
+    uint32_t query_fail = QUERY_FAILURE_RATE * RAND_MAX;
+    for (uint32_t i = 0; i < TEST_LEN * QUERY_RATE; i++) {
+        if (rnd_above_perc(query_fail)) {
+            query_keys.push_back(insert_keys[rnd() % TEST_LEN]);
         }
         else {
-            insert_vals.push_back(insert_vals[rand() % i]);
+            // assuming rndomly generated key will not be found
+            query_keys.push_back(gen_key());
         }
     }
 }
 
 static void
-init_query_keys(std::vector<test_key_t> & insert_keys,
-                std::vector<test_key_t> & query_keys) {
-    uint32_t query_fail = QUERY_FAILURE_RATE * RAND_MAX;
-    for (uint32_t i = 0; i < TEST_LEN * QUERY_RATE; i++) {
-        if (rand_above_perc(query_fail)) {
-            query_keys.push_back(
-                insert_keys[(rand() % (i + (i == 0))) % TEST_LEN]);
-        }
-        else {
-            // assuming randomly generated key will not be found
-            query_keys.push_back(gen_key());
-        }
-    }
-}
-static void
-init_remove_keys(std::vector<test_key_t> & insert_keys,
-                 std::vector<test_key_t> & remove_keys) {
+init_remove_keys(std::vector<test_key_t> & insert_keys, std::vector<test_key_t> & remove_keys) {
+    remove_keys.clear();
     uint32_t upper_bound = (TEST_LEN * REMOVE_RATE);
     uint32_t remove_fail = REMOVE_FAILURE_RATE * RAND_MAX;
     for (uint32_t i = 0; i < upper_bound; i++) {
-        if (rand_above_perc(remove_fail)) {
-            remove_keys.push_back(
-                insert_keys[(rand() % (i + (i == 0))) % TEST_LEN]);
+        if (rnd_above_perc(remove_fail)) {
+            remove_keys.push_back(insert_keys[rnd() % TEST_LEN]);
         }
         else {
-            // assuming randomly generated key will not be found
+            // assuming rndomly generated key will not be found
             remove_keys.push_back(gen_key());
         }
     }
@@ -268,12 +262,12 @@ clear_cache() {
                                    0);
         assert(ptrs[i] != MAP_FAILED);
         for (uint32_t j = 0; j < clear_size; j++) {
-            ptrs[i][j] = rand();
+            ptrs[i][j] = rnd();
         }
     }
     for (uint32_t i = 0; i < 10; i++) {
         for (uint32_t j = 0; j < clear_size; j++) {
-            ptrs[i][j] += rand();
+            ptrs[i][j] += rnd();
         }
         assert(!munmap(ptrs[i], clear_size * sizeof(uint32_t)));
     }
@@ -283,6 +277,7 @@ clear_cache() {
 #endif
 }
 
+//https://github.com/goldsteinn/hashtable_test
 template<typename ht>
 static int run_table(std::vector<test_key_t> & insert_keys,
                std::vector<test_val_t> & insert_vals,
@@ -290,7 +285,7 @@ static int run_table(std::vector<test_key_t> & insert_keys,
                std::vector<test_key_t> & remove_keys) {
 
     clear_cache();
-    ht test_table(INIT_SIZE);
+    ht test_table(INIT_SIZE > 10 ? INIT_SIZE : insert_keys.size() / INIT_SIZE);
 
     uint32_t next_remove, remove_iter = 0;
     next_remove =
@@ -298,7 +293,7 @@ static int run_table(std::vector<test_key_t> & insert_keys,
 
     const uint32_t remove_incr = next_remove;
 
-    auto start_time = now2ms();
+    auto start_time = now2ns();
     auto sum = 0;
     auto dvalue = gen_val();
     for (uint32_t i = 0; i < TEST_LEN; i++) {
@@ -314,7 +309,7 @@ static int run_table(std::vector<test_key_t> & insert_keys,
             sum += sink;
         }
     }
-    auto end_time = now2ms();
+    auto end_time = now2ns();
 
     auto map_name = std::string(typeid(ht).name());
     if (map_name.find("Im") != std::string::npos)
@@ -353,9 +348,9 @@ report(double ns_diff, const char * header, float lf, int sum) {
     fprintf(stderr, "%s Perf -> \n", header);
     const uint64_t ns_mult = 1000 * 1000 * 1000;
 
-    if (ns_diff > ns_mult)
+    if (ns_diff > ns_mult*10)
         fprintf(stderr, "\t%.4lf Sec", ns_diff / ns_mult);
-    if (ns_diff > ns_mult / 1000)
+    if (ns_diff > ns_mult / 100)
         fprintf(stderr, "\t%.3lf MS ", ns_diff / (ns_mult / 1000));
 
     fprintf(stderr, "\t%.2lf US", ns_diff / (ns_mult / (1000 * 1000)));
@@ -363,9 +358,135 @@ report(double ns_diff, const char * header, float lf, int sum) {
     fprintf(stderr, " -> load factor = %.2f, sum = %d, ns / op = %.3lf\n\n", lf, sum, ns_diff / total_ops);
 }
 
+
+void test_delay()
+{
+    const int LEN = 256 * 1024 * 1024;
+
+    for (int len = 1; len < 20000; len *= 2)
+    {
+        auto start_time = now2ns();
+        int* arr2 = new int[LEN]; int sum = 1;
+        for (int i = 1; i < LEN; i += len) sum += arr2[i];
+        auto end_time = now2ns();
+        printf("time[%5d] use %4ld ms [%d] ns / op = %.2lf\n", len, (end_time - start_time) / 1000000, sum, (double)(end_time - start_time) / (LEN / len));
+#if 0
+        start_time = now2ns();
+        for (int i = 1; i < LEN; i += len) sum += arr2[i];
+        end_time = now2ns();
+        printf("time[%5d] use %4ld ms [%d] ns / op = %.2lf\n\n", len, (end_time - start_time) / 1000000, sum, (double)(end_time - start_time) / (LEN / len));
+#endif
+        delete arr2;
+    }
+
+    //    start_time = now2ns();
+    //    for (int i = 1; i < LEN; i += 16)
+    //    arr2[i] += 11;
+    //    printf("time2 use %ld ms\n", (now2ns() - start_time) / 1000000);
+}
+
+struct Hash32 {
+    inline size_t operator()(const uint32_t x) const {
+        return x;
+    }
+};
+
+static inline uint32_t hash32(uint32_t key)
+{
+#if H32 == 0
+    key += ~(key << 15);
+    key ^=  (key >> 10);
+    key +=  (key << 3);
+    key ^=  (key >> 6);
+    key += ~(key << 11);
+    key ^=  (key >> 16);
+    return key;
+
+#elif H32 == 1
+    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+    return (r >> 32) + r;
+#elif H32 == 2
+    //MurmurHash3Mixer
+    uint64_t h = key;
+    h ^= h >> 33;
+    h *= 0xff51afd7ed558ccd;
+    h ^= h >> 33;
+    h *= 0xc4ceb9fe1a85ec53;
+    h ^= h >> 33;
+    return (h >> 32) + h;
+#elif H32 == 3
+    uint64_t x = key;
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    x = x ^ (x >> 31);
+    return (x >> 32) + x;
+#endif
+}
+
+static inline uint32_t get_key(const uint32_t n, const uint32_t x)
+{
+    return hash32(x % (n >> 2));
+}
+
+template<typename ht>
+static uint32_t test_int(const uint32_t n, const uint32_t x0)
+{
+    uint32_t i, x, z = 0;
+    ht h;
+    for (i = 0, x = x0; i < n; ++i) {
+        x = hash32(x);
+#ifndef UDB2_TEST_DEL
+        z += ++h[get_key(n, x)];
+#else
+        auto p = h.emplace(get_key(n, x), i);
+        if (p.second == false) h.erase(p.first);
+#endif
+    }
+//    fprintf(stderr, "# unique keys: %ld; checksum: %u\n", h.size(), z);
+    return h.load_factor() * 100;
+}
+
+//https://github.com/attractivechaos/udb2
+template<typename ht>
+int run_udb2(const char* str)
+{
+    uint32_t m = 5, max = 50000000, n = 10000000;
+    const auto step = (max - n) / m;
+
+    auto now = now2ns();
+    for (int i = 0; i <= m; ++i, n += step) {
+        const uint32_t x0 = i + 1;
+        auto t = now2ns();
+        auto lf = test_int<ht>(n, x0);
+        t = now2ns() - t;
+        printf("    %d\t%.3f\t\t%.2f\t  %2d\n", n, t / 1000000000.0, (double)t / n, lf);
+    }
+
+    printf("%s : %.2lf sec\n\n", str, (now2ns() - now) / 1000000000.0);
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
     srand(time(0));
+
+    //test_delay();
+    {
+        run_udb2<emhash6::HashMap<uint32_t, uint32_t, Hash32>>("emhash6");
+        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
+        run_udb2<ska::flat_hash_map<uint32_t, uint32_t, Hash32>>("ska_flat");
+        run_udb2<ska::bytell_hash_map<uint32_t, uint32_t, Hash32>>("ska_byte");
+        run_udb2<emhash7::HashMap<uint32_t, uint32_t, Hash32>>("emhash7");
+        run_udb2<robin_hood::unordered_flat_map<uint32_t, uint32_t, Hash32>>("martin_flat");
+        run_udb2<phmap::flat_hash_map<uint32_t, uint32_t, Hash32>>("phmap_flat");
+        run_udb2<tsl::robin_map<uint32_t, uint32_t, Hash32>>("tsl_robin");
+        run_udb2<tsl::hopscotch_map<uint32_t, uint32_t, Hash32>>("tsl_hops");
+        run_udb2<emhash5::HashMap<uint32_t, uint32_t, Hash32>>("emhash5");
+#if __linux__ && AVX2
+        run_udb2<fht_table<uint32_t, uint32_t>>("fht_table");
+#endif
+    }
+
     std::vector<test_key_t> insert_keys;
     std::vector<test_val_t> insert_vals;
     std::vector<test_key_t> query_keys;
@@ -394,28 +515,50 @@ int main(int argc, char* argv[])
     fprintf(stderr, "key=%s,value=%s\nrf = %.2lf\nqf = %.2lf\nrr = %.2lf\nqr = %d\nn  = %d\ni  = %d\n\n",
             key_name, val_name, REMOVE_FAILURE_RATE, QUERY_FAILURE_RATE, REMOVE_RATE, QUERY_RATE, TEST_LEN, INIT_SIZE);
 
+    while (true) {
     init_keys(insert_keys);
-    //init_vals(insert_vals);
     init_query_keys(insert_keys, query_keys);
     init_remove_keys(insert_keys, remove_keys);
 
     auto   ret =  run_table<emhash6::HashMap<test_key_t, test_val_t>>  (insert_keys, insert_vals, query_keys, remove_keys);
-#if __linux__ && __x86_64__ && AVX2
+#if __linux__ && AVX2
     if ( ret ==  run_table<fht_table<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
 #endif
 
-    if (ret == run_table <std::unordered_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+
+//    if (ret == run_table <std::unordered_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <ska::flat_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <ska::bytell_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <emhash5::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <emhash7::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <emhash2::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <robin_hood::unordered_node_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <robin_hood::unordered_node_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <phmap::flat_hash_map<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <phmap::node_hash_map<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <phmap::node_hash_map<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <tsl::robin_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <tsl::hopscotch_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <whash::patchmap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
 //    if (ret == run_table <emilib4::HashMap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+    int n = TEST_LEN;
+    printf(">> "); scanf("%u", &n);
+    if (n < 0)
+        break;
+    else if (n < 10 && n > 0)
+        TEST_LEN *= n;
+    else if (n > 100000)
+        TEST_LEN = n;
+    }
+
+
+//    start_time = now2ns();
+//    for (int i = 1; i < LEN; i += 1)
+//        arr1[i] += 11;
+
+
+//    start_time = now2ns();
+//    for (int i = 1; i < LEN; i += 16) arr2[i] += 11;
+//    printf("time2 use %ld ms\n", (now2ns() - start_time) / 1000000);
 
     return 0;
 }

@@ -464,12 +464,12 @@ static const std::array<char, 62> ALPHANUMERIC_CHARS = {
 
 std::uniform_int_distribution<std::size_t> rd_uniform(0, ALPHANUMERIC_CHARS.size() - 1);
 
-#ifdef KEY_STR
+
 static std::mt19937_64 generator(time(0));
 static std::string get_random_alphanum_string(std::size_t size) {
     std::string str(size, '\0');
 
-    const auto comm_head = size % 4 + 1;
+    const auto comm_head = size % 1 + 0;
     //test common head
     for(std::size_t i = 0; i < comm_head; i++) {
         str[i] = ALPHANUMERIC_CHARS[i];
@@ -480,7 +480,6 @@ static std::string get_random_alphanum_string(std::size_t size) {
 
     return str;
 }
-#endif
 
 static int test_case = 0;
 static int loop_vector_time = 0;
@@ -729,7 +728,6 @@ void find_insert_multi(const std::string& hash_name, const std::vector<keyType>&
         sum += mh[hash_id].count(v + v % 2);
     }
 
-    int last =(int)mh[0].size();
     delete []mh;
     check_func_result(hash_name, __FUNCTION__, sum, ts1, 2);
 #endif
@@ -844,7 +842,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
     size_t pow2 = 2u << ilog(n, 2), sum = 0;
 
 #if KEY_STR
-    std::string skey = get_random_alphanum_string(40);
+    std::string skey = get_random_alphanum_string(32);
 #endif
 
     for (size_t v = 0; v < pow2; v++) {
@@ -917,7 +915,6 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
         it = tmp.erase(it);
         sum += 1;
     }
-
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -977,7 +974,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 #ifdef KEY_STR
     for (int i = 0; i < size; i++)
-        randdata.emplace_back(get_random_alphanum_string(srng() % 64 + 8));
+        randdata.emplace_back(get_random_alphanum_string(srng() % 64 + 4));
     return 0;
 #else
 
@@ -988,7 +985,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #endif
 
     auto flag = 0;
-    if (srng() % 100 > iRation)
+    if (srng() % 100 >= iRation)
     {
         for (int i = 0; ; i++) {
             auto key = TO_KEY(srng());
@@ -1131,7 +1128,6 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
     if (hash_tables.find(hash_name) == hash_tables.end())
         return;
 
-
     if (test_case == 0)
         printf("bench %s:%zd\n", hash_name.data(), sizeof(hash_type));
 
@@ -1158,7 +1154,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #elif KEY_SUC
             vList[v].lScore += v * v;
 #elif TKey != 4
-            vList[v][0] += 1;
+            vList[v][0] += v;
+            //vList[v] += vList[v].size();
 #else
             auto& next2 = vList[v + vList.size() / 2];
             vList[v] = next2.substr(0, next2.size() - 1);
@@ -1248,7 +1245,7 @@ static void printResult(int n)
         printf("%13s  %4d     %3.1lf%%\n", v.second.c_str(), (int)(v.first / func_hash_score.size()), (v.first * 100.0 / maxs));
 
 #if _WIN32
-    Sleep(1000*2);
+    Sleep(100*1);
 #else
     usleep(1000*2000);
 #endif
@@ -1506,7 +1503,7 @@ static void printInfo(char* out)
     cpuidInfo(*pTmp ++, 0x80000003, 0);
     cpuidInfo(*pTmp ++, 0x80000004, 0);
 
-    info += sprintf(info, vendor);
+    info += sprintf(info, "%s", vendor);
 
     puts(cbuff);
     if (out)
@@ -1539,7 +1536,7 @@ struct string_equal
     }
 };
 
-int find_test()
+static int find_test()
 {
     emhash6::HashMap<std::string, uint64_t, string_hash, string_equal> map;
     std::string_view key = "key";
@@ -1554,8 +1551,143 @@ int find_test()
 }
 #endif
 
+static inline uint64_t hash64(uint64_t key)
+{
+#if __SIZEOF_INT128__
+    __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
+    return (uint64_t)(r >> 64) + (uint64_t)r;
+#elif _WIN64
+    uint64_t high;
+    return _umul128(key, UINT64_C(11400714819323198485), &high) + high;
+#else
+    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+    return (r >> 32) + r;
+#endif
+}
+
+static inline uint64_t hash32(uint64_t key)
+{
+#if 1
+    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+    return (r >> 32) + r;
+#elif 1
+    //MurmurHash3Mixer
+    uint64_t h = key;
+    h ^= h >> 33;
+    h *= 0xff51afd7ed558ccd;
+    h ^= h >> 33;
+    h *= 0xc4ceb9fe1a85ec53;
+    h ^= h >> 33;
+    return h;
+#elif 1
+    uint64_t x = key;
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    x = x ^ (x >> 31);
+    return x;
+#endif
+}
+
+static void testHashInt(int loops = 100000009)
+{
+    long sum = 0;
+    auto ts = getTime();
+
+#ifdef PHMAP_VERSION_MAJOR
+    for (int i = 0; i < loops; i++)
+        sum += phmap::phmap_mix<8>()(i);
+    printf("phmap hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+#endif
+
+    ts = getTime();
+    for (int i = 1; i < loops; i++)
+        sum += i;
+    printf("phmap mul = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+
+#ifdef ROBIN_HOOD_H_INCLUDED
+    ts = getTime();
+    for (int i = 0; i < loops; i++)
+        sum += robin_hood::hash<uint64_t>()(i);
+    printf("robin hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+#endif
+
+    ts = getTime();
+    for (int i = 0; i < loops; i++)
+        sum += std::hash<uint64_t>()(i);
+    printf("std hash = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
+
+    ts = getTime();
+    for (int i = 0; i < loops; i++)
+        sum += hash64(i);
+    printf("hash64   = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
+
+    ts = getTime();
+    for (int i = 0; i < loops; i++)
+        sum += hash32(i);
+    printf("hash32   = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
+}
+
+static void buildRandString(int size, std::vector<std::string>& rndstring, int str_min, int str_max)
+{
+    std::mt19937_64 srng; srng.seed(time(0));
+    for (int i = 0; i < size; i++)
+        rndstring.emplace_back(get_random_alphanum_string(srng() % (str_max - str_min + 1) + str_min));
+}
+
+static void testHashString(int size, int str_min, int str_max)
+{
+    std::vector<std::string> rndstring;
+    rndstring.reserve(size * 4);
+
+    char os_info[2048]; printInfo(os_info);
+    long sum = 0;
+    for (int i = 1; i <= 4; i++)
+    {
+        rndstring.clear();
+        buildRandString(size * i, rndstring, str_min * i, str_max * i);
+        int64_t start = 0;
+        int t_find = 0;
+
+        start = getTime();
+        for (auto& v : rndstring)
+            sum += std::hash<std::string>()(v);
+        t_find = (getTime() - start) / 1000;
+        printf("stdhash time use = %4d ms\n", t_find);
+
+#ifdef WYHASH_LITTLE_ENDIAN
+        start = getTime();
+        for (auto& v : rndstring)
+            sum += wyhash(v.data(), v.size(), 1);
+        t_find = (getTime() - start) / 1000;
+        printf("wyhash  time use = %4d ms\n", t_find);
+#endif
+
+#ifdef ROBIN_HOOD_H_INCLUDED
+        start = getTime();
+        for (auto& v : rndstring)
+            sum += robin_hood::hash_bytes(v.data(), v.size());
+        t_find = (getTime() - start) / 1000;
+        printf("martin  time use = %4d ms\n", t_find);
+#endif
+
+#ifdef PHMAP_VERSION_MAJOR
+        start = getTime();
+        for (auto& v : rndstring)
+            sum += phmap::Hash<std::string>()(v);
+        t_find = (getTime() - start) / 1000;
+        printf("phmap   time use = %4d ms\n", t_find);
+#endif
+        putchar('\n');
+    }
+    printf("sum = %ld\n", sum);
+
+}
+
 int main(int argc, char* argv[])
 {
+    testHashInt();
+    testHashString(rand() % 1234567 + 1234567, 4, 64);
+
 #if HOOD_HASH && STR_VIEW
     find_test();
 #endif
@@ -1612,7 +1744,8 @@ int main(int argc, char* argv[])
                     hash_tables.emplace("emilib2", "emilib2");
                     hash_tables.emplace("emilib3", "emilib3");
                     hash_tables.emplace("emilib4", "emilib4");
-                } else if (c == 'l') {
+                }
+                else if (c == 'l') {
                     hash_tables.emplace("lru_size", "lru_size");
                     hash_tables.emplace("lru_time", "lru_time");
                 }
@@ -1647,8 +1780,8 @@ int main(int argc, char* argv[])
     while (true) {
         int n = (srng() % maxn) + minn;
         if (auto_set) {
-            printf(">> "); scanf("%u", &n);
-            if (n <= 0)
+            printf(">> ");
+            if (scanf("%u", &n) == 1 && n <= 0)
                 auto_set = false;
         }
         if (load_factor > 0.2 && load_factor < 1) {
