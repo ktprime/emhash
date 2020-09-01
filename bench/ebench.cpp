@@ -64,10 +64,6 @@ std::map<std::string, std::string> hash_tables =
 #endif
 };
 
-#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
-#define PHMAP_HAVE_SSSE3       1
-#endif
-
 #define EM3                    1
 //#define HOOD_HASH              1
 #define PHMAP_HASH             1

@@ -9,6 +9,7 @@
 #include "ska/bytell_hash_map.hpp"
 #include "phmap/phmap.h"
 #include "emilib/hash_emilib33.hpp"
+#include "patchmap/patchmap.hpp"
 
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
@@ -258,7 +259,7 @@ static uint64_t ctor_initlist(T& m, const char* msg = nullptr)
 {
     Timer t("ctor_initlist", msg);
 
-	for (int n = 100000; n--;)
+    for (int n = 100000; n--;)
     m = T({ { 10,make_value(20,(const Value*)0) }, {20,make_value(30,(const Value*)0)}, { 11, make_value(20,(const Value*)0) }, { 21,make_value(30,(const Value*)0) } });
 
     return m.size();
@@ -293,7 +294,8 @@ static uint64_t test(T& m, const char* name)
     puts(name);
     //TEST(m);
     m.max_load_factor(0.88f);
-    insert_assign(m);
+    //insert_assign(m);
+    insert_operator(m);
     printf("load_factor = %.2lf\n", m.load_factor());
 
     erase(m);
@@ -360,6 +362,7 @@ int main()
 #endif
 
     uint64_t ret = 0;
+    { std::unordered_map<uint64_t, Value, hash_t> m3; ret -= test(m3, "\nstd::unordered_map"); }
     { robin_hood::unordered_flat_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_flat_map"); }
     { robin_hood::unordered_node_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_node_map"); }
 //    { emhash4::HashMap<uint64_t, Value, hash_t> m7; ret -= test(m7, "\nemhash4::HashMap"); }
@@ -373,10 +376,10 @@ int main()
  //   { emhash2::HashMap<uint64_t, Value, hash_t> m2; ret -= test(m2, "\nemhash2::HashMap"); }
     { emhash7::HashMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nemhash6::HashMap"); }
 
-    //std::unordered_map<uint64_t, Value, hash_t> m3; ret -= test(m3, "\nstd::unordered_map");
     //google::dense_hash_map<uint64_t, Value, hash_t> m2;ret -= test(m2, "\ngoogle::dense_hash_map");
     { phmap::flat_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::flat_map"); }
     { phmap::node_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::node_map"); }
+//    { whash::patchmap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nwhash::patchmap"); } //insert_or_assign is not exist
 
     delete[] ELEMENTS;
     return (int)ret;

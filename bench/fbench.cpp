@@ -386,9 +386,45 @@ void test_delay()
 }
 
 struct Hash32 {
-    inline size_t operator()(const uint32_t x) const {
-        return x;
-    }
+	inline size_t operator()(uint32_t key) const {
+#if H32 == 0
+		uint64_t h = key;
+		h*=14486182417589908843ull;
+		h^=h>>32;
+		h*=14486182417589908843ull;
+		h^=h>>32;
+		h*=14486182417589908843ull;
+		h^=h>>32;
+		return h;
+#elif H32 == 1
+		key += ~(key << 15);
+		key ^=  (key >> 10);
+		key +=  (key << 3);
+		key ^=  (key >> 6);
+		key += ~(key << 11);
+		key ^=  (key >> 16);
+		return key;
+
+#elif H32 == 2
+		uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+		return (r >> 32) + r;
+#elif H32 == 3
+		//MurmurHash3Mixer
+		uint64_t h = key;
+		h ^= h >> 33;
+		h *= 0xff51afd7ed558ccd;
+		h ^= h >> 33;
+		h *= 0xc4ceb9fe1a85ec53;
+		h ^= h >> 33;
+		return (h >> 32) + h;
+#elif H32 == 4
+		uint64_t x = key;
+		x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+		x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+		x = x ^ (x >> 31);
+		return (x >> 32) + x;
+#endif
+	}
 };
 
 static inline uint32_t hash32(uint32_t key)
@@ -473,7 +509,6 @@ int main(int argc, char* argv[])
     //test_delay();
     {
         run_udb2<emhash6::HashMap<uint32_t, uint32_t, Hash32>>("emhash6");
-        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
         run_udb2<ska::flat_hash_map<uint32_t, uint32_t, Hash32>>("ska_flat");
         run_udb2<ska::bytell_hash_map<uint32_t, uint32_t, Hash32>>("ska_byte");
         run_udb2<emhash7::HashMap<uint32_t, uint32_t, Hash32>>("emhash7");
@@ -485,6 +520,7 @@ int main(int argc, char* argv[])
 #if __linux__ && AVX2
         run_udb2<fht_table<uint32_t, uint32_t>>("fht_table");
 #endif
+        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
     }
 
     std::vector<test_key_t> insert_keys;

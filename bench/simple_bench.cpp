@@ -26,10 +26,12 @@
 
 #include "phmap/phmap.h"
 #include "hrd/hash_set7.h"
+#include "patchmap/patchmap.hpp"
 
 #include "hash_set2.hpp"
 #include "hash_set3.hpp"
 #include "hash_set4.hpp"
+
 using my_clock = std::chrono::high_resolution_clock;
 
 template<typename Map>
@@ -195,12 +197,13 @@ int main(int argc, char* argv[])
 
     bench<hrd7::hash_map<int, std::string>>("hrd7::hash_map");
     bench<emilib3::HashMap<int, std::string>>("emilib3::hashMap");
+    bench<whash::patchmap<int, std::string>>("whash::patchmap");
 
-    bench_wyhash(3234567, 32);
+    //bench_wyhash(3234567, 32);
 
     srand(time(0));
 
-	if (argc > 4)
+    if (argc > 4)
     {
         //phmap::flat_hash_map<int, std::string> mmap;
         robin_hood::unordered_node_map<int, std::string> mmap;

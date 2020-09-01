@@ -48,6 +48,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <algorithm>
 
 #ifdef __has_include
     #if __has_include("wyhash.h")

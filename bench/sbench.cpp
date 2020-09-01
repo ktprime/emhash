@@ -1253,11 +1253,11 @@ static void printInfo(char* out)
     info += sprintf(info, " OS = Win");
 #elif __linux__
     info += sprintf(info, " OS = linux");
-#elif __MAC__
+#elif __MAC__ || __APPLE__
     info += sprintf(info, " OS = MAC");
 #elif __unix__
     info += sprintf(info, " OS = unix");
-#elif
+#else
     info += sprintf(info, " OS = unknow");
 #endif
 
