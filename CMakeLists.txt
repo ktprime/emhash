@@ -15,10 +15,12 @@ message("  CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR} ")
 message("  CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 
 include_directories(${PROJECT_SOURCE_DIR})
-#include_directories(${PROJECT_SOURCE_DIR}/emhash)
+include_directories(${PROJECT_SOURCE_DIR}/thirdparty)
 include_directories(${PROJECT_SOURCE_DIR}/bench)
 
 add_definitions(-DET=1 -DTKey=1 -DTVal=1)
+
+find_package(Threads REQUIRED)
 
 if(WIN32)
     set(CMAKE_CXX_FLAGS "/WX- /MP")
@@ -26,7 +28,7 @@ if(WIN32)
     set(CMAKE_CXX_FLAGS_RELEASE "/Ob1 /Ot /Oi /Oy /GL /arch:AVX ${CMAKE_CXX_FLAGS}")
     add_compile_options(/Ob2 /DNDEBUG /O2 /Ot /Oi /Oy /GL /arch:AVX)
 elseif()
-    set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -march=native -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
     set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -march=native -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
 endif()
 
@@ -34,3 +36,6 @@ add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)
 add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martin_bench.cpp)
 add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hbench.cpp)
 
+target_link_libraries(ebench PRIVATE Threads::Threads)
+target_link_libraries(mbench PRIVATE Threads::Threads)
+target_link_libraries(hbench PRIVATE Threads::Threads)
