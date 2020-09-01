@@ -35,6 +35,7 @@ endif()
 add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)
 add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martin_bench.cpp)
 add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hbench.cpp)
+add_executable(fbench ${PROJECT_SOURCE_DIR}/bench/fbench.cpp)
 
 target_link_libraries(ebench PRIVATE Threads::Threads)
 target_link_libraries(mbench PRIVATE Threads::Threads)
