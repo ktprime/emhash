@@ -25,7 +25,9 @@
 #include "hash_table7.hpp"
 
 #include "phmap/phmap.h"
+#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 #include "hrd/hash_set7.h"
+#endif
 #include "patchmap/patchmap.hpp"
 
 #include "hash_set2.hpp"
@@ -195,7 +197,9 @@ int main(int argc, char* argv[])
     bench<ska::flat_hash_map<int, std::string>>("ska::flat_map");
     bench<ska::bytell_hash_map<int, std::string>>("ska::byte_map");
 
+#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
     bench<hrd7::hash_map<int, std::string>>("hrd7::hash_map");
+#endif
     bench<emilib3::HashMap<int, std::string>>("emilib3::hashMap");
     bench<whash::patchmap<int, std::string>>("whash::patchmap");
 
