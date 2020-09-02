@@ -90,6 +90,10 @@ using std::max;
 KHASH_MAP_INIT_INT(32, uint32_t)
 #endif
 
+    static std::random_device rd;
+    static std::mt19937_64 rnd(rd());
+
+#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 uint32_t const clmul_mod(const uint32_t& i,const uint32_t& j){
     __m128i I{}; I[0]^=i;
     __m128i J{}; J[0]^=j;
@@ -102,11 +106,20 @@ uint32_t const clmul_mod(const uint32_t& i,const uint32_t& j){
     return A[0]^(A[0]>>32)^(B[0]>>32)^X[0]^(X[0]>>32);
   }
 
+
 uint32_t gen_rand(uint32_t i){
   //return i;
   //return wmath::rol(i*uint32_t(3061963241ul),16)*uint32_t(3107070805ul);
   return clmul_mod(uint32_t(i*3061963241ul),uint32_t(3107070805ul));
 }
+
+#else
+
+uint32_t gen_rand(uint32_t i){
+    return rnd();
+}
+
+#endif
 
 /*
  * Author:  David Robert Nadeau
