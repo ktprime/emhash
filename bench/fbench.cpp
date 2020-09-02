@@ -13,6 +13,10 @@
 #include "fht/fht_ht.hpp"
 #endif
 
+#if __GNUC__
+#include <ext/pb_ds/assoc_container.hpp>
+#endif
+
 //#define EMH_FIBONACCI_HASH 1
 
 #include "martin/robin_hood.h"
@@ -21,11 +25,12 @@
 #include "ska/bytell_hash_map.hpp"
 #include "tsl/robin_map.h"
 #include "tsl/hopscotch_map.h"
+
 #include "patchmap/patchmap.hpp"
 //#include "emilib/emilib33.hpp"
 
-#include "hash_table5.hpp"
 #include "hash_table7.hpp"
+#include "hash_table5.hpp"
 #include "hash_table6.hpp"
 
 static std::random_device rd;
@@ -247,7 +252,7 @@ init_remove_keys(std::vector<test_key_t> & insert_keys, std::vector<test_key_t> 
 static void
 clear_cache() {
 
-#if __linux__ && __x86_64__ && AVX2
+#if __linux__ && AVX2
     // not too woried about instruction cache... just clear data cache
     uint32_t *     ptrs[10];
     const uint32_t clear_size = (1 << 22);
@@ -285,7 +290,7 @@ static int run_table(std::vector<test_key_t> & insert_keys,
                std::vector<test_key_t> & remove_keys) {
 
     clear_cache();
-    ht test_table(INIT_SIZE > 10 ? INIT_SIZE : insert_keys.size() / INIT_SIZE);
+    ht test_table;//(INIT_SIZE > 10 ? INIT_SIZE : insert_keys.size() / INIT_SIZE);
 
     uint32_t next_remove, remove_iter = 0;
     next_remove =
@@ -299,7 +304,7 @@ static int run_table(std::vector<test_key_t> & insert_keys,
     for (uint32_t i = 0; i < TEST_LEN; i++) {
         test_table[insert_keys[i]] = dvalue;
         for (uint32_t j = i * QUERY_RATE; j < (i + 1) * QUERY_RATE; j++) {
-            sum += test_table.count(query_keys[j]);
+            sum += test_table.find(query_keys[j]) != test_table.end();
         }
         if (i == next_remove) {
             volatile auto sink = test_table.erase(remove_keys[remove_iter++]);
@@ -385,60 +390,19 @@ void test_delay()
     //    printf("time2 use %ld ms\n", (now2ns() - start_time) / 1000000);
 }
 
-struct Hash32 {
-	inline size_t operator()(uint32_t key) const {
-#if H32 == 0
-		uint64_t h = key;
-		h*=14486182417589908843ull;
-		h^=h>>32;
-		h*=14486182417589908843ull;
-		h^=h>>32;
-		h*=14486182417589908843ull;
-		h^=h>>32;
-		return h;
-#elif H32 == 1
-		key += ~(key << 15);
-		key ^=  (key >> 10);
-		key +=  (key << 3);
-		key ^=  (key >> 6);
-		key += ~(key << 11);
-		key ^=  (key >> 16);
-		return key;
-
-#elif H32 == 2
-		uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-		return (r >> 32) + r;
-#elif H32 == 3
-		//MurmurHash3Mixer
-		uint64_t h = key;
-		h ^= h >> 33;
-		h *= 0xff51afd7ed558ccd;
-		h ^= h >> 33;
-		h *= 0xc4ceb9fe1a85ec53;
-		h ^= h >> 33;
-		return (h >> 32) + h;
-#elif H32 == 4
-		uint64_t x = key;
-		x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-		x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
-		x = x ^ (x >> 31);
-		return (x >> 32) + x;
-#endif
-	}
-};
 
 static inline uint32_t hash32(uint32_t key)
 {
-#if H32 == 0
+#if H32 == 6
     key += ~(key << 15);
-    key ^=  (key >> 10);
-    key +=  (key << 3);
-    key ^=  (key >> 6);
+    key ^= (key >> 10);
+    key += (key << 3);
+    key ^= (key >> 6);
     key += ~(key << 11);
-    key ^=  (key >> 16);
+    key ^= (key >> 16);
     return key;
 
-#elif H32 == 1
+#elif H32 == 0
     uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
     return (r >> 32) + r;
 #elif H32 == 2
@@ -456,8 +420,16 @@ static inline uint32_t hash32(uint32_t key)
     x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
     x = x ^ (x >> 31);
     return (x >> 32) + x;
+#else
+    return key;
 #endif
 }
+
+struct Hash32 {
+    inline size_t operator()(uint32_t key) const {
+        return hash32(key);
+    }
+};
 
 static inline uint32_t get_key(const uint32_t n, const uint32_t x)
 {
@@ -507,8 +479,10 @@ int main(int argc, char* argv[])
     srand(time(0));
 
     //test_delay();
+    if (argc == 1)
     {
         run_udb2<emhash6::HashMap<uint32_t, uint32_t, Hash32>>("emhash6");
+        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
         run_udb2<ska::flat_hash_map<uint32_t, uint32_t, Hash32>>("ska_flat");
         run_udb2<ska::bytell_hash_map<uint32_t, uint32_t, Hash32>>("ska_byte");
         run_udb2<emhash7::HashMap<uint32_t, uint32_t, Hash32>>("emhash7");
@@ -517,10 +491,13 @@ int main(int argc, char* argv[])
         run_udb2<tsl::robin_map<uint32_t, uint32_t, Hash32>>("tsl_robin");
         run_udb2<tsl::hopscotch_map<uint32_t, uint32_t, Hash32>>("tsl_hops");
         run_udb2<emhash5::HashMap<uint32_t, uint32_t, Hash32>>("emhash5");
+
 #if __linux__ && AVX2
         run_udb2<fht_table<uint32_t, uint32_t>>("fht_table");
 #endif
-        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
+#if __GNUC__
+      //  run_udb2<__gnu_pbds::gp_hash_table<uint32_t, uint32_t>>("gp_hashtable");
+#endif
     }
 
     std::vector<test_key_t> insert_keys;
@@ -567,7 +544,6 @@ int main(int argc, char* argv[])
     if (ret == run_table <ska::bytell_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <emhash5::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <emhash7::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-//    if (ret == run_table <emhash2::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
 //    if (ret == run_table <robin_hood::unordered_node_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <phmap::flat_hash_map<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys));
@@ -575,6 +551,10 @@ int main(int argc, char* argv[])
     if (ret == run_table <tsl::robin_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <tsl::hopscotch_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <whash::patchmap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+#if __GNUC__
+    // run_table <__gnu_pbds::gp_hash_table<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys);
+#endif
+
 //    if (ret == run_table <emilib4::HashMap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
     int n = TEST_LEN;
     printf(">> "); scanf("%u", &n);
