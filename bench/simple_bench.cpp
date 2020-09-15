@@ -28,7 +28,7 @@
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 #include "hrd/hash_set7.h"
 #endif
-#include "patchmap/patchmap.hpp"
+//#include "patchmap/patchmap.hpp"
 
 #include "hash_set2.hpp"
 #include "hash_set3.hpp"
@@ -201,7 +201,7 @@ int main(int argc, char* argv[])
     bench<hrd7::hash_map<int, std::string>>("hrd7::hash_map");
 #endif
     bench<emilib3::HashMap<int, std::string>>("emilib3::hashMap");
-    bench<whash::patchmap<int, std::string>>("whash::patchmap");
+//    bench<whash::patchmap<int, std::string>>("whash::patchmap");
 
     //bench_wyhash(3234567, 32);
 

@@ -14,7 +14,7 @@
 #endif
 
 #if __GNUC__
-#include <ext/pb_ds/assoc_container.hpp>
+//#include <ext/pb_ds/assoc_container.hpp>
 #endif
 
 //#define EMH_FIBONACCI_HASH 1
@@ -26,7 +26,7 @@
 #include "tsl/robin_map.h"
 #include "tsl/hopscotch_map.h"
 
-#include "patchmap/patchmap.hpp"
+//#include "patchmap/patchmap.hpp"
 //#include "emilib/emilib33.hpp"
 
 #include "hash_table7.hpp"
@@ -482,7 +482,7 @@ int main(int argc, char* argv[])
     if (argc == 1)
     {
         run_udb2<emhash6::HashMap<uint32_t, uint32_t, Hash32>>("emhash6");
-        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
+//        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
         run_udb2<ska::flat_hash_map<uint32_t, uint32_t, Hash32>>("ska_flat");
         run_udb2<ska::bytell_hash_map<uint32_t, uint32_t, Hash32>>("ska_byte");
         run_udb2<emhash7::HashMap<uint32_t, uint32_t, Hash32>>("emhash7");
@@ -550,7 +550,7 @@ int main(int argc, char* argv[])
 //    if (ret == run_table <phmap::node_hash_map<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <tsl::robin_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <tsl::hopscotch_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <whash::patchmap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <whash::patchmap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
 #if __GNUC__
     // run_table <__gnu_pbds::gp_hash_table<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys);
 #endif
