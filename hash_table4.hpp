@@ -621,7 +621,7 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statics() const
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};

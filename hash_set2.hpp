@@ -394,7 +394,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.999 && value > 0.2f)
+        if (value < 0.9999 && value > 0.2f)
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 
@@ -506,7 +506,7 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statics() const
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};

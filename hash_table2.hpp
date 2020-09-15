@@ -615,7 +615,7 @@ public:
         return bucket_size;
     }
 
-    void dump_statis(bool show_cache) const
+    void dump_statics(bool show_cache) const
     {
         uint32_t buckets[256] = {0};
         uint32_t steps[256]   = {0};

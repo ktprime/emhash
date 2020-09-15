@@ -617,7 +617,7 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statics() const
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};
@@ -1200,43 +1200,43 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-#if 0
-        const auto bucket1 = bucket_from + 1;
-        if (_pairs[bucket1].second == INACTIVE)
-            return bucket1;
-
-        const auto bucket2 = bucket_from + 2;
-        if (_pairs[bucket2].second == INACTIVE)
-            return bucket2;
-#endif
-
 #if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
-        const auto bmask = *(size_t*)((uint8_t*)_bitmask + bucket_from / 8) >> boset;
+        const auto begin = (uint8_t*)_bitmask + bucket_from / 8;
 #else
         const auto boset = bucket_from % SIZE_BIT;
-        const auto bmask = *((size_t*)_bitmask + bucket_from / SIZE_BIT) >> boset;
-#endif
-        if (EMH_LIKELY(bmask != 0))
-            return bucket_from + CTZ(bmask) - 0;
-
-#if EMH_HIGH_LOAD
-        for (uint32_t step = _last; ; step = ++_last) {
-            const auto bmask = *((size_t*)_bitmask + step);
-            if (EMH_LIKELY(bmask != 0))
-                return step * SIZE_BIT + CTZ(bmask);
-
-            else if (EMH_UNLIKELY(step >= _num_buckets / SIZE_BIT))
-                _last = 0 - 1;
-        }
-#else
-        for (uint32_t step = _last; ; step = ++_last & (_mask / SIZE_BIT)) {
-            const auto bmask = *((size_t*)_bitmask + step);
-            if (EMH_LIKELY(bmask != 0))
-                return step * SIZE_BIT + CTZ(bmask);
-        }
+        const auto begin = (size_t*)_bitmask + bucket_from / SIZE_BIT;
 #endif
 
+        const auto bmask = *(size_t*)(begin) >> boset;
+        if (EMH_LIKELY(bmask != 0)) {
+            const auto offset = CTZ(bmask);
+            if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
+                return bucket_from + offset;
+
+            return bucket_from - boset + CTZ(begin[0]);
+        }
+
+        const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
+        {
+            const auto next2 = (bucket_from + 2 * SIZE_BIT) & qmask;
+            const auto bmask2 = *((size_t*)_bitmask + next2);
+            if (EMH_LIKELY(bmask2 != 0))
+                return next2 * SIZE_BIT + CTZ(bmask2);
+        }
+
+        for (; ;) {
+            const auto bmask2 = *((size_t*)_bitmask + _last);
+            if (bmask2 != 0)
+                return _last * SIZE_BIT + CTZ(bmask2);
+
+            const auto next1 = qmask - _last;
+            const auto bmask1 = *((size_t*)_bitmask + next1);
+            if (bmask1 != 0)
+                return next1 * SIZE_BIT + CTZ(bmask1);
+
+            _last = (_last + 1) & qmask;
+        }
         return 0;
     }
 

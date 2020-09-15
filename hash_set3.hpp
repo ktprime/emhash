@@ -502,7 +502,7 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statics() const
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};
@@ -1261,34 +1261,20 @@ private:
         return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
-    static inline uint32_t hash32(uint32_t key)
-    {
-#if 0
-        key = ((key >> 16) ^ key) * 0x45d9f3b;
-        key = ((key >> 16) ^ key) * 0x45d9f3b; //0x119de1f3
-//        key = ((key >> 13) ^ key) * 0xc2b2ae35;
-        key = (key >> 16) ^ key;
-        return key;
-#elif 1
-        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
-#elif 1
-        key += ~(key << 15);
-        key ^= (key >> 10);
-        key += (key << 3);
-        key ^= (key >> 6);
-        key += ~(key << 11);
-        key ^= (key >> 16);
-        return key;
-#endif
-    }
-
     static inline uint64_t hash64(uint64_t key)
     {
-//       return (key >> 33 ^ key ^ key << 11);
-#if 0
+#if __SIZEOF_INT128__
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        __uint128_t r = key; r *= k;
+        return (uint32_t)(r >> 64) + (uint32_t)r;
+#elif _WIN64
+        uint64_t high;
+        constexpr uint64_t k = UINT64_C(11400714819323198485);
+        return _umul128(key, k, &high) + high;
+#elif 1
+        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#elif 1
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1296,29 +1282,23 @@ private:
         h ^= h >> 33;
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
-        return static_cast<size_t>(h);
-#elif __SIZEOF_INT128__
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        __uint128_t r = key; r *= k;
-        return (uint32_t)(r >> 64) + r;
-#else
-        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
+        return h;
+#elif 1
+        uint64_t x = key;
+        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+        x = x ^ (x >> 31);
+        return x;
 #endif
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_inter(const UType key) const
     {
-#if EMH_IDENTITY_HASH
-        return (uint32_t)key;
-#elif 1
-        if (sizeof(UType) <= sizeof(uint32_t))
-            return hash32(key);
-        else
-            return hash64(key);
+#ifdef EMH_FIBONACCI_HASH
+        return hash64(key);
+#elif EMH_IDENTITY_HASH
+        return key + (key >> (sizeof(UType) * 4));
 #else
         return _hasher(key);
 #endif
@@ -1328,9 +1308,9 @@ private:
     inline uint32_t hash_inter(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        return (uint32_t)(_hasher(key) * 11400714819323198485ull);
+        return (_hasher(key) * 11400714819323198485ull);
 #else
-        return (uint32_t)_hasher(key);
+        return _hasher(key);
 #endif
     }
 

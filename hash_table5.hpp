@@ -603,7 +603,7 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statics() const
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};
@@ -960,7 +960,7 @@ public:
 
     static constexpr bool is_triviall_destructable()
     {
-#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
+#if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
         return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -969,7 +969,7 @@ public:
 
     static constexpr bool is_copy_trivially()
     {
-#if __cplusplus >= 201103L || _MSC_VER > 1600 || __clang__
+#if __cplusplus >= 201103L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -1189,7 +1189,7 @@ private:
             next_bucket = nbucket;
         }
 
-        return _num_buckets;
+        return 0;
     }
 
     //kick out bucket and find empty to occpuy
@@ -1281,6 +1281,19 @@ private:
         return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
+/***
+  Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
+Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing¡ªthe most cache-friendly alternative¡ªis typically used.
+
+    It's the core algorithm of this hash map with highly optimization/benchmark.
+normaly linear probing is inefficient with high load factor, it use a new 3-way linear
+probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than
+one-way seach strategy.
+
+1. linear or quadratic probing a few cache line for less cache miss from input slot "bucket_from".
+2. the first  seach  slot from member variant "_last", init with 0
+3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
+*/
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
@@ -1288,24 +1301,20 @@ private:
         if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
-        constexpr auto linear_probe_length = std::min((unsigned int)(128 / sizeof(PairT)) + 1, 3u);//cpu cache line 64 byte,2-3 cache line miss
-        auto offset = 1u;
-//        if (bucket < _last)
-//            bucket = _last;
+        constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
+        auto offset = 2u;
 
+#ifdef EMH_QUADRATIC
         for (; offset < linear_probe_length; offset += 2) {
             auto bucket1 = (bucket + offset) & _mask;
-            if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1)) {
-//				if (bucket < _last)
-//					offset += 0;
+            if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                 return bucket1;
-			}
         }
-#if 0
-        for (auto next = offset * 2; offset < 10; next += ++offset) {
-            const auto bucket3 = (bucket_from + next) & _mask;
-            if (EMH_EMPTY(_pairs, bucket3) || EMH_EMPTY(_pairs, ++bucket3))
-                return bucket3;
+#else
+        for (auto next = offset; offset < linear_probe_length; next += ++offset) {
+            auto bucket1 = (bucket + next) & _mask;
+            if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
+                return bucket1;
         }
 #endif
 
@@ -1313,7 +1322,7 @@ private:
             _last &= _mask;
             if (EMH_EMPTY(_pairs, _last++) || EMH_EMPTY(_pairs, _last++))
                 return _last++ - 1;
-#if 0
+#if EMH_LINEAR3
             auto tail = _mask - _last & _mask;
             if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                 return tail;
@@ -1322,6 +1331,7 @@ private:
             if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
                 return medium;
         }
+
         return 0;
     }
 
@@ -1410,18 +1420,16 @@ private:
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType& key) const
     {
-#ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(),0x12345678);
-#elif EMH_BDKR_HASH
-        uint64_t hash = 0;
-        if (key.size() < 64) {
-            for (const auto c : key)
-                hash = c + hash * 131;
-        } else {
-            for (int i = 0, j = 1; i < key.size(); i += j++)
-                hash = key[i] + hash * 131;
-        }
+#if EMH_BDKR_HASH
+        uint64_t hash = 0; int  i = 0;
+        for (; i + sizeof(uint64_t) < key.size(); i += sizeof(uint64_t))
+            hash += *(uint64_t*)(&key[i]) * KC;
+        int diff = int(key.size() - i) * 8;
+        if (diff != 0)
+            hash += ((*(uint64_t*)(&key[i]) & ((1ull << diff) - 1))) * KC;
         return hash;
+#elif WYHASH_LITTLE_ENDIAN
+        return wyhash(key.c_str(), key.size(), KC);
 #else
         return _hasher(key);
 #endif

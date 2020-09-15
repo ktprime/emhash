@@ -89,15 +89,15 @@
 #else
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
-    #define EMH_BUCKET(p,n) p[n].bucket / 2
-    #define EMH_ADDR(p,n) p[n].bucket
-    #define EMH_EMPTY(p,n) (0 > (int)p[n].bucket)
+    #define EMH_BUCKET(p,n)  p[n].bucket / 2
+    #define EMH_ADDR(p,n)    p[n].bucket
+    #define EMH_EMPTY(p,n)   (0 > (int)p[n].bucket)
     #define EMH_PKV(p,n)     p[n]
     #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; EMH_SET(bucket)
 #endif
 
 #define EMH_SET(bucket)   _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
-#define EMH_BTS(bucket) _bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))
+#define EMH_BTS(bucket)   _bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))
 
 #if _WIN32
     #include <intrin.h>
@@ -629,7 +629,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.999f && value > 0.2f)
+        if (value < 0.9999f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 
@@ -727,7 +727,7 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statics() const
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};
@@ -1496,14 +1496,8 @@ private:
     {
 #if 0
         const auto bucket1 = bucket_from + 1;
-        if (EMH_EMPTY(_pairs, bucket1))
+        if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
             return bucket1;
-
-        if (bInCacheLine) {
-            const auto bucket2 = bucket_from + 2;
-            if (EMH_EMPTY(_pairs, bucket2))
-                return bucket2;
-        }
 #endif
 
         const auto boset = bucket_from % 8;
@@ -1519,25 +1513,27 @@ private:
             return bucket_from - boset + CTZ(begin[0]);
         }
 
+        const auto qmask =  _mask / SIZE_BIT;
+        if (1)
         {
-            const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
-            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask; 
+            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
-            if (bmask2 != 0)
+            if (EMH_LIKELY(bmask2 != 0))
                 return step * SIZE_BIT + CTZ(bmask2);
-
-            const auto next1 = step + 1;
-            const auto bmask1 = *((size_t*)_bitmask + next1);
-            if (bmask1 != 0)
-               return next1 * SIZE_BIT + CTZ(bmask1);
         }
 
         for (; ; ) {
             auto &_last = EMH_ADDR(_pairs, _mask + 1);
-            const auto bmask = *((size_t*)_bitmask + _last);
-            if (bmask != 0)
-                return _last * SIZE_BIT + CTZ(bmask);
-            _last = (_last + 1) & (_mask / SIZE_BIT);
+            const auto bmask2 = *((size_t*)_bitmask + _last);
+            if (bmask2 != 0)
+                return _last * SIZE_BIT + CTZ(bmask2);
+
+            const auto next1 = qmask - _last;
+            const auto bmask1 = *((size_t*)_bitmask + next1);
+            if (bmask1 != 0)
+                return next1 * SIZE_BIT + CTZ(bmask1);
+
+            _last = (_last + 1) & qmask;
         }
         return 0;
     }
@@ -1592,18 +1588,18 @@ private:
         return EMH_ADDR(_pairs, last_bucket) = find_empty_bucket(last_bucket) * 2 + 1;
     }
 
+    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        __uint128_t r = key; r *= k;
-        return (uint32_t)(r >> 64) + (uint32_t)r;
-#elif _WIN32
+        const auto r = (static_cast<unsigned __int128>(KC)) * key;
+        uint64_t high = static_cast<uint64_t>(r >> 64U);
+        return (uint64_t)(high + (high >> 32)) + (uint64_t)r;
+#elif _WIN64
         uint64_t high;
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        return _umul128(key, k, &high) + high;
+        return _umul128(key, KC, &high) + high;
 #elif 1
-        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
 #elif 1
         //MurmurHash3Mixer

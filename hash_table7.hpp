@@ -508,7 +508,7 @@ public:
         uint32_t _from;
     };
 
-    void init(uint32_t bucket, float lf = 0.90f)
+    void init(uint32_t bucket, float lf = 0.95f)
     {
         _num_buckets = _num_filled = 0;
         _pairs = nullptr;
@@ -517,7 +517,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4, float lf = 0.90f)
+    HashMap(uint32_t bucket = 4, float lf = 0.95f)
     {
         init(bucket, lf);
     }
@@ -805,7 +805,7 @@ public:
         return bucket_size;
     }
 
-    void dump_statis(bool show_cache) const
+    void dump_statics(bool show_cache) const
     {
         uint32_t buckets[256] = {0};
         uint32_t steps[256]   = {0};
@@ -1271,7 +1271,7 @@ public:
             return false;
 
 #if EMH_STATIS
-        if (_num_filled > 100'000) dump_statis(1);
+        if (_num_filled > 100'000) dump_statics(1);
 #endif
         rehash(required_buckets + 2);
         return true;
@@ -1617,11 +1617,8 @@ private:
     {
 #if 0
         const auto bucket1 = bucket_from + 1;
-        if (EMH_EMPTY(_pairs, bucket1))
+        if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
             return bucket1;
-        const auto bucket2 = bucket_from + 2;
-        if (EMH_EMPTY(_pairs, bucket2))
-            return bucket2;
 #endif
 
         //fast find by bit
@@ -1644,24 +1641,25 @@ private:
             return bucket_from - boset + CTZ(begin[0]);
         }
 
+        const auto qmask = _mask / SIZE_BIT;
         {
-            const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
-            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
-            const auto bmask2 = *((size_t*)_bitmask + step);
-            if (bmask2 != 0)
-                return step * SIZE_BIT + CTZ(bmask2);
+            const auto next2 = (bucket_from + 2 * SIZE_BIT) & qmask;
+            const auto bmask2 = *((size_t*)_bitmask + next2);
+            if (EMH_LIKELY(bmask2 != 0))
+                return next2 * SIZE_BIT + CTZ(bmask2);
+        }
 
-            const auto next1 = step + 1;
+        for (; ;) {
+            const auto bmask2 = *((size_t*)_bitmask + _last);
+            if (bmask2 != 0)
+                return _last * SIZE_BIT + CTZ(bmask2);
+
+            const auto next1 = qmask - _last;
             const auto bmask1 = *((size_t*)_bitmask + next1);
             if (bmask1 != 0)
                 return next1 * SIZE_BIT + CTZ(bmask1);
-        }
 
-        for (; ; ) {
-            const auto bmask = *((size_t*)_bitmask + _last);
-            if (bmask != 0)
-                return _last * SIZE_BIT + CTZ(bmask);
-            _last = (_last + 1) & (_mask / SIZE_BIT);
+            _last = (_last + 1) & qmask;
         }
         return 0;
     }
@@ -1750,7 +1748,7 @@ private:
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #elif EMH_WYHASH64
-        return wyhash64(key, _num_buckets);
+        return wyhash64(key, 11400714819323198485ull);
 #else
         return _hasher(key);
 #endif
