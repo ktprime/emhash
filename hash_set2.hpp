@@ -250,7 +250,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivially_destructible<KeyT>::value)
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -273,7 +273,7 @@ public:
 
     ~HashSet()
     {
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivially_destructible<KeyT>::value)
             clearkv();
 
         free(_pairs);
@@ -289,7 +289,7 @@ public:
         _loadlf      = other._loadlf;
         _last_bucket = other._last_bucket;
 
-        if (std::is_pod<KeyT>::value) {
+        if (std::is_trivially_copyable<KeyT>::value) {
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
@@ -709,7 +709,7 @@ public:
         const auto main_bucket = hash_bucket(key);
         const auto prev_bucket = find_prev_bucket(main_bucket, last_bucket);
 
-        if (!std::is_pod<KeyT>::value) {
+        if (!std::is_trivially_destructible<KeyT>::value) {
             new(_pairs + bucket) PairT(std::move(key), last_next != last_bucket ? last_next : bucket);
             _pairs[last_bucket].~PairT();
         } else {
@@ -763,7 +763,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (_num_filled > _num_buckets / 4 && std::is_pod<KeyT>::value)
+        if (_num_filled > _num_buckets / 4 && std::is_trivially_destructible<KeyT>::value)
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
         else
             clearkv();
@@ -831,7 +831,7 @@ private:
 
             const auto bucket = find_unique_bucket(opairs.first);
             NEW_KEY(std::move(opairs.first), bucket);
-            if (!std::is_pod<KeyT>::value)
+            if (!std::is_trivially_destructible<KeyT>::value)
                 opairs.~PairT();
         }
 
@@ -874,7 +874,7 @@ private:
             return eqkey ? bucket : INACTIVE;
          } else if (eqkey) {
             const auto nbucket = _pairs[next_bucket].second;
-            if (std::is_pod<KeyT>::value)
+            if (std::is_trivial<KeyT>::value)
                 _pairs[bucket].first = _pairs[next_bucket].first;
             else
                 std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
@@ -907,7 +907,7 @@ private:
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = _pairs[next_bucket].second;
-                if (std::is_pod<KeyT>::value)
+                if (std::is_trivial<KeyT>::value)
                     _pairs[bucket].first = _pairs[next_bucket].first;
                 else
                     std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
@@ -963,7 +963,7 @@ private:
         if (next_bucket == bucket)
             _pairs[new_bucket].second = new_bucket;
 
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivially_destructible<KeyT>::value)
             _pairs[bucket].~PairT();
 
         _pairs[bucket].second = INACTIVE;
@@ -1030,22 +1030,19 @@ private:
             return _last_colls + 1;
 #endif
 
-        //fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
+        //fibonacci an2 = an1 + an0 --> 1, 2, 3, 4, 6, 7, 10, 11 ...
         //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t step = 2, slot = bucket + 1; ;slot += ++step) {
-            const auto bucket1 = slot & _mask;
-            if (_pairs[bucket1].second == INACTIVE)
-                return bucket1;
-
-            const auto bucket2 = bucket1 + 2;
-            if (_pairs[bucket2].second == INACTIVE)
-                return bucket2;
+        for (uint32_t step = 2, slot = bucket + 2; ;slot += ++step) {
+            slot &= _mask;
+            if (_pairs[slot].second == INACTIVE || _pairs[++slot].second == INACTIVE)
+                return slot;
 
             if (step > 4) {
-                if (_pairs[_last_bucket ++].second == INACTIVE || _pairs[_last_bucket ++].second == INACTIVE)
-                    return _last_bucket - 1;
                 _last_bucket &= _mask;
-                auto tail = _mask - _last_bucket;
+                if (_pairs[_last_bucket ++].second == INACTIVE || _pairs[_last_bucket ++].second == INACTIVE)
+                    return _last_bucket++ - 1;
+
+                auto tail = (_num_filled + _last_bucket) & _mask;
                 if (_pairs[tail].second == INACTIVE || _pairs[++tail].second == INACTIVE)
                     return tail;
             }

@@ -350,7 +350,7 @@ public:
             return *this;
 //            htype(other).swap(*this);
 
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivial<KeyT>::value)
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -822,7 +822,7 @@ public:
     template<typename T>
     inline void new_key(const T& key, uint32_t bucket)
     {
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivial<KeyT>::value)
             new(_pairs + bucket) PairT(key, bucket);
         else {
             _pairs[bucket].first  = key;
@@ -835,7 +835,7 @@ public:
     template<typename T>
     inline void new_key(T&& key, uint32_t bucket)
     {
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivial<KeyT>::value)
             new(_pairs + bucket) PairT(std::forward<T>(key), bucket);
         else {
             _pairs[bucket].first  = key;
@@ -894,7 +894,7 @@ public:
 #if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value);
 #else
-        return !(std::is_pod<KeyT>::value);
+        return !(std::is_trivial<KeyT>::value);
 #endif
     }
 
@@ -1022,7 +1022,7 @@ private:
             return eqkey ? bucket : INACTIVE;
          } else if (eqkey) {
             const auto nbucket = _pairs[next_bucket].second;
-            if (std::is_pod<KeyT>::value)
+            if (std::is_trivial<KeyT>::value)
                 _pairs[bucket].first = _pairs[next_bucket].first;
             else
                 std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
@@ -1055,7 +1055,7 @@ private:
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = _pairs[next_bucket].second;
-                if (std::is_pod<KeyT>::value)
+                if (std::is_trivial<KeyT>::value)
                     _pairs[bucket].first = _pairs[next_bucket].first;
                 else
                     std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
@@ -1200,6 +1200,16 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
+#if 0
+        const auto bucket1 = bucket_from + 1;
+        if (_pairs[bucket1].second == INACTIVE)
+            return bucket1;
+
+        const auto bucket2 = bucket_from + 2;
+        if (_pairs[bucket2].second == INACTIVE)
+            return bucket2;
+#endif
+
 #if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
         const auto begin = (uint8_t*)_bitmask + bucket_from / 8;

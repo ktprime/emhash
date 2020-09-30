@@ -1,7 +1,6 @@
-
-// emhash6::HashSet for C++11
+// emhash7::HashSet for C++11
 // version 1.2.0
-// https://github.com/ktprime/ktprime/blob/master/hash_set3.hpp
+// https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -72,12 +71,12 @@
     #define hash_coll_bucket(key)     (hash_inter(key) & _main_mask)
 #elif EMH_HASH
     #define hash_main_bucket(key)     (uint32_t)(_hasher(key) & _main_mask)
-    #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
     #define hash_coll_bucket(key)     ((hash_inter(key) & _coll_mask) + _mains_buckets)
+    #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
 #else
     #define hash_main_bucket(key)     (uint32_t)(hash_inter(key) & _main_mask)
-    #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
     #define hash_coll_bucket(key)     ((_hasher(key) & _coll_mask) + _mains_buckets)
+    #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
 #endif
 
 #if EMH_CACHE_LINE_SIZE < 32
@@ -85,7 +84,7 @@
 #endif
 
 #define EMH_KEY(p,n)      p[n].first
-#define EMH_BUCKET(p,n)  p[n].second
+#define EMH_BUCKET(p,n)   p[n].second
 
 namespace emhash7 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
@@ -263,7 +262,7 @@ public:
         _num_colls  = other._num_colls;
         _num_mains     = other._num_mains;
 
-        if (std::is_pod<KeyT>::value) {
+        if (std::is_trivially_copyable<KeyT>::value) {
             memcpy(_pairs, other._pairs, _total_buckets * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
@@ -296,7 +295,7 @@ public:
         if (this == &other)
             return *this;
 
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivially_destructible<KeyT>::value)
             clearkv();
 
         if (_total_buckets != other._total_buckets) {
@@ -319,7 +318,7 @@ public:
 
     ~HashSet()
     {
-        if (!std::is_pod<KeyT>::value)
+        if (!std::is_trivially_destructible<KeyT>::value)
             clearkv();
 
         free(_pairs);
@@ -802,16 +801,6 @@ public:
     /// Returns an iterator to the next element (or end()).
     iterator erase(iterator it)
     {
-#if 0
-        // we assume that it always points to a valid entry, and not end().
-        assert(this == it._map);
-        if (it._bucket < _mains_buckets)
-            return end();
-        else if (INACTIVE == EMH_BUCKET(_pairs, it._bucket)) {
-            return ++it;
-        }
-#endif
-
         if (it._bucket < _mains_buckets) {
             auto& bucket_size = EMH_BUCKET(_pairs, it._bucket);
             del_main(it._bucket, bucket_size);
@@ -841,7 +830,7 @@ public:
             auto& next_bucket = EMH_BUCKET(_pairs, bucket);
             if (next_bucket != INACTIVE && next_bucket % 2 > 0) {
                 _pairs[bucket].~PairT(); _num_mains -= 1;
-                next_bucket = INACTIVE; 
+                next_bucket = INACTIVE;
             }
         }
         assert(_num_colls == 0 && _num_mains == 0);
@@ -850,7 +839,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (size() > _mains_buckets / 2 && std::is_pod<KeyT>::value)
+        if (size() > _mains_buckets / 2 && std::is_trivially_destructible<KeyT>::value)
             memset(_pairs, INACTIVE,  sizeof(_pairs[0]) * _total_buckets);
         else
             clearkv();
@@ -862,7 +851,7 @@ public:
     bool reserve(uint32_t num_elems)
     {
         //auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
-        const auto required_buckets = num_elems * 10 / 8;
+        const auto required_buckets = num_elems * 10 / 8 + 2;
         if (EMH_LIKELY(required_buckets < _colls_buckets))
             return false;
 
@@ -966,7 +955,7 @@ public:
         }
 
 #if EMH_REHASH_LOG
-        if (_num_colls > EMH_REHASH_LOG) {
+        if (_num_colls > 100000) {
             auto mbucket = size() - collision;
             char buff[255] = {0};
             sprintf(buff, "    _num_colls/main_factor/coll_factor/K/pack/collision = %u/%.2lf%%/%.2lf%%/%s/%zd/%.2lf%%",
@@ -1008,7 +997,7 @@ private:
             return eqkey ? bucket : INACTIVE;
         else if (eqkey) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (std::is_pod<KeyT>::value)
+            if (std::is_trivial<KeyT>::value)
                 std::swap(EMH_KEY(_pairs, bucket), EMH_KEY(_pairs, next_bucket));
            else
                 EMH_KEY(_pairs, bucket) = EMH_KEY(_pairs, next_bucket);
@@ -1041,7 +1030,7 @@ private:
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-                if (std::is_pod<KeyT>::value)
+                if (std::is_trivial<KeyT>::value)
                     std::swap(EMH_KEY(_pairs, bucket), EMH_KEY(_pairs, next_bucket));
                 else
                     EMH_KEY(_pairs, bucket) = EMH_KEY(_pairs, next_bucket);
@@ -1160,12 +1149,7 @@ private:
         if (EMH_BUCKET(_pairs, bucket_from) == INACTIVE)
             return bucket_from;
 
-#if 0
-        const auto bucket_address = (uint32_t)(reinterpret_cast<size_t>(&EMH_BUCKET(_pairs, bucket_from)) % EMH_CACHE_LINE_SIZE);
-        const auto max_probe_length = 2 + (uint32_t)((EMH_CACHE_LINE_SIZE * 2 - bucket_address) / sizeof(PairT));
-#else
         constexpr auto max_probe_length = 2 + EMH_CACHE_LINE_SIZE / sizeof(PairT);//cpu cache line 64 byte,2-3 cache line miss
-#endif
 
 #if 0
         for (auto slot = 1; ; ++slot) {
@@ -1184,31 +1168,19 @@ private:
             }
         }
 #else
-        for (uint32_t slot = 1; ; ++slot) {
-            const auto bucket = next_coll_bucket(bucket_from + slot);
-            if (EMH_BUCKET(_pairs, bucket) == INACTIVE)
+        for (uint32_t slot = 1, step = 2; ; slot += ++step) {
+            auto bucket = next_coll_bucket(bucket_from + slot);
+            if (EMH_BUCKET(_pairs, bucket) == INACTIVE || EMH_BUCKET(_pairs, ++bucket) == INACTIVE)
                 return bucket;
-            else if (slot >= max_probe_length) {
-                const auto bucket1 = next_coll_bucket(bucket + slot * slot); //switch to square search
-                if (EMH_BUCKET(_pairs, bucket1) == INACTIVE)
-                    return bucket1;
 
-                const auto bucket2 = bucket1 + 1;
-                if (EMH_BUCKET(_pairs, bucket2) == INACTIVE)
+            if (step >= max_probe_length) {
+                auto bucket3 = next_coll_bucket(_num_mains + step);
+                if (EMH_BUCKET(_pairs, bucket3) == INACTIVE || EMH_BUCKET(_pairs, ++bucket3) == INACTIVE)
+                    return bucket3;
+
+                auto bucket2 = next_coll_bucket(bucket + slot * slot); //switch to square search
+                if (EMH_BUCKET(_pairs, bucket2) == INACTIVE || EMH_BUCKET(_pairs, ++bucket2) == INACTIVE)
                     return bucket2;
-
-                else if (slot > 6 || max_probe_length > 5) {
-#if 0
-                    const auto bucket3 = next_coll_bucket(bucket_from + rand());
-                    if (EMH_BUCKET(_pairs, bucket3) == INACTIVE)
-                        return bucket3;
-
-                    const auto bucket4 = next_coll_bucket(bucket3 + 1);
-                    if (EMH_BUCKET(_pairs, bucket4) == INACTIVE)
-                        return bucket4;
-#endif
-                    bucket_from += _num_colls;
-                }
             }
         }
 #endif
@@ -1295,7 +1267,7 @@ private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_inter(const UType key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#ifndef EMH_FIBONACCI_HASH
         return hash64(key);
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
@@ -1307,7 +1279,7 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_inter(const UType& key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#ifndef EMH_FIBONACCI_HASH 
         return (_hasher(key) * 11400714819323198485ull);
 #else
         return _hasher(key);
