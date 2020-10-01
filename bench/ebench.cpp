@@ -31,7 +31,7 @@
 static void printInfo(char* out);
 std::map<std::string, std::string> hash_tables =
 {
-    {"stl_hash", "unordered_map"},
+//    {"stl_hash", "unordered_map"},
     {"stl_map", "stl_map"},
     {"btree", "btree_map"},
 
@@ -64,9 +64,9 @@ std::map<std::string, std::string> hash_tables =
 #endif
 };
 
-#define EM3                    1
+//#define EM3                    1
 //#define HOOD_HASH              1
-#define PHMAP_HASH             1
+//#define PHMAP_HASH             1
 //#define EMH_WY_HASH         1
 //#define FL1                    1
 //#define EMH_FIBONACCI_HASH  1

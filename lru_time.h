@@ -55,10 +55,10 @@
 
 #undef NEW_KVALUE
 
-#define GET_KEY(p,n)     p[n].first
-#define GET_VAL(p,n)     p[n].second
+#define EMH_KEY(p,n)     p[n].first
+#define EMH_VAL(p,n)     p[n].second
 #define NEXT_BUCKET(p,n) p[n].bucket
-#define GET_PKV(p,n)     p[n]
+#define EMH_PKV(p,n)     p[n]
 #define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket, _time_out), _num_filled ++
 
 namespace emlru_time {
@@ -67,7 +67,11 @@ constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 
 inline static uint32_t nowts()
 {
+#if EMHASH_LRU_TIME > 0
+    return EMHASH_LRU_TIME;
+#else
     return time(0);
+#endif
 }
 
 template <typename First, typename Second>
@@ -192,12 +196,12 @@ public:
 
         reference operator*() const
         {
-            return _map->GET_PKV(_pairs, _bucket);
+            return _map->EMH_PKV(_pairs, _bucket);
         }
 
         pointer operator->() const
         {
-            return &(_map->GET_PKV(_pairs, _bucket));
+            return &(_map->EMH_PKV(_pairs, _bucket));
         }
 
         bool operator==(const iterator& rhs) const
@@ -252,12 +256,12 @@ public:
 
         reference operator*() const
         {
-            return _map->GET_PKV(_pairs, _bucket);
+            return _map->EMH_PKV(_pairs, _bucket);
         }
 
         pointer operator->() const
         {
-            return &(_map->GET_PKV(_pairs, _bucket));
+            return &(_map->EMH_PKV(_pairs, _bucket));
         }
 
         bool operator==(const const_iterator& rhs) const
@@ -398,7 +402,7 @@ public:
     bool check_timeout(uint32_t bucket)
     {
         //check only main bucket
-        if (IS_TIMEOUT(_pairs, bucket) || hash_bucket(GET_KEY(_pairs, bucket)) == bucket)
+        if (IS_TIMEOUT(_pairs, bucket) || hash_bucket(EMH_KEY(_pairs, bucket)) == bucket)
         {
             //_pairs[bucket].~PairT();
             clear_bucket(bucket);
@@ -512,7 +516,7 @@ public:
         else if (bucket == next_bucket)
             return bucket + 1;
 
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
+        const auto& bucket_key = EMH_KEY(_pairs, bucket);
         return hash_bucket(bucket_key) + 1;
     }
 
@@ -523,7 +527,7 @@ public:
         if (next_bucket == INACTIVE)
             return 0;
 
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
+        const auto& bucket_key = EMH_KEY(_pairs, bucket);
         next_bucket = hash_bucket(bucket_key);
         uint32_t ibucket_size = 1;
 
@@ -545,7 +549,7 @@ public:
         if (next_bucket == INACTIVE)
             return INACTIVE;
 
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
+        const auto& bucket_key = EMH_KEY(_pairs, bucket);
         const auto main_bucket = hash_bucket(bucket_key);
         return main_bucket;
     }
@@ -568,7 +572,7 @@ public:
         if (next_bucket == INACTIVE)
             return -1;
 
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
+        const auto& bucket_key = EMH_KEY(_pairs, bucket);
         const auto main_bucket = hash_bucket(bucket_key);
         if (main_bucket != bucket)
             return 0;
@@ -666,7 +670,7 @@ public:
         const auto bucket = find_filled_bucket(key);
         const auto found = bucket != _num_buckets;
         if (found) {
-            val = GET_VAL(_pairs, bucket);
+            val = EMH_VAL(_pairs, bucket);
         }
         return found;
     }
@@ -675,21 +679,21 @@ public:
     ValueT* try_get(const KeyT& key) noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
+        return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
     }
 
     /// Const version of the above
     ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &GET_VAL(_pairs, bucket);
+        return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
     }
 
     /// Convenience function.
     ValueT get_or_return_default(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? ValueT() : GET_VAL(_pairs, bucket);
+        return bucket == _num_buckets ? ValueT() : EMH_VAL(_pairs, bucket);
     }
 
     // -----------------------------------------------------
@@ -706,8 +710,8 @@ public:
             NEW_KVALUE(key, value, bucket);
         } else {
             if (IS_TIMEOUT(_pairs, bucket)) {
-                GET_KEY(_pairs, bucket) = key;
-                GET_VAL(_pairs, bucket) = value;
+                EMH_KEY(_pairs, bucket) = key;
+                EMH_VAL(_pairs, bucket) = value;
                 found = true;
             }
             SET_TIMEOUT(bucket, _time_out);
@@ -724,8 +728,8 @@ public:
             NEW_KVALUE(key, value, bucket);
         } else {
             if (IS_TIMEOUT(_pairs, bucket)) {
-                GET_KEY(_pairs, bucket) = key;
-                GET_VAL(_pairs, bucket) = value;
+                EMH_KEY(_pairs, bucket) = key;
+                EMH_VAL(_pairs, bucket) = value;
                 found = true;
             }
             SET_TIMEOUT(bucket, timeout);
@@ -743,8 +747,8 @@ public:
             NEW_KVALUE(std::move(key), std::move(value), bucket);
         } else {
             if (IS_TIMEOUT(_pairs, bucket)) {
-                GET_KEY(_pairs, bucket) = std::move(key);
-                GET_VAL(_pairs, bucket) = std::move(value);
+                EMH_KEY(_pairs, bucket) = std::move(key);
+                EMH_VAL(_pairs, bucket) = std::move(value);
                 found = true;
             }
             SET_TIMEOUT(bucket, _time_out);
@@ -897,13 +901,13 @@ public:
         } else {
             //TODO:replace the key
             if (IS_TIMEOUT(_pairs, bucket)) {
-                GET_KEY(_pairs, bucket) = key;
-                GET_VAL(_pairs, bucket) = ValueT();
+                EMH_KEY(_pairs, bucket) = key;
+                EMH_VAL(_pairs, bucket) = ValueT();
             }
 
             SET_TIMEOUT(bucket, _time_out);
         }
-        return GET_VAL(_pairs, bucket);
+        return EMH_VAL(_pairs, bucket);
     }
 
     ValueT& operator[](KeyT&& key)
@@ -915,13 +919,13 @@ public:
             NEW_KVALUE(std::move(key), std::move(ValueT()), bucket);
         } else {
             if (IS_TIMEOUT(_pairs, bucket)) {
-                GET_KEY(_pairs, bucket) = std::move(key);
-                GET_VAL(_pairs, bucket) = std::move(ValueT());
+                EMH_KEY(_pairs, bucket) = std::move(key);
+                EMH_VAL(_pairs, bucket) = std::move(ValueT());
             }
 
             SET_TIMEOUT(bucket, _time_out);
         }
-        return GET_VAL(_pairs, bucket);
+        return EMH_VAL(_pairs, bucket);
     }
 
     // -------------------------------------------------------
@@ -1040,9 +1044,9 @@ public:
 
             old_num_filled -- ;
             if (old_pairs[src_bucket].timeout > now_ts && _num_filled < _max_buckets) {
-                auto& key = GET_KEY(old_pairs, src_bucket);
+                auto& key = EMH_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
-                NEW_KVALUE(std::move(key), std::move(GET_VAL(old_pairs, src_bucket)), bucket);
+                NEW_KVALUE(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
                 _pairs[bucket].timeout = old_pairs[src_bucket].timeout;
             }
             old_pairs[src_bucket].~PairT();
@@ -1091,26 +1095,26 @@ private:
         if (next_bucket == INACTIVE)
             return INACTIVE;
 
-        const auto eqkey = _eq(key, GET_KEY(_pairs, bucket));
+        const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
         if (next_bucket == bucket) {
             return eqkey ? bucket : INACTIVE;
          } else if (eqkey) {
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (is_notrivially())
-                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
+                EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
             else
-                GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+                EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
 
             NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
-        }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(GET_KEY(_pairs, bucket))))
+        }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(EMH_KEY(_pairs, bucket))))
             return INACTIVE;
         */
 
         auto prev_bucket = bucket;
         while (true) {
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
-            if (_eq(key, GET_KEY(_pairs, next_bucket))) {
+            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
                 NEXT_BUCKET(_pairs, prev_bucket) = (nbucket == next_bucket) ? prev_bucket : nbucket;
                 return next_bucket;
             }
@@ -1127,17 +1131,17 @@ private:
     uint32_t erase_bucket(const uint32_t bucket)
     {
         const auto next_bucket = NEXT_BUCKET(_pairs, bucket);
-        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
+        const auto main_bucket = hash_bucket(EMH_KEY(_pairs, bucket));
         if (bucket == main_bucket) {
             if (bucket == next_bucket)
                 return bucket;
 
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (is_notrivially())
-                GET_PKV(_pairs, bucket).swap(GET_PKV(_pairs, next_bucket));
+                EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
             else {
                 const auto timeout = _pairs[bucket].timeout;
-                GET_PKV(_pairs, bucket) = GET_PKV(_pairs, next_bucket);
+                EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
                 _pairs[next_bucket].timeout = timeout;
             }
             NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
@@ -1157,13 +1161,13 @@ private:
 
         if (next_bucket == INACTIVE)
             return _num_buckets;
-        else if (_eq(key, GET_KEY(_pairs, bucket)))
+        else if (_eq(key, EMH_KEY(_pairs, bucket)))
             return IS_TIMEOUT(_pairs, bucket) ? _num_buckets : bucket;
         else if (next_bucket == bucket)
             return _num_buckets;
 
         while (true) {
-            if (_eq(key, GET_KEY(_pairs, next_bucket)))
+            if (_eq(key, EMH_KEY(_pairs, next_bucket)))
                 return (IS_TIMEOUT(_pairs, bucket)) ? _num_buckets : next_bucket;
 
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
@@ -1199,7 +1203,7 @@ private:
     uint32_t find_or_allocate(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
-        const auto& bucket_key = GET_KEY(_pairs, bucket);
+        const auto& bucket_key = EMH_KEY(_pairs, bucket);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE || _eq(key, bucket_key))
             return bucket;
@@ -1217,7 +1221,7 @@ private:
 
         //find next linked bucket and check key
         while (true) {
-            if (_eq(key, GET_KEY(_pairs, next_bucket))) {
+            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
                 return next_bucket;
             } else if (time_bucket == INACTIVE && IS_TIMEOUT(_pairs, next_bucket)) {
                 time_bucket = next_bucket;
@@ -1238,31 +1242,28 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    uint32_t find_empty_bucket(uint32_t bucket_from)
+    uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
         auto bucket = bucket_from + 1;
-        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
-            return bucket;
-
-        bucket = (bucket_from + 2) & _mask;
-        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE)
+        if (NEXT_BUCKET(_pairs, bucket) == INACTIVE || NEXT_BUCKET(_pairs, ++bucket) == INACTIVE)
             return bucket;
 
         //for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
-        for (uint32_t last = 2, slot = 3; ; last ++, slot += last) {
-            const auto bucket1 = (bucket_from + slot) & _mask;
-            if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE)
+        for (uint32_t last = 1, slot = 4; ; slot += ++last) {
+            auto bucket1 = (bucket_from + slot) & _mask;
+            if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE || NEXT_BUCKET(_pairs, ++bucket1) == INACTIVE)
                 return bucket1;
 
-            const auto bucket2 = bucket1 + 2;
-            if (NEXT_BUCKET(_pairs, bucket2) == INACTIVE)
-                return bucket2;
-
-            else if (last > 4) {
+            if (last > 4) {
                 auto& next = NEXT_BUCKET(_pairs, _num_buckets);
-                if (INACTIVE == NEXT_BUCKET(_pairs, ++next))
-                    return next;
-               next &= _mask;
+                if (INACTIVE == NEXT_BUCKET(_pairs, next++) || INACTIVE == NEXT_BUCKET(_pairs, next++))
+                    return next - 1;
+
+                auto medium = (_num_buckets / 2 + next) & _mask;
+                if (INACTIVE == NEXT_BUCKET(_pairs, medium) || INACTIVE == NEXT_BUCKET(_pairs, ++medium))
+                    return medium;
+
+                next &= _mask;
             }
         }
     }
@@ -1303,7 +1304,7 @@ private:
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(GET_KEY(_pairs, bucket));
+        const auto main_bucket = hash_bucket(EMH_KEY(_pairs, bucket));
         if (main_bucket != bucket)
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket != bucket)
