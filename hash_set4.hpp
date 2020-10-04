@@ -870,15 +870,10 @@ public:
     iterator erase(const_iterator cit)
     {
         iterator it(this, cit._bucket);
-        return erase(it);
-    }
-
-    /// Erase an element typedef an iterator.
-    /// Returns an iterator to the next element (or end()).
-    iterator erase(iterator it)
-    {
         const auto bucket = erase_bucket(it._bucket);
+        //move last bucket to current
         clear_bucket(bucket);
+
         //erase from main bucket, return main bucket as next
         return (bucket == it._bucket) ? ++it : it;
     }

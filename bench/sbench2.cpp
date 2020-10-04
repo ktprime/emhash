@@ -38,11 +38,11 @@ std::map<std::string, std::string> hash_tables =
 
     {"emhash7", "emhash7"},
     {"emhash2", "emhash2"},
-//    {"emhash9", "emhash9"},
-    
+    {"emhash9", "emhash9"},
+
     {"gp_hash", "gp_hash"},
 
-    {"emilib2", "emilib2"},
+    {"emiset", "emiset"},
 
 #if ET
     {"martin", "martin_flat"},
@@ -121,7 +121,8 @@ std::map<std::string, std::string> hash_tables =
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 #endif
 
-//#includ//e "hash_table32.hpp"
+#include "emilib/emiset.hpp"
+
 #if ET
     #define  _CPP11_HASH    1
 
@@ -130,7 +131,7 @@ std::map<std::string, std::string> hash_tables =
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
     #include "tsl/robin_set.h"        //https://github.com/tessil/robin-map
 #endif
-    #include "phmap/btree.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
+
 #if ET > 1
     #include "tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
     #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
@@ -669,14 +670,14 @@ template<class hash_type>
 void insert_erase(const std::string& hash_name, const std::vector<keyType>& vList)
 {
 #if KEY_INT
-    hash_type ahash(5000);
-    ahash.max_load_factor (0.87f);
+    const int bucket = 1 << 14;
+    hash_type ahash; //(bucket / 2);
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList) {
-        auto v2 = v % 10007;
-        auto r = ahash.emplace(v2).second;
-        if (!r) {
-            ahash.erase(v2);
+        auto v2 = v % (bucket);
+        auto r = ahash.emplace(v2);
+        if (!r.second) {
+            ahash.erase(r.first);
             sum ++;
         }
     }
@@ -1228,6 +1229,7 @@ static int benchHashSet(int n)
         {  benOneHash<robin_hood::unordered_flat_set <keyType,  ehash_func>>("martin", vList); }
 #endif
 
+        {  benOneHash<emilib::HashSet <keyType,  ehash_func>>("emiset", vList); }
         {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
@@ -1510,7 +1512,7 @@ static void testHashString(int size, int str_min, int str_max)
 
 int main(int argc, char* argv[])
 {
-    testHashInt();
+    //testHashInt();
     //testHashString(rand() % 1234567 + 1234567, 4, 64);
 
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
@@ -1524,11 +1526,11 @@ int main(int argc, char* argv[])
     bool auto_set = false;
     int tn = 0, rnd = time(0) + rand() * rand();
     auto maxc = 500;
-    auto maxn = (1024 * 1024 * 128) / (sizeof(keyType) + 8) + 100000;
+    auto maxn = (1024 * 1024 * 64) / (sizeof(keyType) + 8) + 100000;
     auto minn = (1024 * 1024 * 2) / (sizeof(keyType) + + 8) + 10000;
 
     float load_factor = 0.0945f;
-    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u e l] t(n)\n", (int)maxn);
+    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u e] t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
@@ -1566,10 +1568,9 @@ int main(int argc, char* argv[])
                     hash_tables.erase("robin");
                 else if (c == 's')
                     hash_tables.erase("flat");
-                else if (c == 'e')
-                    hash_tables.emplace("emilib2", "emilib2");
-                else if (c == 'k')
-                    hash_tables.emplace("ktprime", "ktprime");
+                else if (c == 'e') {
+                    hash_tables.emplace("emiset", "emiset");
+                }
                 else if (c == 'b') {
                     hash_tables.emplace("btree", "btree_set");
                     hash_tables.emplace("stl_set", "stl_set");
