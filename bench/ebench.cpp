@@ -11,7 +11,7 @@
 
 #if __cplusplus > 201402L || _MSC_VER >= 1600
    // #define STR_VIEW  1
-    #include <string_view>
+   // #include <string_view>
 #endif
 
 #ifdef __has_include

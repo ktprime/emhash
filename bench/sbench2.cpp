@@ -12,7 +12,7 @@
 
 #if __cplusplus > 201402L || _MSC_VER >= 1600
    // #define STR_VIEW  1
-    #include <string_view>
+   // #include <string_view>
 #endif
 
 #ifdef __has_include
@@ -789,7 +789,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     size_t pow2 = 2u << ilog(vList.size(), 2);
     hash_type tmp;
 
-    const auto max_loadf = 0.999f;
+    const auto max_loadf = 0.990f;
 #ifndef SMAP
     tmp.reserve(pow2 / 2);
     tmp.max_load_factor(max_loadf);

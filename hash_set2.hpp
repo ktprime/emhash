@@ -689,7 +689,10 @@ public:
     //reset last_bucket collision bucket to bucket
     void clear_bucket(uint32_t bucket)
     {
-        _pairs[bucket].~PairT(); _num_filled --; _pairs[bucket].second = INACTIVE;
+        if (!std::is_trivially_destructible<KeyT>::value)
+            _pairs[bucket].~PairT();
+        _pairs[bucket].second = INACTIVE;
+        _num_filled --; 
 
 #if EMH_HIGH_LOAD
         if (bucket <= _last_colls)
