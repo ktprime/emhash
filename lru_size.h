@@ -62,7 +62,9 @@
 #define EMH_VAL(p,n)     p[n].second
 #define NEXT_BUCKET(p,n) p[n].bucket
 #define EMH_PKV(p,n)     p[n]
-#define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket); _num_filled ++
+#define NEW_KVALUE(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket); \
+                             _num_filled ++;\
+                             update_orderid(_pairs[bucket].orderid)
 
 namespace emlru_size {
 
@@ -316,6 +318,7 @@ public:
     {
         _num_buckets = 0;
         _mask = 0;
+        _sum_orderid = 0;
         _pairs = nullptr;
         _num_filled = 0;
         _max_buckets = max_bucket;
@@ -392,6 +395,7 @@ public:
         _mask        = other._mask;
         _loadlf      = other._loadlf;
         _max_buckets = other._max_buckets;
+        _sum_orderid = other._sum_orderid;
         auto opairs  = other._pairs;
 
         if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
@@ -415,6 +419,7 @@ public:
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_max_buckets, other._max_buckets);
+        std::swap(_sum_orderid, other._sum_orderid);
     }
 
     // -------------------------------------------------------------
@@ -654,7 +659,7 @@ public:
         return find_filled_bucket(key) != _num_buckets;
     }
 
-    size_type count(const KeyT& key) const noexcept
+    size_type count(const KeyT& key) noexcept
     {
         return find_filled_bucket(key) == _num_buckets ? 0 : 1;
     }
@@ -714,6 +719,7 @@ public:
             NEW_KVALUE(key, value, bucket);
         } else {
             _pairs[bucket].orderid += incid();
+            update_orderid(incid());
         }
         return { {this, bucket}, found };
     }
@@ -727,6 +733,7 @@ public:
             NEW_KVALUE(std::move(key), std::move(value), bucket);
         } else {
             _pairs[bucket].orderid += incid();
+            update_orderid(incid());
         }
         return { {this, bucket}, found };
     }
@@ -875,6 +882,7 @@ public:
             NEW_KVALUE(key, std::move(ValueT()), bucket);
         } else {
             _pairs[bucket].orderid += incid();
+            update_orderid(incid());
         }
         return EMH_VAL(_pairs, bucket);
     }
@@ -888,6 +896,7 @@ public:
             NEW_KVALUE(std::move(key), std::move(ValueT()), bucket);
         } else {
             _pairs[bucket].orderid += incid();
+            update_orderid(incid());
         }
         return EMH_VAL(_pairs, bucket);
     }
@@ -948,6 +957,12 @@ public:
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 
         _num_filled = 0;
+        _sum_orderid = 0;
+    }
+
+    inline void update_orderid(int32_t incr)
+    {
+        _sum_orderid += incr;
     }
 
     void shrink_to_fit()
@@ -973,43 +988,24 @@ public:
     {
         auto ts = clock();
         uint32_t erase_ids = _num_filled;
-        uint64_t sumid = 0;
+//
+//        for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++)
+//            sumid += _pairs[src_bucket].orderid;
+//        assert(_sum_orderid == sumid);
 
-#ifdef EMHASH_SAFE_REMOVE
-        std::vector<uint32_t> order_ids;
-        order_ids.reserve(_num_filled + 1);
-
-        for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++) {
-            auto orderid = _pairs[src_bucket].orderid;
-            if (NEXT_BUCKET(_pairs, src_bucket) != INACTIVE) {
-                order_ids.push_back(orderid);
-                sumid += orderid;
-            }
-        }
-
-        assert (order_ids.size() == _num_filled);
-
-        auto sorted_end = order_ids.begin() + order_ids.size() / 2;
-        //TODO: BFPRT find the median element in O(n) or evaulate the medium by average
-        std::nth_element(order_ids.begin(), sorted_end, order_ids.end());
-        const auto medium_id = *sorted_end;
-#else
-        for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++)
-            sumid += _pairs[src_bucket].orderid;
-        const auto medium_id = uint32_t(sumid / _num_filled);
-#endif
-
+        auto sumid = _sum_orderid;
+        auto medium_id = uint32_t(sumid / _num_filled);
         const auto tnows = entry<KeyT, ValueT>::nextid();
-        const auto averge_id = uint32_t(sumid / _num_filled);
+
         uint32_t max_id = 1;
         for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++) {
-        //for (int src_bucket = _num_buckets - 1; src_bucket >= 0; src_bucket--) {
             auto& orderid = _pairs[src_bucket].orderid;
             if (orderid > medium_id) {
                 if (orderid > max_id)
                     max_id = orderid;
 #if EMHASH_TIME_DELAY
                 if (tnows + EMHASH_TIME_DELAY < orderid) {
+                    update_orderid(tnows + EMHASH_TIME_DELAY - orderid);
                     orderid = tnows + EMHASH_TIME_DELAY;
                     continue;
                 } else if (tnows < orderid + EMHASH_TIME_DELAY)
@@ -1028,9 +1024,8 @@ public:
 
 #if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
         char buff[256] = {0};
-        snprintf(buff, sizeof(buff), "_num_filled now-med.max-now.erase_ids load_factor|diff = %u %d %d %u %.2f | %.2lf%%, time_use = %d us",
-                _num_filled, int(tnows - medium_id), int(max_id - tnows), erase_ids - _num_filled, load_factor(), (100.0*averge_id - 100.0*medium_id) / (1 + max_id - medium_id), (int)(clock() - ts));
-
+        snprintf(buff, sizeof(buff), "    _num_filled medium_id.pack_size.erase_ids load_factor|%u %u %zu %u %.3f|, time_use = %d ms",
+                _num_filled, medium_id, sizeof(_pairs[0]), erase_ids - _num_filled, load_factor(), (int)(clock() - ts));
 #if EMHASH_TAF_LOG
         static uint32_t iremoves = 0;
         FDLOG("lru_size") << __FUNCTION__ << " removes = " << iremoves ++ << "|" << buff << endl;
@@ -1104,6 +1099,7 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
+        update_orderid(-_pairs[bucket].orderid);
         if (is_notrivially())
             _pairs[bucket].~PairT();
 
@@ -1178,7 +1174,7 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
-    uint32_t find_filled_bucket(const KeyT& key) const
+    uint32_t find_filled_bucket(const KeyT& key)
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = NEXT_BUCKET(_pairs, bucket);
@@ -1187,6 +1183,7 @@ private:
             return _num_buckets;
         else if (_eq(key, EMH_KEY(_pairs, bucket))) {
             _pairs[bucket].orderid += incid();
+            update_orderid(incid());
             return bucket;
         }
         else if (next_bucket == bucket)
@@ -1198,6 +1195,7 @@ private:
         while (true) {
             if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
                 _pairs[next_bucket].orderid += incid();
+                update_orderid(incid());
 #if EMHASH_LRU_GET
                 if (_pairs[next_bucket].orderid > _pairs[prev_bucket].orderid) {
                     EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
@@ -1231,6 +1229,7 @@ private:
         if (next_bucket == bucket)
             NEXT_BUCKET(_pairs, new_bucket) = new_bucket;
 
+        update_orderid(_pairs[bucket].orderid); //erase will clear orderid
         clear_bucket(bucket);
         return bucket;
     }
@@ -1308,7 +1307,7 @@ private:
                 if (INACTIVE == NEXT_BUCKET(_pairs, medium) || INACTIVE == NEXT_BUCKET(_pairs, ++medium))
                     return medium;
 
-               next &= _mask;
+                next &= _mask;
             }
         }
     }
@@ -1441,6 +1440,7 @@ private:
     uint32_t  _mask;
 
     uint32_t  _num_filled;
+    uint64_t  _sum_orderid;
 };
 } // namespace emhash
 #if __cplusplus > 199711

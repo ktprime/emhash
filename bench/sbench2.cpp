@@ -9,12 +9,6 @@
 #include <fstream>
 #include <unordered_set>
 
-
-#if __cplusplus > 201402L || _MSC_VER >= 1600
-   // #define STR_VIEW  1
-   // #include <string_view>
-#endif
-
 #ifdef __has_include
     #if __has_include("wyhash.h")
     #include "wyhash.h"
@@ -229,7 +223,7 @@ struct WysHasher
 };
 
 #if TKey == 0
-    typedef unsigned int keyType;
+    typedef int          keyType;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int"
     #define KEY_INT     1
@@ -641,7 +635,7 @@ template<class hash_type>
 void hash_iter(const hash_type& ahash, const std::string& hash_name)
 {
     auto ts1 = getTime(); size_t sum = 0;
-    for (auto& v : ahash)
+    for (const auto& v : ahash)
         sum += 1;
 
     for (auto it = ahash.cbegin(); it != ahash.cend(); ++it)
@@ -681,6 +675,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
             sum ++;
         }
     }
+    printf("%.4lf", (double)ahash.load_factor());
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 #endif
 }
@@ -879,9 +874,9 @@ void find_hit_all(const hash_type& ahash, const std::string& hash_name, const st
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList) {
 #if KEY_INT
-        sum += ahash.count(v) + v;
+        sum += ahash.count(v) + (size_t)v;
 #elif KEY_SUC
-        sum += ahash.count(v) + v.lScore;
+        sum += ahash.count(v) + (size_t)v.lScore;
 #else
         sum += ahash.count(v) + v.size();
 #endif
@@ -1049,7 +1044,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 
         insert_reserve<hash_type>(hash, hash_name, oList);
 
-        find_hit_all  <hash_type>(hash, hash_name,oList);
+        find_hit_all  <hash_type>(hash, hash_name, oList);
         find_miss_all <hash_type>(hash, hash_name);
 
         auto vList = oList;
@@ -1338,46 +1333,6 @@ static void printInfo(char* out)
     puts(sepator);
 }
 
-#if WYHASH_LITTLE_ENDIAN && STR_VIEW
-struct string_hash
-{
-    using is_transparent = void;
-
-    std::size_t operator()(const std::string& key)    const { return wyhash(key.c_str(), key.size(), 11400714819323198485ull); }
-    std::size_t operator()(const std::string_view& key)    const { return wyhash(key.data(), key.size(), 11400714819323198485ull); }
-    std::size_t operator()(const char* key)        const { return wyhash(key, std::strlen(key), 11400714819323198485ull); }
-};
-
-struct string_equal
-{
-    using is_transparent = int;
-
-    bool operator()(const std::string_view& lhs, const std::string& rhs) const {
-        //const std::string_view view = rhs;
-        return lhs.size() == rhs.size() &&
-            (lhs.data() == rhs.data() || std::strcmp(lhs.data(), rhs.data()) == 0);
-    }
-
-    bool operator()(const char* lhs, const std::string& rhs) const {
-        return std::strcmp(lhs, rhs.c_str()) == 0;
-    }
-};
-
-static int find_test()
-{
-    emhash6::HashSet<std::string, uint64_t, string_hash, string_equal> map;
-    std::string_view key = "key";
-    map.emplace(key, 100);
-    const auto it = map.find(key); // fail
-    assert(it == map.find("key"));
-    assert(it == map.find(std::string("key")));
-
-    assert(key == "key");
-    assert(key == std::string("key"));
-    return 0;
-}
-#endif
-
 static inline uint64_t hash64(uint64_t key)
 {
 #if __SIZEOF_INT128__
@@ -1515,10 +1470,6 @@ int main(int argc, char* argv[])
     //testHashInt();
     //testHashString(rand() % 1234567 + 1234567, 4, 64);
 
-#if WYHASH_LITTLE_ENDIAN && STR_VIEW
-    find_test();
-#endif
-
     srand((unsigned)time(0));
 
     printInfo(nullptr);
@@ -1527,7 +1478,7 @@ int main(int argc, char* argv[])
     int tn = 0, rnd = time(0) + rand() * rand();
     auto maxc = 500;
     auto maxn = (1024 * 1024 * 64) / (sizeof(keyType) + 8) + 100000;
-    auto minn = (1024 * 1024 * 2) / (sizeof(keyType) + + 8) + 10000;
+    auto minn = (1024 * 1024 * 1) /  (sizeof(keyType) + + 8) + 10000;
 
     float load_factor = 0.0945f;
     printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u e] t(n)\n", (int)maxn);

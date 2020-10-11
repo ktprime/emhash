@@ -20,11 +20,19 @@
     #endif
 #endif
 
+#if __linux__ && AVX2
+    #include <sys/mman.h>
+    #include "fht/fht_ht.hpp"
+#endif
+
 #ifndef TKey
     #define TKey              1
 #endif
 #ifndef TVal
     #define TVal              1
+#endif
+#if __GNUC__ > 4 && __linux__
+#include <ext/pb_ds/assoc_container.hpp>
 #endif
 //#define ET                    1
 
@@ -50,6 +58,7 @@ std::map<std::string, std::string> hash_tables =
     {"emilib4", "emilib4"},
     {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
+    {"fht", "fht"},
 
 #if ET
     {"martin", "martin_flat"},
@@ -63,6 +72,10 @@ std::map<std::string, std::string> hash_tables =
     {"byte", "ska_byte"},
 #endif
 };
+
+#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
+#define PHMAP_HAVE_SSSE3      1
+#endif
 
 //#define EM3                    1
 //#define HOOD_HASH              1
@@ -649,7 +662,7 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 }
 
 template<class hash_type>
-void hash_iter(const hash_type& ahash, const std::string& hash_name)
+void hash_iter(hash_type& ahash, const std::string& hash_name)
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (auto& v : ahash)
@@ -679,6 +692,24 @@ void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<
 #endif
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
+}
+
+template<class hash_type>
+void insert_erase(const std::string& hash_name, const std::vector<keyType>& vList)
+{
+#if TKey < 2
+    hash_type ahash;
+    auto ts1 = getTime(); size_t sum = 0;
+    for (const auto& v : vList) {
+        auto v2 = v % (1 << 12);
+        auto r = ahash.emplace(v2, TO_VAL(0)).second;
+        if (!r) {
+            ahash.erase(v2);
+            sum ++;
+        }
+    }
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+#endif
 }
 
 template<class hash_type>
@@ -870,12 +901,12 @@ void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::ve
 }
 
 template<class hash_type>
-void find_hit_all(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void find_hit_all(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList) {
 #if KEY_INT
-        sum += ahash.count(v) + v;
+        sum += ahash.count(v) + (size_t)v;
 #elif KEY_SUC
         sum += ahash.count(v) + v.lScore;
 #else
@@ -891,7 +922,7 @@ void find_hit_all(const hash_type& ahash, const std::string& hash_name, const st
 }
 
 template<class hash_type>
-void erase_find_half(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void erase_find_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList)
@@ -907,10 +938,12 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ahash.erase(v);
 
+#ifndef AVX2
     for (auto it = tmp.begin(); it != tmp.end(); ) {
         it = tmp.erase(it);
         sum += 1;
     }
+#endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -1125,7 +1158,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         return;
 
     if (test_case == 0)
-        printf("bench %s:%zd\n", hash_name.data(), sizeof(hash_type));
+        printf("%s:size %zd\n", hash_name.data(), sizeof(hash_type));
 
     {
         hash_type hash;
@@ -1133,6 +1166,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
 
         func_index  = 0;
+        insert_erase      <hash_type>(hash_name, oList);
         insert_high_load  <hash_type>(hash_name, oList);
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size / 2, 2 * l1_size + 1000);
         insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size * 4, l3_size);
@@ -1167,10 +1201,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         hash_iter<hash_type>(hash, hash_name);
 
 #ifdef UF
-        hash_copy<hash_type>(hash, hash_name);
+        hash_copy <hash_type>(hash, hash_name);
         hash_clear<hash_type>(hash, hash_name);
 #endif
-
     }
 }
 
@@ -1283,8 +1316,7 @@ static int benchHashMap(int n)
         sum += v.size();
 #endif
         loop_vector_time = getTime() - ts;
-        printf("%s n = %d, keyType = %s, valueType = %s(%zd), loop = %d ns:%d\n",
-                __FUNCTION__, n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time * 1000 / vList.size()), (int)sum);
+        printf("n = %d, keyType = %s, valueType = %s(%zd), loop = %d ms:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
     }
 
     {
@@ -1313,6 +1345,9 @@ static int benchHashMap(int n)
 
 #ifdef SMAP
         {  benOneHash<std::map<keyType, valueType>>         ("stl_map", vList); }
+#if __GNUC__ && __linux__
+        {  benOneHash<__gnu_pbds::gp_hash_table<keyType, valueType>>("gp_hash", vList) };
+#endif
 #if ET
         {  benOneHash<phmap::btree_map<keyType, valueType> >("btree", vList); }
 #endif
@@ -1322,6 +1357,9 @@ static int benchHashMap(int n)
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
         {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
+#if __linux__ && AVX2
+        {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
+#endif
 #endif
 
 #ifdef EM3
@@ -1676,7 +1714,6 @@ static void testHashString(int size, int str_min, int str_max)
         putchar('\n');
     }
     printf("sum = %ld\n", sum);
-
 }
 
 int main(int argc, char* argv[])
@@ -1684,7 +1721,7 @@ int main(int argc, char* argv[])
     testHashInt();
     testHashString(rand() % 1234567 + 1234567, 4, 64);
 
-#if HOOD_HASH && STR_VIEW
+#if WYHASH_LITTLE_ENDIAN && STR_VIEW
     find_test();
 #endif
 
@@ -1695,7 +1732,7 @@ int main(int argc, char* argv[])
     bool auto_set = false;
     int tn = 0, rnd = time(0) + rand() * rand();
     auto maxc = 500;
-    auto maxn = (1024 * 1024 * 64) / (sizeof(keyType) + sizeof(valueType) + 8) + 100000;
+    auto maxn = (1024 * 1024 * 128) / (sizeof(keyType) + sizeof(valueType) + 8) + 100000;
     auto minn = (1024 * 1024 * 2) / (sizeof(keyType) + sizeof(valueType) + 8) + 10000;
 
     float load_factor = 0.0945f;
@@ -1769,9 +1806,9 @@ int main(int argc, char* argv[])
 #endif
 
     sfc64 srng(rnd);
-    for (auto& m : hash_tables) {
+    for (auto& m : hash_tables)
         printf("  %s\n", m.second.data());
-    }
+    putchar('\n');
 
     while (true) {
         int n = (srng() % maxn) + minn;
