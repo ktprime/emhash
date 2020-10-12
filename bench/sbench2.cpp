@@ -19,7 +19,7 @@
     #define TKey              1
 #endif
 
-#if __GNUC__
+#if __GNUC__ && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 

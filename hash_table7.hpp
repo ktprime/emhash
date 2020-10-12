@@ -95,12 +95,12 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #include "wyhash.h"
 #endif
 
-#ifdef  EMH_KEY
+#ifdef EMH_KEY
     #undef  EMH_KEY
     #undef  EMH_VAL
     #undef  EMH_PKV
-    #undef  EMH_BUCKET
     #undef  EMH_NEW
+    #undef  EMH_BUCKET
     #undef  EMH_EMPTY
 #endif
 
@@ -255,11 +255,11 @@ struct entry {
         bucket = pairt.bucket;
     }
 
-    entry& operator = (entry&& pairt)
+    entry& operator = (entry&& pairT)
     {
-        second = std::move(pairt.second);
-        bucket = pairt.bucket;
-        first = std::move(pairt.first);
+        second = std::move(pairT.second);
+        bucket = pairT.bucket;
+        first = std::move(pairT.first);
         return *this;
     }
 
@@ -327,7 +327,7 @@ public:
         typedef value_pair&               reference;
 
         iterator() { }
-        iterator(htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init()
         {
@@ -419,7 +419,7 @@ public:
         }
 
     public:
-        htype*   _map;
+        const htype* _map;
         size_t   _bmask;
         size_type _bucket;
         size_type _from;
@@ -492,7 +492,6 @@ public:
             do {
                 _bucket++;
             } while (EMH_BTS(_bucket));
-
 #else
             _bmask &= _bmask - 1;
             if (EMH_LIKELY(_bmask != 0)) {
@@ -1075,31 +1074,28 @@ public:
     /// Same as above, but contains(key) MUST be false
     size_type insert_unique(KeyT&& key, ValueT&& value)
     {
-        check_expand_need();
         return do_insert_unqiue(std::move(key), std::move(value));
     }
 
     size_type insert_unique(const KeyT& key, const ValueT& value)
     {
-        check_expand_need();
         return do_insert_unqiue(key, value);
     }
 
     size_type insert_unique(value_type&& p)
     {
-        check_expand_need();
         return do_insert_unqiue(std::move(p.first), std::move(p.second));
     }
 
     size_type insert_unique(const value_type& p)
     {
-        check_expand_need();
         return do_insert_unqiue(p.first, p.second);
     }
 
     template<typename K, typename V>
     inline size_type do_insert_unqiue(K&& key, V&& value)
     {
+        check_expand_need();
         auto bucket = find_unique_bucket(key);
         EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         return bucket;
@@ -1168,7 +1164,7 @@ public:
     /* Check if inserting a new value rather than overwriting an old entry */
     ValueT& operator[](const KeyT& key)
     {
-        reserve(_num_filled);
+        check_expand_need();
         const auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_pairs,bucket)) {
             EMH_NEW(key, std::move(ValueT()), bucket);
@@ -1179,7 +1175,7 @@ public:
 
     ValueT& operator[](KeyT&& key)
     {
-        reserve(_num_filled);
+        check_expand_need();
         const auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_pairs,bucket)) {
             EMH_NEW(std::move(key), std::move(ValueT()), bucket);
@@ -1228,9 +1224,9 @@ public:
     static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1537,11 +1533,11 @@ private:
 
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
-                break;
+                return _num_buckets;
             next_bucket = nbucket;
         }
 
-        return _num_buckets;
+        return 0;
     }
 
     //kick out bucket and find empty to occpuy
@@ -1649,10 +1645,10 @@ private:
 
         const auto qmask = _mask / SIZE_BIT;
         {
-            const auto next2 = (bucket_from + 2 * SIZE_BIT) & qmask;
-            const auto bmask2 = *((size_t*)_bitmask + next2);
+            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
+            const auto bmask2 = *((size_t*)_bitmask + step);
             if (EMH_LIKELY(bmask2 != 0))
-                return next2 * SIZE_BIT + CTZ(bmask2);
+                return step * SIZE_BIT + CTZ(bmask2);
         }
 
         for (; ;) {

@@ -56,7 +56,7 @@ std::map<std::string, std::string> hash_tables =
 
     {"emilib2", "emilib2"},
     {"emilib4", "emilib4"},
-    {"emilib3", "emilib3"},
+//    {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
     {"fht", "fht"},
 
