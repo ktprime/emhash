@@ -277,7 +277,7 @@ struct entry {
         std::swap(first, o.first);
     }
 
-#ifndef EMH_ORDER_KV
+#ifdef EMH_ORDER_KV
     Second second;//int
     size_type bucket;
     First first; //long
@@ -1273,7 +1273,7 @@ public:
             return false;
 
 #if EMH_STATIS
-        if (_num_filled > 100'000) dump_statics(1);
+        if (_num_filled > 100'0000) dump_statics(1);
 #endif
         rehash(required_buckets + 2);
         return true;

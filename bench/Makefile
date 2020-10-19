@@ -18,9 +18,9 @@ EMH=5
 
 all:
 #	$(CXX) $(CXXFLAGS) fbench.cpp -DK_$(K) -DV_$(V) -DK_LEN=$(K_LEN) -DV_LEN=$(V_LEN) -DINIT_SIZE=$(ISIZE) -DTEST_LEN=$(LEN) -DQUERY_RATE=$(QR) -DREMOVE_RATE=$(RR) -DINSERT_FAILURE_RATE=$(IFR) -DQUERY_FAILURE_RATE=$(QFR) -DREMOVE_FAILURE_RATE=$(RFR) -c
+	$(CXX) $(CXXFLAGS) -DET=1 ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) -DET=1 sbench2.cpp -o sb2
 	$(CXX) $(CXXFLAGS)  hbench.cpp -o hbench
-	$(CXX) $(CXXFLAGS) -DET=1 ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) -DET=1 sbench.cpp -o setbench
 	$(CXX) $(CXXFLAGS) -DET martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) fbench.cpp -o fbench

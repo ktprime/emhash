@@ -80,9 +80,9 @@ std::map<std::string, std::string> hash_tables =
 //#define EM3                    1
 //#define HOOD_HASH              1
 //#define PHMAP_HASH             1
-//#define EMH_WY_HASH         1
+//#define WY_HASH             1
 //#define FL1                    1
-//#define EMH_FIBONACCI_HASH  1
+//#define EMH_FIBONACCI_HASH     1
 
 //#define EMH_BUCKET_INDEX    2
 //#define EMH_REHASH_LOG      1234567
@@ -503,7 +503,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     if (func_result.find(func) == func_result.end()) {
         func_result[func] = sum;
     } else if (sum != func_result[func]) {
-        printf("%s %s %zd != %zd (o)\n", hash_name.c_str(), func.c_str(), sum, func_result[func]);
+        printf("%s %s %zd != %zd (o)\n", hash_name.c_str(), func.c_str(), sum, (size_t)func_result[func]);
     }
 
     auto& showname = hash_tables[hash_name];
@@ -1281,6 +1281,21 @@ static void printResult(int n)
     printf("--------------------------------------------------------------------\n\n");
 }
 
+struct WyIntHasher
+{
+    size_t seed;
+    WyIntHasher()
+    {
+        sfc64 srng(time(NULL) / 1024); seed = srng();
+    }
+
+    std::size_t operator()(size_t v) const
+    {
+        return wyhash64(v, seed);
+    }
+};
+
+
 static int benchHashMap(int n)
 {
     if (n < 10000)
@@ -1291,9 +1306,11 @@ static int benchHashMap(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if KEY_STR && EMH_WY_HASH
+#if KEY_STR && WY_HASH
     using ehash_func = WysHasher;
-#elif KEY_SUC
+#elif WY_HASH && KEY_INT
+    using ehash_func = WyIntHasher;
+#elif _SUC
     using ehash_func = StuHasher;
 #elif KEY_INT && BAD_HASH > 100
     using ehash_func = BadHasher<keyType>;
@@ -1718,8 +1735,8 @@ static void testHashString(int size, int str_min, int str_max)
 
 int main(int argc, char* argv[])
 {
-    testHashInt();
-    testHashString(rand() % 1234567 + 1234567, 4, 64);
+//    testHashInt();
+//    testHashString(rand() % 1234567 + 1234567, 4, 64);
 
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
     find_test();

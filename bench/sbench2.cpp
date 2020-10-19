@@ -473,7 +473,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     if (func_result.find(func) == func_result.end()) {
         func_result[func] = sum;
     } else if (sum != func_result[func]) {
-        printf("%s %s %zd != %zd (o)\n", hash_name.c_str(), func.c_str(), sum, func_result[func]);
+        printf("%s %s %zd != %zd (o)\n", hash_name.c_str(), func.c_str(), (size_t)sum, (size_t)func_result[func]);
     }
 
     auto& showname = hash_tables[hash_name];

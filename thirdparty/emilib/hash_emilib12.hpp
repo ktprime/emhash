@@ -23,7 +23,7 @@ struct HashMapEqualTo
 	}
 };
 
-constexpr uint32_t probe_limit = (1 << (sizeof(uint16_t) * 8) - 2) - 1;
+constexpr uint32_t probe_limit = (1 << ((sizeof(uint16_t) * 8) - 2)) - 1;
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = HashMapEqualTo<KeyT>>

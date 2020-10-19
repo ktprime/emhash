@@ -289,7 +289,7 @@ static uint64_t TEST(const T& m, const char* msg = nullptr)
 template<class T>
 static uint64_t test(T& m, const char* name)
 {
-    uint64_t ret = 0;
+    long ret = 0;
 
     puts(name);
     //TEST(m);

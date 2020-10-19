@@ -635,7 +635,7 @@ void bench_IterateIntegers(MAP& map)
 			result += keyVal.second;
 		}
 	}
-	printf("    total iterate/removing time = %.2lf, %.2lf|%ld\n\n", (ts1 - ts) / 1000.0, (now2ms() - ts) /1000.0, result);
+	printf("    total iterate/removing time = %.2lf, %.2lf|%lu\n\n", (ts1 - ts) / 1000.0, (now2ms() - ts) /1000.0, result);
 }
 
 template<class MAP>
