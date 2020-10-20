@@ -67,12 +67,13 @@ txt file result [martin_bench.txt](https://github.com/ktprime/emhash/blob/master
 
 the benchmark code is some tiny changed for injecting new hash map, the result is not final beacuse it depends on os, cpu, compiler and dataset input.
 
-my ebench result: low is best
-![](int64_t_int.png)
-![](int_string.png)
-![](string_int.png)
-![](int64_t_Struct.png)
+my result is benched on 3 linux server(amd, intel, arm64), 1 win10 pc and 2 Laptop): low is best
 ![](int64_t_int64_t.png)
+![](int_string.png)
+![](string_string.png)
+![](Struct_int64_t.png)
+![](int64_t_Struct.png)
+![](int64_t.png)
 
 # some bad
 - it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
