@@ -593,7 +593,7 @@ public:
 
     const_iterator end() const
     {
-        return {this, _mask + 1};
+        return cend();
     }
 
     size_type size() const
@@ -1214,7 +1214,7 @@ public:
         //pack last position to bit 0
         /**************** -------------------------------- *************/
 
-        for (size_type src_bucket = 0; src_bucket < old_num_buckets; src_bucket++) {
+        for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (EMH_EMPTY(old_pairs, src_bucket))
                 continue;
 
@@ -1639,7 +1639,7 @@ private:
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #elif EMH_WYHASH64
-        return wyhash64(key, 11400714819323198485ull);
+        return wyhash64(key, KC);
 #else
         return _hasher(key);
 #endif
@@ -1649,7 +1649,7 @@ private:
     inline uint64_t hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), 11400714819323198485ull);
+        return wyhash(key.c_str(), key.size(), KC);
 #elif EMH_SAFE_HASH
         return _hash_inter == 0 ?  _hasher(key) : wyhash(key.c_str(), key.size(), 0x123456789);
 #elif EMH_BDKR_HASH
@@ -1666,7 +1666,7 @@ private:
     inline uint64_t hash_key(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        return _hasher(key) * 11400714819323198485ull;
+        return _hasher(key) * KC;
 #else
         return _hasher(key);
 #endif

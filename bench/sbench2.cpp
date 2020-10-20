@@ -55,9 +55,16 @@ std::map<std::string, std::string> hash_tables =
 #define PHMAP_HAVE_SSSE3      1
 #endif
 
+//rand data type
+#ifndef RT
+    #define RT  1  //1 wyrand 2 sfc64 3 mt19937_64
+#endif
+
 //#define HOOD_HASH           1
 //#define PHMAP_HASH          1
-//#define EMH_WY_HASH         1
+#if WYHASH_LITTLE_ENDIAN
+//#define WY_HASH             1
+#endif
 //#define FL1                 1
 //#define EMH_FIBONACCI_HASH  1
 //#define EMH_REHASH_LOG      1234567
@@ -72,6 +79,7 @@ std::map<std::string, std::string> hash_tables =
 //#define EMH_ERASE_SMALL     1
 //#define EMH_BDKR_HASH       1
 //#define EMH_HIGH_LOAD       201000
+//#define EMH_SIZE_TYPE_64BIT  1
 
 //
 #include "hash_set2.hpp"
@@ -207,23 +215,8 @@ struct BadHasher
 };
 #endif
 
-struct WysHasher
-{
-    std::size_t operator()(const std::string& str) const
-    {
-#ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(str.c_str(), str.size(), 0x123456789 + str.size());
-#else
-        size_t hash = 0;
-        for (const auto c : str)
-            hash = c + hash * 131;
-        return hash;
-#endif
-    }
-};
-
 #if TKey == 0
-    typedef int          keyType;
+    typedef unsigned int keyType;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int"
     #define KEY_INT     1
@@ -468,7 +461,7 @@ static std::map<std::string, int64_t> func_result;
 //func:hash -> time
 static std::map<std::string, std::map<std::string, int64_t>> once_func_hash_time;
 
-static void check_func_result(const std::string& hash_name, const std::string& func, int64_t sum, int64_t ts1, int weigh = 1)
+static void check_func_result(const std::string& hash_name, const std::string& func, size_t sum, int64_t ts1, int weigh = 1)
 {
     if (func_result.find(func) == func_result.end()) {
         func_result[func] = sum;
@@ -519,7 +512,7 @@ static void add_hash_func_time(std::map<std::string, std::map<std::string, int64
     const auto first = double(once_score_hash.begin()->first);
     //print once score
     for (auto& v : once_score_hash) {
-        printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first / func_index), v.second.c_str(), last * 1.0 / v.first, first * 100.0 / v.first);
+        printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first / (func_index - 1)), v.second.c_str(), last * 1.0 / v.first, first * 100.0 / v.first);
     }
 }
 
@@ -906,10 +899,12 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ahash.erase(v);
 
+#ifndef AVX2
     for (auto it = tmp.begin(); it != tmp.end(); ) {
         it = tmp.erase(it);
         sum += 1;
     }
+#endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -955,14 +950,54 @@ void shuffle(RandomIt first, RandomIt last)
     }
 }
 
+#if WYHASH_LITTLE_ENDIAN
+struct WysHasher
+{
+    std::size_t operator()(const std::string& str) const
+    {
+        return wyhash(str.c_str(), str.size(), str.size());
+    }
+};
+
+struct WyIntHasher
+{
+    uint64_t seed;
+    WyIntHasher(uint64_t seed1 = randomseed())
+    {
+        seed = seed1;
+    }
+
+    std::size_t operator()(size_t v) const
+    {
+        return wyhash64(v, seed);
+    }
+};
+
+struct WyRand
+{
+    uint64_t seed;
+    WyRand(uint64_t seed1 = randomseed())
+    {
+        seed = seed1;
+    }
+
+    uint64_t operator()()
+    {
+        return wyrand(&seed);
+    }
+};
+#endif
+
 //https://en.wikipedia.org/wiki/Gamma_distribution#/media/File:Gamma_distribution_pdf.svg
 //https://blog.csdn.net/luotuo44/article/details/33690179
 static int buildTestData(int size, std::vector<keyType>& randdata)
 {
     randdata.reserve(size);
 
-#if 1
+#if RT == 2
     sfc64 srng(size);
+#elif WYHASH_LITTLE_ENDIAN && RT == 1
+	WyRand srng(size);
 #else
     std::mt19937_64 srng; srng.seed(size);
 #endif
@@ -976,7 +1011,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #if AR > 0
     const auto iRation = AR;
 #else
-    const auto iRation = 0;
+    const auto iRation = 1;
 #endif
 
     auto flag = 0;
@@ -1065,8 +1100,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         find_hit_half<hash_type>(hash, hash_name, vList);
         erase_half<hash_type>(hash, hash_name, vList);
         erase_find_half<hash_type>(hash, hash_name, vList);
-        insert_find_erase<hash_type>(hash, hash_name, vList);
         erase_reinsert<hash_type>(hash, hash_name, vList);
+        insert_find_erase<hash_type>(hash, hash_name, vList);
+
         hash_iter<hash_type>(hash, hash_name);
 
 #ifdef UF
@@ -1160,16 +1196,18 @@ static int benchHashSet(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if KEY_STR && EMH_WY_HASH
+#if KEY_STR && WY_HASH
     using ehash_func = WysHasher;
+#elif WY_HASH && KEY_INT
+    using ehash_func = WyIntHasher;
 #elif KEY_SUC
     using ehash_func = StuHasher;
 #elif KEY_INT && BAD_HASH > 100
     using ehash_func = BadHasher<keyType>;
-#elif PHMAP_HASH
-    using ehash_func = phmap::Hash<keyType>;
 #elif HOOD_HASH
     using ehash_func = robin_hood::hash<keyType>;
+#elif PHMAP_HASH
+    using ehash_func = phmap::Hash<keyType>;
 #else
     using ehash_func = std::hash<keyType>;
 #endif
@@ -1370,6 +1408,37 @@ static inline uint64_t hash32(uint64_t key)
 #endif
 }
 
+static void testHashRand(int loops = 100000009)
+{
+    long sum = 0;
+    auto ts = getTime();
+    {
+        ts = getTime();
+        sfc64 srng;
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("martin sfc64 = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    }
+
+    {
+        ts = getTime();
+        std::mt19937_64 srng; srng.seed(randomseed());
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("mt19937_64  = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    }
+
+#if WYHASH_LITTLE_ENDIAN
+    {
+        ts = getTime();
+        WyRand srng;
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("wyrand    = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    }
+#endif
+}
+
 static void testHashInt(int loops = 100000009)
 {
     long sum = 0;
@@ -1379,6 +1448,13 @@ static void testHashInt(int loops = 100000009)
     for (int i = 0; i < loops; i++)
         sum += phmap::phmap_mix<8>()(i);
     printf("phmap hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+#endif
+
+#ifdef WYHASH_LITTLE_ENDIAN
+    auto seed = randomseed();
+    for (int i = 0; i < loops; i++)
+        sum += wyhash64(i, seed);
+    printf("wyhash64   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
     ts = getTime();
@@ -1411,7 +1487,7 @@ static void testHashInt(int loops = 100000009)
 
 static void buildRandString(int size, std::vector<std::string>& rndstring, int str_min, int str_max)
 {
-    std::mt19937_64 srng; srng.seed(time(0));
+    std::mt19937_64 srng; srng.seed(randomseed());
     for (int i = 0; i < size; i++)
         rndstring.emplace_back(get_random_alphanum_string(srng() % (str_max - str_min + 1) + str_min));
 }
@@ -1462,12 +1538,12 @@ static void testHashString(int size, int str_min, int str_max)
         putchar('\n');
     }
     printf("sum = %ld\n", sum);
-
 }
 
 int main(int argc, char* argv[])
 {
-    //testHashInt();
+    testHashInt();
+    testHashRand();
     //testHashString(rand() % 1234567 + 1234567, 4, 64);
 
     srand((unsigned)time(0));
@@ -1475,22 +1551,20 @@ int main(int argc, char* argv[])
     printInfo(nullptr);
 
     bool auto_set = false;
-    int tn = 0, rnd = time(0) + rand() * rand();
+    int rnd = time(0) + rand() * rand();
     auto maxc = 500;
     auto maxn = (1024 * 1024 * 64) / (sizeof(keyType) + 8) + 100000;
     auto minn = (1024 * 1024 * 1) /  (sizeof(keyType) + + 8) + 10000;
 
-    float load_factor = 0.0945f;
+    float load_factor = 1.0f;
     printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u e] t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
         if (isdigit(cmd))
-            maxn = atoi(argv[i]) + 1000;
+            maxn = atol(argv[i]) + 1000;
         else if (cmd == 'f' && isdigit(argv[i][1]))
             load_factor = atof(&argv[i][0] + 1) / 100.0f;
-        else if (cmd == 't' && isdigit(argv[i][1]))
-            tn = atoi(&argv[i][0] + 1);
         else if (cmd == 'c' && isdigit(argv[i][1]))
             maxc = atoi(&argv[i][0] + 1);
         else if (cmd == 'a')
@@ -1539,7 +1613,7 @@ int main(int argc, char* argv[])
     while (true) {
         int n = (srng() % maxn) + minn;
         if (auto_set) {
-            printf(">> ");
+            printf(">>");
             if (scanf("%u", &n) == 1 && n <= 0)
                 auto_set = false;
         }

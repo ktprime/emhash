@@ -165,7 +165,7 @@ namespace emhash7 {
     static constexpr size_type INACTIVE = 0 - 0x1u;
 #else
     typedef uint64_t size_type;
-    static constexpr size_type INACTIVE = 0 - 0x1ull;
+static constexpr size_type INACTIVE = 0 - 0x1ull;
 #endif
 
 static constexpr uint32_t MASK_BIT = sizeof(uint8_t) * 8;
@@ -277,7 +277,7 @@ struct entry {
         std::swap(first, o.first);
     }
 
-#ifdef EMH_ORDER_KV
+#ifndef EMH_ORDER_KV
     Second second;//int
     size_type bucket;
     First first; //long
@@ -771,16 +771,16 @@ public:
         return main_bucket;
     }
 
-    size_type get_diss(size_type bucket, size_type next_bucket) const
+    size_type get_diss(size_type bucket, size_type next_bucket, const size_type slots) const
     {
         auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
         auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
             return 0;
         size_type diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
-        if (diff / EMH_CACHE_LINE_SIZE < 127)
-            return diff / EMH_CACHE_LINE_SIZE + 1;
-        return 127;
+        if (diff / EMH_CACHE_LINE_SIZE + 1 < slots)
+            return (diff / EMH_CACHE_LINE_SIZE + 1);
+        return slots - 1;
     }
 
     int get_bucket_info(const size_type bucket, size_type steps[], const size_type slots) const
@@ -794,7 +794,7 @@ public:
         else if (next_bucket == bucket)
             return 1;
 
-        steps[get_diss(bucket, next_bucket) % slots] ++;
+        steps[get_diss(bucket, next_bucket, slots)] ++;
         size_type bucket_size = 2;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
@@ -802,7 +802,7 @@ public:
                 break;
 
             assert((int)nbucket >= 0);
-            steps[get_diss(nbucket, next_bucket) % slots] ++;
+            steps[get_diss(nbucket, next_bucket, slots)] ++;
             bucket_size ++;
             next_bucket = nbucket;
         }
@@ -812,11 +812,12 @@ public:
 
     void dump_statics(bool show_cache) const
     {
-        size_type buckets[256] = {0};
-        size_type steps[256]   = {0};
+        const int slots = 128;
+        size_type buckets[slots + 1] = {0};
+        size_type steps[slots + 1]   = {0};
         char buff[1024 * 16];
         for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
-            auto bsize = get_bucket_info(bucket, steps, 128);
+            auto bsize = get_bucket_info(bucket, steps, slots);
             if (bsize >= 0)
                 buckets[bsize] ++;
         }
@@ -841,9 +842,9 @@ public:
             bucket_coll += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
             miss  += bucketsi * i * i;
-            //(exp(-lf) * pow(lf, k)/factorial(k))
-            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.8lf|%0.8lf  %2.3lf\n",
-                    i, bucketsi, bucketsi * 1.0 * i / _num_filled, poisson, sumn * 100.0 / _num_filled);
+            auto errs = (bucketsi * 1.0 * i / _num_filled - poisson) * 100 / poisson;
+            bsize += sprintf(buff + bsize, "  %2u  %8lu  %0.8lf|%0.2lf%%  %2.3lf\n",
+                    i, bucketsi, bucketsi * 1.0 * i / _num_filled, errs, sumn * 100.0 / _num_filled);
             if (sumn >= _num_filled)
                 break;
         }
@@ -853,14 +854,15 @@ public:
             sums += steps[i];
             if (steps[i] == 0)
                 continue;
-            bsize += sprintf(buff + bsize, "  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / bucket_coll, sums * 100.0 / bucket_coll);
+            if (steps[i] > 10)
+                bsize += sprintf(buff + bsize, "  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / bucket_coll, sums * 100.0 / bucket_coll);
         }
 
         if (sumb == 0)  return;
 
         bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n",
                 _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
-        bsize += sprintf(buff + bsize, "  collision,possion,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%%  %.2lf|%.2lf, %.2lf\n",
+        bsize += sprintf(buff + bsize, "  collision,poisson,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%%  %.2lf|%.2lf, %.2lf\n",
                  (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled,
                  finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
 
@@ -1273,7 +1275,7 @@ public:
             return false;
 
 #if EMH_STATIS
-        if (_num_filled > 100'0000) dump_statics(1);
+        if (_num_filled > 1'000'000) dump_statics(1);
 #endif
         rehash(required_buckets + 2);
         return true;
@@ -1750,7 +1752,7 @@ private:
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #elif EMH_WYHASH64
-        return wyhash64(key, 11400714819323198485ull);
+        return wyhash64(key, KC);
 #else
         return _hasher(key);
 #endif
@@ -1780,7 +1782,7 @@ private:
     inline size_type hash_bucket(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        return _hasher(key) * 11400714819323198485ull;
+        return _hasher(key) * KC;
 #else
         return _hasher(key);
 #endif

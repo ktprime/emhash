@@ -564,16 +564,16 @@ public:
         return hash_main(bucket);
     }
 
-    size_type get_diss(uint32_t bucket, uint32_t next_bucket) const
+    size_type get_diss(uint32_t bucket, uint32_t next_bucket, const uint32_t slots) const
     {
         auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
         auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
             return 0;
         uint32_t diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
-        if (diff / EMH_CACHE_LINE_SIZE < 127)
+        if (diff / EMH_CACHE_LINE_SIZE < slots - 1)
             return diff / EMH_CACHE_LINE_SIZE + 1;
-        return 127;
+        return slots - 1;
     }
 
     int get_bucket_info(const uint32_t bucket, uint32_t steps[], const uint32_t slots) const
@@ -583,12 +583,12 @@ public:
             return -1;
 
         const auto main_bucket = hash_main(bucket);
-        if (main_bucket != bucket)
-            return 0;
-        else if (next_bucket == bucket)
+        if (next_bucket == main_bucket)
             return 1;
+        else if (main_bucket != bucket)
+            return 0;
 
-        steps[get_cache_info(bucket, next_bucket) % slots] ++;
+        steps[get_diss(bucket, next_bucket, slots)] ++;
         uint32_t ibucket_size = 2;
         //find a new empty and linked it to tail
         while (true) {
@@ -596,7 +596,7 @@ public:
             if (nbucket == next_bucket)
                 break;
 
-            steps[get_cache_info(nbucket, next_bucket) % slots] ++;
+            steps[get_diss(nbucket, next_bucket, slots)] ++;
             ibucket_size ++;
             next_bucket = nbucket;
         }
@@ -605,10 +605,11 @@ public:
 
     void dump_statics() const
     {
-        uint32_t buckets[129] = {0};
-        uint32_t steps[129]   = {0};
+        const int slots = 128;
+        uint32_t buckets[slots + 1] = {0};
+        uint32_t steps[slots + 1]   = {0};
         for (uint32_t bucket = 0; bucket < _num_buckets; ++bucket) {
-            auto bsize = get_bucket_info(bucket, steps, 128);
+            auto bsize = get_bucket_info(bucket, steps, slots);
             if (bsize > 0)
                 buckets[bsize] ++;
         }
@@ -623,7 +624,7 @@ public:
             sumn += bucketsi * i;
             collision += bucketsi * (i - 1);
             finds += bucketsi * i * (i + 1) / 2;
-            printf("  %2u  %8u  %.2lf  %.2lf\n", i, bucketsi, bucketsi * 100.0 * i / _num_filled, sumn * 100.0 / _num_filled);
+            printf("  %2u  %8u  %2.2lf|  %.2lf\n", i, bucketsi, bucketsi * 100.0 * i / _num_filled, sumn * 100.0 / _num_filled);
         }
 
         puts("========== collision miss ration ===========");
@@ -892,7 +893,6 @@ public:
         check_expand_need();
         const auto bucket = find_or_allocate(key);
 
-        // Check if inserting a new value rather than overwriting an old entry
         if (EMH_EMPTY(_pairs, bucket)) {
             EMH_NEW(key, value, bucket);
             return ValueT();
@@ -906,10 +906,11 @@ public:
     /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key)
     {
-        check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        /* Check if inserting a new value rather than overwriting an old entry */
+        auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_pairs, bucket)) {
+            /* Check if inserting a new value rather than overwriting an old entry */
+            if (check_expand_need())
+                bucket = find_unique_bucket(key);
             EMH_NEW(key, std::move(ValueT()), bucket);
         }
 
@@ -918,10 +919,10 @@ public:
 
     ValueT& operator[](KeyT&& key)
     {
-        check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        /* Check if inserting a new value rather than overwriting an old entry */
+        auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_pairs, bucket)) {
+            if (check_expand_need())
+                bucket = find_unique_bucket(key);
             EMH_NEW(std::move(key), std::move(ValueT()), bucket);
         }
 
@@ -1004,11 +1005,15 @@ public:
     bool reserve(uint64_t num_elems)
     {
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-        if (EMH_LIKELY(required_buckets < _num_buckets))
+        if (EMH_LIKELY(required_buckets < _mask))
             return false;
 
+#if EMH_STATIS
+        if (_num_filled > 1'000'000) dump_statics();
+#endif
+
         //assert(required_buckets < max_size());
-        rehash(required_buckets + 1);
+        rehash(required_buckets + 2);
         return true;
     }
 
@@ -1301,6 +1306,7 @@ one-way seach strategy.
         if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
+#if 0
         constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
@@ -1332,6 +1338,29 @@ one-way seach strategy.
                 return medium;
         }
 
+#else
+        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 4;
+        for (uint32_t step = 2, slot = bucket + 1; ;slot += ++step) {
+            auto bucket1 = slot & _mask;
+            if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
+                return bucket1;
+
+            if (step > linear_probe_length) {
+                _last &= _mask;
+                if (EMH_EMPTY(_pairs, ++_last) || EMH_EMPTY(_pairs, ++_last))
+                    return _last ++;
+
+#if 0
+                auto tail = (_num_buckets - _last) & _mask;
+                if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
+                    return tail;
+#endif
+                auto medium = (_num_filled + _last) & _mask;
+                if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
+                    return medium;
+            }
+        }
+#endif
         return 0;
     }
 
@@ -1412,6 +1441,8 @@ one-way seach strategy.
         return hash64(key);
 #elif EMH_IDENTITY_HASH
         return (key + (key >> (sizeof(UType) * 4)));
+#elif EMH_WYHASH64
+        return wyhash64(key, KC);
 #else
         return _hasher(key);
 #endif
@@ -1439,7 +1470,7 @@ one-way seach strategy.
     inline uint64_t hash_key(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        return _hasher(key) * 11400714819323198485ull;
+        return _hasher(key) * KC;
 #else
         return _hasher(key);
 #endif
