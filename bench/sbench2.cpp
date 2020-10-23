@@ -312,7 +312,7 @@ static int ilog(int x, const int n = 2)
     return logn;
 }
 
-uint64_t randomseed() {
+static uint64_t randomseed() {
     std::random_device rd;
     return std::uniform_int_distribution<uint64_t>{}(rd);
 }
@@ -821,7 +821,9 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
+#if FL1
 static uint8_t l1_cache[64 * 1024];
+#endif
 template<class hash_type>
 void find_miss_all(hash_type& ahash, const std::string& hash_name)
 {
@@ -997,7 +999,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #if RT == 2
     sfc64 srng(size);
 #elif WYHASH_LITTLE_ENDIAN && RT == 1
-	WyRand srng(size);
+    WyRand srng(size);
 #else
     std::mt19937_64 srng; srng.seed(size);
 #endif
@@ -1410,6 +1412,7 @@ static inline uint64_t hash32(uint64_t key)
 
 static void testHashRand(int loops = 100000009)
 {
+    printf("%s loops = %d\n",__FUNCTION__, loops);
     long sum = 0;
     auto ts = getTime();
     {
@@ -1417,7 +1420,7 @@ static void testHashRand(int loops = 100000009)
         sfc64 srng;
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("martin sfc64 = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+        printf("sfc64      = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
     }
 
     {
@@ -1425,7 +1428,7 @@ static void testHashRand(int loops = 100000009)
         std::mt19937_64 srng; srng.seed(randomseed());
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("mt19937_64  = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+        printf("mt19937_64 = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
     }
 
 #if WYHASH_LITTLE_ENDIAN
@@ -1434,13 +1437,14 @@ static void testHashRand(int loops = 100000009)
         WyRand srng;
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("wyrand    = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+        printf("wyrand     = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
     }
 #endif
 }
 
 static void testHashInt(int loops = 100000009)
 {
+    printf("%s loops = %d\n", __FUNCTION__, loops);
     long sum = 0;
     auto ts = getTime();
 
@@ -1460,29 +1464,48 @@ static void testHashInt(int loops = 100000009)
     ts = getTime();
     for (int i = 1; i < loops; i++)
         sum += i;
-    printf("phmap mul = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("sum  add   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 
 #ifdef ROBIN_HOOD_H_INCLUDED
     ts = getTime();
     for (int i = 0; i < loops; i++)
         sum += robin_hood::hash<uint64_t>()(i);
-    printf("robin hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("martin hash= %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
     ts = getTime();
     for (int i = 0; i < loops; i++)
         sum += std::hash<uint64_t>()(i);
-    printf("std hash = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
+    printf("std hash   = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
     ts = getTime();
     for (int i = 0; i < loops; i++)
         sum += hash64(i);
-    printf("hash64   = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
+    printf("hash64     = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
     ts = getTime();
     for (int i = 0; i < loops; i++)
         sum += hash32(i);
-    printf("hash32   = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
+    printf("hash32     = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
+
+#if 0
+    const int buff_size = 1024*1024 * 16;
+    const int pack_size = 64;
+    auto buffer = new char[buff_size * pack_size];
+    memset(buffer, 0, buff_size * pack_size);
+
+    for (int i = 0; i < 4; i++) {
+        ts = getTime();
+        memset(buffer, 0, buff_size * pack_size);
+        printf("memset   = %4d ms\n", (int)(getTime() - ts) / 1000);
+
+        ts = getTime();
+        for (uint32_t bi = 0; bi < buff_size; bi++)
+           *(int*)(buffer + (bi * pack_size)) = 0;
+        printf("loops   = %4d ms\n\n", (int)(getTime() - ts) / 1000);
+    }
+    delete [] buffer;
+#endif
 }
 
 static void buildRandString(int size, std::vector<std::string>& rndstring, int str_min, int str_max)
@@ -1494,10 +1517,11 @@ static void buildRandString(int size, std::vector<std::string>& rndstring, int s
 
 static void testHashString(int size, int str_min, int str_max)
 {
+    printf("\n%s loops = %d\n", __FUNCTION__, size);
     std::vector<std::string> rndstring;
     rndstring.reserve(size * 4);
 
-    char os_info[2048]; printInfo(os_info);
+    //char os_info[2048]; printInfo(os_info);
     long sum = 0;
     for (int i = 1; i <= 4; i++)
     {
@@ -1510,14 +1534,14 @@ static void testHashString(int size, int str_min, int str_max)
         for (auto& v : rndstring)
             sum += std::hash<std::string>()(v);
         t_find = (getTime() - start) / 1000;
-        printf("stdhash time use = %4d ms\n", t_find);
+        printf("std hash = %4d ms\n", t_find);
 
 #ifdef WYHASH_LITTLE_ENDIAN
         start = getTime();
         for (auto& v : rndstring)
             sum += wyhash(v.data(), v.size(), 1);
         t_find = (getTime() - start) / 1000;
-        printf("wyhash  time use = %4d ms\n", t_find);
+        printf("wyhash   = %4d ms\n", t_find);
 #endif
 
 #ifdef ROBIN_HOOD_H_INCLUDED
@@ -1525,7 +1549,7 @@ static void testHashString(int size, int str_min, int str_max)
         for (auto& v : rndstring)
             sum += robin_hood::hash_bytes(v.data(), v.size());
         t_find = (getTime() - start) / 1000;
-        printf("martin  time use = %4d ms\n", t_find);
+        printf("martin hash = %4d ms\n", t_find);
 #endif
 
 #ifdef PHMAP_VERSION_MAJOR
@@ -1533,7 +1557,7 @@ static void testHashString(int size, int str_min, int str_max)
         for (auto& v : rndstring)
             sum += phmap::Hash<std::string>()(v);
         t_find = (getTime() - start) / 1000;
-        printf("phmap   time use = %4d ms\n", t_find);
+        printf("phmap hash  = %4d ms\n", t_find);
 #endif
         putchar('\n');
     }
@@ -1542,16 +1566,16 @@ static void testHashString(int size, int str_min, int str_max)
 
 int main(int argc, char* argv[])
 {
-    testHashInt();
-    testHashRand();
-    //testHashString(rand() % 1234567 + 1234567, 4, 64);
+    testHashInt(1e8+8);
+    testHashRand(1e8+8);
+    testHashString(1e6+6, 2, 32);
 
     srand((unsigned)time(0));
 
     printInfo(nullptr);
 
     bool auto_set = false;
-    int rnd = time(0) + rand() * rand();
+    int rnd = time(0) + randomseed();
     auto maxc = 500;
     auto maxn = (1024 * 1024 * 64) / (sizeof(keyType) + 8) + 100000;
     auto minn = (1024 * 1024 * 1) /  (sizeof(keyType) + + 8) + 10000;

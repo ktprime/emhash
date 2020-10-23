@@ -870,8 +870,8 @@ public:
         bsize += sprintf(buff + bsize, "============== buckets size end =============\n");
         buff[bsize + 1] = 0;
 
-#if EMH_TAF_LOG
-        FDLOG() << __FUNCTION__ << "|" << buff << endl;
+#ifdef EMH_LOG
+        EMH_LOG() << __FUNCTION__ << "|" << buff << endl;
 #else
         puts(buff);
 #endif
@@ -1332,9 +1332,9 @@ private:
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
-#if EMH_TAF_LOG
+#ifdef EMH_LOG
             static size_type ihashs = 0;
-            FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif

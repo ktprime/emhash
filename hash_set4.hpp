@@ -985,9 +985,9 @@ private:
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/type/sizeof/coll|load_factor = %u/%s/%zd/%.2lf%%|%.2f",
                     _num_filled, typeid(value_type).name(), sizeof(PairT), 100. - 100.0 * mbucket / _num_filled, load_factor());
-#if EMH_TAF_LOG
+#ifdef EMH_LOG
             static uint32_t ihashs = 0;
-            FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1291,16 +1291,15 @@ private:
         return _pairs[next_bucket].second = find_empty_simple(next_bucket);
     }
 
+    const static uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        __uint128_t r = key; r *= k;
-        return (uint32_t)(r >> 64) + (uint32_t)r;
+        __uint128_t r = key; r *= KC;
+        return (uint64_t)(r >> 64) + (uint64_t)r;
 #elif _WIN64
         uint64_t high;
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        return _umul128(key, k, &high) + high;
+        return _umul128(key, KC, &high) + high;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
@@ -1329,6 +1328,8 @@ private:
         return hash64(key);
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
+#elif EMH_WYHASH64
+        return wyhash64(key, KC);
 #else
         return _hasher(key);
 #endif
@@ -1340,14 +1341,9 @@ private:
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.c_str(), key.size(), key.size());
 #elif EMH_BDKR_HASH
-        uint32_t hash = 0;
-        if (key.size() < 256) {
-            for (const auto c : key)
-                hash = c + hash * 131;
-        } else {
-            for (size_t i = 0, j = 1; i < key.size(); i += j++)
-                hash = key[i] + hash * 131;
-        }
+        size_type hash = 0;
+        for (const auto c : key)
+            hash = c + hash * 131;
         return hash;
 #else
         return _hasher(key);

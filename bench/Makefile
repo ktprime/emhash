@@ -1,6 +1,6 @@
-CXX=g++-10
+#CXX=clang++
+#CXX=g++-10
 CXX=g++
-CXX=clang++
 CXXFLAGS=-O3 -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty
 
 K=INT64

@@ -960,9 +960,9 @@ public:
             char buff[255] = {0};
             sprintf(buff, "    _num_colls/main_factor/coll_factor/K/pack/collision = %u/%.2lf%%/%.2lf%%/%s/%zd/%.2lf%%",
                     _num_colls, old_num_mains * 100.0 / old_main_buckets, 100.0 * _num_colls / _colls_buckets, typeid(KeyT).name(), sizeof(_pairs[0]), _num_colls * 100.0 / size());
-#ifdef EMH_TAF_LOG
+#ifdef EMH_LOG
             static uint32_t ihashs = 0;
-            FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif

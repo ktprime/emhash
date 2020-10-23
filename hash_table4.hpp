@@ -1129,7 +1129,7 @@ public:
             const auto main_bucket = hash_bucket(key);
             auto& next_bucket = EMH_BUCKET(_pairs, main_bucket);
             if (next_bucket == INACTIVE) {
-                new(_pairs + main_bucket) PairT(std::move(old_pair)); 
+                new(_pairs + main_bucket) PairT(std::move(old_pair));
                 if (is_notriviall_destructable())
                     old_pair.~PairT();
                 next_bucket = main_bucket;
@@ -1166,9 +1166,9 @@ public:
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/_hash_inter/aver_size/K.V/pack/collision = %u/%u/%.2lf/%s.%s/%zd/%.2lf%%",
                     _num_filled, _hash_inter, (double)_num_filled / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_filled));
-#if EMH_TAF_LOG
+#ifdef EMH_LOG
             static uint32_t ihashs = 0;
-            FDLOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1514,6 +1514,8 @@ private:
         return _hasher(key) & _mask;
 #elif EMH_IDENTITY_HASH
         return ((uint32_t)key + (key >> 20)) & _mask;
+#elif EMH_WYHASH64
+        return wyhash64(key, 11400714819323198485ull) & _mask;
 #else
         return _hasher(key) & _mask;
 #endif

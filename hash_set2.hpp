@@ -92,6 +92,7 @@ public:
     typedef HashSet<KeyT, HashT, EqT> htype;
     typedef std::pair<KeyT, size_type> PairT;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
+    static constexpr float default_load_factor = 0.95f;
 
     typedef KeyT     value_type;
     typedef KeyT&    reference;
@@ -217,19 +218,19 @@ public:
 
     // ------------------------------------------------------------------------
 
-    void init(size_type bucket, float load_factor = 0.95f)
+    void init(size_type bucket, float lf)
     {
         _pairs = nullptr;
         _num_buckets = 0;
         _num_filled = 0;
 
-        max_load_factor(load_factor);
+        max_load_factor(lf);
         reserve(bucket);
     }
 
-    HashSet(size_type bucket = 8, float load_factor = 0.95f)
+    HashSet(size_type bucket = 8, float lf = default_load_factor)
     {
-        init(bucket, load_factor);
+        init(bucket, lf);
     }
 
     HashSet(const HashSet& other)
@@ -262,7 +263,7 @@ public:
 
         if (_num_buckets != other._num_buckets) {
             free(_pairs);
-            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
+            _pairs = (PairT*)malloc((2u + other._num_buckets) * sizeof(PairT));
         }
 
         clone(other);
@@ -337,7 +338,7 @@ public:
         while (_pairs[bucket].second == INACTIVE) {
             ++bucket;
         }
-        return { this, bucket };
+        return {this, bucket};
     }
 
     const_iterator begin() const
@@ -800,13 +801,25 @@ public:
     }
 
 private:
+
+    size_type calculate_bucket(size_type required_buckets)
+    {
+        size_type num_buckets = 4;
+        if (_num_filled > (1 << 16))
+            num_buckets = _num_buckets >> 2;
+        while (num_buckets < required_buckets)
+            num_buckets *= 2;
+        return num_buckets;
+    }
+
     void rehash(size_type required_buckets)
     {
         if (required_buckets < _num_filled)
             return;
 
-        size_type num_buckets = _num_filled > 65536 ? (1u << 16) : 8u;
-        while (num_buckets < required_buckets) { num_buckets *= 2; }
+        auto num_buckets = calculate_bucket(required_buckets);
+        if (num_buckets == _num_buckets && _mask != 0)
+            return;
 
         _mask        = num_buckets - 1;
 #if EMH_HIGH_LOAD
@@ -851,9 +864,9 @@ private:
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/type/sizeof/collision/load_factor = %u/%.2lf/%s/%zd/%2.lf%%|%.2f",
             _num_filled, (double)_num_filled / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_filled), load_factor());
-#if EMH_TAF_LOG
+#ifdef EMH_LOG
             static size_type ihashs = 0;
-            FDLOG() << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1097,16 +1110,15 @@ private:
         return _pairs[next_bucket].second = find_empty_bucket(next_bucket);
     }
 
+    const static uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        __uint128_t r = key; r *= k;
+        __uint128_t r = key; r *= KC;
         return (uint64_t)(r >> 64) + (uint64_t)r;
 #elif _WIN64
         uint64_t high;
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        return _umul128(key, k, &high) + high;
+        return _umul128(key, KC, &high) + high;
 #elif 1
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
@@ -1135,6 +1147,8 @@ private:
         return hash64(key) & _mask;
 #elif EMH_IDENTITY_HASH
         return (key + (key >> (sizeof(UType) * 4))) & _mask;
+#elif EMH_WYHASH64
+        return wyhash64(key, KC) & _mask;
 #else
         return _hasher(key) & _mask;
 #endif
@@ -1147,13 +1161,8 @@ private:
         return wyhash(key.c_str(), key.size(), key.size()) & _mask;
 #elif EMH_BDKR_HASH
         size_type hash = 0;
-        if (key.size() < 256) {
-            for (const auto c : key)
-                hash = c + hash * 131;
-        } else {
-            for (size_t i = 0, j = 1; i < key.size(); i += j++)
-                hash = key[i] + hash * 131;
-        }
+        for (const auto c : key)
+            hash = c + hash * 131;
         return hash & _mask;
 #else
         return _hasher(key) & _mask;
@@ -1164,7 +1173,7 @@ private:
     inline size_type hash_bucket(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        return (_hasher(key) * 11400714819323198485ull) & _mask;
+        return (_hasher(key) * KC) & _mask;
 #else
         return _hasher(key) & _mask;
 #endif

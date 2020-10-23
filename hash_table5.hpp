@@ -1068,8 +1068,8 @@ private:
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%2.lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
-#if EMH_TAF_LOG
-            static uint32_t ihashs = 0; FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+#ifdef EMH_LOG
+            static uint32_t ihashs = 0; EMH_LOG() << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif

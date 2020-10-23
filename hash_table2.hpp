@@ -674,8 +674,8 @@ public:
         bsize += sprintf(buff + bsize, "============== buckets size end =============\n");
         buff[bsize + 1] = 0;
 
-#if EMH_TAF_LOG
-        FDLOG() << __FUNCTION__ << "|" << buff << endl;
+#ifdef EMH_LOG
+        EMH_LOG() << __FUNCTION__ << "|" << buff << endl;
 #else
         puts(buff);
 #endif
@@ -1139,9 +1139,9 @@ private:
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/_hash_inter/aver_size/K.V/pack/collision = %u/%u/%.2lf/%s.%s/%zd/%.2lf%%",
                     _num_filled, _hash_inter, (double)_num_filled / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_filled));
-#if EMH_TAF_LOG
+#ifdef EMH_LOG
             static uint32_t ihashs = 0;
-            FDLOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1521,7 +1521,7 @@ private:
         return _hasher(key);
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
-#elif WYHASH_LITTLE_ENDIAN_
+#elif EMH_WYHASH64
         return wyhash64(key, _num_buckets);
 #else
         return _hasher(key);

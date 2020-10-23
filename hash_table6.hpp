@@ -1235,9 +1235,9 @@ public:
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/_hash_inter/aver_size/K.V/pack/collision = %u/%u/%.2lf/%s.%s/%zd/%.2lf%%",
                     _num_filled, _hash_inter, (double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _mask));
-#if EMH_TAF_LOG
+#ifdef EMH_LOG
             static size_type ihashs = 0;
-            FDLOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1453,7 +1453,8 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position. ***/
 
-    size_type find_or_allocate(const KeyT& key)
+    template<typename Key>
+    size_type find_or_allocate(const Key& key)
     {
         const auto bucket = hash_key(key) & _mask;
         auto next_bucket = EMH_ADDR(_pairs, bucket);
