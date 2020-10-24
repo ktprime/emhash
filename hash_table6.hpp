@@ -431,7 +431,7 @@ public:
         size_type _from;
     };
 
-    void init(size_type bucket, float lf = 0.95f)
+    void init(size_type bucket, float lf = 0.90f)
     {
 #if EMH_SAFE_HASH
         _num_main = _hash_inter = 0;
@@ -444,7 +444,7 @@ public:
         reserve(bucket + 1);
     }
 
-    HashMap(size_type bucket = 4, float lf = 0.95f)
+    HashMap(size_type bucket = 4, float lf = 0.90f)
     {
         init(bucket, lf);
     }

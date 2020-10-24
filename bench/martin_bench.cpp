@@ -77,10 +77,10 @@ std::unordered_map<std::string, std::string> show_name =
 	{"emhash6", "emhash6"},
 	{"emhash7", "emhash7"},
 //	{"emilib3", "emilib3"},
+	{"absl", "absl flat"},
 
 #if ET
 	{"phmap", "phmap flat"},
-	{"absl", "absl flat"},
 	{"robin_hood", "martin flat"},
 	//    {"hrd7", "hrd7map"},
 
@@ -834,7 +834,6 @@ int main(int argc, char* argv[])
 		{ ska::flat_hash_map <size_t, size_t, hash_func> fmap; bench_randomFind(fmap); }
 		{ phmap::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
 //		{ hrd7::hash_map <size_t, size_t, hash_func> hmap;  bench_randomFind(hmap); }
-		{ absl::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
 //		{ emilib3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 
 #endif

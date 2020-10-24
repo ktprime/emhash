@@ -513,7 +513,7 @@ public:
         size_type _from;
     };
 
-    void init(size_type bucket, float lf = 0.95f)
+    void init(size_type bucket, float lf = 0.90f)
     {
         _num_buckets = _num_filled = 0;
         _pairs = nullptr;
@@ -522,7 +522,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(size_type bucket = 4, float lf = 0.95f)
+    HashMap(size_type bucket = 4, float lf = 0.90f)
     {
         init(bucket, lf);
     }
