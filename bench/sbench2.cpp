@@ -37,6 +37,7 @@ std::map<std::string, std::string> hash_tables =
     {"gp_hash", "gp_hash"},
 
     {"emiset", "emiset"},
+    {"absl", "absl_flat"},
 
 #if ET
     {"martin", "martin_flat"},
@@ -60,6 +61,7 @@ std::map<std::string, std::string> hash_tables =
     #define RT  1  //1 wyrand 2 sfc64 3 mt19937_64
 #endif
 
+//#define ABSL                  1
 //#define HOOD_HASH           1
 //#define PHMAP_HASH          1
 #if WYHASH_LITTLE_ENDIAN
@@ -116,6 +118,11 @@ std::map<std::string, std::string> hash_tables =
 //https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
 
+#if ABSL
+#define NDEBUG 1
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/internal/raw_hash_set.cc"
+#endif
 #if HOOD_HASH
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
@@ -278,7 +285,7 @@ static int64_t getTime()
 #elif WIN32_TICK
     return GetTickCount() * 1000;
 #elif _WIN32
-    static LARGE_INTEGER freq = {0};
+    static LARGE_INTEGER freq = {0, 0};
     if (freq.QuadPart == 0) {
         QueryPerformanceFrequency(&freq);
     }
@@ -901,7 +908,7 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ahash.erase(v);
 
-#ifndef AVX2
+#if !(AVX2 || ABSL)
     for (auto it = tmp.begin(); it != tmp.end(); ) {
         it = tmp.erase(it);
         sum += 1;
@@ -1268,6 +1275,9 @@ static int benchHashSet(int n)
         {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
+#if ABSL
+        {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
+#endif
     }
 
     auto pow2 = 1 << ilog(vList.size(), 2);

@@ -56,6 +56,12 @@ using namespace std;
 #include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 #endif
 
+#if ABSL
+#define NDEBUG 1
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/internal/raw_hash_set.cc"
+#endif
+
 static int RND = time(0);
 
 
@@ -74,6 +80,7 @@ std::unordered_map<std::string, std::string> show_name =
 
 #if ET
 	{"phmap", "phmap flat"},
+	{"absl", "absl flat"},
 	{"robin_hood", "martin flat"},
 	//    {"hrd7", "hrd7map"},
 
@@ -94,7 +101,7 @@ static const char* find(const std::string& map_name)
 		}
 	}
 
-	return "";
+	return nullptr;
 }
 
 // this is probably the fastest high quality 64bit random number generator that exists.
@@ -233,17 +240,17 @@ static int64_t now2ms()
 template<class MAP> void bench_insert(MAP& map)
 {
 	auto map_name = find(typeid(MAP).name());
-	if (map_name == "")
+	if (!map_name)
 		return;
 	printf("%s map = %s\n", __FUNCTION__, map_name);
 
-	//    map.max_load_factor(7.0 / 8);
+	constexpr int maxn = 100'000'000;
 	auto nowms = now2ms();
 	sfc64 rng(RND);
 	{
 		{
 			auto ts = now2ms();
-			for (size_t n = 0; n < 100'000'000; ++n) {
+			for (size_t n = 0; n < maxn; ++n) {
 				map[static_cast<int>(rng())];
 			}
 			printf("    insert 100M int %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
@@ -257,7 +264,7 @@ template<class MAP> void bench_insert(MAP& map)
 
 		{
 			auto ts = now2ms();
-			for (size_t n = 0; n < 100'000'000; ++n) {
+			for (size_t n = 0; n < maxn; ++n) {
 				map[static_cast<int>(rng())];
 			}
 			printf("    reinsert 100M int %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
@@ -265,7 +272,7 @@ template<class MAP> void bench_insert(MAP& map)
 
 		{
 			auto ts = now2ms();
-			for (size_t n = 0; n < 100'000'000; ++n) {
+			for (size_t n = 0; n < maxn; ++n) {
 				map.erase(static_cast<int>(rng()));
 			}
 			printf("    remove 100M int %.4lf sec, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, (int)map.size());
@@ -312,7 +319,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
 
 	//    map.max_load_factor(7.0 / 8);
 	auto map_name = find(typeid(MAP).name());
-	if (map_name == "")
+	if (!map_name)
 		return;
 	printf("%s map = %s\n", __FUNCTION__, map_name);
 
@@ -345,7 +352,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
 template<class MAP> void bench_randomDistinct2(MAP& map)
 {
 	auto map_name = find(typeid(MAP).name());
-	if (map_name == "")
+	if (!map_name)
 		return ;
 	printf("%s map = %s\n", __FUNCTION__, map_name);
 
@@ -515,7 +522,7 @@ template<class MAP>
 void bench_randomFindString(MAP& map)
 {
 	auto map_name = find(typeid(MAP).name());
-	if (map_name == "")
+	if (!map_name)
 		return ;
 	printf("%s map = %s\n", __FUNCTION__, map_name);
 
@@ -535,16 +542,17 @@ template<class MAP>
 void bench_randomEraseString(MAP& map)
 {
 	auto map_name = find(typeid(MAP).name());
-	if (map_name == "")
+	if (!map_name)
 		return ;
 	printf("%s map = %s\n", __FUNCTION__, map_name);
 
 	auto nowms = now2ms();
-	{ assert(RND != 123 || 9734165 == runRandomString<MAP> (20'000'000, 7, 0xfffff)); }
-	{ assert(RND != 123 || 2966452 == runRandomString<MAP>(6'000'000, 1000, 0x1ffff)); }
-	{ assert(RND != 123 || 9734165 == runRandomString<MAP>(20'000'000, 8, 0xfffff)); }
-	{ assert(RND != 123 || 9734165 == runRandomString<MAP>(20'000'000, 13, 0xfffff)); }
-	{ assert(RND != 123 || 5867228 == runRandomString<MAP>(12'000'000, 100, 0x7ffff)); }
+	{ runRandomString<MAP> (20'000'000, 7, 0xfffff); }
+	{ runRandomString<MAP>(6'000'000, 1000, 0x1ffff); }
+	{ runRandomString<MAP>(20'000'000, 8, 0xfffff); }
+	{ runRandomString<MAP>(20'000'000, 13, 0xfffff); }
+	{ runRandomString<MAP>(12'000'000, 100, 0x7ffff); }
+
 	printf("total time = %.2lf s\n\n", (now2ms() - nowms) / 1000.0);
 }
 
@@ -610,7 +618,7 @@ template<class MAP>
 void bench_IterateIntegers(MAP& map)
 {
 	auto map_name = find(typeid(MAP).name());
-	if (map_name == "")
+	if (!map_name)
 		return ;
 	printf("%s map = %s\n", __FUNCTION__, map_name);
 
@@ -642,7 +650,7 @@ template<class MAP>
 void bench_randomFind(MAP& bench)
 {
 	auto map_name = find(typeid(MAP).name());
-	if (map_name == "")
+	if (!map_name)
 		return;
 	printf("\n%s map = %s\n", __FUNCTION__, map_name);
 
@@ -671,242 +679,6 @@ void bench_randomFind(MAP& bench)
 	printf("total time = %.2lf\n", ((int)(now2ms() - ts))/1000.0);
 }
 
-std::vector<size_t> integerKeys()
-{
-	std::mt19937_64 rd(0);
-
-	std::vector<size_t> numbers;
-	for (size_t i = 0; i < 1000000; ++i) {
-		numbers.push_back(rd());
-	}
-
-	return numbers;
-}
-
-std::vector<std::string> generateKeys(const std::string& prefix, const std::vector<size_t>& integer_keys, const std::string& suffix)
-{
-	std::vector<std::string> results;
-	results.reserve(integer_keys.size());
-	for (const auto& int_key : integer_keys) {
-		results.emplace_back(prefix + std::to_string(int_key) + suffix);
-		// results.emplace_back(prefix + std::string((const char*)&int_key, sizeof(int_key)) + suffix);
-	}
-	return results;
-}
-
-template<typename HashSet, typename Keys>
-double time_once(const Keys& keys)
-{
-	auto ns = now2ms();
-	HashSet set;
-
-	// Add keys individually to force rehashing every now and then:
-	for (const auto& key : keys) {
-		set.emplace(key);
-	}
-
-	return (now2ms() - ns) / 1000.0;
-}
-
-static void basic_test(int n)
-{
-	printf("1. add 1 - %d one by one\n", n);
-	{
-		{
-			auto ts = now2ms();
-			emhash7::HashMap<int, int> emap(n);
-			for (int i = 0; i < n; i++)
-				emap.insert_unique(i, i);
-			printf("emap unique time = %d ms loadf = %.2lf\n", (int)(now2ms() - ts), emap.load_factor());
-		}
-
-		{
-			auto ts = now2ms();
-			emhash2::HashMap<int, int> emap(n);
-			for (int i = 0; i < n; i++)
-				emap.insert(i, i);
-			printf("emap insert time = %d ms loadf = %.2lf\n", (int)(now2ms() - ts), emap.load_factor());
-		}
-
-		{
-			auto ts = now2ms();
-			std::unordered_map<int, int> umap(n);
-			for (int i = 0; i < n; i++)
-				umap.emplace(i, i);
-			printf("umap insert time = %d ms loadf = %.2lf\n", (int)(now2ms() - ts), umap.load_factor());
-		}
-
-		if (1)
-		{
-			auto ts = now2ms();
-			std::map<int, int> mmap;
-			for (int i = 0; i < n; i++)
-				mmap.emplace(i, i);
-			printf("map time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		{
-			auto ts = now2ms();
-			std::vector<int> v;
-			v.reserve(n);
-			for (int i = 0; i < n; i++)
-				v.emplace_back(i);
-			printf("vec reserve time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		{
-			auto ts = now2ms();
-			std::vector<int> v;
-			for (int i = 0; i < n; i++)
-				v.emplace_back(i);
-			printf("vec emplace time = %d ms\n", (int)(now2ms() - ts));
-		}
-		{
-			auto ts = now2ms();
-			std::vector<int> v(n);
-			for (int i = 0; i < n; i++)
-				v[i] = i;
-			printf("vec resize time = %d ms\n", (int)(now2ms() - ts));
-		}
-		{
-			auto ts = now2ms();
-			std::vector<int> v;
-			for (int i = 0; i < n; i++)
-				v.push_back(i);
-			printf("vec push time = %d ms\n", (int)(now2ms() - ts));
-		}
-		{
-			auto ts = now2ms();
-			emhash9::HashSet<int> eset(n);
-			for (int i = 0; i < n; i++)
-				eset.insert_unique(i);
-			printf("eset time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		{
-			auto ts = now2ms();
-			std::unordered_set<int> uset(n);
-			for (int i = 0; i < n; i++)
-				uset.insert(i);
-			printf("uset time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		puts("\n");
-	}
-
-	printf("2. random_shuffle 1 - %d\n", n);
-	{
-		std::vector <int> data(n);
-		for (int i = 0; i < n; i ++)
-			data[i] = i;
-
-		myrandom_shuffle(data.begin(), data.end());
-		for (int i = 0; i < n; i ++)
-			data[0] += 0;
-
-		{
-			auto ts = now2ms();
-			std::unordered_map<int, int> umap(n);
-			for (auto v: data)
-				umap.emplace(v, 0);
-			printf("umap insert time = %d ms loadf = %.2lf\n", (int)(now2ms() - ts), umap.load_factor());
-		}
-
-		{
-			auto ts = now2ms();
-			emhash6::HashMap<int, int> emap(n);
-			for (auto v: data)
-				emap.insert_unique(v, 0);
-			printf("emap uniqe time = %d ms loadf = %.2lf\n", (int)(now2ms() - ts), emap.load_factor());
-		}
-
-		{
-			auto ts = now2ms();
-			emhash7::HashMap<int, int> emap(n);
-			for (auto v: data)
-				emap.insert(v, 0);
-			printf("emap insert time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		{
-			auto ts = now2ms();
-			std::vector<int> v(n);
-			for (auto d: data)
-				v[d] = 0;
-			printf("vec    time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		{
-			auto ts = now2ms();
-			emhash9::HashSet<int> eset(n);
-			for (auto v: data)
-				eset.insert_unique(v);
-			printf("eset unique time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		{
-			auto ts = now2ms();
-			std::unordered_set<int> eset(n);
-			for (auto v: data)
-				eset.insert(v);
-			printf("uset insert time = %d ms\n", (int)(now2ms() - ts));
-		}
-		puts("\n");
-	}
-
-	puts("3. random data");
-	{
-		std::vector <int> data(n);
-		for (int i = 0; i < n; i ++)
-			data[i] = (uint32_t)(rand() * rand()) % n + rand();
-		myrandom_shuffle(data.begin(), data.end());
-
-		{
-			auto ts = now2ms();
-			emhash2::HashMap<int, int> emap(n);
-			for (auto v: data)
-				emap.insert(v, 0);
-			printf("emap5 insert time = %d ms loadf = %.2lf/size %d\n", (int)(now2ms() - ts), emap.load_factor(), emap.size());
-		}
-
-		{
-			auto ts = now2ms();
-			emhash9::HashSet<int> eset;
-			// for (auto v: data)
-			//     eset.insert(v);
-
-			eset.insert(data.begin(), data.end());
-			printf("eset insert range time = %d ms loadf = %.2lf/size %zd\n", (int)(now2ms() - ts), eset.load_factor(), eset.size());
-		}
-
-		{
-			auto ts = now2ms();
-			std::unordered_map<int, int> umap(n);
-			for (auto v: data)
-				umap.emplace(v, 0);
-			printf("umap insert time = %d ms loadf = %.2lf\n", (int)(now2ms() - ts), umap.load_factor());
-		}
-
-		if (0)
-		{
-			auto ts = now2ms();
-			std::vector<int> vec(n);
-			for (auto d: data)
-				vec[(unsigned int)d % n] = 0;
-			printf("vec time = %d ms\n", (int)(now2ms() - ts));
-		}
-
-		{
-			auto ts = now2ms();
-			std::unordered_set<int> uset(n);
-			uset.insert(data.begin(), data.end());
-			printf("uset insert time = %d ms loadf = %.2lf/size %zd\n", (int)(now2ms() - ts), uset.load_factor(), uset.size());
-		}
-
-		puts("\n");
-	}
-}
-
 int main(int argc, char* argv[])
 {
 	puts("./test [23456mpts] n");
@@ -915,6 +687,7 @@ int main(int argc, char* argv[])
 	for (auto& m : show_name)
 		printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
 
+#if TCPU
 #if _WIN32
 	SetThreadAffinityMask(GetCurrentThread(), 0x2);
 #elif __linux__
@@ -923,6 +696,7 @@ int main(int argc, char* argv[])
 	CPU_SET(0x2, &cpuset);
 	pthread_t current_thread = pthread_self();
 	pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+#endif
 #endif
 
 	if (argc > 1) {
@@ -935,6 +709,8 @@ int main(int argc, char* argv[])
 				show_name.erase("robin_hood");
 			else if (c == 'p')
 				show_name.erase("phmap");
+			else if (c == 'a')
+				show_name.erase("absl");
 			else if (c == 't')
 				show_name.erase("robin_map");
 			else if (c == 's')
@@ -947,7 +723,6 @@ int main(int argc, char* argv[])
 	}
 	if (argc > 2) {
 		int n = argc > 1 ? atoi(argv[2]) : 12345678;
-		basic_test(n);
 		return 0;
 	}
 
@@ -962,6 +737,7 @@ int main(int argc, char* argv[])
 #else
 		typedef std::hash<uint64_t> hash_func;
 #endif
+
 #if EM3
 		{ emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 		{ emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); /*            emap.dump_statis(); */ }
@@ -976,6 +752,9 @@ int main(int argc, char* argv[])
 		{ robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
 		{ ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_IterateIntegers(fmap); }
 		{ phmap::flat_hash_map<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
+#endif
+#if ABSL
+		{ absl::flat_hash_map<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
 #endif
 		putchar('\n');
 	}
@@ -1005,6 +784,9 @@ int main(int argc, char* argv[])
 		{ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench);}
 		{phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 #endif
+#if ABSL
+		{absl::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+#endif
 		putchar('\n');
 	}
 
@@ -1033,6 +815,9 @@ int main(int argc, char* argv[])
 		{ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 #endif
+#if ABSL
+		{absl::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+#endif
 	}
 
 	if (1)
@@ -1049,11 +834,15 @@ int main(int argc, char* argv[])
 		{ ska::flat_hash_map <size_t, size_t, hash_func> fmap; bench_randomFind(fmap); }
 		{ phmap::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
 //		{ hrd7::hash_map <size_t, size_t, hash_func> hmap;  bench_randomFind(hmap); }
+		{ absl::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
 //		{ emilib3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 
 #endif
 		{ emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash6::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
+#if ABSL
+		{ absl::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
+#endif
 #if EM3
 		{ emhash4::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash7::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
@@ -1086,6 +875,9 @@ int main(int argc, char* argv[])
 		{ ska::flat_hash_map <int, int, hash_func> fmap; bench_insert(fmap); }
 		{ phmap::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
 #endif
+#if ABSL
+		{ absl::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
+#endif
 		putchar('\n');
 	}
 
@@ -1114,6 +906,9 @@ int main(int argc, char* argv[])
 		{ ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
 		{ phmap::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
 #endif
+#if ABSL
+		{ absl::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+#endif
 		putchar('\n');
 	}
 
@@ -1140,6 +935,9 @@ int main(int argc, char* argv[])
 		{ robin_hood::unordered_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
 		{ ska::flat_hash_map <int, int, hash_func> fmap; bench_randomDistinct2(fmap); }
 		{ phmap::flat_hash_map <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
+#endif
+#if ABSL
+		{ absl::flat_hash_map <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
 #endif
 		putchar('\n');
 	}

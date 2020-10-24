@@ -35,6 +35,7 @@
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 //#define ET                    1
+//#define ABSL                  1
 
 static void printInfo(char* out);
 std::map<std::string, std::string> hash_tables =
@@ -59,6 +60,7 @@ std::map<std::string, std::string> hash_tables =
 //    {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
     {"fht", "fht"},
+    {"absl", "absl_flat"},
 
 #if ET
     {"martin", "martin_flat"},
@@ -142,6 +144,12 @@ std::map<std::string, std::string> hash_tables =
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 //https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
+
+#if ABSL
+#define NDEBUG 1
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/internal/raw_hash_set.cc"
+#endif
 
 #if HOOD_HASH
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
@@ -308,7 +316,7 @@ static int64_t getTime()
 #elif WIN32_TICK
     return GetTickCount() * 1000;
 #elif _WIN32
-    static LARGE_INTEGER freq = {0};
+    static LARGE_INTEGER freq = {0, 0};
     if (freq.QuadPart == 0) {
         QueryPerformanceFrequency(&freq);
     }
@@ -933,7 +941,7 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ahash.erase(v);
 
-#ifndef AVX2
+#if !(AVX2 | ABSL)
     for (auto it = tmp.begin(); it != tmp.end(); ) {
         it = tmp.erase(it);
         sum += 1;
@@ -1405,6 +1413,9 @@ static int benchHashMap(int n)
         {  benOneHash<emhash3::HashMap <keyType, valueType, ehash_func>>("emhash3", vList); }
 #endif
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
+#if ABSL
+        {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("absl", vList); }
+#endif
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
     }
