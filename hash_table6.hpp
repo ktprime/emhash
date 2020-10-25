@@ -1214,6 +1214,7 @@ public:
         //pack last position to bit 0
         /**************** -------------------------------- *************/
 
+        auto collision = 0;
         for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (EMH_EMPTY(old_pairs, src_bucket))
                 continue;
@@ -1221,6 +1222,10 @@ public:
             auto&& key = EMH_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
+#if EMH_REHASH_LOG
+            if (bucket / 2 != hash_bucket(bucket / 2))
+                collision++;
+#endif
             if (is_triviall_destructable())
                 old_pairs[src_bucket].~PairT();
         }
@@ -1228,13 +1233,12 @@ public:
 #if EMH_REHASH_LOG
         if (_num_filled > EMH_REHASH_LOG) {
 #ifndef EMH_SAFE_HASH
-            auto _num_main = _num_filled / 2;
-            auto _hash_inter = 0;
+            auto _num_main   = old_num_filled - collision;
 #endif
-            size_type collision = _num_filled - _num_main;
+            auto _last = EMH_ADDR(_pairs, _mask + 1);
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/_hash_inter/aver_size/K.V/pack/collision = %u/%u/%.2lf/%s.%s/%zd/%.2lf%%",
-                    _num_filled, _hash_inter, (double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _mask));
+            sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd/%.2lf%%|%.2lf%%",
+                    _num_filled,(double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_buckets), (_last * 100.0 / _num_buckets));
 #ifdef EMH_LOG
             static size_type ihashs = 0;
             EMH_LOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;

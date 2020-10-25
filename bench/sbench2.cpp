@@ -61,7 +61,9 @@ std::map<std::string, std::string> hash_tables =
     #define RT  1  //1 wyrand 2 sfc64 3 mt19937_64
 #endif
 
-//#define ABSL                  1
+#define NDEBUG                1
+//#define ABSL                1
+//#define ABSL_HASH           1
 //#define HOOD_HASH           1
 //#define PHMAP_HASH          1
 #if WYHASH_LITTLE_ENDIAN
@@ -119,10 +121,15 @@ std::map<std::string, std::string> hash_tables =
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
 
 #if ABSL
-#define NDEBUG 1
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/internal/raw_hash_set.cc"
+
+#if ABSL_HASH
+#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/hash.cc"
 #endif
+#endif
+
 #if HOOD_HASH
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
@@ -278,13 +285,17 @@ struct BadHasher
 
 static int64_t getTime()
 {
-#if WIN32_RSU
+#if 0
+    auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
+
+#elif WIN32_RSU
     FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
     GetThreadTimes(GetCurrentThread(), NULL, NULL, &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif WIN32_TICK
     return GetTickCount() * 1000;
-#elif _WIN32
+#elif WIN32_HTIME || _WIN32
     static LARGE_INTEGER freq = {0, 0};
     if (freq.QuadPart == 0) {
         QueryPerformanceFrequency(&freq);
@@ -293,9 +304,19 @@ static int64_t getTime()
     LARGE_INTEGER nowus;
     QueryPerformanceCounter(&nowus);
     return (nowus.QuadPart * 1000000) / (freq.QuadPart);
+#elif WIN32_STIME
+    FILETIME    file_time;
+    SYSTEMTIME  system_time;
+    ULARGE_INTEGER ularge;
+
+    GetSystemTime(&system_time);
+    SystemTimeToFileTime(&system_time, &file_time);
+    ularge.LowPart  = file_time.dwLowDateTime;
+    ularge.HighPart = file_time.dwHighDateTime;
+    return ularge.QuadPart / 10 + system_time.wMilliseconds / 1000;
 #elif LINUX_RUS
     struct rusage rup;
-    getrusage(RUSAGE_THREAD, &rup);
+    getrusage(RUSAGE_SELF, &rup);
     long sec  = rup.ru_utime.tv_sec  + rup.ru_stime.tv_sec;
     long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
     return sec * 1000000 + usec;
@@ -305,6 +326,9 @@ static int64_t getTime()
     struct timeval start;
     gettimeofday(&start, NULL);
     return start.tv_sec * 1000000l + start.tv_usec;
+#else
+    auto tp = std::chrono::steady_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
 #endif
 }
 
@@ -1205,7 +1229,9 @@ static int benchHashSet(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if KEY_STR && WY_HASH
+#if ABSL_HASH && ABSL
+    using ehash_func = absl::Hash<keyType>;
+#elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
 #elif WY_HASH && KEY_INT
     using ehash_func = WyIntHasher;
@@ -1213,10 +1239,10 @@ static int benchHashSet(int n)
     using ehash_func = StuHasher;
 #elif KEY_INT && BAD_HASH > 100
     using ehash_func = BadHasher<keyType>;
-#elif HOOD_HASH
-    using ehash_func = robin_hood::hash<keyType>;
 #elif PHMAP_HASH
     using ehash_func = phmap::Hash<keyType>;
+#elif HOOD_HASH
+    using ehash_func = robin_hood::hash<keyType>;
 #else
     using ehash_func = std::hash<keyType>;
 #endif
@@ -1232,7 +1258,7 @@ static int benchHashSet(int n)
         sum += v.size();
 #endif
         loop_vector_time = getTime() - ts;
-        printf("n = %d, keyType = %s, loop = %d ns:%d\n", n, sKeyType, (int)(loop_vector_time * 1000 / vList.size()), (int)sum);
+        printf("n = %d, keyType = %s, loop_sum = %d ns:%d\n", n, sKeyType, (int)(loop_vector_time * 1000 / vList.size()), (int)sum);
     }
 
     {
@@ -1464,6 +1490,11 @@ static void testHashInt(int loops = 100000009)
     printf("phmap hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
+#ifdef ABSL
+    for (int i = 0; i < loops; i++)
+        sum += absl::Hash<uint64_t>()(i);
+    printf("absl hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+#endif
 #ifdef WYHASH_LITTLE_ENDIAN
     auto seed = randomseed();
     for (int i = 0; i < loops; i++)
@@ -1562,6 +1593,13 @@ static void testHashString(int size, int str_min, int str_max)
         printf("martin hash = %4d ms\n", t_find);
 #endif
 
+#ifdef ABSL
+        start = getTime();
+        for (auto& v : rndstring)
+            sum += absl::Hash<std::string>()(v);
+        t_find = (getTime() - start) / 1000;
+        printf("absl hash = %4d ms\n", t_find);
+#endif
 #ifdef PHMAP_VERSION_MAJOR
         start = getTime();
         for (auto& v : rndstring)
@@ -1576,9 +1614,6 @@ static void testHashString(int size, int str_min, int str_max)
 
 int main(int argc, char* argv[])
 {
-    testHashInt(1e8+8);
-    testHashRand(1e8+8);
-    testHashString(1e6+6, 2, 32);
 
     srand((unsigned)time(0));
 
@@ -1591,7 +1626,7 @@ int main(int argc, char* argv[])
     auto minn = (1024 * 1024 * 1) /  (sizeof(keyType) + + 8) + 10000;
 
     float load_factor = 1.0f;
-    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u e] t(n)\n", (int)maxn);
+    printf("./ebench maxn = %d c(0-1000) f(0-100) a(0-1) d[2-9 h m p s f a u e] rand  test\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
@@ -1605,7 +1640,11 @@ int main(int argc, char* argv[])
             auto_set = true;
         else if (cmd == 'r' && isdigit(argv[i][1]))
             rnd = atoi(&argv[i][0] + 1);
-
+        else if (cmd == 't') {
+            testHashInt(1e8+8);
+            testHashRand(1e8+8);
+            testHashString(1e6+6, 2, 32);
+        }
         else if (cmd == 'd') {
             for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
                 if (c >= '2' && c <= '9') {
@@ -1627,6 +1666,8 @@ int main(int argc, char* argv[])
                     hash_tables.erase("robin");
                 else if (c == 's')
                     hash_tables.erase("flat");
+                else if (c == 'a')
+                    hash_tables.erase("absl");
                 else if (c == 'e') {
                     hash_tables.emplace("emiset", "emiset");
                 }

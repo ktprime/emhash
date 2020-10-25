@@ -1,8 +1,7 @@
 #CXX=clang++
-#CXX=g++-10
 CXX=g++
 CXXFLAGS=-O3 -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty
-#-DABSL=1 -I../..
+#CXXFLAGS=-O3 -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty -DABSL=1 -DABSL_HASH -I.
 
 K=INT64
 V=INT32

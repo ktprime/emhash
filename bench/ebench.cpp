@@ -23,6 +23,7 @@
 #if __linux__ && AVX2
     #include <sys/mman.h>
     #include "fht/fht_ht.hpp"
+    #define FHT_HMAP          1
 #endif
 
 #ifndef TKey
@@ -34,8 +35,7 @@
 #if __GNUC__ > 4 && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
-//#define ET                    1
-//#define ABSL                  1
+
 
 static void printInfo(char* out);
 std::map<std::string, std::string> hash_tables =
@@ -52,15 +52,17 @@ std::map<std::string, std::string> hash_tables =
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
 
-    {"lru_time", "lru_time"},
+//    {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
     {"emilib4", "emilib4"},
+
 //    {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
     {"fht", "fht"},
-    {"absl", "absl_flat"},
+    {"absl", "absl flat"},
+    {"cuckoo", "cuckoo hash"},
 
 #if ET
     {"martin", "martin_flat"},
@@ -84,29 +86,38 @@ std::map<std::string, std::string> hash_tables =
     #define RT  1  //1 wyrand 2 sfc64 3 mt19937_64
 #endif
 
-//#define EM3                    1
-//#define HOOD_HASH              1
-//#define PHMAP_HASH             1
-#if WYHASH_LITTLE_ENDIAN
-//#define WY_HASH             1
+#define NDEBUG                1
+///#define ET                 1
+#ifndef _MSC_VER
+//    #define ABSL            1
+//    #define ABSL_HASH       1
 #endif
-//#define FL1                    1
-//#define EMH_FIBONACCI_HASH     1
 
+//#define CUCKOO_HASHMAP       1
+//#define EM3               1
+//#define PHMAP_HASH        1
+#if WYHASH_LITTLE_ENDIAN
+//    #define WY_HASH         1
+#endif
+//#define HOOD_HASH           1
+//#define FL1                 1
+
+//feature of emhash
+//#define EMH_FIBONACCI_HASH  1
 //#define EMH_BUCKET_INDEX    2
 //#define EMH_REHASH_LOG      1234567
-//#define EMH_AVX_MEMCPY     1
+//#define EMH_AVX_MEMCPY      1
 
-//#define EMH_STATIS         1
-//#define EMH_SAFE_ITER         1
-//#define EMH_SAFE_HASH        1
+//#define EMH_STATIS          1
+//#define EMH_SAFE_ITER       1
+//#define EMH_SAFE_HASH       1
 //#define EMH_IDENTITY_HASH   1
 
-//#define EMH_LRU_SET          1
-//#define EMH_STD_STRING     1
-//#define EMH_ERASE_SMALL    1
+//#define EMH_LRU_SET         1
+//#define EMH_STD_STRING      1
+//#define EMH_ERASE_SMALL     1
 //#define EMH_BDKR_HASH       1
-//#define EMH_HIGH_LOAD        201000
+//#define EMH_HIGH_LOAD       201000
 
 
 #include "hash_table2.hpp"
@@ -146,9 +157,17 @@ std::map<std::string, std::string> hash_tables =
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
 
 #if ABSL
-#define NDEBUG 1
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/internal/raw_hash_set.cc"
+
+#if ABSL_HASH
+#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/hash.cc"
+#endif
+#endif
+
+#if CUCKOO_HASHMAP
+#include "libcuckoo/cuckoohash_map.hh"
 #endif
 
 #if HOOD_HASH
@@ -167,8 +186,10 @@ std::map<std::string, std::string> hash_tables =
     #include "emilib/hash_emilib12.hpp"
     #include "emilib/hash_emilib33.hpp"
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
-    #include "tsl/robin_map.h"        //https://github.com/tessil/robin-map
 #endif
+
+    #include "tsl/robin_map.h"        //https://github.com/tessil/robin-map
+
     #include "lru_size.h"
     #include "lru_time.h"
     #include "phmap/btree.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
@@ -309,13 +330,17 @@ struct BadHasher
 
 static int64_t getTime()
 {
-#if WIN32_RSU
+#if 0
+    auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
+
+#elif WIN32_RSU
     FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
     GetThreadTimes(GetCurrentThread(), NULL, NULL, &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif WIN32_TICK
     return GetTickCount() * 1000;
-#elif _WIN32
+#elif WIN32_HTIME || _WIN32
     static LARGE_INTEGER freq = {0, 0};
     if (freq.QuadPart == 0) {
         QueryPerformanceFrequency(&freq);
@@ -324,9 +349,19 @@ static int64_t getTime()
     LARGE_INTEGER nowus;
     QueryPerformanceCounter(&nowus);
     return (nowus.QuadPart * 1000000) / (freq.QuadPart);
+#elif WIN32_STIME
+    FILETIME    file_time;
+    SYSTEMTIME  system_time;
+    ULARGE_INTEGER ularge;
+
+    GetSystemTime(&system_time);
+    SystemTimeToFileTime(&system_time, &file_time);
+    ularge.LowPart  = file_time.dwLowDateTime;
+    ularge.HighPart = file_time.dwHighDateTime;
+    return ularge.QuadPart / 10 + system_time.wMilliseconds / 1000;
 #elif LINUX_RUS
     struct rusage rup;
-    getrusage(RUSAGE_THREAD, &rup);
+    getrusage(RUSAGE_SELF, &rup);
     long sec  = rup.ru_utime.tv_sec  + rup.ru_stime.tv_sec;
     long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
     return sec * 1000000 + usec;
@@ -336,6 +371,9 @@ static int64_t getTime()
     struct timeval start;
     gettimeofday(&start, NULL);
     return start.tv_sec * 1000000l + start.tv_usec;
+#else
+    auto tp = std::chrono::steady_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
 #endif
 }
 
@@ -350,7 +388,7 @@ static int ilog(int x, const int n = 2)
     return logn;
 }
 
-uint64_t randomseed() {
+static uint64_t randomseed() {
     std::random_device rd;
     return std::uniform_int_distribution<uint64_t>{}(rd);
 }
@@ -941,7 +979,7 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ahash.erase(v);
 
-#if !(AVX2 | ABSL)
+#if !(AVX2 | ABSL | CUCKOO_HASHMAP)
     for (auto it = tmp.begin(); it != tmp.end(); ) {
         it = tmp.erase(it);
         sum += 1;
@@ -1212,7 +1250,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_erase      <hash_type>(hash_name, oList);
         insert_high_load  <hash_type>(hash_name, oList);
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size / 2, 2 * l1_size + 1000);
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size * 4, l3_size);
+        insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size * 4, l3_size * 2);
         insert_no_reserve <hash_type>(hash_name, oList);
         find_insert_multi <hash_type>(hash_name, oList);
 
@@ -1333,7 +1371,9 @@ static int benchHashMap(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if KEY_STR && WY_HASH
+#if ABSL_HASH && ABSL
+    using ehash_func = absl::Hash<keyType>;
+#elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
 #elif WY_HASH && KEY_INT
     using ehash_func = WyIntHasher;
@@ -1341,10 +1381,10 @@ static int benchHashMap(int n)
     using ehash_func = StuHasher;
 #elif KEY_INT && BAD_HASH > 100
     using ehash_func = BadHasher<keyType>;
-#elif HOOD_HASH
-    using ehash_func = robin_hood::hash<keyType>;
 #elif PHMAP_HASH
     using ehash_func = phmap::Hash<keyType>;
+#elif HOOD_HASH
+    using ehash_func = robin_hood::hash<keyType>;
 #else
     using ehash_func = std::hash<keyType>;
 #endif
@@ -1360,7 +1400,7 @@ static int benchHashMap(int n)
         sum += v.size();
 #endif
         loop_vector_time = getTime() - ts;
-        printf("n = %d, keyType = %s, valueType = %s(%zd), loop = %d ms:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
+        printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
     }
 
     {
@@ -1374,13 +1414,13 @@ static int benchHashMap(int n)
 
 #if ET > 1
         {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
-        {  benOneHash<emlru_time::lru_cache <keyType, valueType, ehash_func>>("lru_time", vList); }
-        {  benOneHash<emlru_size::lru_cache <keyType, valueType, ehash_func>>("lru_size", vList); }
+        {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
+        {  benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
 
-        {  benOneHash<emilib2::HashMap     <keyType, valueType, ehash_func>>("emilib2", vList); }
-        {  benOneHash<emilib4::HashMap     <keyType, valueType, ehash_func>>("emilib4", vList); }
+        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
+        {  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
+        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("robin", vList); }
 
-        {  benOneHash<tsl::robin_map     <keyType, valueType, ehash_func>>("robin", vList); }
 #if __x86_64__
         {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("flat", vList); }
         {  benOneHash<hrd7::hash_map     <keyType, valueType, ehash_func>>("hrdset", vList); }
@@ -1389,9 +1429,11 @@ static int benchHashMap(int n)
 
 #ifdef SMAP
         {  benOneHash<std::map<keyType, valueType>>         ("stl_map", vList); }
+
 #if __GNUC__ && __linux__
         {  benOneHash<__gnu_pbds::gp_hash_table<keyType, valueType>>("gp_hash", vList) };
 #endif
+
 #if ET
         {  benOneHash<phmap::btree_map<keyType, valueType> >("btree", vList); }
 #endif
@@ -1401,7 +1443,8 @@ static int benchHashMap(int n)
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
         {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
-#if __linux__ && AVX2
+
+#if FHT_HMAP
         {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
 #endif
 #endif
@@ -1416,6 +1459,10 @@ static int benchHashMap(int n)
 #if ABSL
         {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("absl", vList); }
 #endif
+
+#if CUCKOO_HASHMAP
+        {  benOneHash<libcuckoo::cuckoohash_map <keyType, valueType, ehash_func>>("cuckoo", vList); }
+#endif
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
     }
@@ -1426,75 +1473,6 @@ static int benchHashMap(int n)
     printResult(n);
     return test_case;
 }
-
-#ifdef TREAD
-static int readFile(std::string fileName, int size)
-{
-    if (!freopen(fileName.c_str(), "rb", stdin)) {
-        printf("Cannot open the File : %s", fileName.c_str());
-        freopen(CONSOLE, "r", stdin);
-        return -1;
-    }
-
-    auto ts1 = getTime();
-    std::vector<int64_t> vList;
-    vList.reserve(1038860);
-
-    int64_t                uid, score, pid;
-    if (size == 1) {
-        while (scanf("%ld", &uid) == size) vList.emplace_back(uid);
-    } else if (size == 2) {
-        while (scanf("%ld %ld", &uid, &score) == size) vList.emplace_back(uid);
-    } else if (size == 6) {
-        int items = 0;
-        while (scanf("%ld %ld %d %ld %d %d", &uid, &pid, &items, &score, &items, &items) == size)
-            vList.emplace_back(pid + uid + score + items);
-    }
-    freopen(CONSOLE, "r", stdin);
-
-    //    std::sort(vList.begin(), vList.end());
-    int n = (int)vList.size();
-    printf("\nread file %s  %ld ms, size = %zd\n", fileName.c_str(), (getTime() - ts1) / 1000, vList.size());
-
-#if HOOD_HASH
-    using hash_func = robin_hood::hash<int64_t>;
-#else
-    using hash_func = std::hash<int64_t>;
-#endif
-    n = 25 * 10000 * 2;
-
-    emhash2::HashMap<int64_t, int, hash_func> ehash2(n);
-    emhash6::HashMap<int64_t, int, hash_func> ehash6(n);
-    emhash7::HashMap<int64_t, int, hash_func> ehash7(n);
-    emhash5::HashMap<int64_t, int, hash_func> ehash5(n);
-
-#if _CPP11_HASH
-    ska::flat_hash_map <int64_t, int, hash_func> fmap(n); fmap.max_load_factor(7.0/8);
-    //tsl::robin_map     <int64_t, int, hash_func> rmap(n); rmap.max_load_factor(7.0/8);
-    hrd7::hash_map     <int64_t, int, hash_func> hmap(n); hmap.max_load_factor(7.0/8);
-    phmap::flat_hash_map<int64_t, int> pmap(n);
-    robin_hood::unordered_map<int64_t, int> mmap(n);
-    emilib3::HashMap   <int64_t, int, hash_func> emap(n);
-#endif
-
-    ts1 = getTime();    for (auto v : vList)        ehash6[v] = 1; printf("emhash6   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash6.size(), ehash6.load_factor());
-    ts1 = getTime();    for (auto v : vList)        ehash2[v] = 1; printf("emhash2   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash2.size(), ehash2.load_factor());
-
-#if _CPP11_HASH
-    ts1 = getTime();    for (auto v : vList)        fmap[v] = 1;   printf("ska       insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, fmap.size(), fmap.load_factor());
-    //ts1 = getTime();    for (auto v : vList)        rmap[v] = 1;   printf("tsl       insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, rmap.size(), rmap.load_factor());
-    ts1 = getTime();    for (auto v : vList)        pmap[v] = 1;   printf("pmap      insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, pmap.size(), pmap.load_factor());
-    ts1 = getTime();    for (auto v : vList)        mmap[v] = 1;   printf("martin    insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, mmap.size(), mmap.load_factor());
-    ts1 = getTime();    for (auto v : vList)        emap[v] = 1;   printf("emilib3   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, emap.size(), emap.load_factor());
-    ts1 = getTime();    for (auto v : vList)        hmap[v] = 1;   printf("hrd7      insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, hmap.size(), hmap.load_factor());
-#endif
-    ts1 = getTime();    for (auto v : vList)        ehash7[v] = 1; printf("emhash7   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash7.size(), ehash7.load_factor());
-    ts1 = getTime();    for (auto v : vList)        ehash5[v] = 1; printf("emhash5   insert  %6ld ms, size = %zd|%.2f\n", getTime() - ts1, ehash5.size(), ehash5.load_factor());
-
-    printf("\n");
-    return 0;
-}
-#endif
 
 static void cpuidInfo(int regs[4], int id, int ext)
 {
@@ -1713,6 +1691,12 @@ static void testHashInt(int loops = 100000009)
     printf("phmap hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
+#ifdef ABSL_HASH
+    for (int i = 0; i < loops; i++)
+        sum += absl::Hash<uint64_t>()(i);
+    printf("absl hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+#endif
+
 #ifdef WYHASH_LITTLE_ENDIAN
     auto seed = randomseed();
     for (int i = 0; i < loops; i++)
@@ -1780,7 +1764,6 @@ static void testHashString(int size, int str_min, int str_max)
     std::vector<std::string> rndstring;
     rndstring.reserve(size * 4);
 
-    //char os_info[2048]; printInfo(os_info);
     long sum = 0;
     for (int i = 1; i <= 4; i++)
     {
@@ -1811,6 +1794,14 @@ static void testHashString(int size, int str_min, int str_max)
         printf("martin hash = %4d ms\n", t_find);
 #endif
 
+#ifdef ABSL_HASH
+        start = getTime();
+        for (auto& v : rndstring)
+            sum += absl::Hash<std::string>()(v);
+        t_find = (getTime() - start) / 1000;
+        printf("absl hash = %4d ms\n", t_find);
+#endif
+
 #ifdef PHMAP_VERSION_MAJOR
         start = getTime();
         for (auto& v : rndstring)
@@ -1825,16 +1816,11 @@ static void testHashString(int size, int str_min, int str_max)
 
 int main(int argc, char* argv[])
 {
-    testHashInt(1e8+8);
-    testHashRand(1e8+8);
-    testHashString(1e6+6, 2, 32);
-
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
     find_test();
 #endif
 
     srand((unsigned)time(0));
-
     printInfo(nullptr);
 
     bool auto_set = false;
@@ -1844,7 +1830,7 @@ int main(int argc, char* argv[])
     auto minn = (1024 * 1024 * 2) / (sizeof(keyType) + sizeof(valueType) + 8) + 10000;
 
     float load_factor = 0.0945f;
-    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u e l] t(n)\n", (int)maxn);
+    printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a b t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
@@ -1860,7 +1846,11 @@ int main(int argc, char* argv[])
             auto_set = true;
         else if (cmd == 'r' && isdigit(argv[i][1]))
             rnd = atoi(&argv[i][0] + 1);
-
+        else if (cmd == 'b') {
+            testHashInt(1e8+8);
+            testHashRand(1e8+8);
+            testHashString(1e6+6, 2, 32);
+        }
         else if (cmd == 'd') {
             for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
                 if (c >= '2' && c <= '9') {
@@ -1871,9 +1861,6 @@ int main(int argc, char* argv[])
                     else
                         hash_tables[hash_name] = hash_name;
                 }
-
-                else if (c == 'h')
-                    hash_tables.erase("hrdset");
                 else if (c == 'm')
                     hash_tables.erase("martin");
                 else if (c == 'p')
@@ -1882,6 +1869,10 @@ int main(int argc, char* argv[])
                     hash_tables.erase("robin");
                 else if (c == 's')
                     hash_tables.erase("flat");
+                else if (c == 'a')
+                    hash_tables.erase("absl");
+                else if (c == 'h')
+                    hash_tables.erase("hrdset");
                 else if (c == 'e') {
                     hash_tables.emplace("emilib2", "emilib2");
                     hash_tables.emplace("emilib3", "emilib3");
@@ -1905,13 +1896,6 @@ int main(int argc, char* argv[])
 #ifndef KEY_SUC
     if (tn > 100000)
         TestHashMap(tn);
-#endif
-
-#ifdef TREAD
-    //readFile("./uid_income.txt", 1);
-    //readFile("./pid_income.txt", 1);
-    //readFile("./uids.csv", 2);
-    readFile("./item.log", 6);
 #endif
 
     sfc64 srng(rnd);
