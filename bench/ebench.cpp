@@ -61,7 +61,7 @@ std::map<std::string, std::string> hash_tables =
 //    {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
     {"fht", "fht"},
-    {"absl", "absl flat"},
+    {"absl", "absl_flat"},
     {"cuckoo", "cuckoo hash"},
 
 #if ET

@@ -633,9 +633,10 @@ public:
     return upsert(std::forward<K>(key), [](mapped_type &) {},
                   std::forward<Args>(val)...);
   }
-  template <typename K, typename... Args> bool emplace(K &&key, Args &&... val) {
-    return upsert(std::forward<K>(key), [](mapped_type &) {},
-                  std::forward<Args>(val)...);
+
+  template <class... Args>
+  inline std::pair<int, bool> emplace(Args&&... args) {
+      return std::pair{ 0, insert(std::forward<Args>(args)...) };
   }
 
   /**
@@ -714,7 +715,7 @@ private:
   // true if the key is small and simple, which means using partial keys for
   // lookup would probably slow us down
   static constexpr bool is_simple() {
-    return std::is_pod<key_type>::value && sizeof(key_type) <= 8;
+    return std::is_trivial<key_type>::value && sizeof(key_type) <= 8;
   }
 
   // Whether or not the data is nothrow-move-constructible.
@@ -1892,7 +1893,7 @@ private:
     // array. Then the old buckets will be deleted when new_map is deleted.
     maybe_resize_locks(new_map.bucket_count());
     buckets_.swap(new_map.buckets_);
-    
+
     return ok;
   }
 
@@ -2410,7 +2411,6 @@ public:
       map_.get().minimum_load_factor(mlf);
     }
 
-
     double minimum_load_factor() const {
       return map_.get().minimum_load_factor();
     }
@@ -2580,6 +2580,11 @@ public:
      */
     template <typename K> T &operator[](K &&key) {
       auto result = insert(std::forward<K>(key));
+      return result.first->second;
+    }
+
+    template <typename K> T &operator[](const K &key) {
+      auto result = insert(key);
       return result.first->second;
     }
 
