@@ -1535,13 +1535,8 @@ private:
         return wyhash(key.c_str(), key.size(), key.size());
 #elif EMH_BDKR_HASH
         uint32_t hash = 0;
-        if (key.size() < 64) {
-            for (const auto c : key)
-                hash = c + hash * 131;
-        } else {
-            for (int i = 0, j = 1; i < key.size(); i += j++)
-                hash = key[i] + hash * 131;
-        }
+        for (const auto c : key)
+            hash = c + hash * 131;
         return hash;
 #else
         return _hasher(key);

@@ -41,6 +41,7 @@
 #pragma once
 
 #include <cstring>
+#include <string>
 #include <cstdlib>
 #include <type_traits>
 #include <cassert>
@@ -1054,7 +1055,7 @@ private:
             EMH_BUCKET(_pairs, bucket) = bucket;
 
 #if EMH_REHASH_LOG
-            if (bucket != hash_bucket(key))
+            if (bucket != hash_main(bucket))
                 collision ++;
 #endif
 
@@ -1066,7 +1067,7 @@ private:
         if (_num_filled > EMH_REHASH_LOG) {
             auto mbucket = _num_filled - collision;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%2.lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
+            sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0; EMH_LOG() << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;

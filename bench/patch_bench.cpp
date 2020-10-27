@@ -55,14 +55,18 @@ using value_type = uint64_t;
 #elif PHMAP
 #include "phmap/phmap.h"
 #elif TSL
-
 #include "tsl/robin_map.h"
+#elif ABSL
+  #include "absl/container/flat_hash_map.h"
+  #include "absl/container/internal/raw_hash_set.cc"
 #endif
+
 
 #include <stdio.h>
 #if defined (__has_include) && (__has_include(<x86intrin.h>))
 #include <x86intrin.h>
 #endif
+
 
 #if __x86_64__
 #include <emmintrin.h>
@@ -277,6 +281,11 @@ int main(int argc, char** argv)
 #ifdef MARTIN
   robin_hood::unordered_map<uint32_t,value_type> test;
 #endif
+
+#if ABSL
+  absl::flat_hash_map<uint32_t,value_type> test;
+#endif
+
 #ifdef SPARSEPP
   spp::sparse_hash_map<uint32_t,value_type> test;
 #endif

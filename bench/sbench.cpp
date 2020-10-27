@@ -65,6 +65,7 @@ std::map<std::string, std::string> hash_tables =
 //#define ABSL                1
 //#define ABSL_HASH           1
 //#define HOOD_HASH           1
+//#define MIX_HASH            1
 //#define PHMAP_HASH          1
 #if WYHASH_LITTLE_ENDIAN
 //#define WY_HASH             1
@@ -1021,6 +1022,18 @@ struct WyRand
 };
 #endif
 
+struct IntMixHasher
+{
+    std::size_t operator()(uint64_t key) const
+    {
+        auto ror  = (key >> 32) | (key << 32);
+        auto low  = key * 0xA24BAED4963EE407ull;
+        auto high = ror * 0x9FB21C651E98DF25ull;
+        auto mix  = low + high;
+        return mix >> 32;
+    }
+};
+
 //https://en.wikipedia.org/wiki/Gamma_distribution#/media/File:Gamma_distribution_pdf.svg
 //https://blog.csdn.net/luotuo44/article/details/33690179
 static int buildTestData(int size, std::vector<keyType>& randdata)
@@ -1235,6 +1248,8 @@ static int benchHashSet(int n)
     using ehash_func = WysHasher;
 #elif WY_HASH && KEY_INT
     using ehash_func = WyIntHasher;
+#elif MIX_HASH && KEY_INT
+    using ehash_func = IntMixHasher;
 #elif KEY_SUC
     using ehash_func = StuHasher;
 #elif KEY_INT && BAD_HASH > 100
@@ -1423,6 +1438,25 @@ static inline uint64_t hash64(uint64_t key)
 #endif
 }
 
+static inline uint64_t hashmix(uint64_t key)
+{
+    auto ror  = (key >> 32) | (key << 32);
+    auto low  = key * 0xA24BAED4963EE407ull;
+    auto high = ror * 0x9FB21C651E98DF25ull;
+    auto mix  = low + high;
+    return (mix >> 32) | (mix << 32);
+}
+
+static inline uint64_t rrxmrrxmsx_0(uint64_t v)
+{
+  /* Pelle Evensen's mixer, https://bit.ly/2HOfynt */
+  v ^= (v << 39 | v >> 25) ^ (v << 14 | v >> 50);
+  v *= UINT64_C(0xA24BAED4963EE407);
+  v ^= (v << 40 | v >> 24) ^ (v << 15 | v >> 49);
+  v *= UINT64_C(0x9FB21C651E98DF25);
+  return v ^ v >> 28;
+}
+
 static inline uint64_t hash32(uint64_t key)
 {
 #if 1
@@ -1481,53 +1515,68 @@ static void testHashRand(int loops = 100000009)
 static void testHashInt(int loops = 100000009)
 {
     printf("%s loops = %d\n", __FUNCTION__, loops);
-    long sum = 0;
     auto ts = getTime();
+    long sum = ts;
+    auto r  = ts * ts;
 
 #ifdef PHMAP_VERSION_MAJOR
+    ts = getTime(); sum = 0;
     for (int i = 0; i < loops; i++)
-        sum += phmap::phmap_mix<8>()(i);
+        sum += phmap::phmap_mix<8>()(i + r);
     printf("phmap hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
-#ifdef ABSL
+#ifdef ABSL_HASH
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += absl::Hash<uint64_t>()(i);
+        sum += absl::Hash<uint64_t>()(i + r);
     printf("absl hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
+
 #ifdef WYHASH_LITTLE_ENDIAN
+    ts = getTime(); sum = r;
     auto seed = randomseed();
     for (int i = 0; i < loops; i++)
-        sum += wyhash64(i, seed);
+        sum += wyhash64(i + r, seed);
     printf("wyhash64   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 1; i < loops; i++)
-        sum += i;
+        sum += r + i;
     printf("sum  add   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 
 #ifdef ROBIN_HOOD_H_INCLUDED
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += robin_hood::hash<uint64_t>()(i);
+        sum += robin_hood::hash_int(i + r);
     printf("martin hash= %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += std::hash<uint64_t>()(i);
+        sum += std::hash<uint64_t>()(i + r);
     printf("std hash   = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash64(i);
+        sum += hash64(i + r);
     printf("hash64     = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash32(i);
-    printf("hash32     = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
+        sum += hash32(i + r);
+    printf("hash32     = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+
+    ts = getTime(); sum = r;
+    for (int i = 0; i < loops; i++)
+        sum += hashmix(i + r);
+    printf("hashmix   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+
+    ts = getTime(); sum = r;
+    for (int i = 0; i < loops; i++)
+        sum += rrxmrrxmsx_0(i + r);
+    printf("rrxmrrxmsx_0 = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
 
 #if 0
     const int buff_size = 1024*1024 * 16;
@@ -1562,7 +1611,6 @@ static void testHashString(int size, int str_min, int str_max)
     std::vector<std::string> rndstring;
     rndstring.reserve(size * 4);
 
-    //char os_info[2048]; printInfo(os_info);
     long sum = 0;
     for (int i = 1; i <= 4; i++)
     {
@@ -1593,13 +1641,14 @@ static void testHashString(int size, int str_min, int str_max)
         printf("martin hash = %4d ms\n", t_find);
 #endif
 
-#ifdef ABSL
+#ifdef ABSL_HASH
         start = getTime();
         for (auto& v : rndstring)
             sum += absl::Hash<std::string>()(v);
         t_find = (getTime() - start) / 1000;
         printf("absl hash = %4d ms\n", t_find);
 #endif
+
 #ifdef PHMAP_VERSION_MAJOR
         start = getTime();
         for (auto& v : rndstring)
@@ -1626,7 +1675,7 @@ int main(int argc, char* argv[])
     auto minn = (1024 * 1024 * 1) /  (sizeof(keyType) + + 8) + 10000;
 
     float load_factor = 1.0f;
-    printf("./ebench maxn = %d c(0-1000) f(0-100) a(0-1) d[2-9 h m p s f a u e] rand  test\n", (int)maxn);
+    printf("./ebench maxn = %d i[0-1] c(0-1000) f(0-100) d[2-9 h m p s f u e] b t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
@@ -1640,7 +1689,7 @@ int main(int argc, char* argv[])
             auto_set = true;
         else if (cmd == 'r' && isdigit(argv[i][1]))
             rnd = atoi(&argv[i][0] + 1);
-        else if (cmd == 't') {
+        else if (cmd == 'b') {
             testHashInt(1e8+8);
             testHashRand(1e8+8);
             testHashString(1e6+6, 2, 32);

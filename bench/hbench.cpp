@@ -8,8 +8,9 @@
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
 #include "phmap/phmap.h"
-#include "emilib/hash_emilib33.hpp"
+#include "emilib/emilib33.hpp"
 //#include "patchmap/patchmap.hpp"
+
 
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
@@ -19,6 +20,16 @@
 #include <random>
 #include <iostream>
 #include <unordered_map>
+
+#if ABSL
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/internal/raw_hash_set.cc"
+
+#if ABSL_HASH
+#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/hash.cc"
+#endif
+#endif
 
 #ifdef _WIN32
 #  include <Windows.h>
@@ -52,8 +63,10 @@ public:
 
         //milliseconds
         double msec = double((end.tv_sec - _start.tv_sec) * 1000ULL) + double(end.tv_nsec - _start.tv_nsec)*0.000001;
-
-        printf("%12s: %u\n", _msg, (unsigned)msec);
+        if (msec < 10000)
+			printf("%12s: %u ms\n", _msg, (unsigned)msec);
+		else
+			printf("%12s: %.2lf sec\n", _msg, msec / 1000.0);
     }
 private:
     const char* _msg;
@@ -290,6 +303,7 @@ template<class T>
 static uint64_t test(T& m, const char* name)
 {
     long ret = 0;
+    Timer t(name, "bench");
 
     puts(name);
     //TEST(m);
@@ -322,7 +336,7 @@ static uint64_t test(T& m, const char* name)
     ret += copy_ctor(m);
     ret += copy_operator(m);
     iterator(m);
-    printf("load_factor = %.2lf %ld\n\n", m.load_factor(), ret);
+    printf("\nload_factor = %.2lf %ld", m.load_factor(), ret);
     m.clear();
 
     return ret;
@@ -357,12 +371,13 @@ int main()
 
 #ifdef HOOD_HASH
     using hash_t = robin_hood::hash<int64_t>;
+#elif ABSL_HASH
+    using hash_t = absl::Hash<int64_t>;
 #else
     using hash_t = std::hash<int64_t>;
 #endif
 
     uint64_t ret = 0;
-    { std::unordered_map<uint64_t, Value, hash_t> m3; ret -= test(m3, "\nstd::unordered_map"); }
     { robin_hood::unordered_flat_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_flat_map"); }
     { robin_hood::unordered_node_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_node_map"); }
 //    { emhash4::HashMap<uint64_t, Value, hash_t> m7; ret -= test(m7, "\nemhash4::HashMap"); }
@@ -375,10 +390,14 @@ int main()
     { ska::bytell_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::bytell_hash_map"); }
  //   { emhash2::HashMap<uint64_t, Value, hash_t> m2; ret -= test(m2, "\nemhash2::HashMap"); }
     { emhash7::HashMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nemhash6::HashMap"); }
+#if ABSL
+    { absl::flat_hash_map<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nabsl::flat_hash_map"); }
+#endif
 
     //google::dense_hash_map<uint64_t, Value, hash_t> m2;ret -= test(m2, "\ngoogle::dense_hash_map");
     { phmap::flat_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::flat_map"); }
     { phmap::node_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::node_map"); }
+    { std::unordered_map<uint64_t, Value, hash_t> m3; ret -= test(m3, "\nstd::unordered_map"); }
 //    { whash::patchmap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nwhash::patchmap"); } //insert_or_assign is not exist
 
     delete[] ELEMENTS;

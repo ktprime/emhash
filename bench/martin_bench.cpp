@@ -46,7 +46,7 @@ using namespace std;
 #include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
 #include "martin/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 
-//#include "emilib/hash_emilib32.hpp"
+//#include "emilib/emilib32.hpp"
 //#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
 
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
@@ -65,8 +65,7 @@ using namespace std;
 #endif
 #endif
 
-static int RND = time(0);
-
+static auto RND = time(0);
 
 static std::map<std::string, std::string> show_name =
 {
@@ -859,7 +858,7 @@ int main(int argc, char* argv[])
 		typedef std::hash<int> hash_func;
 #endif
 
-#if ABSL_HASH //failed on other hash
+#if ABSL //failed on other hash
 		{ absl::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
 #endif
 		{ emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }

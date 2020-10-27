@@ -99,6 +99,8 @@ std::map<std::string, std::string> hash_tables =
 #if WYHASH_LITTLE_ENDIAN
 //    #define WY_HASH         1
 #endif
+
+//#define MIX_HASH            1
 //#define HOOD_HASH           1
 //#define FL1                 1
 
@@ -180,11 +182,11 @@ std::map<std::string, std::string> hash_tables =
 #if ET
     #define  _CPP11_HASH    1
 
-    #include "emilib/hash_emilib32.hpp"
+    #include "emilib/emilib32.hpp"
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
-    #include "emilib/hash_emilib12.hpp"
-    #include "emilib/hash_emilib33.hpp"
+    #include "emilib/emilib12.hpp"
+    #include "emilib/emilib33.hpp"
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 #endif
 
@@ -1068,6 +1070,18 @@ struct WyRand
 };
 #endif
 
+struct IntMixHasher
+{
+    std::size_t operator()(uint64_t key) const
+    {
+        auto ror  = (key >> 32) | (key << 32);
+        auto low  = key * 0xA24BAED4963EE407ull;
+        auto high = ror * 0x9FB21C651E98DF25ull;
+        auto mix  = low + high;
+        return mix >> 32;
+    }
+};
+
 //https://en.wikipedia.org/wiki/Gamma_distribution#/media/File:Gamma_distribution_pdf.svg
 //https://blog.csdn.net/luotuo44/article/details/33690179
 static int buildTestData(int size, std::vector<keyType>& randdata)
@@ -1377,6 +1391,8 @@ static int benchHashMap(int n)
     using ehash_func = WysHasher;
 #elif WY_HASH && KEY_INT
     using ehash_func = WyIntHasher;
+#elif MIX_HASH && KEY_INT
+    using ehash_func = IntMixHasher;
 #elif KEY_SUC
     using ehash_func = StuHasher;
 #elif KEY_INT && BAD_HASH > 100
@@ -1624,6 +1640,25 @@ static inline uint64_t hash64(uint64_t key)
 #endif
 }
 
+static inline uint64_t hashmix(uint64_t key)
+{
+    auto ror  = (key >> 32) | (key << 32);
+    auto low  = key * 0xA24BAED4963EE407ull;
+    auto high = ror * 0x9FB21C651E98DF25ull;
+    auto mix  = low + high;
+    return (mix >> 32) | (mix << 32);
+}
+
+static inline uint64_t rrxmrrxmsx_0(uint64_t v)
+{
+  /* Pelle Evensen's mixer, https://bit.ly/2HOfynt */
+  v ^= (v << 39 | v >> 25) ^ (v << 14 | v >> 50);
+  v *= UINT64_C(0xA24BAED4963EE407);
+  v ^= (v << 40 | v >> 24) ^ (v << 15 | v >> 49);
+  v *= UINT64_C(0x9FB21C651E98DF25);
+  return v ^ v >> 28;
+}
+
 static inline uint64_t hash32(uint64_t key)
 {
 #if 1
@@ -1682,54 +1717,68 @@ static void testHashRand(int loops = 100000009)
 static void testHashInt(int loops = 100000009)
 {
     printf("%s loops = %d\n", __FUNCTION__, loops);
-    long sum = 0;
     auto ts = getTime();
+    long sum = ts;
+    auto r  = ts * ts;
 
 #ifdef PHMAP_VERSION_MAJOR
+    ts = getTime(); sum = 0;
     for (int i = 0; i < loops; i++)
-        sum += phmap::phmap_mix<8>()(i);
+        sum += phmap::phmap_mix<8>()(i + r);
     printf("phmap hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
 #ifdef ABSL_HASH
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += absl::Hash<uint64_t>()(i);
+        sum += absl::Hash<uint64_t>()(i + r);
     printf("absl hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
 #ifdef WYHASH_LITTLE_ENDIAN
+    ts = getTime(); sum = r;
     auto seed = randomseed();
     for (int i = 0; i < loops; i++)
-        sum += wyhash64(i, seed);
+        sum += wyhash64(i + r, seed);
     printf("wyhash64   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 1; i < loops; i++)
-        sum += i;
+        sum += r + i;
     printf("sum  add   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 
 #ifdef ROBIN_HOOD_H_INCLUDED
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += robin_hood::hash<uint64_t>()(i);
+        sum += robin_hood::hash_int(i + r);
     printf("martin hash= %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 #endif
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += std::hash<uint64_t>()(i);
+        sum += std::hash<uint64_t>()(i + r);
     printf("std hash   = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash64(i);
+        sum += hash64(i + r);
     printf("hash64     = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
-    ts = getTime();
+    ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash32(i);
-    printf("hash32     = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
+        sum += hash32(i + r);
+    printf("hash32     = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+
+    ts = getTime(); sum = r;
+    for (int i = 0; i < loops; i++)
+        sum += hashmix(i + r);
+    printf("hashmix   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+
+    ts = getTime(); sum = r;
+    for (int i = 0; i < loops; i++)
+        sum += rrxmrrxmsx_0(i + r);
+    printf("rrxmrrxmsx_0 = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
 
 #if 0
     const int buff_size = 1024*1024 * 16;

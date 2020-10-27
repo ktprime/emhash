@@ -201,9 +201,15 @@ struct entry {
         std::swap(first, o.first);
     }
 
+#ifndef EMH_ORDER_KV
     Second second;//int
     size_type bucket;
     First first; //long
+#else
+    First first; //long
+    size_type bucket;
+    Second second;//int
+#endif
 };// __attribute__ ((packed));
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
@@ -548,10 +554,10 @@ public:
         std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_bitmask, other._bitmask);
+        std::swap(EMH_ADDR(_pairs, _mask + 1), EMH_ADDR(other._pairs, other._mask + 1));
     }
 
     // -------------------------------------------------------------
-
     iterator begin()
     {
         const auto bmask = ~(*(size_t*)_bitmask);
@@ -774,39 +780,44 @@ public:
 #endif
 
     // ------------------------------------------------------------
-    template<typename K>
-    iterator find(const K& key, size_t hash_v) noexcept
+    template<typename Key>
+    iterator find(const Key& key, size_t hash_v) noexcept
     {
         return {this, find_filled_hash(key, hash_v)};
     }
 
-    template<typename K>
-    const_iterator find(const K& key, size_t hash_v) const noexcept
+    template<typename Key>
+    const_iterator find(const Key& key, size_t hash_v) const noexcept
     {
         return {this, find_filled_hash(key, hash_v)};
     }
 
+    template<typename Key>
     iterator find(const KeyT& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    const_iterator find(const KeyT& key) const noexcept
+    template<typename Key>
+    const_iterator find(const Key& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    bool contains(const KeyT& key) const noexcept
+    template<typename Key>
+    bool contains(const Key& key) const noexcept
     {
         return find_filled_bucket(key) <= _mask;
     }
 
-    size_type count(const KeyT& key) const noexcept
+    template<typename Key>
+    size_type count(const Key& key) const noexcept
     {
         return find_filled_bucket(key) <= _mask ? 1 : 0;
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key) const noexcept
+    template<typename Key>
+    std::pair<iterator, iterator> equal_range(const Key& key) const noexcept
     {
         const auto found = find(key);
         if (found == end())
@@ -830,21 +841,21 @@ public:
     ValueT* try_get(const KeyT& key) noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket > _mask ? nullptr : &EMH_VAL(_pairs, bucket);
+        return bucket <= _mask ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
 
     /// Const version of the above
     ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket > _mask ? nullptr : &EMH_VAL(_pairs, bucket);
+        return bucket <= _mask ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
 
     /// Convenience function.
     ValueT get_or_return_default(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket > _mask ? ValueT() : EMH_VAL(_pairs, bucket);
+        return bucket <= _mask ? EMH_VAL(_pairs, bucket) : ValueT();
     }
 
     // -----------------------------------------------------
@@ -1002,7 +1013,8 @@ public:
     }
 
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value)      { return do_assign(std::move(key), std::move(value)); }
+
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
@@ -1029,7 +1041,6 @@ public:
     {
         return insert_unique(std::forward<Args>(args)...);
     }
-
 
     ValueT& operator[](const KeyT& key)
     {
@@ -1070,7 +1081,7 @@ public:
         return 1;
     }
 
-    //iterator erase(const_iterator begin_it, const_iterator end_it)
+    //iterator erase const_iterator
     iterator erase(const_iterator cit)
     {
         iterator it(this, cit._bucket);
@@ -1088,7 +1099,8 @@ public:
         return (bucket == it._bucket) ? it.next() : it;
     }
 
-    void _erase(const_iterator it)
+    /// Erase an element typedef an iterator without return next iterator
+    void erase_(const_iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
@@ -1130,6 +1142,7 @@ public:
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * (_mask + 1));
             memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
         }
+        EMH_ADDR(_pairs, _mask + 1) = 0; //_last
         _num_filled = 0;
 #if EMH_SAFE_HASH
         _num_main = _hash_inter = 0;
@@ -1148,6 +1161,9 @@ public:
         if (EMH_LIKELY(required_buckets <= _mask))
             return false;
 
+#if EMH_STATIS
+        if (_num_filled > EMH_STATIS) dump_statics(1);
+#endif
         rehash(required_buckets + 2);
         return true;
     }
@@ -1235,10 +1251,11 @@ public:
 #ifndef EMH_SAFE_HASH
             auto _num_main   = old_num_filled - collision;
 #endif
-            auto _last = EMH_ADDR(_pairs, _mask + 1);
+            const auto num_buckets = _mask + 1;
+            auto last = EMH_ADDR(_pairs, num_buckets);
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd/%.2lf%%|%.2lf%%",
-                    _num_filled,(double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_buckets), (_last * 100.0 / _num_buckets));
+                    _num_filled,(double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / num_buckets), (last * 100.0 / num_buckets));
 #ifdef EMH_LOG
             static size_type ihashs = 0;
             EMH_LOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
@@ -1399,6 +1416,35 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
+    template<typename K>
+    size_type find_filled_hash(const K& key, const size_t hashv) const
+    {
+        const auto bucket = hashv & _mask;
+        auto next_bucket = EMH_ADDR(_pairs, bucket);
+        const auto _num_buckets = _mask + 1;
+
+        if (next_bucket % 2 > 0)
+            return _num_buckets;
+        else if (_eq(key, EMH_KEY(_pairs, bucket)))
+            return bucket;
+        else if (next_bucket == bucket * 2)
+            return _num_buckets;
+
+        next_bucket /= 2;
+        while (true) {
+            if (_eq(key, EMH_KEY(_pairs, next_bucket)))
+                return next_bucket;
+
+            const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
+            if (nbucket == next_bucket)
+                return _num_buckets;
+            next_bucket = nbucket;
+        }
+
+        return 0;
+    }
+
+    // Find the bucket with this key, or return bucket size
     //1. next_bucket = INACTIVE, empty bucket
     //2. next_bucket % 2 == 0 is main bucket
     size_type find_filled_bucket(const KeyT& key) const
@@ -1532,8 +1578,8 @@ private:
                 return step * SIZE_BIT + CTZ(bmask2);
         }
 
+        auto &_last = EMH_ADDR(_pairs, _mask + 1);
         for (; ;) {
-            auto &_last = EMH_ADDR(_pairs, _mask + 1);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
@@ -1608,6 +1654,12 @@ private:
 #elif _WIN64
         uint64_t high;
         return _umul128(key, KC, &high) + high;
+#elif 1
+        auto ror = (key >> 32) | (key << 32);
+        auto low = key * 0xA24BAED4963EE407ull;
+        auto high = ror * 0x9FB21C651E98DF25ull;
+        auto mix = low + high;
+        return (mix >> 32);
 #elif 1
         uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;

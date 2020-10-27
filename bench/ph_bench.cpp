@@ -13,6 +13,11 @@
 #elif EMH == 5
     #include "hash_table5.hpp"
     #define MAPNAME emhash5::HashMap
+    #define EXTRAARGS    
+#elif ABSL
+    #include "absl/container/flat_hash_map.h"
+    #include "absl/container/internal/raw_hash_set.cc"
+    #define MAPNAME absl::flat_hash_map
     #define EXTRAARGS
 #elif MARTIN
     #include "martin/robin_hood.h"
@@ -443,20 +448,20 @@ int main(int argc, char ** argv)
 #endif
 
 #if THR
-	#include "phmap/meminfo.h"
+    #include "phmap/meminfo.h"
     std::thread t1(memlog);
 #endif
 
-	Timer timer(true);
-	auto ts = getTime();
-	long sums = 0;
+    Timer timer(true);
+    auto ts = getTime();
+    long sums = 0;
 
         if(1)
         {
             bench = "sequential"; timer.reset(); hash_t     hash;
             for(i = 0; i < num_keys; i++)
                 hash.emplace(i, value);
-		sums += timer.elapsed().count();
+        sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
 #if 1
@@ -466,7 +471,7 @@ int main(int argc, char ** argv)
             vector<int64_t> v(num_keys);
             timer = _fill_random(v, hash);
             //out("random", num_keys, timer);
-		sums += timer.elapsed().count();
+        sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
 #else
@@ -487,7 +492,7 @@ int main(int argc, char ** argv)
             size_t num_present;
 
             timer = _lookup(v, hash, num_present);
-		sums += timer.elapsed().count();
+        sums += timer.elapsed().count();
             //fprintf(stderr, "found %lu\n", num_present);
             printf("%.2lf %-10s %-10s %d %zd\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, num_present);
         }
@@ -496,7 +501,7 @@ int main(int argc, char ** argv)
             bench = "delete"; timer.reset(); hash_t     hash;
             vector<int64_t> v(num_keys);
             timer = _delete(v,  hash);
-		sums += timer.elapsed().count();
+        sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
         if(1)
@@ -504,7 +509,7 @@ int main(int argc, char ** argv)
             bench = "sequentialstring"; str_hash_t str_hash; timer.reset();
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
-		sums += timer.elapsed().count();
+        sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
         if(1)
@@ -512,7 +517,7 @@ int main(int argc, char ** argv)
             bench = "randomstring"; str_hash_t str_hash; timer.reset();
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer((int)rand()), value);
-		sums += timer.elapsed().count();
+        sums += timer.elapsed().count();
             printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
         }
         if(1)
@@ -521,13 +526,13 @@ int main(int argc, char ** argv)
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
             timer.reset();
-		auto ts1 = getTime();
+        auto ts1 = getTime();
             for(i = 0; i < num_keys; i++)
                 str_hash.erase(new_string_from_integer(i));
-		sums += timer.elapsed().count();
-		printf("%.2lf %-10s %-10s %d %.2lf ",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, (getTime() - ts1) / 1000.0);
-		printf("\nall %.2lf %.2lf ms\n", sums / 1000.0, (getTime() - ts) / 1000.0);
-	}
+        sums += timer.elapsed().count();
+        printf("%.2lf %-10s %-10s %d %.2lf ",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, (getTime() - ts1) / 1000.0);
+        printf("\nall %.2lf %.2lf ms\n", sums / 1000.0, (getTime() - ts) / 1000.0);
+    }
 
         //std::this_thread::sleep_for(std::chrono::seconds(1000));
 

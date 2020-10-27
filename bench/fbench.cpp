@@ -13,6 +13,14 @@
 #include "fht/fht_ht.hpp"
 #endif
 
+#if ABSL
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/internal/raw_hash_set.cc"
+
+#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/hash.cc"
+#endif
+
 #if __GNUC__
 //#include <ext/pb_ds/assoc_container.hpp>
 #endif
@@ -491,6 +499,9 @@ int main(int argc, char* argv[])
         run_udb2<tsl::robin_map<uint32_t, uint32_t, Hash32>>("tsl_robin");
         run_udb2<tsl::hopscotch_map<uint32_t, uint32_t, Hash32>>("tsl_hops");
         run_udb2<emhash5::HashMap<uint32_t, uint32_t, Hash32>>("emhash5");
+#if ABSL
+        run_udb2<absl::flat_hash_map<uint32_t, uint32_t, Hash32>>("absl");
+#endif
 
 #if __linux__ && AVX2
         run_udb2<fht_table<uint32_t, uint32_t>>("fht_table");
@@ -539,6 +550,10 @@ int main(int argc, char* argv[])
 #endif
 
 
+#if ABSL
+    if (ret == run_table <absl::flat_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+#endif
+
 //    if (ret == run_table <std::unordered_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <ska::flat_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <ska::bytell_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
@@ -554,6 +569,7 @@ int main(int argc, char* argv[])
 #if __GNUC__
     // run_table <__gnu_pbds::gp_hash_table<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys);
 #endif
+
 
 //    if (ret == run_table <emilib4::HashMap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
     int n = TEST_LEN;

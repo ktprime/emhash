@@ -1538,16 +1538,10 @@ private:
     inline uint32_t hash_bucket(const UType key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        if (sizeof(UType) <= sizeof(uint32_t))
-            return hash32(key) & _mask;
-        else
-            return uint32_t(hash64(key) & _mask);
+        return uint32_t(hash64(key) & _mask);
 #elif EMH_SAFE_HASH
         if (_hash_inter > 0) {
-            if (sizeof(UType) <= sizeof(uint32_t))
-                return hash32(key) & _mask;
-            else
-                return uint32_t(hash64(key) & _mask);
+            return uint32_t(hash64(key) & _mask);
         }
         return _hasher(key) & _mask;
 #elif EMH_IDENTITY_HASH
@@ -1566,12 +1560,7 @@ private:
         return (_hasher(key) * 11400714819323198485ull) & _mask;
 #elif EMH_STD_STRING
         uint32_t hash = 0;
-        if (key.size() < 32) {
-            for (const auto c : key) hash = c + hash * 131;
-        } else {
-            for (int i = 0, j = 1; i < key.size(); i += j++)
-                hash = key[i] + hash * 131;
-        }
+        for (const auto c : key) hash = c + hash * 131;
         return hash & _mask;
 #else
         return _hasher(key) & _mask;

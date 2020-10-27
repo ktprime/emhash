@@ -41,6 +41,7 @@
 #pragma once
 
 #include <cstring>
+#include <string>
 #include <cstdlib>
 #include <type_traits>
 #include <cassert>
@@ -324,7 +325,7 @@ public:
         uint32_t  _bucket;
     };
 
-    void init(uint32_t bucket, float load_factor = 0.95f)
+    void init(uint32_t bucket, float load_factor = 0.88f)
     {
         _num_buckets = 0;
         _max_bucket = 0;
@@ -337,7 +338,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4, float load_factor = 0.95f)
+    HashMap(uint32_t bucket = 4, float load_factor = 0.88f)
     {
         init(bucket, load_factor);
     }
@@ -1434,50 +1435,18 @@ private:
         return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
     }
 
-    static inline uint32_t hash32(uint32_t key)
-    {
-#if 0
-        key = ((key >> 16) ^ key) * 0x45d9f3b;
-        key = ((key >> 16) ^ key) * 0x45d9f3b; //0x119de1f3
-//        key = ((key >> 13) ^ key) * 0xc2b2ae35;
-        key = (key >> 16) ^ key;
-        return key;
-#elif 1
-        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
-#elif 1
-        key += ~(key << 15);
-        key ^= (key >> 10);
-        key += (key << 3);
-        key ^= (key >> 6);
-        key += ~(key << 11);
-        key ^= (key >> 16);
-        return key;
-#endif
-    }
-
+    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__ && _MPCLMUL
-        //uint64_t const inline clmul_mod(const uint64_t& i,const uint64_t& j){
-        __m128i I{}; I[0] ^= key;
-        __m128i J{}; J[0] ^= UINT64_C(0xde5fb9d2630458e9);
-        __m128i M{}; M[0] ^= 0xb000000000000000ull;
-        __m128i X = _mm_clmulepi64_si128(I,J,0);
-        __m128i A = _mm_clmulepi64_si128(X,M,0);
-        __m128i B = _mm_clmulepi64_si128(A,M,0);
-        return A[0]^A[1]^B[1]^X[0]^X[1];
-#elif __SIZEOF_INT128__
-        constexpr uint64_t k = UINT64_C(11400714819323198485);
-        __uint128_t r = key; r *= k;
-        return (uint32_t)(r >> 64) + (uint32_t)r;
+#if __SIZEOF_INT128__
+        __uint128_t r = key; r *= KC;
+        return (uint64_t)(r >> 64) + (uint64_t)r;
+#elif _WIN64
+        uint64_t high;
+        return _umul128(key, KC, &high) + high;
 #elif 1
-        uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
-        const uint32_t h = static_cast<uint32_t>(r >> 32);
-        const uint32_t l = static_cast<uint32_t>(r);
-        return h + l;
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
 #elif 1
         //MurmurHash3Mixer
         uint64_t h = key;
@@ -1486,7 +1455,7 @@ private:
         h ^= h >> 33;
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
-        return static_cast<size_t>(h);
+        return h;
 #elif 1
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
@@ -1500,32 +1469,41 @@ private:
     inline uint32_t hash_bucket(const UType key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        if (sizeof(UType) <= sizeof(uint32_t))
-            return hash32(key) & _mask;
-        else
-            return uint32_t(hash64(key) & _mask);
+        return (uint32_t)hash64(key) & _mask;
 #elif EMH_SAFE_HASH
         if (_hash_inter > 0) {
-            if (sizeof(UType) <= sizeof(uint32_t))
-                return hash32(key) & _mask;
-            else
                 return uint32_t(hash64(key) & _mask);
         }
         return _hasher(key) & _mask;
 #elif EMH_IDENTITY_HASH
-        return ((uint32_t)key + (key >> 20)) & _mask;
+        return (key + (key >> (sizeof(UType) * 4))) & _mask;
 #elif EMH_WYHASH64
-        return wyhash64(key, 11400714819323198485ull) & _mask;
+        return wyhash64(key, KC);
 #else
         return _hasher(key) & _mask;
 #endif
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
+    inline uint32_t hash_bucket(const UType& key) const
+    {
+#ifdef WYHASH_LITTLE_ENDIAN
+        return wyhash(key.c_str(), key.size(),0x12345678) & _mask;
+#elif EMH_BDKR_HASH
+        uint32_t hash = 0;
+        for (const auto c : key)
+            hash = c + hash * 131;
+        return hash & _mask;
+#else
+        return _hasher(key) & _mask;
+#endif
+    }
+
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
-        return (_hasher(key) * 11400714819323198485ull) & _mask;
+        return _hasher(key) * KC & _mask;
 #else
         return _hasher(key) & _mask;
 #endif
