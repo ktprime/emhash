@@ -1,5 +1,5 @@
 // emhash7::HashMap for C++11/14/17
-// version 1.7.4
+// version 1.7.5
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -890,43 +890,60 @@ public:
     }
 
     // ------------------------------------------------------------
-    template<typename Key>
+    template<typename Key = KeyT>
     iterator find(const Key& key, size_t hash_v) noexcept
     {
         return {this, find_filled_hash(key, hash_v)};
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     const_iterator find(const Key& key, size_t hash_v) const noexcept
     {
         return {this, find_filled_hash(key, hash_v)};
     }
 
     template<typename Key>
-    iterator find(const KeyT& key) noexcept
+    iterator find(const Key& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     const_iterator find(const Key& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
+    ValueT& at(const KeyT& key)
+    {
+        const auto bucket = find_filled_bucket(key);
+        //throw
+        return EMH_VAL(_pairs, bucket);
+    }
+
+    template<typename Key = KeyT>
+    const ValueT& at(const KeyT& key) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        //throw
+        return EMH_VAL(_pairs, bucket);
+    }
+
+    template<typename Key = KeyT>
     bool contains(const Key& key) const noexcept
     {
         return find_filled_bucket(key) != _num_buckets;
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     size_type count(const Key& key) const noexcept
     {
         return find_filled_bucket(key) != _num_buckets ? 1 : 0;
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key) const noexcept
+    template<typename Key = KeyT>
+    std::pair<iterator, iterator> equal_range(const Key& key) const noexcept
     {
         const auto found = find(key);
         if (found == end())
@@ -996,7 +1013,7 @@ public:
         return do_insert(std::move(key), value);
     }
 
-    template<typename K, typename V>
+    template<typename K = KeyT, typename V = ValueT>
     inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
         reserve(_num_filled);
@@ -1010,7 +1027,7 @@ public:
         return { {this, bucket}, found };
     }
 
-    template<typename K, typename V>
+    template<typename K = KeyT, typename V = ValueT>
     inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto bucket = find_or_allocate(key);
@@ -1202,7 +1219,8 @@ public:
     // -------------------------------------------------------
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    size_type erase(const KeyT& key)
+    template<typename Key = KeyT>
+    size_type erase(const Key& key)
     {
         const auto bucket = erase_key(key);
         if ((int)bucket < 0)
@@ -1477,7 +1495,7 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
-    template<typename K>
+    template<typename K = KeyT>
     size_type find_filled_hash(const K& key, const size_t hashv) const
     {
         const auto bucket = hashv & _mask;
@@ -1504,7 +1522,8 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
-    size_type find_filled_bucket(const KeyT& key) const
+    template<typename K = KeyT>
+    size_type find_filled_bucket(const K& key) const
     {
         const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1582,9 +1601,10 @@ private:
 ** bucket/position is free. If not, check whether colliding node/bucket is in its main
 ** position or not: if it is not, move colliding bucket to an empty place and
 ** put new key in its main position; otherwise (colliding bucket is in its main
-** position), new key goes to an empty position.
-*/
-    size_type find_or_allocate(const KeyT& key)
+** position), new key goes to an empty position. ***/
+
+    template<typename Key=KeyT>
+    size_type find_or_allocate(const Key& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);

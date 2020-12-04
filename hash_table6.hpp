@@ -804,6 +804,22 @@ public:
         return {this, find_filled_bucket(key)};
     }
 
+    template<typename Key = KeyT>
+    ValueT& at(const KeyT& key)
+    {
+        const auto bucket = find_filled_bucket(key);
+        //throw
+        return EMH_VAL(_pairs, bucket);
+    }
+
+    template<typename Key = KeyT>
+    const ValueT& at(const KeyT& key) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        //throw
+        return EMH_VAL(_pairs, bucket);
+    }
+
     template<typename Key>
     bool contains(const Key& key) const noexcept
     {

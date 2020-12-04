@@ -221,7 +221,7 @@ public:
         typedef value_pair&               reference;
 
         iterator() { }
-        iterator(htype* hash_map, uint32_t bucket) : _map(hash_map), _bucket(bucket) { }
+        iterator(const htype* hash_map, uint32_t bucket) : _map(hash_map), _bucket(bucket) { }
 
         iterator& operator++()
         {
@@ -263,7 +263,7 @@ public:
         }
 
     public:
-        htype* _map;
+        const htype* _map;
         uint32_t _bucket;
     };
 
@@ -404,15 +404,15 @@ public:
         auto opairs  = other._pairs;
 
         if (is_copy_trivially())
-            memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
+            memcpy(_pairs, opairs, (_num_buckets + 2) * sizeof(PairT));
         else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
                 if ((int)next_bucket >= 0)
                     new(_pairs + bucket) PairT(opairs[bucket]);
             }
+            memcpy(_pairs + _num_buckets, opairs + _num_buckets, sizeof(PairT) * 2);
         }
-        EMH_BUCKET(_pairs, _num_buckets) = EMH_BUCKET(_pairs, _num_buckets + 1) = 0; //set final two tombstones
     }
 
     void swap(HashMap& other)
@@ -464,7 +464,7 @@ public:
 
     const_iterator end() const
     {
-        return {this, _num_buckets};
+        return cend();
     }
 
     size_type size() const
@@ -657,6 +657,20 @@ public:
         return {this, find_filled_bucket(key)};
     }
 
+    ValueT& at(const KeyT& key)
+    {
+        const auto bucket = find_filled_bucket(key);
+        //throw
+        return EMH_VAL(_pairs, bucket);
+    }
+
+    const ValueT& at(const KeyT& key) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        //throw
+        return EMH_VAL(_pairs, bucket);
+    }
+
     bool contains(const KeyT& key) const noexcept
     {
         return find_filled_bucket(key) != _num_buckets;
@@ -832,10 +846,10 @@ public:
         return bucket;
     }
 
-    uint32_t insert_unique(entry<KeyT, ValueT>&& pair)
+    uint32_t insert_unique(entry<KeyT, ValueT>&& pairT)
     {
-        auto bucket = find_unique_bucket(pair.first);
-        EMH_NEW(std::move(pair.first), std::move(pair.second), bucket);
+        auto bucket = find_unique_bucket(pairT.first);
+        EMH_NEW(std::move(pairT.first), std::move(pairT.second), bucket);
         return bucket;
     }
 
@@ -981,7 +995,7 @@ public:
     void clearkv()
     {
         for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
-            if (!(EMH_EMPTY(_pairs, bucket)))
+            if (!EMH_EMPTY(_pairs, bucket))
                 clear_bucket(bucket);
         }
     }
@@ -1030,7 +1044,10 @@ private:
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
         auto old_num_filled  = _num_filled;
         auto old_pairs = _pairs;
+#if EMH_REHASH_LOG
         auto last = _last;
+        uint32_t collision = 0;
+#endif
 
         _last = _num_filled  = 0;
         _num_buckets = num_buckets;
@@ -1044,7 +1061,6 @@ private:
 
         memset(new_pairs + num_buckets, 0, sizeof(PairT) * 2);
         _pairs       = new_pairs;
-        uint32_t collision = 0;
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (EMH_EMPTY(old_pairs, src_bucket))
                 continue;
@@ -1070,7 +1086,7 @@ private:
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
 #ifdef EMH_LOG
-            static uint32_t ihashs = 0; EMH_LOG() << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            static uint32_t ihashs = 0; EMH_LOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1393,13 +1409,11 @@ one-way seach strategy.
         }
     }
 
-    //the first cache line packed
     inline uint32_t hash_bucket(const KeyT& key) const
     {
         return (uint32_t)hash_key(key) & _mask;
     }
 
-    //the first cache line packed
     inline uint32_t hash_main(const uint32_t bucket) const
     {
         return (uint32_t)hash_key(EMH_KEY(_pairs, bucket)) & _mask;
@@ -1414,6 +1428,11 @@ one-way seach strategy.
 #elif _WIN64
         uint64_t high;
         return _umul128(key, KC, &high) + high;
+#elif 1
+        auto low  =  key;
+        auto high = (key >> 32) | (key << 32);
+        auto mix  = (0x94d049bb133111ebull * low + 0xbf58476d1ce4e5b9ull * high);
+        return mix >> 32;
 #elif 1
         uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
