@@ -1,31 +1,20 @@
+CXX=g++-10
 CXX=clang++
-CXX=g++
-CXXFLAGS=-O3 -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty #-DABSL=1 -DABSL_HASH -I.
-
-K=INT64
-V=INT32
-K_LEN=0
-V_LEN=0
-ISIZE=100
-LEN=1234567
-QR=1
-RR=0.3
-IFR=0.2
-QFR=0.2
-RFR=0.3
+CXXFLAGS = -O3 -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty -I/usr/local/include
+#CXXFLAGS += -DFOLLY -lfolly
+#CXXFLAGS += -DABSL=1
 
 EMH=5
 
 all:
-#	$(CXX) $(CXXFLAGS) fbench.cpp -DK_$(K) -DV_$(V) -DK_LEN=$(K_LEN) -DV_LEN=$(V_LEN) -DINIT_SIZE=$(ISIZE) -DTEST_LEN=$(LEN) -DQUERY_RATE=$(QR) -DREMOVE_RATE=$(RR) -DINSERT_FAILURE_RATE=$(IFR) -DQUERY_FAILURE_RATE=$(QFR) -DREMOVE_FAILURE_RATE=$(RFR) -c
 	$(CXX) $(CXXFLAGS) -DET=1 -DTKey=1 -DTVal=1 ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) -DET=1 -DTKey=1 sbench.cpp -o sb
-	$(CXX) $(CXXFLAGS) -DET=1 -DABSL -DHOOD_HASH martin_bench.cpp -lpthread -o mbench
+	$(CXX) $(CXXFLAGS) -DET=1 -DABSL -DABSL_HASH martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) -DABSL hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) -DABSL fbench.cpp -o fbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
-	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) ph_bench.cpp -o phbench
+	$(CXX) $(CXXFLAGS)  patch_bench.cpp -o pabench
 
 fb:
 	./fbench

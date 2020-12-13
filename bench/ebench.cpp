@@ -62,6 +62,8 @@ std::map<std::string, std::string> hash_tables =
     //    {"ktprime", "ktprime"},
     {"fht", "fht"},
     {"absl", "absl_flat"},
+    {"f14_value", "f14_value"},
+    {"f14_vector", "f14_vector"},
     {"cuckoo", "cuckoo hash"},
 
 #if ET
@@ -166,6 +168,10 @@ std::map<std::string, std::string> hash_tables =
 #include "absl/hash/internal/city.cc"
 #include "absl/hash/internal/hash.cc"
 #endif
+#endif
+
+#if FOLLY
+#include "folly/container/F14Map.h"
 #endif
 
 #if CUCKOO_HASHMAP
@@ -1476,6 +1482,11 @@ static int benchHashMap(int n)
         {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("absl", vList); }
 #endif
 
+#if FOLLY
+//      {  benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
+        {  benOneHash<folly::F14VectorMap<keyType, valueType, ehash_func>>("f14_vector", vList); }
+#endif
+
 #if CUCKOO_HASHMAP
         {  benOneHash<libcuckoo::cuckoohash_map <keyType, valueType, ehash_func>>("cuckoo", vList); }
 #endif
@@ -1745,7 +1756,7 @@ static void testHashInt(int loops = 100000009)
 
     ts = getTime(); sum = r;
     for (int i = 1; i < loops; i++)
-        sum += r + i;
+        sum += sum + i;
     printf("sum  add   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
 
 #ifdef ROBIN_HOOD_H_INCLUDED
@@ -1762,7 +1773,7 @@ static void testHashInt(int loops = 100000009)
 
     ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash64(i + r);
+        sum += hash64(i *  r);
     printf("hash64     = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
     ts = getTime(); sum = r;

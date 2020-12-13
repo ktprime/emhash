@@ -282,8 +282,8 @@ int main(int argc, char** argv)
   robin_hood::unordered_map<uint32_t,value_type> test;
 #endif
 
-#if ABSL
-  absl::flat_hash_map<uint32_t,value_type> test;
+#ifdef ABSL
+  absl::flat_hash_map<uint32_t,value_type, std::hash<uint32_t>> test;
 #endif
 
 #ifdef SPARSEPP

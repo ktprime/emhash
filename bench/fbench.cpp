@@ -389,7 +389,7 @@ void test_delay()
         end_time = now2ns();
         printf("time[%5d] use %4ld ms [%d] ns / op = %.2lf\n\n", len, (end_time - start_time) / 1000000, sum, (double)(end_time - start_time) / (LEN / len));
 #endif
-        delete arr2;
+        delete[] arr2;
     }
 
     //    start_time = now2ns();
