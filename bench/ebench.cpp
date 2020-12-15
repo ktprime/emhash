@@ -213,6 +213,7 @@ std::map<std::string, std::string> hash_tables =
 
 #ifdef _WIN32
     # define CONSOLE "CON"
+    # define _CRT_SECURE_NO_WARNINGS 1
     # include <windows.h>
 #else
     # define CONSOLE "/dev/tty"
@@ -731,7 +732,8 @@ void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList) {
-        ahash[v] = TO_VAL(0);
+        //ahash[v] = TO_VAL(0);
+        ahash.emplace(v, TO_VAL(0));
 #if TVal < 2
         sum += ahash.count(v);
 #else
@@ -755,6 +757,15 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
             sum ++;
         }
     }
+
+    ahash.clear();
+    const auto vsize = vList.size() / 8;
+    for (size_t i = 0; i < vList.size(); i++) {
+        sum += ahash.emplace(vList[i], TO_VAL(0)).second;
+        if (i > vsize)
+            ahash.erase(vList[i - vsize]);
+    }
+
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 #endif
 }
@@ -1117,11 +1128,11 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     auto flag = 0;
     if (srng() % 100 >= iRation)
     {
-        for (int i = 0; ; i++) {
+        for (int i = 0; i < size ; i++) {
             auto key = TO_KEY(srng());
             randdata.emplace_back(key);
-            if (randdata.size() >= size)
-                break;
+//            if (randdata.size() >= size)
+//                break;
         }
     }
     else
@@ -1883,6 +1894,7 @@ int main(int argc, char* argv[])
     srand((unsigned)time(0));
     printInfo(nullptr);
 
+    testHashInt(1e8+8);
     bool auto_set = false;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;
@@ -1907,7 +1919,6 @@ int main(int argc, char* argv[])
         else if (cmd == 'r' && isdigit(argv[i][1]))
             rnd = atoi(&argv[i][0] + 1);
         else if (cmd == 'b') {
-            testHashInt(1e8+8);
             testHashRand(1e8+8);
             testHashString(1e6+6, 2, 32);
         }

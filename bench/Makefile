@@ -1,8 +1,20 @@
-CXX=g++-10
+ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
+CXX=g++
+endif
+
+ifeq ($(shell expr `clang++ -dumpversion` '>=' 4.), 1)
 CXX=clang++
+endif
+
 CXXFLAGS = -O3 -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty -I/usr/local/include
-#CXXFLAGS += -DFOLLY -lfolly
-#CXXFLAGS += -DABSL=1
+
+ifeq ($(FOLLY),1)
+CXXFLAGS += -DFOLLY -lfolly
+endif
+
+ifeq ($(ABSL),1)
+CXXFLAGS += -DABSL=1
+endif
 
 EMH=5
 
