@@ -1,12 +1,12 @@
 ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
-CXX=g++
+CXX=g++-10
 endif
 
-ifeq ($(shell expr `clang++ -dumpversion` '>=' 4.), 1)
+ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX=clang++
 endif
 
-CXXFLAGS = -O3 -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty -I/usr/local/include
+CXXFLAGS = -Ofast -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty -I/usr/local/include
 
 ifeq ($(FOLLY),1)
 CXXFLAGS += -DFOLLY -lfolly
@@ -16,17 +16,45 @@ ifeq ($(ABSL),1)
 CXXFLAGS += -DABSL=1
 endif
 
-EMH=5
+ifeq ($(HH),1)
+CXXFLAGS += -DHOOD_HASH=1
+endif
+
+ifeq ($(AH),1)
+CXXFLAGS += -DABSL_HASH=1
+endif
+
+ifneq ($(Key),)
+CXXFLAGS += -DTKey=$(Key)
+endif
+
+ifneq ($(Val),)
+CXXFLAGS += -DTVal=$(Val)
+endif
+
+ifneq ($(ET),)
+CXXFLAGS += -DET=$(ET)
+endif
+
+ifneq ($(EA),)
+CXXFLAGS += -DEA=$(EA)
+endif
+
+ifneq ($(EMH),)
+CXXFLAGS += -DEMH=$(EMH)
+else
+CXXFLAGS += -DEMH=6
+endif
 
 all:
-	$(CXX) $(CXXFLAGS) -DET=1 -DTKey=1 -DTVal=1 ebench.cpp -o ebench
+	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) -DET=1 -DTKey=1 sbench.cpp -o sb
+	$(CXX) $(CXXFLAGS)  patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) -DET=1 -DABSL -DABSL_HASH martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) -DABSL hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) -DABSL fbench.cpp -o fbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) ph_bench.cpp -o phbench
-	$(CXX) $(CXXFLAGS)  patch_bench.cpp -o pabench
 
 fb:
 	./fbench

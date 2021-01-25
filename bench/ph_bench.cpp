@@ -19,6 +19,14 @@
     #include "absl/container/internal/raw_hash_set.cc"
     #define MAPNAME absl::flat_hash_map
     #define EXTRAARGS
+#elif FOLLY
+    #include "folly/container/F14Map.h"
+#if FOLLY == 1
+    #define MAPNAME folly::F14VectorMap
+#else
+    #define MAPNAME folly::F14ValueMap
+#endif
+    #define EXTRAARGS
 #elif MARTIN
     #include "martin/robin_hood.h"
     #define MAPNAME robin_hood::unordered_map

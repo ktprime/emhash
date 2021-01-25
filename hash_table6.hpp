@@ -1577,12 +1577,12 @@ private:
         const auto bmask = *(size_t*)begin >> boset;
         if (EMH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
-            if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
+            //if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
                 return bucket_from + offset;
 
             //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
             //return bucket_from - boset + 7 - CTZ(rerverse_bit);
-            return bucket_from - boset + CTZ(begin[0]);
+            //return bucket_from - boset + CTZ(begin[0]);
         }
 
         const auto qmask = _mask / SIZE_BIT;

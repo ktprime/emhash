@@ -59,6 +59,10 @@ using namespace std;
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/internal/raw_hash_set.cc"
 
+#if FOLLY
+#include "folly/container/F14Map.h"
+#endif
+
 #if ABSL_HASH
 #include "absl/hash/internal/city.cc"
 #include "absl/hash/internal/hash.cc"
@@ -82,6 +86,7 @@ static std::map<std::string, std::string> show_name =
 #if ABSL
 	{"absl", "absl flat"},
 #endif
+	{"folly", "f14_vector"},
 #if ET
 	{"phmap", "phmap flat"},
 	{"robin_hood", "martin flat"},
@@ -746,6 +751,9 @@ int main(int argc, char* argv[])
 #if ABSL
 		{ absl::flat_hash_map<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
 #endif
+#if FOLLY
+		{ folly::F14VectorMap<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
+#endif
 		putchar('\n');
 	}
 
@@ -775,6 +783,9 @@ int main(int argc, char* argv[])
 		{robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 		{ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench);}
 		{phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+#endif
+#if FOLLY
+		{folly::F14VectorMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 #endif
 #if ABSL
 		{absl::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
@@ -809,6 +820,9 @@ int main(int argc, char* argv[])
 		{ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 #endif
+#if FOLLY
+		{folly::F14VectorMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+#endif
 #if ABSL
 		{absl::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 #endif
@@ -839,6 +853,9 @@ int main(int argc, char* argv[])
 #if ABSL
 		{ absl::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
 #endif
+#if FOLLY
+		{ folly::F14VectorMap <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
+#endif
 #if EM3
 		{ emhash4::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash7::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
@@ -860,6 +877,9 @@ int main(int argc, char* argv[])
 
 #if ABSL //failed on other hash
 		{ absl::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
+#endif
+#if FOLLY
+		{ folly::F14VectorMap <int, int, hash_func> pmap; bench_insert(pmap); }
 #endif
 		{ emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 //		{ emilib1::HashMap<int, int, hash_func> emap; bench_insert(emap);  }
@@ -912,6 +932,9 @@ int main(int argc, char* argv[])
 #if ABSL
 		{ absl::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
 #endif
+#if FOLLY
+		{ folly::F14VectorMap <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+#endif
 		putchar('\n');
 	}
 
@@ -945,6 +968,11 @@ int main(int argc, char* argv[])
 #if ABSL
 		{ absl::flat_hash_map <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
 #endif
+
+#if FOLLY
+		{ folly::F14VectorMap <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
+#endif
+
 		putchar('\n');
 	}
 

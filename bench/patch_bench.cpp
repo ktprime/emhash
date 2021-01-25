@@ -61,6 +61,9 @@ using value_type = uint64_t;
   #include "absl/container/internal/raw_hash_set.cc"
 #endif
 
+#if FOLLY
+#include "folly/container/F14Map.h"
+#endif
 
 #include <stdio.h>
 #if defined (__has_include) && (__has_include(<x86intrin.h>))
@@ -286,6 +289,12 @@ int main(int argc, char** argv)
   absl::flat_hash_map<uint32_t,value_type, std::hash<uint32_t>> test;
 #endif
 
+#if FOLLY == 1
+  folly::F14VectorMap<uint32_t,value_type, std::hash<uint32_t>> test;
+#elif FOLLY
+  folly::F14ValueMap<uint32_t,value_type, std::hash<uint32_t>> test;
+#endif
+
 #ifdef SPARSEPP
   spp::sparse_hash_map<uint32_t,value_type> test;
 #endif
@@ -415,6 +424,8 @@ int main(int argc, char** argv)
        << typical_find_time/N     << "f, "
        << typical_not_find_time/N << "n, "
        << (typical_insert_time + typical_delete_time + typical_find_time + typical_not_find_time)/N << endl;
+  cout << typeid(test).name() << " value type :" << sizeof(value_type) << endl;
+
 #ifdef KHASH
   kh_destroy(32, h);
 #endif

@@ -1644,7 +1644,7 @@ private:
         }
 
         //find a new empty and link it to tail, TODO link after main bucket?
-        const auto new_bucket = find_empty_bucket(main_bucket);
+        const auto new_bucket = find_empty_bucket(next_bucket);
         return EMH_BUCKET(_pairs, next_bucket) = new_bucket;
     }
 

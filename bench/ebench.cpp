@@ -56,20 +56,19 @@ std::map<std::string, std::string> hash_tables =
     {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
-    {"emilib4", "emilib4"},
-
+//    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
     {"fht", "fht"},
     {"absl", "absl_flat"},
-    {"f14_value", "f14_value"},
+//    {"f14_value", "f14_value"},
     {"f14_vector", "f14_vector"},
     {"cuckoo", "cuckoo hash"},
 
 #if ET
     {"martin", "martin_flat"},
     {"phmap", "phmap_flat"},
-    {"hrdset",   "hrdset"},
+//    {"hrdset",   "hrdset"},
 
     {"robin", "tsl_robin"},
     {"flat", "ska_flat"},
@@ -1433,7 +1432,7 @@ static int benchHashMap(int n)
         sum += v.size();
 #endif
         loop_vector_time = getTime() - ts;
-        printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
+        printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)sum ,(int)(loop_vector_time));
     }
 
     {
@@ -1494,7 +1493,7 @@ static int benchHashMap(int n)
 #endif
 
 #if FOLLY
-//      {  benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
+        {  benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
         {  benOneHash<folly::F14VectorMap<keyType, valueType, ehash_func>>("f14_vector", vList); }
 #endif
 
@@ -1942,6 +1941,8 @@ int main(int argc, char* argv[])
                     hash_tables.erase("flat");
                 else if (c == 'a')
                     hash_tables.erase("absl");
+                else if (c == 'f')
+                    hash_tables.erase("f14_vector");
                 else if (c == 'h')
                     hash_tables.erase("hrdset");
                 else if (c == 'e') {
