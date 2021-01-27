@@ -10,13 +10,15 @@
     #include "hash_table2.hpp"
     #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
-#elif EMH == 5
-    #include "hash_table5.hpp"
-    #define MAPNAME emhash5::HashMap
-    #define EXTRAARGS    
+#elif EMH == 6
+    #include "hash_table6.hpp"
+    #define MAPNAME emhash6::HashMap
+    #define EXTRAARGS
 #elif ABSL
     #include "absl/container/flat_hash_map.h"
     #include "absl/container/internal/raw_hash_set.cc"
+    #include "absl/hash/internal/city.cc"
+    #include "absl/hash/internal/hash.cc"
     #define MAPNAME absl::flat_hash_map
     #define EXTRAARGS
 #elif FOLLY

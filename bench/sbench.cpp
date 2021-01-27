@@ -1361,7 +1361,7 @@ static void printInfo(char* out)
         "------------------------------------------------------------------------------------------------------------";
 
     puts(sepator);
-    //    puts("Copyright (C) by 2019-2020 Huang Yuanbing bailuzhou at 163.com\n");
+    //    puts("Copyright (C) by 2019-2021 Huang Yuanbing bailuzhou at 163.com\n");
 
     char cbuff[512] = {0};
     char* info = cbuff;

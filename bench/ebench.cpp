@@ -80,6 +80,7 @@ std::map<std::string, std::string> hash_tables =
 
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 #define PHMAP_HAVE_SSSE3      1
+#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #endif
 
 //rand data type
@@ -1432,14 +1433,14 @@ static int benchHashMap(int n)
         sum += v.size();
 #endif
         loop_vector_time = getTime() - ts;
-        printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)sum ,(int)(loop_vector_time));
+        printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
     }
 
     {
         func_print = func_print % func_index + 1;
 #if ET > 2
         {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
-#if __x86_64__
+#if __x86_64__ || _M_X64
         {  benOneHash<ska::bytell_hash_map <keyType, valueType, ehash_func>>("byte", vList); }
 #endif
 #endif
@@ -1453,7 +1454,7 @@ static int benchHashMap(int n)
         {  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
         {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("robin", vList); }
 
-#if __x86_64__
+#if __x86_64__ || _M_X64
         {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("flat", vList); }
         {  benOneHash<hrd7::hash_map     <keyType, valueType, ehash_func>>("hrdset", vList); }
 #endif
@@ -1544,7 +1545,7 @@ static void printInfo(char* out)
         "------------------------------------------------------------------------------------------------------------";
 
     puts(sepator);
-    //    puts("Copyright (C) by 2019-2020 Huang Yuanbing bailuzhou at 163.com\n");
+    //    puts("Copyright (C) by 2019-2021 Huang Yuanbing bailuzhou at 163.com\n");
 
     char cbuff[512] = {0};
     char* info = cbuff;

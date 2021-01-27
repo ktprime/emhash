@@ -43,10 +43,10 @@ using value_type = uint64_t;
 #ifdef KHASH
 #include "khash.h"
 #endif
-#if EMH == 6
+
 #include "hash_table6.hpp"
-#elif EMH == 7
-#define EMH__HIGH_LOAD  100000
+#if EMH == 7
+//#define EMH_HIGH_LOAD  100000
 #include "hash_table7.hpp"
 #elif EMH == 5
 #include "hash_table5.hpp"
@@ -56,9 +56,13 @@ using value_type = uint64_t;
 #include "phmap/phmap.h"
 #elif TSL
 #include "tsl/robin_map.h"
-#elif ABSL
+#endif
+
+#if ABSL
   #include "absl/container/flat_hash_map.h"
   #include "absl/container/internal/raw_hash_set.cc"
+  #include "absl/hash/internal/city.cc"
+  #include "absl/hash/internal/hash.cc"
 #endif
 
 #if FOLLY
@@ -285,16 +289,6 @@ int main(int argc, char** argv)
   robin_hood::unordered_map<uint32_t,value_type> test;
 #endif
 
-#ifdef ABSL
-  absl::flat_hash_map<uint32_t,value_type, std::hash<uint32_t>> test;
-#endif
-
-#if FOLLY == 1
-  folly::F14VectorMap<uint32_t,value_type, std::hash<uint32_t>> test;
-#elif FOLLY
-  folly::F14ValueMap<uint32_t,value_type, std::hash<uint32_t>> test;
-#endif
-
 #ifdef SPARSEPP
   spp::sparse_hash_map<uint32_t,value_type> test;
 #endif
@@ -323,8 +317,6 @@ int main(int argc, char** argv)
   int ret, is_missing;
   khiter_t k;
 
-#elif EMH == 6
-   emhash6::HashMap<uint32_t,value_type> test;
 #elif EMH == 7
    emhash7::HashMap<uint32_t,value_type> test;
 #elif EMH == 5
@@ -333,6 +325,14 @@ int main(int argc, char** argv)
    tsl::robin_map<uint32_t,value_type> test;
 #elif PHMAP
   phmap::flat_hash_map<uint32_t,value_type> test;
+#elif ABSL
+  absl::flat_hash_map<uint32_t,value_type, std::hash<uint32_t>> test;
+#elif FOLLY == 1
+  folly::F14VectorMap<uint32_t,value_type, std::hash<uint32_t>> test;
+#elif FOLLY
+  folly::F14ValueMap<uint32_t,value_type, std::hash<uint32_t>> test;
+#else
+   emhash6::HashMap<uint32_t,value_type> test;
 #endif
 
   std::uniform_int_distribution<size_t> distr;
@@ -411,10 +411,10 @@ int main(int argc, char** argv)
     }
     if (0 == (i & (i - 1)) && i > 24) {
         printf("%8zd  %.4lf %.4lf %.4lf %.4lf %.4lf\n", i,
-                typical_memory/(i*4096),       
+                typical_memory/(i*4096),
                 typical_insert_time/(i*4096),
-                typical_delete_time/(i*4096),   
-                typical_find_time/(i*4096),     
+                typical_delete_time/(i*4096),
+                typical_find_time/(i*4096),
                 typical_not_find_time/(i*4096) );
     }
   }

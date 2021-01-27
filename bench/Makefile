@@ -1,5 +1,5 @@
 ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
-CXX=g++-10
+CXX=g++
 endif
 
 ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
@@ -42,19 +42,17 @@ endif
 
 ifneq ($(EMH),)
 CXXFLAGS += -DEMH=$(EMH)
-else
-CXXFLAGS += -DEMH=6
 endif
 
 all:
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
-	$(CXX) $(CXXFLAGS) -DET=1 -DTKey=1 sbench.cpp -o sb
-	$(CXX) $(CXXFLAGS)  patch_bench.cpp -o pabench
-	$(CXX) $(CXXFLAGS) -DET=1 -DABSL -DABSL_HASH martin_bench.cpp -lpthread -o mbench
-	$(CXX) $(CXXFLAGS) -DABSL hbench.cpp -o hbench
-	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) -DABSL fbench.cpp -o fbench
+	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
+	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
+	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o mbench
+	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
+	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) fbench.cpp -o fbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
-	$(CXX) $(CXXFLAGS) -DEMH=$(EMH) ph_bench.cpp -o phbench
+	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
 
 fb:
 	./fbench
