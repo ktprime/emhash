@@ -156,7 +156,7 @@ bool parallel_hash_set<N, RefSet, Mtx_, Policy, Hash, Eq, Alloc>::load(InputArch
         return false;
     }
 
-    for (size_t i = 0; i < submap_count; ++i) {            
+    for (size_t i = 0; i < submap_count; ++i) {
         auto& inner = sets_[i];
         typename Lockable::UniqueLock m(const_cast<Inner&>(inner));
         if (!inner.set_.load(ar)) {

@@ -4,7 +4,7 @@
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2019-2020 Huang Yuanbing & bailuzhou AT 163.com
+// Copyright (c) 2019-2021 Huang Yuanbing & bailuzhou AT 163.com
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -131,14 +131,14 @@ struct entry {
         bucket = ibucket;
     }
 
-    entry(const std::pair<First,Second>& pair)
-        :second(pair.second),first(pair.first)
+    entry(const std::pair<First,Second>& pairT)
+        :second(pairT.second),first(pairT.first)
     {
         bucket = INACTIVE;
     }
 
-    entry(std::pair<First, Second>&& pair)
-        :second(std::move(pair.second)),first(std::move(pair.first))
+    entry(std::pair<First, Second>&& pairT)
+        :second(std::move(pairT.second)), first(std::move(pairT.first))
     {
         bucket = INACTIVE;
     }
