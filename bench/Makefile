@@ -1,27 +1,23 @@
 ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
-CXX=g++
+CXX=g++  -fwhole-program
 endif
 
 ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX=clang++
 endif
 
-CXXFLAGS = -Ofast -march=native -flto -mtune=native -fwhole-program -std=c++17 -I.. -I../thirdparty -I/usr/local/include
+CXXFLAGS = -Ofast -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include
 
-ifeq ($(FOLLY),1)
+ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly
 endif
 
-ifeq ($(ABSL),1)
+ifneq ($(ABSL),)
 CXXFLAGS += -DABSL=1
 endif
 
-ifeq ($(HH),1)
+ifneq ($(HH),)
 CXXFLAGS += -DHOOD_HASH=1
-endif
-
-ifeq ($(AH),1)
-CXXFLAGS += -DABSL_HASH=1
 endif
 
 ifneq ($(Key),)
@@ -42,6 +38,10 @@ endif
 
 ifneq ($(EMH),)
 CXXFLAGS += -DEMH=$(EMH)
+endif
+
+ifneq ($(AH),)
+CXXFLAGS += -DABSL_HASH=1 ../thirdparty/absl/hash/internal/wyhash.cc
 endif
 
 all:

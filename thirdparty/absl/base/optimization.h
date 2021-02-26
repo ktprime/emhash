@@ -22,13 +22,15 @@
 #ifndef ABSL_BASE_OPTIMIZATION_H_
 #define ABSL_BASE_OPTIMIZATION_H_
 
+#include <assert.h>
+
 #include "absl/base/config.h"
 
 // ABSL_BLOCK_TAIL_CALL_OPTIMIZATION
 //
-// Instructs the compiler to avoid optimizing tail-call recursion. Use of this
-// macro is useful when you wish to preserve the existing function order within
-// a stack trace for logging, debugging, or profiling purposes.
+// Instructs the compiler to avoid optimizing tail-call recursion. This macro is
+// useful when you wish to preserve the existing function order within a stack
+// trace for logging, debugging, or profiling purposes.
 //
 // Example:
 //
@@ -179,7 +181,7 @@
 #endif
 
 // ABSL_INTERNAL_ASSUME(cond)
-// Informs the compiler than a condition is always true and that it can assume
+// Informs the compiler that a condition is always true and that it can assume
 // it to be true for optimization purposes. The call has undefined behavior if
 // the condition is false.
 // In !NDEBUG mode, the condition is checked with an assert().
@@ -216,7 +218,7 @@
 // This macro forces small unique name on a static file level symbols like
 // static local variables or static functions. This is intended to be used in
 // macro definitions to optimize the cost of generated code. Do NOT use it on
-// symbols exported from translation unit since it may casue a link time
+// symbols exported from translation unit since it may cause a link time
 // conflict.
 //
 // Example:
