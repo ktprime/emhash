@@ -64,7 +64,7 @@ using namespace std;
 #endif
 
 #if ABSL_HASH
-//#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/city.cc"
 #include "absl/hash/internal/hash.cc"
 #endif
 #endif

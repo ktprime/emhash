@@ -17,8 +17,10 @@
 #elif ABSL
     #include "absl/container/flat_hash_map.h"
     #include "absl/container/internal/raw_hash_set.cc"
-    //#include "absl/hash/internal/city.cc"
+#if ABSL_HASH
+    #include "absl/hash/internal/city.cc"
     #include "absl/hash/internal/hash.cc"
+#endif
     #define MAPNAME absl::flat_hash_map
     #define EXTRAARGS
 #elif FOLLY

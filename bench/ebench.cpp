@@ -165,7 +165,7 @@ std::map<std::string, std::string> hash_tables =
 #include "absl/container/internal/raw_hash_set.cc"
 
 #if ABSL_HASH
-//#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/city.cc"
 #include "absl/hash/internal/hash.cc"
 //#include "absl/hash/internal/wyhash.cc"
 #endif

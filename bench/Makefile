@@ -50,9 +50,9 @@ all:
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
-	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) fbench.cpp -o fbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
+	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) fbench.cpp -o fbench
 
 fb:
 	./fbench

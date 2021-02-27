@@ -126,7 +126,7 @@ std::map<std::string, std::string> hash_tables =
 #include "absl/container/internal/raw_hash_set.cc"
 
 #if ABSL_HASH
-//#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/city.cc"
 #include "absl/hash/internal/hash.cc"
 #endif
 #endif
@@ -1718,7 +1718,7 @@ int main(int argc, char* argv[])
                 else if (c == 'a')
                     hash_tables.erase("absl");
                 else if (c == 'e') {
-                    hash_tables.emplace("emiset", "emiset");
+                    hash_tables.erase("emiset");
                 }
                 else if (c == 'b') {
                     hash_tables.emplace("btree", "btree_set");
