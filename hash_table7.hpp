@@ -1384,11 +1384,12 @@ private:
 
     void clear_bucket(size_type bucket)
     {
-        if (is_triviall_destructable())
-            _pairs[bucket].~PairT();
         EMH_BUCKET(_pairs, bucket) = INACTIVE;
-
         _num_filled --;
+        if (is_triviall_destructable()) {
+            _pairs[bucket].~PairT();
+            EMH_BUCKET(_pairs, bucket) = INACTIVE;
+        }
         _bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
     }
 

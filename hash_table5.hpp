@@ -705,14 +705,14 @@ public:
     ValueT* try_get(const KeyT& key) noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
+        return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
 
     /// Const version of the above
     ValueT* try_get(const KeyT& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
+        return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
 
     /// Convenience function.
@@ -1106,10 +1106,12 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        if (is_triviall_destructable())
-            _pairs[bucket].~PairT();
-        EMH_BUCKET(_pairs, bucket) = INACTIVE;
+        EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
         _num_filled --;
+        if (is_triviall_destructable()) {
+            _pairs[bucket].~PairT();
+            EMH_BUCKET(_pairs, bucket) = INACTIVE; //some compiler the status is reset by destructor
+        }
     }
 
     uint32_t erase_key(const KeyT& key)

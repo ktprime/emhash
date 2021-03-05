@@ -1300,11 +1300,13 @@ private:
 
     void clear_bucket(size_type bucket)
     {
-        if (is_triviall_destructable())
-            _pairs[bucket].~PairT();
-        EMH_ADDR(_pairs, bucket) = INACTIVE;
+        EMH_ADDR(_pairs, bucket) = INACTIVE; //loop call in destructor
         _num_filled --;
-        _bitmask[bucket / MASK_BIT] |= 1 << (bucket % MASK_BIT);
+        if (is_triviall_destructable()) {
+            _pairs[bucket].~PairT();
+            EMH_ADDR(_pairs, bucket) = INACTIVE;
+        }
+        _bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
     }
 
     template<class K = size_type> typename std::enable_if <bInCacheLine, K>::type
