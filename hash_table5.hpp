@@ -84,6 +84,9 @@
     #define EMH_CACHE_LINE_SIZE 64
 #endif
 
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+#define EMH_DEFAULT_LOAD_FACTOR 0.8f
+#endif
 #if EMH_BUCKET_INDEX == 0
     #define EMH_KEY(p,n)     p[n].second.first
     #define EMH_VAL(p,n)     p[n].second.second
@@ -325,7 +328,7 @@ public:
         uint32_t _bucket;
     };
 
-    void init(uint32_t bucket, float lf = 0.88f)
+    void init(uint32_t bucket, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
         _pairs = nullptr;
         _mask  = _num_buckets = 0;
@@ -334,7 +337,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(uint32_t bucket = 4, float lf = 0.88f)
+    HashMap(uint32_t bucket = 2, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
         init(bucket, lf);
     }
@@ -431,6 +434,9 @@ public:
 
     iterator begin()
     {
+        if (_num_filled == 0)
+            return end();
+
         uint32_t bucket = 0;
         while (EMH_EMPTY(_pairs, bucket)) {
             ++bucket;
@@ -438,8 +444,21 @@ public:
         return {this, bucket};
     }
 
+    iterator last()
+    {
+        if (_num_filled == 0)
+            return end();
+
+        uint32_t bucket = _num_buckets - 1;
+        while (EMH_EMPTY(_pairs, bucket)) bucket--;
+        return {this, bucket};
+    }
+
     const_iterator cbegin() const
     {
+        if (_num_filled == 0)
+            return end();
+
         uint32_t bucket = 0;
         while (EMH_EMPTY(_pairs, bucket)) {
             ++bucket;
@@ -713,6 +732,28 @@ public:
     {
         const auto bucket = find_filled_bucket(key);
         return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
+    }
+
+    /// set value if key exist
+    bool try_set(const KeyT& key, const ValueT& value) noexcept
+    {
+        const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            return false;
+
+        EMH_VAL(_pairs, bucket) = value;
+        return true;
+    }
+
+    /// set value if key exist
+    bool try_set(const KeyT& key, ValueT&& value) noexcept
+    {
+        const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            return false;
+
+        EMH_VAL(_pairs, bucket) = std::move(value);
+        return true;
     }
 
     /// Convenience function.
@@ -1011,9 +1052,10 @@ public:
         _last = _num_filled = 0;
     }
 
-    void shrink_to_fit()
+    void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4)
     {
-        rehash(_num_filled);
+        if (load_factor() < min_factor && bucket_count() > 10) //safe guard
+            rehash(_num_filled);
     }
 
     /// Make room for this many elements
@@ -1511,5 +1553,5 @@ private:
 };
 } // namespace emhash
 #if __cplusplus > 199711
-//template <class Key, class Val> using emihash = emhash1::HashMap<Key, Val, std::hash<Key>>;
+//template <class Key, class Val> using emhash5 = ehmap<Key, Val, std::hash<Key>>;
 #endif
