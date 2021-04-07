@@ -85,8 +85,9 @@
 #endif
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
-#define EMH_DEFAULT_LOAD_FACTOR 0.8f
+#define EMH_DEFAULT_LOAD_FACTOR 0.88f
 #endif
+
 #if EMH_BUCKET_INDEX == 0
     #define EMH_KEY(p,n)     p[n].second.first
     #define EMH_VAL(p,n)     p[n].second.second
@@ -344,7 +345,7 @@ public:
 
     HashMap(const HashMap& other)
     {
-        _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
+        _pairs = alloc_bucket(other._num_buckets);
         clone(other);
     }
 
@@ -371,7 +372,7 @@ public:
 
         if (_num_buckets != other._num_buckets) {
             free(_pairs);
-            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
+            _pairs = alloc_bucket(other._num_buckets);
         }
 
         clone(other);
@@ -1074,6 +1075,12 @@ public:
         return true;
     }
 
+    static inline PairT* alloc_bucket(uint32_t num_buckets)
+    {
+        auto new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
+        return (PairT *)(new_pairs);
+    }
+
 private:
     void rehash(uint32_t required_buckets)
     {
@@ -1083,7 +1090,7 @@ private:
         uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
-        auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
+        auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         auto old_num_filled  = _num_filled;
         auto old_pairs = _pairs;
 #if EMH_REHASH_LOG
@@ -1389,8 +1396,9 @@ one-way seach strategy.
             _last &= _mask;
             if (EMH_EMPTY(_pairs, _last++) || EMH_EMPTY(_pairs, _last++))
                 return _last++ - 1;
-#if EMH_LINEAR3
-            auto tail = _mask - _last & _mask;
+
+#if EMH_LINEAR3 || 1
+            auto tail = _mask - (_last & _mask);
             if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                 return tail;
 #endif
@@ -1411,7 +1419,7 @@ one-way seach strategy.
                 if (EMH_EMPTY(_pairs, ++_last) || EMH_EMPTY(_pairs, ++_last))
                     return _last ++;
 
-#if 0
+#if 1
                 auto tail = (_num_buckets - _last) & _mask;
                 if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                     return tail;

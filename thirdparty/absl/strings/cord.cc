@@ -491,7 +491,7 @@ static bool RepMemoryUsageLeaf(const CordRep* rep, size_t* total_mem_usage) {
 }
 
 void Cord::InlineRep::AssignSlow(const Cord::InlineRep& src) {
-  ClearSlow();
+  UnrefTree();
 
   data_ = src.data_;
   if (is_tree()) {
@@ -501,11 +501,10 @@ void Cord::InlineRep::AssignSlow(const Cord::InlineRep& src) {
   }
 }
 
-void Cord::InlineRep::ClearSlow() {
+void Cord::InlineRep::UnrefTree() {
   if (is_tree()) {
     CordRep::Unref(tree());
   }
-  ResetToEmpty();
 }
 
 // --------------------------------------------------------------------
@@ -1688,6 +1687,8 @@ absl::string_view Cord::FlattenSlowPath() {
   } else if (rep->tag == EXTERNAL) {
     *fragment = absl::string_view(rep->external()->base, rep->length);
     return true;
+  } else if (rep->tag == RING) {
+    return rep->ring()->IsFlat(fragment);
   } else if (rep->tag == SUBSTRING) {
     CordRep* child = rep->substring()->child;
     if (child->tag >= FLAT) {
@@ -1698,6 +1699,9 @@ absl::string_view Cord::FlattenSlowPath() {
       *fragment = absl::string_view(
           child->external()->base + rep->substring()->start, rep->length);
       return true;
+    } else if (child->tag == RING) {
+      return child->ring()->IsFlat(rep->substring()->start, rep->length,
+                                   fragment);
     }
   }
   return false;

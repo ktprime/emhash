@@ -35,7 +35,7 @@
 #define PHMAP_BTREE_BTREE_CONTAINER_H_
 
 #ifdef _MSC_VER
-    #pragma warning(push)
+    #pragma warning(push)  
 
     #pragma warning(disable : 4127) // conditional expression is constant
     #pragma warning(disable : 4324) // structure was padded due to alignment specifier
@@ -3814,7 +3814,7 @@ namespace priv {
     template <typename Key, typename Compare, typename Alloc>
     class btree_set : public priv::btree_set_container<
         priv::btree<priv::set_params<
-            Key, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ false>>>
+            Key, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ false>>> 
     {
         using Base = typename btree_set::btree_set_container;
 
@@ -3871,10 +3871,10 @@ namespace priv {
     template <typename Key, typename Compare,  typename Alloc>
         class btree_multiset : public priv::btree_multiset_container<
         priv::btree<priv::set_params<
-             Key, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ true>>>
+             Key, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ true>>> 
     {
         using Base = typename btree_multiset::btree_multiset_container;
-
+        
     public:
         btree_multiset() {}
         using Base::Base;
@@ -3908,7 +3908,7 @@ namespace priv {
     void swap(btree_multiset<K, C, A> &x, btree_multiset<K, C, A> &y) {
         return x.swap(y);
     }
-
+    
     // Erases all elements that satisfy the predicate pred from the container.
     // ----------------------------------------------------------------------
     template <typename K, typename C, typename A, typename Pred>
@@ -3929,7 +3929,7 @@ namespace priv {
     template <typename Key, typename Value, typename Compare,  typename Alloc>
         class btree_map : public priv::btree_map_container<
         priv::btree<priv::map_params<
-             Key, Value, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ false>>>
+             Key, Value, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ false>>> 
     {
         using Base = typename btree_map::btree_map_container;
 
@@ -3988,7 +3988,7 @@ namespace priv {
     template <typename Key, typename Value, typename Compare, typename Alloc>
         class btree_multimap : public priv::btree_multimap_container<
         priv::btree<priv::map_params<
-              Key, Value, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ true>>>
+              Key, Value, Compare, Alloc, /*TargetNodeSize=*/ 256, /*Multi=*/ true>>> 
     {
         using Base = typename btree_multimap::btree_multimap_container;
 
@@ -4043,7 +4043,7 @@ namespace priv {
 }  // namespace btree
 
 #ifdef _MSC_VER
-     #pragma warning(pop)
+     #pragma warning(pop)  
 #endif
 
 
