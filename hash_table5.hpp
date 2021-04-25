@@ -260,6 +260,11 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
@@ -316,6 +321,11 @@ public:
         bool operator!=(const const_iterator& rhs) const
         {
             return _bucket != rhs._bucket;
+        }
+
+        size_type bucket() const
+        {
+            return _bucket;
         }
 
     private:
@@ -987,6 +997,17 @@ public:
     }
 
     // -------------------------------------------------------
+    /// return 0 if not erase
+    size_type erase_node(const KeyT& key, const size_type slot)
+    {
+        if (slot < _num_buckets && _pairs[slot].second != INACTIVE && _pairs[slot].first == key) {
+            erase_bucket(slot);
+            return 1;
+        }
+
+        return erase(key);
+    }
+
     /// Erase an element from the hash table.
     /// return 0 if element was not found
     size_type erase(const KeyT& key)

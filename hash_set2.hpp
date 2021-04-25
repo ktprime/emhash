@@ -144,6 +144,11 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
@@ -201,6 +206,11 @@ public:
         bool operator!=(const const_iterator& rhs) const
         {
             return _bucket != rhs._bucket;
+        }
+
+        size_type bucket() const
+        {
+            return _bucket;
         }
 
     private:
@@ -414,6 +424,51 @@ public:
         return (1u << 31) / sizeof(PairT);
     }
 
+#ifdef TEST_TIMER_FEATURE
+    size_type get_bucket_value(const size_type main_bucket, const KeyT& key, std::vector<KeyT>& vec)
+    {
+        auto node = _pairs[main_bucket].first;
+        //if (node->expire <= key)
+        //    vec.push_back(node);
+
+        auto next_bucket = _pairs[main_bucket].second;
+        if (next_bucket == main_bucket)
+            return vec.size();
+
+        while (true) {
+            const auto nbucket = _pairs[next_bucket].second;
+
+            node = _pairs[next_bucket].first;
+            //if (node->expire <= key) //TODO use outer filter
+            //    vec.push_back(node);
+
+            if (nbucket == next_bucket)
+                return next_bucket;
+            next_bucket = nbucket;
+        }
+        return vec.size();
+    }
+
+    size_type get_main_bucket(const KeyT& key) const
+    {
+        const auto bucket = hash_bucket(key);
+        const auto next_bucket = _pairs[bucket].second;
+        if (next_bucket == INACTIVE)
+            return -1;
+
+        const auto& node = _pairs[next_bucket].first;
+        //check current bucket_key is in main bucket or not
+        const auto main_bucket = hash_bucket(node);
+        if (main_bucket != bucket)
+            return -1;
+       //else if (next_bucket == main_bucket /** && node->expire > key * /)
+       //     return -1;
+
+        return main_bucket;
+    }
+#endif
+
+#ifdef EMH_STATIS
     size_type bucket_main() const
     {
         auto bucket_size = 0;
@@ -424,7 +479,6 @@ public:
         return bucket_size;
     }
 
-#ifdef EMH_STATIS
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
@@ -734,6 +788,17 @@ public:
 #endif
     }
 
+    /// return 0 if not erase
+    size_type erase_node(const KeyT& key, const size_type slot)
+    {
+        if (slot < _num_buckets && _pairs[slot].second != INACTIVE && _pairs[slot].first == key) {
+            erase_bucket(slot);
+            return 1;
+        }
+
+        return erase(key);
+    }
+
     /// Erase an element from the hash table.
     /// return 0 if element was not found
     size_type erase(const KeyT& key)
@@ -751,7 +816,6 @@ public:
         iterator it(this, cit._bucket);
         const auto bucket = erase_bucket(it._bucket);
         //move last bucket to current
-        clear_bucket(bucket);
 
         //erase from main bucket, return main bucket as next
         return (bucket == it._bucket) ? ++it : it;
@@ -759,8 +823,9 @@ public:
 
     void _erase(const_iterator it)
     {
-        const auto bucket = erase_bucket(it._bucket);
-        clear_bucket(bucket);
+       const auto slot = it._bucket;
+       if (slot < _num_buckets && _pairs[slot].second != INACTIVE)
+           erase_bucket(slot);
     }
 
     void clearkv()
@@ -794,6 +859,8 @@ public:
     {
         const auto required_buckets = num_elems * _loadlf >> 27;
         if (EMH_LIKELY(required_buckets < _num_buckets))
+            return false;
+        else if (_num_filled < 16 && _num_filled < _num_buckets)
             return false;
 
         rehash(required_buckets + 2);
@@ -928,6 +995,7 @@ private:
         return INACTIVE;
     }
 
+    //return the real erased bucket
     size_type erase_bucket(const size_type bucket)
     {
         const auto next_bucket = _pairs[bucket].second;
@@ -941,11 +1009,13 @@ private:
                     std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
                 _pairs[bucket].second = (nbucket == next_bucket) ? bucket : nbucket;
             }
+            clear_bucket(next_bucket);
             return next_bucket;
         }
 
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         _pairs[prev_bucket].second = (bucket == next_bucket) ? prev_bucket : next_bucket;
+        clear_bucket(bucket);
         return bucket;
     }
 
