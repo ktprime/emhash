@@ -149,6 +149,11 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
@@ -206,6 +211,11 @@ public:
         bool operator!=(const const_iterator& rhs) const
         {
             return _bucket != rhs._bucket;
+        }
+
+        size_type bucket() const
+        {
+            return _bucket;
         }
 
     private:
@@ -309,7 +319,7 @@ public:
 
     HashSet& operator=(HashSet&& other)
     {
-        if (this == &other) {
+        if (this != &other) {
             swap(other);
             other.clear();
         }
@@ -378,7 +388,7 @@ public:
 
     const_iterator end() const
     {
-        return {this, _total_buckets};
+        return cend();
     }
 
     size_type size() const
@@ -410,7 +420,7 @@ public:
         return _hasher;
     }
 
-    EqT key_eq() const
+    EqT& key_eq() const
     {
         return _eq;
     }

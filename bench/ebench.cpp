@@ -1286,8 +1286,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_no_reserve <hash_type>(hash_name, oList);
         find_insert_multi <hash_type>(hash_name, oList);
 
-        insert_reserve<hash_type>(hash,hash_name, oList);
-        find_hit_all  <hash_type>(hash, hash_name,oList);
+        insert_reserve<hash_type>(hash, hash_name, oList);
+        find_hit_all  <hash_type>(hash, hash_name, oList);
         find_miss_all <hash_type>(hash, hash_name);
 
         auto vList = oList;

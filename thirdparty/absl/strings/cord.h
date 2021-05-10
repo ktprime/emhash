@@ -70,6 +70,7 @@
 #include <string>
 #include <type_traits>
 
+#include "absl/base/config.h"
 #include "absl/base/internal/endian.h"
 #include "absl/base/internal/per_thread_tls.h"
 #include "absl/base/macros.h"
@@ -80,6 +81,11 @@
 #include "absl/strings/internal/cord_internal.h"
 #include "absl/strings/internal/cord_rep_ring.h"
 #include "absl/strings/internal/cord_rep_ring_reader.h"
+#include "absl/strings/internal/cordz_functions.h"
+#include "absl/strings/internal/cordz_info.h"
+#include "absl/strings/internal/cordz_statistics.h"
+#include "absl/strings/internal/cordz_update_scope.h"
+#include "absl/strings/internal/cordz_update_tracker.h"
 #include "absl/strings/internal/resize_uninitialized.h"
 #include "absl/strings/internal/string_constant.h"
 #include "absl/strings/string_view.h"
@@ -664,9 +670,18 @@ class Cord {
   explicit constexpr Cord(strings_internal::StringConstant<T>);
 
  private:
+  using CordRep = absl::cord_internal::CordRep;
+  using CordzInfo = cord_internal::CordzInfo;
+  using CordzUpdateScope = cord_internal::CordzUpdateScope;
+  using CordzUpdateTracker = cord_internal::CordzUpdateTracker;
+  using InlineData = cord_internal::InlineData;
+  using MethodIdentifier = CordzUpdateTracker::MethodIdentifier;
+
   friend class CordTestPeer;
   friend bool operator==(const Cord& lhs, const Cord& rhs);
   friend bool operator==(const Cord& lhs, absl::string_view rhs);
+
+  friend const CordzInfo* GetCordzInfoForTesting(const Cord& cord);
 
   // Calls the provided function once for each cord chunk, in order.  Unlike
   // Chunks(), this API will not allocate memory.
@@ -687,6 +702,7 @@ class Cord {
     static_assert(kMaxInline >= sizeof(absl::cord_internal::CordRep*), "");
 
     constexpr InlineRep() : data_() {}
+    explicit InlineRep(InlineData::DefaultInitType init) : data_(init) {}
     InlineRep(const InlineRep& src);
     InlineRep(InlineRep&& src);
     InlineRep& operator=(const InlineRep& src);
@@ -717,7 +733,23 @@ class Cord {
     void remove_prefix(size_t n);  // REQUIRES: holding data
     void AppendArray(const char* src_data, size_t src_size);
     absl::string_view FindFlatStartPiece() const;
-    void AppendTree(absl::cord_internal::CordRep* tree);
+
+    // Sets the tree value for this instance. `rep` must not be null.
+    // Requires the current instance to hold a tree, and a lock to be held on
+    // any CordzInfo referenced by this instance. The latter is enforced through
+    // the CordzUpdateScope argument. If the current instance is sampled, then
+    // the CordzInfo instance is updated to reference the new `rep` value.
+    void SetTree(CordRep* rep, const CordzUpdateScope& scope);
+
+    // Sets the tree value for this instance, and randomly samples this cord.
+    // This function disregards existing contents in `data_`, and should be
+    // called when a Cord is 'promoted' from an 'uninitialized' or 'inlined'
+    // value to a non-inlined (tree / ring) value.
+    void EmplaceTree(CordRep* rep, MethodIdentifier method);
+
+    void AppendTreeToInlined(CordRep* tree, MethodIdentifier method);
+    void AppendTreeToTree(CordRep* tree, MethodIdentifier method);
+    void AppendTree(CordRep* tree, MethodIdentifier method);
     void PrependTree(absl::cord_internal::CordRep* tree);
     void GetAppendRegion(char** region, size_t* size, size_t max_length);
     void GetAppendRegion(char** region, size_t* size);
@@ -771,6 +803,11 @@ class Cord {
 
     // Resets the current cordz_info to null / empty.
     void clear_cordz_info() { data_.clear_cordz_info(); }
+
+    // Updates the cordz statistics. info may be nullptr if the CordzInfo object
+    // is unknown.
+    void UpdateCordzStatistics();
+    void UpdateCordzStatisticsSlow();
 
    private:
     friend class Cord;
@@ -943,11 +980,12 @@ inline Cord::InlineRep::InlineRep(const Cord::InlineRep& src)
   if (is_tree()) {
     data_.clear_cordz_info();
     absl::cord_internal::CordRep::Ref(as_tree());
+    CordzInfo::MaybeTrackCord(data_, src.data_,
+                              CordzUpdateTracker::kConstructorCord);
   }
 }
 
-inline Cord::InlineRep::InlineRep(Cord::InlineRep&& src) {
-  data_ = src.data_;
+inline Cord::InlineRep::InlineRep(Cord::InlineRep&& src) : data_(src.data_) {
   src.ResetToEmpty();
 }
 
@@ -1003,8 +1041,25 @@ inline size_t Cord::InlineRep::size() const {
   return is_tree() ? as_tree()->length : inline_size();
 }
 
+inline void Cord::InlineRep::EmplaceTree(CordRep* rep,
+                                         MethodIdentifier method) {
+  data_.make_tree(rep);
+  CordzInfo::MaybeTrackCord(data_, method);
+}
+
+inline void Cord::InlineRep::SetTree(CordRep* rep,
+                                     const CordzUpdateScope& scope) {
+  assert(rep);
+  assert(data_.is_tree());
+  data_.set_tree(rep);
+  scope.SetCordRep(rep);
+}
+
 inline void Cord::InlineRep::set_tree(absl::cord_internal::CordRep* rep) {
   if (rep == nullptr) {
+    if (ABSL_PREDICT_FALSE(is_profiled())) {
+      absl::cord_internal::CordzInfo::UntrackCord(cordz_info());
+    }
     ResetToEmpty();
   } else {
     if (data_.is_tree()) {
@@ -1014,7 +1069,9 @@ inline void Cord::InlineRep::set_tree(absl::cord_internal::CordRep* rep) {
     } else {
       // `data_` contains inlined data: initialize data_ to tree value `rep`.
       data_.make_tree(rep);
+      CordzInfo::MaybeTrackCord(data_, CordzUpdateTracker::kUnknown);
     }
+    UpdateCordzStatistics();
   }
 }
 
@@ -1025,9 +1082,13 @@ inline void Cord::InlineRep::replace_tree(absl::cord_internal::CordRep* rep) {
     return;
   }
   data_.set_tree(rep);
+  UpdateCordzStatistics();
 }
 
 inline absl::cord_internal::CordRep* Cord::InlineRep::clear() {
+  if (ABSL_PREDICT_FALSE(is_profiled())) {
+    absl::cord_internal::CordzInfo::UntrackCord(cordz_info());
+  }
   absl::cord_internal::CordRep* result = tree();
   ResetToEmpty();
   return result;
@@ -1038,6 +1099,11 @@ inline void Cord::InlineRep::CopyToArray(char* dst) const {
   size_t n = inline_size();
   assert(n != 0);
   cord_internal::SmallMemmove(dst, data_.as_chars(), n);
+}
+
+inline void Cord::InlineRep::UpdateCordzStatistics() {
+  if (ABSL_PREDICT_TRUE(!is_profiled())) return;
+  UpdateCordzStatisticsSlow();
 }
 
 constexpr inline Cord::Cord() noexcept {}

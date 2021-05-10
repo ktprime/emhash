@@ -403,6 +403,7 @@ public:
         if (is_triviall_destructable())
             clearkv();
         free(_pairs);
+        _pairs = nullptr;
     }
 
     void clone(const HashMap& other)
@@ -1493,7 +1494,7 @@ one-way seach strategy.
     }
 
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    static inline uint64_t hash64(uint64_t key)
+    static uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__
         __uint128_t r = key; r *= KC;

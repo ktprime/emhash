@@ -19,9 +19,10 @@
     #define TKey              1
 #endif
 
-#if __GNUC__ && __linux__
+#if __GNUC__ > 4 && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
+
 
 static void printInfo(char* out);
 std::map<std::string, std::string> hash_tables =
@@ -54,6 +55,7 @@ std::map<std::string, std::string> hash_tables =
 
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 #define PHMAP_HAVE_SSSE3      1
+#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #endif
 
 //rand data type
@@ -161,6 +163,7 @@ std::map<std::string, std::string> hash_tables =
 
 #ifdef _WIN32
     # define CONSOLE "CON"
+    # define _CRT_SECURE_NO_WARNINGS 1
     # include <windows.h>
 #else
     # define CONSOLE "/dev/tty"
@@ -1063,11 +1066,11 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     auto flag = 0;
     if (srng() % 100 >= iRation)
     {
-        for (int i = 0; ; i++) {
+        for (int i = 0; i < size ; i++) {
             auto key = TO_KEY(srng());
             randdata.emplace_back(key);
-            if (randdata.size() >= size)
-                break;
+//            if (randdata.size() >= size)
+//                break;
         }
     }
     else
@@ -1110,21 +1113,18 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 
     {
         hash_type hash;
-        const uint32_t l1_size = (64 * 1024)   / (sizeof(keyType) + sizeof(int));
-        const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(int));
+        const uint32_t l1_size = (64 * 1024)   / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
+        const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
 
         func_index  = 0;
-#if 1
         insert_erase      <hash_type>(hash_name, oList);
         insert_high_load  <hash_type>(hash_name, oList);
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size / 2, 2 * l1_size + 1000);
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size * 4, l3_size * 4);
+        insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size * 4, l3_size * 2);
         insert_no_reserve <hash_type>(hash_name, oList);
         find_insert_multi <hash_type>(hash_name, oList);
-#endif
 
         insert_reserve<hash_type>(hash, hash_name, oList);
-
         find_hit_all  <hash_type>(hash, hash_name, oList);
         find_miss_all <hash_type>(hash, hash_name);
 
@@ -1146,9 +1146,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         find_hit_half<hash_type>(hash, hash_name, vList);
         erase_half<hash_type>(hash, hash_name, vList);
         erase_find_half<hash_type>(hash, hash_name, vList);
-        erase_reinsert<hash_type>(hash, hash_name, vList);
         insert_find_erase<hash_type>(hash, hash_name, vList);
-
+        erase_reinsert<hash_type>(hash, hash_name, vList);
         hash_iter<hash_type>(hash, hash_name);
 
 #ifdef UF

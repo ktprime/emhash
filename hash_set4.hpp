@@ -188,6 +188,11 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
@@ -276,6 +281,11 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
@@ -332,8 +342,12 @@ public:
 
     HashSet(HashSet&& other)
     {
-        _num_buckets = _num_filled = 0;
+#ifdef EMH_MOVE_EMPTY
         _pairs = nullptr;
+        _num_buckets = _num_filled = 0;
+#else
+        init(4, 0.95f);
+#endif
         swap(other);
     }
 
@@ -463,7 +477,7 @@ public:
 
     const_iterator end() const
     {
-        return {this, _num_buckets};
+        return cend();
     }
 
     size_type size() const
@@ -485,7 +499,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return static_cast<float>(_num_filled) / (_mask + 1);
+        return static_cast<float>(_num_filled) / (_num_buckets + 0.01f);
     }
 
     HashT& hash_function() const
