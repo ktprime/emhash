@@ -131,6 +131,7 @@ std::map<std::string, std::string> hash_tables =
 #include "hash_table5.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
+#include "hash_table8.hpp"
 
 //https://www.zhihu.com/question/46156495
 //https://eourcs.github.io/LockFreeCuckooHash/

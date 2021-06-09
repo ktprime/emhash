@@ -2,9 +2,9 @@
 #include "wyhash.h"
 //#define THR 1
 
-#if EMH == 7
-    #include "hash_table7.hpp"
-    #define MAPNAME emhash7::HashMap
+#if EMH == 8
+    #include "hash_table8.hpp"
+    #define MAPNAME emhash8::HashMap
     #define EXTRAARGS
 #elif EMH == 2
     #include "hash_table2.hpp"

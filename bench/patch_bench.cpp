@@ -45,9 +45,9 @@ using value_type = uint64_t;
 #endif
 
 #include "hash_table6.hpp"
-#if EMH == 7
+#if EMH == 8
 //#define EMH_HIGH_LOAD  100000
-#include "hash_table7.hpp"
+#include "hash_table8.hpp"
 #elif EMH == 5
 #include "hash_table5.hpp"
 #elif MARTIN
@@ -319,8 +319,8 @@ int main(int argc, char** argv)
   int ret, is_missing;
   khiter_t k;
 
-#elif EMH == 7
-  emhash7::HashMap<uint32_t,value_type> test;
+#elif EMH == 8
+  emhash8::HashMap<uint32_t,value_type> test;
 #elif EMH == 5
   emhash5::HashMap<uint32_t,value_type> test;
 #elif TSL
