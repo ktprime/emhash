@@ -535,7 +535,7 @@ public:
         //assert(main_bucket == hash_bucket(_pairs[next_bucket].first));
         if (main_bucket != bucket)
             return -1;
-       else if (next_bucket == main_bucket && node->expire != key)
+        else if (next_bucket == main_bucket && node->expire != key)
             return -1;
 
         return main_bucket;
@@ -897,7 +897,7 @@ public:
 
     void _erase(const_iterator it)
     {
-       erase_bucket(it._bucket);
+        erase_bucket(it._bucket);
     }
 
     void clearkv()

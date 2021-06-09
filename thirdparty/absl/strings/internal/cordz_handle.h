@@ -20,6 +20,7 @@
 
 #include "absl/base/config.h"
 #include "absl/base/internal/raw_logging.h"
+#include "absl/base/internal/spinlock.h"
 #include "absl/synchronization/mutex.h"
 
 namespace absl {
@@ -39,9 +40,20 @@ class CordzHandle {
 
   bool is_snapshot() const { return is_snapshot_; }
 
+  // Returns true if this instance is safe to be deleted because it is either a
+  // snapshot, which is always safe to delete, or not included in the global
+  // delete queue and thus not included in any snapshot.
+  // Callers are responsible for making sure this instance can not be newly
+  // discovered by other threads. For example, CordzInfo instances first de-list
+  // themselves from the global CordzInfo list before determining if they are
+  // safe to be deleted directly.
+  // If SafeToDelete returns false, callers MUST use the Delete() method to
+  // safely queue CordzHandle instances for deletion.
+  bool SafeToDelete() const;
+
   // Deletes the provided instance, or puts it on the delete queue to be deleted
   // once there are no more sample tokens (snapshot) instances potentially
-  // referencing the instance. `handle` may be null.
+  // referencing the instance. `handle` should not be null.
   static void Delete(CordzHandle* handle);
 
   // Returns the current entries in the delete queue in LIFO order.
@@ -70,9 +82,11 @@ class CordzHandle {
   // Global queue data. CordzHandle stores a pointer to the global queue
   // instance to harden against ODR violations.
   struct Queue {
-    constexpr explicit Queue(absl::ConstInitType) : mutex(absl::kConstInit) {}
+    constexpr explicit Queue(absl::ConstInitType)
+        : mutex(absl::kConstInit,
+                absl::base_internal::SCHEDULE_COOPERATIVE_AND_KERNEL) {}
 
-    absl::Mutex mutex;
+    absl::base_internal::SpinLock mutex;
     std::atomic<CordzHandle*> dq_tail ABSL_GUARDED_BY(mutex){nullptr};
 
     // Returns true if this delete queue is empty. This method does not acquire

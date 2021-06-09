@@ -281,10 +281,7 @@
 // ABSL_ATTRIBUTE_RETURNS_NONNULL
 //
 // Tells the compiler that a particular function never returns a null pointer.
-#if ABSL_HAVE_ATTRIBUTE(returns_nonnull) || \
-    (defined(__GNUC__) && \
-     (__GNUC__ > 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)) && \
-     !defined(__clang__))
+#if ABSL_HAVE_ATTRIBUTE(returns_nonnull)
 #define ABSL_ATTRIBUTE_RETURNS_NONNULL __attribute__((returns_nonnull))
 #else
 #define ABSL_ATTRIBUTE_RETURNS_NONNULL
@@ -602,31 +599,24 @@
 //    case 42:
 //      ...
 //
-// Notes: when compiled with clang in C++11 mode, the ABSL_FALLTHROUGH_INTENDED
-// macro is expanded to the [[clang::fallthrough]] attribute, which is analysed
-// when  performing switch labels fall-through diagnostic
-// (`-Wimplicit-fallthrough`). See clang documentation on language extensions
-// for details:
+// Notes: When supported, GCC and Clang can issue a warning on switch labels
+// with unannotated fallthrough using the warning `-Wimplicit-fallthrough`. See
+// clang documentation on language extensions for details:
 // https://clang.llvm.org/docs/AttributeReference.html#fallthrough-clang-fallthrough
 //
-// When used with unsupported compilers, the ABSL_FALLTHROUGH_INTENDED macro
-// has no effect on diagnostics. In any case this macro has no effect on runtime
+// When used with unsupported compilers, the ABSL_FALLTHROUGH_INTENDED macro has
+// no effect on diagnostics. In any case this macro has no effect on runtime
 // behavior and performance of code.
 
 #ifdef ABSL_FALLTHROUGH_INTENDED
 #error "ABSL_FALLTHROUGH_INTENDED should not be defined."
-#endif
-
-// TODO(zhangxy): Use c++17 standard [[fallthrough]] macro, when supported.
-#if defined(__clang__) && defined(__has_warning)
-#if __has_feature(cxx_attributes) && __has_warning("-Wimplicit-fallthrough")
+#elif ABSL_HAVE_CPP_ATTRIBUTE(fallthrough)
+#define ABSL_FALLTHROUGH_INTENDED [[fallthrough]]
+#elif ABSL_HAVE_CPP_ATTRIBUTE(clang::fallthrough)
 #define ABSL_FALLTHROUGH_INTENDED [[clang::fallthrough]]
-#endif
-#elif defined(__GNUC__) && __GNUC__ >= 7
+#elif ABSL_HAVE_CPP_ATTRIBUTE(gnu::fallthrough)
 #define ABSL_FALLTHROUGH_INTENDED [[gnu::fallthrough]]
-#endif
-
-#ifndef ABSL_FALLTHROUGH_INTENDED
+#else
 #define ABSL_FALLTHROUGH_INTENDED \
   do {                            \
   } while (0)

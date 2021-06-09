@@ -56,6 +56,7 @@ using ::absl::cord_internal::CordRepExternal;
 using ::absl::cord_internal::CordRepFlat;
 using ::absl::cord_internal::CordRepRing;
 using ::absl::cord_internal::CordRepSubstring;
+using ::absl::cord_internal::CordzUpdateTracker;
 using ::absl::cord_internal::InlineData;
 using ::absl::cord_internal::kMaxFlatLength;
 using ::absl::cord_internal::kMinFlatLength;
@@ -210,7 +211,7 @@ static CordRep* MakeBalancedTree(CordRep** reps, size_t n) {
 }
 
 static CordRepFlat* CreateFlat(const char* data, size_t length,
-                            size_t alloc_hint) {
+                               size_t alloc_hint) {
   CordRepFlat* flat = CordRepFlat::New(length + alloc_hint);
   flat->length = length;
   memcpy(flat->Data(), data, length);
@@ -234,9 +235,7 @@ static CordRep* RingNewTree(const char* data, size_t length,
 
 // Create a new tree out of the specified array.
 // The returned node has a refcount of 1.
-static CordRep* NewTree(const char* data,
-                        size_t length,
-                        size_t alloc_hint) {
+static CordRep* NewTree(const char* data, size_t length, size_t alloc_hint) {
   if (length == 0) return nullptr;
   if (cord_ring_enabled()) {
     return RingNewTree(data, length, alloc_hint);
@@ -283,6 +282,35 @@ static CordRep* NewSubstring(CordRep* child, size_t offset, size_t length) {
   }
 }
 
+// Creates a CordRep from the provided string. If the string is large enough,
+// and not wasteful, we move the string into an external cord rep, preserving
+// the already allocated string contents.
+// Requires the provided string length to be larger than `kMaxInline`.
+static CordRep* CordRepFromString(std::string&& src) {
+  assert(src.length() > cord_internal::kMaxInline);
+  if (
+      // String is short: copy data to avoid external block overhead.
+      src.size() <= kMaxBytesToCopy ||
+      // String is wasteful: copy data to avoid pinning too much unused memory.
+      src.size() < src.capacity() / 2
+  ) {
+    return NewTree(src.data(), src.size(), 0);
+  }
+
+  struct StringReleaser {
+    void operator()(absl::string_view /* data */) {}
+    std::string data;
+  };
+  const absl::string_view original_data = src;
+  auto* rep =
+      static_cast<::absl::cord_internal::CordRepExternalImpl<StringReleaser>*>(
+          absl::cord_internal::NewExternalRep(original_data,
+                                              StringReleaser{std::move(src)}));
+  // Moving src may have invalidated its data pointer, so adjust it.
+  rep->base = rep->template get<0>().data.data();
+  return rep;
+}
+
 // --------------------------------------------------------------------
 // Cord::InlineRep functions
 
@@ -301,24 +329,6 @@ inline char* Cord::InlineRep::set_data(size_t n) {
   ResetToEmpty();
   set_inline_size(n);
   return data_.as_chars();
-}
-
-static inline CordRepFlat* MakeFlat(const InlineData& data, size_t extra = 0) {
-  static_assert(kMinFlatLength >= sizeof(data), "");
-  size_t len = data.inline_size();
-  CordRepFlat* result = CordRepFlat::New(len + extra);
-  result->length = len;
-  memcpy(result->Data(), data.as_chars(), sizeof(data));
-  return result;
-}
-
-inline CordRep* Cord::InlineRep::force_tree(size_t extra_hint) {
-  if (data_.is_tree()) {
-    return data_.as_tree();
-  }
-  CordRepFlat* result = MakeFlat(data_, extra_hint);
-  set_tree(result);
-  return result;
 }
 
 inline void Cord::InlineRep::reduce_size(size_t n) {
@@ -346,7 +356,7 @@ void Cord::InlineRep::AppendTreeToInlined(CordRep* tree,
                                           MethodIdentifier method) {
   assert(!is_tree());
   if (!data_.is_empty()) {
-    CordRepFlat* flat = MakeFlat(data_);
+    CordRepFlat* flat = MakeFlatWithExtraCapacity(0);
     if (cord_ring_enabled()) {
       tree = CordRepRing::Append(CordRepRing::Create(flat, 1), tree);
     } else {
@@ -376,14 +386,38 @@ void Cord::InlineRep::AppendTree(CordRep* tree, MethodIdentifier method) {
   }
 }
 
-void Cord::InlineRep::PrependTree(CordRep* tree) {
-  assert(tree != nullptr);
-  if (data_.is_empty()) {
-    set_tree(tree);
-  } else if (cord_ring_enabled()) {
-    set_tree(CordRepRing::Prepend(ForceRing(force_tree(0), 1), tree));
+void Cord::InlineRep::PrependTreeToInlined(CordRep* tree,
+                                           MethodIdentifier method) {
+  assert(!is_tree());
+  if (!data_.is_empty()) {
+    CordRepFlat* flat = MakeFlatWithExtraCapacity(0);
+    if (cord_ring_enabled()) {
+      tree = CordRepRing::Prepend(CordRepRing::Create(flat, 1), tree);
+    } else {
+      tree = Concat(tree, flat);
+    }
+  }
+  EmplaceTree(tree, method);
+}
+
+void Cord::InlineRep::PrependTreeToTree(CordRep* tree,
+                                        MethodIdentifier method) {
+  assert(is_tree());
+  const CordzUpdateScope scope(data_.cordz_info(), method);
+  if (cord_ring_enabled()) {
+    tree = CordRepRing::Prepend(ForceRing(data_.as_tree(), 1), tree);
   } else {
-    set_tree(Concat(tree, force_tree(0)));
+    tree = Concat(tree, data_.as_tree());
+  }
+  SetTree(tree, scope);
+}
+
+void Cord::InlineRep::PrependTree(CordRep* tree, MethodIdentifier method) {
+  assert(tree != nullptr);
+  if (data_.is_tree()) {
+    PrependTreeToTree(tree, method);
+  } else {
+    PrependTreeToInlined(tree, method);
   }
 }
 
@@ -435,78 +469,43 @@ static inline bool PrepareAppendRegion(CordRep* root, char** region,
   return true;
 }
 
+template <bool has_length>
 void Cord::InlineRep::GetAppendRegion(char** region, size_t* size,
-                                      size_t max_length) {
-  if (max_length == 0) {
-    *region = nullptr;
-    *size = 0;
-    return;
-  }
+                                      size_t length) {
+  auto constexpr method = CordzUpdateTracker::kGetAppendRegion;
 
-  // Try to fit in the inline buffer if possible.
-  if (!is_tree()) {
-    size_t inline_length = inline_size();
-    if (max_length <= kMaxInline - inline_length) {
-      *region = data_.as_chars() + inline_length;
-      *size = max_length;
-      set_inline_size(inline_length + max_length);
+  CordRep* root = tree();
+  size_t sz = root ? root->length : inline_size();
+  if (root == nullptr) {
+    size_t available = kMaxInline - sz;
+    if (available >= (has_length ? length : 1)) {
+      *region = data_.as_chars() + sz;
+      *size = has_length ? length : available;
+      set_inline_size(has_length ? sz + length : kMaxInline);
       return;
     }
   }
 
-  CordRep* root = force_tree(max_length);
-
-  if (PrepareAppendRegion(root, region, size, max_length)) {
-    UpdateCordzStatistics();
+  size_t extra = has_length ? length : (std::max)(sz, kMinFlatLength);
+  CordRep* rep = root ? root : MakeFlatWithExtraCapacity(extra);
+  CordzUpdateScope scope(root ? data_.cordz_info() : nullptr, method);
+  if (PrepareAppendRegion(rep, region, size, length)) {
+    CommitTree(root, rep, scope, method);
     return;
   }
 
   // Allocate new node.
-  CordRepFlat* new_node =
-      CordRepFlat::New(std::max(static_cast<size_t>(root->length), max_length));
-  new_node->length = std::min(new_node->Capacity(), max_length);
+  CordRepFlat* new_node = CordRepFlat::New(extra);
+  new_node->length = std::min(new_node->Capacity(), length);
   *region = new_node->Data();
   *size = new_node->length;
 
   if (cord_ring_enabled()) {
-    replace_tree(CordRepRing::Append(ForceRing(root, 1), new_node));
-    return;
+    rep = CordRepRing::Append(ForceRing(rep, 1), new_node);
+  } else {
+    rep = Concat(rep, new_node);
   }
-  replace_tree(Concat(root, new_node));
-}
-
-void Cord::InlineRep::GetAppendRegion(char** region, size_t* size) {
-  const size_t max_length = std::numeric_limits<size_t>::max();
-
-  // Try to fit in the inline buffer if possible.
-  if (!data_.is_tree()) {
-    size_t inline_length = inline_size();
-    if (inline_length < kMaxInline) {
-      *region = data_.as_chars() + inline_length;
-      *size = kMaxInline - inline_length;
-      set_inline_size(kMaxInline);
-      return;
-    }
-  }
-
-  CordRep* root = force_tree(max_length);
-
-  if (PrepareAppendRegion(root, region, size, max_length)) {
-    UpdateCordzStatistics();
-    return;
-  }
-
-  // Allocate new node.
-  CordRepFlat* new_node = CordRepFlat::New(root->length);
-  new_node->length = new_node->Capacity();
-  *region = new_node->Data();
-  *size = new_node->length;
-
-  if (cord_ring_enabled()) {
-    replace_tree(CordRepRing::Append(ForceRing(root, 1), new_node));
-    return;
-  }
-  replace_tree(Concat(root, new_node));
+  CommitTree(root, rep, scope, method);
 }
 
 // If the rep is a leaf, this will increment the value at total_mem_usage and
@@ -517,33 +516,42 @@ static bool RepMemoryUsageLeaf(const CordRep* rep, size_t* total_mem_usage) {
     return true;
   }
   if (rep->tag == EXTERNAL) {
-    *total_mem_usage += sizeof(CordRepConcat) + rep->length;
+    // We don't know anything about the embedded / bound data, but we can safely
+    // assume it is 'at least' a word / pointer to data. In the future we may
+    // choose to use the 'data' byte as a tag to identify the types of some
+    // well-known externals, such as a std::string instance.
+    *total_mem_usage +=
+        sizeof(cord_internal::CordRepExternalImpl<intptr_t>) + rep->length;
     return true;
   }
   return false;
 }
 
-void Cord::InlineRep::UpdateCordzStatisticsSlow() {
-  CordRep* tree = as_tree();
-  data_.cordz_info()->RecordMetrics(tree->length);
-}
-
 void Cord::InlineRep::AssignSlow(const Cord::InlineRep& src) {
-  UnrefTree();
-
-  data_ = src.data_;
-  if (is_tree()) {
-    CordRep::Ref(tree());
-    clear_cordz_info();
-    CordzInfo::MaybeTrackCord(data_, CordzUpdateTracker::kAssignCord);
+  assert(&src != this);
+  assert(is_tree() || src.is_tree());
+  auto constexpr method = CordzUpdateTracker::kAssignCord;
+  if (ABSL_PREDICT_TRUE(!is_tree())) {
+    EmplaceTree(CordRep::Ref(src.as_tree()), src.data_, method);
+    return;
   }
+
+  CordRep* tree = as_tree();
+  if (CordRep* src_tree = src.tree()) {
+    // Leave any existing `cordz_info` in place, and let MaybeTrackCord()
+    // decide if this cord should be (or remains to be) sampled or not.
+    data_.set_tree(CordRep::Ref(src_tree));
+    CordzInfo::MaybeTrackCord(data_, src.data_, method);
+  } else {
+    CordzInfo::MaybeUntrackCord(data_.cordz_info());
+    data_ = src.data_;
+  }
+  CordRep::Unref(tree);
 }
 
 void Cord::InlineRep::UnrefTree() {
   if (is_tree()) {
-    if (ABSL_PREDICT_FALSE(is_profiled())) {
-      absl::cord_internal::CordzInfo::UntrackCord(cordz_info());
-    }
+    CordzInfo::MaybeUntrackCord(data_.cordz_info());
     CordRep::Unref(tree());
   }
 }
@@ -551,42 +559,24 @@ void Cord::InlineRep::UnrefTree() {
 // --------------------------------------------------------------------
 // Constructors and destructors
 
-Cord::Cord(absl::string_view src) : contents_(InlineData::kDefaultInit) {
+Cord::Cord(absl::string_view src, MethodIdentifier method)
+    : contents_(InlineData::kDefaultInit) {
   const size_t n = src.size();
   if (n <= InlineRep::kMaxInline) {
     contents_.set_data(src.data(), n, true);
   } else {
     CordRep* rep = NewTree(src.data(), n, 0);
-    contents_.EmplaceTree(rep, CordzUpdateTracker::kConstructorString);
+    contents_.EmplaceTree(rep, method);
   }
 }
 
 template <typename T, Cord::EnableIfString<T>>
-Cord::Cord(T&& src) {
-  if (
-      // String is short: copy data to avoid external block overhead.
-      src.size() <= kMaxBytesToCopy ||
-      // String is wasteful: copy data to avoid pinning too much unused memory.
-      src.size() < src.capacity() / 2
-  ) {
-    if (src.size() <= InlineRep::kMaxInline) {
-      contents_.set_data(src.data(), src.size(), false);
-    } else {
-      contents_.set_tree(NewTree(src.data(), src.size(), 0));
-    }
+Cord::Cord(T&& src) : contents_(InlineData::kDefaultInit) {
+  if (src.size() <= InlineRep::kMaxInline) {
+    contents_.set_data(src.data(), src.size(), true);
   } else {
-    struct StringReleaser {
-      void operator()(absl::string_view /* data */) {}
-      std::string data;
-    };
-    const absl::string_view original_data = src;
-    auto* rep = static_cast<
-        ::absl::cord_internal::CordRepExternalImpl<StringReleaser>*>(
-        absl::cord_internal::NewExternalRep(
-            original_data, StringReleaser{std::forward<T>(src)}));
-    // Moving src may have invalidated its data pointer, so adjust it.
-    rep->base = rep->template get<0>().data.data();
-    contents_.set_tree(rep);
+    CordRep* rep = CordRepFromString(std::forward<T>(src));
+    contents_.EmplaceTree(rep, CordzUpdateTracker::kConstructorString);
   }
 }
 
@@ -595,12 +585,9 @@ template Cord::Cord(std::string&& src);
 // The destruction code is separate so that the compiler can determine
 // that it does not need to call the destructor on a moved-from Cord.
 void Cord::DestroyCordSlow() {
-  if (ABSL_PREDICT_FALSE(contents_.is_profiled())) {
-    absl::cord_internal::CordzInfo::UntrackCord(contents_.cordz_info());
-  }
-  if (CordRep* tree = contents_.tree()) {
-    CordRep::Unref(VerifyTree(tree));
-  }
+  assert(contents_.is_tree());
+  CordzInfo::MaybeUntrackCord(contents_.cordz_info());
+  CordRep::Unref(VerifyTree(contents_.as_tree()));
 }
 
 // --------------------------------------------------------------------
@@ -612,114 +599,117 @@ void Cord::Clear() {
   }
 }
 
-Cord& Cord::operator=(absl::string_view src) {
-  if (ABSL_PREDICT_FALSE(contents_.is_profiled())) {
-    absl::cord_internal::CordzInfo::UntrackCord(contents_.cordz_info());
-    contents_.clear_cordz_info();
+Cord& Cord::AssignLargeString(std::string&& src) {
+  auto constexpr method = CordzUpdateTracker::kAssignString;
+  assert(src.size() > kMaxBytesToCopy);
+  CordRep* rep = CordRepFromString(std::move(src));
+  if (CordRep* tree = contents_.tree()) {
+    CordzUpdateScope scope(contents_.cordz_info(), method);
+    contents_.SetTree(rep, scope);
+    CordRep::Unref(tree);
+  } else {
+    contents_.EmplaceTree(rep, method);
   }
+  return *this;
+}
 
+Cord& Cord::operator=(absl::string_view src) {
+  auto constexpr method = CordzUpdateTracker::kAssignString;
   const char* data = src.data();
   size_t length = src.size();
   CordRep* tree = contents_.tree();
   if (length <= InlineRep::kMaxInline) {
-    // Embed into this->contents_
+    // Embed into this->contents_, which is somewhat subtle:
+    // - MaybeUntrackCord must be called before Unref(tree).
+    // - MaybeUntrackCord must be called before set_data() clobbers cordz_info.
+    // - set_data() must be called before Unref(tree) as it may reference tree.
+    if (tree != nullptr) CordzInfo::MaybeUntrackCord(contents_.cordz_info());
     contents_.set_data(data, length, true);
-    if (tree) CordRep::Unref(tree);
+    if (tree != nullptr) CordRep::Unref(tree);
     return *this;
   }
-  if (tree != nullptr && tree->tag >= FLAT &&
-      tree->flat()->Capacity() >= length &&
-      tree->refcount.IsOne()) {
-    // Copy in place if the existing FLAT node is reusable.
-    memmove(tree->flat()->Data(), data, length);
-    tree->length = length;
-    VerifyTree(tree);
-    return *this;
-  }
-  contents_.set_tree(NewTree(data, length, 0));
-  if (tree) CordRep::Unref(tree);
-  return *this;
-}
-
-template <typename T, Cord::EnableIfString<T>>
-Cord& Cord::operator=(T&& src) {
-  if (src.size() <= kMaxBytesToCopy) {
-    *this = absl::string_view(src);
+  if (tree != nullptr) {
+    CordzUpdateScope scope(contents_.cordz_info(), method);
+    if (tree->tag >= FLAT && tree->flat()->Capacity() >= length &&
+        tree->refcount.IsOne()) {
+      // Copy in place if the existing FLAT node is reusable.
+      memmove(tree->flat()->Data(), data, length);
+      tree->length = length;
+      VerifyTree(tree);
+      return *this;
+    }
+    contents_.SetTree(NewTree(data, length, 0), scope);
+    CordRep::Unref(tree);
   } else {
-    *this = Cord(std::forward<T>(src));
+    contents_.EmplaceTree(NewTree(data, length, 0), method);
   }
   return *this;
 }
-
-template Cord& Cord::operator=(std::string&& src);
 
 // TODO(sanjay): Move to Cord::InlineRep section of file.  For now,
 // we keep it here to make diffs easier.
-void Cord::InlineRep::AppendArray(const char* src_data, size_t src_size) {
-  if (src_size == 0) return;  // memcpy(_, nullptr, 0) is undefined.
+void Cord::InlineRep::AppendArray(absl::string_view src,
+                                  MethodIdentifier method) {
+  if (src.empty()) return;  // memcpy(_, nullptr, 0) is undefined.
 
   size_t appended = 0;
-  CordRep* root = nullptr;
-  if (is_tree()) {
-    root = data_.as_tree();
+  CordRep* rep = tree();
+  const CordRep* const root = rep;
+  CordzUpdateScope scope(root ? cordz_info() : nullptr, method);
+  if (root != nullptr) {
     char* region;
-    if (PrepareAppendRegion(root, &region, &appended, src_size)) {
-      memcpy(region, src_data, appended);
-      UpdateCordzStatistics();
+    if (PrepareAppendRegion(rep, &region, &appended, src.size())) {
+      memcpy(region, src.data(), appended);
     }
   } else {
     // Try to fit in the inline buffer if possible.
     size_t inline_length = inline_size();
-    if (src_size <= kMaxInline - inline_length) {
+    if (src.size() <= kMaxInline - inline_length) {
       // Append new data to embedded array
-      memcpy(data_.as_chars() + inline_length, src_data, src_size);
-      set_inline_size(inline_length + src_size);
+      memcpy(data_.as_chars() + inline_length, src.data(), src.size());
+      set_inline_size(inline_length + src.size());
       return;
     }
 
-    // It is possible that src_data == data_, but when we transition from an
-    // InlineRep to a tree we need to assign data_ = root via set_tree. To
-    // avoid corrupting the source data before we copy it, delay calling
-    // set_tree until after we've copied data.
+    // Note: we don't concern ourselves if src aliases data stored in the
+    // inlined data of 'this',  as we update the InlineData only at the end.
     // We are going from an inline size to beyond inline size. Make the new size
     // either double the inlined size, or the added size + 10%.
-    const size_t size1 = inline_length * 2 + src_size;
-    const size_t size2 = inline_length + src_size / 10;
-    root = CordRepFlat::New(std::max<size_t>(size1, size2));
-    appended = std::min(
-        src_size, root->flat()->Capacity() - inline_length);
-    memcpy(root->flat()->Data(), data_.as_chars(), inline_length);
-    memcpy(root->flat()->Data() + inline_length, src_data, appended);
-    root->length = inline_length + appended;
-    set_tree(root);
+    const size_t size1 = inline_length * 2 + src.size();
+    const size_t size2 = inline_length + src.size() / 10;
+    rep = CordRepFlat::New(std::max<size_t>(size1, size2));
+    appended = std::min(src.size(), rep->flat()->Capacity() - inline_length);
+    memcpy(rep->flat()->Data(), data_.as_chars(), inline_length);
+    memcpy(rep->flat()->Data() + inline_length, src.data(), appended);
+    rep->length = inline_length + appended;
   }
 
-  src_data += appended;
-  src_size -= appended;
-  if (src_size == 0) {
+  src.remove_prefix(appended);
+  if (src.empty()) {
+    CommitTree(root, rep, scope, method);
     return;
   }
 
   if (cord_ring_enabled()) {
-    absl::string_view data(src_data, src_size);
-    root = ForceRing(root, (data.size() - 1) / kMaxFlatLength + 1);
-    replace_tree(CordRepRing::Append(root->ring(), data));
-    return;
+    rep = ForceRing(rep, (src.size() - 1) / kMaxFlatLength + 1);
+    rep = CordRepRing::Append(rep->ring(), src);
+  } else {
+    // Use new block(s) for any remaining bytes that were not handled above.
+    // Alloc extra memory only if the right child of the root of the new tree
+    // is going to be a FLAT node, which will permit further inplace appends.
+    size_t length = src.size();
+    if (src.size() < kMaxFlatLength) {
+      // The new length is either
+      // - old size + 10%
+      // - old_size + src.size()
+      // This will cause a reasonable conservative step-up in size that is
+      // still large enough to avoid excessive amounts of small fragments
+      // being added.
+      length = std::max<size_t>(rep->length / 10, src.size());
+    }
+    rep = Concat(rep, NewTree(src.data(), src.size(), length - src.size()));
   }
-
-  // Use new block(s) for any remaining bytes that were not handled above.
-  // Alloc extra memory only if the right child of the root of the new tree is
-  // going to be a FLAT node, which will permit further inplace appends.
-  size_t length = src_size;
-  if (src_size < kMaxFlatLength) {
-    // The new length is either
-    // - old size + 10%
-    // - old_size + src_size
-    // This will cause a reasonable conservative step-up in size that is still
-    // large enough to avoid excessive amounts of small fragments being added.
-    length = std::max<size_t>(root->length / 10, src_size);
-  }
-  set_tree(Concat(root, NewTree(src_data, src_size, length - src_size)));
+  CommitTree(root, rep, scope, method);
 }
 
 inline CordRep* Cord::TakeRep() const& {
@@ -734,12 +724,13 @@ inline CordRep* Cord::TakeRep() && {
 
 template <typename C>
 inline void Cord::AppendImpl(C&& src) {
+  auto constexpr method = CordzUpdateTracker::kAppendCord;
   if (empty()) {
     // Since destination is empty, we can avoid allocating a node,
     if (src.contents_.is_tree()) {
       // by taking the tree directly
       CordRep* rep = std::forward<C>(src).TakeRep();
-      contents_.EmplaceTree(rep, CordzUpdateTracker::kAppendCord);
+      contents_.EmplaceTree(rep, method);
     } else {
       // or copying over inline data
       contents_.data_ = src.contents_.data_;
@@ -753,12 +744,12 @@ inline void Cord::AppendImpl(C&& src) {
     CordRep* src_tree = src.contents_.tree();
     if (src_tree == nullptr) {
       // src has embedded data.
-      contents_.AppendArray(src.contents_.data(), src_size);
+      contents_.AppendArray({src.contents_.data(), src_size}, method);
       return;
     }
     if (src_tree->tag >= FLAT) {
       // src tree just has one flat node.
-      contents_.AppendArray(src_tree->flat()->Data(), src_size);
+      contents_.AppendArray({src_tree->flat()->Data(), src_size}, method);
       return;
     }
     if (&src == this) {
@@ -787,7 +778,8 @@ void Cord::Append(T&& src) {
   if (src.size() <= kMaxBytesToCopy) {
     Append(absl::string_view(src));
   } else {
-    Append(Cord(std::forward<T>(src)));
+    CordRep* rep = CordRepFromString(std::forward<T>(src));
+    contents_.AppendTree(rep, CordzUpdateTracker::kAppendString);
   }
 }
 
@@ -797,7 +789,7 @@ void Cord::Prepend(const Cord& src) {
   CordRep* src_tree = src.contents_.tree();
   if (src_tree != nullptr) {
     CordRep::Ref(src_tree);
-    contents_.PrependTree(src_tree);
+    contents_.PrependTree(src_tree, CordzUpdateTracker::kPrependCord);
     return;
   }
 
@@ -820,7 +812,8 @@ void Cord::Prepend(absl::string_view src) {
       return;
     }
   }
-  contents_.PrependTree(NewTree(src.data(), src.size(), 0));
+  CordRep* rep = NewTree(src.data(), src.size(), 0);
+  contents_.PrependTree(rep, CordzUpdateTracker::kPrependString);
 }
 
 template <typename T, Cord::EnableIfString<T>>
@@ -828,7 +821,8 @@ inline void Cord::Prepend(T&& src) {
   if (src.size() <= kMaxBytesToCopy) {
     Prepend(absl::string_view(src));
   } else {
-    Prepend(Cord(std::forward<T>(src)));
+    CordRep* rep = CordRepFromString(std::forward<T>(src));
+    contents_.PrependTree(rep, CordzUpdateTracker::kPrependString);
   }
 }
 
@@ -926,12 +920,17 @@ void Cord::RemovePrefix(size_t n) {
   CordRep* tree = contents_.tree();
   if (tree == nullptr) {
     contents_.remove_prefix(n);
-  } else if (tree->tag == RING) {
-    contents_.replace_tree(CordRepRing::RemovePrefix(tree->ring(), n));
   } else {
-    CordRep* newrep = RemovePrefixFrom(tree, n);
-    CordRep::Unref(tree);
-    contents_.replace_tree(VerifyTree(newrep));
+    auto constexpr method = CordzUpdateTracker::kRemovePrefix;
+    CordzUpdateScope scope(contents_.cordz_info(), method);
+    if (tree->tag == RING) {
+      tree = CordRepRing::RemovePrefix(tree->ring(), n);
+    } else {
+      CordRep* newrep = RemovePrefixFrom(tree, n);
+      CordRep::Unref(tree);
+      tree = VerifyTree(newrep);
+    }
+    contents_.SetTreeOrEmpty(tree, scope);
   }
 }
 
@@ -942,12 +941,17 @@ void Cord::RemoveSuffix(size_t n) {
   CordRep* tree = contents_.tree();
   if (tree == nullptr) {
     contents_.reduce_size(n);
-  } else if (tree->tag == RING) {
-    contents_.replace_tree(CordRepRing::RemoveSuffix(tree->ring(), n));
   } else {
-    CordRep* newrep = RemoveSuffixFrom(tree, n);
-    CordRep::Unref(tree);
-    contents_.replace_tree(VerifyTree(newrep));
+    auto constexpr method = CordzUpdateTracker::kRemoveSuffix;
+    CordzUpdateScope scope(contents_.cordz_info(), method);
+    if (tree->tag == RING) {
+      tree = CordRepRing::RemoveSuffix(tree->ring(), n);
+    } else {
+      CordRep* newrep = RemoveSuffixFrom(tree, n);
+      CordRep::Unref(tree);
+      tree = VerifyTree(newrep);
+    }
+    contents_.SetTreeOrEmpty(tree, scope);
   }
 }
 
@@ -1007,17 +1011,20 @@ Cord Cord::Subcord(size_t pos, size_t new_size) const {
   size_t length = size();
   if (pos > length) pos = length;
   if (new_size > length - pos) new_size = length - pos;
+  if (new_size == 0) return sub_cord;
+
   CordRep* tree = contents_.tree();
   if (tree == nullptr) {
     // sub_cord is newly constructed, no need to re-zero-out the tail of
     // contents_ memory.
     sub_cord.contents_.set_data(contents_.data() + pos, new_size, false);
-  } else if (new_size == 0) {
-    // We want to return empty subcord, so nothing to do.
-  } else if (new_size <= InlineRep::kMaxInline) {
+    return sub_cord;
+  }
+
+  if (new_size <= InlineRep::kMaxInline) {
+    char* dest = sub_cord.contents_.data_.as_chars();
     Cord::ChunkIterator it = chunk_begin();
     it.AdvanceBytes(pos);
-    char* dest = sub_cord.contents_.data_.as_chars();
     size_t remaining_size = new_size;
     while (remaining_size > it->size()) {
       cord_internal::SmallMemmove(dest, it->data(), it->size());
@@ -1027,12 +1034,17 @@ Cord Cord::Subcord(size_t pos, size_t new_size) const {
     }
     cord_internal::SmallMemmove(dest, it->data(), remaining_size);
     sub_cord.contents_.set_inline_size(new_size);
-  } else if (tree->tag == RING) {
-    tree = CordRepRing::SubRing(CordRep::Ref(tree)->ring(), pos, new_size);
-    sub_cord.contents_.set_tree(tree);
-  } else {
-    sub_cord.contents_.set_tree(NewSubRange(tree, pos, new_size));
+    return sub_cord;
   }
+
+  if (tree->tag == RING) {
+    CordRepRing* ring = CordRep::Ref(tree)->ring();
+    tree = CordRepRing::SubRing(ring, pos, new_size);
+  } else {
+    tree = NewSubRange(tree, pos, new_size);
+  }
+  sub_cord.contents_.EmplaceTree(tree, contents_.data_,
+                                 CordzUpdateTracker::kSubCord);
   return sub_cord;
 }
 
@@ -1474,6 +1486,7 @@ Cord Cord::ChunkIterator::AdvanceAndReadBytes(size_t n) {
   ABSL_HARDENING_ASSERT(bytes_remaining_ >= n &&
                         "Attempted to iterate past `end()`");
   Cord subcord;
+  auto constexpr method = CordzUpdateTracker::kCordReader;
 
   if (n <= InlineRep::kMaxInline) {
     // Range to read fits in inline data. Flatten it.
@@ -1496,11 +1509,12 @@ Cord Cord::ChunkIterator::AdvanceAndReadBytes(size_t n) {
   if (ring_reader_) {
     size_t chunk_size = current_chunk_.size();
     if (n <= chunk_size && n <= kMaxBytesToCopy) {
-      subcord = Cord(current_chunk_.substr(0, n));
+      subcord = Cord(current_chunk_.substr(0, n), method);
     } else {
       auto* ring = CordRep::Ref(ring_reader_.ring())->ring();
       size_t offset = ring_reader_.length() - bytes_remaining_;
-      subcord.contents_.set_tree(CordRepRing::SubRing(ring, offset, n));
+      CordRep* rep = CordRepRing::SubRing(ring, offset, n);
+      subcord.contents_.EmplaceTree(rep, method);
     }
     if (n < chunk_size) {
       bytes_remaining_ -= n;
@@ -1519,7 +1533,7 @@ Cord Cord::ChunkIterator::AdvanceAndReadBytes(size_t n) {
     const char* data = subnode->tag == EXTERNAL ? subnode->external()->base
                                                 : subnode->flat()->Data();
     subnode = NewSubstring(subnode, current_chunk_.data() - data, n);
-    subcord.contents_.set_tree(VerifyTree(subnode));
+    subcord.contents_.EmplaceTree(VerifyTree(subnode), method);
     RemoveChunkPrefix(n);
     return subcord;
   }
@@ -1562,7 +1576,7 @@ Cord Cord::ChunkIterator::AdvanceAndReadBytes(size_t n) {
   if (node == nullptr) {
     // We have reached the end of the Cord.
     assert(bytes_remaining_ == 0);
-    subcord.contents_.set_tree(VerifyTree(subnode));
+    subcord.contents_.EmplaceTree(VerifyTree(subnode), method);
     return subcord;
   }
 
@@ -1602,7 +1616,7 @@ Cord Cord::ChunkIterator::AdvanceAndReadBytes(size_t n) {
   current_chunk_ = absl::string_view(data + offset + n, length - n);
   current_leaf_ = node;
   bytes_remaining_ -= n;
-  subcord.contents_.set_tree(VerifyTree(subnode));
+  subcord.contents_.EmplaceTree(VerifyTree(subnode), method);
   return subcord;
 }
 
@@ -1709,6 +1723,7 @@ char Cord::operator[](size_t i) const {
 }
 
 absl::string_view Cord::FlattenSlowPath() {
+  assert(contents_.is_tree());
   size_t total_size = size();
   CordRep* new_rep;
   char* new_buffer;
@@ -1729,10 +1744,9 @@ absl::string_view Cord::FlattenSlowPath() {
                                             s.size());
         });
   }
-  if (CordRep* tree = contents_.tree()) {
-    CordRep::Unref(tree);
-  }
-  contents_.set_tree(new_rep);
+  CordzUpdateScope scope(contents_.cordz_info(), CordzUpdateTracker::kFlatten);
+  CordRep::Unref(contents_.as_tree());
+  contents_.SetTree(new_rep, scope);
   return absl::string_view(new_buffer, total_size);
 }
 
@@ -1847,8 +1861,7 @@ static void DumpNode(CordRep* rep, bool include_data, std::ostream* os,
           *os << absl::CEscape(std::string(rep->external()->base, rep->length));
         *os << "]\n";
       } else if (rep->tag >= FLAT) {
-        *os << "FLAT cap=" << rep->flat()->Capacity()
-            << " [";
+        *os << "FLAT cap=" << rep->flat()->Capacity() << " [";
         if (include_data)
           *os << absl::CEscape(std::string(rep->flat()->Data(), rep->length));
         *os << "]\n";
@@ -1860,7 +1873,7 @@ static void DumpNode(CordRep* rep, bool include_data, std::ostream* os,
         do {
           DumpNode(ring->entry_child(head), include_data, os,
                    indent + kIndentStep);
-          head = ring->advance(head);;
+          head = ring->advance(head);
         } while (head != ring->tail());
       }
       if (stack.empty()) break;
@@ -1906,9 +1919,8 @@ static bool VerifyNode(CordRep* root, CordRep* start_node,
         worklist.push_back(node->concat()->left);
       }
     } else if (node->tag >= FLAT) {
-      ABSL_INTERNAL_CHECK(
-          node->length <= node->flat()->Capacity(),
-          ReportError(root, node));
+      ABSL_INTERNAL_CHECK(node->length <= node->flat()->Capacity(),
+                          ReportError(root, node));
     } else if (node->tag == EXTERNAL) {
       ABSL_INTERNAL_CHECK(node->external()->base != nullptr,
                           ReportError(root, node));

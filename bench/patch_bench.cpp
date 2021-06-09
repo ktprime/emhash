@@ -320,11 +320,11 @@ int main(int argc, char** argv)
   khiter_t k;
 
 #elif EMH == 7
-   emhash7::HashMap<uint32_t,value_type> test;
+  emhash7::HashMap<uint32_t,value_type> test;
 #elif EMH == 5
-   emhash5::HashMap<uint32_t,value_type> test;
+  emhash5::HashMap<uint32_t,value_type> test;
 #elif TSL
-   tsl::robin_map<uint32_t,value_type> test;
+  tsl::robin_map<uint32_t,value_type> test;
 #elif PHMAP
   phmap::flat_hash_map<uint32_t,value_type> test;
 #elif ABSL
@@ -334,7 +334,7 @@ int main(int argc, char** argv)
 #elif FOLLY
   folly::F14ValueMap<uint32_t,value_type, std::hash<uint32_t>> test;
 #else
-   emhash6::HashMap<uint32_t,value_type> test;
+  emhash6::HashMap<uint32_t,value_type> test;
 #endif
 
   std::uniform_int_distribution<size_t> distr;

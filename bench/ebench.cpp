@@ -51,6 +51,7 @@ std::map<std::string, std::string> hash_tables =
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
+    {"emhash8", "emhash8"},
 
 //    {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
@@ -1504,6 +1505,7 @@ static int benchHashMap(int n)
 #endif
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
+        {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
     }
 
     auto pow2 = 1 << ilog(vList.size(), 2);

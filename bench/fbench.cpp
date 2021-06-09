@@ -128,9 +128,9 @@ static std::mt19937_64 rnd(rd());
     }
 
 #elif defined V_STRING
-   const char* val_name = "string";
-   typedef std::string  test_val_t;
-   typedef test_val_t * val_sink_t;
+    const char* val_name = "string";
+    typedef std::string  test_val_t;
+    typedef test_val_t * val_sink_t;
 
 #if V_LEN == 0
 #define V_LEN 10

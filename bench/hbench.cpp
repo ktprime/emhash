@@ -153,7 +153,7 @@ static void emplace(T& m, const char* msg = nullptr)
     const Value v = make_value(1, (const Value*)0);
     for (int n = LOOPS; n--;)
     for (const uint64_t* p = ELEMENTS; p != end; ++p)
-       m.emplace(*p, v);
+        m.emplace(*p, v);
 }
 
 template<class T>

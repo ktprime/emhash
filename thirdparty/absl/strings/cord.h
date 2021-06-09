@@ -671,11 +671,16 @@ class Cord {
 
  private:
   using CordRep = absl::cord_internal::CordRep;
+  using CordRepFlat = absl::cord_internal::CordRepFlat;
   using CordzInfo = cord_internal::CordzInfo;
   using CordzUpdateScope = cord_internal::CordzUpdateScope;
   using CordzUpdateTracker = cord_internal::CordzUpdateTracker;
   using InlineData = cord_internal::InlineData;
   using MethodIdentifier = CordzUpdateTracker::MethodIdentifier;
+
+  // Creates a cord instance with `method` representing the originating
+  // public API call causing the cord to be created.
+  explicit Cord(absl::string_view src, MethodIdentifier method);
 
   friend class CordTestPeer;
   friend bool operator==(const Cord& lhs, const Cord& rhs);
@@ -720,19 +725,17 @@ class Cord {
     // Returns nullptr if holding bytes
     absl::cord_internal::CordRep* tree() const;
     absl::cord_internal::CordRep* as_tree() const;
-    // Discards old pointer, if any
-    void set_tree(absl::cord_internal::CordRep* rep);
-    // Replaces a tree with a new root. This is faster than set_tree, but it
-    // should only be used when it's clear that the old rep was a tree.
-    void replace_tree(absl::cord_internal::CordRep* rep);
     // Returns non-null iff was holding a pointer
     absl::cord_internal::CordRep* clear();
     // Converts to pointer if necessary.
-    absl::cord_internal::CordRep* force_tree(size_t extra_hint);
     void reduce_size(size_t n);  // REQUIRES: holding data
     void remove_prefix(size_t n);  // REQUIRES: holding data
-    void AppendArray(const char* src_data, size_t src_size);
+    void AppendArray(absl::string_view src, MethodIdentifier method);
     absl::string_view FindFlatStartPiece() const;
+
+    // Creates a CordRepFlat instance from the current inlined data with `extra'
+    // bytes of desired additional capacity.
+    CordRepFlat* MakeFlatWithExtraCapacity(size_t extra);
 
     // Sets the tree value for this instance. `rep` must not be null.
     // Requires the current instance to hold a tree, and a lock to be held on
@@ -741,18 +744,37 @@ class Cord {
     // the CordzInfo instance is updated to reference the new `rep` value.
     void SetTree(CordRep* rep, const CordzUpdateScope& scope);
 
+    // Identical to SetTree(), except that `rep` is allowed to be null, in
+    // which case the current instance is reset to an empty value.
+    void SetTreeOrEmpty(CordRep* rep, const CordzUpdateScope& scope);
+
     // Sets the tree value for this instance, and randomly samples this cord.
     // This function disregards existing contents in `data_`, and should be
     // called when a Cord is 'promoted' from an 'uninitialized' or 'inlined'
     // value to a non-inlined (tree / ring) value.
     void EmplaceTree(CordRep* rep, MethodIdentifier method);
 
+    // Identical to EmplaceTree, except that it copies the parent stack from
+    // the provided `parent` data if the parent is sampled.
+    void EmplaceTree(CordRep* rep, const InlineData& parent,
+                     MethodIdentifier method);
+
+    // Commits the change of a newly created, or updated `rep` root value into
+    // this cord. `old_rep` indicates the old (inlined or tree) value of the
+    // cord, and determines if the commit invokes SetTree() or EmplaceTree().
+    void CommitTree(const CordRep* old_rep, CordRep* rep,
+                    const CordzUpdateScope& scope, MethodIdentifier method);
+
     void AppendTreeToInlined(CordRep* tree, MethodIdentifier method);
     void AppendTreeToTree(CordRep* tree, MethodIdentifier method);
     void AppendTree(CordRep* tree, MethodIdentifier method);
-    void PrependTree(absl::cord_internal::CordRep* tree);
-    void GetAppendRegion(char** region, size_t* size, size_t max_length);
-    void GetAppendRegion(char** region, size_t* size);
+    void PrependTreeToInlined(CordRep* tree, MethodIdentifier method);
+    void PrependTreeToTree(CordRep* tree, MethodIdentifier method);
+    void PrependTree(CordRep* tree, MethodIdentifier method);
+
+    template <bool has_length>
+    void GetAppendRegion(char** region, size_t* size, size_t length);
+
     bool IsSame(const InlineRep& other) const {
       return memcmp(&data_, &other.data_, sizeof(data_)) == 0;
     }
@@ -803,11 +825,6 @@ class Cord {
 
     // Resets the current cordz_info to null / empty.
     void clear_cordz_info() { data_.clear_cordz_info(); }
-
-    // Updates the cordz statistics. info may be nullptr if the CordzInfo object
-    // is unknown.
-    void UpdateCordzStatistics();
-    void UpdateCordzStatisticsSlow();
 
    private:
     friend class Cord;
@@ -864,6 +881,10 @@ class Cord {
   // Helper for Append().
   template <typename C>
   void AppendImpl(C&& src);
+
+  // Assigns the value in 'src' to this instance, 'stealing' its contents.
+  // Requires src.length() > kMaxBytesToCopy.
+  Cord& AssignLargeString(std::string&& src);
 
   // Helper for AbslHashValue().
   template <typename H>
@@ -967,8 +988,11 @@ inline CordRep* NewExternalRep(absl::string_view data,
 template <typename Releaser>
 Cord MakeCordFromExternal(absl::string_view data, Releaser&& releaser) {
   Cord cord;
-  cord.contents_.set_tree(::absl::cord_internal::NewExternalRep(
-      data, std::forward<Releaser>(releaser)));
+  if (auto* rep = ::absl::cord_internal::NewExternalRep(
+          data, std::forward<Releaser>(releaser))) {
+    cord.contents_.EmplaceTree(rep,
+                               Cord::MethodIdentifier::kMakeCordFromExternal);
+  }
   return cord;
 }
 
@@ -976,12 +1000,12 @@ constexpr Cord::InlineRep::InlineRep(cord_internal::InlineData data)
     : data_(data) {}
 
 inline Cord::InlineRep::InlineRep(const Cord::InlineRep& src)
-    : data_(src.data_) {
-  if (is_tree()) {
-    data_.clear_cordz_info();
-    absl::cord_internal::CordRep::Ref(as_tree());
-    CordzInfo::MaybeTrackCord(data_, src.data_,
-                              CordzUpdateTracker::kConstructorCord);
+    : data_(InlineData::kDefaultInit) {
+  if (CordRep* tree = src.tree()) {
+    EmplaceTree(CordRep::Ref(tree), src.data_,
+                CordzUpdateTracker::kConstructorCord);
+  } else {
+    data_ = src.data_;
   }
 }
 
@@ -1041,10 +1065,27 @@ inline size_t Cord::InlineRep::size() const {
   return is_tree() ? as_tree()->length : inline_size();
 }
 
+inline cord_internal::CordRepFlat* Cord::InlineRep::MakeFlatWithExtraCapacity(
+    size_t extra) {
+  static_assert(cord_internal::kMinFlatLength >= sizeof(data_), "");
+  size_t len = data_.inline_size();
+  auto* result = CordRepFlat::New(len + extra);
+  result->length = len;
+  memcpy(result->Data(), data_.as_chars(), sizeof(data_));
+  return result;
+}
+
 inline void Cord::InlineRep::EmplaceTree(CordRep* rep,
                                          MethodIdentifier method) {
+  assert(rep);
   data_.make_tree(rep);
   CordzInfo::MaybeTrackCord(data_, method);
+}
+
+inline void Cord::InlineRep::EmplaceTree(CordRep* rep, const InlineData& parent,
+                                         MethodIdentifier method) {
+  data_.make_tree(rep);
+  CordzInfo::MaybeTrackCord(data_, parent, method);
 }
 
 inline void Cord::InlineRep::SetTree(CordRep* rep,
@@ -1055,39 +1096,30 @@ inline void Cord::InlineRep::SetTree(CordRep* rep,
   scope.SetCordRep(rep);
 }
 
-inline void Cord::InlineRep::set_tree(absl::cord_internal::CordRep* rep) {
-  if (rep == nullptr) {
-    if (ABSL_PREDICT_FALSE(is_profiled())) {
-      absl::cord_internal::CordzInfo::UntrackCord(cordz_info());
-    }
-    ResetToEmpty();
+inline void Cord::InlineRep::SetTreeOrEmpty(CordRep* rep,
+                                            const CordzUpdateScope& scope) {
+  assert(data_.is_tree());
+  if (rep) {
+    data_.set_tree(rep);
   } else {
-    if (data_.is_tree()) {
-      // `data_` already holds a 'tree' value and an optional cordz_info value.
-      // Replace the tree value only, leaving the cordz_info value unchanged.
-      data_.set_tree(rep);
-    } else {
-      // `data_` contains inlined data: initialize data_ to tree value `rep`.
-      data_.make_tree(rep);
-      CordzInfo::MaybeTrackCord(data_, CordzUpdateTracker::kUnknown);
-    }
-    UpdateCordzStatistics();
+    data_ = {};
   }
+  scope.SetCordRep(rep);
 }
 
-inline void Cord::InlineRep::replace_tree(absl::cord_internal::CordRep* rep) {
-  ABSL_ASSERT(is_tree());
-  if (ABSL_PREDICT_FALSE(rep == nullptr)) {
-    set_tree(rep);
-    return;
+inline void Cord::InlineRep::CommitTree(const CordRep* old_rep, CordRep* rep,
+                                        const CordzUpdateScope& scope,
+                                        MethodIdentifier method) {
+  if (old_rep) {
+    SetTree(rep, scope);
+  } else {
+    EmplaceTree(rep, method);
   }
-  data_.set_tree(rep);
-  UpdateCordzStatistics();
 }
 
 inline absl::cord_internal::CordRep* Cord::InlineRep::clear() {
-  if (ABSL_PREDICT_FALSE(is_profiled())) {
-    absl::cord_internal::CordzInfo::UntrackCord(cordz_info());
+  if (is_tree()) {
+    CordzInfo::MaybeUntrackCord(cordz_info());
   }
   absl::cord_internal::CordRep* result = tree();
   ResetToEmpty();
@@ -1101,12 +1133,10 @@ inline void Cord::InlineRep::CopyToArray(char* dst) const {
   cord_internal::SmallMemmove(dst, data_.as_chars(), n);
 }
 
-inline void Cord::InlineRep::UpdateCordzStatistics() {
-  if (ABSL_PREDICT_TRUE(!is_profiled())) return;
-  UpdateCordzStatisticsSlow();
-}
-
 constexpr inline Cord::Cord() noexcept {}
+
+inline Cord::Cord(absl::string_view src)
+    : Cord(src, CordzUpdateTracker::kConstructorString) {}
 
 template <typename T>
 constexpr Cord::Cord(strings_internal::StringConstant<T>)
@@ -1123,6 +1153,15 @@ inline Cord& Cord::operator=(const Cord& x) {
   return *this;
 }
 
+template <typename T, Cord::EnableIfString<T>>
+Cord& Cord::operator=(T&& src) {
+  if (src.size() <= cord_internal::kMaxBytesToCopy) {
+    return operator=(absl::string_view(src));
+  } else {
+    return AssignLargeString(std::forward<T>(src));
+  }
+}
+
 inline Cord::Cord(const Cord& src) : contents_(src.contents_) {}
 
 inline Cord::Cord(Cord&& src) noexcept : contents_(std::move(src.contents_)) {}
@@ -1137,7 +1176,6 @@ inline Cord& Cord::operator=(Cord&& x) noexcept {
 }
 
 extern template Cord::Cord(std::string&& src);
-extern template Cord& Cord::operator=(std::string&& src);
 
 inline size_t Cord::size() const {
   // Length is 1st field in str.rep_
@@ -1180,7 +1218,7 @@ inline absl::string_view Cord::Flatten() {
 }
 
 inline void Cord::Append(absl::string_view src) {
-  contents_.AppendArray(src.data(), src.size());
+  contents_.AppendArray(src, CordzUpdateTracker::kAppendString);
 }
 
 extern template void Cord::Append(std::string&& src);
