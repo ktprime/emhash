@@ -101,6 +101,7 @@ namespace emhash8 {
 
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 constexpr uint32_t END      = 0 - 1;
+constexpr uint32_t EAD      = 2;
 
 #if 0
 template <typename First, typename Second>
@@ -174,7 +175,7 @@ public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
     typedef std::pair<KeyT,ValueT>            value_type;
 //    typedef entry<KeyT, ValueT>               PairT;
-    typedef std::pair<KeyT, ValueT>            PairT;
+    typedef std::pair<KeyT, ValueT>           PairT;
 
 public:
     typedef KeyT   key_type;
@@ -195,7 +196,7 @@ public:
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
+        typedef std::ptrdiff_t       difference_type;
         typedef PairT                value_type;
 
         typedef PairT*               pointer;
@@ -215,6 +216,17 @@ public:
             auto old_index = _slot;
             goto_next_element();
             return {_map, old_index};
+        }
+
+        iterator& operator--()
+        {
+            _slot ++;
+            return *this;
+        }
+
+        iterator operator--(int)
+        {
+            return {_map, _slot++};
         }
 
         reference operator*() const
@@ -257,7 +269,7 @@ public:
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
+        typedef std::ptrdiff_t       difference_type;
         typedef PairT                value_type;
 
         typedef PairT*               pointer;
@@ -278,6 +290,17 @@ public:
             auto old_index = _slot;
             goto_next_element();
             return {_map, old_index};
+        }
+
+        const_iterator& operator--()
+        {
+            _slot ++;
+            return *this;
+        }
+
+        const_iterator operator--(int)
+        {
+            return {_map, _slot++};
         }
 
         reference operator*() const
@@ -401,15 +424,13 @@ public:
         _mask        = other._mask;
 
         auto opairs  = other._pairs;
-        auto oindex  = other._index;
-
-        memcpy(_index, oindex, (_num_buckets + 2) * sizeof(Index));
+        memcpy(_index, other._index, (_num_buckets + EAD) * sizeof(Index));
 
         if (is_copy_trivially()) {
             memcpy(_pairs, opairs, _num_filled * sizeof(PairT));
         } else {
-            for (size_type bucket = 0; bucket < _num_filled; bucket++)
-                new(_pairs + bucket) PairT(opairs[bucket]);
+            for (size_type slot = 0; slot < _num_filled; slot++)
+                new(_pairs + slot) PairT(opairs[slot]);
         }
     }
 
@@ -604,12 +625,12 @@ public:
             ibucket_size ++;
             next_bucket = nbucket;
         }
-        return ibucket_size;
+        return (int)ibucket_size;
     }
 
     void dump_statics() const
     {
-        const int slots = 128;
+        const uint32_t slots = 128;
         size_type buckets[slots + 1] = {0};
         size_type steps[slots + 1]   = {0};
         for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
@@ -1055,13 +1076,13 @@ public:
 
     static inline PairT* alloc_bucket(size_type num_buckets)
     {
-        auto new_pairs = (char*)malloc(num_buckets * sizeof(PairT) + (2 + num_buckets) * sizeof(Index));
+        auto new_pairs = (char*)malloc(num_buckets * sizeof(PairT) + (EAD + num_buckets) * sizeof(Index));
         return (PairT *)(new_pairs);
     }
 
     static inline Index* alloc_index(size_type num_buckets)
     {
-        auto new_index = (char*)malloc((2 + num_buckets) * sizeof(Index));
+        auto new_index = (char*)malloc((EAD + num_buckets) * sizeof(Index));
         return (Index *)(new_index);
     }
 
@@ -1077,7 +1098,6 @@ private:
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         auto new_index = (Index*)(new_pairs + num_buckets);
         auto old_pairs = _pairs;
-        auto old_index = _index;
 
 #if EMH_REHASH_LOG
         auto last = _last;
@@ -1089,7 +1109,10 @@ private:
         _mask        = num_buckets - 1;
 
         memset(new_index, INACTIVE, sizeof(new_index[0]) * num_buckets);
-        memset(new_index + num_buckets, 0, sizeof(new_index[0]) * 2);
+        memset(new_index + num_buckets, 0, sizeof(new_index[0]) * EAD);
+
+        //if (is_copy_trivially())
+        //    memcpy(new_pairs, _pairs, _num_filled * sizeof(PairT));
 
 #if 0
         if (_num_filled > 100)
@@ -1104,6 +1127,7 @@ private:
             const auto bucket = find_unique_bucket(key);
             EMH_INDEX(_index, bucket) = {bucket, slot};
 
+            //if (!is_copy_trivially())
             new(_pairs + slot) PairT(std::move(old_pairs[slot]));
 #if EMH_REHASH_LOG
             if (bucket != hash_main(bucket))
@@ -1497,10 +1521,10 @@ one-way seach strategy.
     inline uint64_t hash_key(const UType& key) const
     {
 #if EMH_BDKR_HASH
-        uint64_t hash = 0; int  i = 0;
+        uint64_t hash = 0; size_t i = 0;
         for (; i + sizeof(uint64_t) < key.size(); i += sizeof(uint64_t))
             hash += *(uint64_t*)(&key[i]) * KC;
-        int diff = int(key.size() - i) * 8;
+        auto diff = int(key.size() - i) * 8;
         if (diff != 0)
             hash += ((*(uint64_t*)(&key[i]) & ((1ull << diff) - 1))) * KC;
         return hash;

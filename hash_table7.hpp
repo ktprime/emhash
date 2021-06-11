@@ -1393,8 +1393,9 @@ private:
         _bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
     }
 
-    template<class K = size_type> typename std::enable_if<!bInCacheLine, K>::type
-    erase_key(const KeyT& key)
+#if 0
+    template<class K = KeyT> typename std::enable_if<bInCacheLine, size_type>::type
+    erase_key(const K& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1433,9 +1434,9 @@ private:
 
         return INACTIVE;
     }
-
-    template<class K = size_type> typename std::enable_if<bInCacheLine, K>::type
-    erase_key(const KeyT& key)
+#else
+    template<class K = KeyT> //typename std::enable_if<!bInCacheLine, size_type>::type
+    size_type erase_key(const K& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1473,6 +1474,7 @@ private:
 
         return find_bucket;
     }
+#endif
 
     size_type erase_bucket(const size_type bucket)
     {
