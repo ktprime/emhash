@@ -122,7 +122,7 @@ std::map<std::string, std::string> hash_tables =
 //#define EMH_STD_STRING      1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_BDKR_HASH       1
-//#define EMH_HIGH_LOAD       201000
+#define EMH_HIGH_LOAD         200000
 
 
 #include "hash_table2.hpp"
