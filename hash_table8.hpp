@@ -66,6 +66,7 @@
     #undef  EMH_BUCKET
     #undef  EMH_NEW
     #undef  EMH_EMPTY
+    #undef  EMH_PREVET
 #endif
 
 // likely/unlikely
@@ -92,6 +93,7 @@
 #define EMH_BUCKET(i,n)  i[n].bucket
 #define EMH_SLOT(i,n)    i[n].slot
 #define EMH_INDEX(i,n)   i[n]
+#define EMH_PREVET(i,n)  i[n].slot
 #define EMH_NEW(key, value, bucket) new(_pairs + _num_filled) PairT(key, value);\
                                     _index[bucket] = {bucket, _num_filled++};
 
@@ -99,7 +101,7 @@
 
 namespace emhash8 {
 
-constexpr uint32_t INACTIVE = 0xFFFFFFFF;
+constexpr uint32_t INACTIVE = 0xAAAAAAAA;
 constexpr uint32_t END      = 0 - 1;
 constexpr uint32_t EAD      = 2;
 
@@ -345,6 +347,7 @@ public:
         _index = nullptr;
         _mask  = _num_buckets = 0;
         _num_filled = 0;
+        _ehead = 0;
         max_load_factor(lf);
         reserve(bucket);
     }
@@ -422,6 +425,7 @@ public:
         _loadlf      = other._loadlf;
         _last        = other._last;
         _mask        = other._mask;
+        _ehead       = other._ehead;
 
         auto opairs  = other._pairs;
         memcpy(_index, other._index, (_num_buckets + EAD) * sizeof(Index));
@@ -445,6 +449,7 @@ public:
         std::swap(_loadlf, other._loadlf);
         std::swap(_last, other._last);
         std::swap(_mask, other._mask);
+        std::swap(_ehead, other._ehead);
     }
 
     // -------------------------------------------------------------
@@ -1050,6 +1055,7 @@ public:
 
         memset(_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
         _last = _num_filled = 0;
+        _ehead = 0;
     }
 
     void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4)
@@ -1064,6 +1070,17 @@ public:
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
+
+#if EMH_HIGH_LOAD > 10000
+        if (_num_filled > EMH_HIGH_LOAD) {
+            if (_ehead == 0) {
+                set_empty();
+                return false;
+            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_index, _ehead) != 0-_ehead) {
+                return false;
+            }
+        }
+#endif
 
 #if EMH_STATIS
         if (_num_filled > 1'000'000) dump_statics();
@@ -1086,6 +1103,38 @@ public:
         return (Index *)(new_index);
     }
 
+    void set_empty()
+    {
+        auto prev = 0;
+        for (uint32_t bucket = 1; bucket < _num_buckets; ++bucket) {
+            if (EMH_EMPTY(_index, bucket)) {
+                if (prev != 0) {
+                    EMH_PREVET(_index, bucket) = prev;
+                    EMH_BUCKET(_index, prev) = 0-bucket;
+                } else
+                    _ehead = bucket;
+                prev = bucket;
+            }
+        }
+
+        EMH_PREVET(_index, _ehead) = prev;
+        EMH_BUCKET(_index, prev) = 0 -_ehead;
+        _ehead = 0-EMH_BUCKET(_index, _ehead);
+    }
+
+    //prev-ehead->next
+    uint32_t pop_empty(const uint32_t bucket)
+    {
+        const auto prev_bucket = EMH_PREVET(_index, bucket);
+        const auto next_bucket = 0-EMH_BUCKET(_index, bucket);
+
+        EMH_PREVET(_index, next_bucket) = prev_bucket;
+        EMH_BUCKET(_index, prev_bucket) = 0-next_bucket;
+
+        _ehead = next_bucket;
+        return bucket;
+    }
+
 private:
     void rehash(size_type required_buckets)
     {
@@ -1104,6 +1153,7 @@ private:
         size_type collision = 0;
 #endif
 
+        _ehead = 0;
         _last = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
@@ -1184,6 +1234,11 @@ private:
 
         if (is_triviall_destructable())
             _pairs[last_slot].~PairT();
+
+#if EMH_HIGH_LOAD
+        if (_ehead != 0 && 10 * _num_filled < 8 * _num_buckets)
+            _ehead = 0;
+#endif
 
         EMH_INDEX(_index, ebucket) = {INACTIVE, END};
         return last_slot;
@@ -1299,8 +1354,13 @@ private:
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = EMH_BUCKET(_index, bucket);
-        if ((int)next_bucket < 0)
+        if ((int)next_bucket < 0) {
+#if EMH_HIGH_LOAD
+            if (next_bucket != INACTIVE)
+                pop_empty(bucket);
+#endif
             return bucket;
+        }
 
         const auto slot = EMH_SLOT(_index, bucket);
         const auto& bucket_key = EMH_KEY(_pairs, slot);
@@ -1336,8 +1396,13 @@ private:
     {
         const auto bucket = hash_bucket(key);
         auto next_bucket = EMH_BUCKET(_index, bucket);
-        if ((int)next_bucket < 0)
+        if ((int)next_bucket < 0) {
+#if EMH_HIGH_LOAD
+            if (next_bucket != INACTIVE)
+                pop_empty(bucket);
+#endif
             return bucket;
+        }
 
         //check current bucket_key is in main bucket or not
         const auto obmain = hash_main(bucket);
@@ -1366,6 +1431,10 @@ one-way seach strategy.
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from)
     {
+#if EMH_HIGH_LOAD
+        if (_ehead)
+            return pop_empty(_ehead);
+#endif
         auto bucket = bucket_from;
         if (EMH_EMPTY(_index, ++bucket) || EMH_EMPTY(_index, ++bucket))
             return bucket;
@@ -1553,10 +1622,11 @@ private:
     EqT       _eq;
 
     size_type _num_buckets;
-    size_type _num_filled;
-    size_type _mask;
-    size_type _last;
     size_type _loadlf;
+    size_type _mask;
+    size_type _num_filled;
+    size_type _last;
+    size_type _ehead;
 };
 } // namespace emhash
 #if __cplusplus > 199711

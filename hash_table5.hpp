@@ -66,6 +66,7 @@
     #undef  EMH_BUCKET
     #undef  EMH_NEW
     #undef  EMH_EMPTY
+    #undef  EMH_PREVET
 #endif
 
 // likely/unlikely
@@ -104,7 +105,7 @@
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n)  p[n].bucket
-    #define EMH_PREVET(p,n)  *(uint32_t*)(&p[n].second)
+    #define EMH_PREVET(p,n)  *(uint32_t*)(&p[n].first)
     #define EMH_PKV(p,n)     p[n]
     #define EMH_NEW(key, value, bucket) new(_pairs + bucket) PairT(key, value, bucket); _num_filled ++
 #endif
@@ -176,7 +177,7 @@ struct entry {
         return *this;
     }
 
-    void swap(entry<First, Second>&& o)
+    void swap(entry<First, Second>& o)
     {
         std::swap(second, o.second);
         std::swap(first, o.first);
@@ -345,9 +346,9 @@ public:
         _pairs = nullptr;
         _mask  = _num_buckets = 0;
         _num_filled = 0;
-        _ehead = 0;
         max_load_factor(lf);
         reserve(bucket);
+        assert(_ehead == 0);
     }
 
     HashMap(uint32_t bucket = 2, float lf = EMH_DEFAULT_LOAD_FACTOR)
@@ -1062,7 +1063,7 @@ public:
     {
         for (uint32_t bucket = 0; _num_filled > 0; ++bucket) {
             if (!EMH_EMPTY(_pairs, bucket))
-                clear_bucket(bucket);
+                clear_bucket(bucket, false);
         }
     }
 
@@ -1097,9 +1098,11 @@ public:
             if (_ehead == 0) {
                 set_empty();
                 return false;
-            } else if (/*_num_filled + 100 < _num_buckets && */(int)EMH_BUCKET(_pairs, _ehead) != 0-_ehead) {
+            } else if (/*_num_filled + 100 < _num_buckets && **/EMH_BUCKET(_pairs, _ehead) != 0-_ehead) {
                 return false;
             }
+//            if (_num_buckets - _num_filled > 1)
+//            printf("%u,%d %f\n", _num_buckets, _num_buckets - _num_filled, load_factor());
         }
 #endif
 
@@ -1124,16 +1127,16 @@ public:
         for (uint32_t bucket = 1; bucket < _num_buckets; ++bucket) {
             if (EMH_EMPTY(_pairs, bucket)) {
                 if (prev != 0) {
-                    EMH_BUCKET(_pairs, prev) = 0-bucket;
                     EMH_PREVET(_pairs, bucket) = prev;
+                    EMH_BUCKET(_pairs, prev) = 0-bucket;
                 } else
                     _ehead = bucket;
                 prev = bucket;
             }
         }
 
-        EMH_BUCKET(_pairs, prev) = 0 -_ehead;
         EMH_PREVET(_pairs, _ehead) = prev;
+        EMH_BUCKET(_pairs, prev) = 0-_ehead;
         _ehead = 0-EMH_BUCKET(_pairs, _ehead);
     }
 
@@ -1143,11 +1146,28 @@ public:
         const auto prev_bucket = EMH_PREVET(_pairs, bucket);
         const auto next_bucket = 0-EMH_BUCKET(_pairs, bucket);
 
-        EMH_BUCKET(_pairs, prev_bucket) = 0-next_bucket;
         EMH_PREVET(_pairs, next_bucket) = prev_bucket;
+        EMH_BUCKET(_pairs, prev_bucket) = 0-next_bucket;
 
+//        assert(_ehead != next_bucket);
         _ehead = next_bucket;
         return bucket;
+    }
+
+    //ehead->bucket->next
+    void push_empty(const uint32_t bucket)
+    {
+#if 0
+        const int next_bucket = 0-EMH_BUCKET(_pairs, _ehead);
+        assert(next_bucket > 0);
+
+        EMH_PREVET(_pairs, bucket) = _ehead;
+        EMH_BUCKET(_pairs, bucket) = -next_bucket;
+
+        EMH_PREVET(_pairs, next_bucket) = bucket;
+        EMH_BUCKET(_pairs, _ehead)      = 0-bucket;
+//        _ehead = bucket;
+#endif
     }
 
 private:
@@ -1156,7 +1176,7 @@ private:
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
+        uint32_t num_buckets = _num_filled > (1 << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
@@ -1223,18 +1243,22 @@ private:
         return reserve(_num_filled);
     }
 
-    void clear_bucket(uint32_t bucket)
+    void clear_bucket(uint32_t bucket, bool clear = true)
     {
-        _num_filled --;
         EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
+        _num_filled --;
         if (is_triviall_destructable()) {
             _pairs[bucket].~PairT();
             EMH_BUCKET(_pairs, bucket) = INACTIVE; //some compiler the status is reset by destructor
         }
 
 #if EMH_HIGH_LOAD
-        if (_ehead != 0 && 10 * _num_filled < 8 * _num_buckets)
-            _ehead = 0;
+        if (_ehead && clear) {
+            if (10 * _num_filled < 8 * _num_buckets)
+                _ehead = 0;
+            else
+                push_empty(bucket);
+        }
 #endif
     }
 
@@ -1251,7 +1275,7 @@ private:
             if (is_copy_trivially())
                 EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
             else
-                EMH_PKV(_pairs, bucket).swap(std::move(EMH_PKV(_pairs, next_bucket)));
+                EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
 
             EMH_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
@@ -1276,7 +1300,7 @@ private:
                 if (is_copy_trivially())
                     EMH_PKV(_pairs, next_bucket) = EMH_PKV(_pairs, nbucket);
                 else
-                    EMH_PKV(_pairs, next_bucket).swap(std::move(EMH_PKV(_pairs, nbucket)));
+                    EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, nbucket));
                 EMH_BUCKET(_pairs, next_bucket) = (nbucket == last) ? next_bucket : last;
                 return nbucket;
 #endif
@@ -1301,7 +1325,7 @@ private:
                 if (is_copy_trivially())
                     EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
                 else
-                    EMH_PKV(_pairs, bucket).swap(std::move(EMH_PKV(_pairs, next_bucket)));
+                    EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
                 EMH_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             }
             return next_bucket;
@@ -1355,7 +1379,7 @@ private:
             EMH_BUCKET(_pairs, new_bucket) = new_bucket;
 
         _num_filled ++;
-        clear_bucket(bucket);
+        clear_bucket(bucket, false);
         return bucket;
     }
 
@@ -1394,7 +1418,7 @@ private:
         while (true) {
             if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
 #if EMH_LRU_SET
-                EMH_PKV(_pairs, next_bucket).swap(std::move(EMH_PKV(_pairs, prev_bucket)));
+                EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
                 return prev_bucket;
 #else
                 return next_bucket;
@@ -1613,10 +1637,10 @@ one-way seach strategy.
     inline uint64_t hash_key(const UType& key) const
     {
 #if EMH_BDKR_HASH
-        uint64_t hash = 0; int  i = 0;
+        uint64_t hash = 0; size_t i = 0;
         for (; i + sizeof(uint64_t) < key.size(); i += sizeof(uint64_t))
             hash += *(uint64_t*)(&key[i]) * KC;
-        int diff = int(key.size() - i) * 8;
+        auto diff = int(key.size() - i) * 8;
         if (diff != 0)
             hash += ((*(uint64_t*)(&key[i]) & ((1ull << diff) - 1))) * KC;
         return hash;
