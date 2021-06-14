@@ -960,7 +960,7 @@ public:
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
         //erase from main bucket, return main bucket as next
-       return (bucket == it._bucket) ? ++it : it;
+        return (bucket == it._bucket) ? ++it : it;
     }
 
      /// No need return next iterator for performace issuse in some case

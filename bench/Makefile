@@ -46,8 +46,8 @@ endif
 
 all:
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
-	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
+	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench

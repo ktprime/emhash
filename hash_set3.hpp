@@ -984,7 +984,7 @@ public:
         auto diff = old_num_colls + old_num_mains - _num_colls - _num_mains;
         if (diff != 0) {
             printf("%d %d | %d %d diff = %d\n", old_num_colls, old_num_mains, _num_colls, _num_mains, (int)diff);
-           assert(diff == 0);
+            assert(diff == 0);
         }
     }
 
@@ -1009,7 +1009,7 @@ private:
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (std::is_trivial<KeyT>::value)
                 std::swap(EMH_KEY(_pairs, bucket), EMH_KEY(_pairs, next_bucket));
-           else
+            else
                 EMH_KEY(_pairs, bucket) = EMH_KEY(_pairs, next_bucket);
             EMH_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;

@@ -1089,11 +1089,9 @@ public:
     bool reserve(uint64_t num_elems)
     {
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-        if (EMH_LIKELY(required_buckets < _mask)) {
+        if (EMH_LIKELY(required_buckets < _mask))
             return false;
-        }
-
-#if EMH_HIGH_LOAD > 10000
+#if EMH_HIGH_LOAD > 1000
         if (_num_filled > EMH_HIGH_LOAD) {
             if (_ehead == 0) {
                 set_empty();

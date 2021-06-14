@@ -333,7 +333,7 @@ int main(int argc, char** argv)
   folly::F14VectorMap<uint32_t,value_type, std::hash<uint32_t>> test;
 #elif FOLLY
   folly::F14ValueMap<uint32_t,value_type, std::hash<uint32_t>> test;
-#else
+#elif EMH == 6
   emhash6::HashMap<uint32_t,value_type> test;
 #endif
 

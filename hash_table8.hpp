@@ -158,7 +158,7 @@ struct entry {
         return *this;
     }
 
-    void swap(entry<First, Second>&& o)
+    void swap(entry<First, Second>& o)
     {
         std::swap(second, o.second);
         std::swap(first, o.first);
@@ -410,7 +410,6 @@ public:
     {
         if (is_triviall_destructable())
             clearkv();
-
         free(_pairs);
         _pairs = nullptr;
         _index = nullptr;
@@ -972,11 +971,10 @@ public:
     /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key)
     {
+        check_expand_need();
         auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_index, bucket)) {
             /* Check if inserting a new value rather than overwriting an old entry */
-            if (check_expand_need())
-                bucket = find_unique_bucket(key);
             EMH_NEW(key, std::move(ValueT()), bucket);
         }
 
@@ -986,10 +984,9 @@ public:
 
     ValueT& operator[](KeyT&& key)
     {
-        auto bucket = find_or_allocate(key);
+        check_expand_need();
+        const auto bucket = find_or_allocate(key);
         if (EMH_EMPTY(_index, bucket)) {
-            if (check_expand_need())
-                bucket = find_unique_bucket(key);
             EMH_NEW(std::move(key), std::move(ValueT()), bucket);
         }
 
@@ -1003,7 +1000,7 @@ public:
     {
         auto slot = find_filled_slot(key);
         if (slot == END)
-           return 0;
+            return 0;
 
         erase_slot(slot);
         return 1;
@@ -1070,7 +1067,6 @@ public:
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
-
 #if EMH_HIGH_LOAD > 10000
         if (_num_filled > EMH_HIGH_LOAD) {
             if (_ehead == 0) {
@@ -1147,7 +1143,6 @@ private:
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         auto new_index = (Index*)(new_pairs + num_buckets);
         auto old_pairs = _pairs;
-
 #if EMH_REHASH_LOG
         auto last = _last;
         size_type collision = 0;
