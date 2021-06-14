@@ -1072,7 +1072,7 @@ public:
             if (_ehead == 0) {
                 set_empty();
                 return false;
-            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_index, _ehead) != 0-_ehead) {
+            } else if (/*_num_filled + 100 < _num_buckets && */-EMH_BUCKET(_index, _ehead) != _ehead) {
                 return false;
             }
         }
@@ -1102,11 +1102,11 @@ public:
     void set_empty()
     {
         auto prev = 0;
-        for (uint32_t bucket = 1; bucket < _num_buckets; ++bucket) {
+        for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
             if (EMH_EMPTY(_index, bucket)) {
                 if (prev != 0) {
                     EMH_PREVET(_index, bucket) = prev;
-                    EMH_BUCKET(_index, prev) = 0-bucket;
+                    EMH_BUCKET(_index, prev) = -bucket;
                 } else
                     _ehead = bucket;
                 prev = bucket;
@@ -1114,18 +1114,18 @@ public:
         }
 
         EMH_PREVET(_index, _ehead) = prev;
-        EMH_BUCKET(_index, prev) = 0 -_ehead;
-        _ehead = 0-EMH_BUCKET(_index, _ehead);
+        EMH_BUCKET(_index, prev) = -_ehead;
+        _ehead = -EMH_BUCKET(_index, _ehead);
     }
 
     //prev-ehead->next
     uint32_t pop_empty(const uint32_t bucket)
     {
         const auto prev_bucket = EMH_PREVET(_index, bucket);
-        const auto next_bucket = 0-EMH_BUCKET(_index, bucket);
+        const int next_bucket = -EMH_BUCKET(_index, bucket);
 
         EMH_PREVET(_index, next_bucket) = prev_bucket;
-        EMH_BUCKET(_index, prev_bucket) = 0-next_bucket;
+        EMH_BUCKET(_index, prev_bucket) = -next_bucket;
 
         _ehead = next_bucket;
         return bucket;

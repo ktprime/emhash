@@ -1096,7 +1096,7 @@ public:
             if (_ehead == 0) {
                 set_empty();
                 return false;
-            } else if (/*_num_filled + 100 < _num_buckets && **/EMH_BUCKET(_pairs, _ehead) != 0-_ehead) {
+            } else if (/*_num_filled + 100 < _num_buckets && **/-EMH_BUCKET(_pairs, _ehead) != _ehead) {
                 return false;
             }
 //            if (_num_buckets - _num_filled > 1)
@@ -1122,11 +1122,11 @@ public:
     void set_empty()
     {
         auto prev = 0;
-        for (uint32_t bucket = 1; bucket < _num_buckets; ++bucket) {
+        for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
             if (EMH_EMPTY(_pairs, bucket)) {
                 if (prev != 0) {
                     EMH_PREVET(_pairs, bucket) = prev;
-                    EMH_BUCKET(_pairs, prev) = 0-bucket;
+                    EMH_BUCKET(_pairs, prev) = -bucket;
                 } else
                     _ehead = bucket;
                 prev = bucket;
@@ -1134,36 +1134,36 @@ public:
         }
 
         EMH_PREVET(_pairs, _ehead) = prev;
-        EMH_BUCKET(_pairs, prev) = 0-_ehead;
-        _ehead = 0-EMH_BUCKET(_pairs, _ehead);
+        EMH_BUCKET(_pairs, prev) = -_ehead;
+        _ehead = -EMH_BUCKET(_pairs, _ehead);
     }
 
     //prev-ehead->next
     uint32_t pop_empty(const uint32_t bucket)
     {
         const auto prev_bucket = EMH_PREVET(_pairs, bucket);
-        const auto next_bucket = 0-EMH_BUCKET(_pairs, bucket);
+        int next_bucket = -EMH_BUCKET(_pairs, bucket);
+        assert(next_bucket > 0);
 
         EMH_PREVET(_pairs, next_bucket) = prev_bucket;
-        EMH_BUCKET(_pairs, prev_bucket) = 0-next_bucket;
+        EMH_BUCKET(_pairs, prev_bucket) = -next_bucket;
 
-//        assert(_ehead != next_bucket);
         _ehead = next_bucket;
         return bucket;
     }
 
     //ehead->bucket->next
-    void push_empty(const uint32_t bucket)
+    void push_empty(const int32_t bucket)
     {
 #if 0
-        const int next_bucket = 0-EMH_BUCKET(_pairs, _ehead);
+        const int next_bucket = -EMH_BUCKET(_pairs, _ehead);
         assert(next_bucket > 0);
 
         EMH_PREVET(_pairs, bucket) = _ehead;
         EMH_BUCKET(_pairs, bucket) = -next_bucket;
 
         EMH_PREVET(_pairs, next_bucket) = bucket;
-        EMH_BUCKET(_pairs, _ehead)      = 0-bucket;
+        EMH_BUCKET(_pairs, _ehead)      = -bucket;
 //        _ehead = bucket;
 #endif
     }
