@@ -1061,18 +1061,74 @@ public:
             rehash(_num_filled);
     }
 
+
+    void set_empty()
+    {
+        auto prev = 0;
+        for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
+            if (EMH_EMPTY(_index, bucket)) {
+                if (prev != 0) {
+                    EMH_PREVET(_index, bucket) = prev;
+                    EMH_BUCKET(_index, prev) = -bucket;
+                }
+                else
+                    _ehead = bucket;
+                prev = bucket;
+            }
+        }
+
+        EMH_PREVET(_index, _ehead) = prev;
+        EMH_BUCKET(_index, prev) = 0 - _ehead;
+        _ehead = 0 - EMH_BUCKET(_index, _ehead);
+    }
+
+    //prev-ehead->next
+    uint32_t pop_empty(const uint32_t bucket)
+    {
+        const auto prev_bucket = EMH_PREVET(_index, bucket);
+        const int next_bucket = 0 - EMH_BUCKET(_index, bucket);
+
+        EMH_PREVET(_index, next_bucket) = prev_bucket;
+        EMH_BUCKET(_index, prev_bucket) = -next_bucket;
+
+        _ehead = next_bucket;
+        return bucket;
+    }
+
+    //ehead->bucket->next
+    void push_empty(const int32_t bucket)
+    {
+#if 1
+        const int next_bucket = 0-EMH_BUCKET(_index, _ehead);
+        assert(next_bucket > 0);
+
+        EMH_PREVET(_index, bucket) = _ehead;
+        EMH_BUCKET(_index, bucket) = -next_bucket;
+
+        EMH_PREVET(_index, next_bucket) = bucket;
+        EMH_BUCKET(_index, _ehead) = -bucket;
+        //        _ehead = bucket;
+#endif
+    }
+
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
+#if EMH_HIGH_LOAD == 0
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
-#if EMH_HIGH_LOAD > 10000
-        if (_num_filled > EMH_HIGH_LOAD) {
+
+#elif EMH_HIGH_LOAD
+        const auto required_buckets = (uint32_t)(num_elems  + num_elems * 1 / 9);
+        if (EMH_LIKELY(required_buckets < _mask))
+            return false;
+
+        if (_num_buckets > EMH_HIGH_LOAD) {
             if (_ehead == 0) {
                 set_empty();
                 return false;
-            } else if (/*_num_filled + 100 < _num_buckets && */-EMH_BUCKET(_index, _ehead) != _ehead) {
+            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_index, _ehead) + _ehead == 0) {
                 return false;
             }
         }
@@ -1099,45 +1155,13 @@ public:
         return (Index *)(new_index);
     }
 
-    void set_empty()
-    {
-        auto prev = 0;
-        for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
-            if (EMH_EMPTY(_index, bucket)) {
-                if (prev != 0) {
-                    EMH_PREVET(_index, bucket) = prev;
-                    EMH_BUCKET(_index, prev) = -bucket;
-                } else
-                    _ehead = bucket;
-                prev = bucket;
-            }
-        }
-
-        EMH_PREVET(_index, _ehead) = prev;
-        EMH_BUCKET(_index, prev) = -_ehead;
-        _ehead = -EMH_BUCKET(_index, _ehead);
-    }
-
-    //prev-ehead->next
-    uint32_t pop_empty(const uint32_t bucket)
-    {
-        const auto prev_bucket = EMH_PREVET(_index, bucket);
-        const int next_bucket = -EMH_BUCKET(_index, bucket);
-
-        EMH_PREVET(_index, next_bucket) = prev_bucket;
-        EMH_BUCKET(_index, prev_bucket) = -next_bucket;
-
-        _ehead = next_bucket;
-        return bucket;
-    }
-
 private:
     void rehash(size_type required_buckets)
     {
         if (required_buckets < _num_filled)
             return;
 
-        size_type num_buckets = _num_filled > 65536 ? (1u << 16) : 4u;
+        uint32_t num_buckets = _num_filled > (1 << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
@@ -1230,12 +1254,17 @@ private:
         if (is_triviall_destructable())
             _pairs[last_slot].~PairT();
 
+        EMH_INDEX(_index, ebucket) = { INACTIVE, END };
+
 #if EMH_HIGH_LOAD
-        if (_ehead != 0 && 10 * _num_filled < 8 * _num_buckets)
-            _ehead = 0;
+        if (_ehead) {
+            if (10 * _num_filled < 8 * _num_buckets)
+                _ehead = 0;
+            else if (ebucket)
+                push_empty(ebucket);
+        }
 #endif
 
-        EMH_INDEX(_index, ebucket) = {INACTIVE, END};
         return last_slot;
     }
 

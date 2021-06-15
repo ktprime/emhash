@@ -30,10 +30,14 @@
     #define TKey              1
 #endif
 #ifndef TVal
-    #define TVal              1
+    #define TVal              2
 #endif
 #if __GNUC__ > 4 && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
+#endif
+
+#if STR_SIZE < 5
+#define STR_SIZE 15
 #endif
 
 
@@ -89,7 +93,7 @@ std::map<std::string, std::string> hash_tables =
     #define RT  1  //1 wyrand 2 sfc64 3 mt19937_64
 #endif
 
-#define NDEBUG                1
+//#define NDEBUG                1
 ///#define ET                 1
 #ifndef _MSC_VER
 //    #define ABSL            1
@@ -122,7 +126,7 @@ std::map<std::string, std::string> hash_tables =
 //#define EMH_STD_STRING      1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_BDKR_HASH       1
-#define EMH_HIGH_LOAD         200000
+#define EMH_HIGH_LOAD         2345
 
 
 #include "hash_table2.hpp"
@@ -302,7 +306,7 @@ struct BadHasher
     #define TO_KEY(i)   std::to_string(i)
     #define sKeyType    "string"
 #elif TKey == 3
-    #define KEY_SUC    1
+    #define KEY_CLA    1
     typedef StructValue keyType;
     #define TO_KEY(i)   StructValue((int64_t)i)
     #define sKeyType    "Struct"
@@ -722,7 +726,7 @@ void hash_iter(hash_type& ahash, const std::string& hash_name)
     for (auto it = ahash.cbegin(); it != ahash.cend(); ++it)
 #if KEY_INT
         sum += it->first;
-#elif KEY_SUC
+#elif KEY_CLA
     sum += it->first.lScore;
 #else
     sum += it->first.size();
@@ -830,7 +834,7 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, std
     for (auto & v : vList) {
 #if KEY_INT
         auto v2 = v / 101 + v;
-#elif KEY_SUC
+#elif KEY_CLA
         auto v2(v.lScore / 101 + v.lScore);
 #elif TKey != 4
         v += char(128 + (int)v[0]);
@@ -892,7 +896,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
             auto& v = vList[i - vList.size()];
 #if KEY_INT
             auto v2 = v + (v / 11) + i;
-#elif KEY_SUC
+#elif KEY_CLA
             auto v2 = v.lScore + (v.lScore / 11) + i;
 #elif TKey != 4
             auto v2 = v; v2[0] += '2';
@@ -908,7 +912,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         auto& v = vList[i - minn];
 #if KEY_INT
         auto v2 = (v / 7) + 4 * v;
-#elif KEY_SUC
+#elif KEY_CLA
         auto v2 = (v.lScore / 7) + 4 * v.lScore;
 #elif TKey != 4
         auto v2 = v; v2[0] += '1';
@@ -932,7 +936,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
     size_t pow2 = 2u << ilog(n, 2), sum = 0;
 
 #if KEY_STR
-    std::string skey = get_random_alphanum_string(32);
+    std::string skey = get_random_alphanum_string(STR_SIZE);
 #endif
 
     for (size_t v = 0; v < pow2; v++) {
@@ -940,7 +944,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
         l1_cache[v % sizeof(l1_cache)] = 0;
 #endif
 #if KEY_STR
-        skey[v % 32 + 1] ++;
+        skey[v % STR_SIZE + 1] ++;
         sum += ahash.count((const char*)skey.c_str());
 #else
         sum += ahash.count(TO_KEY(v));
@@ -970,7 +974,7 @@ void find_hit_all(hash_type& ahash, const std::string& hash_name, const std::vec
     for (const auto& v : vList) {
 #if KEY_INT
         sum += ahash.count(v) + (size_t)v;
-#elif KEY_SUC
+#elif KEY_CLA
         sum += ahash.count(v) + (size_t)v.lScore;
 #else
         sum += ahash.count(v) + v.size();
@@ -1098,7 +1102,7 @@ struct IntMixHasher
         auto low  = key * 0xA24BAED4963EE407ull;
         auto high = ror * 0x9FB21C651E98DF25ull;
         auto mix  = low + high;
-        return mix >> 32;
+        return mix;
     }
 };
 
@@ -1118,7 +1122,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 #ifdef KEY_STR
     for (int i = 0; i < size; i++)
-        randdata.emplace_back(get_random_alphanum_string(srng() % 64 + 4));
+        randdata.emplace_back(get_random_alphanum_string(srng() % STR_SIZE + 4));
     return 0;
 #else
 
@@ -1169,7 +1173,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 static int TestHashMap(int n, int max_loops = 1234567)
 {
-#ifndef KEY_SUC
+#ifndef KEY_CLA
     emhash2::HashMap <keyType, int> ehash5;
     emhash4::HashMap <keyType, int> ehash2;
 
@@ -1288,15 +1292,15 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_no_reserve <hash_type>(hash_name, oList);
         find_insert_multi <hash_type>(hash_name, oList);
 
-        insert_reserve<hash_type>(hash, hash_name, oList);
-        find_hit_all  <hash_type>(hash, hash_name, oList);
+        insert_reserve<hash_type>(hash,hash_name, oList);
+        find_hit_all  <hash_type>(hash, hash_name,oList);
         find_miss_all <hash_type>(hash, hash_name);
 
         auto vList = oList;
         for (size_t v = 0; v < vList.size() / 2; v++) {
 #if KEY_INT
             vList[v] += v * v + v;
-#elif KEY_SUC
+#elif KEY_CLA
             vList[v].lScore += v * v;
 #elif TKey != 4
             vList[v][0] += v;
@@ -1314,7 +1318,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         erase_reinsert<hash_type>(hash, hash_name, vList);
         hash_iter<hash_type>(hash, hash_name);
 
-#ifdef UF
+#ifndef UF
         hash_copy <hash_type>(hash, hash_name);
         hash_clear<hash_type>(hash, hash_name);
 #endif
@@ -1413,7 +1417,7 @@ static int benchHashMap(int n)
     using ehash_func = WyIntHasher;
 #elif MIX_HASH && KEY_INT
     using ehash_func = IntMixHasher;
-#elif KEY_SUC
+#elif KEY_CLA
     using ehash_func = StuHasher;
 #elif KEY_INT && BAD_HASH > 100
     using ehash_func = BadHasher<keyType>;
@@ -1430,7 +1434,7 @@ static int benchHashMap(int n)
         for (auto& v : vList)
 #if KEY_INT
             sum += v;
-#elif KEY_SUC
+#elif KEY_CLA
         sum += v.lScore;
 #else
         sum += v.size();
@@ -1672,7 +1676,7 @@ static inline uint64_t hashmix(uint64_t key)
     auto low  = key * 0xA24BAED4963EE407ull;
     auto high = ror * 0x9FB21C651E98DF25ull;
     auto mix  = low + high;
-    return (mix >> 32) | (mix << 32);
+    return mix;// (mix >> 32) | (mix << 32);
 }
 
 static inline uint64_t rrxmrrxmsx_0(uint64_t v)
@@ -1788,7 +1792,7 @@ static void testHashInt(int loops = 100000009)
 
     ts = getTime(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash64(i *  r);
+        sum += hash64(i + r);
     printf("hash64     = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
 
     ts = getTime(); sum = r;
@@ -1970,7 +1974,7 @@ int main(int argc, char* argv[])
         }
     }
 
-#ifndef KEY_SUC
+#ifndef KEY_CLA
     if (tn > 100000)
         TestHashMap(tn);
 #endif
