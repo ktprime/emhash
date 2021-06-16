@@ -17,9 +17,9 @@
 #include "martin/robin_hood.h"
 #include "emilib/emilib32.hpp"
 
-#include "hash_table2.hpp"
-#include "hash_table3.hpp"
-#include "hash_table4.hpp"
+#include "old/hash_table2.hpp"
+#include "old/hash_table3.hpp"
+#include "old/hash_table4.hpp"
 #include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"

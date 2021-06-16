@@ -34,9 +34,9 @@ using namespace std;
 
 //#define EMH_HIGH_LOAD 123456
 
-#include "hash_table2.hpp"
-#include "hash_table3.hpp"
-#include "hash_table4.hpp"
+#include "old/hash_table2.hpp"
+#include "old/hash_table3.hpp"
+#include "old/hash_table4.hpp"
 #include "hash_table5.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
@@ -80,8 +80,8 @@ static std::map<std::string, std::string> show_name =
 	//{"emilib1", "ktprime"},
 	{"emhash4", "emhash4"},
 	{"emhash7", "emhash7"},
-	{"emhash8", "emhash8"},
 #endif
+	{"emhash8", "emhash8"},
 
 	{"emhash5", "emhash5"},
 	{"emhash6", "emhash6"},

@@ -3,7 +3,7 @@ CXX=g++  -fwhole-program
 endif
 
 ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
-CXX=clang++
+CXX=clang++-8
 endif
 
 CXXFLAGS = -Ofast -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include

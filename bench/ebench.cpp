@@ -126,7 +126,7 @@ std::map<std::string, std::string> hash_tables =
 //#define EMH_STD_STRING      1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_BDKR_HASH       1
-#define EMH_HIGH_LOAD         2345
+//#define EMH_HIGH_LOAD         2345
 
 
 #include "old/hash_table2.hpp"
@@ -562,7 +562,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     }
 
     auto& showname = hash_tables[hash_name];
-    once_func_hash_time[func][showname] += (getTime() - ts1 - loop_vector_time / 2) / weigh;
+    once_func_hash_time[func][showname] += (getTime() - ts1) / weigh;
     func_index ++;
 
     long ts = (getTime() - ts1) / 1000;
