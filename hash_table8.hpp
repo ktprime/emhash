@@ -532,7 +532,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.999f && value > 0.2f)
+        if (value < 1.0-1e-4 && value > 0.2f)
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 

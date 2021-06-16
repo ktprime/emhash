@@ -44,6 +44,12 @@ ifneq ($(AH),)
 CXXFLAGS += -DABSL_HASH=1 ../thirdparty/absl/hash/internal/wyhash.cc
 endif
 
+
+ifneq ($(HL),)
+CXXFLAGS += -DEMH_HIGH_LOAD=$(HL)
+endif
+
+
 all:
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench

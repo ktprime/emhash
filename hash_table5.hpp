@@ -429,8 +429,10 @@ public:
                 auto next_bucket = EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
                 if ((int)next_bucket >= 0)
                     new(_pairs + bucket) PairT(opairs[bucket]);
+#if EMH_HIGH_LOAD
                 else if (next_bucket != INACTIVE)
                     EMH_PREVET(_pairs, bucket) = EMH_PREVET(opairs, bucket);
+#endif
             }
             memcpy(_pairs + _num_buckets, opairs + _num_buckets, sizeof(PairT) * 2);
         }
@@ -438,7 +440,7 @@ public:
 
     void swap(HashMap& other)
     {
-        //      std::swap(_eq, other._eq);
+//      std::swap(_eq, other._eq);
         std::swap(_hasher, other._hasher);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
@@ -1073,10 +1075,16 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
+#if EMH_HIGH_LOAD
         if (_ehead > 0)
             clear_empty();
-
         clearkv();
+#else
+        if (is_triviall_destructable() || sizeof(PairT) > EMH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
+            clearkv();
+        else
+            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+#endif
 
         _last = _num_filled = 0;
     }
@@ -1502,7 +1510,7 @@ one-way seach strategy.
         if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
-#if 0
+#if 1
         constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
@@ -1521,18 +1529,19 @@ one-way seach strategy.
 #endif
 
         while (true) {
-            _last &= _mask;
-            if (EMH_EMPTY(_pairs, _last++) || EMH_EMPTY(_pairs, _last++))
-                return _last++ - 1;
+            if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
+                return _last++;
+            ++_last &= _mask;
 
 #if EMH_LINEAR3 || 1
-            auto tail = _mask - (_last & _mask);
+            auto tail = _mask - _last;
             if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                 return tail;
-#endif
+#else
             auto medium = (_num_filled + _last) & _mask;
             if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
                 return medium;
+#endif
         }
 
 #else
@@ -1554,7 +1563,7 @@ one-way seach strategy.
 #endif
                 auto medium = (_num_filled + _last) & _mask;
                 if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
-                    return medium;
+                    return _last = medium;
             }
         }
 #endif
