@@ -115,7 +115,7 @@
 
 namespace emhash5 {
 
-const constexpr uint32_t INACTIVE = 0xAAAAAAAA;
+const constexpr uint32_t INACTIVE = 0xFAAAAAAA;
 
 template <typename First, typename Second>
 struct entry {
@@ -384,7 +384,7 @@ public:
         if (is_triviall_destructable())
             clearkv();
 
-        if (_num_buckets != other._num_buckets) {
+        if (_num_buckets < other._num_buckets || _num_buckets > 3 * other._num_buckets) {
             free(_pairs);
             _pairs = alloc_bucket(other._num_buckets);
         }
@@ -407,7 +407,6 @@ public:
         if (is_triviall_destructable())
             clearkv();
         free(_pairs);
-        _pairs = nullptr;
     }
 
     void clone(const HashMap& other)
@@ -545,7 +544,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.999f && value > 0.2f)
+        if (value < 1.0-1e-4 && value > 0.2f)
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 
@@ -1074,13 +1073,12 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable() || sizeof(PairT) > EMH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
-            clearkv();
-        else
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+        if (_ehead > 0)
+            clear_empty();
+
+        clearkv();
 
         _last = _num_filled = 0;
-        _ehead = 0;
     }
 
     void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4)
@@ -1088,7 +1086,6 @@ public:
         if (load_factor() < min_factor && bucket_count() > 10) //safe guard
             rehash(_num_filled);
     }
-
 
     void set_empty()
     {
@@ -1106,18 +1103,28 @@ public:
         }
 
         EMH_PREVET(_pairs, _ehead) = prev;
-        EMH_BUCKET(_pairs, prev) = 0 - _ehead;
-        _ehead = 0 - EMH_BUCKET(_pairs, _ehead);
+        EMH_BUCKET(_pairs, prev) = 0-_ehead;
+        _ehead = 0-EMH_BUCKET(_pairs, _ehead);
+    }
+
+    void clear_empty()
+    {
+        auto prev = EMH_PREVET(_pairs, _ehead);
+        while (prev != _ehead) {
+            EMH_BUCKET(_pairs, prev) = INACTIVE;
+            prev = EMH_PREVET(_pairs, prev);
+        }
+        EMH_BUCKET(_pairs, _ehead) = INACTIVE;
+        _ehead = 0;
     }
 
     //prev-ehead->next
     uint32_t pop_empty(const uint32_t bucket)
     {
         const auto prev_bucket = EMH_PREVET(_pairs, bucket);
-        int next_bucket = (int)(0 - EMH_BUCKET(_pairs, bucket));
-        assert(next_bucket > 0);
-        if (_num_filled * 10 < _num_buckets * 8)
-            printf("load = %f\n", load_factor());
+        int next_bucket = (int)(0-EMH_BUCKET(_pairs, bucket));
+//        assert(next_bucket > 0 && _ehead > 0);
+//        assert(next_bucket <= _mask && prev_bucket <= _mask);
 
         EMH_PREVET(_pairs, next_bucket) = prev_bucket;
         EMH_BUCKET(_pairs, prev_bucket) = -next_bucket;
@@ -1129,7 +1136,6 @@ public:
     //ehead->bucket->next
     void push_empty(const int32_t bucket)
     {
-#if 1
         const int next_bucket = 0-EMH_BUCKET(_pairs, _ehead);
         assert(next_bucket > 0);
 
@@ -1139,7 +1145,6 @@ public:
         EMH_PREVET(_pairs, next_bucket) = bucket;
         EMH_BUCKET(_pairs, _ehead) = -bucket;
         //        _ehead = bucket;
-#endif
     }
 
     /// Make room for this many elements
@@ -1155,12 +1160,14 @@ public:
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
 
-        if (_num_buckets > EMH_HIGH_LOAD) {
+        else if (_num_buckets < 16 && _num_filled < _num_buckets)
+            return false;
+
+        else if (_num_buckets > EMH_HIGH_LOAD) {
             if (_ehead == 0) {
                 set_empty();
                 return false;
-            }
-            else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_pairs, _ehead) + _ehead == 0) {
+            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_pairs, _ehead) != 0-_ehead) {
                 return false;
             }
         }
@@ -1187,7 +1194,7 @@ private:
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > (1 << 16) ? (1u << 16) : 4u;
+        uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
@@ -1203,16 +1210,13 @@ private:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
-        if (sizeof(PairT) <= EMH_CACHE_LINE_SIZE / 2)
-            memset(new_pairs, INACTIVE, sizeof(PairT) * num_buckets);
-        else
-            for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
-                EMH_BUCKET(new_pairs, bucket) = INACTIVE;
+        for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
+            EMH_BUCKET(new_pairs, bucket) = INACTIVE;
 
         memset(new_pairs + num_buckets, 0, sizeof(PairT) * 2);
         _pairs       = new_pairs;
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
-            if (EMH_EMPTY(old_pairs, src_bucket))
+            if ((int)EMH_BUCKET(old_pairs, src_bucket) < 0)
                 continue;
 
             auto& key = EMH_KEY(old_pairs, src_bucket);
@@ -1256,17 +1260,17 @@ private:
 
     void clear_bucket(uint32_t bucket, bool clear = true)
     {
-        EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
         _num_filled --;
         if (is_triviall_destructable()) {
+            EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
             _pairs[bucket].~PairT();
-            EMH_BUCKET(_pairs, bucket) = INACTIVE; //some compiler the status is reset by destructor
         }
+        EMH_BUCKET(_pairs, bucket) = INACTIVE; //some compiler the status is reset by destructor
 
 #if EMH_HIGH_LOAD
         if (_ehead && clear) {
             if (10 * _num_filled < 8 * _num_buckets)
-                _ehead = 0;
+                clear_empty();
             else if (bucket)
                 push_empty(bucket);
         }

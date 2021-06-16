@@ -1331,11 +1331,8 @@ private:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
-        if (bInCacheLine)
-            memset(new_pairs, INACTIVE, sizeof(PairT) * num_buckets);
-        else
-            for (size_type bucket = 0; bucket < num_buckets; bucket++)
-                EMH_BUCKET(new_pairs, bucket) = INACTIVE;
+        for (size_type bucket = 0; bucket < num_buckets; bucket++)
+            EMH_BUCKET(new_pairs, bucket) = INACTIVE;
 
         memset(new_pairs + _num_buckets, 0, sizeof(PairT) * 2);
 

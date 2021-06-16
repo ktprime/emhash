@@ -1229,13 +1229,8 @@ public:
         _num_main = 0;
 #endif
 
-        if (bInCacheLine) {
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
-        } else {
-            for (size_type bucket = 0; bucket < num_buckets; bucket++) {
-                EMH_ADDR(_pairs, bucket) = INACTIVE;
-            }
-        }
+        for (size_type bucket = 0; bucket < num_buckets; bucket++)
+            EMH_ADDR(_pairs, bucket) = INACTIVE;
 
         //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);

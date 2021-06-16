@@ -102,7 +102,7 @@
 namespace emhash8 {
 
 constexpr uint32_t INACTIVE = 0xAAAAAAAA;
-constexpr uint32_t END      = 0 - 1;
+constexpr uint32_t END      = 0-1;
 constexpr uint32_t EAD      = 2;
 
 #if 0
@@ -386,7 +386,7 @@ public:
         if (is_triviall_destructable())
             clearkv();
 
-        if (_num_buckets != other._num_buckets) {
+        if (_num_buckets < other._num_buckets || _num_buckets > 2 * other._num_buckets) {
             free(_pairs);
             _pairs = alloc_bucket(other._num_buckets);
 //            free(_index); _index = alloc_index(other._num_buckets);
@@ -411,8 +411,6 @@ public:
         if (is_triviall_destructable())
             clearkv();
         free(_pairs);
-        _pairs = nullptr;
-        _index = nullptr;
     }
 
     void clone(const HashMap& other)
@@ -439,8 +437,8 @@ public:
 
     void swap(HashMap& other)
     {
+        //      std::swap(_eq, other._eq);
         std::swap(_hasher, other._hasher);
-//      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_index, other._index);
         std::swap(_num_buckets, other._num_buckets);
@@ -847,6 +845,7 @@ public:
         for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
             do_insert(begin->first, begin->second);
     }
+
 #if 0
     template <typename Iter>
     void insert(Iter begin, Iter end)
@@ -1039,18 +1038,19 @@ public:
 
     void clearkv()
     {
-        while (_num_filled --) {
+        while (_num_filled --)
             _pairs[_num_filled].~PairT();
-        }
     }
 
     /// Remove all elements, keeping full capacity.
     void clear()
     {
+        if (_num_filled > 0 || _ehead > 0)
+            memset(_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
+
         if (is_triviall_destructable())
             clearkv();
 
-        memset(_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
         _last = _num_filled = 0;
         _ehead = 0;
     }
@@ -1060,7 +1060,6 @@ public:
         if (load_factor() < min_factor && bucket_count() > 10) //safe guard
             rehash(_num_filled);
     }
-
 
     void set_empty()
     {
@@ -1078,15 +1077,26 @@ public:
         }
 
         EMH_PREVET(_index, _ehead) = prev;
-        EMH_BUCKET(_index, prev) = 0 - _ehead;
-        _ehead = 0 - EMH_BUCKET(_index, _ehead);
+        EMH_BUCKET(_index, prev) = 0-_ehead;
+        _ehead = 0-EMH_BUCKET(_index, _ehead);
+    }
+
+    void clear_empty()
+    {
+        auto prev = EMH_PREVET(_index, _ehead);
+        while (prev != _ehead) {
+            EMH_BUCKET(_index, prev) = INACTIVE;
+            prev = EMH_PREVET(_index, prev);
+        }
+        EMH_BUCKET(_index, _ehead) = INACTIVE;
+        _ehead = 0;
     }
 
     //prev-ehead->next
     uint32_t pop_empty(const uint32_t bucket)
     {
         const auto prev_bucket = EMH_PREVET(_index, bucket);
-        const int next_bucket = 0 - EMH_BUCKET(_index, bucket);
+        const int next_bucket = 0-EMH_BUCKET(_index, bucket);
 
         EMH_PREVET(_index, next_bucket) = prev_bucket;
         EMH_BUCKET(_index, prev_bucket) = -next_bucket;
@@ -1098,7 +1108,6 @@ public:
     //ehead->bucket->next
     void push_empty(const int32_t bucket)
     {
-#if 1
         const int next_bucket = 0-EMH_BUCKET(_index, _ehead);
         assert(next_bucket > 0);
 
@@ -1108,7 +1117,6 @@ public:
         EMH_PREVET(_index, next_bucket) = bucket;
         EMH_BUCKET(_index, _ehead) = -bucket;
         //        _ehead = bucket;
-#endif
     }
 
     /// Make room for this many elements
@@ -1120,15 +1128,18 @@ public:
             return false;
 
 #elif EMH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)(num_elems  + num_elems * 1 / 9);
+        const auto required_buckets = (uint32_t)(num_elems + num_elems * 1 / 9);
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
 
-        if (_num_buckets > EMH_HIGH_LOAD) {
+        else if (_num_buckets < 16 && _num_filled < _num_buckets)
+            return false;
+
+        else if (_num_buckets > EMH_HIGH_LOAD) {
             if (_ehead == 0) {
                 set_empty();
                 return false;
-            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_index, _ehead) + _ehead == 0) {
+            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_index, _ehead) != 0-_ehead) {
                 return false;
             }
         }
@@ -1161,7 +1172,7 @@ private:
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > (1 << 16) ? (1u << 16) : 4u;
+        uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
@@ -1259,7 +1270,7 @@ private:
 #if EMH_HIGH_LOAD
         if (_ehead) {
             if (10 * _num_filled < 8 * _num_buckets)
-                _ehead = 0;
+                clear_empty();
             else if (ebucket)
                 push_empty(ebucket);
         }
