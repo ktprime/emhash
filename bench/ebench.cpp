@@ -20,17 +20,12 @@
     #endif
 #endif
 
-#if __linux__ && AVX2
-    #include <sys/mman.h>
-    #include "fht/fht_ht.hpp"
-    #define FHT_HMAP          1
-#endif
 
 #ifndef TKey
     #define TKey              1
 #endif
 #ifndef TVal
-    #define TVal              2
+    #define TVal              1
 #endif
 #if __GNUC__ > 4 && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
@@ -40,9 +35,8 @@
 #define STR_SIZE 15
 #endif
 
-
 static void printInfo(char* out);
-std::map<std::string, std::string> hash_tables =
+std::map<std::string, std::string> maps =
 {
 //    {"stl_hash", "unordered_map"},
     {"stl_map", "stl_map"},
@@ -137,6 +131,8 @@ std::map<std::string, std::string> hash_tables =
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
 
+//http://www.brendangregg.com/index.html
+
 //https://www.zhihu.com/question/46156495
 //https://eourcs.github.io/LockFreeCuckooHash/
 //https://lemire.me/blog/2018/08/15/fast-strongly-universal-64-bit-hashing-everywhere/
@@ -166,15 +162,21 @@ std::map<std::string, std::string> hash_tables =
 //https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
 
+#if __linux__ && AVX2
+#include <sys/mman.h>
+#include "fht/fht_ht.hpp" //https://github.com/goldsteinn/hashtable_test/blob/master/my_table/fht_ht.hpp
+#define FHT_HMAP          1
+#endif
+
 #if ABSL
+//#define _HAS_DEPRECATED_RESULT_OF 1
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/internal/raw_hash_set.cc"
+#endif
 
 #if ABSL_HASH
 #include "absl/hash/internal/city.cc"
 #include "absl/hash/internal/hash.cc"
-//#include "absl/hash/internal/wyhash.cc"
-#endif
 #endif
 
 #if FOLLY
@@ -196,6 +198,7 @@ std::map<std::string, std::string> hash_tables =
     #define  _CPP11_HASH    1
 
     #include "emilib/emilib32.hpp"
+
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
     #include "emilib/emilib12.hpp"
@@ -260,7 +263,7 @@ struct StructValue
     char data[(PACK - 24) / 8 * 8];
 #endif
 
-#if COMP
+#if VCOMP
     std::string sdata = {"test data input"};
     std::vector<int> vint = {1,2,3,4,5,6,7,8};
     std::map<std::string, int> msi = {{"111", 1}, {"1222", 2}};
@@ -561,7 +564,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
         printf("%s %s %zd != %zd (o)\n", hash_name.c_str(), func.c_str(), (size_t)sum, (size_t)func_result[func]);
     }
 
-    auto& showname = hash_tables[hash_name];
+    auto& showname = maps[hash_name];
     once_func_hash_time[func][showname] += (getTime() - ts1) / weigh;
     func_index ++;
 
@@ -739,8 +742,8 @@ void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList) {
-        //ahash[v] = TO_VAL(0);
-        ahash.emplace(v, TO_VAL(0));
+        ahash[v] = TO_VAL(0);
+        //ahash.emplace(v, TO_VAL(0));
 #if TVal < 2
         sum += ahash.count(v);
 #else
@@ -802,14 +805,14 @@ void insert_reserve(hash_type& ahash, const std::string& hash_name, const std::v
 }
 
 template<class hash_type>
-void find_insert_multi(const std::string& hash_name, const std::vector<keyType>& vList)
+void multi_small_bench(const std::string& hash_name, const std::vector<keyType>& vList)
 {
 #if KEY_INT
     size_t sum = 0;
-    constexpr auto hash_size = 65437;
-    auto mh = new hash_type[hash_size];
+    const auto hash_size = vList.size() / 10003 + 2021;
+    const auto ts1 = getTime();
 
-    auto ts1 = getTime();
+    auto mh = new hash_type[hash_size];
     for (const auto& v : vList) {
         auto hash_id = ((uint64_t)v) % hash_size;
         sum += mh[hash_id].emplace(v, TO_VAL(0)).second;
@@ -818,6 +821,11 @@ void find_insert_multi(const std::string& hash_name, const std::vector<keyType>&
     for (const auto& v : vList) {
         auto hash_id = ((uint64_t)v) % hash_size;
         sum += mh[hash_id].count(v + v % 2);
+    }
+
+    for (const auto& v : vList) {
+        auto hash_id = ((uint64_t)v) % hash_size;
+        sum += mh[hash_id].erase(v + v % 2);
     }
 
     delete []mh;
@@ -856,7 +864,7 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
     const auto smalls = min_size + vList.size() % cache_size;
     hash_type tmp, empty;
 #ifndef SMAP
-    empty.max_load_factor(0.875);
+    //empty.max_load_factor(0.875);
 #endif
     tmp = empty;
 
@@ -886,7 +894,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     tmp.reserve(pow2 / 2);
     tmp.max_load_factor(max_loadf);
 #endif
-    int minn = (max_loadf - 0.2f) * pow2, maxn = max_loadf * pow2;
+    int minn = (max_loadf - 0.2f) * pow2, maxn = int(max_loadf * pow2);
     int i = 0;
 
     for (; i < minn; i++) {
@@ -1017,10 +1025,12 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
 template<class hash_type>
 void hash_clear(hash_type& ahash, const std::string& hash_name)
 {
-    auto ts1 = getTime();
-    size_t sum = ahash.size();
-    ahash.clear(); ahash.clear();
-    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+    if (ahash.size() > 1000'000) {
+        auto ts1 = getTime();
+        size_t sum = ahash.size();
+        ahash.clear(); ahash.clear();
+        check_func_result(hash_name, __FUNCTION__, sum, ts1);
+    }
 }
 
 template<class hash_type>
@@ -1030,12 +1040,13 @@ void hash_copy(hash_type& ahash, const std::string& hash_name)
     auto ts1 = getTime();
     hash_type thash = ahash;
     ahash = thash;
+    thash = thash;
     ahash = std::move(thash);
     sum  = thash.size();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
-#if PACK >= 24
+#if PACK >= 24 && VCOMP == 0
 static_assert(sizeof(StructValue) == PACK, "PACK >=24");
 #endif
 
@@ -1174,7 +1185,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 static int TestHashMap(int n, int max_loops = 1234567)
 {
 #ifndef KEY_CLA
-    emhash2::HashMap <keyType, int> ehash5;
+    emhash5::HashMap <keyType, int> ehash5;
     emhash4::HashMap <keyType, int> ehash2;
 
     sfc64 srng(time(NULL));
@@ -1273,7 +1284,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
 template<class hash_type>
 void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 {
-    if (hash_tables.find(hash_name) == hash_tables.end())
+    if (maps.find(hash_name) == maps.end())
         return;
 
     if (test_case == 0)
@@ -1281,25 +1292,29 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 
     {
         hash_type hash;
-        const uint32_t l1_size = (64 * 1024)   / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
-        const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType) + sizeof(int));
+        const uint32_t l1_size = (32 * 1024)   / (sizeof(keyType) + sizeof(valueType));
+        const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
         func_index  = 0;
+        multi_small_bench <hash_type>(hash_name, oList);
+
         insert_erase      <hash_type>(hash_name, oList);
         insert_high_load  <hash_type>(hash_name, oList);
+
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size / 2, 2 * l1_size + 1000);
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l1_size * 4, l3_size * 2);
+        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", 2 * l1_size + 1000, l3_size / 4);
+        insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l3_size / 2, l3_size * 2);
+
         insert_no_reserve <hash_type>(hash_name, oList);
-        find_insert_multi <hash_type>(hash_name, oList);
 
         insert_reserve<hash_type>(hash,hash_name, oList);
-        find_hit_all  <hash_type>(hash, hash_name,oList);
-        find_miss_all <hash_type>(hash, hash_name);
+        find_hit_all  <hash_type>(hash,hash_name, oList);
+        find_miss_all <hash_type>(hash,hash_name);
 
         auto vList = oList;
         for (size_t v = 0; v < vList.size() / 2; v++) {
 #if KEY_INT
-            vList[v] += v * v + v;
+            vList[v] += v;
 #elif KEY_CLA
             vList[v].lScore += v * v;
 #elif TKey != 4
@@ -1515,7 +1530,7 @@ static int benchHashMap(int n)
 
     auto pow2 = 1 << ilog(vList.size(), 2);
     auto iload = 50 * vList.size() / pow2;
-    printf("\n %d ======== n = %d, load_factor = %.2lf, data_type = %d ========\n", test_case + 1, n, iload / 100.0, flag);
+    printf("\n %d ======== n = %d, load_factor = %.3lf, data_type = %d ========\n", test_case + 1, n, iload / 100.0, flag);
     printResult(n);
     return test_case;
 }
@@ -1935,41 +1950,41 @@ int main(int argc, char* argv[])
                 if (c >= '2' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;
-                    if (hash_tables.find(hash_name) != hash_tables.end())
-                        hash_tables.erase(hash_name);
+                    if (maps.find(hash_name) != maps.end())
+                        maps.erase(hash_name);
                     else
-                        hash_tables[hash_name] = hash_name;
+                        maps[hash_name] = hash_name;
                 }
                 else if (c == 'm')
-                    hash_tables.erase("martin");
+                    maps.erase("martin");
                 else if (c == 'p')
-                    hash_tables.erase("phmap");
+                    maps.erase("phmap");
                 else if (c == 't')
-                    hash_tables.erase("robin");
+                    maps.erase("robin");
                 else if (c == 's')
-                    hash_tables.erase("flat");
+                    maps.erase("flat");
                 else if (c == 'a')
-                    hash_tables.erase("absl");
+                    maps.erase("absl");
                 else if (c == 'f')
-                    hash_tables.erase("f14_vector");
+                    maps.erase("f14_vector");
                 else if (c == 'h')
-                    hash_tables.erase("hrdset");
+                    maps.erase("hrdset");
                 else if (c == 'e') {
-                    hash_tables.emplace("emilib2", "emilib2");
-                    hash_tables.emplace("emilib3", "emilib3");
-                    hash_tables.emplace("emilib4", "emilib4");
+                    maps.emplace("emilib2", "emilib2");
+                    maps.emplace("emilib3", "emilib3");
+                    maps.emplace("emilib4", "emilib4");
                 }
                 else if (c == 'l') {
-                    hash_tables.emplace("lru_size", "lru_size");
-                    hash_tables.emplace("lru_time", "lru_time");
+                    maps.emplace("lru_size", "lru_size");
+                    maps.emplace("lru_time", "lru_time");
                 }
                 else if (c == 'k')
-                    hash_tables.emplace("ktprime", "ktprime");
+                    maps.emplace("ktprime", "ktprime");
                 else if (c == 'b') {
-                    hash_tables.emplace("btree", "btree_map");
-                    hash_tables.emplace("smap", "stl_map");
+                    maps.emplace("btree", "btree_map");
+                    maps.emplace("smap", "stl_map");
                 } else if (c == 'u')
-                    hash_tables.emplace("stl_hash", "unordered_map");
+                    maps.emplace("stl_hash", "unordered_map");
             }
         }
     }
@@ -1980,7 +1995,7 @@ int main(int argc, char* argv[])
 #endif
 
     sfc64 srng(rnd);
-    for (auto& m : hash_tables)
+    for (auto& m : maps)
         printf("  %s\n", m.second.data());
     putchar('\n');
 

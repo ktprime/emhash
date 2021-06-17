@@ -1158,12 +1158,12 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-#if EMH_HIGH_LOAD == 0
+#if EMH_HIGH_LOAD < 1000
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
 
-#elif EMH_HIGH_LOAD
+#else
         const auto required_buckets = (uint32_t)(num_elems + num_elems * 1 / 9);
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
@@ -1270,7 +1270,7 @@ private:
     {
         _num_filled --;
         if (is_triviall_destructable()) {
-            EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
+            //EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
             _pairs[bucket].~PairT();
         }
         EMH_BUCKET(_pairs, bucket) = INACTIVE; //some compiler the status is reset by destructor

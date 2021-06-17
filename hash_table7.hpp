@@ -150,6 +150,9 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #endif
 
 #define EMH_BTS(bucket)  _bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))
+//check bit is set
+#define EMH_EMPTY2(p,bucket) (_bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))) != 0
+
 
 #if _WIN32
     #include <intrin.h>
@@ -1644,7 +1647,8 @@ private:
         }
 
         //find a new empty and link it to tail, TODO link after main bucket?
-        const auto new_bucket = find_empty_bucket(next_bucket);
+        const auto new_bucket = //next_bucket < bucket + 256 / sizeof(PairT) ?
+            find_empty_bucket(next_bucket);// : find_empty_bucket(bucket + 1);
         return EMH_BUCKET(_pairs, next_bucket) = new_bucket;
     }
 
@@ -1652,7 +1656,7 @@ private:
     size_type find_empty_bucket(const size_type bucket_from)
     {
 #if 0
-        const auto bucket1 = bucket_from + 1;
+        auto bucket1 = bucket_from + 1;
         if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
             return bucket1;
 #endif

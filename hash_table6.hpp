@@ -505,7 +505,7 @@ public:
     {
         if (is_triviall_destructable()) {
             for (size_type bucket = 0; _num_filled > 0; ++bucket) {
-                if (!(EMH_EMPTY(_pairs, bucket))) {
+                if (!EMH_EMPTY(_pairs, bucket)) {
                     _num_filled--;
                     _pairs[bucket].~PairT();
                 }
@@ -641,7 +641,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 0.9999f && value > 0.2f)
+        if (value < 1 - 1e-4 && value > 0.2f)
             _loadlf = (size_type)((1 << 27) / value);
     }
 
@@ -1087,7 +1087,8 @@ public:
     // -------------------------------------------------------
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    size_type erase(const KeyT& key)
+    template<typename Key = KeyT>
+    size_type erase(const Key& key)
     {
         const auto bucket = erase_key(key);
         if ((int)bucket < 0)
@@ -1414,17 +1415,18 @@ private:
                 EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
             else
                 EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
-            EMH_ADDR(_pairs, bucket) = next_bucket == nbucket ? 2 * bucket : 2 * nbucket;
+            EMH_ADDR(_pairs, bucket) = (next_bucket == nbucket ? bucket : nbucket) * 2;
             return next_bucket;
         }
 
         const auto main_bucket = hash_bucket(bucket);
         next_bucket /= 2;
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
+        const auto odd_bucket = (prev_bucket == main_bucket ? 0 : 1);
         if (bucket == next_bucket)
-            EMH_ADDR(_pairs, prev_bucket) = prev_bucket * 2 + (prev_bucket == main_bucket ? 0 : 1);
+            EMH_ADDR(_pairs, prev_bucket) = prev_bucket * 2 + odd_bucket;
         else
-            EMH_ADDR(_pairs, prev_bucket) = next_bucket * 2 + (prev_bucket == main_bucket ? 0 : 1);
+            EMH_ADDR(_pairs, prev_bucket) = next_bucket * 2 + odd_bucket;
         return bucket;
     }
 
@@ -1462,29 +1464,7 @@ private:
     //2. next_bucket % 2 == 0 is main bucket
     size_type find_filled_bucket(const KeyT& key) const
     {
-        const auto bucket = hash_key(key) & _mask;
-        auto next_bucket = EMH_ADDR(_pairs, bucket);
-        const auto _num_buckets = _mask + 1;
-
-        if (next_bucket % 2 > 0)
-            return _num_buckets;
-        else if (_eq(key, EMH_KEY(_pairs, bucket)))
-            return bucket;
-        else if (next_bucket == bucket * 2)
-            return _num_buckets;
-
-        next_bucket /= 2;
-        while (true) {
-            if (_eq(key, EMH_KEY(_pairs, next_bucket)))
-                return next_bucket;
-
-            const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (nbucket == next_bucket)
-                return _num_buckets;
-            next_bucket = nbucket;
-        }
-
-        return 0;
+        return find_filled_hash(key, hash_key(key));
     }
 
     //kick out bucket and find empty to occpuy
@@ -1537,6 +1517,7 @@ private:
         else if (next_bucket % 2 > 0)
             return kickout_bucket(bucket);
 
+        int collisions = 2;
         next_bucket /= 2;
         //find next linked bucket and check key
         while (true) {
@@ -1553,10 +1534,11 @@ private:
             if (nbucket == next_bucket)
                 break;
             next_bucket = nbucket;
+            collisions++;
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(bucket);
+        const auto new_bucket = find_empty_bucket(bucket + collisions);
         return EMH_ADDR(_pairs, next_bucket) = new_bucket * 2 + 1;
     }
 
@@ -1564,7 +1546,7 @@ private:
     size_type find_empty_bucket(const size_type bucket_from)
     {
 #if 0
-        const auto bucket1 = bucket_from + 1;
+        auto bucket1 = bucket_from + 1;
         if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
             return bucket1;
 #endif
@@ -1574,12 +1556,12 @@ private:
         const auto bmask = *(size_t*)begin >> boset;
         if (EMH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
-            //if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
+//            if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
                 return bucket_from + offset;
 
             //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
             //return bucket_from - boset + 7 - CTZ(rerverse_bit);
-            //return bucket_from - boset + CTZ(begin[0]);
+//            return bucket_from - boset + CTZ(begin[0]);
         }
 
         const auto qmask = _mask / SIZE_BIT;
@@ -1591,7 +1573,7 @@ private:
                 return step * SIZE_BIT + CTZ(bmask2);
         }
 
-        auto &_last = EMH_ADDR(_pairs, _mask + 1);
+        auto& _last = EMH_ADDR(_pairs, _mask + 1);
         for (; ;) {
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
@@ -1754,7 +1736,7 @@ private:
 
 #if EMH_SAFE_HASH
     size_type _num_main;
-    size_type  _hash_inter;
+    size_type _hash_inter;
 #endif
 };
 } // namespace emhash
