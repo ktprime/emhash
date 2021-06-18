@@ -123,9 +123,10 @@ constexpr size_type SIZE_BIT = sizeof(size_t) * 8;
 static_assert(INACTIVE % 2 == 1, "INACTIVE must be even and < 0(to int)");
 static_assert((int)INACTIVE < 0, "INACTIVE must be even and < 0(to int)");
 
+//https://gist.github.com/jtbr/1896790eb6ad50506d5f042991906c30
 inline static size_type CTZ(size_t n)
 {
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#if defined(__x86_64__) || defined(_M_X64) || defined(_M_IX86) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
 #elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
     n = __builtin_bswap64(n);
@@ -1462,7 +1463,8 @@ private:
     // Find the bucket with this key, or return bucket size
     //1. next_bucket = INACTIVE, empty bucket
     //2. next_bucket % 2 == 0 is main bucket
-    size_type find_filled_bucket(const KeyT& key) const
+    template<typename Key>
+    size_type find_filled_bucket(const Key& key) const
     {
         return find_filled_hash(key, hash_key(key));
     }
@@ -1538,7 +1540,7 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(bucket + collisions);
+        const auto new_bucket = find_empty_bucket(bucket + 1);
         return EMH_ADDR(_pairs, next_bucket) = new_bucket * 2 + 1;
     }
 
@@ -1701,7 +1703,7 @@ private:
     inline uint64_t hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), KC);
+        return wyhash(key.c_str(), key.size(), key.size());
 #elif EMH_SAFE_HASH
         return _hash_inter == 0 ?  _hasher(key) : wyhash(key.c_str(), key.size(), 0x123456789);
 #elif EMH_BDKR_HASH

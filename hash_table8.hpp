@@ -397,7 +397,7 @@ public:
         return *this;
     }
 
-    HashMap& operator=(HashMap&& other)
+    HashMap& operator=(HashMap&& other) noexcept
     {
         if (this != &other) {
             swap(other);
