@@ -389,7 +389,7 @@ int main()
     { ska::flat_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::flat_hash_map"); }
     { ska::bytell_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::bytell_hash_map"); }
  //   { emhash2::HashMap<uint64_t, Value, hash_t> m2; ret -= test(m2, "\nemhash2::HashMap"); }
-    { emhash7::HashMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nemhash6::HashMap"); }
+    { emhash7::HashMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nemhash7::HashMap"); }
 #if ABSL
     { absl::flat_hash_map<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nabsl::flat_hash_map"); }
 #endif

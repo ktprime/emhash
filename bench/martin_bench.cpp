@@ -728,7 +728,7 @@ int main(int argc, char* argv[])
 
 	if (argc > 1) {
 		for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][i ++ ]) {
-			if (c >= '2' && c < '8') {
+			if (c >= '2' && c < '9') {
 				string map_name("emhash");
 				map_name += c;
 				show_name.erase(map_name);

@@ -1034,7 +1034,7 @@ void hash_clear(hash_type& ahash, const std::string& hash_name)
 }
 
 template<class hash_type>
-void hash_copy(hash_type& ahash, const std::string& hash_name)
+void hash_copy_clear(hash_type& ahash, const std::string& hash_name)
 {
     size_t sum = 0;
     auto ts1 = getTime();
@@ -1042,7 +1042,9 @@ void hash_copy(hash_type& ahash, const std::string& hash_name)
     ahash = thash;
     thash = thash;
     ahash = std::move(thash);
-    sum  = thash.size();
+    sum  += ahash.size();
+    ahash.clear(); ahash.clear();
+    sum  += ahash.size();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -1334,8 +1336,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         hash_iter<hash_type>(hash, hash_name);
 
 #ifndef UF
-        hash_copy <hash_type>(hash, hash_name);
-        hash_clear<hash_type>(hash, hash_name);
+        hash_copy_clear <hash_type>(hash, hash_name);
+        //hash_clear<hash_type>(hash, hash_name);
 #endif
     }
 }

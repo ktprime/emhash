@@ -236,13 +236,11 @@ struct entry {
     entry(const std::pair<First,Second>& pair)
         :second(pair.second),first(pair.first)
     {
-        bucket = INACTIVE;
     }
 
     entry(std::pair<First, Second>&& pair)
         :second(std::move(pair.second)),first(std::move(pair.first))
     {
-        bucket = INACTIVE;
     }
 
     entry(const entry& pairt)
