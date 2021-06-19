@@ -1268,12 +1268,12 @@ private:
 
     void clear_bucket(uint32_t bucket, bool clear = true)
     {
-        _num_filled --;
         if (is_triviall_destructable()) {
             //EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
             _pairs[bucket].~PairT();
         }
         EMH_BUCKET(_pairs, bucket) = INACTIVE; //some compiler the status is reset by destructor
+        _num_filled--;
 
 #if EMH_HIGH_LOAD
         if (_ehead && clear) {

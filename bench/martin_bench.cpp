@@ -22,7 +22,7 @@
 #include <sys/resource.h>
 #endif
 
-#include "thirdparty/wyhash.h"
+#include "wyhash.h"
 using namespace std;
 
 //#define EMH_STATIS 1
@@ -79,8 +79,8 @@ static std::map<std::string, std::string> show_name =
 	//{"emhash3", "emhash3"},
 	//{"emilib1", "ktprime"},
 	{"emhash4", "emhash4"},
-	{"emhash7", "emhash7"},
 #endif
+	{"emhash7", "emhash7"},
 	{"emhash8", "emhash8"},
 
 	{"emhash5", "emhash5"},
@@ -115,90 +115,124 @@ static const char* find(const std::string& map_name)
 	return nullptr;
 }
 
+struct WyRnd
+{
+	using result_type = uint64_t;
+	uint64_t seed_;
+	WyRnd(uint64_t seed1 = time(0)) { seed_ = seed1; }
+
+	WyRnd()
+		: WyRnd(UINT64_C(0x853c49e6748fea9b)) {}
+
+	uint64_t operator()() { return wyrand(&seed_); }
+
+	void seed() { seed_ = std::random_device{}(); }
+
+	static constexpr uint64_t(min)() { return (std::numeric_limits<uint64_t>::min)(); }
+	static constexpr uint64_t(max)() { return (std::numeric_limits<uint64_t>::max)(); }
+
+	uint64_t operator()(uint64_t boundExcluded) noexcept {
+#ifdef __SIZEOF_INT128__
+		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+#elif _MSC_VER
+		uint64_t high;
+		uint64_t a = operator()();
+		_umul128(a, boundExcluded, &high);
+		return high;
+#endif
+	}
+};
+
+#if MT_RNG
+	#define MRNG sfc64
+#else
+	#define MRNG WyRnd
+#endif
+
 // this is probably the fastest high quality 64bit random number generator that exists.
 // Implements Small Fast Counting v4 RNG from PractRand.
 class sfc64 {
-	public:
-		using result_type = uint64_t;
+public:
+	using result_type = uint64_t;
 
-		// no copy ctors so we don't accidentally get the same random again
-		sfc64(sfc64 const&) = delete;
-		sfc64& operator=(sfc64 const&) = delete;
+	// no copy ctors so we don't accidentally get the same random again
+	sfc64(sfc64 const&) = delete;
+	sfc64& operator=(sfc64 const&) = delete;
 
-		sfc64(sfc64&&) = default;
-		sfc64& operator=(sfc64&&) = default;
+	sfc64(sfc64&&) = default;
+	sfc64& operator=(sfc64&&) = default;
 
-		sfc64(std::array<uint64_t, 4> const& state)
-			: m_a(state[0])
-			  , m_b(state[1])
-			  , m_c(state[2])
-			  , m_counter(state[3]) {}
+	sfc64(std::array<uint64_t, 4> const& state)
+		: m_a(state[0])
+		  , m_b(state[1])
+		  , m_c(state[2])
+		  , m_counter(state[3]) {}
 
-		static constexpr uint64_t(min)() {
-			return (std::numeric_limits<uint64_t>::min)();
-		}
-		static constexpr uint64_t(max)() {
-			return (std::numeric_limits<uint64_t>::max)();
-		}
+	static constexpr uint64_t(min)() {
+		return (std::numeric_limits<uint64_t>::min)();
+	}
+	static constexpr uint64_t(max)() {
+		return (std::numeric_limits<uint64_t>::max)();
+	}
 
-		sfc64()
-			: sfc64(UINT64_C(0x853c49e6748fea9b)) {}
+	sfc64()
+		: sfc64(UINT64_C(0x853c49e6748fea9b)) {}
 
-		sfc64(uint64_t seed)
-			: m_a(seed), m_b(seed), m_c(seed), m_counter(1) {
-				for (int i = 0; i < 12; ++i) {
-					operator()();
-				}
+	sfc64(uint64_t seed)
+		: m_a(seed), m_b(seed), m_c(seed), m_counter(1) {
+			for (int i = 0; i < 12; ++i) {
+				operator()();
 			}
-
-		void seed() {
-			*this = sfc64{std::random_device{}()};
 		}
 
-		uint64_t operator()() noexcept {
-			auto const tmp = m_a + m_b + m_counter++;
-			m_a = m_b ^ (m_b >> right_shift);
-			m_b = m_c + (m_c << left_shift);
-			m_c = rotl(m_c, rotation) + tmp;
-			return tmp;
-		}
+	void seed() {
+		*this = sfc64{std::random_device{}()};
+	}
 
-		// this is a bit biased, but for our use case that's not important.
-		uint64_t operator()(uint64_t boundExcluded) noexcept {
+	uint64_t operator()() noexcept {
+		auto const tmp = m_a + m_b + m_counter++;
+		m_a = m_b ^ (m_b >> right_shift);
+		m_b = m_c + (m_c << left_shift);
+		m_c = rotl(m_c, rotation) + tmp;
+		return tmp;
+	}
+
+	// this is a bit biased, but for our use case that's not important.
+	uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
-			return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
 #elif _MSC_VER
-			uint64_t high;
-			uint64_t a = operator()();
-			_umul128(a, boundExcluded, &high);
-			return high;
+		uint64_t high;
+		uint64_t a = operator()();
+		_umul128(a, boundExcluded, &high);
+		return high;
 #endif
-		}
+	}
 
-		std::array<uint64_t, 4> state() const {
-			return {m_a, m_b, m_c, m_counter};
-		}
+	std::array<uint64_t, 4> state() const {
+		return {m_a, m_b, m_c, m_counter};
+	}
 
-		void state(std::array<uint64_t, 4> const& s) {
-			m_a = s[0];
-			m_b = s[1];
-			m_c = s[2];
-			m_counter = s[3];
-		}
+	void state(std::array<uint64_t, 4> const& s) {
+		m_a = s[0];
+		m_b = s[1];
+		m_c = s[2];
+		m_counter = s[3];
+	}
 
-	private:
+private:
 	template <typename T>
-			T rotl(T const x, int k) {
-				return (x << k) | (x >> (8 * sizeof(T) - k));
-			}
+		T rotl(T const x, int k) {
+			return (x << k) | (x >> (8 * sizeof(T) - k));
+		}
 
-		static constexpr int rotation = 24;
-		static constexpr int right_shift = 11;
-		static constexpr int left_shift = 3;
-		uint64_t m_a;
-		uint64_t m_b;
-		uint64_t m_c;
-		uint64_t m_counter;
+	static constexpr int rotation = 24;
+	static constexpr int right_shift = 11;
+	static constexpr int left_shift = 3;
+	uint64_t m_a;
+	uint64_t m_b;
+	uint64_t m_c;
+	uint64_t m_counter;
 };
 
 static int64_t now2ms()
@@ -240,7 +274,7 @@ template<class MAP> void bench_insert(MAP& map)
 
 	constexpr int maxn = 100'000'000;
 	auto nowms = now2ms();
-	sfc64 rng(RND);
+	MRNG rng(RND);
 	{
 		{
 			auto ts = now2ms();
@@ -297,7 +331,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
 	// random bits to set for the mask
 	std::vector<int> bits(64);
 	std::iota(bits.begin(), bits.end(), 0);
-	sfc64 rng(999);
+	MRNG rng(999);
 
 #if 0
 	for (auto &v : bits) v = rng();
@@ -353,7 +387,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
 	constexpr size_t const n = 50'000'000;
 
 	auto nowms = now2ms();
-	sfc64 rng(RND);
+	MRNG rng(RND);
 
 	//    map.max_load_factor(7.0 / 8);
 	int checksum;
@@ -410,7 +444,7 @@ template<class MAP>
 size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 {
 	//printf("%s map = %s\n", __FUNCTION__, typeid(MAP).name());
-	sfc64 rng(RND);
+	MRNG rng(RND);
 
 	// time measured part
 	size_t verifier = 0;
@@ -615,7 +649,7 @@ void bench_IterateIntegers(MAP& map)
 		return ;
 	printf("%s map = %s\n", __FUNCTION__, map_name);
 
-	sfc64 rng(RND);
+	MRNG rng(RND);
 
 	size_t const num_iters = 50000;
 	uint64_t result = 0;
@@ -740,8 +774,8 @@ int main(int argc, char* argv[])
 //		{ emilib1::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
 		{ emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
-		{ emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 		{ emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
+		{ emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 		{ emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #if ET
 //		{ hrd7::hash_map <uint64_t, uint64_t, hash_func> hmap;  bench_IterateIntegers(hmap); }
@@ -770,7 +804,6 @@ int main(int argc, char* argv[])
 #endif
 
 #if EM3
-		{emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 		{emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 		{emhash2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 		{emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
@@ -778,6 +811,7 @@ int main(int argc, char* argv[])
 #endif
 		{emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 		{emhash5::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+		{emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 //		{emilib1::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 #if ET
 //		{emilib3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
@@ -810,9 +844,9 @@ int main(int argc, char* argv[])
 		{emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-		{emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 #endif
+		{emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 //		{emilib1::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
@@ -854,6 +888,7 @@ int main(int argc, char* argv[])
 		{ emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 //		{ emilib1::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash6::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
+		{ emhash7::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 #if ABSL
 		{ absl::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
 #endif
@@ -862,7 +897,6 @@ int main(int argc, char* argv[])
 #endif
 #if EM3
 		{ emhash4::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
-		{ emhash7::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash8::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
@@ -886,11 +920,11 @@ int main(int argc, char* argv[])
 #if FOLLY
 		{ folly::F14VectorMap <int, int, hash_func> pmap; bench_insert(pmap); }
 #endif
+		{ emhash7::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 //		{ emilib1::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash5::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #if EM3
-		{ emhash7::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash4::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
@@ -919,10 +953,10 @@ int main(int argc, char* argv[])
 
 		{ emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 //		{ emilib1::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+		{ emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 #if EM3
 		{ emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-		{ emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
@@ -957,9 +991,9 @@ int main(int argc, char* argv[])
 		{ emhash6::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 		{ emhash5::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 //		{ emilib1::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+		{ emhash7::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #if EM3
 		{ emhash2::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-		{ emhash7::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 		{ emhash8::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 		{ emhash4::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 		{ emhash3::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }

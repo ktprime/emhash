@@ -50,6 +50,7 @@
     #undef  EMH_VAL
     #undef  EMH_PKV
     #undef  EMH_NEW
+    #undef  EMH_SET
     #undef  EMH_BUCKET
     #undef  EMH_EMPTY
 #endif
@@ -96,8 +97,9 @@
     #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; EMH_SET(bucket)
 #endif
 
-#define EMH_SET(bucket)   _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT))
-#define EMH_BTS(bucket)   _bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))
+//set bit 1 to 0
+#define EMH_SET(bucket)       _bitmask[bucket / MASK_BIT] &= ~(1u << (bucket % MASK_BIT))
+//#define EMH_EMPTY2(p,bucket)   _bitmask[bucket / MASK_BIT] & (1u << (bucket % MASK_BIT))
 
 #if _WIN32
     #include <intrin.h>
@@ -120,6 +122,7 @@ namespace emhash6 {
 constexpr size_type MASK_BIT = sizeof(size_type) * 8;
 constexpr size_type BIT_PACK = sizeof(uint64_t) * 2 + sizeof(uint8_t);
 constexpr size_type SIZE_BIT = sizeof(size_t) * 8;
+constexpr size_type PACK_SIZE = 1; // > 1
 static_assert(INACTIVE % 2 == 1, "INACTIVE must be even and < 0(to int)");
 static_assert((int)INACTIVE < 0, "INACTIVE must be even and < 0(to int)");
 
@@ -454,6 +457,11 @@ public:
     HashMap(size_type bucket = 4, float lf = 0.90f)
     {
         init(bucket, lf);
+    }
+
+    inline size_type AllocSize(size_type num_buckets) const
+    {
+        return num_buckets * sizeof(PairT) + PACK_SIZE * sizeof(PairT) + num_buckets / 8 + sizeof(uint64_t);
     }
 
     HashMap(const HashMap& other)
@@ -909,7 +917,7 @@ public:
     {
         const auto bucket = find_or_allocate(key);
         const auto next   = bucket / 2;
-        const auto found = EMH_EMPTY(_pairs, next);
+        const auto found  = EMH_EMPTY(_pairs, next);
         if (found) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(value), next, bucket);
         }
@@ -1092,7 +1100,7 @@ public:
     size_type erase(const Key& key)
     {
         const auto bucket = erase_key(key);
-        if ((int)bucket < 0)
+        if (bucket == INACTIVE)
             return 0;
 
         clear_bucket(bucket);
@@ -1196,7 +1204,7 @@ public:
         if (num_buckets < sizeof(uint64_t))
             num_buckets = sizeof(uint64_t);
 #else
-        size_type num_buckets = _num_filled > 65536 ? (1u << 16) : sizeof(uint64_t);
+        size_type num_buckets = _num_filled > (1u << 16) ? (1u << 16) : sizeof(uint64_t);
         while (num_buckets < required_buckets) { num_buckets *= 2; }
         //assert(num_buckets == (2 << CTZ(required_buckets)));
 #endif
@@ -1298,17 +1306,18 @@ private:
     void clear_bucket(size_type bucket)
     {
         EMH_ADDR(_pairs, bucket) = INACTIVE; //loop call in destructor
-        _num_filled --;
         if (is_triviall_destructable()) {
             _pairs[bucket].~PairT();
             EMH_ADDR(_pairs, bucket) = INACTIVE;
         }
         _bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
+        _num_filled--;
     }
 
-    template<class K = size_type> typename std::enable_if <bInCacheLine, K>::type
-    erase_key(const KeyT& key)
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
+    size_type erase_key(const UType& key)
     {
+        const auto empty_bucket = INACTIVE;
         const auto bucket = hash_key(key) & _mask;
         auto next_bucket = EMH_ADDR(_pairs, bucket);
 
@@ -1316,13 +1325,13 @@ private:
             const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
             if (eqkey)
 #if EMH_SAFE_HASH
-            return eqkey ? (_num_main --, bucket) : INACTIVE;
+            return eqkey ? (_num_main --, bucket) : empty_bucket;
 #else
-            return eqkey ? bucket : INACTIVE;
+            return eqkey ? bucket : empty_bucket;
 #endif
         }
         else if (next_bucket % 2 > 0)
-            return INACTIVE;
+            return empty_bucket;
         else if (_eq(key, EMH_KEY(_pairs, bucket))) {
             next_bucket /= 2;
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
@@ -1330,7 +1339,7 @@ private:
                 EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
             else
                 EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
-            EMH_ADDR(_pairs, bucket) = next_bucket == nbucket ? bucket * 2 : nbucket * 2;
+            EMH_ADDR(_pairs, bucket) = (next_bucket == nbucket ? bucket : nbucket) * 2;
             return next_bucket;
         }
 
@@ -1339,7 +1348,7 @@ private:
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
-                EMH_ADDR(_pairs, prev_bucket) = (nbucket == next_bucket ? prev_bucket * 2 : nbucket * 2) + (1 - (prev_bucket == bucket));
+                EMH_ADDR(_pairs, prev_bucket) = (nbucket == next_bucket ? prev_bucket : nbucket) * 2 + (1 - (prev_bucket == bucket));
                 return next_bucket;
             }
 
@@ -1349,11 +1358,11 @@ private:
             next_bucket = nbucket;
         }
 
-        return INACTIVE;
+        return empty_bucket;
     }
 
-    template<class K = size_type> typename std::enable_if<!bInCacheLine, K>::type
-    erase_key(const KeyT& key)
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
+    size_type erase_key(const UType& key)
     {
         const auto empty_bucket = INACTIVE;
         const auto bucket = hash_key(key) & _mask;
@@ -1540,7 +1549,7 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(bucket + 1);
+        const auto new_bucket = find_empty_bucket(next_bucket);
         return EMH_ADDR(_pairs, next_bucket) = new_bucket * 2 + 1;
     }
 
