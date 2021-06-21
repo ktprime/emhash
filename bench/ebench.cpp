@@ -1924,7 +1924,7 @@ static void testHashString(int size, int str_min, int str_max)
 int main(int argc, char* argv[])
 {
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
-    find_test();
+    //find_test();
 #endif
     auto start = now2ms();
 
