@@ -1,10 +1,8 @@
-# emhash feature
-
-A quite fast and memory efficient *open address c++ flat hash map*, it is easy to be benched/tested/compared with other's flat hash map.
+# A quite fast and memory efficient *open address c++ flat hash map*
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- default load factor is 0.95 and can be set to **0.999** by enable compile marco *EMHASH_HIGH_LOAD* (in hash_table[6/7].hpp)
+- default load factor is 0.95 and can be set to **0.999** by set marco *EMHASH_HIGH_LOAD == somevalue* (in hash_table[5/6/7/8].hpp)
 
 - **head only** support by c++11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue.
     - _erase :  without return next iterator after erasion
@@ -18,47 +16,48 @@ A quite fast and memory efficient *open address c++ flat hash map*, it is easy t
 - **lru** can be used if compile marco EMHASH_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be founded/probed only once during next access.
 
 - **no tombstones** in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
-    
-- more than **5 different** implementation to choose, each of them is some tiny different can be used in some case
+
+- more than **3 different** implementation to choose, each of them is some tiny different can be used in some case
 for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
 
-- it's the **fastest** hash map for find performance(100% hit) at present, and fast inserting performacne if no rehash (**reserve before insertsion**) and effficient erasion. At present from 6 different benchmark(4 of them in my bench dir) by my bench
+- the **fastest** hash map for find performance(100% hit) at present, and fast inserting performacne if no rehash (**reserve before insertsion**) and effficient erasion. At present from 6 different benchmark(4 of them in my bench dir) by my bench
 
-- It's fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, ARM64).
+- fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, ARM64).
 
 - many optimization with *integer* key, some new and interesting feature is underdeveloping if it's stable to release.
 
 # emhash design
 
-- only *one array* allocted, each node/bucket contains a struct (keyT key, int32_t bucket, ValueT value), bucket is not awalys in the middle between key and value, depend on struct align pack and compiler marco.
+- only *one array* allocted, each node/bucket contains a struct/entry (Key key, uint32_t bucket, Value value), bucket is not awalys in the middle between key and value, depend on struct align pack and compiler marco,
+index data(bucket) is not separated from the other hash implemention.
 
-- a simple and smart **collision algorithm** used for hash collision, collision bucket is linked after the main bucket with a auxiliary integer index(bucket). main bucket can not be occupyed and all opertion starts from it. 
+- a smart **collision algorithm** used for hash collision, collision node is linked after the main bucket with a auxiliary integer index(bucket). main bucket can not be occupyed and all opertion based it.
 
-- **three different ways** of probe is used to seach the empty bucket. it's not suffered heavily performance loss by primary and secondary clustering.
+- **three different ways** of probing is used to seach empty slot. it's not suffered heavily performance loss by primary and secondary clustering.
    - linear probing search 2-3 cpu cachelines
-   - quadratic probing start work after limited linear probing
-   - random probing used with a very bad hash
+   - quadratic probing works after limited linear probing
+   - linear search both begin&end with last founded empty slot
 
-- a new design linear probing is used (in hash_table5.hpp).
+- a new linear probing is used (in hash_table5.hpp).
 	normaly linear probing is inefficient with high load factor, it use a new 3-way linear
 probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than traditional seach strategy.
 
 - use the **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *EMHASH_SAFE_HASH* is set to defend hash attack(but 10% performance descrease)
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be showed from dump info.
- 
+
 - A new cache friendly algorithm of finding multi empty bucket base on cpu bit scanf(ctz) instruction. it filters *64* bucket at once than other's implemention.
- 
+
 - choose *different* hash algorithm by set compile marco *EMHASH_FIBONACCI_HASH* or *EMHASH_IDENTITY_HASH* depend on use case.
 
-- A thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is faster than std::hash implementation 
+- A thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is faster than std::hash implementation
 
 ### benchmark
 
 some of benchmark result is uploaded, I use other hash map (martinus, ska, phmap, dense_hash_map ...) source to compile and benchmark.
 [![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench High Load](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
 
-another html result with impressive curve [chartsAll.html](https://github.com/ktprime/emhash/blob/master/bench/tsl_bench/chartsAll.html) 
+another html result with impressive curve [chartsAll.html](https://github.com/ktprime/emhash/blob/master/bench/tsl_bench/chartsAll.html)
 (download all js file in tls_bench dir)
 generated by [Tessil](https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html) benchmark code
 
@@ -83,18 +82,18 @@ my result is benched on 3 linux server(amd, intel, arm64), 1 win10 pc and 2 Lapt
     auto& myref = myhash[1];//**wrong used here**,  can not keep reference stable
      ....
     auto old = myref ;  // myref maybe be changed and not invalid.
-       
+
     emhash7:HashMap<int,int> myhash2;
     for (int i = 0; i < 10000; i ++)
         myhash2[rand()] = myhash2[rand()]; // it will be crashed because of rehash, call reserve before or use insert.
  ```
 
 - for very large key-value, use pointer instead of value if you care about memory usage with high frequency of insertion or erasion
-```  
+```
   emhash7:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
 
   emhash7:HashMap<keyT,*valueT> myhash2; //new valueT, or use std::shared_ptr<valueT>.
-  
+
 ```
 
 - the only known bug as follow example, if erase key/iterator during iteration. one key will be iteraored twice or missed. and fix it can desearse performance 20% or even much more and no good way to fix.
@@ -104,7 +103,7 @@ my result is benched on 3 linux server(amd, intel, arm64), 1 win10 pc and 2 Lapt
     //dome some init ...
     for (const auto& it : myhash)
     {
-        if (some_key = it.first) {
+        if (some_key == it.first) {
             myhash.erase(key);  //no any break
        }
        ...

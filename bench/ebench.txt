@@ -265,3 +265,199 @@ insert_reserve
  skarupk flat   82
  tessil robin   75
 --------------------------------------------------------------------
+
+-------------------------------- function benchmark -----------------------------------------------
+erase_find_half
+   54           martin_flat             100
+   54           absl_flat               98
+   61           phmap_flat              87
+   99           emhash7                 54
+
+erase_half
+   90           phmap_flat              100
+   91           martin_flat             99
+   91           absl_flat               98
+   93           emhash7                 96
+
+erase_reinsert
+   65           emhash7                 100
+   72           phmap_flat              89
+   78           absl_flat               83
+   99           martin_flat             65
+
+find_hit_all
+   82           emhash7                 100
+   83           martin_flat             99
+   97           absl_flat               84
+   98           phmap_flat              83
+
+find_hit_half
+   72           martin_flat             100
+   80           absl_flat               90
+   82           phmap_flat              87
+   99           emhash7                 73
+
+find_miss_all
+   60           martin_flat             100
+   60           absl_flat               99
+   62           phmap_flat              96
+   100          emhash7                 60
+
+hash_copy_clear
+   41           emhash7                 100
+   44           martin_flat             91
+   90           phmap_flat              45
+   99           absl_flat               41
+
+hash_iter
+   83           phmap_flat              100
+   85           absl_flat               98
+   91           emhash7                 91
+   95           martin_flat             87
+
+insert_find_erase
+   73           emhash7                 100
+   89           phmap_flat              82
+   90           martin_flat             81
+   99           absl_flat               73
+
+insert_high_load
+   27           emhash7                 100
+   56           phmap_flat              49
+   60           absl_flat               46
+   99           martin_flat             27
+
+insert_l1_cache
+   48           emhash7                 100
+   73           phmap_flat              66
+   81           martin_flat             58
+   86           absl_flat               55
+
+insert_l2_cache
+   44           emhash7                 100
+   66           phmap_flat              67
+   81           martin_flat             54
+   84           absl_flat               52
+
+insert_l3_cache
+   58           emhash7                 100
+   66           phmap_flat              88
+   84           absl_flat               69
+   95           martin_flat             61
+
+insert_no_reserve
+   58           phmap_flat              100
+   58           emhash7                 99
+   66           absl_flat               87
+   100          martin_flat             58
+
+insert_reserve
+   74           emhash7                 100
+   88           phmap_flat              83
+   92           absl_flat               80
+   98           martin_flat             75
+
+-------------------------------- function benchmark -----------------------------------------------
+erase_find_half
+   54           martin_flat             100
+   54           absl_flat               98
+   61           phmap_flat              87
+   99           emhash7                 54
+
+erase_half
+   90           phmap_flat              100
+   91           martin_flat             99
+   91           absl_flat               98
+   93           emhash7                 96
+
+erase_reinsert
+   65           emhash7                 100
+   72           phmap_flat              89
+   78           absl_flat               83
+   99           martin_flat             65
+
+find_hit_all
+   82           emhash7                 100
+   83           martin_flat             99
+   97           absl_flat               84
+   98           phmap_flat              83
+
+find_hit_half
+   72           martin_flat             100
+   80           absl_flat               90
+   82           phmap_flat              87
+   99           emhash7                 73
+
+find_miss_all
+   60           martin_flat             100
+   60           absl_flat               99
+   62           phmap_flat              96
+   100          emhash7                 60
+
+hash_copy_clear
+   41           emhash7                 100
+   44           martin_flat             91
+   90           phmap_flat              45
+   99           absl_flat               41
+
+hash_iter
+   83           phmap_flat              100
+   85           absl_flat               98
+   91           emhash7                 91
+   95           martin_flat             87
+
+insert_find_erase
+   73           emhash7                 100
+   89           phmap_flat              82
+   90           martin_flat             81
+   99           absl_flat               73
+
+insert_high_load
+   27           emhash7                 100
+   56           phmap_flat              49
+   60           absl_flat               46
+   99           martin_flat             27
+
+insert_l1_cache
+   48           emhash7                 100
+   73           phmap_flat              66
+   81           martin_flat             58
+   86           absl_flat               55
+
+insert_l2_cache
+   44           emhash7                 100
+   66           phmap_flat              67
+   81           martin_flat             54
+   84           absl_flat               52
+
+insert_l3_cache
+   58           emhash7                 100
+   66           phmap_flat              88
+   84           absl_flat               69
+   95           martin_flat             61
+
+insert_no_reserve
+   58           phmap_flat              100
+   58           emhash7                 99
+   66           absl_flat               87
+   100          martin_flat             58
+
+insert_reserve
+   74           emhash7                 100
+   88           phmap_flat              83
+   92           absl_flat               80
+   98           martin_flat             75
+------------------------------------------------------------------------------------------------------------
+gcc 9.4.0 __cplusplus = 201703 x86-64 OS = linux, cpu = AMD EPYC 7K62 48-Core Processor
+------------------------------------------------------------------------------------------------------------
+======== hash  top1   top2  top3 =======================
+    absl_flat  0.0   0.5     269
+      emhash7 456.5  43.0    0
+  martin_flat  0.0   54.0    176
+   phmap_flat 43.5   401.5   54
+======== hash    score  weigh ==========================
+    absl_flat    76     84.0%
+  martin_flat    77     84.1%
+   phmap_flat    81     89.0%
+      emhash7    91     100.0%
+--------------------------------------------------------------------

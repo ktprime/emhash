@@ -9,9 +9,9 @@
 #include <fstream>
 #include <iostream>
 
-#if __cplusplus > 201402L || _MSC_VER >= 1600
-   // #define STR_VIEW  1
-   // #include <string_view>
+#if __cplusplus > 201402L || _MSVC_LANG >= 201402L
+   #define STR_VIEW  1
+   #include <string_view>
 #endif
 
 #ifdef __has_include
@@ -195,8 +195,6 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if ET
-    #define  _CPP11_HASH    1
-
     #include "emilib/emilib32.hpp"
 
 #if __x86_64__ || _WIN64
@@ -294,9 +292,14 @@ struct BadHasher
 #endif
 
 #if TKey == 0
+#ifndef SMK
     typedef unsigned int keyType;
-    #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int"
+#else
+    typedef short        keyType;
+    #define sKeyType    "short"
+#endif
+    #define TO_KEY(i)   (keyType)i
     #define KEY_INT     1
 #elif TKey == 1
     typedef int64_t      keyType;
@@ -347,7 +350,7 @@ struct BadHasher
     #define sValueType  "Struct"
 #endif
 
-static int64_t getTime()
+static int64_t now2ms()
 {
 #if 0
     auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
@@ -565,10 +568,10 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     }
 
     auto& showname = maps[hash_name];
-    once_func_hash_time[func][showname] += (getTime() - ts1) / weigh;
+    once_func_hash_time[func][showname] += (now2ms() - ts1) / weigh;
     func_index ++;
 
-    long ts = (getTime() - ts1) / 1000;
+    long ts = (now2ms() - ts1) / 1000;
     if (func_index == func_print)
         printf("%8s: %8s %4ld, ",hash_name.data(), func.c_str(), ts);
     else if (func_index == func_print + 1)
@@ -722,7 +725,7 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 template<class hash_type>
 void hash_iter(hash_type& ahash, const std::string& hash_name)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (auto& v : ahash)
         sum += TO_SUM(v.second);
 
@@ -740,7 +743,7 @@ void hash_iter(hash_type& ahash, const std::string& hash_name)
 template<class hash_type>
 void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (const auto& v : vList) {
         ahash[v] = TO_VAL(0);
         //ahash.emplace(v, TO_VAL(0));
@@ -758,7 +761,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 {
 #if TKey < 2
     hash_type ahash;
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (const auto& v : vList) {
         auto v2 = v % (1 << 12);
         auto r = ahash.emplace(v2, TO_VAL(0)).second;
@@ -784,7 +787,7 @@ template<class hash_type>
 void insert_no_reserve( const std::string& hash_name, const std::vector<keyType>& vList)
 {
     hash_type ahash;
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (const auto& v : vList)
         sum += ahash.emplace(v, TO_VAL(0)).second;
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -793,7 +796,7 @@ void insert_no_reserve( const std::string& hash_name, const std::vector<keyType>
 template<class hash_type>
 void insert_reserve(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
 #ifndef SMAP
     ahash.reserve(vList.size());
     ahash.max_load_factor(0.99f);
@@ -810,7 +813,7 @@ void multi_small_bench(const std::string& hash_name, const std::vector<keyType>&
 #if KEY_INT
     size_t sum = 0;
     const auto hash_size = vList.size() / 10003 + 2021;
-    const auto ts1 = getTime();
+    const auto ts1 = now2ms();
 
     auto mh = new hash_type[hash_size];
     for (const auto& v : vList) {
@@ -836,7 +839,7 @@ void multi_small_bench(const std::string& hash_name, const std::vector<keyType>&
 template<class hash_type>
 void insert_find_erase(const hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     hash_type tmp(ahash);
 
     for (auto & v : vList) {
@@ -860,7 +863,7 @@ void insert_find_erase(const hash_type& ahash, const std::string& hash_name, std
 template<class hash_type>
 void insert_cache_size(const std::string& hash_name, const std::vector<keyType>& vList, const char* level, const uint32_t min_size, const uint32_t cache_size)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     const auto smalls = min_size + vList.size() % cache_size;
     hash_type tmp, empty;
 #ifndef SMAP
@@ -915,7 +918,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         }
     }
 
-    auto ts1 = getTime();
+    auto ts1 = now2ms();
     for (; i  < maxn; i++) {
         auto& v = vList[i - minn];
 #if KEY_INT
@@ -939,7 +942,7 @@ static uint8_t l1_cache[64 * 1024];
 template<class hash_type>
 void find_miss_all(hash_type& ahash, const std::string& hash_name)
 {
-    auto ts1 = getTime();
+    auto ts1 = now2ms();
     auto n = ahash.size();
     size_t pow2 = 2u << ilog(n, 2), sum = 0;
 
@@ -964,7 +967,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
 template<class hash_type>
 void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (const auto& v : vList) {
 #if FL1
         if (sum % (1024 * 256) == 0)
@@ -978,7 +981,7 @@ void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::ve
 template<class hash_type>
 void find_hit_all(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (const auto& v : vList) {
 #if KEY_INT
         sum += ahash.count(v) + (size_t)v;
@@ -999,7 +1002,7 @@ void find_hit_all(hash_type& ahash, const std::string& hash_name, const std::vec
 template<class hash_type>
 void erase_find_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (const auto& v : vList)
         sum += ahash.count(v);
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -1009,7 +1012,7 @@ template<class hash_type>
 void erase_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto tmp = ahash;
-    auto ts1 = getTime(); size_t sum = 0;
+    auto ts1 = now2ms(); size_t sum = 0;
     for (const auto& v : vList)
         sum += ahash.erase(v);
 
@@ -1026,7 +1029,7 @@ template<class hash_type>
 void hash_clear(hash_type& ahash, const std::string& hash_name)
 {
     if (ahash.size() > 1000'000) {
-        auto ts1 = getTime();
+        auto ts1 = now2ms();
         size_t sum = ahash.size();
         ahash.clear(); ahash.clear();
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -1037,7 +1040,7 @@ template<class hash_type>
 void hash_copy_clear(hash_type& ahash, const std::string& hash_name)
 {
     size_t sum = 0;
-    auto ts1 = getTime();
+    auto ts1 = now2ms();
     hash_type thash = ahash;
     ahash = thash;
     thash = thash;
@@ -1188,11 +1191,11 @@ static int TestHashMap(int n, int max_loops = 1234567)
 {
 #ifndef KEY_CLA
     emhash5::HashMap <keyType, int> ehash5;
-    emhash4::HashMap <keyType, int> ehash2;
+    emhash6::HashMap <keyType, int> ehash2;
 
     sfc64 srng(time(NULL));
 #if 1
-    emhash3::HashMap <keyType, int> unhash;
+    emhash7::HashMap <keyType, int> unhash;
 #else
     std::unordered_map<long,int> unhash;
 #endif
@@ -1447,7 +1450,7 @@ static int benchHashMap(int n)
 #endif
 
     {
-        int64_t ts = getTime(), sum = 0ul;
+        int64_t ts = now2ms(), sum = 0ul;
         for (auto& v : vList)
 #if KEY_INT
             sum += v;
@@ -1456,7 +1459,7 @@ static int benchHashMap(int n)
 #else
         sum += v.size();
 #endif
-        loop_vector_time = getTime() - ts;
+        loop_vector_time = now2ms() - ts;
         printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us:%d\n", n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
     }
 
@@ -1637,38 +1640,46 @@ static void printInfo(char* out)
 struct string_hash
 {
     using is_transparent = void;
-
-    std::size_t operator()(const std::string& key)    const { return wyhash(key.c_str(), key.size(), 11400714819323198485ull); }
-    std::size_t operator()(const std::string_view& key)    const { return wyhash(key.data(), key.size(), 11400714819323198485ull); }
-    std::size_t operator()(const char* key)        const { return wyhash(key, std::strlen(key), 11400714819323198485ull); }
+    std::size_t operator()(const char* key)             const { auto ksize = std::strlen(key); return wyhash(key, ksize, ksize); }
+    std::size_t operator()(const std::string& key)      const { return wyhash(key.c_str(), key.size(), key.size()); }
+    std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size());  }
 };
 
 struct string_equal
 {
     using is_transparent = int;
 
+#if 1
     bool operator()(const std::string_view& lhs, const std::string& rhs) const {
-        //const std::string_view view = rhs;
-        return lhs.size() == rhs.size() &&
-            (lhs.data() == rhs.data() || std::strcmp(lhs.data(), rhs.data()) == 0);
+        return lhs.size() == rhs.size() && lhs == rhs;
     }
+#endif
 
     bool operator()(const char* lhs, const std::string& rhs) const {
         return std::strcmp(lhs, rhs.c_str()) == 0;
     }
+
+    bool operator()(const char* lhs, const std::string_view& rhs) const {
+        return std::strcmp(lhs, rhs.data()) == 0;
+    }
+
+    bool operator()(const std::string_view& rhs, const char* lhs) const {
+        return std::strcmp(lhs, rhs.data()) == 0;
+    }
 };
 
-static int find_test()
+static int find_strview_test()
 {
-    emhash6::HashMap<std::string, uint64_t, string_hash, string_equal> map;
+    emhash6::HashMap<const std::string, char, string_hash, string_equal> map;
     std::string_view key = "key";
-    map.emplace(key, 100);
+    std::string     skey = "key";
+    map.emplace(key, 0);
     const auto it = map.find(key); // fail
     assert(it == map.find("key"));
-    assert(it == map.find(std::string("key")));
+    assert(it == map.find(skey));
 
     assert(key == "key");
-    assert(key == std::string("key"));
+    assert(key == skey);
     return 0;
 }
 #endif
@@ -1733,30 +1744,30 @@ static void testHashRand(int loops = 100000009)
 {
     printf("%s loops = %d\n",__FUNCTION__, loops);
     long sum = 0;
-    auto ts = getTime();
+    auto ts = now2ms();
     {
-        ts = getTime();
+        ts = now2ms();
         sfc64 srng;
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("sfc64      = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+        printf("sfc64      = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
     }
 
     {
-        ts = getTime();
+        ts = now2ms();
         std::mt19937_64 srng; srng.seed(randomseed());
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("mt19937_64 = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+        printf("mt19937_64 = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
     }
 
 #if WYHASH_LITTLE_ENDIAN
     {
-        ts = getTime();
+        ts = now2ms();
         WyRand srng;
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("wyrand     = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+        printf("wyrand     = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
     }
 #endif
 }
@@ -1764,68 +1775,68 @@ static void testHashRand(int loops = 100000009)
 static void testHashInt(int loops = 100000009)
 {
     printf("%s loops = %d\n", __FUNCTION__, loops);
-    auto ts = getTime();
+    auto ts = now2ms();
     long sum = ts;
     auto r  = ts * ts;
 
 #ifdef PHMAP_VERSION_MAJOR
-    ts = getTime(); sum = 0;
+    ts = now2ms(); sum = 0;
     for (int i = 0; i < loops; i++)
         sum += phmap::phmap_mix<8>()(i + r);
-    printf("phmap hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("phmap hash = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
 #endif
 
 #ifdef ABSL_HASH
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += absl::Hash<uint64_t>()(i + r);
-    printf("absl hash = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("absl hash = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
 #endif
 
 #ifdef WYHASH_LITTLE_ENDIAN
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     auto seed = randomseed();
     for (int i = 0; i < loops; i++)
         sum += wyhash64(i + r, seed);
-    printf("wyhash64   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("wyhash64   = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
 #endif
 
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 1; i < loops; i++)
         sum += sum + i;
-    printf("sum  add   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("sum  add   = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
 
 #ifdef ROBIN_HOOD_H_INCLUDED
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += robin_hood::hash_int(i + r);
-    printf("martin hash= %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("martin hash= %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
 #endif
 
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += std::hash<uint64_t>()(i + r);
-    printf("std hash   = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
+    printf("std hash   = %4d ms [%ld]\n",  (int)(now2ms() - ts) / 1000, sum);
 
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += hash64(i + r);
-    printf("hash64     = %4d ms [%ld]\n",  (int)(getTime() - ts) / 1000, sum);
+    printf("hash64     = %4d ms [%ld]\n",  (int)(now2ms() - ts) / 1000, sum);
 
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += hash32(i + r);
-    printf("hash32     = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("hash32     = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
 
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += hashmix(i + r);
-    printf("hashmix   = %4d ms [%ld]\n", (int)(getTime() - ts) / 1000, sum);
+    printf("hashmix   = %4d ms [%ld]\n", (int)(now2ms() - ts) / 1000, sum);
 
-    ts = getTime(); sum = r;
+    ts = now2ms(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += rrxmrrxmsx_0(i + r);
-    printf("rrxmrrxmsx_0 = %4d ms [%ld]\n\n", (int)(getTime() - ts) / 1000, sum);
+    printf("rrxmrrxmsx_0 = %4d ms [%ld]\n\n", (int)(now2ms() - ts) / 1000, sum);
 
 #if 0
     const int buff_size = 1024*1024 * 16;
@@ -1834,14 +1845,14 @@ static void testHashInt(int loops = 100000009)
     memset(buffer, 0, buff_size * pack_size);
 
     for (int i = 0; i < 4; i++) {
-        ts = getTime();
+        ts = now2ms();
         memset(buffer, 0, buff_size * pack_size);
-        printf("memset   = %4d ms\n", (int)(getTime() - ts) / 1000);
+        printf("memset   = %4d ms\n", (int)(now2ms() - ts) / 1000);
 
-        ts = getTime();
+        ts = now2ms();
         for (uint32_t bi = 0; bi < buff_size; bi++)
            *(int*)(buffer + (bi * pack_size)) = 0;
-        printf("loops   = %4d ms\n\n", (int)(getTime() - ts) / 1000);
+        printf("loops   = %4d ms\n\n", (int)(now2ms() - ts) / 1000);
     }
     delete [] buffer;
 #endif
@@ -1868,41 +1879,41 @@ static void testHashString(int size, int str_min, int str_max)
         int64_t start = 0;
         int t_find = 0;
 
-        start = getTime();
+        start = now2ms();
         for (auto& v : rndstring)
             sum += std::hash<std::string>()(v);
-        t_find = (getTime() - start) / 1000;
+        t_find = (now2ms() - start) / 1000;
         printf("std hash = %4d ms\n", t_find);
 
 #ifdef WYHASH_LITTLE_ENDIAN
-        start = getTime();
+        start = now2ms();
         for (auto& v : rndstring)
             sum += wyhash(v.data(), v.size(), 1);
-        t_find = (getTime() - start) / 1000;
+        t_find = (now2ms() - start) / 1000;
         printf("wyhash   = %4d ms\n", t_find);
 #endif
 
 #ifdef ROBIN_HOOD_H_INCLUDED
-        start = getTime();
+        start = now2ms();
         for (auto& v : rndstring)
             sum += robin_hood::hash_bytes(v.data(), v.size());
-        t_find = (getTime() - start) / 1000;
+        t_find = (now2ms() - start) / 1000;
         printf("martin hash = %4d ms\n", t_find);
 #endif
 
 #ifdef ABSL_HASH
-        start = getTime();
+        start = now2ms();
         for (auto& v : rndstring)
             sum += absl::Hash<std::string>()(v);
-        t_find = (getTime() - start) / 1000;
+        t_find = (now2ms() - start) / 1000;
         printf("absl hash = %4d ms\n", t_find);
 #endif
 
 #ifdef PHMAP_VERSION_MAJOR
-        start = getTime();
+        start = now2ms();
         for (auto& v : rndstring)
             sum += phmap::Hash<std::string>()(v);
-        t_find = (getTime() - start) / 1000;
+        t_find = (now2ms() - start) / 1000;
         printf("phmap hash  = %4d ms\n", t_find);
 #endif
         putchar('\n');
@@ -1915,6 +1926,7 @@ int main(int argc, char* argv[])
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
     find_test();
 #endif
+    auto start = now2ms();
 
     srand((unsigned)time(0));
     printInfo(nullptr);
@@ -1923,8 +1935,8 @@ int main(int argc, char* argv[])
     bool auto_set = false;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;
-    auto maxn = (1024 * 1024 * 128) / (sizeof(keyType) + sizeof(valueType) + 8) + 100000;
-    auto minn = (1024 * 1024 * 2) / (sizeof(keyType) + sizeof(valueType) + 8) + 10000;
+    auto maxn = (1024 * 1024 * 128) / (sizeof(keyType) + sizeof(valueType) + 4) + 100000;
+    auto minn = (1024 * 1024 * 2) / (sizeof(keyType) + sizeof(valueType) + 4) + 10000;
 
     float load_factor = 0.0945f;
     printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a b t(n)\n", (int)maxn);
@@ -1932,7 +1944,7 @@ int main(int argc, char* argv[])
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
         if (isdigit(cmd))
-            maxn = atol(argv[i]) + 1000;
+            maxn = atoll(argv[i]) + 1000;
         else if (cmd == 'f' && isdigit(argv[i][1]))
             load_factor = atof(&argv[i][0] + 1) / 100.0f;
         else if (cmd == 't' && isdigit(argv[i][1]))
@@ -1996,7 +2008,12 @@ int main(int argc, char* argv[])
         TestHashMap(tn);
 #endif
 
+#if WYHASH_LITTLE_ENDIAN
+    WyRand srng(rnd);
+#else
     sfc64 srng(rnd);
+#endif
+
     for (auto& m : maps)
         printf("  %s\n", m.second.data());
     putchar('\n');
@@ -2020,6 +2037,7 @@ int main(int argc, char* argv[])
             break;
     }
 
+    printf("total time = %.3lf s", (now2ms() - start) / 1000000.0);
     return 0;
 }
 

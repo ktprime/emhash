@@ -757,6 +757,8 @@ int main(int argc, char* argv[])
 	for (auto& m : show_name)
 		printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
 
+    const auto start = now2ms();
+
 	if (1)
 	{
 #if ABSL_HASH
@@ -1018,6 +1020,7 @@ int main(int argc, char* argv[])
 		putchar('\n');
 	}
 
+	printf("total time = %.3lf s", (now2ms() - start) / 1000000.0);
 	return 0;
 }
 
