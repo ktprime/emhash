@@ -68,6 +68,7 @@ the benchmark code is some tiny changed for injecting new hash map, the result i
 
 my result is benched on 3 linux server(amd, intel, arm64), 1 win10 pc and 2 Laptop): low is best
 ![](int64_t_int64_t.png)
+![](int64_t_int64_t_m1.png)
 ![](int_string.png)
 ![](string_string.png)
 ![](Struct_int64_t.png)

@@ -1315,6 +1315,11 @@ public:
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
+#if EMH_HIGH_LOAD
+        if (required_buckets < 256 && _num_filled < _num_buckets)
+            return false;
+#endif
+
 #if EMH_STATIS
         if (_num_filled > EMH_STATIS) dump_statics(1);
 #endif
