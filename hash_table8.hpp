@@ -349,7 +349,7 @@ public:
         _num_filled = 0;
         _ehead = 0;
         max_load_factor(lf);
-        reserve(bucket);
+        reserve(bucket, true);
     }
 
     HashMap(size_type bucket = 2, float lf = EMH_DEFAULT_LOAD_FACTOR)
@@ -704,7 +704,8 @@ public:
 
     size_type count(const KeyT& key) const noexcept
     {
-        return find_filled_slot(key) == END ? 0 : 1;
+        //return find_filled_slot(key) == END ? 0 : 1;
+        return find_sorted_bucket(key) == END ? 0 : 1;
     }
 
     std::pair<iterator, iterator> equal_range(const KeyT& key)
@@ -841,7 +842,7 @@ public:
 
     void insert(std::initializer_list<value_type> ilist)
     {
-        reserve(ilist.size() + _num_filled);
+        reserve(ilist.size() + _num_filled, false);
         for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
             do_insert(begin->first, begin->second);
     }
@@ -850,7 +851,7 @@ public:
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
-        reserve(std::distance(begin, end) + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled, false);
         for (; begin != end; ++begin) {
             emplace(*begin);
         }
@@ -861,7 +862,7 @@ public:
     {
         Iter citbeg = begin;
         Iter citend = begin;
-        reserve(std::distance(begin, end) + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled, false);
         for (; begin != end; ++begin) {
             if (try_insert_mainbucket(begin->first, begin->second) < 0) {
                 std::swap(*begin, *citend++);
@@ -876,7 +877,7 @@ public:
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
-        reserve(std::distance(begin, end) + _num_filled);
+        reserve(std::distance(begin, end) + _num_filled, false);
         for (; begin != end; ++begin) {
             insert_unique(*begin);
         }
@@ -1120,11 +1121,11 @@ public:
     }
 
     /// Make room for this many elements
-    bool reserve(uint64_t num_elems)
+    bool reserve(uint64_t num_elems, bool force)
     {
 #if EMH_HIGH_LOAD == 0
         const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-        if (EMH_LIKELY(required_buckets < _mask))
+        if (EMH_LIKELY(required_buckets < _mask)) // && !force
             return false;
 
 #elif EMH_HIGH_LOAD
@@ -1166,6 +1167,38 @@ public:
         return (Index *)(new_index);
     }
 
+    bool reserve(uint32_t required_buckets)
+    {
+        if (_num_filled != required_buckets || _num_filled == 0)
+            return reserve(required_buckets, true);
+
+        _ehead = _last = 0;
+
+        std::sort(_pairs, _pairs + _num_filled, [this](const PairT & l, const PairT & r) {
+           const auto hashl = hash_key(l.first), hashr = hash_key(r.first);
+           auto diff = int64_t((hashl & _mask) - (hashr & _mask));
+           if (diff != 0)
+              return diff < 0;
+#if 0
+           return hashl < hashr;
+#else
+           return l.first < r.first;
+#endif
+        });
+
+        memset(_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
+        for (size_type slot = 0; slot < _num_filled; slot++) {
+            const auto& key = EMH_KEY(_pairs, slot);
+            const auto bucket = hash_bucket(key);
+            auto& next_bucket = EMH_BUCKET(_index, bucket);
+            if ((int)next_bucket < 0)
+                EMH_INDEX(_index, bucket) = {1, slot};
+            else
+               next_bucket ++;
+        }
+        return true;
+    }
+
 private:
     void rehash(size_type required_buckets)
     {
@@ -1194,10 +1227,19 @@ private:
         //if (is_copy_trivially())
         //    memcpy(new_pairs, _pairs, _num_filled * sizeof(PairT));
 
-#if 0
-        if (_num_filled > 100)
-        std::sort(old_pairs, old_pairs + _num_filled,
-           [this](const PairT & l, const PairT & r) { return hash_bucket(l.first) < hash_bucket(r.first); });
+#ifdef EMH_SORT
+        if (_num_filled > 1)
+        std::sort(old_pairs, old_pairs + _num_filled, [this](const PairT & l, const PairT & r) {
+           const auto hashl = hash_key(l.first), hashr = hash_key(r.first);
+           auto diff = int64_t((hashl & _mask) - (hashr & _mask));
+           if (diff != 0)
+              return diff < 0;
+#if 1
+           return hashl < hashr;
+#else
+           return l.first < r.first;
+#endif
+        });
 #endif
 
         _pairs       = new_pairs;
@@ -1239,7 +1281,7 @@ private:
     // Can we fit another element?
     inline bool check_expand_need()
     {
-        return reserve(_num_filled);
+        return reserve(_num_filled, false);
     }
 
     size_type slot_to_bucket(const size_type slot) const
@@ -1324,6 +1366,69 @@ private:
         }
 
         return 0;
+    }
+
+    size_type find_hash_bucket(const KeyT& key) const
+    {
+        const auto hashk = hash_key(key);
+        const auto bucket = hashk & _mask;
+        auto next_bucket = EMH_BUCKET(_index, bucket);
+
+        if ((int)next_bucket < 0)
+            return END;
+
+        auto slot = EMH_SLOT(_index, bucket);
+        if (_eq(key, EMH_KEY(_pairs, slot++)))
+            return slot;
+        else if (next_bucket == bucket)
+            return END;
+
+        while (true) {
+            const auto& okey = EMH_KEY(_pairs, slot++);
+            if (_eq(key, okey))
+                return slot;
+
+            const auto hasho = hash_key(okey);
+            if (hasho > hashk)
+               break;
+            else if ((hasho & _mask) != bucket)
+               break;
+            else if (slot >= _num_filled)
+               break;
+        }
+
+        return END;
+    }
+
+    size_type find_sorted_bucket(const KeyT& key) const
+    {
+        const auto bucket = hash_bucket(key);
+        auto slot  = (int)EMH_SLOT(_index, bucket);
+        if (slot < 0 /**|| key < EMH_KEY(_pairs, slot)*/)
+            return END;
+
+        const auto slots = EMH_BUCKET(_index, bucket);
+        if (_eq(key, EMH_KEY(_pairs, slot)))
+            return slot;
+        else if (slots == 1)
+            return END;
+
+#if 1
+        if (key < EMH_KEY(_pairs, slot) || key > EMH_KEY(_pairs, slots + slot - 1))
+            return END;
+#endif
+
+        for (int i = 0; i < slots; i++) {
+            const auto& okey = EMH_KEY(_pairs, slot + i);
+            if (_eq(key, okey))
+                return slot;
+#if 0
+            else if (okey > key)
+                return END;
+#endif
+        }
+
+        return END;
     }
 
     // Find the slot with this key, or return bucket size
@@ -1633,7 +1738,7 @@ one-way seach strategy.
             hash += ((*(uint64_t*)(&key[i]) & ((1ull << diff) - 1))) * KC;
         return hash;
 #elif WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), KC);
+        return wyhash(key.c_str(), key.size(), key.size());
 #else
         return _hasher(key);
 #endif
