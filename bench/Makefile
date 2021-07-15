@@ -38,6 +38,8 @@ endif
 
 ifneq ($(EMH),)
 CXXFLAGS += -DEMH=$(EMH)
+else
+CXXFLAGS += -DEMH=7
 endif
 
 ifneq ($(AH),)

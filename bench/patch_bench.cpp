@@ -48,8 +48,8 @@ using value_type = uint64_t;
 #if EMH == 8
 //#define EMH_HIGH_LOAD  100000
 #include "hash_table8.hpp"
-#elif EMH == 5
-#include "hash_table5.hpp"
+#elif EMH == 7
+#include "hash_table7.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
 #elif PHMAP
@@ -321,8 +321,8 @@ int main(int argc, char** argv)
 
 #elif EMH == 8
   emhash8::HashMap<uint32_t,value_type> test;
-#elif EMH == 5
-  emhash5::HashMap<uint32_t,value_type> test;
+#elif EMH == 7
+  emhash7::HashMap<uint32_t,value_type> test;
 #elif TSL
   tsl::robin_map<uint32_t,value_type> test;
 #elif PHMAP
@@ -333,8 +333,6 @@ int main(int argc, char** argv)
   folly::F14VectorMap<uint32_t,value_type, std::hash<uint32_t>> test;
 #elif FOLLY
   folly::F14ValueMap<uint32_t,value_type, std::hash<uint32_t>> test;
-#elif EMH == 6
-  emhash6::HashMap<uint32_t,value_type> test;
 #endif
 
   std::uniform_int_distribution<size_t> distr;

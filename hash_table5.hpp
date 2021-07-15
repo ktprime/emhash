@@ -1557,7 +1557,7 @@ one-way seach strategy.
                     return _last ++;
 
 #if 1
-                auto tail = (_num_buckets - _last) & _mask;
+                auto tail = (_mask / 2 + _last) & _mask;
                 if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                     return tail;
 #endif

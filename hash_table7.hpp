@@ -1696,20 +1696,20 @@ private:
         }
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1)
-        {
-#if 0
+        if (1) {
+#if 1
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
             if (EMH_LIKELY(bmask2 != 0))
                 return step * SIZE_BIT + CTZ(bmask2);
 #endif
-
+#if 0
             const auto begino = bucket_from - bucket_from % 32;
             const auto beginw = *(size_t*)((uint8_t*)_bitmask + begino / 8);
             if (beginw != 0) {
                 return begino + CTZ(beginw);//reverse beginw
             }
+#endif
         }
 
         auto& _last = EMH_BUCKET(_pairs, _num_buckets);
@@ -1717,7 +1717,7 @@ private:
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
-#if 0
+#if 1
             const auto next1 = (_last + qmask / 2) & qmask;
             const auto bmask1 = *((size_t*)_bitmask + next1);
             if (bmask1 != 0) {
