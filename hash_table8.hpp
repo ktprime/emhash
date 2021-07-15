@@ -704,8 +704,8 @@ public:
 
     size_type count(const KeyT& key) const noexcept
     {
-        //return find_filled_slot(key) == END ? 0 : 1;
-        return find_sorted_bucket(key) == END ? 0 : 1;
+        return find_filled_slot(key) == END ? 0 : 1;
+        //return find_sorted_bucket(key) == END ? 0 : 1;
     }
 
     std::pair<iterator, iterator> equal_range(const KeyT& key)

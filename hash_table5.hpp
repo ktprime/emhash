@@ -1510,7 +1510,7 @@ one-way seach strategy.
         if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
-#if 1
+#ifdef EMH_LPL
         constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
