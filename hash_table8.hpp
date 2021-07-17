@@ -1611,7 +1611,6 @@ one-way seach strategy.
             if (EMH_EMPTY(_index, medium) || EMH_EMPTY(_index, ++medium))
                 return medium;
         }
-
 #else
         constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 4;
         for (size_type step = 2, slot = bucket + 1; ;slot += ++step) {
@@ -1625,7 +1624,7 @@ one-way seach strategy.
                     return _last ++;
 
 #if 1
-                auto tail = (_num_buckets - _last) & _mask;
+                auto tail = (_mask / 2 + _last) & _mask;
                 if (EMH_EMPTY(_index, tail) || EMH_EMPTY(_index, ++tail))
                     return tail;
 #endif

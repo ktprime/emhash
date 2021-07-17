@@ -1703,7 +1703,7 @@ private:
             if (EMH_LIKELY(bmask2 != 0))
                 return step * SIZE_BIT + CTZ(bmask2);
 #endif
-#if 0
+#if 1
             const auto begino = bucket_from - bucket_from % 32;
             const auto beginw = *(size_t*)((uint8_t*)_bitmask + begino / 8);
             if (beginw != 0) {

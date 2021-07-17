@@ -97,9 +97,10 @@
     #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; EMH_SET(bucket)
 #endif
 
-//set bit 1 to 0
-#define EMH_SET(bucket)       _bitmask[bucket / MASK_BIT] &= ~(1u << (bucket % MASK_BIT))
-//#define EMH_EMPTY2(p,bucket)   _bitmask[bucket / MASK_BIT] & (1u << (bucket % MASK_BIT))
+#define EMH_MASK(bucket)               1 << (bucket % MASK_BIT)
+#define EMH_SET(bucket)                _bitmask[bucket / MASK_BIT] &= ~(EMH_MASK(bucket))
+#define EMH_CLS(bucket)                _bitmask[bucket / MASK_BIT] |= EMH_MASK(bucket)
+//#define EMH_EMPTY(bitmask, bucket)     (_bitmask[bucket / MASK_BIT] & (EMH_MASK(bucket))) != 0
 
 #if _WIN32
     #include <intrin.h>
@@ -269,6 +270,11 @@ public:
             }
         }
 
+        size_t bucket()
+        {
+            return _bucket;
+        }
+
         void erase(size_type bucket)
         {
 #ifndef EMH_SAFE_ITER
@@ -363,7 +369,7 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        const_iterator() { }
+        //const_iterator() { }
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket) { init(); }
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
@@ -377,6 +383,11 @@ public:
             } else {
                 _bmask = 0;
             }
+        }
+
+        size_t bucket()
+        {
+            return _bucket;
         }
 
         const_iterator& operator++()
@@ -512,12 +523,9 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable()) {
-            for (size_type bucket = 0; _num_filled > 0; ++bucket) {
-                if (!EMH_EMPTY(_pairs, bucket)) {
-                    _num_filled--;
-                    _pairs[bucket].~PairT();
-                }
+        if (is_triviall_destructable() && _num_filled > 0) {
+            for (auto it = cbegin(); it.bucket() <= _mask; ++it) {
+                _pairs[it.bucket()].~PairT();
             }
         }
         free(_pairs);
@@ -1152,17 +1160,15 @@ public:
 
     void clearkv()
     {
-        for (size_type bucket = 0; _num_filled > 0; ++bucket) {
-            if (EMH_EMPTY(_pairs, bucket))
-                continue;
-            clear_bucket(bucket);
+        for (iterator it = begin(); it.bucket() <= _mask; ++it) {
+            clear_bucket(it.bucket());
         }
     }
 
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable() || !bInCacheLine || _num_filled < _mask / 4)
+        if (is_triviall_destructable() || _num_filled < _mask / 8)
             clearkv();
         else {
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * (_mask + 1));

@@ -384,7 +384,7 @@ public:
         if (is_triviall_destructable())
             clearkv();
 
-        if (_num_buckets < other._num_buckets || _num_buckets > 3 * other._num_buckets) {
+        if (_num_buckets < other._num_buckets || _num_buckets > 2 * other._num_buckets) {
             free(_pairs);
             _pairs = alloc_bucket(other._num_buckets);
         }
@@ -546,7 +546,7 @@ public:
 
     void max_load_factor(float value)
     {
-        if (value < 1.0-1e-4 && value > 0.2f)
+        if (value < 0.999f && value > 0.2f)
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 
@@ -728,6 +728,17 @@ public:
             return { found, found };
         else
             return { found, std::next(found) };
+    }
+
+    template<typename V>
+    V try_get2(const KeyT key, V val) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        const auto found = bucket != _num_buckets;
+        if (found) {
+            return (EMH_VAL(_pairs, bucket)).get();
+        }
+        return nullptr;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
@@ -1095,6 +1106,50 @@ public:
             rehash(_num_filled);
     }
 
+    /// Make room for this many elements
+    bool reserve(uint64_t num_elems)
+    {
+#if EMH_HIGH_LOAD < 1000
+        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
+        if (EMH_LIKELY(required_buckets < _mask))
+            return false;
+
+#else
+        const auto required_buckets = (uint32_t)(num_elems + num_elems * 1 / 9);
+        if (EMH_LIKELY(required_buckets < _mask))
+            return false;
+
+        else if (_num_buckets < 16 && _num_filled < _num_buckets)
+            return false;
+
+        else if (_num_buckets > EMH_HIGH_LOAD) {
+            if (_ehead == 0) {
+                set_empty();
+                return false;
+            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_pairs, _ehead) != 0-_ehead) {
+                return false;
+            }
+        }
+#endif
+
+#if EMH_STATIS
+        if (_num_filled > 1'000'000) dump_statics();
+#endif
+
+        //assert(required_buckets < max_size());
+        rehash(required_buckets + 2);
+        return true;
+    }
+
+private:
+
+    static inline PairT* alloc_bucket(uint32_t num_buckets)
+    {
+        const auto new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
+        return (PairT *)(new_pairs);
+    }
+
+#if EMH_HIGH_LOAD
     void set_empty()
     {
         auto prev = 0;
@@ -1154,49 +1209,8 @@ public:
         EMH_BUCKET(_pairs, _ehead) = -bucket;
         //        _ehead = bucket;
     }
-
-    /// Make room for this many elements
-    bool reserve(uint64_t num_elems)
-    {
-#if EMH_HIGH_LOAD < 1000
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
-        if (EMH_LIKELY(required_buckets < _mask))
-            return false;
-
-#else
-        const auto required_buckets = (uint32_t)(num_elems + num_elems * 1 / 9);
-        if (EMH_LIKELY(required_buckets < _mask))
-            return false;
-
-        else if (_num_buckets < 16 && _num_filled < _num_buckets)
-            return false;
-
-        else if (_num_buckets > EMH_HIGH_LOAD) {
-            if (_ehead == 0) {
-                set_empty();
-                return false;
-            } else if (/*_num_filled + 100 < _num_buckets && */EMH_BUCKET(_pairs, _ehead) != 0-_ehead) {
-                return false;
-            }
-        }
 #endif
 
-#if EMH_STATIS
-        if (_num_filled > 1'000'000) dump_statics();
-#endif
-
-        //assert(required_buckets < max_size());
-        rehash(required_buckets + 2);
-        return true;
-    }
-
-    static inline PairT* alloc_bucket(uint32_t num_buckets)
-    {
-        const auto new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
-        return (PairT *)(new_pairs);
-    }
-
-private:
     void rehash(uint32_t required_buckets)
     {
         if (required_buckets < _num_filled)
@@ -1259,7 +1273,6 @@ private:
         assert(old_num_filled == _num_filled);
     }
 
-private:
     // Can we fit another element?
     inline bool check_expand_need()
     {
@@ -1533,12 +1546,12 @@ one-way seach strategy.
                 return _last++;
             ++_last &= _mask;
 
-#if EMH_LINEAR3 || 1
+#ifndef EMH_LINEAR3
             auto tail = _mask - _last;
             if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                 return tail;
 #else
-            auto medium = (_num_filled + _last) & _mask;
+            auto medium = (_mask / 2 + _last) & _mask;
             if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
                 return medium;
 #endif
@@ -1546,24 +1559,26 @@ one-way seach strategy.
 
 #else
         constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 4;
-        for (uint32_t step = 2, slot = bucket + 1; ;slot += ++step) {
+        for (uint32_t step = 2, slot = bucket + 1; ;slot += 2, step ++) {
             auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                 return bucket1;
 
             if (step > linear_probe_length) {
-                _last &= _mask;
-                if (EMH_EMPTY(_pairs, ++_last) || EMH_EMPTY(_pairs, ++_last))
-                    return _last ++;
-
+                if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
+                    return _last++;
+                ++_last &= _mask;
 #if 1
-                auto tail = (_mask / 2 + _last) & _mask;
+                auto tail = _mask - _last;
                 if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                     return tail;
 #endif
-                auto medium = (_num_filled + _last) & _mask;
+#if EMH_LINEAR3
+                //auto medium = (_num_filled + _last) & _mask;
+                auto medium = (_num_buckets / 2 + _last) & _mask;
                 if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
                     return _last = medium;
+#endif
             }
         }
 #endif
