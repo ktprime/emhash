@@ -755,7 +755,7 @@ public:
     {
         const auto bucket = hash_bucket(key) & _mask;
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if (EMH_EMPTY(_pairs, bucket))
             return 0;
         else if (bucket == next_bucket)
             return bucket + 1;
@@ -767,10 +767,10 @@ public:
     //Returns the number of elements in bucket n.
     size_type bucket_size(const size_type bucket) const
     {
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if (EMH_EMPTY(_pairs, bucket))
             return 0;
 
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
         next_bucket = hash_bucket(EMH_KEY(_pairs, bucket)) & _mask;
         size_type bucket_size = 1;
 
@@ -788,10 +788,10 @@ public:
 
     size_type get_main_bucket(const size_type bucket) const
     {
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if (EMH_EMPTY(_pairs, bucket))
             return INACTIVE;
 
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
         const auto main_bucket = hash_bucket(bucket_key) & _mask;
         return main_bucket;
@@ -811,10 +811,10 @@ public:
 
     int get_bucket_info(const size_type bucket, size_type steps[], const size_type slots) const
     {
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if (EMH_EMPTY(_pairs, bucket))
             return -1;
 
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if ((hash_bucket(EMH_KEY(_pairs, bucket)) & _mask) != bucket)
             return 0;
         else if (next_bucket == bucket)
@@ -869,7 +869,7 @@ public:
             finds += bucketsi * i * (i + 1) / 2;
             miss  += bucketsi * i * i;
             auto errs = (bucketsi * 1.0 * i / _num_filled - poisson) * 100 / poisson;
-            bsize += sprintf(buff + bsize, "  %2u  %8lu  %0.8lf|%0.2lf%%  %2.3lf\n",
+            bsize += sprintf(buff + bsize, "  %2u  %8ld  %0.8lf|%0.2lf%%  %2.3lf\n",
                     i, bucketsi, bucketsi * 1.0 * i / _num_filled, errs, sumn * 100.0 / _num_filled);
             if (sumn >= _num_filled)
                 break;
@@ -1103,8 +1103,7 @@ public:
     size_type try_insert_mainbucket(const KeyT& key, const ValueT& value)
     {
         const auto bucket = hash_bucket(key) & _mask;
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((int)next_bucket >= 0)
+        if (!EMH_EMPTY(_pairs, bucket))
             return INACTIVE;
 
         EMH_NEW(key, value, bucket);
@@ -1266,7 +1265,7 @@ public:
     }
 
     /// Erase an element typedef an iterator without return next iterator
-    void erase_(const_iterator it)
+    void _erase(const_iterator it)
     {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
@@ -1669,13 +1668,6 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from)
     {
-#if 0
-        auto bucket1 = bucket_from + 1;
-        if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
-            return bucket1;
-#endif
-
-        //fast find by bit
 #if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
         const auto begin = (uint8_t*)_bitmask + bucket_from / 8;
@@ -1718,7 +1710,8 @@ private:
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
 #if 1
-            const auto next1 = (_last + qmask / 2) & qmask;
+            const auto next1 = (qmask / 2 + _last)  & qmask;
+//            const auto next1 = qmask - _last;
             const auto bmask1 = *((size_t*)_bitmask + next1);
             if (bmask1 != 0) {
                 _last = next1;
