@@ -116,10 +116,9 @@ static inline uint64_t _wyr4(const uint8_t *p) {
 }
 #endif
 static inline uint64_t _wyr3(const uint8_t *p, size_t k) { return (((uint64_t)p[0])<<16)|(((uint64_t)p[k>>1])<<8)|p[k-1];}
-
 //wyhash main function
 static inline uint64_t wyhash(const void *key, size_t len, uint64_t seed, const uint64_t *secret){
-  const uint8_t *p=(const uint8_t *)key; seed^=*secret;	uint64_t	a,	b;
+  const uint8_t *p=(const uint8_t *)key; seed^=*secret; uint64_t a, b;
   if(_likely_(len<=16)){
     if(_likely_(len>=4)){ a=(_wyr4(p)<<32)|_wyr4(p+((len>>3)<<2)); b=(_wyr4(p+len-4)<<32)|_wyr4(p+len-4-((len>>3)<<2)); }
     else if(_likely_(len>0)){ a=_wyr3(p,len); b=0;}
@@ -146,7 +145,7 @@ static inline uint64_t wyhash(const void *key, size_t len, uint64_t seed, const 
 //the default secret parameters
 static const uint64_t _wyp[4] = {0xa0761d6478bd642full, 0xe7037ed1a0b428dbull, 0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
 
-static inline uint64_t wyhash(const void *key, size_t len, uint64_t seed) { return wyhash(key, len, seed, &_wyp[0]); }
+static inline uint64_t wyhash(const void *key, size_t len, uint64_t seed) { return wyhash(key, len, seed, _wyp); }
 
 //a useful 64bit-64bit mix function to produce deterministic pseudo random numbers that can pass BigCrush and PractRand
 static inline uint64_t wyhash64(uint64_t A, uint64_t B){ A^=0xa0761d6478bd642full; B^=0xe7037ed1a0b428dbull; _wymum(&A,&B); return _wymix(A^0xa0761d6478bd642full,B^0xe7037ed1a0b428dbull);}
@@ -198,7 +197,7 @@ static inline void make_secret(uint64_t seed, uint64_t *secret){
     First we use pos=hash1(key) to approximately locate the bucket.
     Then we search signature=hash2(key) from pos linearly.
     If we find a bucket with matched signature we report the bucket
-    Or if we meet a bucket whose signifure=0, we report a new position to insert
+    Or if we meet a bucket whose signature=0, we report a new position to insert
     The signature collision probability is very low as we usually searched N~10 buckets.
     By combining hash1 and hash2, we acturally have 128 bit anti-collision strength.
     hash1 and hash2 can be the same function, resulting lower collision resistance but faster.
@@ -216,6 +215,7 @@ static inline void make_secret(uint64_t seed, uint64_t *secret){
     if(pos<size)	value[pos]++;	//	we process the vallue
     else	cerr<<"the key does not exist\n";
 */
+/*
 #ifdef	WYHASHMAP_WEAK_SMALL_FAST	// for small hashmaps whose size < 2^24 and acceptable collision
 typedef	uint32_t	wyhashmap_t;
 #else
@@ -241,6 +241,7 @@ static	inline	size_t	wyhashmap(wyhashmap_t	*idx,	size_t	idx_size,	const	void *ke
 	}
 	return	i;
 }
+*/
 #endif
 
 /* The Unlicense

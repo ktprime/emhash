@@ -837,7 +837,7 @@ namespace priv {
 
         using allocator_type = Alloc;
         using key_type = Key;
-        using size_type = std::make_signed<size_t>::type;
+        using size_type = std::size_t ;
         using difference_type = ptrdiff_t;
 
         // True if this is a multiset or multimap.
@@ -1609,10 +1609,10 @@ namespace priv {
 
         static node_type *EmptyNode() {
 #ifdef _MSC_VER
-            static EmptyNodeType* empty_node = new EmptyNodeType;
+            static EmptyNodeType empty_node;
             // This assert fails on some other construction methods.
-            assert(empty_node->parent == empty_node);
-            return empty_node;
+            assert(empty_node.parent == &empty_node);
+            return &empty_node;
 #else
             static constexpr EmptyNodeType empty_node(
                 const_cast<EmptyNodeType *>(&empty_node));
@@ -2755,7 +2755,7 @@ namespace priv {
             return {0, _begin};
         }
 
-        if (count == size_) {
+        if (count == (difference_type)size_) {
             clear();
             return {count, this->end()};
         }

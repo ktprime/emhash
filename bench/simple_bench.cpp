@@ -51,9 +51,9 @@ void bench(char const* title)
     {
         for (int i = 0; i < 10; ++i) {
             map.clear();
-            for (int32_t i = 0; i < 1000000; i++)
+            for (int32_t j = 0; j < 1000000; j++)
             {
-                map.emplace(i, "abcd");
+                map.emplace(i + j, "abcd");
             }
         }
     }
@@ -77,11 +77,7 @@ void bench(char const* title)
     {
         for (size_t x = 0; x < 10; ++x) {
             for (int32_t i = 0; i < 5000000; i++) {
-                auto it = map.find(i);
-                if (it != map.end())
-                {
-                    result += it->second.size();
-                }
+                result = map.count(i);
             }
         }
     }

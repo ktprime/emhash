@@ -76,16 +76,17 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 #pragma once
 
-#include <cstdint>
-#include <functional>
 #include <cstring>
 #include <string>
 #include <cmath>
 #include <cstdlib>
+#include <type_traits>
 #include <cassert>
 #include <utility>
+#include <cstdint>
+#include <functional>
 #include <iterator>
-#include <type_traits>
+#include <algorithm>
 
 #ifdef __has_include
     #if __has_include("wyhash.h")
@@ -407,7 +408,7 @@ public:
         void goto_next_element()
         {
 #ifdef EMH_SAFE_ITER
-            auto _bitmask = _map->_bitmask;
+            auto* _bitmask = _map->_bitmask;
             do {
                 _bucket++;
             } while (EMH_SET(_bucket));
@@ -499,7 +500,7 @@ public:
         void goto_next_element()
         {
 #ifdef EMH_SAFE_ITER
-            auto _bitmask = _map->_bitmask;
+            auto* _bitmask = _map->_bitmask;
             do {
                 _bucket++;
             } while (EMH_SET(_bucket));
@@ -524,7 +525,7 @@ public:
         size_type _from;
     };
 
-    void init(size_type bucket, float lf = 0.90f)
+    void init(size_type bucket, float lf = 0.95f)
     {
 
         _pairs = nullptr;
@@ -534,7 +535,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(size_type bucket = 4, float lf = 0.90f)
+    HashMap(size_type bucket = 4, float lf = 0.95f)
     {
         init(bucket, lf);
     }
@@ -613,7 +614,7 @@ public:
 //        _bitmask     = decltype(_bitmask)((uint8_t*)_pairs + ((uint8_t*)other._bitmask - (uint8_t*)other._pairs));
         _bitmask     = decltype(_bitmask)(_pairs + PACK_SIZE + other._num_buckets);
 
-        auto opairs  = other._pairs;
+        auto* opairs  = other._pairs;
         if (is_copy_trivially())
             memcpy(_pairs, opairs, AllocSize(_num_buckets));
         else {
@@ -644,11 +645,12 @@ public:
     // -------------------------------------------------------------
     iterator begin()
     {
+        if (0 == _num_filled)
+            return {this, _mask + 1};
+
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this,  CTZ(bmask)};
-        else if (0 == _num_filled)
-            return {this, _mask + 1};
+            return { this,  CTZ(bmask) };
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -664,6 +666,16 @@ public:
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
+    }
+
+    iterator last()
+    {
+        if (_num_filled == 0)
+            return end();
+
+        uint32_t bucket = _mask;
+        while (EMH_EMPTY(_pairs, bucket)) bucket--;
+        return {this, bucket};
     }
 
     const_iterator begin() const
@@ -841,7 +853,7 @@ public:
         const int slots = 128;
         size_type buckets[slots + 1] = {0};
         size_type steps[slots + 1]   = {0};
-        char buff[1024 * 16];
+        char buff[1024 * 8];
         for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
             auto bsize = get_bucket_info(bucket, steps, slots);
             if (bsize >= 0)
@@ -854,7 +866,7 @@ public:
         int bsize = sprintf (buff, "============== buckets size ration ========\n");
 
         miss += _num_buckets - _num_filled;
-        for (size_type i = 1, factorial = 1; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
+        for (int i = 1, factorial = 1; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
             double poisson = fk / factorial; factorial *= i; fk *= lf;
             if (poisson > 1e-13 && i < 20)
             sum_poisson += poisson * 100.0 * (i - 1) / i;
@@ -869,7 +881,7 @@ public:
             finds += bucketsi * i * (i + 1) / 2;
             miss  += bucketsi * i * i;
             auto errs = (bucketsi * 1.0 * i / _num_filled - poisson) * 100 / poisson;
-            bsize += sprintf(buff + bsize, "  %2u  %8ld  %0.8lf|%0.2lf%%  %2.3lf\n",
+            bsize += sprintf(buff + bsize, "  %2d  %8ld  %0.8lf|%0.2lf%%  %2.3lf\n",
                     i, bucketsi, bucketsi * 1.0 * i / _num_filled, errs, sumn * 100.0 / _num_filled);
             if (sumn >= _num_filled)
                 break;
@@ -881,13 +893,14 @@ public:
             if (steps[i] == 0)
                 continue;
             if (steps[i] > 10)
-                bsize += sprintf(buff + bsize, "  %2u  %8u  %0.2lf  %.2lf\n", i, steps[i], steps[i] * 100.0 / bucket_coll, sums * 100.0 / bucket_coll);
+                bsize += sprintf(buff + bsize, "  %2d  %8u  %0.2lf  %.2lf\n", (int)i, steps[i], steps[i] * 100.0 / bucket_coll, sums * 100.0 / bucket_coll);
         }
 
         if (sumb == 0)  return;
 
         bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n",
                 _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
+
         bsize += sprintf(buff + bsize, "  collision,poisson,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%%  %.2lf|%.2lf, %.2lf\n",
                  (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled,
                  finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
@@ -1070,8 +1083,8 @@ public:
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
-            do_insert(begin->first, begin->second);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(it->first, it->second);
     }
 
     template <typename Iter>
@@ -1326,7 +1339,7 @@ public:
 #endif
 
 #if EMH_STATIS
-        if (_num_filled > EMH_STATIS) dump_statics(1);
+        if (_num_filled > EMH_STATIS) dump_statics(true);
 #endif
         rehash(required_buckets + 2);
         return true;
@@ -1338,20 +1351,20 @@ private:
         if (required_buckets < _num_filled)
             return;
 
-        uint64_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 8u;
+        auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 8u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
-        auto new_pairs = (PairT*)malloc(AllocSize(num_buckets));
+        auto* new_pairs = (PairT*)malloc(AllocSize(num_buckets));
         //TODO: throwOverflowError
         auto old_num_filled = _num_filled;
         auto old_pairs = _pairs;
-        auto obmask    = _bitmask;
+        auto* obmask   = _bitmask;
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
-        memset(new_pairs + _num_buckets, 0, sizeof(PairT) * PACK_SIZE);
+        memset((char*)(new_pairs + _num_buckets), 0, sizeof(PairT) * PACK_SIZE);
 
         const auto num_byte = num_buckets / 8;
         _bitmask     = decltype(_bitmask)(new_pairs + PACK_SIZE + num_buckets);
@@ -1670,13 +1683,13 @@ private:
     {
 #if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
-        const auto begin = (uint8_t*)_bitmask + bucket_from / 8;
+        auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
 #else
         const auto boset = bucket_from % SIZE_BIT;
-        const auto begin = (size_t*)_bitmask + bucket_from / SIZE_BIT;
+        auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
 #endif
 
-        const auto bmask = *(size_t*)(begin) >> boset;
+        const auto bmask = *(size_t*)(start) >> boset;
         if (EMH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
 //            if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
@@ -1815,7 +1828,7 @@ private:
 #elif EMH_WYHASH64
         return wyhash64(key, KC);
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
@@ -1830,7 +1843,7 @@ private:
             hash = key[i] + hash * 131;
         return hash;
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
@@ -1840,7 +1853,7 @@ private:
 #ifdef EMH_FIBONACCI_HASH
         return _hasher(key) * KC;
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 

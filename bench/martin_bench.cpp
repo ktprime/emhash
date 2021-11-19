@@ -12,6 +12,7 @@
 #include <array>
 
 #ifdef _WIN32
+#define NOMINMAX
 # include <windows.h>
 #else
 #include <sched.h>
@@ -22,6 +23,10 @@
 #include <sys/resource.h>
 #endif
 
+#if 0
+#include "ahash/ahash.c"
+#include "ahash/random_state.c"
+#endif
 #include "wyhash.h"
 using namespace std;
 
@@ -43,16 +48,18 @@ using namespace std;
 #include "hash_table8.hpp"
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600
+#include "martin/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "phmap/phmap.h"           //https://github.com/tessil/robin-map
+
+#if ET
 #include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
 #include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
-#include "martin/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
-
 //#include "emilib/emilib32.hpp"
 //#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
 
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 #include "ska/bytell_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
-#include "phmap/phmap.h"           //https://github.com/tessil/robin-map
+#endif
 #endif
 
 #if ABSL
@@ -70,6 +77,8 @@ using namespace std;
 #endif
 #endif
 
+
+
 static auto RND = time(0);
 
 static std::map<std::string, std::string> show_name =
@@ -81,10 +90,10 @@ static std::map<std::string, std::string> show_name =
 	{"emhash4", "emhash4"},
 #endif
 	{"emhash7", "emhash7"},
-	{"emhash8", "emhash8"},
+//	{"emhash8", "emhash8"},
 
 	{"emhash5", "emhash5"},
-	{"emhash6", "emhash6"},
+//	{"emhash6", "emhash6"},
 #if ABSL
 	{"absl", "absl flat"},
 #endif
@@ -805,8 +814,8 @@ int main(int argc, char* argv[])
 		typedef std::hash<std::string> hash_func;
 #endif
 
-#if EM3
 		{emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+#if EM3
 		{emhash2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 		{emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 		{emhash4::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
@@ -846,8 +855,8 @@ int main(int argc, char* argv[])
 		{emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-		{emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 #endif
+		{emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 		{emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
@@ -897,9 +906,9 @@ int main(int argc, char* argv[])
 #if FOLLY
 		{ folly::F14VectorMap <size_t, size_t, hash_func> pmap; bench_randomFind(pmap); }
 #endif
+		{ emhash8::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 #if EM3
 		{ emhash4::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
-		{ emhash8::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 		{ emhash3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap); }
 #endif
@@ -925,12 +934,12 @@ int main(int argc, char* argv[])
 		{ emhash7::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 //		{ emilib1::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+		{ emhash8::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash5::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #if EM3
 		{ emhash2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash4::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 		{ emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-		{ emhash8::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #endif
 #if ET
 //		{ emilib3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
@@ -957,8 +966,8 @@ int main(int argc, char* argv[])
 //		{ emilib1::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-#if EM3
 		{ emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+#if EM3
 		{ emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 		{ emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
@@ -994,9 +1003,9 @@ int main(int argc, char* argv[])
 		{ emhash5::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 //		{ emilib1::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 		{ emhash7::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+		{ emhash8::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #if EM3
 		{ emhash2::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-		{ emhash8::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 		{ emhash4::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 		{ emhash3::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #endif
@@ -1020,7 +1029,7 @@ int main(int argc, char* argv[])
 		putchar('\n');
 	}
 
-	printf("total time = %.3lf s", (now2ms() - start) / 1000000.0);
+	printf("total time = %.3lf s", (now2ms() - start) / 1000.0);
 	return 0;
 }
 

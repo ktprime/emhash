@@ -55,6 +55,11 @@
     #if __has_include("wyhash.h")
     #include "wyhash.h"
     #endif
+    #if __has_include("ahash.h")
+    #include "ahash.h"
+    #endif
+#elif AHASH || AHASH_AHASH_H
+    #include "ahash.h"
 #elif EMH_WY_HASH
     #include "wyhash.h"
 #endif
@@ -170,7 +175,7 @@ struct entry {
         return *this;
     }
 
-    entry& operator = (entry& o)
+    entry& operator = (const entry& o)
     {
         second = o.second;
         bucket = o.bucket;
@@ -677,10 +682,10 @@ public:
         }
 
         if (sumb == 0)  return;
-        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%zd/ %.2lf%%/%.2lf%%/%.2lf\n",
-                _num_filled, _num_filled * 1.0 / sumb, sizeof(PairT), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
-        assert(sumn == _num_filled);
+        printf("    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%d/ %.2lf%%/%.2lf%%/%.2lf\n",
+                _num_filled, _num_filled * 1.0 / sumb, int(sizeof(PairT)), (collision * 100.0 / _num_filled), (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumc == collision);
+        assert(sumn == _num_filled);
         puts("============== buckets size end =============");
     }
 #endif
@@ -731,7 +736,7 @@ public:
     }
 
     template<typename V>
-    V try_get2(const KeyT key, V val) const
+    V try_rget(const KeyT key, V val) const
     {
         const auto bucket = find_filled_bucket(key);
         const auto found = bucket != _num_buckets;
@@ -1094,7 +1099,7 @@ public:
         if (is_triviall_destructable() || sizeof(PairT) > EMH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
             clearkv();
         else
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+            memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 #endif
 
         _last = _num_filled = 0;
@@ -1145,7 +1150,7 @@ private:
 
     static inline PairT* alloc_bucket(uint32_t num_buckets)
     {
-        const auto new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
+        auto* new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
         return (PairT *)(new_pairs);
     }
 
@@ -1235,8 +1240,9 @@ private:
         for (uint32_t bucket = 0; bucket < num_buckets; bucket++)
             EMH_BUCKET(new_pairs, bucket) = INACTIVE;
 
-        memset(new_pairs + num_buckets, 0, sizeof(PairT) * 2);
+        memset((char*)(new_pairs + num_buckets), 0, sizeof(PairT) * 2);
         _pairs       = new_pairs;
+
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if ((int)EMH_BUCKET(old_pairs, src_bucket) < 0)
                 continue;
@@ -1501,7 +1507,7 @@ private:
 
 /***
   Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
-Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing¡ªthe most cache-friendly alternative¡ªis typically used.
+Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing the most cache-friendly alternative is typically used.
 
     It's the core algorithm of this hash map with highly optimization/benchmark.
 normaly linear probing is inefficient with high load factor, it use a new 3-way linear
@@ -1683,8 +1689,10 @@ one-way seach strategy.
         if (diff != 0)
             hash += ((*(uint64_t*)(&key[i]) & ((1ull << diff) - 1))) * KC;
         return hash;
+#elif defined(AHASH_AHASH_H)
+        return ahash64(key.c_str(), key.size(), KC);
 #elif WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), KC);
+        return wyhash(key.c_str(), key.size(), key.size() + KC);
 #else
         return _hasher(key);
 #endif

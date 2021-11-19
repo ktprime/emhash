@@ -44,11 +44,11 @@ static constexpr size_t kMaxFlatLength = kMaxFlatSize - kFlatOverhead;
 static constexpr size_t kMinFlatLength = kMinFlatSize - kFlatOverhead;
 
 constexpr uint8_t AllocatedSizeToTagUnchecked(size_t size) {
-  return static_cast<uint8_t>((size <= 1024) ? size / 8
-                                             : 128 + size / 32 - 1024 / 32);
+  return static_cast<uint8_t>((size <= 1024) ? size / 8 + 2
+                                             : 130 + size / 32 - 1024 / 32);
 }
 
-static_assert(kMinFlatSize / 8 >= FLAT, "");
+static_assert(kMinFlatSize / 8 + 2 >= FLAT, "");
 static_assert(AllocatedSizeToTagUnchecked(kMaxFlatSize) <= MAX_FLAT_TAG, "");
 
 // Helper functions for rounded div, and rounding to exact sizes.
@@ -73,7 +73,7 @@ inline uint8_t AllocatedSizeToTag(size_t size) {
 
 // Converts the provided tag to the corresponding allocated size
 constexpr size_t TagToAllocatedSize(uint8_t tag) {
-  return (tag <= 128) ? (tag * 8) : (1024 + (tag - 128) * 32);
+  return (tag <= 130) ? ((tag - 2) * 8) : (1024 + (tag - 130) * 32);
 }
 
 // Converts the provided tag to the corresponding available data length
@@ -82,7 +82,7 @@ constexpr size_t TagToLength(uint8_t tag) {
 }
 
 // Enforce that kMaxFlatSize maps to a well-known exact tag value.
-static_assert(TagToAllocatedSize(224) == kMaxFlatSize, "Bad tag logic");
+static_assert(TagToAllocatedSize(226) == kMaxFlatSize, "Bad tag logic");
 
 struct CordRepFlat : public CordRep {
   // Creates a new flat node.
@@ -117,9 +117,20 @@ struct CordRepFlat : public CordRep {
 #endif
   }
 
+  // Create a CordRepFlat containing `data`, with an optional additional
+  // extra capacity of up to `extra` bytes. Requires that `data.size()`
+  // is less than kMaxFlatLength.
+  static CordRepFlat* Create(absl::string_view data, size_t extra = 0) {
+    assert(data.size() <= kMaxFlatLength);
+    CordRepFlat* flat = New(data.size() + (std::min)(extra, kMaxFlatLength));
+    memcpy(flat->Data(), data.data(), data.size());
+    flat->length = data.size();
+    return flat;
+  }
+
   // Returns a pointer to the data inside this flat rep.
-  char* Data() { return storage; }
-  const char* Data() const { return storage; }
+  char* Data() { return reinterpret_cast<char*>(storage); }
+  const char* Data() const { return reinterpret_cast<const char*>(storage); }
 
   // Returns the maximum capacity (payload size) of this instance.
   size_t Capacity() const { return TagToLength(tag); }

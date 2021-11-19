@@ -1359,6 +1359,11 @@ public:
                                    std::forward<Args>(args)...);
     }
 
+    template <class... Args, typename std::enable_if<IsDecomposable<Args...>::value, int>::type = 0>
+    std::pair<iterator, bool> emplace_with_hash(size_t hashval, Args&&... args) {
+        return PolicyTraits::apply(EmplaceDecomposableHashval{*this, hashval}, std::forward<Args>(args)...);
+    }
+
     // This overload kicks in if we cannot deduce the key from args. It constructs
     // value_type unconditionally and then either moves it into the table or
     // destroys.
@@ -1374,9 +1379,24 @@ public:
         return PolicyTraits::apply(InsertSlot<true>{*this, std::move(*slot)}, elem);
     }
 
+    template <class... Args, typename std::enable_if<!IsDecomposable<Args...>::value, int>::type = 0>
+    std::pair<iterator, bool> emplace_with_hash(size_t hashval, Args&&... args) {
+        typename std::aligned_storage<sizeof(slot_type), alignof(slot_type)>::type raw;
+        slot_type* slot = reinterpret_cast<slot_type*>(&raw);
+
+        PolicyTraits::construct(&alloc_ref(), slot, std::forward<Args>(args)...);
+        const auto& elem = PolicyTraits::element(slot);
+        return PolicyTraits::apply(InsertSlotWithHash<true>{*this, std::move(*slot), hashval}, elem);
+    }
+
     template <class... Args>
     iterator emplace_hint(const_iterator, Args&&... args) {
         return emplace(std::forward<Args>(args)...).first;
+    }
+
+    template <class... Args>
+    iterator emplace_hint_with_hash(size_t hashval, const_iterator, Args&&... args) {
+        return emplace_with_hash(hashval, std::forward<Args>(args)...).first;
     }
 
     // Extension API: support for lazy emplace.
@@ -1628,20 +1648,22 @@ public:
     // called heterogeneous key support.
     template <class K = key_type>
     iterator find(const key_arg<K>& key, size_t hashval) {
-        auto seq = probe(hashval);
-        while (true) {
-            Group g{ctrl_ + seq.offset()};
-            for (int i : g.Match((h2_t)H2(hashval))) {
-                if (PHMAP_PREDICT_TRUE(PolicyTraits::apply(
-                                          EqualElement<K>{key, eq_ref()},
-                                          PolicyTraits::element(slots_ + seq.offset((size_t)i)))))
-                    return iterator_at(seq.offset((size_t)i));
-            }
-            if (PHMAP_PREDICT_TRUE(g.MatchEmpty())) 
-                return end();
-            seq.next();
-        }
+        size_t offset;
+        if (find_impl(key, hashval, offset))
+            return iterator_at(offset);
+        else
+            return end();
     }
+
+    template <class K = key_type>
+    pointer find_ptr(const key_arg<K>& key, size_t hashval) {
+        size_t offset;
+        if (find_impl(key, hashval, offset))
+            return &PolicyTraits::element(slots_ + offset);
+        else
+            return nullptr;
+    }
+
     template <class K = key_type>
     iterator find(const key_arg<K>& key) {
         return find(key, this->hash(key));
@@ -1722,6 +1744,24 @@ private:
     template <class Container, typename Enabler>
     friend struct phmap::priv::hashtable_debug_internal::HashtableDebugAccess;
 
+    template <class K = key_type>
+    bool find_impl(const key_arg<K>& key, size_t hashval, size_t& offset) {
+        auto seq = probe(hashval);
+        while (true) {
+            Group g{ ctrl_ + seq.offset() };
+            for (int i : g.Match((h2_t)H2(hashval))) {
+                offset = seq.offset((size_t)i);
+                if (PHMAP_PREDICT_TRUE(PolicyTraits::apply(
+                    EqualElement<K>{key, eq_ref()},
+                    PolicyTraits::element(slots_ + offset))))
+                    return true;
+            }
+            if (PHMAP_PREDICT_TRUE(g.MatchEmpty()))
+                return false;
+            seq.next();
+        }
+    }
+
     struct FindElement 
     {
         template <class K, class... Args>
@@ -1769,6 +1809,15 @@ private:
             return s.emplace_decomposable(key, s.hash(key), std::forward<Args>(args)...);
         }
         raw_hash_set& s;
+    };
+
+    struct EmplaceDecomposableHashval {
+        template <class K, class... Args>
+        std::pair<iterator, bool> operator()(const K& key, Args&&... args) const {
+            return s.emplace_decomposable(key, hashval, std::forward<Args>(args)...);
+        }
+        raw_hash_set& s;
+        size_t hashval;
     };
 
     template <bool do_destroy>
@@ -3186,14 +3235,16 @@ public:
     // NOTE: This is a very low level operation and should not be used without
     // specific benchmarks indicating its importance.
     // --------------------------------------------------------------------
-    template <class K = key_type>
-    void prefetch(const key_arg<K>& key) const {
-        (void)key;
-        size_t hashval     = this->hash(key);
+    void prefetch_hash(size_t hashval) const {
         const Inner& inner = sets_[subidx(hashval)];
         const auto&  set   = inner.set_;
         typename Lockable::SharedLock m(const_cast<Inner&>(inner));
         set.prefetch_hash(hashval);
+    }
+
+    template <class K = key_type>
+    void prefetch(const key_arg<K>& key) const {
+        prefetch_hash(this->hash(key));
     }
 
     // The API of find() has two extensions.
@@ -3376,12 +3427,20 @@ private:
 
 protected:
     template <class K = key_type, class L = typename Lockable::SharedLock>
-    iterator find(const key_arg<K>& key, size_t hashval, L &mutexlock) {
+    pointer find_ptr(const key_arg<K>& key, size_t hashval, L& mutexlock)
+    {
         Inner& inner = sets_[subidx(hashval)];
-        auto&  set = inner.set_;
+        auto& set = inner.set_;
         mutexlock = std::move(L(inner));
-        auto  it = set.find(key, hashval);
-        return make_iterator(&inner, it);
+        return set.find_ptr(key, hashval);
+    }
+
+    template <class K = key_type, class L = typename Lockable::SharedLock>
+    iterator find(const key_arg<K>& key, size_t hashval, L& mutexlock) {
+        Inner& inner = sets_[subidx(hashval)];
+        auto& set = inner.set_;
+        mutexlock = std::move(L(inner));
+        return make_iterator(&inner, set.find(key, hashval));
     }
 
     template <class K>
@@ -3603,7 +3662,7 @@ public:
     template <class K = key_type, class... Args>
     iterator try_emplace_with_hash(size_t hashval, const_iterator, const key_arg<K>& k, Args&&... args) {
         return try_emplace_with_hash(hashval, k, std::forward<Args>(args)...).first;
-    }    
+    }
 
     // if map contains key, lambda is called with the mapped value (under read lock protection),
     // and if_contains returns true. This is a const API and lambda should not modify the value
@@ -3612,6 +3671,16 @@ public:
     bool if_contains(const key_arg<K>& key, F&& f) const {
         return const_cast<parallel_hash_map*>(this)->template 
             modify_if_impl<K, F, typename Lockable::SharedLock>(key, std::forward<F>(f));
+    }
+
+    // if map contains key, lambda is called with the mapped value without read lock protection,
+    // and if_contains_unsafe returns true. This is a const API and lambda should not modify the value
+    // This should be used only if we know that no other thread may be mutating the map at the time.
+    // -----------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool if_contains_unsafe(const key_arg<K>& key, F&& f) const {
+        return const_cast<parallel_hash_map*>(this)->template 
+            modify_if_impl<K, F, LockableBaseImpl<phmap::NullMutex>::DoNothing>(key, std::forward<F>(f));
     }
 
     // if map contains key, lambda is called with the mapped value  (under write lock protection),
@@ -3674,10 +3743,10 @@ private:
         static_assert(std::is_invocable<F, mapped_type&>::value);
 #endif
         L m;
-        auto it = this->template find<K, L>(key, this->hash(key), m);
-        if (it == this->end())
+        auto ptr = this->template find_ptr<K, L>(key, this->hash(key), m);
+        if (ptr == nullptr)
             return false;
-        std::forward<F>(f)(Policy::value(&*it));
+        std::forward<F>(f)(Policy::value(ptr));
         return true;
     }
 
@@ -3688,8 +3757,7 @@ private:
 #endif
         L m;
         auto it = this->template find<K, L>(key, this->hash(key), m);
-        if (it == this->end())
-            return false;
+        if (it == this->end()) return false;
         if (std::forward<F>(f)(Policy::value(&*it)))
         {
             this->erase(it);
@@ -4392,6 +4460,8 @@ public:
     using Base::insert;
     using Base::emplace;
     using Base::emplace_hint;
+    using Base::emplace_with_hash;
+    using Base::emplace_hint_with_hash;
     using Base::extract;
     using Base::merge;
     using Base::swap;

@@ -53,6 +53,9 @@
 #include "absl/base/macros.h"
 #endif
 
+// TODO(rogeeff): Remove after the backward compatibility period.
+#include "absl/base/internal/dynamic_annotations.h"  // IWYU pragma: export
+
 // -------------------------------------------------------------------------
 // Decide which features are enabled.
 
@@ -428,31 +431,6 @@ ABSL_NAMESPACE_END
 #define ABSL_ANNOTATE_IGNORE_READS_AND_WRITES_END()    // empty
 #define ABSL_ANNOTATE_UNPROTECTED_READ(x) (x)
 
-#endif
-
-#ifdef __cplusplus
-#ifdef ABSL_HAVE_THREAD_SANITIZER
-ABSL_INTERNAL_BEGIN_EXTERN_C
-int RunningOnValgrind();
-double ValgrindSlowdown();
-ABSL_INTERNAL_END_EXTERN_C
-#else
-namespace absl {
-ABSL_NAMESPACE_BEGIN
-namespace base_internal {
-ABSL_DEPRECATED(
-    "Don't use this interface. It is misleading and is being deleted.")
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline int RunningOnValgrind() { return 0; }
-ABSL_DEPRECATED(
-    "Don't use this interface. It is misleading and is being deleted.")
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline double ValgrindSlowdown() { return 1.0; }
-}  // namespace base_internal
-ABSL_NAMESPACE_END
-}  // namespace absl
-
-using absl::base_internal::RunningOnValgrind;
-using absl::base_internal::ValgrindSlowdown;
-#endif
 #endif
 
 // -------------------------------------------------------------------------

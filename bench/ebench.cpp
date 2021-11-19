@@ -9,6 +9,16 @@
 #include <fstream>
 #include <iostream>
 
+#ifdef _WIN32
+    # define NOMINMAX
+    # define _CRT_SECURE_NO_WARNINGS 1
+    # include <windows.h>
+#else
+    # include <unistd.h>
+    # include <sys/resource.h>
+    # include <sys/time.h>
+#endif
+
 #if __cplusplus > 201402L || _MSVC_LANG >= 201402L
    #define STR_VIEW  1
    #include <string_view>
@@ -20,7 +30,6 @@
     #endif
 #endif
 
-
 #ifndef TKey
     #define TKey              1
 #endif
@@ -31,6 +40,7 @@
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 
+#define ET                 1
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
@@ -47,9 +57,9 @@ std::map<std::string, std::string> maps =
     {"emhash4", "emhash4"},
 
     {"emhash5", "emhash5"},
-    {"emhash6", "emhash6"},
+//    {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
-    {"emhash8", "emhash8"},
+//    {"emhash8", "emhash8"},
 
 //    {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
@@ -84,11 +94,10 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT  1  //1 wyrand 2 sfc64 3 mt19937_64
+    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define NDEBUG                1
-///#define ET                 1
 #ifndef _MSC_VER
 //    #define ABSL            1
 //    #define ABSL_HASH       1
@@ -123,17 +132,21 @@ std::map<std::string, std::string> maps =
 //#define EMH_HIGH_LOAD         2345
 
 
+#ifdef EM3
 #include "old/hash_table2.hpp"
 #include "old/hash_table3.hpp"
 #include "old/hash_table4.hpp"
+#endif
 #include "hash_table5.hpp"
+//#include "old/hash_table557.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
 
+//https://zhuanlan.zhihu.com/p/363213858
+//https://www.zhihu.com/question/46156495
 //http://www.brendangregg.com/index.html
 
-//https://www.zhihu.com/question/46156495
 //https://eourcs.github.io/LockFreeCuckooHash/
 //https://lemire.me/blog/2018/08/15/fast-strongly-universal-64-bit-hashing-everywhere/
 ////some others
@@ -175,8 +188,9 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if ABSL_HASH
-#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/low_level_hash.cc"
 #include "absl/hash/internal/hash.cc"
+#include "absl/hash/internal/city.cc"
 #endif
 
 #if FOLLY
@@ -192,6 +206,11 @@ std::map<std::string, std::string> maps =
 #endif
 #if PHMAP_HASH
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
+#endif
+
+#if 1
+#include "ahash/ahash.c"
+#include "ahash/random_state.c"
 #endif
 
 #if ET
@@ -219,16 +238,6 @@ std::map<std::string, std::string> maps =
 
 #include <unordered_map>
 
-#ifdef _WIN32
-    # define CONSOLE "CON"
-    # define _CRT_SECURE_NO_WARNINGS 1
-    # include <windows.h>
-#else
-    # define CONSOLE "/dev/tty"
-    # include <unistd.h>
-    # include <sys/resource.h>
-    # include <sys/time.h>
-#endif
 
 #ifndef PACK
 #define PACK 128
@@ -250,6 +259,11 @@ struct StructValue
     int64_t operator ()() const
     {
         return lScore;
+    }
+
+    bool operator < (const StructValue& r) const
+    {
+        return lScore < r.lScore;
     }
 
     int64_t lUid;
@@ -414,117 +428,167 @@ static uint64_t randomseed() {
     std::random_device rd;
     return std::uniform_int_distribution<uint64_t>{}(rd);
 }
-// this is probably the fastest high quality 64bit random number generator that exists.
-// Implements Small Fast Counting v4 RNG from PractRand.
-class sfc64 {
+
+#if __SIZEOF_INT128__
+class Lehmer64 {
+    __uint128_t g_lehmer64_state;
+
+    uint64_t splitmix64_x; /* The state can be seeded with any value. */
+
+    public:
+    // call this one before calling splitmix64
+    Lehmer64(uint64_t seed) { splitmix64_x = seed; }
+
+    // returns random number, modifies splitmix64_x
+    // compared with D. Lemire against
+    // http://grepcode.com/file/repository.grepcode.com/java/root/jdk/openjdk/8-b132/java/util/SplittableRandom.java#SplittableRandom.0gamma
+    inline uint64_t splitmix64(void) {
+        uint64_t z = (splitmix64_x += UINT64_C(0x9E3779B97F4A7C15));
+        z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+        return z ^ (z >> 31);
+    }
+
+    // returns the 32 least significant bits of a call to splitmix64
+    // this is a simple function call followed by a cast
+    inline uint32_t splitmix64_cast32(void) {
+        return (uint32_t)splitmix64();
+    }
+
+    // same as splitmix64, but does not change the state, designed by D. Lemire
+    inline uint64_t splitmix64_stateless(uint64_t index) {
+        uint64_t z = (index + UINT64_C(0x9E3779B97F4A7C15));
+        z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+        return z ^ (z >> 31);
+    }
+
+    inline void lehmer64_seed(uint64_t seed) {
+        g_lehmer64_state = (((__uint128_t)splitmix64_stateless(seed)) << 64) +
+            splitmix64_stateless(seed + 1);
+    }
+
+    inline uint64_t operator()() {
+        g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
+        return g_lehmer64_state >> 64;
+    }
+};
+#endif
+
+class Orbit {
 public:
     using result_type = uint64_t;
 
-    sfc64()
-        : sfc64(randomseed()) {}
+    static constexpr uint64_t(min)() {
+        return 0;
+    }
+    static constexpr uint64_t(max)() {
+        return UINT64_C(0xffffffffffffffff);
+    }
 
-    sfc64(uint64_t a, uint64_t b, uint64_t c, uint64_t counter)
-        : m_a{ a }
-        , m_b{ b }
-        , m_c{ c }
-        , m_counter{ counter } {}
-
-    sfc64(std::array<uint64_t, 4> const& state)
-        : m_a{ state[0] }
-        , m_b{ state[1] }
-        , m_c{ state[2] }
-        , m_counter{ state[3] } {}
-
-    explicit sfc64(uint64_t seed)
-        : m_a(seed)
-        , m_b(seed)
-        , m_c(seed)
-        , m_counter(1) {
-        for (int i = 0; i < 12; ++i) {
+    Orbit(uint64_t seed) noexcept
+        : stateA(seed)
+        , stateB(UINT64_C(0x9E6C63D0676A9A99)) {
+        for (size_t i = 0; i < 10; ++i) {
             operator()();
         }
     }
 
-    // no copy ctors so we don't accidentally get the same random again
-    sfc64(sfc64 const&) = delete;
-    sfc64& operator=(sfc64 const&) = delete;
-
-    sfc64(sfc64&&) = default;
-    sfc64& operator=(sfc64&&) = default;
-
-    ~sfc64() = default;
-
-    static constexpr uint64_t(min)() {
-        return (std::numeric_limits<uint64_t>::min)();
-    }
-    static constexpr uint64_t(max)() {
-        return (std::numeric_limits<uint64_t>::max)();
-    }
-
-    void seed() {
-        seed(randomseed());
-    }
-
-    void seed(uint64_t seed) {
-        state(sfc64{ seed }.state());
-    }
-
     uint64_t operator()() noexcept {
-        auto const tmp = m_a + m_b + m_counter++;
-        m_a = m_b ^ (m_b >> right_shift);
-        m_b = m_c + (m_c << left_shift);
-        m_c = rotl(m_c, rotation) + tmp;
-        return tmp;
-    }
-
-    template <typename T>
-    T uniform(T input) {
-        return static_cast<T>(operator()(static_cast<uint64_t>(input)));
-    }
-
-    template <typename T>
-    T uniform() {
-        return static_cast<T>(operator()());
-    }
-
-    // Uses the java method. A bit slower than 128bit magic from
-    // https://arxiv.org/pdf/1805.10941.pdf, but produces the exact same results in both 32bit and
-    // 64 bit.
-    uint64_t operator()(uint64_t boundExcluded) noexcept {
-        uint64_t x, r;
-        do {
-            x = operator()();
-            r = x % boundExcluded;
-        } while (x - r > (UINT64_C(0) - boundExcluded));
-        return r;
-    }
-
-    std::array<uint64_t, 4> state() const {
-        return { {m_a, m_b, m_c, m_counter} };
-    }
-
-    void state(std::array<uint64_t, 4> const& s) {
-        m_a = s[0];
-        m_b = s[1];
-        m_c = s[2];
-        m_counter = s[3];
+        uint64_t s = (stateA += 0xC6BC279692B5C323u);
+        uint64_t t = ((s == 0u) ? stateB : (stateB += 0x9E3779B97F4A7C15u));
+        uint64_t z = (s ^ s >> 31) * ((t ^ t >> 22) | 1u);
+        return z ^ z >> 26;
     }
 
 private:
-    template <typename T>
-    T rotl(T const x, size_t k) {
-        return (x << k) | (x >> (8 * sizeof(T) - k));
+    static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
+        return (x << k) | (x >> (64U - k));
     }
 
-    static constexpr size_t rotation = 24;
-    static constexpr size_t right_shift = 11;
-    static constexpr size_t left_shift = 3;
-    uint64_t m_a;
-    uint64_t m_b;
-    uint64_t m_c;
-    uint64_t m_counter;
+    uint64_t stateA;
+    uint64_t stateB;
 };
 
+class RomuDuoJr {
+public:
+    using result_type = uint64_t;
+
+    static constexpr uint64_t(min)() {
+        return 0;
+    }
+    static constexpr uint64_t(max)() {
+        return UINT64_C(0xffffffffffffffff);
+    }
+
+    RomuDuoJr(uint64_t seed) noexcept
+        : mX(seed)
+        , mY(UINT64_C(0x9E6C63D0676A9A99)) {
+        for (size_t i = 0; i < 10; ++i) {
+            operator()();
+        }
+    }
+
+    uint64_t operator()() noexcept {
+        uint64_t x = mX;
+
+        mX = UINT64_C(15241094284759029579) * mY;
+        mY = rotl(mY - x, 27);
+
+        return x;
+    }
+
+private:
+    static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
+        return (x << k) | (x >> (64U - k));
+    }
+
+    uint64_t mX;
+    uint64_t mY;
+};
+
+class Sfc4 {
+public:
+    using result_type = uint64_t;
+
+    static constexpr uint64_t(min)() {
+        return 0;
+    }
+    static constexpr uint64_t(max)() {
+        return UINT64_C(0xffffffffffffffff);
+    }
+
+    Sfc4(uint64_t seed) noexcept
+        : mA(seed)
+        , mB(seed)
+        , mC(seed)
+        , mCounter(1) {
+        for (size_t i = 0; i < 12; ++i) {
+            operator()();
+        }
+    }
+
+    uint64_t operator()() noexcept {
+        uint64_t tmp = mA + mB + mCounter++;
+        mA = mB ^ (mB >> 11U);
+        mB = mC + (mC << 3U);
+        mC = rotl(mC, 24U) + tmp;
+        return tmp;
+    }
+
+private:
+    static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
+        return (x << k) | (x >> (64U - k));
+    }
+
+    uint64_t mA;
+    uint64_t mB;
+    uint64_t mC;
+    uint64_t mCounter;
+};
+
+// this is probably the fastest high quality 64bit random number generator that exists.
+// Implements Small Fast Counting v4 RNG from PractRand.
 #include <chrono>
 static const std::array<char, 62> ALPHANUMERIC_CHARS = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -723,13 +787,13 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 }
 
 template<class hash_type>
-void hash_iter(hash_type& ahash, const std::string& hash_name)
+void hash_iter(hash_type& ht_hash, const std::string& hash_name)
 {
     auto ts1 = getus(); size_t sum = 0;
-    for (auto& v : ahash)
+    for (auto& v : ht_hash)
         sum += TO_SUM(v.second);
 
-    for (auto it = ahash.cbegin(); it != ahash.cend(); ++it)
+    for (auto it = ht_hash.cbegin(); it != ht_hash.cend(); ++it)
 #if KEY_INT
         sum += it->first;
 #elif KEY_CLA
@@ -741,16 +805,16 @@ void hash_iter(hash_type& ahash, const std::string& hash_name)
 }
 
 template<class hash_type>
-void erase_reinsert(hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void erase_reinsert(hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
-        ahash[v] = TO_VAL(0);
-        //ahash.emplace(v, TO_VAL(0));
+        ht_hash[v] = TO_VAL(0);
+        //ht_hash.emplace(v, TO_VAL(0));
 #if TVal < 2
-        sum += ahash.count(v);
+        sum += ht_hash.count(v);
 #else
-        sum += TO_SUM(ahash[v]);
+        sum += TO_SUM(ht_hash[v]);
 #endif
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -760,23 +824,23 @@ template<class hash_type>
 void insert_erase(const std::string& hash_name, const std::vector<keyType>& vList)
 {
 #if TKey < 2
-    hash_type ahash;
+    hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
         auto v2 = v % (1 << 12);
-        auto r = ahash.emplace(v2, TO_VAL(0)).second;
+        auto r = ht_hash.emplace(v2, TO_VAL(0)).second;
         if (!r) {
-            ahash.erase(v2);
+            ht_hash.erase(v2);
             sum ++;
         }
     }
 
-    ahash.clear();
+    ht_hash.clear();
     const auto vsize = vList.size() / 8;
     for (size_t i = 0; i < vList.size(); i++) {
-        sum += ahash.emplace(vList[i], TO_VAL(0)).second;
+        sum += ht_hash.emplace(vList[i], TO_VAL(0)).second;
         if (i > vsize)
-            ahash.erase(vList[i - vsize]);
+            ht_hash.erase(vList[i - vsize]);
     }
 
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -786,24 +850,24 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 template<class hash_type>
 void insert_no_reserve( const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    hash_type ahash;
+    hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
-        sum += ahash.emplace(v, TO_VAL(0)).second;
+        sum += ht_hash.emplace(v, TO_VAL(0)).second;
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
 template<class hash_type>
-void insert_reserve(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
 #ifndef SMAP
-    ahash.reserve(vList.size());
-    ahash.max_load_factor(0.99f);
+    ht_hash.reserve(vList.size());
+    ht_hash.max_load_factor(0.99f);
 #endif
 
     for (const auto& v : vList)
-        sum += ahash.emplace(v, TO_VAL(0)).second;
+        sum += ht_hash.emplace(v, TO_VAL(0)).second;
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -837,10 +901,10 @@ void multi_small_bench(const std::string& hash_name, const std::vector<keyType>&
 }
 
 template<class hash_type>
-void insert_find_erase(const hash_type& ahash, const std::string& hash_name, std::vector<keyType>& vList)
+void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
-    hash_type tmp(ahash);
+    hash_type tmp(ht_hash);
 
     for (auto & v : vList) {
 #if KEY_INT
@@ -940,10 +1004,10 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 static uint8_t l1_cache[64 * 1024];
 #endif
 template<class hash_type>
-void find_miss_all(hash_type& ahash, const std::string& hash_name)
+void find_miss_all(hash_type& ht_hash, const std::string& hash_name)
 {
     auto ts1 = getus();
-    auto n = ahash.size();
+    auto n = ht_hash.size();
     size_t pow2 = 2u << ilog(n, 2), sum = 0;
 
 #if KEY_STR
@@ -956,16 +1020,16 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
 #endif
 #if KEY_STR
         skey[v % STR_SIZE + 1] ++;
-        sum += ahash.count((const char*)skey.c_str());
+        sum += ht_hash.count((const char*)skey.c_str());
 #else
-        sum += ahash.count(TO_KEY(v));
+        sum += ht_hash.count(TO_KEY(v));
 #endif
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
 template<class hash_type>
-void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void find_hit_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -973,22 +1037,22 @@ void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::ve
         if (sum % (1024 * 256) == 0)
             memset(l1_cache, 0, sizeof(l1_cache));
 #endif
-        sum += ahash.count(v);
+        sum += ht_hash.count(v);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
 template<class hash_type>
-void find_hit_all(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void find_hit_all(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
 #if KEY_INT
-        sum += ahash.count(v) + (size_t)v;
+        sum += ht_hash.count(v) + (size_t)v;
 #elif KEY_CLA
-        sum += ahash.count(v) + (size_t)v.lScore;
+        sum += ht_hash.count(v) + (size_t)v.lScore;
 #else
-        sum += ahash.count(v) + v.size();
+        sum += ht_hash.count(v) + v.size();
 #endif
 #if FL1
         if (sum % (1024 * 64) == 0)
@@ -1000,21 +1064,21 @@ void find_hit_all(hash_type& ahash, const std::string& hash_name, const std::vec
 }
 
 template<class hash_type>
-void erase_find_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void erase_find_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
-        sum += ahash.count(v);
+        sum += ht_hash.count(v);
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
 template<class hash_type>
-void erase_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto tmp = ahash;
+    auto tmp = ht_hash;
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
-        sum += ahash.erase(v);
+        sum += ht_hash.erase(v);
 
 #if !(AVX2 | ABSL | CUCKOO_HASHMAP)
     for (auto it = tmp.begin(); it != tmp.end(); ) {
@@ -1026,28 +1090,28 @@ void erase_half(hash_type& ahash, const std::string& hash_name, const std::vecto
 }
 
 template<class hash_type>
-void hash_clear(hash_type& ahash, const std::string& hash_name)
+void hash_clear(hash_type& ht_hash, const std::string& hash_name)
 {
-    if (ahash.size() > 1000'000) {
+    if (ht_hash.size() > 1000'000) {
         auto ts1 = getus();
-        size_t sum = ahash.size();
-        ahash.clear(); ahash.clear();
+        size_t sum = ht_hash.size();
+        ht_hash.clear(); ht_hash.clear();
         check_func_result(hash_name, __FUNCTION__, sum, ts1);
     }
 }
 
 template<class hash_type>
-void hash_copy_clear(hash_type& ahash, const std::string& hash_name)
+void copy_clear(hash_type& ht_hash, const std::string& hash_name)
 {
     size_t sum = 0;
     auto ts1 = getus();
-    hash_type thash = ahash;
-    ahash = thash;
+    hash_type thash = ht_hash;
+    ht_hash = thash;
     thash = thash;
-    ahash = std::move(thash);
-    sum  += ahash.size();
-    ahash.clear(); ahash.clear();
-    sum  += ahash.size();
+    ht_hash = std::move(thash);
+    sum  += ht_hash.size();
+    ht_hash.clear(); ht_hash.clear();
+    sum  += ht_hash.size();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -1129,9 +1193,13 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     randdata.reserve(size);
 
 #if RT == 2
-    sfc64 srng(size);
+    Sfc4 srng(size);
 #elif WYHASH_LITTLE_ENDIAN && RT == 1
     WyRand srng(size);
+#elif RT == 3
+    RomuDuoJr srng(size);
+#elif (RT == 4 && __SIZEOF_INT128__)
+    Lehmer64 srng(size);
 #else
     std::mt19937_64 srng; srng.seed(size);
 #endif
@@ -1193,7 +1261,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
     emhash5::HashMap <keyType, int> ehash5;
     emhash6::HashMap <keyType, int> ehash2;
 
-    sfc64 srng(time(NULL));
+    Sfc4 srng(time(NULL));
 #if 1
     emhash7::HashMap <keyType, int> unhash;
 #else
@@ -1317,11 +1385,11 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         find_miss_all <hash_type>(hash,hash_name);
 
         auto vList = oList;
-        for (size_t v = 0; v < vList.size() / 2; v++) {
+        for (size_t v = 0; v < vList.size(); v += 2) {
 #if KEY_INT
             vList[v] += v;
 #elif KEY_CLA
-            vList[v].lScore += v * v;
+            vList[v].lScore += v;
 #elif TKey != 4
             vList[v][0] += v;
             //vList[v] += vList[v].size();
@@ -1331,15 +1399,15 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #endif
         }
 
-        find_hit_half<hash_type>(hash, hash_name, vList);
-        erase_half<hash_type>(hash, hash_name, vList);
-        erase_find_half<hash_type>(hash, hash_name, vList);
+        find_hit_50<hash_type>(hash, hash_name, vList);
+        erase_50<hash_type>(hash, hash_name, vList);
+        erase_find_50<hash_type>(hash, hash_name, vList);
         insert_find_erase<hash_type>(hash, hash_name, vList);
         erase_reinsert<hash_type>(hash, hash_name, vList);
         hash_iter<hash_type>(hash, hash_name);
 
 #ifndef UF
-        hash_copy_clear <hash_type>(hash, hash_name);
+        copy_clear <hash_type>(hash, hash_name);
         //hash_clear<hash_type>(hash, hash_name);
 #endif
     }
@@ -1472,8 +1540,8 @@ static int benchHashMap(int n)
 #endif
 #endif
 
-#if ET > 1
         {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
+#if ET > 1
         {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
         {  benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
 
@@ -1745,13 +1813,39 @@ static void testHashRand(int loops = 100000009)
     printf("%s loops = %d\n",__FUNCTION__, loops);
     long sum = 0;
     auto ts = getus();
+
     {
         ts = getus();
-        sfc64 srng;
+        Sfc4 srng(randomseed());
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("sfc64      = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+        printf("Sfc4       = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
+
+    {
+        ts = getus();
+        RomuDuoJr srng(randomseed());
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("RomuDuoJr  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+    {
+        ts = getus();
+        Orbit srng(randomseed());
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("Orbit      = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+
+#if __SIZEOF_INT128__
+    {
+        ts = getus();
+        Lehmer64 srng(randomseed());
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("Lehmer64    = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+#endif
 
     {
         ts = getus();
@@ -1786,7 +1880,7 @@ static void testHashInt(int loops = 100000009)
     printf("phmap hash = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 #endif
 
-#ifdef ABSL_HASH
+#if ABSL_HASH && ABSL
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += absl::Hash<uint64_t>()(i + r);
@@ -1891,6 +1985,29 @@ static void testHashString(int size, int str_min, int str_max)
             sum += wyhash(v.data(), v.size(), 1);
         t_find = (getus() - start) / 1000;
         printf("wyhash   = %4d ms\n", t_find);
+
+#endif
+
+#ifdef AHASH_AHASH_H
+        start = getus();
+        for (auto& v : rndstring)
+            sum += ahash64(v.data(), v.size(), 1);
+        t_find = (getus() - start) / 1000;
+        printf("ahash   = %4d ms\n", t_find);
+#endif
+
+#if ABSL_HASH
+        constexpr uint64_t kHashSalt[5] = {
+            uint64_t{0x243F6A8885A308D3}, uint64_t{0x13198A2E03707344},
+            uint64_t{0xA4093822299F31D0}, uint64_t{0x082EFA98EC4E6C89},
+            uint64_t{0x452821E638D01377},
+        };
+
+        start = getus();
+        for (auto& v : rndstring)
+            sum += absl::hash_internal::LowLevelHash(v.data(), v.size(), 1, kHashSalt);
+        t_find = (getus() - start) / 1000;
+        printf("absl low = %4d ms\n", t_find);
 #endif
 
 #ifdef ROBIN_HOOD_H_INCLUDED
@@ -1901,7 +2018,7 @@ static void testHashString(int size, int str_min, int str_max)
         printf("martin hash = %4d ms\n", t_find);
 #endif
 
-#ifdef ABSL_HASH
+#if ABSL_HASH && ABSL
         start = getus();
         for (auto& v : rndstring)
             sum += absl::Hash<std::string>()(v);
@@ -1928,10 +2045,15 @@ int main(int argc, char* argv[])
 #endif
     auto start = getus();
 
+#ifdef AHASH_AHASH_H
+    printf("ahash_version = %s",  ahash_version());
+#endif
+
     srand((unsigned)time(0));
     printInfo(nullptr);
 
     testHashInt(1e8+8);
+    testHashString(1e6+6, 2, 32);
     bool auto_set = false;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;
@@ -1957,7 +2079,6 @@ int main(int argc, char* argv[])
             rnd = atoi(&argv[i][0] + 1);
         else if (cmd == 'b') {
             testHashRand(1e8+8);
-            testHashString(1e6+6, 2, 32);
         }
         else if (cmd == 'd') {
             for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
@@ -2011,7 +2132,7 @@ int main(int argc, char* argv[])
 #if WYHASH_LITTLE_ENDIAN
     WyRand srng(rnd);
 #else
-    sfc64 srng(rnd);
+    Sfc4 srng(rnd);
 #endif
 
     for (auto& m : maps)
