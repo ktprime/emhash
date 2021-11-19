@@ -286,7 +286,7 @@ hash_write(ahasher_t hasher, const char* input, size_t size)
             sum = shuffle_add2(sum, tail[0]);
             sum = shuffle_add2(sum, tail[1]);
             size -= 64;
-            input = ((uint8_t*)input) + 64;
+            input = input + 64;
           }
           aes256_t encoded = aes_encode2(current[0], current[1]);
           aes128_t current0 = _mm256_extractf128_si256(encoded, 0);

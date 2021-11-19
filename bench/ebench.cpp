@@ -403,7 +403,11 @@ static int64_t getus()
     return sec * 1000000 + usec;
 #elif LINUX_TICK || __APPLE__
     return clock();
-#elif __linux__ || __unix__
+#elif __linux__
+    struct timespec ts = {0};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000'000 + ts.tv_nsec / 1000;
+#elif __unix__
     struct timeval start;
     gettimeofday(&start, NULL);
     return start.tv_sec * 1'000'000ull + start.tv_usec;
