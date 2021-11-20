@@ -10,7 +10,9 @@
 #include <iostream>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
     # define NOMINMAX
+#endif
     # define _CRT_SECURE_NO_WARNINGS 1
     # include <windows.h>
 #else
@@ -53,7 +55,7 @@ std::map<std::string, std::string> maps =
     {"btree", "btree_map"},
 
     {"emhash2", "emhash2"},
-    {"emhash3",  "emhash3"},
+    {"emhash3", "emhash3"},
     {"emhash4", "emhash4"},
 
     {"emhash5", "emhash5"},
@@ -77,7 +79,7 @@ std::map<std::string, std::string> maps =
 #if ET
     {"martin", "martin_flat"},
     {"phmap", "phmap_flat"},
-//    {"hrdset",   "hrdset"},
+//    {"hrdset", "hrdset"},
 
     {"robin", "tsl_robin"},
     {"flat", "ska_flat"},
@@ -94,7 +96,7 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define NDEBUG                1
@@ -1286,7 +1288,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
         auto rid  = n ++;
         auto id   = TO_KEY(rid);
         if (type <= 40 || ehash2.size() < 1000) {
-            ehash2[id] += type; ehash5[id] += type; unhash[id]  += type;
+            ehash2[id] += type; ehash5[id] += type; unhash[id] += type;
 
             assert(ehash2[id] == unhash[id]); assert(ehash5[id] == unhash[id]);
         }
@@ -1571,16 +1573,6 @@ static int benchHashMap(int n)
 #endif
 #endif
 
-#if ET
-        {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
-        {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
-        {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
-
-#if FHT_HMAP
-        {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
-#endif
-#endif
-
 #ifdef EM3
 //        {  benOneHash<emilib1::HashMap <keyType, valueType, ehash_func>>("ktprime", vList); }
         {  benOneHash<emhash2::HashMap <keyType, valueType, ehash_func>>("emhash2", vList); }
@@ -1603,6 +1595,17 @@ static int benchHashMap(int n)
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
+#if ET
+        {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
+        {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
+        {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
+
+#if FHT_HMAP
+        {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
+#endif
+#endif
+
+
     }
 
     auto pow2 = 1 << ilog(vList.size(), 2);
@@ -1714,7 +1717,7 @@ struct string_hash
     using is_transparent = void;
     std::size_t operator()(const char* key)             const { auto ksize = std::strlen(key); return wyhash(key, ksize, ksize); }
     std::size_t operator()(const std::string& key)      const { return wyhash(key.c_str(), key.size(), key.size()); }
-    std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size());  }
+    std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size()); }
 };
 
 struct string_equal
@@ -1914,12 +1917,12 @@ static void testHashInt(int loops = 100000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += std::hash<uint64_t>()(i + r);
-    printf("std hash   = %4d ms [%ld]\n",  (int)(getus() - ts) / 1000, sum);
+    printf("std hash   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += hash64(i + r);
-    printf("hash64     = %4d ms [%ld]\n",  (int)(getus() - ts) / 1000, sum);
+    printf("hash64     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
@@ -2050,7 +2053,7 @@ int main(int argc, char* argv[])
     auto start = getus();
 
 #ifdef AHASH_AHASH_H
-    printf("ahash_version = %s",  ahash_version());
+    printf("ahash_version = %s", ahash_version());
 #endif
 
     srand((unsigned)time(0));

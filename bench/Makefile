@@ -2,11 +2,14 @@ ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
 CXX=g++  -fwhole-program
 endif
 
+ifneq ($(CL),)
 ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX=clang++
 endif
+endif
 
 CXXFLAGS = -Ofast -mavx -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include
+
 
 ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly
@@ -55,6 +58,7 @@ endif
 
 
 all:
+	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
