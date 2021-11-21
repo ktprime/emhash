@@ -19,6 +19,9 @@
 #include "hash_table7.hpp"
 #include "hash_table5.hpp"
 #include "hash_set2.hpp"
+#include "hash_set4.hpp"
+#include "emilib/emilib.hpp"
+#include "emilib/emiset.hpp"
 
 // https://github.com/Tessil/robin-map
 #include "tsl/robin_set.h"
@@ -53,13 +56,17 @@ void showHeader()
 #ifndef _WIN32
     std::string name = abi::__cxa_demangle(typeid(T).name(), 0, 0, &status);
 #else
-    const char* cname = typeid(T).name() + 5;
+    const char* cname = typeid(T).name() + 0;
+	if (strstr(cname, "class") != 0)
+		cname += 6;
+	else
+		cname += 2;
+
     while ((cname[0] >= '0' && cname[0] <= 9) || cname[0] == ' ')
         cname ++;
     string name = cname;
 #endif
     name = inplace_replace_all(name, "unsigned long", "ulong");
-    // name = inplace_replace_all(name, "std::", "");
     if (name.size() > 80)
         name.resize(80);
     cout << "--- " << name << ":" << endl;
@@ -278,7 +285,9 @@ void benchmarkAllUnorderedSets(const Samples& ulongArray,
     benchmarkSet<std::unordered_set<Sample>>(ulongArray, runCount);
     benchmarkSet<std::unordered_multiset<Sample>>(ulongArray, runCount);
     benchmarkSet<emhash2::HashSet<Sample>>(ulongArray, runCount);
+    benchmarkSet<emhash9::HashSet<Sample>>(ulongArray, runCount);
     benchmarkSet<phmap::flat_hash_set<Sample>>(ulongArray, runCount);
+    benchmarkSet<emilib::HashSet<Sample>>(ulongArray, runCount);
 }
 
 int main(__attribute__((unused)) int argc,
@@ -293,15 +302,16 @@ int main(__attribute__((unused)) int argc,
     cout << "# Vector:" << endl;
     benchmarkVector<std::vector<Sample>>(ulongArray, runCount);
 
-    cout << "# Unordered Sets:" << endl;
+    cout << "\n# Unordered Sets:" << endl;
     benchmarkAllUnorderedSets(ulongArray, runCount);
-    cout << "=========================" << endl;
+    cout << "===================================================" << endl;
 
-    cout << "# Ordered Sets:" << endl;
+    cout << "\n# Ordered Sets:" << endl;
     benchmarkSet<std::set<Sample>>(ulongArray, runCount);
     benchmarkSet<std::multiset<Sample>>(ulongArray, runCount);
+    benchmarkSet<phmap::btree_set<Sample>>(ulongArray, runCount);
 
-    cout << "# Unordered Maps:" << endl;
+    cout << "\n# Unordered Maps:" << endl;
     benchmarkMap<phmap::flat_hash_map<Sample, Sample>>(ulongArray, runCount);
     benchmarkMap<tsl::robin_map<Sample, Sample>>(ulongArray, runCount);
     benchmarkMap<tsl::robin_pg_map<Sample, Sample>>(ulongArray, runCount);
@@ -313,8 +323,9 @@ int main(__attribute__((unused)) int argc,
     benchmarkMap<std::unordered_map<Sample, Sample>>(ulongArray, runCount);
     benchmarkMap<emhash5::HashMap<Sample, Sample>>(ulongArray, runCount);
     benchmarkMap<emhash7::HashMap<Sample, Sample>>(ulongArray, runCount);
+    benchmarkMap<emilib::HashMap<Sample, Sample>>(ulongArray, runCount);
 
-    cout << "# Ordered Maps:" << endl;
+    cout << "\n# Ordered Maps:" << endl;
     benchmarkMap<std::map<Sample, Sample>>(ulongArray, runCount);
     benchmarkMap<phmap::btree_map<Sample, Sample>>(ulongArray, runCount);
 

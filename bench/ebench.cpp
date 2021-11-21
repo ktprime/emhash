@@ -77,6 +77,7 @@ std::map<std::string, std::string> maps =
     {"cuckoo", "cuckoo hash"},
 
 #if ET
+    {"zhashmap", "zhashmap"},
     {"martin", "martin_flat"},
     {"phmap", "phmap_flat"},
 //    {"hrdset", "hrdset"},
@@ -217,6 +218,7 @@ std::map<std::string, std::string> maps =
 
 #if ET
     #include "emilib/emilib32.hpp"
+    #include "zhashmap/hashmap.h"
 
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
@@ -1599,6 +1601,7 @@ static int benchHashMap(int n)
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
         {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
+        //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
 #if FHT_HMAP
         {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
@@ -2061,29 +2064,31 @@ int main(int argc, char* argv[])
 
     testHashInt(1e8+8);
     testHashString(1e6+6, 2, 32);
-    bool auto_set = false;
+    int run_type = 0;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;
     auto maxn = (1024 * 1024 * 128) / (sizeof(keyType) + sizeof(valueType) + 4) + 100000;
     auto minn = (1024 * 1024 * 2) / (sizeof(keyType) + sizeof(valueType) + 4) + 10000;
 
     float load_factor = 0.0945f;
-    printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a b t(n)\n", (int)maxn);
+    printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a(0-3) b t(n)\n", (int)maxn);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
+        const auto value = atoi(&argv[i][0] + 1);
+
         if (isdigit(cmd))
             maxn = atoll(argv[i]) + 1000;
-        else if (cmd == 'f' && isdigit(argv[i][1]))
+        else if (cmd == 'f' && value > 0)
             load_factor = atof(&argv[i][0] + 1) / 100.0f;
-        else if (cmd == 't' && isdigit(argv[i][1]))
-            tn = atoi(&argv[i][0] + 1);
-        else if (cmd == 'c' && isdigit(argv[i][1]))
-            maxc = atoi(&argv[i][0] + 1);
+        else if (cmd == 't' && value > 0)
+            tn = value;
+        else if (cmd == 'c' && value > 0)
+            maxc = value;
         else if (cmd == 'a')
-            auto_set = true;
-        else if (cmd == 'r' && isdigit(argv[i][1]))
-            rnd = atoi(&argv[i][0] + 1);
+            run_type = value;
+        else if (cmd == 'r' && value > 0)
+            rnd = value;
         else if (cmd == 'b') {
             testHashRand(1e8+8);
         }
@@ -2146,13 +2151,20 @@ int main(int argc, char* argv[])
         printf("  %s\n", m.second.data());
     putchar('\n');
 
+    int n = (srng() % 2*minn) + minn;
     while (true) {
-        int n = (srng() % maxn) + minn;
-        if (auto_set) {
+        if (run_type == 2) {
             printf(">>");
             if (scanf("%u", &n) == 1 && n <= 0)
-                auto_set = false;
+                run_type = 0;
+        } else if (run_type == 1) {
+            n = (srng() % maxn) + minn;
+        } else {
+            n = n * 10 / 9;
+            if (n > maxn)
+                n = (srng() % maxn) + minn;
         }
+
         if (load_factor > 0.2 && load_factor < 1) {
             auto pow2 = 1 << ilog(n, 2);
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);

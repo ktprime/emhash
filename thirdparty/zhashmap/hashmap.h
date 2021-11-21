@@ -178,7 +178,9 @@ struct hashmap
     inline size_t key_index(Key key) { return hash_index(_hasher(key)); }
     inline hasher hash_function() const { return _hasher; }
     inline iterator begin() { return iterator{ this, 0 }; }
+    inline iterator cbegin() const { return iterator{ this, 0 }; }
     inline iterator end() { return iterator{ this, limit }; }
+    inline iterator cend() const { return iterator{ this, limit }; }
 
     /*
      * bit manipulation helpers
@@ -247,7 +249,11 @@ struct hashmap
     }
 
     iterator insert(iterator i, const value_type& val) { return insert(val); }
-    iterator insert(Key key, Value val) { return insert(value_type(key, val)); }
+    iterator insert(const Key key, const Value& val) { return insert(value_type(key, val)); }
+    iterator emplace(const Key key, const Value& val) { return insert(value_type(key, val)); }
+    iterator emplace(const Key key, Value&& val) { return insert(std::move(value_type(key, val))); }
+
+    void reserve(size_t size) {}
 
     iterator insert(const value_type& v)
     {
@@ -256,6 +262,35 @@ struct hashmap
             if ((state & occupied) != occupied) {
                 bitmap_set(bitmap, i, occupied);
                 data[i] = data_type{v.first, v.second};
+                used++;
+                if ((state & deleted) == deleted) tombs--;
+                if (load() > load_factor) {
+                    resize_internal(data, bitmap, limit, limit << 1);
+                    for (i = key_index(v.first); ; i = (i+1) & index_mask()) {
+                        bitmap_state state = bitmap_get(bitmap, i);
+                             if (state == available) abort();
+                        else if (state == deleted); /* skip */
+                        else if (_compare(data[i].first, v.first)) {
+                            return iterator{this, i};
+                        }
+                    }
+                } else {
+                    return iterator{this, i};
+                }
+            } else if (_compare(data[i].first, v.first)) {
+                data[i].second = v.second;
+                return iterator{this, i};
+            }
+        }
+    }
+
+    iterator insert(value_type&& v)
+    {
+        for (size_t i = key_index(v.first); ; i = (i+1) & index_mask()) {
+            bitmap_state state = bitmap_get(bitmap, i);
+            if ((state & occupied) != occupied) {
+                bitmap_set(bitmap, i, occupied);
+                data[i] = data_type{std::move(v.first), std::move(v.second)};
                 used++;
                 if ((state & deleted) == deleted) tombs--;
                 if (load() > load_factor) {
@@ -305,6 +340,11 @@ struct hashmap
         }
     }
 
+    size_t count(const Key &key) const
+    {
+        return find(key) != end() ? 1 : 0;
+    }
+
     iterator find(const Key &key)
     {
         for (size_t i = key_index(key); ; i = (i+1) & index_mask()) {
@@ -316,7 +356,16 @@ struct hashmap
         return end();
     }
 
-    void erase(Key key)
+    iterator erase(iterator it)
+    {
+        auto next = it;
+        auto key = data[it.i].first;
+        erase(key);
+        next ++;
+        return netxt;
+    }
+
+    int erase(const Key& key)
     {
         for (size_t i = key_index(key); ; i = (i+1) & index_mask()) {
             bitmap_state state = bitmap_get(bitmap, i);
@@ -328,9 +377,10 @@ struct hashmap
                 bitmap_clear(bitmap, i, occupied);
                 used--;
                 tombs++;
-                return;
+                return 1;
             }
         }
+        return 0;
     }
 };
 
