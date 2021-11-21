@@ -59,6 +59,7 @@ endif
 
 all:
 	$(CXX) $(CXXFLAGS) app.cpp -o app
+	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb

@@ -1866,9 +1866,18 @@ public:
         return insertOrAssignImpl(std::move(key), std::forward<Mapped>(obj));
     }
 
+    std::pair<iterator, bool> insert(iterator hint, const value_type& keyval) {
+        ROBIN_HOOD_TRACE(this)
+        return emplace(keyval);
+    }
+
     std::pair<iterator, bool> insert(const value_type& keyval) {
         ROBIN_HOOD_TRACE(this)
         return emplace(keyval);
+    }
+
+    std::pair<iterator, bool> insert(iterator it, value_type&& keyval) {
+        return emplace(std::move(keyval));
     }
 
     std::pair<iterator, bool> insert(value_type&& keyval) {

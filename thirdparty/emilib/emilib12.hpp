@@ -38,6 +38,9 @@ public:
 	using value_type      = PairT;
 	using reference       = PairT&;
 	using const_reference = const PairT&;
+	typedef ValueT mapped_type;
+	typedef ValueT val_type;
+	typedef KeyT   key_type;
 
 	class iterator
 	{
@@ -411,6 +414,11 @@ public:
 	}
 
 	std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+	{
+		return insert(p.first, p.second);
+	}
+
+	std::pair<iterator, bool> insert(iterator it, const std::pair<KeyT, ValueT>& p)
 	{
 		return insert(p.first, p.second);
 	}

@@ -859,6 +859,12 @@ public:
         return do_insert(p.first, p.second);
     }
 
+    std::pair<iterator, bool> insert(iterator it, const value_type& p)
+    {
+        check_expand_need();
+        return do_insert(p.first, p.second);
+    }
+
     std::pair<iterator, bool> insert(value_type && p)
     {
         check_expand_need();

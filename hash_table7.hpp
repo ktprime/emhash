@@ -1080,6 +1080,12 @@ public:
         return do_insert(std::move(p.first), std::move(p.second));
     }
 
+    std::pair<iterator, bool> insert(iterator it, const value_type& p)
+    {
+        check_expand_need();
+        return do_insert(p.first, p.second);
+    }
+
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
