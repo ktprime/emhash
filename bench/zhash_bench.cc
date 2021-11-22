@@ -9,8 +9,15 @@
 #include <functional>
 
 #if ABSL
-#include "absl/hash/hash.h"
+//#define _HAS_DEPRECATED_RESULT_OF 1
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/internal/raw_hash_set.cc"
+#endif
+
+#if ABSL_HASH
+#include "absl/hash/internal/low_level_hash.cc"
+#include "absl/hash/internal/hash.cc"
+#include "absl/hash/internal/city.cc"
 #endif
 
 #include "tsl/robin_map.h"

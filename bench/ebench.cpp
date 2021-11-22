@@ -1607,8 +1607,6 @@ static int benchHashMap(int n)
         {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
 #endif
 #endif
-
-
     }
 
     auto pow2 = 1 << ilog(vList.size(), 2);
@@ -2063,7 +2061,6 @@ int main(int argc, char* argv[])
     printInfo(nullptr);
 
     testHashInt(1e8+8);
-    testHashString(1e6+6, 2, 32);
     int run_type = 0;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;
@@ -2091,6 +2088,7 @@ int main(int argc, char* argv[])
             rnd = value;
         else if (cmd == 'b') {
             testHashRand(1e8+8);
+            testHashString(1e6+6, 2, 32);
         }
         else if (cmd == 'd') {
             for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {

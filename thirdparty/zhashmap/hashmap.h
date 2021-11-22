@@ -362,7 +362,7 @@ struct hashmap
         auto key = data[it.i].first;
         erase(key);
         next ++;
-        return netxt;
+        return next;
     }
 
     int erase(const Key& key)
