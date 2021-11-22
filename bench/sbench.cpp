@@ -860,7 +860,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 static uint8_t l1_cache[64 * 1024];
 #endif
 template<class hash_type>
-void find_miss_all(hash_type& ahash, const std::string& hash_name)
+void find_hit_0(hash_type& ahash, const std::string& hash_name)
 {
     auto ts1 = getTime();
     auto n = ahash.size();
@@ -885,7 +885,7 @@ void find_miss_all(hash_type& ahash, const std::string& hash_name)
 }
 
 template<class hash_type>
-void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void find_hit_50(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -899,7 +899,7 @@ void find_hit_half(hash_type& ahash, const std::string& hash_name, const std::ve
 }
 
 template<class hash_type>
-void find_hit_all(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void find_hit_100(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -920,7 +920,7 @@ void find_hit_all(const hash_type& ahash, const std::string& hash_name, const st
 }
 
 template<class hash_type>
-void erase_find_half(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void rfind_50(const hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getTime(); size_t sum = 0;
     for (const auto& v : vList)
@@ -929,7 +929,7 @@ void erase_find_half(const hash_type& ahash, const std::string& hash_name, const
 }
 
 template<class hash_type>
-void erase_half(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
+void erase_50(hash_type& ahash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto tmp = ahash;
     auto ts1 = getTime(); size_t sum = 0;
@@ -1125,8 +1125,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         find_insert_multi <hash_type>(hash_name, oList);
 
         insert_reserve<hash_type>(hash, hash_name, oList);
-        find_hit_all  <hash_type>(hash, hash_name, oList);
-        find_miss_all <hash_type>(hash, hash_name);
+        find_hit_100  <hash_type>(hash, hash_name, oList);
+        find_hit_0 <hash_type>(hash, hash_name);
 
         auto vList = oList;
         for (size_t v = 0; v < vList.size() / 2; v++) {
@@ -1143,9 +1143,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #endif
         }
 
-        find_hit_half<hash_type>(hash, hash_name, vList);
-        erase_half<hash_type>(hash, hash_name, vList);
-        erase_find_half<hash_type>(hash, hash_name, vList);
+        find_hit_50<hash_type>(hash, hash_name, vList);
+        erase_50<hash_type>(hash, hash_name, vList);
+        rfind_50<hash_type>(hash, hash_name, oList);
         insert_find_erase<hash_type>(hash, hash_name, vList);
         erase_reinsert<hash_type>(hash, hash_name, vList);
         hash_iter<hash_type>(hash, hash_name);

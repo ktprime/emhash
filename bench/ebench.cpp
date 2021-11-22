@@ -334,7 +334,7 @@ struct BadHasher
     typedef StructValue keyType;
     #define TO_KEY(i)   StructValue((int64_t)i)
     #define sKeyType    "Struct"
-#else
+#elif TKey == 4
     #define KEY_STR     1
     typedef std::string_view keyType;
     #define TO_KEY(i)   std::to_string(i)
@@ -623,6 +623,20 @@ static std::string get_random_alphanum_string(std::size_t size) {
     return str;
 }
 
+#if STR_VIEW
+static char string_view_buf[1024 * 10] = {0};
+static std::string_view get_random_alphanum_string_view(std::size_t size) {
+
+    if (string_view_buf[0] == 0) {
+        for(std::size_t i = 0; i < sizeof(string_view_buf); i++)
+            string_view_buf[i] = ALPHANUMERIC_CHARS[rd_uniform(generator)];
+    }
+
+    auto start = generator() % (sizeof(string_view_buf) - size - 1);
+    return {string_view_buf + start, size};
+}
+#endif
+
 static int test_case = 0;
 static int loop_vector_time = 0;
 static int func_index = 1, func_print = 0;
@@ -813,7 +827,7 @@ void hash_iter(hash_type& ht_hash, const std::string& hash_name)
 }
 
 template<class hash_type>
-void erase_reinsert(hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
+void erase_reinsert(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -909,10 +923,10 @@ void multi_small_bench(const std::string& hash_name, const std::vector<keyType>&
 }
 
 template<class hash_type>
-void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
+void insert_find_erase(hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
-    hash_type tmp(ht_hash);
+//    hash_type tmp(ht_hash);
 
     for (auto & v : vList) {
 #if KEY_INT
@@ -925,9 +939,9 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 #else
         const keyType v2(v.data(), v.size() - 1);
 #endif
-        sum += tmp.emplace(v2, TO_VAL(0)).second;
-        sum += tmp.count(v2);
-        sum += tmp.erase(v2);
+        sum += ht_hash.emplace(v2, TO_VAL(0)).second;
+        sum += ht_hash.count(v2);
+        sum += ht_hash.erase(v2);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1, 3);
 }
@@ -1012,23 +1026,30 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 static uint8_t l1_cache[64 * 1024];
 #endif
 template<class hash_type>
-void find_miss_all(hash_type& ht_hash, const std::string& hash_name)
+void find_hit_0(hash_type& ht_hash, const std::string& hash_name)
 {
-    auto ts1 = getus();
     auto n = ht_hash.size();
     size_t pow2 = 2u << ilog(n, 2), sum = 0;
 
 #if KEY_STR
-    std::string skey = get_random_alphanum_string(STR_SIZE);
+#if TKey != 4
+    auto skey = get_random_alphanum_string(STR_SIZE);
 #endif
+#endif
+
+    auto ts1 = getus();
 
     for (size_t v = 0; v < pow2; v++) {
 #if FL1
         l1_cache[v % sizeof(l1_cache)] = 0;
 #endif
 #if KEY_STR
-        skey[v % STR_SIZE + 1] ++;
-        sum += ht_hash.count((const char*)skey.c_str());
+#if TKey != 4
+        skey[v % STR_SIZE + 1] ++; sum += ht_hash.count(skey);
+#else
+        std::string_view skey = "notfind_view";
+        sum += ht_hash.count(skey);
+#endif
 #else
         sum += ht_hash.count(TO_KEY(v));
 #endif
@@ -1051,7 +1072,7 @@ void find_hit_50(hash_type& ht_hash, const std::string& hash_name, const std::ve
 }
 
 template<class hash_type>
-void find_hit_all(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+void find_hit_100(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -1060,7 +1081,7 @@ void find_hit_all(hash_type& ht_hash, const std::string& hash_name, const std::v
 #elif KEY_CLA
         sum += ht_hash.count(v) + (size_t)v.lScore;
 #else
-        sum += ht_hash.count(v) + v.size();
+        sum += ht_hash.count(v);
 #endif
 #if FL1
         if (sum % (1024 * 64) == 0)
@@ -1072,7 +1093,7 @@ void find_hit_all(hash_type& ht_hash, const std::string& hash_name, const std::v
 }
 
 template<class hash_type>
-void erase_find_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+void find_erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
@@ -1089,10 +1110,10 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
         sum += ht_hash.erase(v);
 
 #if !(AVX2 | ABSL | CUCKOO_HASHMAP)
-    for (auto it = tmp.begin(); it != tmp.end(); ) {
-        it = tmp.erase(it);
-        sum += 1;
-    }
+//    for (auto it = tmp.begin(); it != tmp.end(); ) {//
+//        it = tmp.erase(it);
+ //       sum += 1;
+ //   }
 #endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -1214,7 +1235,12 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 #ifdef KEY_STR
     for (int i = 0; i < size; i++)
+#if TKey != 4
         randdata.emplace_back(get_random_alphanum_string(srng() % STR_SIZE + 4));
+#else
+        randdata.emplace_back(get_random_alphanum_string_view(srng() % STR_SIZE + 4));
+#endif
+
     return 0;
 #else
 
@@ -1389,29 +1415,29 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_no_reserve <hash_type>(hash_name, oList);
 
         insert_reserve<hash_type>(hash,hash_name, oList);
-        find_hit_all  <hash_type>(hash,hash_name, oList);
-        find_miss_all <hash_type>(hash,hash_name);
+        find_hit_100  <hash_type>(hash,hash_name, oList);
+        find_hit_0 <hash_type>(hash,hash_name);
 
         auto vList = oList;
         for (size_t v = 0; v < vList.size(); v += 2) {
 #if KEY_INT
-            vList[v] += v;
+            vList[v] += v * v;
 #elif KEY_CLA
-            vList[v].lScore += v;
+            vList[v].lScore += v * v;
 #elif TKey != 4
-            vList[v][0] += v;
-            //vList[v] += vList[v].size();
+            vList[v][0] += v * v;
 #else
-            auto& next2 = vList[v + vList.size() / 2];
-            vList[v] = next2.substr(0, next2.size() - 1);
+            auto& next2 = vList[v];
+            next2 = next2.substr(0, next2.size() - 1);
 #endif
         }
 
         find_hit_50<hash_type>(hash, hash_name, vList);
         erase_50<hash_type>(hash, hash_name, vList);
-        erase_find_50<hash_type>(hash, hash_name, vList);
+        find_erase_50<hash_type>(hash, hash_name, oList);
+
         insert_find_erase<hash_type>(hash, hash_name, vList);
-        erase_reinsert<hash_type>(hash, hash_name, vList);
+        erase_reinsert<hash_type>(hash, hash_name, oList);
         hash_iter<hash_type>(hash, hash_name);
 
 #ifndef UF
@@ -2152,8 +2178,8 @@ int main(int argc, char* argv[])
     int n = (srng() % 2*minn) + minn;
     while (true) {
         if (run_type == 2) {
-            printf(">>");
-            if (scanf("%u", &n) == 1 && n <= 0)
+            printf(">>"); scanf("%u", &n);
+            if (n <= 0)
                 run_type = 0;
         } else if (run_type == 1) {
             n = (srng() % maxn) + minn;

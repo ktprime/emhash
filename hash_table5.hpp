@@ -1696,9 +1696,9 @@ one-way seach strategy.
             hash += ((*(uint64_t*)(&key[i]) & ((1ull << diff) - 1))) * KC;
         return hash;
 #elif defined(AHASH_AHASH_H)
-        return ahash64(key.c_str(), key.size(), KC);
+        return ahash64(key.data(), key.size(), KC);
 #elif WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size() + KC);
+        return wyhash(key.data(), key.size(), key.size() + KC);
 #else
         return _hasher(key);
 #endif

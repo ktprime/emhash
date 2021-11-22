@@ -1718,9 +1718,9 @@ private:
     inline uint64_t hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size());
+        return wyhash(key.data(), key.size(), key.size());
 #elif EMH_SAFE_HASH
-        return _hash_inter == 0 ?  _hasher(key) : wyhash(key.c_str(), key.size(), 0x123456789);
+        return _hash_inter == 0 ?  _hasher(key) : wyhash(key.data(), key.size(), 0x123456789);
 #elif EMH_BDKR_HASH
         uint64_t hash = 0;
         for (size_type i = 0, j = 1; i < size; i += j++)

@@ -1353,7 +1353,7 @@ private:
     inline uint32_t hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size());
+        return wyhash(key.data(), key.size(), key.size());
 #elif EMH_BDKR_HASH
         size_type hash = 0;
         for (const auto c : key)

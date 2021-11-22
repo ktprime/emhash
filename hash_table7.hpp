@@ -1846,7 +1846,7 @@ private:
     inline size_type hash_bucket(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size());
+        return wyhash(key.data(), key.size(), key.size());
 #elif EMH_BKDR_HASH
         uint64_t hash = 0;
         for (size_type i = 0, j = 1; i < size; i += j++)
