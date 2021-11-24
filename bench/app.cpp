@@ -57,18 +57,22 @@ void showHeader()
     std::string name = abi::__cxa_demangle(typeid(T).name(), 0, 0, &status);
 #else
     const char* cname = typeid(T).name() + 0;
-	if (strstr(cname, "class") != 0)
-		cname += 6;
-	else
-		cname += 2;
+    if (strstr(cname, "class") != 0)
+        cname += 6;
+    else
+        cname += 2;
 
     while ((cname[0] >= '0' && cname[0] <= 9) || cname[0] == ' ')
         cname ++;
     string name = cname;
 #endif
+
+    auto c = name.find('<');
+    if (c != string::npos)
+        name = name.substr(0, c);
     name = inplace_replace_all(name, "unsigned long", "ulong");
-    if (name.size() > 80)
-        name.resize(80);
+    if (name.size() > 60)
+        name.resize(60);
     cout << "--- " << name << ":" << endl;
 }
 
@@ -77,7 +81,7 @@ void showResults(const string& tag, const Durs& durs, size_t elementCount, bool 
     const auto min_dur = *min_element(begin(durs), end(durs));
     const auto dur_ns = cr::duration_cast<cr::nanoseconds>(min_dur).count();
     cout << tag << ":"
-         << fixed << right << setprecision(1) << setw(3) << setfill(' ')
+         << fixed << right << setprecision(1) << setw(4) << setfill(' ')
          << (static_cast<double>(dur_ns)) / elementCount
          << "ns"
          << (okFlag ? "" : " ERR")
@@ -100,9 +104,7 @@ void benchmarkVector(const Samples& ulongArray, const size_t runCount)
     {
         auto beg = Clock::now();
         for (size_t i = 0; i < ulongArray.size(); ++i)
-        {
             x.push_back(ulongArray[i]);
-        }
         durs[runIx] = Clock::now() - beg;
     }
     showResults("push_back", durs, ulongArray.size(), true);
@@ -125,9 +127,7 @@ Set benchmarkSet_insert(const Samples& ulongArray,
     {
         const auto beg = Clock::now();
         for (const auto& e : ulongArray)
-        {
             x.insert(e);
-        }
         durs[runIx] = Clock::now() - beg;
     }
     if constexpr (reserveFlag)
@@ -153,39 +153,31 @@ void benchmarkSet(const Samples& ulongArray,
 
     Set x = benchmarkSet_insert<Set, false>(ulongArray, runCount);
 
-    bool allHit = true;
+    int allHit = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
-        {
-            const auto hit = x.find(e);
-            if (hit == x.end()) { allHit = false; }
-        }
+        for (const auto e : ulongArray)
+            allHit += x.count(e);
         durs[runIx] = Clock::now() - beg;
     }
-    showResults("find", durs, ulongArray.size(), allHit);
+    showResults("find", durs, ulongArray.size(), allHit == ulongArray.size() * runCount);
 
-    bool allErase = true;
+    int allErase = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
-        {
-            const auto count = x.erase(e);
-            if (count != 1) { allErase = false; }
-        }
+        for (const auto e : ulongArray)
+            allErase += x.erase(e);
         durs[runIx] = Clock::now() - beg;
     }
-    showResults("erase", durs, ulongArray.size(), allErase);
+    showResults("erase", durs, ulongArray.size(), allErase == ulongArray.size());
 
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
-        {
+        for (const auto e : ulongArray)
             x.insert(e);
-        }
         durs[runIx] = Clock::now() - beg;
     }
     showResults("reinsert", durs, ulongArray.size(), true);
@@ -210,47 +202,37 @@ void benchmarkMap(const Samples& ulongArray, const size_t runCount)
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
-        {
-            x[e] = e;
-        }
+        for (const auto e : ulongArray)
+            x[e] = 0;
         durs[runIx] = Clock::now() - beg;
     }
     showResults("insert", durs, ulongArray.size(), true);
 
-    bool allHit = true;
+    int allHit = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
-        {
-            const auto hit = x.find(e);
-            if (hit == x.end()) { allHit = false; }
-        }
+        for (const auto e : ulongArray)
+            allHit += x.count(e);
         durs[runIx] = Clock::now() - beg;
     }
-    showResults("find", durs, ulongArray.size(), allHit);
+    showResults("find", durs, ulongArray.size(), allHit == ulongArray.size() * runCount);
 
-    bool allErase = true;
+    int allErase = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
-        {
-            const auto count = x.erase(e);
-            if (count != 1) { allErase = false; }
-        }
+        for (const auto e : ulongArray)
+            allErase += x.erase(e);
         durs[runIx] = Clock::now() - beg;
     }
-    showResults("erase", durs, ulongArray.size(), allErase);
+    showResults("erase", durs, ulongArray.size(), allErase == ulongArray.size());
 
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
-        {
-            x[e] = e;
-        }
+        for (const auto e : ulongArray)
+            x[e] = 1;
         durs[runIx] = Clock::now() - beg;
     }
     showResults("reinsert", durs, ulongArray.size(), true);
@@ -294,8 +276,10 @@ int main(__attribute__((unused)) int argc,
          __attribute__((unused)) const char* argv[],
          __attribute__((unused)) const char* envp[])
 {
-    const size_t elementCount = 400000; ///< Number of elements.
-    const size_t runCount = 5;          ///< Number of runs per benchmark.
+    size_t elementCount = 1234567; ///< Number of elements.
+    const size_t runCount = 3;          ///< Number of runs per benchmark.
+    if (argc > 1)
+        elementCount = atoi(argv[1]);
 
     const auto ulongArray = getSource(elementCount);
 

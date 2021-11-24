@@ -21,6 +21,12 @@
 #endif
 
 #include "tsl/robin_map.h"
+#include "tsl/hopscotch_map.h"
+#include "tsl/bhopscotch_map.h"
+#include "tsl/array_map.h"
+#include "tsl/ordered_map.h"
+#include "tsl/sparse_map.h"
+#include "tsl/htrie_map.h"
 
 #include "google/dense_hash_map"
 #include "zhashmap/hashmap.h"
@@ -31,6 +37,8 @@
 #include "emilib/emilib.hpp"
 #include "martin/robin_hood.h"
 #include "phmap/phmap.h"
+#include "ska/flat_hash_map.hpp"
+#include "ska/bytell_hash_map.hpp"
 
 using namespace std::chrono;
 
@@ -94,8 +102,9 @@ std::vector<std::pair<K,V>> get_random(size_t count)
 template <typename T>
 void print_timings(const char *name, T t1, T t2, T t3, T t4, T t5, T t6, size_t count)
 {
+    static int maps = 0;
     char buf[128];
-    snprintf(buf, sizeof(buf), "_%s::insert_", name);
+    snprintf(buf, sizeof(buf), "_%s::insert [%2d]", name, ++maps);
     printf("|%-40s|%8s|%12zu|%8.1f|\n", buf, "random", count,
         duration_cast<nanoseconds>(t2-t1).count()/(float)count);
     snprintf(buf, sizeof(buf), "_%s::clear_", name);
@@ -110,33 +119,36 @@ void print_timings(const char *name, T t1, T t2, T t3, T t4, T t5, T t6, size_t 
     snprintf(buf, sizeof(buf), "_%s::erase_", name);
     printf("|%-40s|%8s|%12zu|%8.1f|\n", buf, "random", count,
         duration_cast<nanoseconds>(t6-t5).count()/(float)count);
-    printf("|%-40s|%8s|%12s|%8s|\n", "-", "-", "-", "-");
+    printf("|%-40s|%8s|%12s|%8s|%8.2f\n", "-", "-", "-", "-",
+            duration_cast<nanoseconds>(t6-t1).count()/(float)count);
 }
 
 static const size_t sizes[] = { 1023, 16383, 65535, 1048575, 0 };
 
 template <typename Map>
-void bench_spread(const char *name, size_t count, size_t spread)
+float bench_spread(const char *name, size_t count, size_t spread)
 {
     Map map;
     auto t1 = system_clock::now();
     for (size_t i = 0; i < count; i++) {
         map[i&spread]++;
     }
-    auto t2 = system_clock::now();
+
+    auto t2 = duration_cast<nanoseconds>(system_clock::now() - t1).count() / float(count);
     char buf[128];
     snprintf(buf, sizeof(buf), "_%s_", name);
-    printf("|%-40s|%8zu|%12zu|%8.1f|\n", buf, spread, count,
-        duration_cast<nanoseconds>(t2-t1).count()/(float)count);
+    printf("|%-40s|%8zu|%12zu|%8.1f|\n", buf, spread, count, t2);
+    return t2;
 }
 
 template <typename Map>
 void bench_spread(const char *name, size_t count)
 {
+    float lf = 0.0;
     for (const size_t *s = sizes; *s != 0; s++) {
-        bench_spread<Map>(name,count,*s);
+        lf += bench_spread<Map>(name,count,*s);
     }
-    printf("|%-40s|%8s|%12s|%8s|\n", "-", "-", "-", "-");
+    printf("|%-40s|%8s|%12s|%8s|%7.1f\n", "-", "-", "-", "-", lf);
 }
 
 template <typename Map>
@@ -231,8 +243,8 @@ void bench_map_google(const char* name, size_t count)
 void heading()
 {
     printf("\n");
-    printf("|%-40s|%8s|%12s|%8s|\n",
-        "container", "spread", "count", "time_ns");
+    printf("|%-40s|%8s|%12s|%8s|%8s|\n",
+        "container", "spread", "count", "time_ns", "total_ns");
     printf("|%-40s|%8s|%12s|%8s|\n",
         ":--------------------------------------",
         "-----:", "----:", "------:");
@@ -253,7 +265,15 @@ int main(int argc, char **argv)
 
     heading();
     bench_spread<std::unordered_map<size_t,size_t>>("std::unordered_map::operator[]",count);
+
     bench_spread<tsl::robin_map<size_t,size_t>>("tsl::robin_map::operator[]",count);
+    bench_spread<tsl::hopscotch_map<size_t,size_t>>("tsl::hopscotch_map::operator[]",count);
+    bench_spread<tsl::bhopscotch_map<size_t,size_t>>("tsl::bhopscotch_map::operator[]",count);
+    bench_spread<tsl::ordered_map<size_t,size_t>>("tsl::ordered_map::operator[]",count);
+    bench_spread<tsl::sparse_map<size_t,size_t>>("tsl::sparse_map::operator[]",count);
+//    bench_spread<tsl::array_map<size_t,size_t>>("tsl::array_map::operator[]",count);
+//    bench_spread<tsl::htrie_map<size_t,size_t>>("tsl::htrie_map::operator[]",count);
+
     bench_spread<zedland::hashmap<size_t,size_t>>("zedland::hashmap::operator[]",count);
     bench_spread<zedland::linkedhashmap<size_t,size_t>>("zedland::linkedhashmap::operator[]",count);
 #if ABSL
@@ -269,6 +289,12 @@ int main(int argc, char **argv)
     heading();
     bench_map<std::unordered_map<size_t,size_t>>("std::unordered_map", count);
     bench_map<tsl::robin_map<size_t,size_t>>("tsl::robin_map", count);
+    bench_map<tsl::hopscotch_map<size_t,size_t>>("tsl::hopscotch_map::",count);
+    bench_map<tsl::bhopscotch_map<size_t,size_t>>("tsl::bhopscotch_map::",count);
+//    bench_map<tsl::ordered_map<size_t,size_t>>("tsl::ordered_map::",count);
+    bench_map<tsl::sparse_map<size_t,size_t>>("tsl::sparse_map::",count);
+//    bench_spread<tsl::array_map<size_t,size_t>>("tsl::array_map::",count);
+
     bench_map<zedland::hashmap<size_t,size_t>>("zedland::hashmap", count);
     bench_map<zedland::linkedhashmap<size_t,size_t>>("zedland::linkedhashmap", count);
 #if ABSL
@@ -279,7 +305,12 @@ int main(int argc, char **argv)
     bench_map<emhash7::HashMap<size_t,size_t>>("emhash7::HashMap",count);
     bench_map<emilib2::HashMap<size_t,size_t>>("emilib2::HashMap",count);
     bench_map<emilib::HashMap<size_t,size_t>>("emilib::HashMap",count);
-    //bench_map<robin_hood::unordered_flat_map<size_t,size_t>>("martinus::flat_hash",count);
+    //bench_map<robin_hood::unordered_node_map<size_t,size_t>>("martinus::node_hash",count);
     bench_map<phmap::flat_hash_map<size_t,size_t>>("phmap::flat_hash_hash",count);
+    bench_map<phmap::node_hash_map<size_t,size_t>>("phmap::node_hash_hash",count);
+    bench_map<ska::flat_hash_map<size_t,size_t>>("ska::flat_hash_hash",count);
+    bench_map<ska::bytell_hash_map<size_t,size_t>>("ska::bytell_hash_map",count);
+
+    return 0;
 }
 
