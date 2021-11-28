@@ -737,6 +737,7 @@ int main(int argc, char* argv[])
 #endif
 #endif
 
+    int tests = 10;
     if (argc > 1) {
         for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][i ++ ]) {
             if (c >= '2' && c < '9') {
@@ -757,6 +758,8 @@ int main(int argc, char* argv[])
                 show_name.erase("hrd7");
             else if (c == 'e')
                 show_name.erase("emilib");
+            else if (c == 'd')
+                tests = atoi(argv[1] + i);
         }
     }
     if (argc > 2) {
@@ -770,7 +773,7 @@ int main(int argc, char* argv[])
 
     const auto start = now2ms();
 
-    if (1)
+    if (tests > 0)
     {
 #if ABSL_HASH
         typedef absl::Hash<uint64_t> hash_func;
@@ -806,7 +809,7 @@ int main(int argc, char* argv[])
         putchar('\n');
     }
 
-    if (1)
+    if (tests > 1)
     {
 #ifdef HOOD_HASH
         typedef robin_hood::hash<std::string> hash_func;
@@ -843,7 +846,7 @@ int main(int argc, char* argv[])
         putchar('\n');
     }
 
-    if (1)
+    if (tests > 2)
     {
 #ifdef HOOD_HASH
         typedef robin_hood::hash<std::string> hash_func;
@@ -879,7 +882,7 @@ int main(int argc, char* argv[])
 #endif
     }
 
-    if (1)
+    if (tests > 3)
     {
 #if ABSL_HASH
         typedef absl::Hash<size_t> hash_func;

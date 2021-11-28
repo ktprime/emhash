@@ -23,6 +23,10 @@ ifneq ($(HH),)
 CXXFLAGS += -DHOOD_HASH=1
 endif
 
+ifneq ($(FH),)
+CXXFLAGS += -DEMH_FIBONACCI_HASH
+endif
+
 ifneq ($(Key),)
 CXXFLAGS += -DTKey=$(Key)
 endif

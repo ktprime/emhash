@@ -162,22 +162,27 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 namespace emhash7 {
 
-#ifndef EMH_SIZE_TYPE_64BIT
-    typedef uint32_t size_type;
-    static constexpr size_type INACTIVE = 0 - 0x1u;
-#else
+#ifdef EMH_SIZE_TYPE_16BIT
+    typedef uint16_t size_type;
+    static constexpr size_type INACTIVE = 0xFFFE;
+#elif EMH_SIZE_TYPE_64BIT
     typedef uint64_t size_type;
     static constexpr size_type INACTIVE = 0 - 0x1ull;
+#else
+    typedef uint32_t size_type;
+    static constexpr size_type INACTIVE = 0 - 0x1u;
 #endif
 
 static constexpr uint32_t MASK_BIT = sizeof(uint32_t) * 8;
 static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
 static constexpr uint32_t PACK_SIZE = 2; // > 1
+#ifndef EMH_SIZE_TYPE_16BIT
 static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
+#endif
 static_assert(PACK_SIZE > 0, "PACK_SIZE must negative (to int)");
 
 //count the leading zero bit
-inline static uint32_t CTZ(size_t n)
+inline static size_type CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -211,7 +216,7 @@ inline static uint32_t CTZ(size_t n)
     #endif
 #endif
 
-    return (uint32_t)index;
+    return (size_type)index;
 }
 
 template <typename First, typename Second>
@@ -535,7 +540,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(size_type bucket = 4, float lf = 0.95f)
+    HashMap(size_type bucket = 4, float lf = 0.90f)
     {
         init(bucket, lf);
     }
@@ -646,11 +651,11 @@ public:
     iterator begin()
     {
         if (0 == _num_filled)
-            return {this, _mask + 1};
+            return {this, size_type(_mask + 1)};
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return { this,  CTZ(bmask) };
+            return { this, CTZ(bmask) };
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -660,9 +665,9 @@ public:
     {
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this,  CTZ(bmask)};
+            return {this, CTZ(bmask)};
         else if (0 == _num_filled)
-            return {this, _mask + 1};
+            return {this, size_type(_mask + 1)};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -673,7 +678,7 @@ public:
         if (_num_filled == 0)
             return end();
 
-        uint32_t bucket = _mask;
+        auto bucket = _mask;
         while (EMH_EMPTY(_pairs, bucket)) bucket--;
         return {this, bucket};
     }
@@ -738,7 +743,7 @@ public:
     void max_load_factor(float value)
     {
         if (value < 0.9999f && value > 0.2f)
-            _loadlf = (size_type)((1 << 27) / value);
+            _loadlf = (uint32_t)((1 << 27) / value);
     }
 
     constexpr size_type max_size() const
@@ -1335,7 +1340,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-        const auto required_buckets = (size_type)(num_elems * _loadlf >> 27);
+        const auto required_buckets = (num_elems * _loadlf >> 27);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -1397,7 +1402,7 @@ private:
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #ifdef EMH_LOG
-            static size_type ihashs = 0;
+            static uint32_t ihashs = 0;
             EMH_LOG() << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
@@ -1876,7 +1881,7 @@ private:
     size_type _num_buckets;
 
     size_type _num_filled;
-    size_type _loadlf;
+    uint32_t  _loadlf;
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
