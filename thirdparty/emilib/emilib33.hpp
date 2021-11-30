@@ -225,16 +225,21 @@ public:
 
     HashMap& operator=(const HashMap& other)
     {
+        if (this != &other) {
         clear();
         reserve(other.size());
         insert(other.cbegin(), other.cend());
+        }
         return *this;
     }
 
-    void operator=(HashMap&& other)
+    HashMap& operator=(HashMap&& other)
     {
-        swap(other);
-        other.clear();
+        if (this != &other) {
+            swap(other);
+            other.clear();
+        }
+        return *this;
     }
 
     ~HashMap()

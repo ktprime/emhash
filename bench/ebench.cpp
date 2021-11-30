@@ -42,7 +42,10 @@
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 
-#define ET                 1
+#ifndef ET
+#define ET                 2
+#endif
+
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
@@ -66,7 +69,8 @@ std::map<std::string, std::string> maps =
 //    {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
 
-    {"emilib2", "emilib2"},
+//    {"emilib2", "emilib2"},
+    {"emilib", "emilib"},
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
@@ -97,7 +101,7 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT 2  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define NDEBUG                1
@@ -113,8 +117,6 @@ std::map<std::string, std::string> maps =
 //    #define WY_HASH         1
 #endif
 
-//#define MIX_HASH            1
-//#define HOOD_HASH           1
 //#define FL1                 1
 
 //feature of emhash
@@ -223,6 +225,7 @@ std::map<std::string, std::string> maps =
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
     #include "emilib/emilib12.hpp"
+    #include "emilib/emilib.hpp"
     #include "emilib/emilib33.hpp"
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 #endif
@@ -293,21 +296,6 @@ struct StuHasher
         return v.lScore * 11400714819323198485ull;
     }
 };
-
-#if BAD_HASH > 100
-template <typename KeyT>
-struct BadHasher
-{
-    std::size_t operator()(const KeyT& v) const
-    {
-#if 1
-        return v % BAD_HASH;
-#else
-        return v.size();
-#endif
-    }
-};
-#endif
 
 #if TKey == 0
 #ifndef SMK
@@ -624,7 +612,7 @@ static std::string get_random_alphanum_string(std::size_t size) {
 }
 
 #if STR_VIEW
-static char string_view_buf[1024 * 10] = {0};
+static char string_view_buf[1024 * 32] = {0};
 static std::string_view get_random_alphanum_string_view(std::size_t size) {
 
     if (string_view_buf[0] == 0) {
@@ -650,7 +638,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     if (func_result.find(func) == func_result.end()) {
         func_result[func] = sum;
     } else if (sum != func_result[func]) {
-        printf("%s %s %zd != %zd (o)\n", hash_name.c_str(), func.c_str(), (size_t)sum, (size_t)func_result[func]);
+        printf("%s %s %zd != %zd (o)\n", hash_name.data(), func.data(), (size_t)sum, (size_t)func_result[func]);
     }
 
     auto& showname = maps[hash_name];
@@ -659,13 +647,13 @@ static void check_func_result(const std::string& hash_name, const std::string& f
 
     long ts = (getus() - ts1) / 1000;
     if (func_index == func_print)
-        printf("%8s: %8s %4ld, ",hash_name.data(), func.c_str(), ts);
+        printf("%8s: %8s %4ld, ",hash_name.data(), func.data(), ts);
     else if (func_index == func_print + 1)
-        printf("%8s %4ld, ", func.c_str(), ts);
+        printf("%8s %4ld, ", func.data(), ts);
     else if (func_index == func_print + 2)
-        printf("%8s %4ld, ", func.c_str(), ts);
+        printf("%8s %4ld, ", func.data(), ts);
     else if (func_index == func_print + 3)
-        printf("%8s %4ld\n", func.c_str(), ts);
+        printf("%8s %4ld\n", func.data(), ts);
 }
 
 static void inline hash_convert(const std::map<std::string, int64_t>& hash_score, std::multimap <int64_t, std::string>& score_hash)
@@ -696,7 +684,7 @@ static void add_hash_func_time(std::map<std::string, std::map<std::string, int64
     const auto first = double(once_score_hash.begin()->first);
     //print once score
     for (auto& v : once_score_hash) {
-        printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first / (func_index - 1)), v.second.c_str(), last * 1.0 / v.first, first * 100.0 / v.first);
+        printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first / (func_index - 1)), v.second.data(), last * 1.0 / v.first, first * 100.0 / v.first);
     }
 }
 
@@ -705,7 +693,7 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
     std::multimap <int64_t, std::string> rscore_hash;
     hash_convert(hash_rtime, rscore_hash);
 
-    puts(func.c_str());
+    puts(func.data());
 
     auto mins = rscore_hash.begin()->first;
     for (auto& v : rscore_hash) {
@@ -713,7 +701,7 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
 
         //hash_func_score[v.second][func] = (int)((mins * 100) / (v.first + 1));
         hash_func_score[v.second][func] = v.first / test_case;
-        printf("   %-8d     %-21s   %02d\n", (int)(v.first / test_case), v.second.c_str(), (int)((mins * 100) / v.first));
+        printf("   %-8d     %-21s   %02d\n", (int)(v.first / test_case), v.second.data(), (int)((mins * 100) / v.first));
     }
     putchar('\n');
 }
@@ -796,14 +784,14 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 
     pys += std::string("\n\n# ") + os_info;
 
-    //puts(pys.c_str());
+    //puts(pys.data());
     std::ofstream  outfile;
     auto full_file = file + ".py";
     outfile.open("./" + full_file, std::fstream::out | std::fstream::trunc | std::fstream::binary);
     if (outfile.is_open())
         outfile << pys;
     else
-        printf("\n\n =============== can not open %s ==============\n\n", full_file.c_str());
+        printf("\n\n =============== can not open %s ==============\n\n", full_file.data());
 
     outfile.close();
 }
@@ -898,7 +886,7 @@ void multi_small_bench(const std::string& hash_name, const std::vector<keyType>&
 {
 #if KEY_INT
     size_t sum = 0;
-    const auto hash_size = vList.size() / 10003 + 2021;
+    const auto hash_size = vList.size() / 10003 + 2022;
     const auto ts1 = getus();
 
     auto mh = new hash_type[hash_size];
@@ -1170,7 +1158,7 @@ struct WysHasher
 {
     std::size_t operator()(const std::string& str) const
     {
-        return wyhash(str.c_str(), str.size(), str.size());
+        return wyhash(str.data(), str.size(), str.size());
     }
 };
 
@@ -1202,18 +1190,6 @@ struct WyRand
     }
 };
 #endif
-
-struct IntMixHasher
-{
-    std::size_t operator()(uint64_t key) const
-    {
-        auto ror  = (key >> 32) | (key << 32);
-        auto low  = key * 0xA24BAED4963EE407ull;
-        auto high = ror * 0x9FB21C651E98DF25ull;
-        auto mix  = low + high;
-        return mix;
-    }
-};
 
 //https://en.wikipedia.org/wiki/Gamma_distribution#/media/File:Gamma_distribution_pdf.svg
 //https://blog.csdn.net/luotuo44/article/details/33690179
@@ -1409,7 +1385,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_high_load  <hash_type>(hash_name, oList);
 
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size / 2, 2 * l1_size + 1000);
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", 2 * l1_size + 1000, l3_size / 4);
+        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", l1_size * 4 + 1000, l3_size / 4);
         insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l3_size / 2, l3_size * 2);
 
         insert_no_reserve <hash_type>(hash_name, oList);
@@ -1447,8 +1423,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
     }
 }
 
-constexpr auto base1 = 300000000;
-constexpr auto base2 =      20000;
+constexpr static auto base1 = 300000000;
+constexpr static auto base2 =      20000;
 void reset_top3(std::map<std::string, int64_t>& top3, const std::multimap <int64_t, std::string>& once_score_hash)
 {
     auto it0 = once_score_hash.begin();
@@ -1505,13 +1481,13 @@ static void printResult(int n)
     if (top3.size() >= 3)
         puts("======== hash  top1   top2  top3 =======================");
     for (auto& v : top3)
-        printf("%13s %4.1lf  %4.1lf %4d\n", v.first.c_str(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (int)(v.second % (base2 / 2)));
+        printf("%13s %4.1lf  %4.1lf %4d\n", v.first.data(), v.second / (double)(base1), (v.second / (base2 / 2) % 1000) / 2.0, (int)(v.second % (base2 / 2)));
 
     auto maxs = score_hash.rbegin()->first;
     //print hash rank
     puts("======== hash    score  weigh ==========================");
     for (auto& v : score_hash)
-        printf("%13s  %4d     %3.1lf%%\n", v.second.c_str(), (int)(v.first / func_hash_score.size()), (v.first * 100.0 / maxs));
+        printf("%13s  %4d     %3.1lf%%\n", v.second.data(), (int)(v.first / func_hash_score.size()), (v.first * 100.0 / maxs));
 
 #if _WIN32
     Sleep(100*1);
@@ -1520,6 +1496,81 @@ static void printResult(int n)
 #endif
     printf("--------------------------------------------------------------------\n\n");
 }
+
+static inline uint64_t hashfib(uint64_t key)
+{
+#if __SIZEOF_INT128__
+    __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
+    return (uint64_t)(r >> 64) + (uint64_t)r;
+#elif _WIN64
+    uint64_t high;
+    return _umul128(key, UINT64_C(11400714819323198485), &high) + high;
+#else
+    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+    return (r >> 32) + r;
+#endif
+}
+
+static inline uint64_t hashmix(uint64_t key)
+{
+    auto ror  = (key >> 32) | (key << 32);
+    auto low  = key * 0xA24BAED4963EE407ull;
+    auto high = ror * 0x9FB21C651E98DF25ull;
+    auto mix  = low + high;
+    return mix;// (mix >> 32) | (mix << 32);
+}
+
+static inline uint64_t rrxmrrxmsx_0(uint64_t v)
+{
+    /* Pelle Evensen's mixer, https://bit.ly/2HOfynt */
+    v ^= (v << 39 | v >> 25) ^ (v << 14 | v >> 50);
+    v *= UINT64_C(0xA24BAED4963EE407);
+    v ^= (v << 40 | v >> 24) ^ (v << 15 | v >> 49);
+    v *= UINT64_C(0x9FB21C651E98DF25);
+    return v ^ v >> 28;
+}
+
+static inline uint64_t hash_mur3(uint64_t key)
+{
+    //MurmurHash3Mixer
+    uint64_t h = key;
+    h ^= h >> 33;
+    h *= 0xff51afd7ed558ccd;
+    h ^= h >> 33;
+    h *= 0xc4ceb9fe1a85ec53;
+    h ^= h >> 33;
+    return h;
+}
+
+template<typename T>
+struct Int64Hasher
+{
+    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
+    inline std::size_t operator()(T key) const
+    {
+#if FIB_HASH == 1
+        return key;
+#elif FIB_HASH == 2
+        return hashfib(key);
+#elif FIB_HASH == 3
+        return hash_mur3(key);
+#elif FIB_HASH == 4
+        return hashmix(key);
+#elif FIB_HASH == 5
+        return rrxmrrxmsx_0(key);
+#elif FIB_HASH > 100
+        return key % FIB_HASH; //bad hash
+#elif FIB_HASH == 6
+        return wyhash64(key, KC);
+#else
+        auto x = key;
+        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+        x = x ^ (x >> 31);
+        return x;
+#endif
+    }
+};
 
 static int benchHashMap(int n)
 {
@@ -1535,14 +1586,10 @@ static int benchHashMap(int n)
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
-#elif WY_HASH && KEY_INT
-    using ehash_func = WyIntHasher;
-#elif MIX_HASH && KEY_INT
-    using ehash_func = IntMixHasher;
+#elif KEY_INT && FIB_HASH >= 0
+    using ehash_func = Int64Hasher<keyType>;
 #elif KEY_CLA
     using ehash_func = StuHasher;
-#elif KEY_INT && BAD_HASH > 100
-    using ehash_func = BadHasher<keyType>;
 #elif PHMAP_HASH
     using ehash_func = phmap::Hash<keyType>;
 #elif HOOD_HASH
@@ -1576,12 +1623,14 @@ static int benchHashMap(int n)
 
         {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
 #if ET > 1
+#if ET > 2
         {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
         {  benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
+#endif
 
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
+        {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
-        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("robin", vList); }
 
 #if __x86_64__ || _M_X64
         {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("flat", vList); }
@@ -1626,7 +1675,8 @@ static int benchHashMap(int n)
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
-        {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
+        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("robin", vList); }
         //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
 #if FHT_HMAP
@@ -1743,7 +1793,7 @@ struct string_hash
 {
     using is_transparent = void;
     std::size_t operator()(const char* key)             const { auto ksize = std::strlen(key); return wyhash(key, ksize, ksize); }
-    std::size_t operator()(const std::string& key)      const { return wyhash(key.c_str(), key.size(), key.size()); }
+    std::size_t operator()(const std::string& key)      const { return wyhash(key.data(), key.size(), key.size()); }
     std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size()); }
 };
 
@@ -1758,7 +1808,7 @@ struct string_equal
 #endif
 
     bool operator()(const char* lhs, const std::string& rhs) const {
-        return std::strcmp(lhs, rhs.c_str()) == 0;
+        return std::strcmp(lhs, rhs.data()) == 0;
     }
 
     bool operator()(const char* lhs, const std::string_view& rhs) const {
@@ -1785,62 +1835,6 @@ static int find_strview_test()
     return 0;
 }
 #endif
-
-static inline uint64_t hash64(uint64_t key)
-{
-#if __SIZEOF_INT128__
-    __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
-    return (uint64_t)(r >> 64) + (uint64_t)r;
-#elif _WIN64
-    uint64_t high;
-    return _umul128(key, UINT64_C(11400714819323198485), &high) + high;
-#else
-    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-    return (r >> 32) + r;
-#endif
-}
-
-static inline uint64_t hashmix(uint64_t key)
-{
-    auto ror  = (key >> 32) | (key << 32);
-    auto low  = key * 0xA24BAED4963EE407ull;
-    auto high = ror * 0x9FB21C651E98DF25ull;
-    auto mix  = low + high;
-    return mix;// (mix >> 32) | (mix << 32);
-}
-
-static inline uint64_t rrxmrrxmsx_0(uint64_t v)
-{
-  /* Pelle Evensen's mixer, https://bit.ly/2HOfynt */
-  v ^= (v << 39 | v >> 25) ^ (v << 14 | v >> 50);
-  v *= UINT64_C(0xA24BAED4963EE407);
-  v ^= (v << 40 | v >> 24) ^ (v << 15 | v >> 49);
-  v *= UINT64_C(0x9FB21C651E98DF25);
-  return v ^ v >> 28;
-}
-
-static inline uint64_t hash32(uint64_t key)
-{
-#if 1
-    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-    return (r >> 32) + r;
-#elif 1
-    //MurmurHash3Mixer
-    uint64_t h = key;
-    h ^= h >> 33;
-    h *= 0xff51afd7ed558ccd;
-    h ^= h >> 33;
-    h *= 0xc4ceb9fe1a85ec53;
-    h ^= h >> 33;
-    return h;
-#elif 1
-    uint64_t x = key;
-    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
-    x = x ^ (x >> 31);
-    return x;
-#endif
-}
 
 static void testHashRand(int loops = 100000009)
 {
@@ -1948,13 +1942,13 @@ static void testHashInt(int loops = 100000009)
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash64(i + r);
-    printf("hash64     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+        sum += hashfib(i + r);
+    printf("hashfib     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
-        sum += hash32(i + r);
-    printf("hash32     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+        sum += hash_mur3(i + r);
+    printf("hash_mur3  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
@@ -2142,7 +2136,7 @@ int main(int argc, char* argv[])
                     maps.erase("hrdset");
                 else if (c == 'e') {
                     maps.emplace("emilib2", "emilib2");
-                    maps.emplace("emilib3", "emilib3");
+//                    maps.emplace("emilib3", "emilib3");
                     maps.emplace("emilib4", "emilib4");
                 }
                 else if (c == 'l') {

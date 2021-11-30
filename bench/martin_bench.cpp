@@ -57,6 +57,7 @@ using namespace std;
 #include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
 #include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
 //#include "emilib/emilib32.hpp"
+#include "emilib/emilib.hpp"
 //#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
 
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
@@ -103,6 +104,7 @@ static std::map<std::string, std::string> show_name =
 #if ET
     {"phmap", "phmap flat"},
     {"robin_hood", "martin flat"},
+    {"emilib", "emilib"},
     //    {"emilib", "emilib3 flat"},
     //    {"hrd7", "hrd7map"},
 
@@ -154,10 +156,66 @@ struct WyRnd
     }
 };
 
-#if MT_RNG
-#define MRNG sfc64
+class RomuDuoJr {
+public:
+    using result_type = uint64_t;
+
+    static constexpr uint64_t(min)() {
+        return 0;
+    }
+    static constexpr uint64_t(max)() {
+        return UINT64_C(0xffffffffffffffff);
+    }
+
+    RomuDuoJr(uint64_t seed) noexcept
+        : mX(seed)
+        , mY(UINT64_C(0x9E6C63D0676A9A99)) {
+        for (size_t i = 0; i < 10; ++i) {
+            operator()();
+        }
+    }
+
+    uint64_t operator()() noexcept {
+        uint64_t x = mX;
+
+        mX = UINT64_C(15241094284759029579) * mY;
+        mY = rotl(mY - x, 27);
+
+        return x;
+    }
+
+    uint64_t operator()(uint64_t boundExcluded) noexcept {
+#ifdef __SIZEOF_INT128__
+        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+#elif _MSC_VER
+        uint64_t high;
+        uint64_t a = operator()();
+        _umul128(a, boundExcluded, &high);
+        return high;
+#endif
+    }
+
+private:
+    static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
+        return (x << k) | (x >> (64U - k));
+    }
+
+    uint64_t mX;
+    uint64_t mY;
+};
+
+#ifndef RT
+    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+#endif
+
+#if RT == 1
+    #define MRNG sfc64
+#elif RT == 2
+    #define MRNG WyRnd
+#elif RT == 3
+    #define MRNG RomuDuoJr
 #else
-#define MRNG WyRnd
+    #define MRNG std::mt19937_64
 #endif
 
 // this is probably the fastest high quality 64bit random number generator that exists.
@@ -244,6 +302,82 @@ class sfc64 {
         uint64_t m_b;
         uint64_t m_c;
         uint64_t m_counter;
+};
+
+
+static inline uint64_t hashfib(uint64_t key)
+{
+#if __SIZEOF_INT128__
+    __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
+    return (uint64_t)(r >> 64) + (uint64_t)r;
+#elif _WIN64
+    uint64_t high;
+    return _umul128(key, UINT64_C(11400714819323198485), &high) + high;
+#else
+    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+    return (r >> 32) + r;
+#endif
+}
+
+static inline uint64_t hashmix(uint64_t key)
+{
+    auto ror  = (key >> 32) | (key << 32);
+    auto low  = key * 0xA24BAED4963EE407ull;
+    auto high = ror * 0x9FB21C651E98DF25ull;
+    auto mix  = low + high;
+    return mix;// (mix >> 32) | (mix << 32);
+}
+
+static inline uint64_t rrxmrrxmsx_0(uint64_t v)
+{
+    /* Pelle Evensen's mixer, https://bit.ly/2HOfynt */
+    v ^= (v << 39 | v >> 25) ^ (v << 14 | v >> 50);
+    v *= UINT64_C(0xA24BAED4963EE407);
+    v ^= (v << 40 | v >> 24) ^ (v << 15 | v >> 49);
+    v *= UINT64_C(0x9FB21C651E98DF25);
+    return v ^ v >> 28;
+}
+
+static inline uint64_t hash_mur3(uint64_t key)
+{
+    //MurmurHash3Mixer
+    uint64_t h = key;
+    h ^= h >> 33;
+    h *= 0xff51afd7ed558ccd;
+    h ^= h >> 33;
+    h *= 0xc4ceb9fe1a85ec53;
+    h ^= h >> 33;
+    return h;
+}
+
+template<typename T>
+struct Int64Hasher
+{
+    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
+    inline std::size_t operator()(T key) const
+    {
+#if FIB_HASH == 1
+        return key;
+#elif FIB_HASH == 2
+        return hashfib(key);
+#elif FIB_HASH == 3
+        return hash_mur3(key);
+#elif FIB_HASH == 4
+        return hashmix(key);
+#elif FIB_HASH == 5
+        return rrxmrrxmsx_0(key);
+#elif FIB_HASH > 100
+        return key % FIB_HASH; //bad hash
+#elif FIB_HASH == 6
+        return wyhash64(key, KC);
+#else
+        auto x = key;
+        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+        x = x ^ (x >> 31);
+        return x;
+#endif
+    }
 };
 
 static int64_t now2ms()
@@ -787,7 +921,6 @@ int main(int argc, char* argv[])
         { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
-        //        { emilib1::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
         { emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
@@ -799,6 +932,7 @@ int main(int argc, char* argv[])
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_IterateIntegers(fmap); }
         { phmap::flat_hash_map<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
+        { emilib::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
 #if ABSL
         { absl::flat_hash_map<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
@@ -830,7 +964,7 @@ int main(int argc, char* argv[])
         {emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
         //        {emilib1::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
 #if ET
-        //        {emilib3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+        {emilib::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
         //        {hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
         {tsl::robin_map  <std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
         {robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
@@ -867,7 +1001,7 @@ int main(int argc, char* argv[])
         {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
         //        {emilib1::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
 #if ET
-        //        {emilib3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+        {emilib::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
         //        {hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
         {tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench);}
         {robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench);}
@@ -886,6 +1020,8 @@ int main(int argc, char* argv[])
     {
 #if ABSL_HASH
         typedef absl::Hash<size_t> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<size_t> hash_func;
 #elif !STD_HASH
         typedef robin_hood::hash<size_t> hash_func;
 #else
@@ -902,7 +1038,7 @@ int main(int argc, char* argv[])
             { ska::flat_hash_map <size_t, size_t, hash_func> fmap; bench_randomFind(fmap, numInserts[i], numFindsPerInsert[i]); }
             { phmap::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
             //        { hrd7::hash_map <size_t, size_t, hash_func> hmap;  bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
-            //        { emilib3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { emilib::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 
 #endif
             { emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -929,6 +1065,8 @@ int main(int argc, char* argv[])
     {
 #if ABSL_HASH
         typedef absl::Hash<int> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<int> hash_func;
 #elif !STD_HASH
         typedef robin_hood::hash<int> hash_func;
 #else
@@ -952,7 +1090,7 @@ int main(int argc, char* argv[])
         { emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #endif
 #if ET
-        //        { emilib3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+        { emilib::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         //        { hrd7::hash_map <int, int, hash_func> hmap;  bench_insert(hmap); }
         { tsl::robin_map  <int, int, hash_func> rmap; bench_insert(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_insert(martin); }
@@ -968,6 +1106,8 @@ int main(int argc, char* argv[])
         typedef robin_hood::hash<uint64_t> hash_func;
 #elif ABSL_HASH
         typedef absl::Hash<uint64_t> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<uint64_t> hash_func;
 #else
         typedef std::hash<uint64_t> hash_func;
 #endif
@@ -984,7 +1124,7 @@ int main(int argc, char* argv[])
 #endif
 
 #if ET
-        //        { emilib3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+        { emilib::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         //        { hrd7::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
@@ -1004,6 +1144,8 @@ int main(int argc, char* argv[])
     {
 #if ABSL_HASH
         typedef absl::Hash<int> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<int> hash_func;
 #elif !STD_HASH
         typedef robin_hood::hash<int> hash_func;
 #else
@@ -1021,7 +1163,7 @@ int main(int argc, char* argv[])
 #endif
 
 #if ET
-        //        { emilib3::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+        { emilib::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         //        { hrd7::hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
         { tsl::robin_map     <int, int, hash_func> rmap; bench_randomDistinct2(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }

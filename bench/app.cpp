@@ -83,7 +83,6 @@ void showResults(const string& tag, const Durs& durs, size_t elementCount, bool 
     cout << tag << ":"
          << fixed << right << setprecision(1) << setw(4) << setfill(' ')
          << (static_cast<double>(dur_ns)) / elementCount
-         << "ns"
          << (okFlag ? "" : " ERR")
          << ", ";
 }
@@ -126,7 +125,7 @@ Set benchmarkSet_insert(const Samples& ulongArray,
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
-        for (const auto& e : ulongArray)
+        for (const auto e : ulongArray)
             x.insert(e);
         durs[runIx] = Clock::now() - beg;
     }

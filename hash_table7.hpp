@@ -1,5 +1,5 @@
 // emhash7::HashMap for C++11/14/17
-// version 1.7.5
+// version 1.7.6
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -122,6 +122,9 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #define EMH_CACHE_LINE_SIZE 64
 #endif
 
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+#define EMH_DEFAULT_LOAD_FACTOR 0.88f
+#endif
 #if EMH_BUCKET_INDEX == 0
     #define EMH_KEY(p,n)     p[n].second.first
     #define EMH_VAL(p,n)     p[n].second.second
@@ -270,7 +273,7 @@ struct entry {
         return *this;
     }
 
-    entry& operator = (entry& o)
+    entry& operator = (const entry& o)
     {
         second = o.second;
         bucket = o.bucket;
@@ -409,6 +412,11 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
@@ -501,6 +509,11 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
@@ -530,7 +543,7 @@ public:
         size_type _from;
     };
 
-    void init(size_type bucket, float lf = 0.95f)
+    void init(size_type bucket, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
 
         _pairs = nullptr;
@@ -540,7 +553,7 @@ public:
         reserve(bucket);
     }
 
-    HashMap(size_type bucket = 4, float lf = 0.90f)
+    HashMap(size_type bucket = 4, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
         init(bucket, lf);
     }
@@ -598,7 +611,7 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable() && _num_filled > 0) {
+        if (is_triviall_destructable()) {
             for (auto it = cbegin(); it.bucket() <= _mask; ++it) {
                 _pairs[it.bucket()].~PairT();
             }
@@ -1800,22 +1813,10 @@ private:
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__
+#if __SIZEOF_INT128__ && EMH_FIBONACCI_HASH == 1
         __uint128_t r = key; r *= KC;
         return (uint64_t)(r >> 64) + (uint64_t)r;
-#elif _WIN64
-        uint64_t high;
-        return _umul128(key, KC, &high) + high;
-#elif 1
-        auto ror = (key >> 32) | (key << 32);
-        auto low = key * 0xA24BAED4963EE407ull;
-        auto high = ror * 0x9FB21C651E98DF25ull;
-        auto mix = low + high;
-        return (mix >> 32);
-#elif 1
-        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-        return (r >> 32) + r;
-#elif 1
+#elif EMH_FIBONACCI_HASH == 2
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1824,7 +1825,19 @@ private:
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif 1
+#elif _WIN64 && EMH_FIBONACCI_HASH == 1
+        uint64_t high;
+        return _umul128(key, KC, &high) + high;
+#elif EMH_FIBONACCI_HASH == 3
+        auto ror  = (key >> 32) | (key << 32);
+        auto low  = key * 0xA24BAED4963EE407ull;
+        auto high = ror * 0x9FB21C651E98DF25ull;
+        auto mix  = low + high;
+        return mix;
+#elif EMH_FIBONACCI_HASH == 1
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#else
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);

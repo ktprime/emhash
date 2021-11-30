@@ -196,16 +196,21 @@ public:
 
     HashMap& operator=(const HashMap& other)
     {
+        if (this != &other) {
         clear();
         reserve(other.size());
         insert(other.cbegin(), other.cend());
+        }
         return *this;
     }
 
-    void operator=(HashMap&& other)
+    HashMap& operator=(HashMap&& other)
     {
-        swap(other);
-        other.clear();
+        if (this != &other) {
+            swap(other);
+            other.clear();
+        }
+        return *this;
     }
 
     ~HashMap()
@@ -308,7 +313,7 @@ public:
     inline bool is_filled(size_t bucket) const { return (_states[bucket] & 1) != INACTIVE; }
     inline bool is_empty(size_t bucket) const { return (_states[bucket] & 1) == INACTIVE; }
 
-    void set_probe(uint32_t main_bucket, const uint32_t probe)
+    void set_probe(uint32_t main_bucket, uint32_t probe)
     {
         auto& probe_flag = _states[main_bucket];
         if (probe < over_probe_)

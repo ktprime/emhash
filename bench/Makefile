@@ -24,7 +24,15 @@ CXXFLAGS += -DHOOD_HASH=1
 endif
 
 ifneq ($(FH),)
-CXXFLAGS += -DEMH_FIBONACCI_HASH
+CXXFLAGS += -DFIB_HASH=$(FH)
+endif
+
+ifneq ($(EH),)
+CXXFLAGS += -DEMH_FIBONACCI_HASH=$(EH)
+endif
+
+ifneq ($(RT),)
+CXXFLAGS += -DRT=$(RT)
 endif
 
 ifneq ($(Key),)
@@ -55,9 +63,12 @@ CXXFLAGS += -DABSL_HASH=1
 #CXXFLAGS += ../thirdparty/absl/hash/internal/city.cc
 endif
 
-
 ifneq ($(HL),)
 CXXFLAGS += -DEMH_HIGH_LOAD=$(HL)
+endif
+
+ifneq ($(AVX2),)
+CXXFLAGS += -DAVX2_EHASH=$(AVX2) -mavx2
 endif
 
 

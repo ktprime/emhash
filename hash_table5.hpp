@@ -1,5 +1,5 @@
 // emhash5::HashMap for C++11
-// version 1.5.7
+// version 1.5.8
 // https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -24,12 +24,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-
 // From
 // NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
-// Quadratic collision resolution   1 - ln(1-L) - L/2    1/(1-L) - L - ln(1-L)
+// Quadratic collision resolution  1 - ln(1-L) - L/2     1/(1-L) - L - ln(1-L)
 // Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-//
+// separator chain resolution      1 + L / 2             exp(-L) + L
+
 // -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
 // QUADRATIC COLLISION RES.
 //    probes/successful lookup    1.05  1.44  1.62  2.01  2.21  2.85  5.11
@@ -37,11 +37,17 @@
 // LINEAR COLLISION RES.
 //    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
 //    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
+// SEPARATE CHAN RES.
+//    probes/successful lookup    1.05  1.25  1.3   1.25  1.4   1.45  1.50
+//    probes/unsuccessful lookup  1.00  1.11  1.15  1.22  1.25  1.31  1.37
+//    clacul/unsuccessful lookup  1.01  1.25  1.36, 1.56, 1.64, 1.81, 1.97
+
 
 #pragma once
 
 #include <cstring>
 #include <string>
+#include <cmath>
 #include <cstdlib>
 #include <type_traits>
 #include <cassert>
@@ -203,14 +209,15 @@ public:
     typedef std::pair<KeyT,ValueT>            value_type;
 
 #if EMH_BUCKET_INDEX == 0
-    typedef std::pair<KeyT, ValueT>           value_pair;
+    typedef value_type                        value_pair;
     typedef std::pair<uint32_t, value_type>   PairT;
 #elif EMH_BUCKET_INDEX == 2
-    typedef std::pair<KeyT, ValueT>           value_pair;
+    typedef value_type                        value_pair;
     typedef std::pair<value_type, uint32_t>   PairT;
 #else
-    typedef entry<KeyT, ValueT>               PairT;
     typedef entry<KeyT, ValueT>               value_pair;
+    typedef entry<KeyT, ValueT>               PairT;
+
 #endif
 
 public:
@@ -232,7 +239,7 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        iterator() { }
+        //iterator() { }
         iterator(const htype* hash_map, uint32_t bucket) : _map(hash_map), _bucket(bucket) { }
 
         iterator& operator++()
@@ -294,7 +301,7 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        const_iterator() { }
+        //const_iterator() { }
         const_iterator(const iterator& proto) : _map(proto._map), _bucket(proto._bucket) { }
         const_iterator(const htype* hash_map, uint32_t bucket) : _map(hash_map), _bucket(bucket) { }
 
@@ -445,14 +452,14 @@ public:
 
     void swap(HashMap& other)
     {
-//      std::swap(_eq, other._eq);
         std::swap(_hasher, other._hasher);
+        //      std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
+        std::swap(_mask, other._mask);
         std::swap(_loadlf, other._loadlf);
         std::swap(_last, other._last);
-        std::swap(_mask, other._mask);
         std::swap(_ehead, other._ehead);
     }
 
@@ -1636,23 +1643,12 @@ one-way seach strategy.
     }
 
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    static uint64_t hash64(uint64_t key)
+    static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__
+#if __SIZEOF_INT128__ && EMH_FIBONACCI_HASH == 1
         __uint128_t r = key; r *= KC;
         return (uint64_t)(r >> 64) + (uint64_t)r;
-#elif _WIN64
-        uint64_t high;
-        return _umul128(key, KC, &high) + high;
-#elif 1
-        auto low  =  key;
-        auto high = (key >> 32) | (key << 32);
-        auto mix  = (0x94d049bb133111ebull * low + 0xbf58476d1ce4e5b9ull * high);
-        return mix >> 32;
-#elif 1
-        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-        return (r >> 32) + r;
-#elif 1
+#elif EMH_FIBONACCI_HASH == 2
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1661,7 +1657,19 @@ one-way seach strategy.
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif 1
+#elif _WIN64 && EMH_FIBONACCI_HASH == 1
+        uint64_t high;
+        return _umul128(key, KC, &high) + high;
+#elif EMH_FIBONACCI_HASH == 3
+        auto ror  = (key >> 32) | (key << 32);
+        auto low  = key * 0xA24BAED4963EE407ull;
+        auto high = ror * 0x9FB21C651E98DF25ull;
+        auto mix  = low + high;
+        return mix;
+#elif EMH_FIBONACCI_HASH == 1
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#else
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
