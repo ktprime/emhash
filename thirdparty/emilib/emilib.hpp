@@ -26,7 +26,7 @@ namespace emilib {
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(1);
-    const static auto simd_erased = _mm_set1_epi8(3);
+    const static auto simd_delete = _mm_set1_epi8(3);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm_set1_epi8
@@ -35,7 +35,7 @@ namespace emilib {
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
 #elif 1
     const static auto simd_empty  = _mm256_set1_epi8(1);
-    const static auto simd_erased = _mm256_set1_epi8(3);
+    const static auto simd_delete = _mm256_set1_epi8(3);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
     #define SET1_EPI8      _mm256_set1_epi8
     #define LOADU_EPI8     _mm256_loadu_si256
@@ -43,14 +43,14 @@ namespace emilib {
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
 #elif AVX512_EHASH
     const static auto simd_empty  = _mm512_set1_epi8(1);
-    const static auto simd_erased = _mm512_set1_epi8(3);
+    const static auto simd_delete = _mm512_set1_epi8(3);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
     #define SET1_EPI8      _mm512_set1_epi8
     #define LOADU_EPI8     _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
     #define CMPEQ_EPI8     _mm512_test_epi8_mask
 #else
-	//TODO arm neon
+    //TODO arm neon
 #endif
 
 //find filled or empty
@@ -594,24 +594,38 @@ public:
     bool erase(const KeyT& key)
     {
         auto bucket = find_filled_bucket(key);
-        if (bucket != _num_buckets) {
-            _states[bucket] = State::ERASED;
-            _pairs[bucket].~PairT();
-            _num_filled -= 1;
-            return true;
-        } else {
+        if (bucket == _num_buckets)
             return false;
+
+        _pairs[bucket].~PairT();
+        auto state = _states[bucket] = _states[bucket + 1] % 4 == State::EMPTY ? State::EMPTY : State::DELETE;
+        if (state == State::EMPTY) {
+            while (bucket > 1 && _states[--bucket] == State::DELETE)
+                _states[bucket] = State::EMPTY;
         }
+
+        _num_filled -= 1;
+        return true;
     }
 
-    /// Erase an element using an iterator.
-    /// Returns an iterator to the next element (or end()).
+    iterator erase(const_iterator cit)
+    {
+        iterator it(this, cit._bucket);
+        return erase(it);
+    }
+
     iterator erase(iterator it)
     {
-        //DCHECK_EQ_F(it._map, this);
-        //DCHECK_LT_F(it._bucket, _num_buckets);
-        _states[it._bucket] = State::ERASED;
-        _pairs[it._bucket].~PairT();
+        auto bucket = it._bucket;
+        _pairs[bucket].~PairT();
+
+        auto state = _states[bucket] = _states[bucket + 1] % 4 == State::EMPTY ? State::EMPTY : State::DELETE;
+
+        if (state == State::EMPTY) {
+            while (bucket > 1 && _states[--bucket] == State::DELETE)
+                _states[bucket] = State::EMPTY;
+        }
+
         _num_filled -= 1;
         return ++it;
     }
@@ -812,7 +826,7 @@ private:
 
             //3. find erased
             if (hole == -1) {
-                const auto mask3 = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_erased));
+                const auto mask3 = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (mask3 != 0)
                     hole = next_bucket + CTZ(mask3);
             }
@@ -856,7 +870,7 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const
     {
-#if 0
+#if 1
         if (_num_filled > _num_buckets / 2) {
             while ((_states[next_bucket++] % 2 != State::FILLED));
             return next_bucket - 1;
@@ -877,7 +891,7 @@ private:
     enum State : uint8_t
     {
         FILLED   = 0, // Is set with key/value
-        ERASED   = 3, // Is inside a search-chain, but is empty
+        DELETE   = 3, // Is inside a search-chain, but is empty
         EMPTY    = 1, // Never been touched empty
     };
 

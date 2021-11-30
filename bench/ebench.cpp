@@ -179,6 +179,7 @@ std::map<std::string, std::string> maps =
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 //https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
+//https://gankra.github.io/blah/hashbrown-tldr/ swiss
 
 #if __linux__ && AVX2
 #include <sys/mman.h>
