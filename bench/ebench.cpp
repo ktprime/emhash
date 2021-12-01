@@ -69,7 +69,7 @@ std::map<std::string, std::string> maps =
 //    {"lru_time", "lru_time"},
     {"lru_size", "lru_size"},
 
-//    {"emilib2", "emilib2"},
+    {"emilib2", "emilib2"},
     {"emilib", "emilib"},
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
@@ -220,13 +220,13 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if ET
-    #include "emilib/emilib32.hpp"
+//    #include "emilib/emilib32.hpp"
     #include "zhashmap/hashmap.h"
 
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
-    #include "emilib/emilib12.hpp"
     #include "emilib/emilib.hpp"
+    #include "emilib/emilib2.hpp"
     #include "emilib/emilib33.hpp"
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 #endif
@@ -1629,9 +1629,8 @@ static int benchHashMap(int n)
         {  benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
 #endif
 
-        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
-        {  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
-        {  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
+        //{  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
+        //{  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
 
 #if __x86_64__ || _M_X64
         {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("flat", vList); }
@@ -1677,6 +1676,7 @@ static int benchHashMap(int n)
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
+        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
         {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("robin", vList); }
         //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
