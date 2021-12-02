@@ -13,7 +13,9 @@
 
 #ifdef _MSC_VER
 #  include <intrin.h>
+#ifndef __clang__
 #  include <zmmintrin.h>
+#endif
 #else
 #  include <x86intrin.h>
 #endif
@@ -299,7 +301,7 @@ public:
     {
         if (this != &other) {
             *this = std::move(other);
-            if (!is_triviall_destructable)
+            if (!is_triviall_destructable())
                 other.clear();
             else
                 other._num_filled = 0;
@@ -308,6 +310,7 @@ public:
 
     HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
     {
+        reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
@@ -319,15 +322,16 @@ public:
          return *this;
     }
 
-    void operator=(HashMap&& other)
+    HashMap& operator=(HashMap&& other)
     {
         if (this != &other) {
             swap(other);
-            if (!is_triviall_destructable)
+            if (!is_triviall_destructable())
                 other.clear();
             else
                 other._num_filled = 0;
         }
+        return *this;
     }
 
     ~HashMap()
@@ -373,6 +377,7 @@ public:
             memcpy(_states, other._states, _num_buckets * sizeof(_states[0]));
         } else {
             clear();
+            if (other.size() > 0)
             insert_unique(other.begin(), other.end());
         }
     }
@@ -709,6 +714,11 @@ public:
         _max_probe_length = -1;
     }
 
+    void shrink_to_fit()
+    {
+        rehash(_num_filled);
+    }
+
     bool reserve(size_t num_elems)
     {
         size_t required_buckets = num_elems + num_elems / 8;
@@ -723,7 +733,7 @@ public:
     void rehash(size_t num_elems)
     {
         const size_t required_buckets = num_elems;
-        if (required_buckets <= _num_filled)
+        if (required_buckets < _num_filled)
             return;
 
         uint64_t num_buckets = 4;
@@ -765,6 +775,7 @@ public:
         memset(_pairs + num_buckets, 0, sizeof(_pairs[0]));
 
         _max_probe_length = -1;
+        auto collision = 0;
 
         for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
             if ((old_states[src_bucket] & FILLED_MASK) == State::EFILLED) {
@@ -779,6 +790,7 @@ public:
 #else
                 const auto key_hash = _hasher(src_pair.first);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
+                collision += (_states[key_hash & _mask] & FILLED_MASK) == State::EFILLED;
 #endif
                 _states[dst_bucket] = KEYHASH_MASK(key_hash);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
@@ -789,10 +801,12 @@ public:
             }
         }
 
-        if (_num_filled > 0 && _num_filled < old_num_filled)
+        if (_num_filled < old_num_filled) {
+            collision += old_num_filled - _num_filled;
+            _max_probe_length = 0;
+        } else if (_num_filled > 0 && _max_probe_length < 0)
             _max_probe_length = 0;
 
-        const auto collision = int(old_num_filled - _num_filled);
         //TODO: use find find_empty slot
         for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if ((old_states[src_bucket] & FILLED_MASK) == State::EFILLED) {
@@ -809,8 +823,8 @@ public:
             }
         }
 
-        if (_num_filled > 10'0000 && collision > 0)
-            printf("\t\tmax_probe_length/_max_probe_length = %d/%d, collsions = %d, collision = %.2f%%\n",
+        if (_num_filled > 100'0000)
+            printf("\t\t\tmax_probe_length/_max_probe_length = %d/%d, collsions = %d, collision = %.2f%%\n",
                 max_probe_length, _max_probe_length, collision, collision * 100.0f / _num_buckets);
 
         free(old_states);
@@ -966,7 +980,7 @@ private:
 
         if (hole != (size_t)-1)
             return hole;
-        return find_empty_slot2(next_bucket, i - bucket);
+        return find_empty_slot(next_bucket, i - bucket);
     }
 
     size_t find_empty_slot2(size_t next_bucket, int offset)
@@ -1013,8 +1027,8 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const
     {
-#if 1
-        if (_num_filled * 10 > _num_buckets * 6) {
+#if 0
+        if (_num_filled * 4 > _num_buckets) {
             while ((_states[next_bucket++] & FILLED_MASK) != State::EFILLED);
             return next_bucket - 1;
         }
@@ -1035,12 +1049,10 @@ private:
     {
         if (offset > _max_probe_length)
             _max_probe_length = offset;
-//        offset = offset >= simd_gaps ? 1 : 0;
     }
 
     inline int max_search_gap(size_t bucket) const
     {
-//        return (_states[bucket] & 1) == 0 ? _max_probe_length : simd_gaps;
         return _max_probe_length;
     }
 

@@ -43,7 +43,7 @@
 #endif
 
 #ifndef ET
-#define ET                 2
+//#define ET                 1
 #endif
 
 #if STR_SIZE < 5
@@ -67,10 +67,11 @@ std::map<std::string, std::string> maps =
 //    {"emhash8", "emhash8"},
 
 //    {"lru_time", "lru_time"},
-    {"lru_size", "lru_size"},
+//    {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
     {"emilib", "emilib"},
+//    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
     //    {"ktprime", "ktprime"},
@@ -219,15 +220,17 @@ std::map<std::string, std::string> maps =
 #include "ahash/random_state.c"
 #endif
 
+#include "emilib/emilib.hpp"
+#include "emilib/emilib2.hpp"
+
 #if ET
 //    #include "emilib/emilib32.hpp"
     #include "zhashmap/hashmap.h"
 
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
-    #include "emilib/emilib.hpp"
-    #include "emilib/emilib2.hpp"
     #include "emilib/emilib33.hpp"
+//    #include "simd_hash_map/simd_hash_map.hpp"
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 #endif
 
@@ -819,8 +822,9 @@ template<class hash_type>
 void erase_reinsert(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto& v : vList) {
-        ht_hash[v] = TO_VAL(0);
+    for (auto& v : vList) {
+//        ht_hash[v] = TO_VAL(0);
+        ht_hash.emplace(v, TO_VAL(0));
         //ht_hash.emplace(v, TO_VAL(0));
 #if TVal < 2
         sum += ht_hash.count(v);
@@ -1005,7 +1009,8 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 #else
         const keyType v2(v.data(), v.size() - 1);
 #endif
-        tmp[v2] = TO_VAL(0);
+        //tmp[v2] = TO_VAL(0);
+        tmp.emplace(v2, TO_VAL(0));
         sum += tmp.count(v2);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -1124,6 +1129,7 @@ void copy_clear(hash_type& ht_hash, const std::string& hash_name)
     size_t sum = 0;
     auto ts1 = getus();
     hash_type thash = ht_hash;
+    sum += thash.size();
     ht_hash = thash;
     thash = thash;
     ht_hash = std::move(thash);
@@ -1270,7 +1276,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
 {
 #ifndef KEY_CLA
     emhash5::HashMap <keyType, int> ehash5;
-    emhash6::HashMap <keyType, int> ehash2;
+    emilib::HashMap <keyType, int> ehash2;
 
     Sfc4 srng(time(NULL));
 #if 1
@@ -1346,7 +1352,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
         }
         if (loops % 100000 == 0) {
             printf("%d %d\r", loops, (int)ehash2.size());
-#ifdef KEY_INT
+#if 0
             ehash2.shrink_to_fit();
             //ehash5.shrink_to_fit();
 
@@ -1669,14 +1675,16 @@ static int benchHashMap(int n)
 #if CUCKOO_HASHMAP
         {  benOneHash<libcuckoo::cuckoohash_map <keyType, valueType, ehash_func>>("cuckoo", vList); }
 #endif
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
+        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
-        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
-        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
+//        {  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
+
         {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("robin", vList); }
         //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
@@ -1900,7 +1908,7 @@ static void testHashInt(int loops = 100000009)
     printf("%s loops = %d\n", __FUNCTION__, loops);
     auto ts = getus();
     long sum = ts;
-    auto r  = ts * ts;
+    auto r  =  ts;
 
 #ifdef PHMAP_VERSION_MAJOR
     ts = getus(); sum = 0;
@@ -2081,7 +2089,7 @@ int main(int argc, char* argv[])
     srand((unsigned)time(0));
     printInfo(nullptr);
 
-    testHashInt(1e8+8);
+    testHashInt(1e7+8);
     int run_type = 0;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;

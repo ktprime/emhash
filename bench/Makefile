@@ -3,8 +3,8 @@ CXX=g++  -fwhole-program
 endif
 
 ifneq ($(CL),)
-ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
-CXX=clang++
+ifeq ($(shell expr `clang++-12 -dumpversion` '>=' 1.), 1)
+CXX=clang++-12
 endif
 endif
 
@@ -74,11 +74,11 @@ endif
 
 all:
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
+	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
-	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
