@@ -389,20 +389,22 @@ static int64_t now2ms()
 #elif 0
     return GetTickCount64() / 1000;
 #else
-    static LARGE_INTEGER freq = {0};
-    if (freq.QuadPart == 0)
-        QueryPerformanceFrequency(&freq);
+    LARGE_INTEGER freq = {0};
+    //if (freq.QuadPart == 0)
+    QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;
     QueryPerformanceCounter(&nowus);
     return (nowus.QuadPart * 1000) / (freq.QuadPart);
 #endif
-#elif __linux__ || __unix__
-    struct rusage rup;
-    getrusage(RUSAGE_SELF, &rup);
-    uint64_t sec = rup.ru_utime.tv_sec + rup.ru_stime.tv_sec;
-    uint64_t usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
-    return sec * 1000 + usec / 1000;
+#elif __linux__
+    struct timespec ts = {0};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+#elif __unix__
+    struct timeval start;
+    gettimeofday(&start, NULL);
+    return start.tv_sec * 1000 + start.tv_usec / 1000;
 #else
     auto tp = std::chrono::steady_clock::now();
     return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();

@@ -1027,10 +1027,10 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const
     {
-#if 0
+#if 1
         if (_num_filled * 4 > _num_buckets) {
-            while ((_states[next_bucket++] & FILLED_MASK) != State::EFILLED);
-            return next_bucket - 1;
+		while ((_states[next_bucket++] & FILLED_MASK) != State::EFILLED);
+		return next_bucket - 1;
         }
 #endif
 

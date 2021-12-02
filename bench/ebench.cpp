@@ -373,10 +373,8 @@ static int64_t getus()
 #elif WIN32_TICK
     return GetTickCount() * 1000;
 #elif WIN32_HTIME || _WIN32
-    static LARGE_INTEGER freq = {0, 0};
-    if (freq.QuadPart == 0) {
-        QueryPerformanceFrequency(&freq);
-    }
+    LARGE_INTEGER freq = {0, 0};
+	QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;
     QueryPerformanceCounter(&nowus);
@@ -838,24 +836,32 @@ void erase_reinsert(hash_type& ht_hash, const std::string& hash_name, const std:
 template<class hash_type>
 void insert_erase(const std::string& hash_name, const std::vector<keyType>& vList)
 {
-#if TKey < 2
-    hash_type ht_hash;
+#if TVal < 2
+    hash_type ht_hash(1000);
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto& v : vList) {
-        auto v2 = v % (1 << 12);
-        auto r = ht_hash.emplace(v2, TO_VAL(0)).second;
-        if (!r) {
-            ht_hash.erase(v2);
-            sum ++;
-        }
+    const auto vsmall = 1024;
+    for (size_t i = 0; i < vList.size(); i++) {
+        sum += ht_hash.emplace(vList[i], TO_VAL(0)).second;
+        if (i > vsmall)
+            ht_hash.erase(vList[i - vsmall]);
     }
 
-    ht_hash.clear();
+    if (vList.size() % 3 == 0)
+        ht_hash.clear();
+    const auto vmedium = vList.size() / 100;
+    for (size_t i = 0; i < vList.size(); i++) {
+        ht_hash.emplace(vList[i], TO_VAL(0)).second;
+        if (i > vmedium)
+            sum += ht_hash.erase(vList[i - vmedium]);
+    }
+
+    if (vList.size() % 2 == 0)
+        ht_hash.clear();
     const auto vsize = vList.size() / 8;
     for (size_t i = 0; i < vList.size(); i++) {
         sum += ht_hash.emplace(vList[i], TO_VAL(0)).second;
         if (i > vsize)
-            ht_hash.erase(vList[i - vsize]);
+            sum += ht_hash.erase(vList[i - vsize]);
     }
 
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
