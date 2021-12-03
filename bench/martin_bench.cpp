@@ -29,6 +29,7 @@
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
 #endif
+
 #include "wyhash.h"
 using namespace std;
 
@@ -48,6 +49,7 @@ using namespace std;
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
+
 #include "emilib/emilib.hpp"
 #include "emilib/emilib2.hpp"
 
@@ -379,6 +381,30 @@ struct Int64Hasher
     }
 };
 
+#if WYHASH_LITTLE_ENDIAN
+struct WysHasher
+{
+    std::size_t operator()(const std::string& str) const
+    {
+        return wyhash(str.data(), str.size(), str.size());
+    }
+};
+
+struct WyIntHasher
+{
+    uint64_t seed;
+    WyIntHasher(uint64_t seed1 = 1) { seed = seed1; }
+    std::size_t operator()(size_t v) const { return wyhash64(v, seed); }
+};
+
+struct WyRand
+{
+    uint64_t seed;
+    WyRand(uint64_t seed1 = 1) { seed = seed1; }
+    uint64_t operator()() { return wyrand(&seed); }
+};
+#endif
+
 static int64_t now2ms()
 {
 #if _WIN32
@@ -603,19 +629,24 @@ size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
     auto const strData32 = reinterpret_cast<uint32_t*>(&str[0]) + idx32;
 
     MAP map;
+//    map.reserve(bitMask / 8);
     auto ts = now2ms();
     for (size_t i = 0; i < max_n; ++i) {
         *strData32 = rng() & bitMask;
-
+#if 0
         // create an entry.
         map[str] = 0;
-
         *strData32 = rng() & bitMask;
         auto it = map.find(str);
         if (it != map.end()) {
             ++verifier;
             map.erase(it);
         }
+#else
+        map.emplace(str, 0);
+        *strData32 = rng() & bitMask;
+        verifier += map.erase(str);
+#endif
     }
 
     printf("    %016x time = %.2lf, loadf = %.2lf %d\n", bitMask, ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
@@ -668,7 +699,7 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
                 } else {
                     *strData32 = val;
                 }
-                map[str] = static_cast<size_t>(1);
+                map[str] = 1;
                 ++i;
             }
 
@@ -852,63 +883,11 @@ void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
     printf("nums = %zd, total time = %.2lf\n", numInserts, ((int)(now2ms() - ts))/1000.0);
 }
 
-int main(int argc, char* argv[])
+void runTest(int sflags, int eflags)
 {
-    puts("./test [23456mpts] n");
-    srand(time(0));
-
-    for (auto& m : show_name)
-        printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
-
-#if TCPU
-#if _WIN32
-    SetThreadAffinityMask(GetCurrentThread(), 0x2);
-#elif __linux__
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(0x2, &cpuset);
-    pthread_t current_thread = pthread_self();
-    pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
-#endif
-#endif
-
-    int tests = 10;
-    if (argc > 1) {
-        for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][i ++ ]) {
-            if (c >= '2' && c < '9') {
-                string map_name("emhash");
-                map_name += c;
-                show_name.erase(map_name);
-            } else if (c == 'm')
-                show_name.erase("robin_hood");
-            else if (c == 'p')
-                show_name.erase("phmap");
-            else if (c == 'a')
-                show_name.erase("absl");
-            else if (c == 't')
-                show_name.erase("robin_map");
-            else if (c == 's')
-                show_name.erase("ska");
-            else if (c == 'h')
-                show_name.erase("hrd7");
-            else if (c == 'e')
-                show_name.erase("emilib");
-            else if (c == 'd')
-                tests = atoi(argv[1] + i);
-        }
-    }
-    if (argc > 2) {
-        int n = argc > 1 ? atoi(argv[2]) : 12345678;
-        return 0;
-    }
-
-    puts("test hash");
-    for (auto& m : show_name)
-        printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
-
     const auto start = now2ms();
 
-    if (tests > 0)
+    if (sflags <= 1 && eflags >= 1)
     {
 #if ABSL_HASH
         typedef absl::Hash<uint64_t> hash_func;
@@ -932,93 +911,98 @@ int main(int argc, char* argv[])
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_IterateIntegers(fmap); }
-        { phmap::flat_hash_map<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
+        { phmap::flat_hash_map<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
 #endif
         { emilib::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #if ABSL
-        { absl::flat_hash_map<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
+        { absl::flat_hash_map<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
 #endif
 #if FOLLY
-        { folly::F14VectorMap<uint64_t, uint64_t, hash_func> pmap;bench_IterateIntegers(pmap); }
+        { folly::F14VectorMap<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
 #endif
         putchar('\n');
     }
 
-    if (tests > 1)
+    if (sflags <= 2 && eflags >= 2)
     {
 #ifdef HOOD_HASH
         typedef robin_hood::hash<std::string> hash_func;
 #elif ABSL_HASH
         typedef absl::Hash<std::string> hash_func;
+#elif WYHASH_LITTLE_ENDIAN
+        typedef WysHasher hash_func;
 #else
         typedef std::hash<std::string> hash_func;
 #endif
 
-        {emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+        {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #if EM3
-        {emhash2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {emhash4::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+        {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emhash4::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #endif
-        {emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {emhash5::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {emilib::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomFindString(bench); }
+        {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #if ET
         //        {hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
-        {tsl::robin_map  <std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
-        {ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench);}
-        {phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+        {tsl::robin_map  <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        {robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        {ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench); }
+        {phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if FOLLY
-        {folly::F14VectorMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+        {folly::F14VectorMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if ABSL
-        {absl::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench);}
+        {absl::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
         putchar('\n');
     }
 
-    if (tests > 2)
+    if (sflags <= 3 && eflags >= 3)
     {
 #ifdef HOOD_HASH
         typedef robin_hood::hash<std::string> hash_func;
 #elif ABSL_HASH
         typedef absl::Hash<std::string> hash_func;
+#elif WYHASH_LITTLE_ENDIAN
+        typedef WysHasher hash_func;
 #else
         typedef std::hash<std::string> hash_func;
 #endif
 
 #if EM3
-        {emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+        {emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
-        {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {emilib::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+        {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {emilib::HashMap<std::string,  int, hash_func> bench;  bench_randomEraseString(bench); }
+        {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+
 #if ET
         //        {hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
-        {tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
-        {phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+        {tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
 #if FOLLY
-        {folly::F14VectorMap<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+        {folly::F14VectorMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
 #if ABSL
-        {absl::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench);}
+        {absl::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
     }
 
-    if (tests > 3)
+    if (sflags <= 4 && eflags >= 4)
     {
 #if ABSL_HASH
         typedef absl::Hash<size_t> hash_func;
@@ -1030,8 +1014,8 @@ int main(int argc, char* argv[])
         typedef std::hash<size_t> hash_func;
 #endif
 
-        static constexpr size_t numInserts[] = {200, 2000, 500'000};
-        static constexpr size_t numFindsPerInsert[] = {5'000'000, 500'000, 1000};
+        static constexpr size_t numInserts[] = { 200, 2000, 500'000 };
+        static constexpr size_t numFindsPerInsert[] = { 5'000'000, 500'000, 1000 };
         for (int i = 0; i < 3; i++)
         {
 #if ET
@@ -1062,7 +1046,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (1)
+    if (sflags <= 5 && eflags >= 5)
     {
 #if ABSL_HASH
         typedef absl::Hash<int> hash_func;
@@ -1101,7 +1085,7 @@ int main(int argc, char* argv[])
         putchar('\n');
     }
 
-    if (1)
+    if (sflags <= 6 && eflags >= 6)
     {
 #if HOOD_HASH
         typedef robin_hood::hash<uint64_t> hash_func;
@@ -1141,7 +1125,7 @@ int main(int argc, char* argv[])
         putchar('\n');
     }
 
-    if (1)
+    if (sflags <= 7 && eflags >= 7)
     {
 #if ABSL_HASH
         typedef absl::Hash<int> hash_func;
@@ -1183,6 +1167,69 @@ int main(int argc, char* argv[])
     }
 
     printf("total time = %.3lf s", (now2ms() - start) / 1000.0);
+}
+
+int main(int argc, char* argv[])
+{
+    puts("./test [23456mptseb0d2] n");
+    srand(time(0));
+
+    for (auto& m : show_name)
+        printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
+
+#if TCPU
+#if _WIN32
+    SetThreadAffinityMask(GetCurrentThread(), 0x2);
+#elif __linux__
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(0x2, &cpuset);
+    pthread_t current_thread = pthread_self();
+    pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+#endif
+#endif
+
+    int sflags = 1, eflags = 7;
+    if (argc > 1) {
+        printf("cmd agrs = %s\n", argv[1]);
+        for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
+            if (c >= '2' && c < '9') {
+                string map_name("emhash");
+                map_name += c;
+                if (show_name.count(map_name) == 1)
+                    show_name.erase(map_name);
+                else
+                    show_name.emplace(map_name, map_name);
+            } else if (c == 'm')
+                show_name.erase("robin_hood");
+            else if (c == 'p')
+                show_name.erase("phmap");
+            else if (c == 'a')
+                show_name.erase("absl");
+            else if (c == 't')
+                show_name.erase("robin_map");
+            else if (c == 's')
+                show_name.erase("ska");
+            else if (c == 'h')
+                show_name.erase("hrd7");
+            else if (c == 'e')
+                show_name.erase("emilib");
+            else if (c == 'b')
+                sflags = atoi(&argv[1][++i]);
+            else if (c == 'd')
+                eflags = atoi(&argv[1][++i]);
+        }
+    }
+    if (argc > 2) {
+        int n = argc > 1 ? atoi(argv[2]) : 12345678;
+        return 0;
+    }
+
+    puts("test hash:");
+    for (auto& m : show_name)
+        printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
+
+    runTest(sflags, eflags);
     return 0;
 }
 

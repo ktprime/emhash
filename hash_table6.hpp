@@ -192,7 +192,7 @@ struct entry {
         return *this;
     }
 
-    entry& operator = (entry& o)
+    entry& operator = (const entry& o)
     {
         second = o.second;
         bucket = o.bucket;
@@ -255,7 +255,6 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        iterator() { }
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init()
@@ -277,36 +276,28 @@ public:
 
         void erase(size_type bucket)
         {
-#ifndef EMH_SAFE_ITER
             if (_bucket / SIZE_BIT == bucket / SIZE_BIT)
                 _bmask &= ~(1ull << (bucket % SIZE_BIT));
-#endif
         }
 
         iterator& next()
         {
             goto_next_element();
-#ifndef EMH_SAFE_ITER
             _bmask &= _bmask - 1;
-#endif
             return *this;
         }
 
         iterator& operator++()
         {
-#ifndef EMH_SAFE_ITER
             _bmask &= _bmask - 1;
-#endif
             goto_next_element();
             return *this;
         }
 
         iterator operator++(int)
         {
-#ifndef EMH_SAFE_ITER
-            _bmask &= _bmask - 1;
-#endif
             auto old_index = _bucket;
+            _bmask &= _bmask - 1;
             goto_next_element();
             return {_map, old_index};
         }
@@ -331,30 +322,29 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
-#ifdef EMH_SAFE_ITER
-            auto _bitmask = _map->_bitmask;
-            do {
-                _bucket++;
-            } while (EMH_BTS(_bucket));
-#else
             if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && _from < _map->bucket_count())
+            do {
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+            } while (_bmask == 0);
 
-            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
-#endif
+            _bucket = _from + CTZ(_bmask);
         }
 
     public:
         const htype* _map;
-        size_t   _bmask;
+        size_t    _bmask;
         size_type _bucket;
         size_type _from;
     };
@@ -369,7 +359,6 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        //const_iterator() { }
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket) { init(); }
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
@@ -423,31 +412,30 @@ public:
             return _bucket != rhs._bucket;
         }
 
+        size_type bucket() const
+        {
+            return _bucket;
+        }
+
     private:
         void goto_next_element()
         {
-#ifdef EMH_SAFE_ITER
-            auto _bitmask = _map->_bitmask;
-            do {
-                _bucket++;
-            } while (EMH_BTS(_bucket));
-#else
             _bmask &= _bmask - 1;
             if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && _from < _map->bucket_count())
+            do {
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+            } while (_bmask == 0);
 
-            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
-#endif
+            _bucket = _from + CTZ(_bmask);
         }
 
     public:
         const htype* _map;
-        size_t   _bmask;
+        size_t    _bmask;
         size_type _bucket;
         size_type _from;
     };
@@ -491,8 +479,8 @@ public:
     HashMap(std::initializer_list<value_type> ilist)
     {
         init((size_type)ilist.size());
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
-            do_insert(begin->first, begin->second);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(it->first, it->second);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -524,7 +512,7 @@ public:
     ~HashMap()
     {
         if (is_triviall_destructable() && _num_filled > 0) {
-            for (auto it = cbegin(); it.bucket() <= _mask; ++it) {
+            for (auto it = begin(); it.bucket() <= _mask; ++it) {
                 _pairs[it.bucket()].~PairT();
             }
         }
@@ -1205,7 +1193,7 @@ public:
     {
         if (required_buckets < _num_filled)
             return;
-#if (__GNUC__ >= 4 || __clang__)
+#if 0 //(__GNUC__ >= 4 || __clang__)
         size_type num_buckets = 1ul << (sizeof(required_buckets) * 8 - __builtin_clz(required_buckets));
         if (num_buckets < sizeof(uint64_t))
             num_buckets = sizeof(uint64_t);
@@ -1276,7 +1264,7 @@ public:
 #if EMH_REHASH_LOG
         if (_num_filled > EMH_REHASH_LOG) {
 #ifndef EMH_SAFE_HASH
-            auto _num_main   = old_num_filled - collision;
+            auto _num_main = old_num_filled - collision;
 #endif
             const auto num_buckets = _mask + 1;
             auto last = EMH_ADDR(_pairs, num_buckets);
@@ -1659,23 +1647,10 @@ private:
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__
-        const auto r = (static_cast<unsigned __int128>(KC)) * key;
-        uint64_t high = static_cast<uint64_t>(r >> 64U);
-        return (uint64_t)(high + (high >> 32)) + (uint64_t)r;
-#elif _WIN64
-        uint64_t high;
-        return _umul128(key, KC, &high) + high;
-#elif 1
-        auto ror = (key >> 32) | (key << 32);
-        auto low = key * 0xA24BAED4963EE407ull;
-        auto high = ror * 0x9FB21C651E98DF25ull;
-        auto mix = low + high;
-        return (mix >> 32);
-#elif 1
-        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-        return (r >> 32) + r;
-#elif 1
+#if __SIZEOF_INT128__ && EMH_FIBONACCI_HASH == 1
+        __uint128_t r = key; r *= KC;
+        return (uint64_t)(r >> 64) + (uint64_t)r;
+#elif EMH_FIBONACCI_HASH == 2
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1684,7 +1659,19 @@ private:
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif 1
+#elif _WIN64 && EMH_FIBONACCI_HASH == 1
+        uint64_t high;
+        return _umul128(key, KC, &high) + high;
+#elif EMH_FIBONACCI_HASH == 3
+        auto ror  = (key >> 32) | (key << 32);
+        auto low  = key * 0xA24BAED4963EE407ull;
+        auto high = ror * 0x9FB21C651E98DF25ull;
+        auto mix  = low + high;
+        return mix;
+#elif EMH_FIBONACCI_HASH == 1
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#else
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);

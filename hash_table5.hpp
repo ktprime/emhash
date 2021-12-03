@@ -1471,7 +1471,7 @@ private:
 #endif
         //find next linked bucket and check key
         while (true) {
-            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
+            if (EMH_UNLIKELY(_eq(key, EMH_KEY(_pairs, next_bucket)))) {
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
                 return prev_bucket;
@@ -1509,9 +1509,9 @@ private:
 
         //check current bucket_key is in main bucket or not
         const auto obmain = hash_main(bucket);
-        if (obmain != bucket)
+        if (EMH_UNLIKELY(obmain != bucket))
             return kickout_bucket(obmain, bucket);
-        else if (next_bucket != bucket)
+        else if (EMH_UNLIKELY(next_bucket != bucket))
             next_bucket = find_last_bucket(next_bucket);
 
         //find a new empty and link it to tail
@@ -1543,7 +1543,7 @@ one-way seach strategy.
             return bucket;
 
 #ifdef EMH_LPL
-        constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
+        constexpr auto linear_probe_length = std::max((unsigned int)(192 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
 #ifdef EMH_QUADRATIC

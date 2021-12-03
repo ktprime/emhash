@@ -20,30 +20,17 @@
 #  include <x86intrin.h>
 #endif
 
+// likely/unlikely
+#if (__GNUC__ >= 4 || __clang__)
+#    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
+#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#else
+#    define EMH_LIKELY(condition)   condition
+#    define EMH_UNLIKELY(condition) condition
+#endif
+
 namespace emilib {
 
-#if 0
-    #define ELOW_BITS 0
-    enum State : uint8_t
-    {
-        EFILLED = 0, // Is set with key/value
-        EEMPTY  = 1 << ELOW_BITS, // Never been touched empty
-        EDELETE = 3 << ELOW_BITS, // Is inside a search-chain, but is deteted/removed/erased
-    };
-
-    constexpr uint8_t FILLED_MASK = EEMPTY < EDELETE ? EEMPTY : EDELETE;
-    constexpr uint8_t EMPTY_MASK  = EEMPTY > EDELETE ? EEMPTY : EDELETE;
-
-    #if ELOW_BITS == 0
-    constexpr uint64_t EFILLED_FIND = 0xfefefefefefefefeull;
-    constexpr uint64_t EEMPTY_FIND  = 0x0101010101010101ull;
-    #elif ELOW_BITS == 1
-    constexpr uint64_t EFILLED_MASK = 0xfdfdfdfdfdfdfdfdull;
-    constexpr uint64_t EEMPTY_MASK  = 0x0202020202020202ull;
-    constexpr uint8_t PACK_STAT     = 0b1101'1000;
-    #endif
-    #define KEYHASH_MASK(key_hash) (key_hash >> 24) << (ELOW_BITS + 1)
-#else
     enum State : uint8_t
     {
         EFILLED  = 0,
@@ -57,13 +44,11 @@ namespace emilib {
     constexpr uint8_t  PACK_STAT    = 0b0001'1110;
     constexpr uint64_t EFILLED_FIND = 0x7f7f7f7f7f7f7f7full;
     constexpr uint64_t EEMPTY_FIND  = 0x8080808080808080ull;
-    #define KEYHASH_MASK(key_hash) ((uint8_t)(key_hash >> 24)) >> 1
-#endif
-
+    #define key_hash2(key_hash, key) ((uint8_t)(key_hash >> 24)) >> 1
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
-    const static auto simd_ltemp  = _mm_set1_epi8(0);
+    const static auto simd_ezero  = _mm_set1_epi8(0);
     const static auto simd_detele = _mm_set1_epi8(EDELETE);
     const static auto simd_gmask  = _mm_set1_epi8(EPROMASK);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
@@ -76,7 +61,7 @@ namespace emilib {
     #define CMPGT_EPI8     _mm_cmpgt_epi8
 #elif 1
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
-    const static auto simd_ltemp  = _mm256_set1_epi8(0);
+    const static auto simd_ezero  = _mm256_set1_epi8(0);
     const static auto simd_detele = _mm256_set1_epi8(EDELETE);
     const static auto simd_gmask  = _mm256_set1_epi8(EPROMASK);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
@@ -517,7 +502,7 @@ public:
         if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
             return { iterator(this, bucket), false };
         } else {
-            _states[bucket] = KEYHASH_MASK(key_hash);
+            _states[bucket] = key_hash2(key_hash, key);
             new(_pairs + bucket) PairT(key, value); _num_filled++;
             return { iterator(this, bucket), true };
         }
@@ -534,7 +519,7 @@ public:
             return { iterator(this, bucket), false };
         }
         else {
-            _states[bucket] = KEYHASH_MASK(key_hash);
+            _states[bucket] = key_hash2(key_hash, key);
             new(_pairs + bucket) PairT(key, std::move(value)); _num_filled++;
             return { iterator(this, bucket), true };
         }
@@ -586,7 +571,7 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = KEYHASH_MASK(key_hash);
+        _states[bucket] = key_hash2(key_hash, key);
         new(_pairs + bucket) PairT(key, value); _num_filled++;
     }
 
@@ -597,7 +582,7 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = KEYHASH_MASK(key_hash);
+        _states[bucket] = key_hash2(key_hash, key);
         new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
     }
 
@@ -622,7 +607,7 @@ public:
         if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
             _pairs[bucket].second = value;
         } else {
-            _states[bucket] = KEYHASH_MASK(key_hash);
+            _states[bucket] = key_hash2(key_hash, key);
             new(_pairs + bucket) PairT(key, value); _num_filled++;
         }
     }
@@ -637,7 +622,7 @@ public:
 
         /* Check if inserting a new value rather than overwriting an old entry */
         if ((_states[bucket] & FILLED_MASK) != State::EFILLED) {
-            _states[bucket] = KEYHASH_MASK(key_hash);
+            _states[bucket] = key_hash2(key_hash, key);
             new(_pairs + bucket) PairT(key, ValueT()); _num_filled++;
         }
         return _pairs[bucket].second;
@@ -722,7 +707,7 @@ public:
     bool reserve(size_t num_elems)
     {
         size_t required_buckets = num_elems + num_elems / 8;
-        if (required_buckets < _num_buckets)
+        if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
         rehash(required_buckets + 2);
@@ -733,24 +718,24 @@ public:
     void rehash(size_t num_elems)
     {
         const size_t required_buckets = num_elems;
-        if (required_buckets < _num_filled)
+        if (EMH_UNLIKELY(required_buckets < _num_filled))
             return;
 
         uint64_t num_buckets = 4;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
-        auto pairs_size = (num_buckets + 1) * sizeof(PairT);
-        auto state_size = (simd_gaps + num_buckets) * sizeof(uint8_t);
+        const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
+        auto state_size = (simd_gaps + num_buckets) * sizeof(FILLED_MASK);
         state_size += (simd_gaps - state_size % simd_gaps) % 8;
         assert(state_size % 8 == 0);
 
-        auto* new_data  = malloc(pairs_size + state_size);
+        const auto* new_data  = (char*)malloc(pairs_size + state_size);
 #if 1
         auto* new_state = (decltype(_states))new_data;
-        auto* new_pairs = (decltype(_pairs))((char*)new_data + state_size);
+        auto* new_pairs = (decltype(_pairs))(new_data + state_size);
 #else
         auto* new_pairs = (decltype(_pairs))new_data;
-        auto* new_state = (decltype(_states))((char*)new_data + pairs_size);
+        auto* new_state = (decltype(_states))(new_data + pairs_size);
 #endif
 
         auto old_num_filled  = _num_filled;
@@ -792,7 +777,7 @@ public:
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
                 collision += (_states[key_hash & _mask] & FILLED_MASK) == State::EFILLED;
 #endif
-                _states[dst_bucket] = KEYHASH_MASK(key_hash);
+                _states[dst_bucket] = key_hash2(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 if (is_triviall_destructable())
                     src_pair.~PairT();
@@ -815,7 +800,7 @@ public:
                 const auto key_hash = _hasher(src_pair.first);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
 
-                _states[dst_bucket] = KEYHASH_MASK(key_hash);
+                _states[dst_bucket] = key_hash2(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 if (is_triviall_destructable())
                     src_pair.~PairT();
@@ -856,9 +841,9 @@ private:
                 next_bucket = (key_hash + ++offset) & _mask;
             }
         } else {
-            const char keymask = KEYHASH_MASK(key_hash);
+            const char keymask = key_hash2(key_hash, key);
             const auto filled = SET1_EPI8(keymask);
-            const auto round  = next_bucket + max_search_gap(next_bucket);
+            const int round   = max_search_gap(next_bucket);
             /****
             1. start at bucket h1 (mod n)
             2. load the Group of bytes starting at the current bucket
@@ -868,29 +853,28 @@ private:
             6. if there was any matches, return false
             7. otherwise (every entry was FULL or ERASEDD), probe (mod n) and GOTO 2
             **/
-            for (auto i = next_bucket; i <= round; i += simd_gaps) {
+            for (int i = round; i >= 0; i -= simd_gaps) {
                 const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
+
                 auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
                 while (maskf != 0) {
                     const auto fbucket = next_bucket + CTZ(maskf);
-                    if (fbucket >= _num_buckets)
+                    if (EMH_UNLIKELY(fbucket >= _num_buckets))
                         break;
                     else if (_eq(_pairs[fbucket].first, key))
                         return fbucket;
                     maskf &= maskf - 1;
                 }
 
-                if (_max_probe_length >= simd_gaps) {
-                    const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-                    if (maske != 0)
-                        break;
-                }
+                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+                if (maske != 0)
+                    break;
 
                 next_bucket += simd_gaps;
-                if (next_bucket >= _num_buckets) {
-                    i -= next_bucket - _num_buckets;
+                if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
+                    i += next_bucket - _num_buckets;
                     next_bucket = 0;
-                 }
+                }
             }
         }
         return _num_buckets;
@@ -924,7 +908,7 @@ private:
             return find_empty_slot((key_hash + offset) & _mask, offset);
         }
 
-        const char keymask = KEYHASH_MASK(key_hash);
+        const char keymask = key_hash2(key_hash, key);
         const auto filled = SET1_EPI8(keymask);
         const auto bucket = (size_t)(key_hash & _mask);
         const auto round  = bucket + max_search_gap(bucket);
@@ -946,7 +930,7 @@ private:
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (fbucket >= _num_buckets)
+                if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break; //overflow
                 if (_eq(_pairs[fbucket].first, key))
                     return fbucket;
@@ -972,15 +956,18 @@ private:
 
             //4. next round
             next_bucket += simd_gaps;
-            if (next_bucket >= _num_buckets) {
+            if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
                 i -= next_bucket - _num_buckets;
                 next_bucket = 0;
             }
         }
 
-        if (hole != (size_t)-1)
+        if (EMH_LIKELY(hole != (size_t)-1))
             return hole;
-        return find_empty_slot(next_bucket, i - bucket);
+
+
+        offset = i - bucket;
+        return find_empty_slot(next_bucket, offset);
     }
 
     size_t find_empty_slot2(size_t next_bucket, int offset)
@@ -988,7 +975,7 @@ private:
         const auto bucket = next_bucket;
         while (true) {
             const auto vec   = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
-            const auto maske = MOVEMASK_EPI8(CMPGT_EPI8(simd_ltemp, vec));
+            const auto maske = MOVEMASK_EPI8(CMPGT_EPI8(simd_ezero, vec));
             if (maske != 0) {
                 next_bucket += CTZ(maske);
                 if (next_bucket < _num_buckets)
@@ -1008,17 +995,17 @@ private:
     size_t find_empty_slot(size_t next_bucket, int offset)
     {
         while (true) {
-            const auto bmask = *(uint64_t*)(_states + next_bucket) & EEMPTY_FIND;
-            if (bmask != 0) {
-                const auto probe = CTZ(bmask) / stat_bits;
+            const auto maske = *(uint64_t*)(_states + next_bucket) & EEMPTY_FIND;
+            if (EMH_LIKELY(maske != 0)) {
+                const auto probe = CTZ(maske) / stat_bits;
                 offset += probe;
                 check_offset(offset);
                 return next_bucket + probe;
             }
             next_bucket += stat_gaps;
-            offset += stat_gaps;
-            if (next_bucket >= _num_buckets) {
-                offset -= (next_bucket - _num_buckets);
+            offset      += stat_gaps;
+            if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
+                offset -= next_bucket - _num_buckets;
                 next_bucket = 0;
             }
         }
@@ -1027,19 +1014,16 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const
     {
-#if 1
+#if 0
         if (_num_filled * 4 > _num_buckets) {
-		while ((_states[next_bucket++] & FILLED_MASK) != State::EFILLED);
-		return next_bucket - 1;
+            while ((_states[next_bucket++] & FILLED_MASK) != State::EFILLED);
+            return next_bucket - 1;
         }
 #endif
-
         while (next_bucket < _num_buckets) {
-            const auto bmask = ~(*(uint64_t*)(_states + next_bucket) | EFILLED_FIND);
-            if (bmask != 0) {
-                next_bucket += CTZ(bmask) / stat_bits;
-                return next_bucket;
-            }
+            const auto maske = ~(*(uint64_t*)(_states + next_bucket) | EFILLED_FIND);
+            if (EMH_LIKELY(maske != 0))
+                return next_bucket + CTZ(maske) / stat_bits;;
             next_bucket += stat_gaps;
         }
         return _num_buckets;
@@ -1047,7 +1031,7 @@ private:
 
     inline void check_offset(int offset)
     {
-        if (offset > _max_probe_length)
+        if (EMH_UNLIKELY(offset > _max_probe_length))
             _max_probe_length = offset;
     }
 

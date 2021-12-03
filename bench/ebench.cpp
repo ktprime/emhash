@@ -87,8 +87,8 @@ std::map<std::string, std::string> maps =
     {"phmap", "phmap_flat"},
 //    {"hrdset", "hrdset"},
 
-    {"robin", "tsl_robin"},
-    {"flat", "ska_flat"},
+//    {"robin", "tsl_robin"},
+//    {"flat", "ska_flat"},
 
     {"hopsco", "tsl_hopsco"},
     {"byte", "ska_byte"},
@@ -850,7 +850,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
         ht_hash.clear();
     const auto vmedium = vList.size() / 100;
     for (size_t i = 0; i < vList.size(); i++) {
-        ht_hash.emplace(vList[i], TO_VAL(0)).second;
+        ht_hash.emplace(vList[i], TO_VAL(0));
         if (i > vmedium)
             sum += ht_hash.erase(vList[i - vmedium]);
     }
@@ -1280,6 +1280,8 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 static int TestHashMap(int n, int max_loops = 1234567)
 {
+#if GCOV== 0
+
 #ifndef KEY_CLA
     emhash5::HashMap <keyType, int> ehash5;
     emilib::HashMap <keyType, int> ehash2;
@@ -1374,6 +1376,8 @@ static int TestHashMap(int n, int max_loops = 1234567)
 
     printf("\n");
 #endif
+#endif
+
     return 0;
 }
 
@@ -2152,7 +2156,7 @@ int main(int argc, char* argv[])
                 else if (c == 'e') {
                     maps.emplace("emilib2", "emilib2");
 //                    maps.emplace("emilib3", "emilib3");
-                    maps.emplace("emilib4", "emilib4");
+//                    maps.emplace("emilib4", "emilib4");
                 }
                 else if (c == 'l') {
                     maps.emplace("lru_size", "lru_size");

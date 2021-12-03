@@ -164,7 +164,6 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #endif
 
 namespace emhash7 {
-
 #ifdef EMH_SIZE_TYPE_16BIT
     typedef uint16_t size_type;
     static constexpr size_type INACTIVE = 0xFFFE;
@@ -336,7 +335,6 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        //iterator() { }
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init()
@@ -358,36 +356,28 @@ public:
 
         void erase(size_type bucket)
         {
-#ifndef EMH_SAFE_ITER
             if (_bucket / SIZE_BIT == bucket / SIZE_BIT)
                 _bmask &= ~(1ull << (bucket % SIZE_BIT));
-#endif
         }
 
         iterator& next()
         {
             goto_next_element();
-#ifndef EMH_SAFE_ITER
             _bmask &= _bmask - 1;
-#endif
             return *this;
         }
 
         iterator& operator++()
         {
-#ifndef EMH_SAFE_ITER
             _bmask &= _bmask - 1;
-#endif
             goto_next_element();
             return *this;
         }
 
         iterator operator++(int)
         {
-#ifndef EMH_SAFE_ITER
-            _bmask &= _bmask - 1;
-#endif
             auto old_index = _bucket;
+            _bmask &= _bmask - 1;
             goto_next_element();
             return {_map, old_index};
         }
@@ -420,22 +410,17 @@ public:
     private:
         void goto_next_element()
         {
-#ifdef EMH_SAFE_ITER
-            auto* _bitmask = _map->_bitmask;
-            do {
-                _bucket++;
-            } while (EMH_SET(_bucket));
-#else
             if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && _from < _map->bucket_count())
+            do {
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+            } while (_bmask == 0);
 
-            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
-#endif
+            _bucket = _from + CTZ(_bmask);
+            assert(_bucket <= _map->bucket_count());
         }
 
     public:
@@ -455,7 +440,6 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        //const_iterator() { }
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket) { init(); }
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
@@ -517,23 +501,18 @@ public:
     private:
         void goto_next_element()
         {
-#ifdef EMH_SAFE_ITER
-            auto* _bitmask = _map->_bitmask;
-            do {
-                _bucket++;
-            } while (EMH_SET(_bucket));
-#else
             _bmask &= _bmask - 1;
             if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && _from < _map->bucket_count())
+            do {
                 _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+            } while (_bmask == 0);
 
-            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _map->bucket_count();
-#endif
+            _bucket = _from + CTZ(_bmask);
+            assert(_bucket <= _map->bucket_count());
         }
 
     public:
@@ -545,7 +524,6 @@ public:
 
     void init(size_type bucket, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
-
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_buckets = _num_filled = 0;
@@ -579,8 +557,8 @@ public:
     HashMap(std::initializer_list<value_type> ilist)
     {
         init((size_type)ilist.size());
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
-            do_insert(begin->first, begin->second);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(it->first, it->second);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -621,7 +599,7 @@ public:
 
     void clone(const HashMap& other)
     {
-//        _hasher      = other._hasher;
+        _hasher      = other._hasher;
 //        _eq          = other._eq;
 
         _num_filled  = other._num_filled;
@@ -1677,7 +1655,7 @@ private:
 #endif
         //find next linked bucket and check key, if lru is set then swap current key with prev_bucket
         while (true) {
-            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
+            if (EMH_UNLIKELY(_eq(key, EMH_KEY(_pairs, next_bucket)))) {
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
                 return prev_bucket;
@@ -1744,7 +1722,7 @@ private:
         for (size_t i = 2; ; i++) {
             const auto step = (bucket_from + i * SIZE_BIT) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
-            if (EMH_LIKELY(bmask3 != 0))
+            if (bmask3 != 0)
                 return step * SIZE_BIT + CTZ(bmask3);
 
             const auto bmask2 = *((size_t*)_bitmask + _last);
@@ -1801,7 +1779,7 @@ private:
 
         //check current bucket_key is in main bucket or not
         const auto main_bucket = hash_bucket(EMH_KEY(_pairs, bucket)) & _mask;
-        if (main_bucket != bucket)
+        if (EMH_UNLIKELY(main_bucket != bucket))
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket != bucket)
             next_bucket = find_last_bucket(next_bucket);
