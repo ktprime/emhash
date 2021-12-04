@@ -861,12 +861,12 @@ private:
                 maskf &= maskf - 1;
             }
 
+
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = next_bucket + CTZ(maske);
-                const int diff = ebucket - bucket;
-                const int offset = diff >= 0 ? diff : _num_buckets + diff;
+                const auto ebucket = std::min(hole, next_bucket + CTZ(maske));
+                const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
                 return ebucket;

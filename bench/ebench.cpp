@@ -374,7 +374,7 @@ static int64_t getus()
     return GetTickCount() * 1000;
 #elif WIN32_HTIME || _WIN32
     LARGE_INTEGER freq = {0, 0};
-	QueryPerformanceFrequency(&freq);
+    QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;
     QueryPerformanceCounter(&nowus);

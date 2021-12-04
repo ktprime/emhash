@@ -3,8 +3,8 @@ CXX=g++  -fwhole-program
 endif
 
 ifneq ($(CL),)
-ifeq ($(shell expr `clang++-12 -dumpversion` '>=' 1.), 1)
-CXX=clang++-12
+ifeq ($(shell expr `clang++-11 -dumpversion` '>=' 1.), 1)
+CXX=clang++-11
 endif
 endif
 
