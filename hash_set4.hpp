@@ -141,7 +141,6 @@ public:
         typedef value_type*               pointer;
         typedef value_type&               reference;
 
-        iterator() { }
         iterator(htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { init(); }
         void init()
         {
@@ -196,24 +195,17 @@ public:
     private:
         void goto_next_element()
         {
-#ifdef EMH_SAFE_ITER
-            auto bitmask = _set->_bitmask;
-
-            do {
-                _bucket++;
-            } while (bitmask[_bucket / MASK_BIT] & (1 << (_bucket % MASK_BIT)));
-#else
             _bmask &= _bmask - 1;
             if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && EMH_LIKELY(_from < _set->bucket_count()))
+            do
                 _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+            while (_bmask == 0);
 
-            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _set->bucket_count();
-#endif
+            _bucket = _from + CTZ(_bmask);
         }
 
     public:
@@ -232,8 +224,7 @@ public:
         typedef value_type*               pointer;
         typedef value_type&               reference;
 
-        const_iterator() { }
-        const_iterator(const iterator& it) : _set(it._set), _bucket(it._bucket) { init(); }
+        const_iterator(const iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         const_iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { init(); }
 
         void init()
@@ -289,24 +280,17 @@ public:
     private:
         void goto_next_element()
         {
-#ifdef EMH_SAFE_ITER
-            auto bitmask = _set->_bitmask;
-
-            do {
-                _bucket++;
-            } while (bitmask[_bucket / MASK_BIT] & (1 << (_bucket % MASK_BIT)));
-#else
             _bmask &= _bmask - 1;
             if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
 
-            while (_bmask == 0 && EMH_LIKELY(_from < _set->bucket_count()))
+            do
                 _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+            while (_bmask == 0);
 
-            _bucket = _bmask != 0 ? _from + CTZ(_bmask) : _set->bucket_count();
-#endif
+            _bucket = _from + CTZ(_bmask);
         }
 
     public:
@@ -1191,7 +1175,7 @@ private:
             const auto bucket2 = bucket1 + 1;
             if (_pairs[bucket2].second == INACTIVE)
                 return bucket2;
-#if 1
+#if 0
             else if (last > 3) {
                 const auto next = (bucket1 + _num_filled) & _mask;
                 const auto bucket3 = next;
@@ -1209,51 +1193,40 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-#if 0
-        const auto bucket1 = bucket_from + 1;
-        if (_pairs[bucket1].second == INACTIVE)
-            return bucket1;
-
-        const auto bucket2 = bucket_from + 2;
-        if (_pairs[bucket2].second == INACTIVE)
-            return bucket2;
-#endif
-
 #if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
-        const auto begin = (uint8_t*)_bitmask + bucket_from / 8;
+        auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
 #else
         const auto boset = bucket_from % SIZE_BIT;
-        const auto begin = (size_t*)_bitmask + bucket_from / SIZE_BIT;
+        auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
 #endif
 
-        const auto bmask = *(size_t*)(begin) >> boset;
+        const auto bmask = *(size_t*)(start) >> boset;
         if (EMH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
-            if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
-                return bucket_from + offset;
-
-            return bucket_from - boset + CTZ(begin[0]);
+            return bucket_from + offset;
         }
 
-        const auto qmask = (SIZE_BIT + _mask) / SIZE_BIT - 1;
-        {
-            const auto next2 = (bucket_from + 2 * SIZE_BIT) & qmask;
-            const auto bmask2 = *((size_t*)_bitmask + next2);
-            if (EMH_LIKELY(bmask2 != 0))
-                return next2 * SIZE_BIT + CTZ(bmask2);
-        }
+        const auto qmask = _mask / SIZE_BIT;
 
-        for (; ;) {
+        for (size_t i = 2; ; i++) {
+            const auto step = (bucket_from + i * SIZE_BIT) & qmask;
+            const auto bmask3 = *((size_t*)_bitmask + step);
+            if (bmask3 != 0)
+                return step * SIZE_BIT + CTZ(bmask3);
+
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
-
-            const auto next1 = qmask - _last;
+#if 0
+            const auto next1 = (qmask / 2 + _last)  & qmask;
+//            const auto next1 = qmask - _last;
             const auto bmask1 = *((size_t*)_bitmask + next1);
-            if (bmask1 != 0)
+            if (bmask1 != 0) {
+                _last = next1;
                 return next1 * SIZE_BIT + CTZ(bmask1);
-
+            }
+#endif
             _last = (_last + 1) & qmask;
         }
         return 0;
@@ -1302,7 +1275,7 @@ private:
             next_bucket = find_last_bucket(next_bucket);
 
         //find a new empty and link it to tail
-        return _pairs[next_bucket].second = find_empty_simple(next_bucket);
+        return _pairs[next_bucket].second = find_empty_bucket(next_bucket);
     }
 
     const static uint64_t KC = UINT64_C(11400714819323198485);

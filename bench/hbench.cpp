@@ -1,3 +1,5 @@
+#include "util.h"
+
 #if __x86_64__
 //#include "hrd/hash_set7.h"
 #endif
@@ -8,7 +10,9 @@
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
 #include "phmap/phmap.h"
-#include "emilib/emilib33.hpp"
+//#include "emilib/emilib33.hpp"
+#include "emilib/emilib.hpp"
+#include "emilib/emilib2.hpp"
 //#include "patchmap/patchmap.hpp"
 
 
@@ -22,7 +26,7 @@
 #include <unordered_map>
 
 #if ABSL
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/internal/raw_hash_set.cc"
 
 #if ABSL_HASH
@@ -373,12 +377,16 @@ int main()
     using hash_t = robin_hood::hash<int64_t>;
 #elif ABSL_HASH
     using hash_t = absl::Hash<int64_t>;
+#elif FIB_HASH
+    using hash_t = Int64Hasher<int64_t>;
 #else
     using hash_t = std::hash<int64_t>;
 #endif
 
     uint64_t ret = 0;
     { robin_hood::unordered_flat_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_flat_map"); }
+    { emilib::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib::HashMap"); }
+    { emilib2::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib2::HashMap"); }
     { robin_hood::unordered_node_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_node_map"); }
 //    { emhash4::HashMap<uint64_t, Value, hash_t> m7; ret -= test(m7, "\nemhash4::HashMap"); }
 //    { emilib3::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib3::HashMap"); }

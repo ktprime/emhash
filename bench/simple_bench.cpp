@@ -15,7 +15,9 @@
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
 #include "martin/robin_hood.h"
-#include "emilib/emilib32.hpp"
+//#include "emilib/emilib32.hpp"
+#include "emilib/emilib.hpp"
+#include "emilib/emilib2.hpp"
 
 #include "old/hash_table2.hpp"
 #include "old/hash_table3.hpp"
@@ -176,6 +178,9 @@ int main(int argc, char* argv[])
     bench<robin_hood::unordered_node_map<int, std::string>>("robin_hood::unordered_node_map");
     bench<robin_hood::unordered_flat_map<int, std::string>>("robin_hood::unordered_flat_map");
 
+    bench<emilib::HashMap<int, std::string>>("emilib::hashMap");
+    bench<emilib2::HashMap<int, std::string>>("emilib2::hashMap");
+
     bench<emhash2::HashMap<int, std::string>>("emhash2::hashMap");
     bench<emhash3::HashMap<int, std::string>>("emhash3::hashMap");
     bench<emhash4::HashMap<int, std::string>>("emhash4::hashMap");
@@ -196,7 +201,7 @@ int main(int argc, char* argv[])
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
     bench<hrd7::hash_map<int, std::string>>("hrd7::hash_map");
 #endif
-    bench<emilib3::HashMap<int, std::string>>("emilib3::hashMap");
+//    bench<emilib3::HashMap<int, std::string>>("emilib3::hashMap");
 //    bench<whash::patchmap<int, std::string>>("whash::patchmap");
 
     //bench_wyhash(3234567, 32);

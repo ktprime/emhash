@@ -97,20 +97,17 @@ inline static uint32_t CTZ(uint64_t n)
 }
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
-class HashMap
+template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+class HashSet
 {
 private:
-    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
+    using htype = HashSet<KeyT, HashT, EqT>;
 
-    using PairT = std::pair<KeyT, ValueT>;
 public:
     using size_t          = uint32_t;
-    using value_type      = PairT;
-    using reference       = PairT&;
-    using const_reference = const PairT&;
-    typedef ValueT mapped_type;
-    typedef ValueT val_type;
+    using value_type      = KeyT;
+    using reference       = KeyT&;
+    using const_reference = const KeyT&;
     typedef KeyT   key_type;
 
     class iterator
@@ -118,11 +115,11 @@ public:
     public:
         using iterator_category = std::forward_iterator_tag;
         using difference_type   = std::ptrdiff_t;
-        using value_type        = std::pair<KeyT, ValueT>;
+        using value_type        = KeyT;
         using pointer           = value_type*;
         using reference         = value_type&;
 
-        iterator(htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { }
+        iterator(htype* hash_set, size_t bucket) : _set(hash_set), _bucket(bucket) { }
 
         size_t operator - (iterator& r)
         {
@@ -144,17 +141,17 @@ public:
         {
             size_t old_index = _bucket;
             goto_next_element();
-            return iterator(_map, old_index);
+            return iterator(_set, old_index);
         }
 
         reference operator*() const
         {
-            return _map->_pairs[_bucket];
+            return _set->_keys[_bucket];
         }
 
         pointer operator->() const
         {
-            return _map->_pairs + _bucket;
+            return _set->_keys + _bucket;
         }
 
         bool operator==(const iterator& rhs) const
@@ -170,11 +167,11 @@ public:
     private:
         void goto_next_element()
         {
-            _bucket = _map->find_filled_slot(_bucket + 1);
+            _bucket = _set->find_filled_slot(_bucket + 1);
         }
 
     public:
-        htype*  _map;
+        htype*  _set;
         size_t  _bucket;
     };
 
@@ -183,12 +180,12 @@ public:
     public:
         using iterator_category = std::forward_iterator_tag;
         using difference_type   = std::ptrdiff_t;
-        using value_type        = const std::pair<KeyT, ValueT>;
+        using value_type        = const KeyT;
         using pointer           = value_type*;
         using reference         = value_type&;
 
-        const_iterator(iterator proto) : _map(proto._map), _bucket(proto._bucket)  { }
-        const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket)
+        const_iterator(iterator proto) : _set(proto._set), _bucket(proto._bucket)  { }
+        const_iterator(const htype* hash_set, size_t bucket) : _set(hash_set), _bucket(bucket)
         {
         }
 
@@ -212,22 +209,22 @@ public:
         {
             size_t old_index = _bucket;
             goto_next_element();
-            return const_iterator(_map, old_index);
+            return const_iterator(_set, old_index);
         }
 
         reference operator*() const
         {
-            return _map->_pairs[_bucket];
+            return _set->_keys[_bucket];
         }
 
         pointer operator->() const
         {
-            return _map->_pairs + _bucket;
+            return _set->_keys + _bucket;
         }
 
         bool operator==(const const_iterator& rhs) const
         {
-            //DCHECK_EQ_F(_map, rhs._map);
+            //DCHECK_EQ_F(_set, rhs._set);
             return _bucket == rhs._bucket;
         }
 
@@ -239,29 +236,29 @@ public:
     private:
         void goto_next_element()
         {
-            _bucket = _map->find_filled_slot(_bucket + 1);
+            _bucket = _set->find_filled_slot(_bucket + 1);
         }
 
     public:
-        const htype*  _map;
+        const htype*  _set;
         size_t        _bucket;
     };
 
     // ------------------------------------------------------------------------
 
-    HashMap() = default;
+    HashSet() = default;
 
-    HashMap(size_t n)
+    HashSet(size_t n)
     {
         rehash(n);
     }
 
-    HashMap(const HashMap& other)
+    HashSet(const HashSet& other)
     {
         clone(other);
     }
 
-    HashMap(HashMap&& other)
+    HashSet(HashSet&& other)
     {
         if (this != &other) {
             *this = std::move(other);
@@ -272,21 +269,21 @@ public:
         }
     }
 
-    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
+    HashSet(std::initializer_list<KeyT> il)
     {
         reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
 
-    HashMap& operator=(const HashMap& other)
+    HashSet& operator=(const HashSet& other)
     {
         if (this != &other)
             clone(other);
          return *this;
     }
 
-    HashMap& operator=(HashMap&& other)
+    HashSet& operator=(HashSet&& other)
     {
         if (this != &other) {
             swap(other);
@@ -298,7 +295,7 @@ public:
         return *this;
     }
 
-    ~HashMap()
+    ~HashSet()
     {
         if (!is_triviall_destructable())
             clear();
@@ -310,13 +307,13 @@ public:
     static constexpr bool is_copy_trivially()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600
-        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
+        return (std::is_trivially_copyable<KeyT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value);
 #endif
     }
 
-    void clone(const HashMap& other)
+    void clone(const HashSet& other)
     {
         if (other.size() == 0) {
             clear();
@@ -327,12 +324,12 @@ public:
         if (is_copy_trivially()) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
-            memcpy(_pairs,  other._pairs,  _num_buckets * sizeof(_pairs[0]));
+            memcpy(_keys,  other._keys,  _num_buckets * sizeof(_keys[0]));
         } else {
             clear();
             reserve(other._num_buckets / 2);
             for (auto it = other.cbegin();  it != other.cend(); ++it)
-                new(_pairs + it.bucket()) PairT(*it);
+                new(_keys + it.bucket()) KeyT(*it);
         }
         //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
@@ -340,12 +337,12 @@ public:
         memcpy(_states, other._states, (_num_buckets + simd_gaps) * sizeof(_states[0]));
     }
 
-    void swap(HashMap& other)
+    void swap(HashSet& other)
     {
         std::swap(_hasher,           other._hasher);
         std::swap(_eq,               other._eq);
         std::swap(_states,           other._states);
-        std::swap(_pairs,            other._pairs);
+        std::swap(_keys,            other._keys);
         std::swap(_num_buckets,      other._num_buckets);
         std::swap(_num_filled,       other._num_filled);
         std::swap(_max_probe_length, other._max_probe_length);
@@ -436,28 +433,19 @@ public:
         return find_filled_bucket(k) != _num_buckets;
     }
 
-    /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename KeyLike>
-    ValueT* try_get(const KeyLike& k)
+    KeyT* try_get(const KeyLike& k)
     {
         auto bucket = find_filled_bucket(k);
-        return &_pairs[bucket].second;
+        return &_keys[bucket];
     }
 
     /// Const version of the above
     template<typename KeyLike>
-    ValueT* try_get(const KeyLike& k) const
+    KeyT* try_get(const KeyLike& k) const
     {
         auto bucket = find_filled_bucket(k);
-        return &_pairs[bucket].second;
-    }
-
-    /// Convenience function.
-    template<typename KeyLike>
-    ValueT get_or_return_default(const KeyLike& k) const
-    {
-        const ValueT* ret = try_get(k);
-        return ret ? *ret : ValueT();
+        return &_keys[bucket];
     }
 
     // -----------------------------------------------------
@@ -465,7 +453,7 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
+    std::pair<iterator, bool> insert(const KeyT& key)
     {
         check_expand_need();
 
@@ -476,12 +464,12 @@ public:
             return { iterator(this, bucket), false };
         } else {
             _states[bucket] = KEYHASH_MASK(key_hash);
-            new(_pairs + bucket) PairT(key, value); _num_filled++;
+            new(_keys + bucket) KeyT(key); _num_filled++;
             return { iterator(this, bucket), true };
         }
     }
 
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
+    std::pair<iterator, bool> insert(KeyT&& key)
     {
         check_expand_need();
 
@@ -493,36 +481,31 @@ public:
         }
         else {
             _states[bucket] = KEYHASH_MASK(key_hash);
-            new(_pairs + bucket) PairT(key, std::move(value)); _num_filled++;
+            new(_keys + bucket) KeyT(std::move(key)); _num_filled++;
             return { iterator(this, bucket), true };
         }
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key, const ValueT& value)
+    std::pair<iterator, bool> emplace(const KeyT& key)
     {
-        return insert(key, value);
+        return insert(key);
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key, ValueT&& value)
+    std::pair<iterator, bool> emplace(KeyT&& key)
     {
-        return insert(key, std::move(value));
+        return insert(std::move(key));
     }
 
-    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(iterator it, const KeyT& key)
     {
-        return insert(p.first, p.second);
-    }
-
-    std::pair<iterator, bool> insert(iterator it, const std::pair<KeyT, ValueT>& p)
-    {
-        return insert(p.first, p.second);
+        return insert(key);
     }
 
     void insert(const_iterator beginc, const_iterator endc)
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc) {
-            insert(beginc->first, beginc->second);
+            insert(*beginc);
         }
     }
 
@@ -530,12 +513,12 @@ public:
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc) {
-            insert_unique(beginc->first, beginc->second);
+            insert_unique(*beginc);
         }
     }
 
     /// Same as above, but contains(key) MUST be false
-    void insert_unique(const KeyT& key, const ValueT& value)
+    void insert_unique(const KeyT& key)
     {
         check_expand_need();
 
@@ -543,10 +526,10 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = KEYHASH_MASK(key_hash);
-        new(_pairs + bucket) PairT(key, value); _num_filled++;
+        new(_keys + bucket) KeyT(key); _num_filled++;
     }
 
-    void insert_unique(KeyT&& key, ValueT&& value)
+    void insert_unique(KeyT&& key)
     {
         check_expand_need();
 
@@ -554,20 +537,10 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = KEYHASH_MASK(key_hash);
-        new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
+        new(_keys + bucket) KeyT(std::move(key)); _num_filled++;
     }
 
-    void insert_unique(std::pair<KeyT, ValueT>&& p)
-    {
-        insert_unique(std::move(p.first), std::move(p.second));
-    }
-
-    void insert_unique(std::pair<KeyT, ValueT>& p)
-    {
-        insert_unique(p.first, p.second);
-    }
-
-    void insert_or_assign(const KeyT& key, ValueT&& value)
+    void insert_or_assign(const KeyT& key)
     {
         check_expand_need();
 
@@ -576,27 +549,11 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (_states[bucket] % 2 == State::EFILLED) {
-            _pairs[bucket].second = value;
+
         } else {
             _states[bucket] = KEYHASH_MASK(key_hash);
-            new(_pairs + bucket) PairT(key, value); _num_filled++;
+            new(_keys + bucket) KeyT(key); _num_filled++;
         }
-    }
-
-    /// Like std::map<KeyT,ValueT>::operator[].
-    ValueT& operator[](const KeyT& key)
-    {
-        check_expand_need();
-
-        const auto key_hash = _hasher(key);
-        const auto bucket = find_or_allocate(key, key_hash);
-
-        /* Check if inserting a new value rather than overwriting an old entry */
-        if (_states[bucket] % 2 != State::EFILLED) {
-            _states[bucket] = KEYHASH_MASK(key_hash);
-            new(_pairs + bucket) PairT(key, ValueT()); _num_filled++;
-        }
-        return _pairs[bucket].second;
     }
 
     // -------------------------------------------------------
@@ -634,7 +591,7 @@ public:
     void _erase(size_t bucket)
     {
         if (is_triviall_destructable())
-            _pairs[bucket].~PairT();
+            _keys[bucket].~KeyT();
         auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
         if (state == State::EEMPTY) {
             while (bucket > 1 && _states[--bucket] == State::EDELETE)
@@ -646,9 +603,9 @@ public:
     static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return (std::is_trivially_destructible<KeyT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value);
 #endif
     }
 
@@ -658,7 +615,7 @@ public:
         if (!is_triviall_destructable()) {
             for (size_t bucket=0; _num_filled; ++bucket) {
                 if (_states[bucket] % 2 == State::EFILLED) {
-                    _pairs[bucket].~PairT();
+                    _keys[bucket].~KeyT();
                     _num_filled --;
                 }
                 _states[bucket] = State::EEMPTY;
@@ -698,21 +655,20 @@ public:
         auto status_size = (simd_gaps + num_buckets) * sizeof(uint8_t);
         status_size += (8 - status_size % 8) % 8;
 
-        auto new_states = (uint8_t*)malloc(status_size + (num_buckets + 1) * sizeof(PairT));
-        auto new_pairs  = (PairT*)(new_states + status_size);
-            //(PairT*)malloc((num_buckets + 1) * sizeof(PairT));
+        auto new_states = (uint8_t*)malloc(status_size + (num_buckets + 1) * sizeof(KeyT));
+        auto new_keys  = (KeyT*)(new_states + status_size);
 
         auto old_num_filled  = _num_filled;
         auto old_num_buckets = _num_buckets;
         auto old_states      = _states;
-        auto old_pairs       = _pairs;
+        auto old_keys        = _keys;
         auto max_probe_length = _max_probe_length;
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
         _states      = new_states;
-        _pairs       = new_pairs;
+        _keys        = new_keys;
 
         std::fill_n(_states, num_buckets, State::EEMPTY);
         //find empty tombstone
@@ -720,23 +676,23 @@ public:
         //find filled tombstone
         std::fill_n(_states + num_buckets + simd_gaps / 2, simd_gaps / 2, State::EEMPTY + 4);
         //fill last packet zero
-        memset(new_pairs + num_buckets, 0, sizeof(new_pairs[0]));
+        memset(new_keys + num_buckets, 0, sizeof(new_keys[0]));
 
         _max_probe_length = -1;
         auto collision = 0;
 
         for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
-                auto& src_pair = old_pairs[src_bucket];
+                auto& src_key = old_keys[src_bucket];
 
-                const auto key_hash = _hasher(src_pair.first);
+                const auto key_hash = _hasher(src_key);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
                 collision += _states[key_hash & _mask] % 2 == State::EFILLED;
 
                 _states[dst_bucket] = KEYHASH_MASK(key_hash);
-                new(_pairs + dst_bucket) PairT(std::move(src_pair));
+                new(_keys + dst_bucket) KeyT(std::move(src_key));
                 _num_filled += 1;
-                src_pair.~PairT();
+                src_key.~KeyT();
             }
         }
 
@@ -765,7 +721,7 @@ private:
         if (0 && _max_probe_length < simd_gaps / 4) {
             for (int offset = 0; offset <= _max_probe_length; ) {
                 if (_states[next_bucket] % 2 == State::EFILLED) {
-                    if (_eq(_pairs[next_bucket].first, key)) {
+                    if (_eq(_keys[next_bucket], key)) {
                         return next_bucket;
                     }
                 }
@@ -786,7 +742,7 @@ private:
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_UNLIKELY(fbucket >= _num_buckets))
                         break; //overflow
-                    else if (_eq(_pairs[fbucket].first, key))
+                    else if (_eq(_keys[fbucket], key))
                         return fbucket;
                     maskf &= maskf - 1;
                 }
@@ -818,7 +774,7 @@ private:
             for (; offset <= _max_probe_length; ++offset) {
                 auto bucket = (key_hash + offset) & _mask;
                 if (_states[bucket] % 2 == State::EFILLED) {
-                    if (_eq(_pairs[bucket].first, key)) {
+                    if (_eq(_keys[bucket], key)) {
                         return bucket;
                     }
                 }
@@ -850,7 +806,7 @@ private:
                 const auto fbucket = next_bucket + CTZ(maskf);
                 if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break;
-                else if (_eq(_pairs[fbucket].first, key))
+                else if (_eq(_keys[fbucket], key))
                     return fbucket;
                 maskf &= maskf - 1;
             }
@@ -859,7 +815,7 @@ private:
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = std::min(hole, next_bucket + CTZ(maske));
+                const auto ebucket = std::min<size_t>(hole, next_bucket + CTZ(maske));
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
@@ -941,7 +897,7 @@ private:
     HashT   _hasher;
     EqT     _eq;
     uint8_t*_states           = nullptr;
-    PairT*  _pairs            = nullptr;
+    KeyT*   _keys             = nullptr;
     size_t  _num_buckets      =  0;
     size_t  _mask             =  0; // _num_buckets minus one
     size_t  _num_filled       =  0;

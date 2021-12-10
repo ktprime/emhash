@@ -325,6 +325,7 @@ public:
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
+    class const_iterator;
     class iterator
     {
     public:
@@ -335,6 +336,7 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
+        iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init()
@@ -349,7 +351,7 @@ public:
             }
         }
 
-        size_t bucket()
+        size_t bucket() const
         {
             return _bucket;
         }
@@ -376,10 +378,10 @@ public:
 
         iterator operator++(int)
         {
-            auto old_index = _bucket;
+            iterator old = *this;
             _bmask &= _bmask - 1;
             goto_next_element();
-            return {_map, old_index};
+            return old;
         }
 
         reference operator*() const
@@ -402,11 +404,6 @@ public:
             return _bucket != rhs._bucket;
         }
 
-        size_type bucket() const
-        {
-            return _bucket;
-        }
-
     private:
         void goto_next_element()
         {
@@ -420,7 +417,6 @@ public:
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
-            assert(_bucket <= _map->bucket_count());
         }
 
     public:
@@ -440,7 +436,7 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket) { init(); }
+        const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init()
@@ -455,7 +451,7 @@ public:
             }
         }
 
-        size_t bucket()
+        size_t bucket() const
         {
             return _bucket;
         }
@@ -468,9 +464,9 @@ public:
 
         const_iterator operator++(int)
         {
-            auto old_index = _bucket;
+            const_iterator old(*this);
             goto_next_element();
-            return {_map, old_index};
+            return old;
         }
 
         reference operator*() const
@@ -493,11 +489,6 @@ public:
             return _bucket != rhs._bucket;
         }
 
-        size_type bucket() const
-        {
-            return _bucket;
-        }
-
     private:
         void goto_next_element()
         {
@@ -512,7 +503,6 @@ public:
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
-            assert(_bucket <= _map->bucket_count());
         }
 
     public:
@@ -590,8 +580,10 @@ public:
     ~HashMap()
     {
         if (is_triviall_destructable()) {
-            for (auto it = cbegin(); it.bucket() <= _mask; ++it) {
-                _pairs[it.bucket()].~PairT();
+            //clearkv();
+            for (auto it = cbegin(); _num_filled; ++it) {
+                _num_filled --;
+                it->~PairT();
             }
         }
         free(_pairs);
@@ -615,10 +607,8 @@ public:
             memcpy(_pairs, opairs, AllocSize(_num_buckets));
         else {
             memcpy(_pairs + _num_buckets, opairs + _num_buckets, PACK_SIZE * sizeof(PairT) + _num_buckets / 8 + sizeof(uint64_t));
-            for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
-                if (EMH_EMPTY(_pairs, bucket))
-                    continue;
-
+            for (auto it = other.cbegin(); it.bucket() <= _mask; ++it) {
+                const auto bucket = it.bucket();
                 EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
                 new(_pairs + bucket) PairT(opairs[bucket]);
             }
@@ -1264,7 +1254,7 @@ public:
     //iterator erase const_iterator
     iterator erase(const_iterator cit)
     {
-        iterator it(this, cit._bucket);
+        iterator it(cit);
         return erase(it);
     }
 
@@ -1306,7 +1296,7 @@ public:
 
     void clearkv()
     {
-        for (iterator it = begin(); it.bucket() <= _mask; ++it) {
+        for (auto it = cbegin(); _num_filled; ++it) {
             clear_bucket(it.bucket());
         }
     }
@@ -1843,11 +1833,6 @@ private:
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.data(), key.size(), key.size());
-#elif EMH_BKDR_HASH
-        uint64_t hash = 0;
-        for (size_type i = 0, j = 1; i < size; i += j++)
-            hash = key[i] + hash * 131;
-        return hash;
 #else
         return (size_type)_hasher(key);
 #endif

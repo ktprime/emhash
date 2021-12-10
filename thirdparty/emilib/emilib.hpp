@@ -7,9 +7,10 @@
 #pragma once
 
 #include <cstdlib>
+#include <cstring>
 #include <iterator>
 #include <utility>
-
+#include <cassert>
 
 #ifdef _MSC_VER
 #  include <intrin.h>
@@ -34,17 +35,16 @@ namespace emilib {
     enum State : uint8_t
     {
         EFILLED  = 0,
-        EEMPTY   = 0b1000'0000,
-        EDELETE  = 0b1100'0000,
-        EPROMASK = 0b1111'1110,
+        EEMPTY   = 0x80, // 0b1000'0000,
+        EDELETE  = EEMPTY + 0x40, //0b1100'0000,
+        EPROMASK = 0xFE, //0b1111'1110,
     };
 
     constexpr uint8_t  FILLED_MASK  = EEMPTY;
     constexpr uint8_t  EMPTY_MASK   = EDELETE;
-    constexpr uint8_t  PACK_STAT    = 0b0001'1110;
+    constexpr uint8_t  PACK_STAT    = uint8_t(EDELETE + EEMPTY);
     constexpr uint64_t EFILLED_FIND = 0x7f7f7f7f7f7f7f7full;
     constexpr uint64_t EEMPTY_FIND  = 0x8080808080808080ull;
-    #define key_hash2(key_hash, key) ((uint8_t)(key_hash >> 24)) >> 1
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
@@ -122,7 +122,7 @@ template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, type
 class HashMap
 {
 private:
-    using MyType = HashMap<KeyT, ValueT, HashT, EqT>;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
     using PairT = std::pair<KeyT, ValueT>;
 public:
@@ -134,23 +134,54 @@ public:
     typedef ValueT val_type;
     typedef KeyT   key_type;
 
+#ifndef EMH_HASH2
+    #define hash2_key(key_hash, key) ((uint8_t)(key_hash >> 24)) >> 1
+#else
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
+    inline uint8_t hash2_key(uint64_t key_hash, const UType& key) const
+    {
+        return (uint8_t)(key_hash >> 32) >> 1;
+    }
+
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
+    inline uint8_t hash2_key(uint64_t key_hash, const UType& key) const
+    {
+        if constexpr (sizeof(UType) > 4)
+            return (uint8_t)(key >> 32) >> 1;
+       else
+            return (uint8_t)((key * key_hash) >> 24) >> 1;
+    }
+#endif
+
     class iterator
     {
     public:
         using iterator_category = std::forward_iterator_tag;
-        using difference_type   = size_t;
+        using difference_type   = std::ptrdiff_t;
         using value_type        = std::pair<KeyT, ValueT>;
         using pointer           = value_type*;
         using reference         = value_type&;
 
-        iterator(MyType* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { }
+        iterator(htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
-        size_t operator - (iterator& r)
+        void init()
+        {
+            _from = (_bucket / stat_gaps) * stat_gaps;
+            if (_bucket < _map->bucket_count()) {
+                _bmask = *(uint64_t*)(_map->_states + _from) | EFILLED_FIND;
+                _bmask |= (1ull << (_bucket % stat_gaps * stat_gaps)) - 1;
+                _bmask = ~_bmask;
+            } else {
+                _bmask = 0;
+            }
+        }
+
+        size_t operator - (iterator& r) const
         {
             return _bucket - r._bucket;
         }
 
-        size_t bucket()
+        size_t bucket() const
         {
             return _bucket;
         }
@@ -163,9 +194,9 @@ public:
 
         iterator operator++(int)
         {
-            size_t old_index = _bucket;
+            iterator old(*this);
             goto_next_element();
-            return iterator(_map, old_index);
+            return old;
         }
 
         reference operator*() const
@@ -191,34 +222,57 @@ public:
     private:
         void goto_next_element()
         {
-            _bucket = _map->find_filled_slot(_bucket + 1);
+            _bmask &= _bmask - 1;
+            if (_bmask != 0) {
+                _bucket = _from + CTZ(_bmask) / stat_bits;
+                return;
+            }
+
+            do {
+                _bmask = ~(*(uint64_t*)(_map->_states + (_from += stat_gaps)) | EFILLED_FIND);
+            } while (_bmask == 0);
+
+            _bucket = _from + CTZ(_bmask) / stat_bits;
         }
 
     public:
-        MyType* _map;
-        size_t  _bucket;
+        const htype*  _map;
+        uint64_t      _bmask;
+        size_t        _bucket;
+        size_t        _from;
     };
 
     class const_iterator
     {
     public:
         using iterator_category = std::forward_iterator_tag;
-        using difference_type   = size_t;
+        using difference_type   = std::ptrdiff_t;
         using value_type        = const std::pair<KeyT, ValueT>;
         using pointer           = value_type*;
         using reference         = value_type&;
 
-        const_iterator(iterator proto) : _map(proto._map), _bucket(proto._bucket)  { }
-        const_iterator(const MyType* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket)
+        explicit const_iterator(iterator it)
+            : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
+        const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
+
+        void init()
         {
+            _from = (_bucket / stat_gaps) * stat_gaps;
+            if (_bucket < _map->bucket_count()) {
+                _bmask = *(uint64_t*)(_map->_states + _from) | EFILLED_FIND;
+                _bmask |= (1ull << (_bucket % stat_gaps * stat_gaps)) - 1;
+                _bmask = ~_bmask;
+            } else {
+                _bmask = 0;
+            }
         }
 
-        size_t bucket()
+        size_t bucket() const
         {
             return _bucket;
         }
 
-        size_t operator - (const_iterator& r)
+        size_t operator - (const_iterator& r) const
         {
             return _bucket - r._bucket;
         }
@@ -231,9 +285,9 @@ public:
 
         const_iterator operator++(int)
         {
-            size_t old_index = _bucket;
+            const_iterator old(*this);
             goto_next_element();
-            return const_iterator(_map, old_index);
+            return old;
         }
 
         reference operator*() const
@@ -260,12 +314,24 @@ public:
     private:
         void goto_next_element()
         {
-            _bucket = _map->find_filled_slot(_bucket + 1);
+            _bmask &= _bmask - 1;
+            if (_bmask != 0) {
+                _bucket = _from + CTZ(_bmask) / stat_bits;
+                return;
+            }
+
+            do {
+                _bmask = ~(*(uint64_t*)(_map->_states + (_from += stat_gaps)) | EFILLED_FIND);
+            } while (_bmask == 0);
+
+            _bucket = _from + CTZ(_bmask) / stat_bits;
         }
 
     public:
-        const MyType* _map;
+        const htype*  _map;
+        uint64_t      _bmask;
         size_t        _bucket;
+        size_t        _from;
     };
 
     // ------------------------------------------------------------------------
@@ -321,16 +387,11 @@ public:
 
     ~HashMap()
     {
-        if (!is_triviall_destructable()) {
-            for (size_t bucket=0; _num_filled; ++bucket) {
-                if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
-                    _pairs[bucket].~PairT();
-                    _num_filled --;
-                }
-            }
-        }
+        if (!is_triviall_destructable())
+            clear();
+
         _num_filled = 0;
-        free(_states);
+        free(_pairs);
     }
 
     static constexpr bool is_copy_trivially()
@@ -344,27 +405,26 @@ public:
 
     void clone(const HashMap& other)
     {
+        if (other.size() == 0) {
+            clear();
+            return;
+        }
+
+        _hasher     = other._hasher;
         if (is_copy_trivially()) {
-            if (other._num_filled == 0) {
-                clear();
-                return;
-            }
-            _num_filled  = _num_buckets = 0;
+            _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
-            assert(_num_buckets == other._num_buckets);
-
-            _hasher    =  other._hasher;
-//            _eq        =  other._eq;
-            _num_filled =  other._num_filled;
-            _max_probe_length =  other._max_probe_length;
-
             memcpy(_pairs,  other._pairs,  _num_buckets * sizeof(_pairs[0]));
-            memcpy(_states, other._states, _num_buckets * sizeof(_states[0]));
         } else {
             clear();
-            if (other.size() > 0)
-            insert_unique(other.begin(), other.end());
+            reserve(other._num_buckets / 2);
+            for (auto it = other.cbegin();  it != other.cend(); ++it)
+                new(_pairs + it.bucket()) PairT(*it);
         }
+        assert(_num_buckets == other._num_buckets);
+        _num_filled = other._num_filled;
+        _max_probe_length = other._max_probe_length;
+        memcpy(_states, other._states, (_num_buckets + simd_gaps) * sizeof(_states[0]));
     }
 
     void swap(HashMap& other)
@@ -383,11 +443,15 @@ public:
 
     iterator begin()
     {
+        if (_num_filled == 0)
+            return { this, _num_buckets };
         return { this, find_filled_slot(0) };
     }
 
     const_iterator cbegin() const
     {
+        if (_num_filled == 0)
+            return { this, _num_buckets };
         return { this, find_filled_slot(0) };
     }
 
@@ -502,7 +566,7 @@ public:
         if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
             return { iterator(this, bucket), false };
         } else {
-            _states[bucket] = key_hash2(key_hash, key);
+            _states[bucket] = hash2_key(key_hash, key);
             new(_pairs + bucket) PairT(key, value); _num_filled++;
             return { iterator(this, bucket), true };
         }
@@ -519,7 +583,7 @@ public:
             return { iterator(this, bucket), false };
         }
         else {
-            _states[bucket] = key_hash2(key_hash, key);
+            _states[bucket] = hash2_key(key_hash, key);
             new(_pairs + bucket) PairT(key, std::move(value)); _num_filled++;
             return { iterator(this, bucket), true };
         }
@@ -545,19 +609,19 @@ public:
         return insert(p.first, p.second);
     }
 
-    void insert(const_iterator begin, const_iterator end)
+    void insert(const_iterator beginc, const_iterator endc)
     {
-        reserve(end - begin + _num_filled);
-        for (; begin != end; ++begin) {
-            insert(begin->first, begin->second);
+        reserve(endc - beginc + _num_filled);
+        for (; beginc != endc; ++beginc) {
+            insert(beginc->first, beginc->second);
         }
     }
 
-    void insert_unique(const_iterator begin, const_iterator end)
+    void insert_unique(const_iterator beginc, const_iterator endc)
     {
-        reserve(end - begin + _num_filled);
-        for (; begin != end; ++begin) {
-            insert_unique(begin->first, begin->second);
+        reserve(endc - beginc + _num_filled);
+        for (; beginc != endc; ++beginc) {
+            insert_unique(beginc->first, beginc->second);
         }
     }
 
@@ -569,7 +633,7 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = key_hash2(key_hash, key);
+        _states[bucket] = hash2_key(key_hash, key);
         new(_pairs + bucket) PairT(key, value); _num_filled++;
     }
 
@@ -580,7 +644,7 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = key_hash2(key_hash, key);
+        _states[bucket] = hash2_key(key_hash, key);
         new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
     }
 
@@ -605,7 +669,7 @@ public:
         if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
             _pairs[bucket].second = value;
         } else {
-            _states[bucket] = key_hash2(key_hash, key);
+            _states[bucket] = hash2_key(key_hash, key);
             new(_pairs + bucket) PairT(key, value); _num_filled++;
         }
     }
@@ -620,7 +684,7 @@ public:
 
         /* Check if inserting a new value rather than overwriting an old entry */
         if ((_states[bucket] & FILLED_MASK) != State::EFILLED) {
-            _states[bucket] = key_hash2(key_hash, key);
+            _states[bucket] = hash2_key(key_hash, key);
             new(_pairs + bucket) PairT(key, ValueT()); _num_filled++;
         }
         return _pairs[bucket].second;
@@ -643,7 +707,7 @@ public:
     iterator erase(const_iterator cit)
     {
         _erase(cit._bucket);
-        iterator it(this, cit._bucket);
+        iterator it(cit);
         return ++it;
     }
 
@@ -688,12 +752,10 @@ public:
     void clear()
     {
         if (!is_triviall_destructable()) {
-            for (size_t bucket=0; _num_filled; ++bucket) {
-                if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
-                    _pairs[bucket].~PairT();
-                    _num_filled --;
-                }
+            for (auto it = begin(); it != end(); ++it) {
+                const auto bucket = it.bucket();
                 _states[bucket] = State::EEMPTY;
+                (*it).~PairT();
             }
         } else if (_num_filled)
             std::fill_n(_states, _num_buckets, State::EEMPTY);
@@ -724,16 +786,16 @@ public:
         if (EMH_UNLIKELY(required_buckets < _num_filled))
             return;
 
-        uint64_t num_buckets = 4;
+        auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : stat_gaps;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
-        auto state_size = (simd_gaps + num_buckets) * sizeof(FILLED_MASK);
-        state_size += (simd_gaps - state_size % simd_gaps) % 8;
+        auto state_size = (simd_gaps + num_buckets) * sizeof(State::EFILLED);
+//        state_size += (simd_gaps - state_size % simd_gaps) % 8;
         assert(state_size % 8 == 0);
 
         const auto* new_data  = (char*)malloc(pairs_size + state_size);
-#if 1
+#if 0
         auto* new_state = (decltype(_states))new_data;
         auto* new_pairs = (decltype(_pairs))(new_data + state_size);
 #else
@@ -753,14 +815,21 @@ public:
         _states      = new_state;
         _pairs       = new_pairs;
 
-        std::fill_n(_states, num_buckets, State::EEMPTY);
-        //find empty/delete tombstone
-        std::fill_n(_states + num_buckets + 0, simd_gaps - 1, State::EDELETE + PACK_STAT);
-        //find filled tombstone
-        std::fill_n(_states + num_buckets + simd_gaps - 1, 1, State::EFILLED);
-
         //fill last packet zero
         memset(_pairs + num_buckets, 0, sizeof(_pairs[0]));
+
+        //init empty tombstone
+        std::fill_n(_states, num_buckets, State::EEMPTY);
+        //set filled tombstone
+        std::fill_n(_states + num_buckets, simd_gaps, State::EFILLED + PACK_STAT);
+#if 0
+        if constexpr (std::is_integral<KeyT>::value) {
+            auto keymask = (hash2_key(_hasher(0), (KeyT)(0))) - 1;
+            if ((keymask & EEMPTY) == State::EEMPTY)
+                keymask = State::EFILLED + PACK_STAT;
+            std::fill_n(_states + num_buckets, simd_gaps, keymask);
+        }
+#endif
 
         _max_probe_length = -1;
         auto collisions = 0;
@@ -784,7 +853,7 @@ public:
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
                 collisions += (_states[key_hash & _mask] & FILLED_MASK) == State::EFILLED;
 #endif
-                _states[dst_bucket] = key_hash2(key_hash, src_pair.first);
+                _states[dst_bucket] = hash2_key(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 if (is_triviall_destructable())
                     src_pair.~PairT();
@@ -804,7 +873,7 @@ public:
                 const auto key_hash = _hasher(src_pair.first);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
 
-                _states[dst_bucket] = key_hash2(key_hash, src_pair.first);
+                _states[dst_bucket] = hash2_key(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 if (is_triviall_destructable())
                     src_pair.~PairT();
@@ -812,11 +881,13 @@ public:
             }
         }
 
-        if (_num_filled > 100'0000)
+#if EMH_DUMP
+        if (_num_filled > 1000000)
             printf("\t\t\tmax_probe_length/_max_probe_length = %d/%d, collsions = %d, collisions = %.2f%%\n",
                 max_probe_length, _max_probe_length, collisions, collisions * 100.0f / _num_buckets);
+#endif
 
-        free(old_states);
+        free(old_pairs);
     }
 
 private:
@@ -846,9 +917,8 @@ private:
                 next_bucket = (key_hash + ++offset) & _mask;
             }
         } else {
-            const char keymask = key_hash2(key_hash, key);
+            const char keymask = hash2_key(key_hash, key);
             const auto filled = SET1_EPI8(keymask);
-            const int round   = max_search_gap(next_bucket);
             /****
             1. start at bucket h1 (mod n)
             2. load the Group of bytes starting at the current bucket
@@ -858,15 +928,41 @@ private:
             6. if there was any matches, return false
             7. otherwise (every entry was FULL or ERASEDD), probe (mod n) and GOTO 2
             **/
+
+#if 0
+            const auto headsize = next_bucket % simd_gaps;
+            if (1) {
+                next_bucket -= headsize;
+                const auto head_mask = ~((1 << headsize) - 1);
+                const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
+                auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & head_mask;
+                while (maskf != 0) {
+                    const auto fbucket = next_bucket + CTZ(maskf);
+                    if (!std::is_integral<KeyLike>::value && EMH_UNLIKELY(fbucket >= _num_buckets))
+                        break; //overflow
+                    if (_eq(_pairs[fbucket].first, key))
+                        return fbucket;
+                    maskf &= maskf - 1;
+                }
+
+                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)) & head_mask;
+                if (maske != 0)
+                    return _num_buckets;
+                next_bucket += simd_gaps;
+            }
+
+            const int round = max_search_gap(next_bucket) - (simd_gaps - headsize) % simd_gaps;
+            assert(next_bucket % simd_gaps == 0);
+#endif
+            const int round = max_search_gap(next_bucket);
             for (int i = round; i >= 0; i -= simd_gaps) {
                 const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
-
                 auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
                 while (maskf != 0) {
                     const auto fbucket = next_bucket + CTZ(maskf);
-//                    if (EMH_UNLIKELY(fbucket >= _num_buckets))
-//                        break;
-                    if (_eq(_pairs[fbucket].first, key))
+                    if (EMH_UNLIKELY(fbucket >= _num_buckets))
+                        break;
+                    else if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
                     maskf &= maskf - 1;
                 }
@@ -888,7 +984,7 @@ private:
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
     template<typename KeyLike>
-    size_t find_or_allocate(const KeyLike& key, size_t key_hash)
+    size_t find_or_allocate(const KeyLike& key, uint64_t key_hash)
     {
         size_t hole = (size_t)-1;
         int offset = 0;
@@ -910,7 +1006,11 @@ private:
             return find_empty_slot((key_hash + offset) & _mask, offset);
         }
 
-        const char keymask = key_hash2(key_hash, key);
+        //TODO:same
+        const char keymask = hash2_key(key_hash, key);
+        //else
+        //const char keymask = hash2_key(key_hash, (KeyT&)key);
+
         const auto filled = SET1_EPI8(keymask);
         const auto bucket = (size_t)(key_hash & _mask);
         const auto round  = bucket + max_search_gap(bucket);
@@ -925,20 +1025,22 @@ private:
         4.otherwise, get the first match and enter the SMALL TABLE NASTY CORNER CASE ZONE
         5.check that the match (mod n) isn't FULL.
         ***/
-        for (; i <= round; i += simd_gaps) {
+        for (; (int)i <= (int)round; i += simd_gaps) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
 
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (_eq(_pairs[fbucket].first, key))
+                if (EMH_UNLIKELY(fbucket >= _num_buckets))
+                    break;
+                else if (_eq(_pairs[fbucket].first, key))
                     return fbucket;
                 maskf &= maskf - 1;
             }
 
             //3. find erased
-            if (hole == -1) {
+            if (EMH_LIKELY(hole == -1)) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_detele));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);
@@ -969,14 +1071,14 @@ private:
         next_bucket = find_empty_slot(next_bucket, offset);
 #elif 1
         next_bucket = find_empty_slot2(next_bucket, offset);
-#ifndef EMH_NORH
+#ifndef EMH_NRB
         assert (EMH_UNLIKELY(offset > _max_probe_length));
         if (_max_probe_length > 4 * simd_gaps) {
             const size_t sbucket = bucket + _max_probe_length - 1;
             const size_t ebucket = next_bucket - _max_probe_length + 1;
-            for (size_t i = 0; i < simd_gaps; i++) {
+            for (size_t i = 0; i <= simd_gaps / 2; i++) {
 
-                const auto mbucket = (bucket + offset / 2 + i - simd_gaps / 2) & _mask;
+                const auto mbucket = (bucket + offset / 2 + i - simd_gaps / 4) & _mask;
                 auto& mpairs = _pairs[mbucket];
 
                 //TODO keep main bucket info or robin hood backshifts
@@ -988,10 +1090,9 @@ private:
                     //update new offset
                     auto doffset1 = (mbucket - bucket + _num_buckets) & _mask;
                     auto doffset2 = (next_bucket - mbucket + _num_buckets) & _mask;
-                    check_offset(std::max(doffset1, doffset2));
+                    check_offset(std::max<size_t>(doffset1, doffset2));
                     return mbucket;
                 }
-
 #if 0
                 const auto kbucket = (sbucket - i) & _mask;
                 auto& kpairs = _pairs[kbucket];
@@ -1032,22 +1133,23 @@ private:
 
     size_t find_empty_slot2(size_t next_bucket, int& offset)
     {
-        const auto bucket = next_bucket;
         while (true) {
             const auto vec   = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
             const auto maske = MOVEMASK_EPI8(CMPGT_EPI8(simd_ezero, vec));
-            if (maske != 0) {
-                next_bucket += CTZ(maske);
-                if (EMH_LIKELY(next_bucket < _num_buckets))
-                    break;
+            if (EMH_LIKELY(maske != 0)) {
+                const auto probe = CTZ(maske);
+                offset      += probe;
+                next_bucket += probe;
+                return next_bucket;
             }
             next_bucket += simd_gaps;
-            if (next_bucket >= _num_buckets)
+            offset      += simd_gaps;
+            if (next_bucket >= _num_buckets) {
+                offset -= next_bucket - _num_buckets;
                 next_bucket = 0;
+            }
         }
-
-        offset += (next_bucket - bucket + _num_buckets) & _mask;
-        return next_bucket;
+        return 0;
     }
 
     size_t find_empty_slot(size_t next_bucket, int offset)
@@ -1059,12 +1161,11 @@ private:
                 offset      += probe;
                 next_bucket += probe;
                 check_offset(offset);
-                if (EMH_LIKELY(next_bucket < _num_buckets))
-                    return next_bucket;
+                return next_bucket;
             }
             next_bucket += stat_gaps;
             offset      += stat_gaps;
-            if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
+            if (next_bucket >= _num_buckets) {
                 offset -= next_bucket - _num_buckets;
                 next_bucket = 0;
             }
@@ -1080,10 +1181,10 @@ private:
             return next_bucket - 1;
         }
 #endif
-        while (next_bucket < _num_buckets) {
+        while (true) {
             const auto maske = ~(*(uint64_t*)(_states + next_bucket) | EFILLED_FIND);
             if (EMH_LIKELY(maske != 0))
-                return next_bucket + CTZ(maske) / stat_bits;;
+                return next_bucket + CTZ(maske) / stat_bits;
             next_bucket += stat_gaps;
         }
         return _num_buckets;

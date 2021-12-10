@@ -194,6 +194,7 @@ public:
     HashMap(HashMap&& other)
     {
         *this = std::move(other);
+         other._num_filled = 0;
     }
 
     HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)

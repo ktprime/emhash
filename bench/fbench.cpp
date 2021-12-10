@@ -1,12 +1,6 @@
 #include <assert.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <random>
+
+#include "util.h"
 
 #if __linux__ && AVX2
 #include <sys/mman.h>
@@ -14,12 +8,13 @@
 #endif
 
 #if ABSL
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/internal/raw_hash_set.cc"
 
 #if ABSL_HASH
-#include "absl/hash/internal/city.cc"
+#include "absl/hash/internal/low_level_hash.cc"
 #include "absl/hash/internal/hash.cc"
+#include "absl/hash/internal/city.cc"
 #endif
 #endif
 
@@ -38,6 +33,8 @@
 
 //#include "patchmap/patchmap.hpp"
 //#include "emilib/emilib33.hpp"
+#include "emilib/emilib.hpp"
+#include "emilib/emilib2.hpp"
 
 #include "hash_table7.hpp"
 #include "hash_table5.hpp"
@@ -541,39 +538,51 @@ int main(int argc, char* argv[])
     fprintf(stderr, "key=%s,value=%s\nrf = %.2lf\nqf = %.2lf\nrr = %.2lf\nqr = %d\nn  = %d\ni  = %d\n\n",
             key_name, val_name, REMOVE_FAILURE_RATE, QUERY_FAILURE_RATE, REMOVE_RATE, QUERY_RATE, TEST_LEN, INIT_SIZE);
 
+#ifdef HOOD_HASH
+    using hash_t = robin_hood::hash<int64_t>;
+#elif ABSL_HASH
+    using hash_t = absl::Hash<int64_t>;
+#elif FIB_HASH
+    using hash_t = Int64Hasher<int64_t>;
+#else
+    using hash_t = std::hash<int64_t>;
+#endif
+
     while (true) {
     init_keys(insert_keys);
     init_query_keys(insert_keys, query_keys);
     init_remove_keys(insert_keys, remove_keys);
 
-    auto   ret =  run_table<emhash6::HashMap<test_key_t, test_val_t>>  (insert_keys, insert_vals, query_keys, remove_keys);
+    auto   ret =  run_table<emhash6::HashMap<test_key_t, test_val_t, hash_t>>  (insert_keys, insert_vals, query_keys, remove_keys);
 #if __linux__ && AVX2
-    if ( ret ==  run_table<fht_table<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if ( ret ==  run_table<fht_table<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
 #endif
 
 
 #if ABSL
-    if (ret == run_table <absl::flat_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <absl::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
 #endif
 
-//    if (ret == run_table <std::unordered_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <ska::flat_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <ska::bytell_hash_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <emhash5::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <emhash7::HashMap<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-//    if (ret == run_table <robin_hood::unordered_node_map<test_key_t, test_val_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <phmap::flat_hash_map<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys));
-//    if (ret == run_table <phmap::node_hash_map<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <tsl::robin_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <tsl::hopscotch_map<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
-//    if (ret == run_table <whash::patchmap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <std::unordered_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <ska::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <ska::bytell_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <emhash5::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <emilib::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <emilib2::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <emhash7::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <robin_hood::unordered_node_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <phmap::flat_hash_map<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <phmap::node_hash_map<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <tsl::robin_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+    if (ret == run_table <tsl::hopscotch_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <whash::patchmap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
 #if __GNUC__
-    // run_table <__gnu_pbds::gp_hash_table<test_key_t, test_val_t>> (insert_keys, insert_vals, query_keys, remove_keys);
+    // run_table <__gnu_pbds::gp_hash_table<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 
 
-//    if (ret == run_table <emilib4::HashMap<test_key_t, test_val_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+//    if (ret == run_table <emilib4::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
     int n = TEST_LEN;
     printf(">> "); scanf("%u", &n);
     if (n < 0)

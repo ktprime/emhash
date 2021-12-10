@@ -33,7 +33,7 @@
 #include "zhashmap/linkedhashmap.h"
 #include "hash_table7.hpp"
 #include "hash_table5.hpp"
-#include "emilib/emilib12.hpp"
+#include "emilib/emilib2.hpp"
 #include "emilib/emilib.hpp"
 #include "martin/robin_hood.h"
 #include "phmap/phmap.h"
@@ -279,7 +279,7 @@ int main(int argc, char **argv)
 #if ABSL
     bench_spread<absl::flat_hash_map<size_t,size_t>>("absl::flat_hash_map::operator[]",count);
 #endif
-//    bench_spread<emhash5::HashMap<size_t,size_t>>("emhash5::HashMap::operator[]",count);
+    bench_spread<emhash5::HashMap<size_t,size_t>>("emhash5::HashMap::operator[]",count);
     bench_spread<emhash7::HashMap<size_t,size_t>>("emhash7::HashMap::operator[]",count);
     bench_spread<emilib2::HashMap<size_t,size_t>>("emilib2::HashMap::operator[]",count);
     bench_spread<emilib::HashMap<size_t,size_t>>("emilib::HashMap::operator[]",count);
@@ -301,7 +301,7 @@ int main(int argc, char **argv)
     bench_map_google<google::dense_hash_map<size_t,size_t>>("google::dense_hash_map", count);
     bench_map<absl::flat_hash_map<size_t,size_t>>("absl::flat_hash_map",count);
 #endif
-//    bench_map<emhash5::HashMap<size_t,size_t>>("emhash5::HashMap",count);
+    bench_map<emhash5::HashMap<size_t,size_t>>("emhash5::HashMap",count);
     bench_map<emhash7::HashMap<size_t,size_t>>("emhash7::HashMap",count);
     bench_map<emilib2::HashMap<size_t,size_t>>("emilib2::HashMap",count);
     bench_map<emilib::HashMap<size_t,size_t>>("emilib::HashMap",count);

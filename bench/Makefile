@@ -1,15 +1,12 @@
 ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
-CXX=g++  -fwhole-program
+CXX?=g++ -fwhole-program
 endif
 
-ifneq ($(CL),)
-ifeq ($(shell expr `clang++-11 -dumpversion` '>=' 1.), 1)
-CXX=clang++-11
-endif
+ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
+CXX?=clang++
 endif
 
-CXXFLAGS = -Ofast -mavx -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include
-
+CXXFLAGS = -O2 -mavx -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include
 
 ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly
@@ -74,11 +71,12 @@ endif
 
 all:
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
+	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
+	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
-	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench

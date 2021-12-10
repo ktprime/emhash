@@ -217,7 +217,6 @@ public:
 #else
     typedef entry<KeyT, ValueT>               value_pair;
     typedef entry<KeyT, ValueT>               PairT;
-
 #endif
 
 public:

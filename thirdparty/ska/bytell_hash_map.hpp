@@ -744,7 +744,7 @@ private:
     BlockPointer entries = BlockType::empty_block();
     size_t num_slots_minus_one = 0;
     typename HashPolicySelector<ArgumentHash>::type hash_policy;
-    float _max_load_factor = 0.9375f;
+    float _max_load_factor = 0.9999f;
     size_t num_elements = 0;
 
     size_t num_buckets_for_reserve(size_t num_elements) const
