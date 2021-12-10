@@ -26,7 +26,7 @@
 #include <unordered_map>
 
 #if ABSL
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/internal/raw_hash_set.cc"
 
 #if ABSL_HASH
