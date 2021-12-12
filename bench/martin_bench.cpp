@@ -1,22 +1,6 @@
-#include <bitset>
-#include <numeric>
 #include <sstream>
 
-#include <random>
-#include <map>
-#include <ctime>
-#include <cassert>
-#include <string>
-#include <algorithm>
-#include <chrono>
-#include <array>
-
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-# include <windows.h>
-#else
+#ifndef _WIN32
 #include <sched.h>
 #include <pthread.h>
 //#include <cpuid.h>
@@ -42,6 +26,7 @@ using namespace std;
 
 //#define EMH_HIGH_LOAD 123456
 
+#include "util.h"
 #include "old/hash_table2.hpp"
 #include "old/hash_table3.hpp"
 #include "old/hash_table4.hpp"
@@ -65,24 +50,11 @@ using namespace std;
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 #include "ska/bytell_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
-#endif
-
-#if ABSL
-#define NDEBUG 1
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/internal/raw_hash_set.cc"
 
 #if FOLLY
 #include "folly/container/F14Map.h"
 #endif
-
-#if ABSL_HASH
-#include "absl/hash/internal/city.cc"
-#include "absl/hash/internal/hash.cc"
 #endif
-#endif
-
-
 
 static auto RND = time(0);
 
@@ -128,82 +100,6 @@ static const char* find(const std::string& map_name)
 
     return nullptr;
 }
-
-struct WyRnd
-{
-    using result_type = uint64_t;
-    uint64_t seed_;
-    WyRnd(uint64_t seed1 = time(0)) { seed_ = seed1; }
-
-    WyRnd()
-        : WyRnd(UINT64_C(0x853c49e6748fea9b)) {}
-
-    uint64_t operator()() { return wyrand(&seed_); }
-
-    void seed() { seed_ = std::random_device{}(); }
-
-    static constexpr uint64_t(min)() { return (std::numeric_limits<uint64_t>::min)(); }
-    static constexpr uint64_t(max)() { return (std::numeric_limits<uint64_t>::max)(); }
-
-    uint64_t operator()(uint64_t boundExcluded) noexcept {
-#ifdef __SIZEOF_INT128__
-        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
-        uint64_t high;
-        uint64_t a = operator()();
-        _umul128(a, boundExcluded, &high);
-        return high;
-#endif
-    }
-};
-
-class RomuDuoJr {
-public:
-    using result_type = uint64_t;
-
-    static constexpr uint64_t(min)() {
-        return 0;
-    }
-    static constexpr uint64_t(max)() {
-        return UINT64_C(0xffffffffffffffff);
-    }
-
-    RomuDuoJr(uint64_t seed) noexcept
-        : mX(seed)
-        , mY(UINT64_C(0x9E6C63D0676A9A99)) {
-        for (size_t i = 0; i < 10; ++i) {
-            operator()();
-        }
-    }
-
-    uint64_t operator()() noexcept {
-        uint64_t x = mX;
-
-        mX = UINT64_C(15241094284759029579) * mY;
-        mY = rotl(mY - x, 27);
-
-        return x;
-    }
-
-    uint64_t operator()(uint64_t boundExcluded) noexcept {
-#ifdef __SIZEOF_INT128__
-        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
-        uint64_t high;
-        uint64_t a = operator()();
-        _umul128(a, boundExcluded, &high);
-        return high;
-#endif
-    }
-
-private:
-    static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
-        return (x << k) | (x >> (64U - k));
-    }
-
-    uint64_t mX;
-    uint64_t mY;
-};
 
 #ifndef RT
     #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
@@ -305,136 +201,9 @@ class sfc64 {
         uint64_t m_counter;
 };
 
-
-static inline uint64_t hashfib(uint64_t key)
+static inline int64_t now2ms()
 {
-#if __SIZEOF_INT128__
-    __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
-    return (uint64_t)(r >> 64) + (uint64_t)r;
-#elif _WIN64
-    uint64_t high;
-    return _umul128(key, UINT64_C(11400714819323198485), &high) + high;
-#else
-    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-    return (r >> 32) + r;
-#endif
-}
-
-static inline uint64_t hashmix(uint64_t key)
-{
-    auto ror  = (key >> 32) | (key << 32);
-    auto low  = key * 0xA24BAED4963EE407ull;
-    auto high = ror * 0x9FB21C651E98DF25ull;
-    auto mix  = low + high;
-    return mix;// (mix >> 32) | (mix << 32);
-}
-
-static inline uint64_t rrxmrrxmsx_0(uint64_t v)
-{
-    /* Pelle Evensen's mixer, https://bit.ly/2HOfynt */
-    v ^= (v << 39 | v >> 25) ^ (v << 14 | v >> 50);
-    v *= UINT64_C(0xA24BAED4963EE407);
-    v ^= (v << 40 | v >> 24) ^ (v << 15 | v >> 49);
-    v *= UINT64_C(0x9FB21C651E98DF25);
-    return v ^ v >> 28;
-}
-
-static inline uint64_t hash_mur3(uint64_t key)
-{
-    //MurmurHash3Mixer
-    uint64_t h = key;
-    h ^= h >> 33;
-    h *= 0xff51afd7ed558ccd;
-    h ^= h >> 33;
-    h *= 0xc4ceb9fe1a85ec53;
-    h ^= h >> 33;
-    return h;
-}
-
-template<typename T>
-struct Int64Hasher
-{
-    static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    inline std::size_t operator()(T key) const
-    {
-#if FIB_HASH == 1
-        return key;
-#elif FIB_HASH == 2
-        return hashfib(key);
-#elif FIB_HASH == 3
-        return hash_mur3(key);
-#elif FIB_HASH == 4
-        return hashmix(key);
-#elif FIB_HASH == 5
-        return rrxmrrxmsx_0(key);
-#elif FIB_HASH > 100
-        return key % FIB_HASH; //bad hash
-#elif FIB_HASH == 6
-        return wyhash64(key, KC);
-#else
-        auto x = key;
-        x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-        x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
-        x = x ^ (x >> 31);
-        return x;
-#endif
-    }
-};
-
-#if WYHASH_LITTLE_ENDIAN
-struct WysHasher
-{
-    std::size_t operator()(const std::string& str) const
-    {
-        return wyhash(str.data(), str.size(), str.size());
-    }
-};
-
-struct WyIntHasher
-{
-    uint64_t seed;
-    WyIntHasher(uint64_t seed1 = 1) { seed = seed1; }
-    std::size_t operator()(size_t v) const { return wyhash64(v, seed); }
-};
-
-struct WyRand
-{
-    uint64_t seed;
-    WyRand(uint64_t seed1 = 1) { seed = seed1; }
-    uint64_t operator()() { return wyrand(&seed); }
-};
-#endif
-
-static int64_t now2ms()
-{
-#if _WIN32
-#if 0
-    FILETIME ptime[4] = { 0 };
-    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[1], &ptime[2], &ptime[3]);
-    return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10000;
-#elif 0
-    return GetTickCount64() / 1000;
-#else
-    LARGE_INTEGER freq = {0};
-    //if (freq.QuadPart == 0)
-    QueryPerformanceFrequency(&freq);
-
-    LARGE_INTEGER nowus;
-    QueryPerformanceCounter(&nowus);
-    return (nowus.QuadPart * 1000) / (freq.QuadPart);
-#endif
-#elif __linux__
-    struct timespec ts = {0};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-#elif __unix__
-    struct timeval start;
-    gettimeofday(&start, NULL);
-    return start.tv_sec * 1000 + start.tv_usec / 1000;
-#else
-    auto tp = std::chrono::steady_clock::now();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
-#endif
+    return getus() / 1000;
 }
 
 template<class MAP> void bench_insert(MAP& map)
@@ -501,8 +270,8 @@ std::ostream& operator<<(std::ostream& os, as_bits_t<T> const& t) {
 template<class MAP> void bench_randomInsertErase(MAP& map)
 {
     // random bits to set for the mask
-    std::vector<int> bits(64);
-    std::iota(bits.begin(), bits.end(), 0);
+    std::vector<int> bits(64, 0);
+//    std::iota(bits.begin(), bits.end(), 0);
     MRNG rng(999);
 
 #if 0
@@ -1073,7 +842,7 @@ void runTest(int sflags, int eflags)
         { emhash4::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         { emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #endif
-        { emilib::HashMap<int, int, hash_func> emap;  bench_insert(emap); }
+        { emilib::HashMap<int, int, hash_func>  emap; bench_insert(emap); }
         { emilib2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #if ET
         //        { hrd7::hash_map <int, int, hash_func> hmap;  bench_insert(hmap); }

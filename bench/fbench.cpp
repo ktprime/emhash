@@ -1,5 +1,3 @@
-#include <assert.h>
-
 #include "util.h"
 
 #if __linux__ && AVX2
@@ -7,16 +5,6 @@
 #include "fht/fht_ht.hpp"
 #endif
 
-#if ABSL
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/internal/raw_hash_set.cc"
-
-#if ABSL_HASH
-#include "absl/hash/internal/low_level_hash.cc"
-#include "absl/hash/internal/hash.cc"
-#include "absl/hash/internal/city.cc"
-#endif
-#endif
 
 #if __GNUC__
 //#include <ext/pb_ds/assoc_container.hpp>
@@ -184,10 +172,9 @@ static double QUERY_FAILURE_RATE = 0.3;
 static double REMOVE_FAILURE_RATE = 0.25;
 #endif
 
-static int64_t now2ns()
+static int64_t inline now2ns()
 {
-    auto tp = std::chrono::steady_clock::now();
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
+    return getus() * 1000;
 }
 
 static void init_keys(std::vector<test_key_t> & insert_keys);
@@ -465,7 +452,7 @@ static uint32_t test_int(const uint32_t n, const uint32_t x0)
 template<typename ht>
 int run_udb2(const char* str)
 {
-    uint32_t m = 5, max = 50000000, n = 10000000;
+    uint32_t m = 5, max = 50000000, n = 10000000 + rand() % 1001;
     const auto step = (max - n) / m;
 
     auto now = now2ns();
@@ -498,6 +485,8 @@ int main(int argc, char* argv[])
         run_udb2<tsl::robin_map<uint32_t, uint32_t, Hash32>>("tsl_robin");
         run_udb2<tsl::hopscotch_map<uint32_t, uint32_t, Hash32>>("tsl_hops");
         run_udb2<emhash5::HashMap<uint32_t, uint32_t, Hash32>>("emhash5");
+        run_udb2<emilib::HashMap<uint32_t, uint32_t, Hash32>>("emilib");
+        run_udb2<emilib2::HashMap<uint32_t, uint32_t, Hash32>>("emilib2");
 #if ABSL
         run_udb2<absl::flat_hash_map<uint32_t, uint32_t, Hash32>>("absl");
 #endif

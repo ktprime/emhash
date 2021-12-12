@@ -34,41 +34,34 @@ namespace emilib {
 
     enum State : uint8_t
     {
-        EFILLED  = 0,
-        EEMPTY   = 0x80, // 0b1000'0000,
-        EDELETE  = EEMPTY + 0x40, //0b1100'0000,
-        EPROMASK = 0xFE, //0b1111'1110,
+        EFILLED  = 0x00,
+        EEMPTY   = 0xFF, //0b1111'1111,
+        EDELETE  = 0x80, //0b1000'0000,
+        SENTINEL = 0x7E, //0b0111'0000
     };
 
-    constexpr uint8_t  FILLED_MASK  = EEMPTY;
+    constexpr uint8_t  FILLED_MASK  = EDELETE;
     constexpr uint8_t  EMPTY_MASK   = EDELETE;
-    constexpr uint8_t  PACK_STAT    = uint8_t(EDELETE + EEMPTY);
     constexpr uint64_t EFILLED_FIND = 0x7f7f7f7f7f7f7f7full;
     constexpr uint64_t EEMPTY_FIND  = 0x8080808080808080ull;
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
-    const static auto simd_ezero  = _mm_set1_epi8(0);
     const static auto simd_detele = _mm_set1_epi8(EDELETE);
-    const static auto simd_gmask  = _mm_set1_epi8(EPROMASK);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm_set1_epi8
     #define LOADU_EPI8     _mm_loadu_si128
-    #define AND_EPI8(a)    _mm_and_si128(LOADU_EPI8(a), simd_gmask)
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
     #define CMPGT_EPI8     _mm_cmpgt_epi8
 #elif 1
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
-    const static auto simd_ezero  = _mm256_set1_epi8(0);
     const static auto simd_detele = _mm256_set1_epi8(EDELETE);
-    const static auto simd_gmask  = _mm256_set1_epi8(EPROMASK);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm256_set1_epi8
     #define LOADU_EPI8     _mm256_loadu_si256
-    #define AND_EPI8(a)    _mm256_and_si256(LOADU_EPI8(a), simd_gmask)
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
     #define CMPGT_EPI8     _mm256_cmpgt_epi8
@@ -752,10 +745,11 @@ public:
     void clear()
     {
         if (!is_triviall_destructable()) {
-            for (auto it = begin(); it != end(); ++it) {
+            for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _states[bucket] = State::EEMPTY;
                 (*it).~PairT();
+                _num_filled --;
             }
         } else if (_num_filled)
             std::fill_n(_states, _num_buckets, State::EEMPTY);
@@ -818,15 +812,20 @@ public:
         //fill last packet zero
         memset(_pairs + num_buckets, 0, sizeof(_pairs[0]));
 
-        //init empty tombstone
+        //fill empty tombstone
         std::fill_n(_states, num_buckets, State::EEMPTY);
-        //set filled tombstone
-        std::fill_n(_states + num_buckets, simd_gaps, State::EFILLED + PACK_STAT);
+
+        //set delete tombstone for some use.
+        for (auto index = 0; index < _num_buckets; index += simd_gaps)
+            _states[index] = _states[index + simd_gaps / 2] = State::EDELETE;
+
+        //set sentinel to deal with iterator
+        std::fill_n(_states + num_buckets, simd_gaps, State::SENTINEL);
 #if 0
         if constexpr (std::is_integral<KeyT>::value) {
             auto keymask = (hash2_key(_hasher(0), (KeyT)(0))) - 1;
             if ((keymask & EEMPTY) == State::EEMPTY)
-                keymask = State::EFILLED + PACK_STAT;
+                keymask = State::SENTINEL;
             std::fill_n(_states + num_buckets, simd_gaps, keymask);
         }
 #endif
@@ -837,7 +836,7 @@ public:
         for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
             if ((old_states[src_bucket] & FILLED_MASK) == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
-#if 0
+#ifdef EMH_NRB
                 if (EMH_UNLIKELY(src_bucket >= old_num_buckets))
                     break;
                 const auto key_hash = _hasher(src_pair.first);
@@ -869,10 +868,19 @@ public:
         for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if ((old_states[src_bucket] & FILLED_MASK) == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
-
                 const auto key_hash = _hasher(src_pair.first);
+#if 0
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
-
+#else
+                auto bucket = key_hash & _mask; int offset = 0;
+                auto dst_bucket = find_empty_slot2(bucket, offset);
+                if (offset > _max_probe_length && offset >= 2 * simd_gaps) {
+                    auto mbucket = robin_shift(bucket, dst_bucket, offset);
+                    if (mbucket != -1)
+                        dst_bucket = mbucket;
+                } else
+                    check_offset(offset);
+#endif
                 _states[dst_bucket] = hash2_key(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 if (is_triviall_destructable())
@@ -919,15 +927,14 @@ private:
         } else {
             const char keymask = hash2_key(key_hash, key);
             const auto filled = SET1_EPI8(keymask);
-            /****
+            /*****
             1. start at bucket h1 (mod n)
             2. load the Group of bytes starting at the current bucket
             3. search the Group for your key's h2 in parallel (match_byte)
             4. for each match, check if the keys are equal, return if found
             5. search the Group for an EEMPTY bucket in parallel (match_empty)
             6. if there was any matches, return false
-            7. otherwise (every entry was FULL or ERASEDD), probe (mod n) and GOTO 2
-            **/
+            7. otherwise (every entry was FULL or ERASEDD), probe (mod n) and GOTO 2 **/
 
 #if 0
             const auto headsize = next_bucket % simd_gaps;
@@ -981,6 +988,62 @@ private:
         return _num_buckets;
     }
 
+    size_t robin_shift(size_t bucket, size_t next_bucket, int offset)
+    {
+        const size_t sbucket = bucket + _max_probe_length - 1;
+        const size_t ebucket = next_bucket - _max_probe_length + 1;
+        const size_t obucket = bucket + offset / 2 - simd_gaps / 4;
+        for (size_t i = 0; i <= simd_gaps / 2; i++) 
+        {
+            const auto mbucket = (obucket + i) & _mask;
+            auto& mpairs = _pairs[mbucket];
+
+            //TODO keep main bucket info or robin hood backshifts
+            if ((_hasher(mpairs.first) & _mask) == mbucket) {
+                new(_pairs + next_bucket) PairT(std::move(mpairs)); mpairs.~PairT();
+                _states[next_bucket] = _states[mbucket]; //bugs
+                _states[mbucket] = State::EEMPTY;
+
+                //update new offset
+                auto doffset1 = (mbucket - bucket + _num_buckets) & _mask;
+                auto doffset2 = (next_bucket - mbucket + _num_buckets) & _mask;
+                check_offset(std::max<size_t>(doffset1, doffset2));
+                return mbucket;
+            }
+#if 1
+            const auto kbucket = (sbucket - i) & _mask;
+            auto& kpairs = _pairs[kbucket];
+
+            //TODO keep main bucket info or robin hood backshifts
+            if ((_hasher(kpairs.first) & _mask) == kbucket) {
+                new(_pairs + next_bucket) PairT(std::move(kpairs)); kpairs.~PairT();
+                _states[next_bucket] = _states[kbucket]; //bugs
+                _states[kbucket] = State::EEMPTY;
+
+                //update new offset
+                const auto doffset = (next_bucket - kbucket + _num_buckets) & _mask;
+                check_offset(doffset);
+                return kbucket;
+            }
+
+            /*bucket ---> kbucket  nbucket ---> next_bucket */
+            const auto nbucket = (ebucket + i) & _mask;
+            auto& epairs = _pairs[nbucket];
+            if ((_hasher(epairs.first) & _mask) == nbucket) {
+                new(_pairs + next_bucket) PairT(std::move(epairs)); epairs.~PairT();
+                _states[next_bucket] = _states[nbucket]; //bugs
+                _states[nbucket] = State::EEMPTY;
+
+                //update new offset
+                const auto doffset = (nbucket - bucket + _num_buckets) & _mask;
+                check_offset(doffset);
+                return nbucket;
+            }
+#endif
+        }
+        return -1;
+    }
+
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
     template<typename KeyLike>
@@ -1016,15 +1079,14 @@ private:
         const auto round  = bucket + max_search_gap(bucket);
         auto next_bucket  = bucket, i = bucket;
 
-        /****
+        /*****
         https://gankra.github.io/blah/hashbrown-tldr/
         start at bucket h1 (mod n)
         1.load the Group of bytes starting at the current bucket
         2.search the Group for EEMPTY or ERASEDD in parallel (match_empty_or_deleted)
         3.if there was no match (unlikely), probe and GOTO 2
         4.otherwise, get the first match and enter the SMALL TABLE NASTY CORNER CASE ZONE
-        5.check that the match (mod n) isn't FULL.
-        ***/
+        5.check that the match (mod n) isn't FULL.  ***/
         for (; (int)i <= (int)round; i += simd_gaps) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
 
@@ -1039,20 +1101,20 @@ private:
                 maskf &= maskf - 1;
             }
 
-            //3. find erased
-            if (EMH_LIKELY(hole == -1)) {
-                const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_detele));
-                if (maskd != 0)
-                    hole = next_bucket + CTZ(maskd);
-            }
-
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = std::min<size_t>(next_bucket + CTZ(maske), hole);
+                const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 check_offset(offset);
                 return ebucket;
+            }
+
+            //3. find erased
+            if (hole == -1) {
+                const auto zero = MOVEMASK_EPI8(vec);
+                if (zero != 0)
+                    hole = next_bucket + CTZ(zero);
             }
 
             //4. next round
@@ -1063,8 +1125,9 @@ private:
             }
         }
 
-        if (EMH_LIKELY(hole != (size_t)-1))
+        if (EMH_LIKELY(hole != (size_t)-1)) {
             return hole;
+        }
 
         offset = i - bucket;
 #if 0
@@ -1072,58 +1135,11 @@ private:
 #elif 1
         next_bucket = find_empty_slot2(next_bucket, offset);
 #ifndef EMH_NRB
-        assert (EMH_UNLIKELY(offset > _max_probe_length));
         if (_max_probe_length > 4 * simd_gaps) {
-            const size_t sbucket = bucket + _max_probe_length - 1;
-            const size_t ebucket = next_bucket - _max_probe_length + 1;
-            for (size_t i = 0; i <= simd_gaps / 2; i++) {
-
-                const auto mbucket = (bucket + offset / 2 + i - simd_gaps / 4) & _mask;
-                auto& mpairs = _pairs[mbucket];
-
-                //TODO keep main bucket info or robin hood backshifts
-                if ((_hasher(mpairs.first) & _mask) == mbucket) {
-                    new(_pairs + next_bucket) PairT(std::move(mpairs)); mpairs.~PairT();
-                    _states[next_bucket] = _states[mbucket]; //bugs
-                    _states[mbucket] = State::EEMPTY;
-
-                    //update new offset
-                    auto doffset1 = (mbucket - bucket + _num_buckets) & _mask;
-                    auto doffset2 = (next_bucket - mbucket + _num_buckets) & _mask;
-                    check_offset(std::max<size_t>(doffset1, doffset2));
-                    return mbucket;
-                }
-#if 0
-                const auto kbucket = (sbucket - i) & _mask;
-                auto& kpairs = _pairs[kbucket];
-
-                //TODO keep main bucket info or robin hood backshifts
-                if ((_hasher(kpairs.first) & _mask) == kbucket) {
-                    new(_pairs + next_bucket) PairT(std::move(kpairs)); kpairs.~PairT();
-                    _states[next_bucket] = _states[kbucket]; //bugs
-                    _states[kbucket] = State::EEMPTY;
-
-                    //update new offset
-                    const auto doffset = (next_bucket - kbucket + _num_buckets) & _mask;
-                    check_offset(doffset);
-                    return kbucket;
-                }
-
-                /*bucket ---> kbucket  nbucket ---> next_bucket **/
-                const auto nbucket = (ebucket + i) & _mask;
-                auto& epairs = _pairs[nbucket];
-                if ((_hasher(epairs.first) & _mask) == nbucket) {
-                    new(_pairs + next_bucket) PairT(std::move(epairs)); epairs.~PairT();
-                    _states[next_bucket] = _states[nbucket]; //bugs
-                    _states[nbucket] = State::EEMPTY;
-
-                    //update new offset
-                    const auto doffset = (nbucket - bucket + _num_buckets) & _mask;
-                    check_offset(doffset);
-                    return nbucket;
-                }
-#endif
-            }
+            //assert (EMH_UNLIKELY(offset > _max_probe_length));
+            auto nbucket = robin_shift(bucket, next_bucket, offset);
+            if (nbucket != (size_t)-1)
+                return nbucket;
         }
 #endif
         _max_probe_length = offset;
@@ -1135,7 +1151,7 @@ private:
     {
         while (true) {
             const auto vec   = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
-            const auto maske = MOVEMASK_EPI8(CMPGT_EPI8(simd_ezero, vec));
+            const auto maske = MOVEMASK_EPI8(vec);
             if (EMH_LIKELY(maske != 0)) {
                 const auto probe = CTZ(maske);
                 offset      += probe;
@@ -1207,9 +1223,9 @@ private:
     EqT     _eq;
     uint8_t*_states           = nullptr;
     PairT*  _pairs            = nullptr;
-    size_t  _num_buckets      =  0;
-    size_t  _mask             =  0; // _num_buckets minus one
-    size_t  _num_filled       =  0;
+    size_t  _num_buckets      = 0;
+    size_t  _mask             = 0; // _num_buckets minus one
+    size_t  _num_filled       = 0;
     int     _max_probe_length = -1; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };
 

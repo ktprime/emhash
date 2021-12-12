@@ -3,12 +3,14 @@
 #include <random>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <ctime>
 #include <cassert>
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <fstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -153,6 +155,18 @@ class Lehmer64 {
         g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
         return g_lehmer64_state >> 64;
     }
+		// this is a bit biased, but for our use case that's not important.
+	uint64_t operator()(uint64_t boundExcluded) noexcept {
+#ifdef __SIZEOF_INT128__
+		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+#elif _MSC_VER
+		uint64_t high;
+		uint64_t a = operator()();
+		_umul128(a, boundExcluded, &high);
+		return high;
+#endif
+	}
+	
 };
 #endif
 
@@ -181,6 +195,19 @@ public:
         uint64_t z = (s ^ s >> 31) * ((t ^ t >> 22) | 1u);
         return z ^ z >> 26;
     }
+
+	// this is a bit biased, but for our use case that's not important.
+	uint64_t operator()(uint64_t boundExcluded) noexcept {
+#ifdef __SIZEOF_INT128__
+		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+#elif _MSC_VER
+		uint64_t high;
+		uint64_t a = operator()();
+		_umul128(a, boundExcluded, &high);
+		return high;
+#endif
+	}
+
 
 private:
     static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
@@ -218,6 +245,19 @@ public:
 
         return x;
     }
+	
+	// this is a bit biased, but for our use case that's not important.
+	uint64_t operator()(uint64_t boundExcluded) noexcept {
+#ifdef __SIZEOF_INT128__
+		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+#elif _MSC_VER
+		uint64_t high;
+		uint64_t a = operator()();
+		_umul128(a, boundExcluded, &high);
+		return high;
+#endif
+	}
+
 
 private:
     static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
@@ -256,6 +296,19 @@ public:
         mC = rotl(mC, 24U) + tmp;
         return tmp;
     }
+	
+		// this is a bit biased, but for our use case that's not important.
+	uint64_t operator()(uint64_t boundExcluded) noexcept {
+#ifdef __SIZEOF_INT128__
+		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+#elif _MSC_VER
+		uint64_t high;
+		uint64_t a = operator()();
+		_umul128(a, boundExcluded, &high);
+		return high;
+#endif
+	}
+
 
 private:
     static constexpr uint64_t rotl(uint64_t x, unsigned k) noexcept {
@@ -533,3 +586,18 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
     return {string_view_buf + start, size};
 }
 #endif
+
+#if ABSL
+#define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
+#define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE2 1
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/internal/raw_hash_set.cc"
+
+#if ABSL_HASH
+#include "absl/hash/internal/low_level_hash.cc"
+#include "absl/hash/internal/hash.cc"
+#include "absl/hash/internal/city.cc"
+#endif
+#endif
+

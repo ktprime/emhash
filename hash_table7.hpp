@@ -338,6 +338,7 @@ public:
 
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+        iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { }
 
         void init()
         {
@@ -438,6 +439,7 @@ public:
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+        const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { }
 
         void init()
         {
@@ -632,11 +634,11 @@ public:
     iterator begin()
     {
         if (0 == _num_filled)
-            return {this, size_type(_mask + 1)};
+            return {this, _num_buckets, false};
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return { this, CTZ(bmask) };
+            return {this, CTZ(bmask) };
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -648,7 +650,7 @@ public:
         if (bmask != 0)
             return {this, CTZ(bmask)};
         else if (0 == _num_filled)
-            return {this, size_type(_mask + 1)};
+            return {this, _num_buckets, false};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -671,12 +673,12 @@ public:
 
     iterator end()
     {
-        return {this, _num_buckets};
+        return {this, _num_buckets, false};
     }
 
     const_iterator cend() const
     {
-        return {this, _num_buckets};
+        return {this, _num_buckets, false};
     }
 
     const_iterator end() const
@@ -921,13 +923,13 @@ public:
     template<typename Key>
     iterator find(const Key& key) noexcept
     {
-        return {this, find_filled_bucket(key)};
+        return {this, find_filled_bucket(key), false};
     }
 
     template<typename Key = KeyT>
     const_iterator find(const Key& key) const noexcept
     {
-        return {this, find_filled_bucket(key)};
+        return {this, find_filled_bucket(key), false};
     }
 
     template<typename Key = KeyT>
@@ -1040,7 +1042,7 @@ public:
         } else {
             EMH_VAL(_pairs, bucket) = std::move(value);
         }
-        return { {this, bucket}, found };
+        return { {this, bucket, false}, found };
     }
 
     template<typename K = KeyT, typename V = ValueT>
@@ -1051,7 +1053,7 @@ public:
         if (found) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         }
-        return { {this, bucket}, found };
+        return { {this, bucket, false}, found };
     }
 
     std::pair<iterator, bool> insert(const value_type& p)

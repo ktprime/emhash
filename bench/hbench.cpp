@@ -21,26 +21,6 @@
 #include "hash_table5.hpp"
 #include "old/hash_table2.hpp"
 
-#include <random>
-#include <iostream>
-#include <unordered_map>
-
-#if ABSL
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/internal/raw_hash_set.cc"
-
-#if ABSL_HASH
-#include "absl/hash/internal/city.cc"
-#include "absl/hash/internal/hash.cc"
-#endif
-#endif
-
-#ifdef _WIN32
-#  include <Windows.h>
-#else
-#  include <time.h>
-#endif
-
 #ifdef _WIN32
 class Timer
 {
@@ -68,9 +48,9 @@ public:
         //milliseconds
         double msec = double((end.tv_sec - _start.tv_sec) * 1000ULL) + double(end.tv_nsec - _start.tv_nsec)*0.000001;
         if (msec < 10000)
-			printf("%12s: %u ms\n", _msg, (unsigned)msec);
-		else
-			printf("%12s: %.2lf sec\n", _msg, msec / 1000.0);
+            printf("%12s: %u ms\n", _msg, (unsigned)msec);
+        else
+            printf("%12s: %.2lf sec\n", _msg, msec / 1000.0);
     }
 private:
     const char* _msg;
@@ -361,9 +341,9 @@ int main()
 
     //fill input data
     {
-           std::random_device rd;
-           std::mt19937_64 gen(rd());
-           std::uniform_int_distribution<uint64_t> dis;
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::uniform_int_distribution<uint64_t> dis;
 
         uint64_t offset = time(0);
         for (uint64_t i = 0; i != MAX_ELEMENTS; ++i) {

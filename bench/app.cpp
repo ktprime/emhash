@@ -1,14 +1,7 @@
-#include <iostream>
 #include <iomanip>
-#include <string>
-#include <vector>
-#include <unordered_set>
-#include <unordered_map>
-#include <set>
-#include <map>
-#include <chrono>
-
+#include "util.h"
 #include <typeinfo>
+
 #ifndef _WIN32
 #include <cxxabi.h>
 #endif
@@ -28,6 +21,11 @@
 #include "tsl/robin_map.h"
 #include "phmap/phmap.h"
 #include "phmap/btree.h"
+
+#if ABSL
+#include "absl/container/btree_map.h"
+#endif
+
 
 #include "has_member.hpp"
 define_has_member(reserve);
@@ -294,23 +292,40 @@ int main(__attribute__((unused)) int argc,
     benchmarkSet<std::multiset<Sample>>(ulongArray, runCount);
     benchmarkSet<phmap::btree_set<Sample>>(ulongArray, runCount);
 
+#ifdef HOOD_HASH
+    using hash_t = robin_hood::hash<Sample>;
+#elif ABSL_HASH
+    using hash_t = absl::Hash<Sample>;
+#elif FIB_HASH
+    using hash_t = Int64Hasher<Sample>;
+#else
+    using hash_t = std::hash<Sample>;
+#endif
+
+
     cout << "\n# Unordered Maps:" << endl;
-    benchmarkMap<phmap::flat_hash_map<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<tsl::robin_map<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<tsl::robin_pg_map<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<ska::flat_hash_map<Sample, Sample>>(ulongArray, runCount);
-    /* TODO: benchmarkMap<ska::bytell_hash_map<Sample, Sample>>(ulongArray, runCount); */
-    benchmarkMap<robin_hood::unordered_flat_map<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<robin_hood::unordered_node_map<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<robin_hood::unordered_map<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<std::unordered_map<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<emhash5::HashMap<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<emhash7::HashMap<Sample, Sample>>(ulongArray, runCount);
-    benchmarkMap<emilib::HashMap<Sample, Sample>>(ulongArray, runCount);
+    benchmarkMap<phmap::flat_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+#if ABSL
+    benchmarkMap<absl::flat_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+#endif
+    benchmarkMap<tsl::robin_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<tsl::robin_pg_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<ska::flat_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    /* TODO: benchmarkMap<ska::bytell_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount); */
+    benchmarkMap<robin_hood::unordered_flat_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<robin_hood::unordered_node_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<robin_hood::unordered_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<std::unordered_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<emhash5::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<emhash7::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<emilib::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
 
     cout << "\n# Ordered Maps:" << endl;
     benchmarkMap<std::map<Sample, Sample>>(ulongArray, runCount);
     benchmarkMap<phmap::btree_map<Sample, Sample>>(ulongArray, runCount);
+#if ABSL
+    benchmarkMap<absl::btree_map<Sample, Sample>>(ulongArray, runCount);
+#endif
 
     return 0;
 }

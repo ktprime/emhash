@@ -61,7 +61,6 @@ std::map<std::string, std::string> maps =
 
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 #define PHMAP_HAVE_SSSE3      1
-#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #endif
 
 //rand data type
@@ -72,9 +71,7 @@ std::map<std::string, std::string> maps =
 //#define CUCKOO_HASHMAP       1
 //#define EM3               1
 //#define PHMAP_HASH        1
-#if WYHASH_LITTLE_ENDIAN
-//    #define WY_HASH         1
-#endif
+//#define WY_HASH           1
 
 //#define FL1                 1
 
@@ -143,18 +140,6 @@ std::map<std::string, std::string> maps =
 #include <sys/mman.h>
 #include "fht/fht_ht.hpp" //https://github.com/goldsteinn/hashtable_test/blob/master/my_table/fht_ht.hpp
 #define FHT_HMAP          1
-#endif
-
-#if ABSL
-//#define _HAS_DEPRECATED_RESULT_OF 1
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/internal/raw_hash_set.cc"
-#endif
-
-#if ABSL_HASH
-#include "absl/hash/internal/low_level_hash.cc"
-#include "absl/hash/internal/hash.cc"
-#include "absl/hash/internal/city.cc"
 #endif
 
 #if FOLLY
@@ -320,7 +305,7 @@ struct StuHasher
 
 static int test_case = 0;
 static int loop_vector_time = 0;
-static int func_index = 1, func_size = 10;
+static int func_index = 0, func_size = 10;
 static int func_first = 0, func_last = 0;
 static float hlf = 0.0;
 
@@ -342,19 +327,17 @@ static void check_func_result(const std::string& hash_name, const std::string& f
 
     long ts = (getus() - ts1) / 1000;
 
-    if (func_size > 0) {
-        if (func_index == func_first)
-            printf("%8s  (%.3f): %8s %4ld, ", hash_name.data(), hlf, func.data(), ts);
+    if (func_index == func_first)
+        printf("%8s  (%.3f): %8s %4ld, ", hash_name.data(), hlf, func.data(), ts);
 
-        for (int i = 1; i <= 3; i++) {
-            if (func_index == (func_first + i) % func_size + 1) {
-                printf("%8s %4ld, ", func.data(), ts);
-                break;
-            }
+    for (int i = 0; i <= 3; i++) {
+        if (func_index == (func_first + i) % func_size + 1) {
+            printf("%8s %4ld, ", func.data(), ts);
+            break;
         }
-        if (func_index == func_last)
-            printf("\n");
     }
+    if (func_index == func_last)
+        printf("\n");
 }
 
 static void inline hash_convert(const std::map<std::string, int64_t>& hash_score, std::multimap <int64_t, std::string>& score_hash)
@@ -501,7 +484,7 @@ template<class hash_type>
 void hash_iter(const hash_type& ht_hash, const std::string& hash_name)
 {
     auto ts1 = getus(); size_t sum = 0;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 5; i++) {
     for (const auto& v : ht_hash)
         sum += 1;
 
@@ -564,13 +547,13 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 }
 
 template<class hash_type>
-void insert_no_reserve( const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_no_reserve(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
         sum += ht_hash.emplace(v, TO_VAL(0)).second;
-    hlf = ht_hash.load_factor();
+
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -835,10 +818,13 @@ void copy_clear(hash_type& ht_hash, const std::string& hash_name)
     auto ts1 = getus();
     hash_type thash = ht_hash;
     sum += thash.size();
+
     ht_hash = thash;
-    thash = thash;
+    sum  += ht_hash.size();
+
     ht_hash = std::move(thash);
     sum  += ht_hash.size();
+
     ht_hash.clear(); ht_hash.clear();
     sum  += ht_hash.size();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -889,8 +875,6 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
         for (int i = 0; i < size ; i++) {
             auto key = TO_KEY(srng());
             randdata.emplace_back(key);
-//            if (randdata.size() >= size)
-//                break;
         }
     }
     else
@@ -1198,7 +1182,8 @@ static int benchHashMap(int n)
         sum += v.size();
 #endif
         loop_vector_time = getus() - ts;
-        printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us, sum = %d\n", n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
+        printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us, sum = %d\n",
+                n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
     }
 
     {
@@ -1598,7 +1583,8 @@ int main(int argc, char* argv[])
         maxn = 1024*1024*1024 / type_size;
 
     float load_factor = 0.0945f;
-    printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a(0-3) b t(n %dkB - %dMB)\n", (int)maxn, minn*type_size >> 10, maxn*type_size >> 20);
+    printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a(0-3) b t(n %dkB - %dMB)\n",
+            (int)maxn, minn*type_size >> 10, maxn*type_size >> 20);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];

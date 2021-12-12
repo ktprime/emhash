@@ -715,10 +715,15 @@ public:
         _pairs       = new_pairs;
 
         std::fill_n(_states, num_buckets, State::EEMPTY);
-        //find empty tombstone
+
+        //set delete tombstone for some use.
+        //for (size_t index = 0; index < _num_buckets; index += simd_gaps)
+        //    _states[index] = _states[index + simd_gaps / 2] = State::EDELETE;
+        //set filled/packed tombstone
         std::fill_n(_states + num_buckets, simd_gaps / 2, State::EFILLED + 4);
-        //find filled tombstone
+        //set empty/packed tombstone
         std::fill_n(_states + num_buckets + simd_gaps / 2, simd_gaps / 2, State::EEMPTY + 4);
+
         //fill last packet zero
         memset(new_pairs + num_buckets, 0, sizeof(new_pairs[0]));
 

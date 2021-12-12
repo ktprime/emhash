@@ -36,7 +36,7 @@
 // see https://semver.org/
 #define ROBIN_HOOD_VERSION_MAJOR 3  // for incompatible API changes
 #define ROBIN_HOOD_VERSION_MINOR 11 // for adding functionality in a backwards-compatible manner
-#define ROBIN_HOOD_VERSION_PATCH 3  // for backwards-compatible bug fixes
+#define ROBIN_HOOD_VERSION_PATCH 4  // for backwards-compatible bug fixes
 
 #include <algorithm>
 #include <cstdlib>
@@ -1821,6 +1821,11 @@ public:
     }
 
     template <typename... Args>
+    iterator emplace_hint(Args&&... args) {
+        return emplace(std::forward<Args>(args)...).first;
+    }
+
+    template <typename... Args>
     std::pair<iterator, bool> try_emplace(const key_type& key, Args&&... args) {
         return try_emplace_impl(key, std::forward<Args>(args)...);
     }
@@ -1866,21 +1871,22 @@ public:
         return insertOrAssignImpl(std::move(key), std::forward<Mapped>(obj));
     }
 
-    std::pair<iterator, bool> insert(iterator hint, const value_type& keyval) {
-        ROBIN_HOOD_TRACE(this)
-        return emplace(keyval);
-    }
-
     std::pair<iterator, bool> insert(const value_type& keyval) {
         ROBIN_HOOD_TRACE(this)
         return emplace(keyval);
     }
 
-    std::pair<iterator, bool> insert(iterator it, value_type&& keyval) {
-        return emplace(std::move(keyval));
+    std::pair<iterator, bool> insert(const_iterator hint, const value_type& keyval) {
+        (void)hint;
+        return emplace(keyval);
     }
 
     std::pair<iterator, bool> insert(value_type&& keyval) {
+        return emplace(std::move(keyval));
+    }
+
+    std::pair<iterator, bool> insert(const_iterator hint, value_type&& keyval) {
+        (void)hint;
         return emplace(std::move(keyval));
     }
 

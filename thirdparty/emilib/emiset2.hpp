@@ -58,7 +58,7 @@ namespace emilib2 {
     #define SET1_EPI8      _mm512_set1_epi8
     #define LOADU_EPI8     _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
-    #define CMPEQ_EPI8     _mm512_test_epi8_mask
+    #define CMPEQ_EPI8     _mm512_cmpeq_epi16_mask
 #else
     //TODO arm neon
 #endif
@@ -815,7 +815,7 @@ private:
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = std::min<size_t>(hole, next_bucket + CTZ(maske));
+                const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;

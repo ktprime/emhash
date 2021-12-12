@@ -106,12 +106,6 @@ std::map<std::string, std::string> maps =
 //https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
 
-#if ABSL_HASH
-#include "absl/hash/internal/low_level_hash.cc"
-#include "absl/hash/internal/hash.cc"
-#include "absl/hash/internal/city.cc"
-#endif
-
 #if HOOD_HASH
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
@@ -126,8 +120,6 @@ std::map<std::string, std::string> maps =
 #if ET
     #define  _CPP11_HASH    1
 
-#include "absl/container/flat_hash_set.h"
-#include "absl/container/internal/raw_hash_set.cc"
 #if __x86_64__ || _WIN64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
@@ -255,7 +247,7 @@ struct StuHasher
 
 static int test_case = 0;
 static int loop_vector_time = 0;
-static int func_index = 1, func_size = 10;
+static int func_index = 0, func_size = 10;
 static int func_first = 0, func_last = 0;
 static float hlf = 0.0;
 
@@ -277,19 +269,17 @@ static void check_func_result(const std::string& hash_name, const std::string& f
 
     long ts = (getus() - ts1) / 1000;
 
-    if (func_size > 0) {
-        if (func_index == func_first)
-            printf("%8s  (%.3f): %8s %4ld, ", hash_name.data(), hlf, func.data(), ts);
+    if (func_index == func_first)
+        printf("%8s  (%.3f): %8s %4ld, ", hash_name.data(), hlf, func.data(), ts);
 
-        for (int i = 1; i <= 3; i++) {
-            if (func_index == (func_first + i) % func_size + 1) {
-                printf("%8s %4ld, ", func.data(), ts);
-                break;
-            }
+    for (int i = 0; i <= 3; i++) {
+        if (func_index == (func_first + i) % func_size + 1) {
+            printf("%8s %4ld, ", func.data(), ts);
+            break;
         }
-        if (func_index == func_last)
-            printf("\n");
     }
+    if (func_index == func_last)
+        printf("\n");
 }
 
 static void inline hash_convert(const std::map<std::string, int64_t>& hash_score, std::multimap <int64_t, std::string>& score_hash)
@@ -497,7 +487,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 }
 
 template<class hash_type>
-void insert_no_reserve( const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_no_reserve(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
@@ -767,10 +757,13 @@ void copy_clear(hash_type& ht_hash, const std::string& hash_name)
     auto ts1 = getus();
     hash_type thash = ht_hash;
     sum += thash.size();
+
     ht_hash = thash;
-    thash = thash;
+    sum  += ht_hash.size();
+
     ht_hash = std::move(thash);
     sum  += ht_hash.size();
+
     ht_hash.clear(); ht_hash.clear();
     sum  += ht_hash.size();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -821,8 +814,6 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
         for (int i = 0; i < size ; i++) {
             auto key = TO_KEY(srng());
             randdata.emplace_back(key);
-//            if (randdata.size() >= size)
-//                break;
         }
     }
     else
@@ -1066,7 +1057,9 @@ static int benchHashSet(int n)
 #if ET
         {  benOneHash<phmap::flat_hash_set <keyType,  ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_set <keyType,  ehash_func>>("martin", vList); }
+#if ASBL
         {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
+#endif
 #endif
 
         {  benOneHash<emilib::HashSet <keyType,  ehash_func>>("emiset", vList); }
