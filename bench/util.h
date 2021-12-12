@@ -20,13 +20,13 @@
 #endif
 #define NDEBUG                1
 #ifdef _WIN32
-	#ifndef NOMINMAX
-	#define NOMINMAX
-	#endif
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
     # define CONSOLE "CON"
     # define _CRT_SECURE_NO_WARNINGS 1
     # include <windows.h>
-	
+    
 #else
     # define CONSOLE "/dev/tty"
     # include <unistd.h>
@@ -155,18 +155,18 @@ class Lehmer64 {
         g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
         return g_lehmer64_state >> 64;
     }
-		// this is a bit biased, but for our use case that's not important.
-	uint64_t operator()(uint64_t boundExcluded) noexcept {
+        // this is a bit biased, but for our use case that's not important.
+    uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
-		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
 #elif _MSC_VER
-		uint64_t high;
-		uint64_t a = operator()();
-		_umul128(a, boundExcluded, &high);
-		return high;
+        uint64_t high;
+        uint64_t a = operator()();
+        _umul128(a, boundExcluded, &high);
+        return high;
 #endif
-	}
-	
+    }
+    
 };
 #endif
 
@@ -196,17 +196,17 @@ public:
         return z ^ z >> 26;
     }
 
-	// this is a bit biased, but for our use case that's not important.
-	uint64_t operator()(uint64_t boundExcluded) noexcept {
+    // this is a bit biased, but for our use case that's not important.
+    uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
-		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
 #elif _MSC_VER
-		uint64_t high;
-		uint64_t a = operator()();
-		_umul128(a, boundExcluded, &high);
-		return high;
+        uint64_t high;
+        uint64_t a = operator()();
+        _umul128(a, boundExcluded, &high);
+        return high;
 #endif
-	}
+    }
 
 
 private:
@@ -245,18 +245,18 @@ public:
 
         return x;
     }
-	
-	// this is a bit biased, but for our use case that's not important.
-	uint64_t operator()(uint64_t boundExcluded) noexcept {
+    
+    // this is a bit biased, but for our use case that's not important.
+    uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
-		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
 #elif _MSC_VER
-		uint64_t high;
-		uint64_t a = operator()();
-		_umul128(a, boundExcluded, &high);
-		return high;
+        uint64_t high;
+        uint64_t a = operator()();
+        _umul128(a, boundExcluded, &high);
+        return high;
 #endif
-	}
+    }
 
 
 private:
@@ -296,18 +296,18 @@ public:
         mC = rotl(mC, 24U) + tmp;
         return tmp;
     }
-	
-		// this is a bit biased, but for our use case that's not important.
-	uint64_t operator()(uint64_t boundExcluded) noexcept {
+    
+        // this is a bit biased, but for our use case that's not important.
+    uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
-		return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
 #elif _MSC_VER
-		uint64_t high;
-		uint64_t a = operator()();
-		_umul128(a, boundExcluded, &high);
-		return high;
+        uint64_t high;
+        uint64_t a = operator()();
+        _umul128(a, boundExcluded, &high);
+        return high;
 #endif
-	}
+    }
 
 
 private:
@@ -588,8 +588,10 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #endif
 
 #if ABSL
+#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE2 1
+#endif
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/internal/raw_hash_set.cc"

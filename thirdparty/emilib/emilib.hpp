@@ -127,7 +127,7 @@ public:
     typedef ValueT val_type;
     typedef KeyT   key_type;
 
-#ifndef EMH_HASH2
+#ifdef EMH_HASH2
     #define hash2_key(key_hash, key) ((uint8_t)(key_hash >> 24)) >> 1
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
@@ -141,7 +141,7 @@ public:
     {
         if constexpr (sizeof(UType) > 4)
             return (uint8_t)(key >> 32) >> 1;
-       else
+        else
             return (uint8_t)((key * key_hash) >> 24) >> 1;
     }
 #endif
@@ -329,9 +329,7 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap() = default;
-
-    HashMap(size_t n)
+    HashMap(size_t n = 4)
     {
         rehash(n);
     }
@@ -363,7 +361,7 @@ public:
     {
         if (this != &other)
             clone(other);
-         return *this;
+        return *this;
     }
 
     HashMap& operator=(HashMap&& other)
@@ -813,7 +811,8 @@ public:
         memset(_pairs + num_buckets, 0, sizeof(_pairs[0]));
 
         //fill empty tombstone
-        std::fill_n(_states, num_buckets, State::EEMPTY);
+        //std::fill_n(_states, num_buckets, State::EEMPTY);
+        memset(_states, -1u, num_buckets);
 
         //set delete tombstone for some use.
         for (auto index = 0; index < _num_buckets; index += simd_gaps)
@@ -961,8 +960,9 @@ private:
             const int round = max_search_gap(next_bucket) - (simd_gaps - headsize) % simd_gaps;
             assert(next_bucket % simd_gaps == 0);
 #endif
-            const int round = max_search_gap(next_bucket);
-            for (int i = round; i >= 0; i -= simd_gaps) {
+            int i = max_search_gap(next_bucket);
+            //for (int i = round; i >= 0; i -= simd_gaps) {
+            for ( ; ; ) {
                 const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
                 auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
                 while (maskf != 0) {
@@ -983,6 +983,9 @@ private:
                     i += next_bucket - _num_buckets;
                     next_bucket = 0;
                 }
+
+                if (EMH_UNLIKELY((i -= simd_gaps) < 0))
+                    break;
             }
         }
         return _num_buckets;
@@ -1087,7 +1090,7 @@ private:
         3.if there was no match (unlikely), probe and GOTO 2
         4.otherwise, get the first match and enter the SMALL TABLE NASTY CORNER CASE ZONE
         5.check that the match (mod n) isn't FULL.  ***/
-        for (; (int)i <= (int)round; i += simd_gaps) {
+        for (; ;) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
 
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
@@ -1123,6 +1126,9 @@ private:
                 i -= next_bucket - _num_buckets;
                 next_bucket = 0;
             }
+
+            if (EMH_UNLIKELY((i += simd_gaps) >= round))
+                break;
         }
 
         if (EMH_LIKELY(hole != (size_t)-1)) {

@@ -497,6 +497,7 @@ void hash_iter(const hash_type& ht_hash, const std::string& hash_name)
     sum += it->first.size();
 #endif
     }
+    hlf = ht_hash.load_factor();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -1633,9 +1634,8 @@ int main(int argc, char* argv[])
                 else if (c == 'h')
                     maps.erase("hrdset");
                 else if (c == 'e') {
+                    maps.erase("emilib");
                     maps.erase("emilib2");
-//                    maps.emplace("emilib3", "emilib3");
-//                    maps.emplace("emilib4", "emilib4");
                 }
                 else if (c == 'l') {
                     maps.emplace("lru_size", "lru_size");

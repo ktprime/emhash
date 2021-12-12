@@ -32,6 +32,7 @@
 
 namespace emilib2 {
 
+constexpr static uint64_t EMPTY_MASK = 0x0101010101010101ull;
 #define KEYHASH_MASK(key_hash) ((uint8_t)(key_hash >> 24) << 1)
 
 #ifndef AVX2_EHASH
@@ -249,9 +250,7 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap() = default;
-
-    HashMap(size_t n)
+    HashMap(size_t n = 4)
     {
         rehash(n);
     }
@@ -283,7 +282,7 @@ public:
     {
         if (this != &other)
             clone(other);
-         return *this;
+        return *this;
     }
 
     HashMap& operator=(HashMap&& other)
@@ -714,7 +713,8 @@ public:
         _states      = new_states;
         _pairs       = new_pairs;
 
-        std::fill_n(_states, num_buckets, State::EEMPTY);
+        //std::fill_n(_states, num_buckets, State::EEMPTY);
+        memset(_states, (uint32_t)EMPTY_MASK, num_buckets);
 
         //set delete tombstone for some use.
         //for (size_t index = 0; index < _num_buckets; index += simd_gaps)
@@ -780,10 +780,10 @@ private:
                 next_bucket = (key_hash + ++offset) & _mask;
             }
         } else {
-            const char keymask = KEYHASH_MASK(key_hash);
-            const auto filled = SET1_EPI8(keymask);
+            const auto filled = SET1_EPI8(KEYHASH_MASK(key_hash));
+            int i = _max_probe_length;
 
-            for (int i = _max_probe_length; i >= 0; i -= simd_gaps) {
+            for ( ; ; ) {
                 const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
                 auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
@@ -796,19 +796,20 @@ private:
                     maskf &= maskf - 1;
                 }
 
-                if (_max_probe_length >= simd_gaps) {
                 const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
                 if (maske != 0)
                     break;
-                }
 
                 next_bucket += simd_gaps;
                 if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
                     i += next_bucket - _num_buckets;
                     next_bucket = 0;
                 }
+                if ((i -= simd_gaps) < 0)
+                    break;
             }
         }
+
         return _num_buckets;
     }
 
@@ -840,14 +841,13 @@ private:
             return find_empty_slot((key_hash + offset) & _mask, offset);
         }
 
-        const char keymask = KEYHASH_MASK(key_hash);
-        const auto filled = SET1_EPI8(keymask);
+        const auto filled = SET1_EPI8(KEYHASH_MASK(key_hash));
         const auto bucket = (size_t)(key_hash & _mask);
         const auto round  = bucket + _max_probe_length;
         auto next_bucket  = bucket, i = bucket;
 
-        for (; i <= round; i += simd_gaps) {
-            const auto vec  = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+        for ( ; ; ) {
+            const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
             auto maskf  = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             //1. find filled
@@ -860,11 +860,10 @@ private:
                 maskf &= maskf - 1;
             }
 
-
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = std::min(hole, next_bucket + CTZ(maske));
+                const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
@@ -884,6 +883,8 @@ private:
                 i -= next_bucket - _num_buckets;
                 next_bucket = 0;
             }
+            if ((i += simd_gaps) > round)
+                break;
         }
 
         if (EMH_LIKELY(hole != (size_t)-1))
@@ -894,8 +895,6 @@ private:
 
     size_t find_empty_slot(size_t next_bucket, int offset)
     {
-        constexpr uint64_t EMPTY_MASK = 0x0101010101010101ull;
-
         while (true) {
             const auto maske = *(uint64_t*)(_states + next_bucket) & EMPTY_MASK;
             if (EMH_LIKELY(maske != 0)) {
@@ -947,9 +946,9 @@ private:
     EqT     _eq;
     uint8_t*_states           = nullptr;
     PairT*  _pairs            = nullptr;
-    size_t  _num_buckets      =  0;
-    size_t  _mask             =  0; // _num_buckets minus one
-    size_t  _num_filled       =  0;
+    size_t  _num_buckets      = 0;
+    size_t  _mask             = 0; // _num_buckets minus one
+    size_t  _num_filled       = 0;
     int     _max_probe_length = -1; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };
 
