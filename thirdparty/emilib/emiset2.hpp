@@ -261,11 +261,7 @@ public:
     HashSet(HashSet&& other)
     {
         if (this != &other) {
-            *this = std::move(other);
-            if (!is_triviall_destructable())
-                other.clear();
-            else
-                other._num_filled = 0;
+            swap(other);
         }
     }
 
@@ -287,10 +283,7 @@ public:
     {
         if (this != &other) {
             swap(other);
-            if (!is_triviall_destructable())
-                other.clear();
-            else
-                other._num_filled = 0;
+            other.clear();
         }
         return *this;
     }

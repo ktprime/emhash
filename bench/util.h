@@ -26,7 +26,7 @@
     # define CONSOLE "CON"
     # define _CRT_SECURE_NO_WARNINGS 1
     # include <windows.h>
-    
+
 #else
     # define CONSOLE "/dev/tty"
     # include <unistd.h>
@@ -166,7 +166,7 @@ class Lehmer64 {
         return high;
 #endif
     }
-    
+
 };
 #endif
 
@@ -245,7 +245,7 @@ public:
 
         return x;
     }
-    
+
     // this is a bit biased, but for our use case that's not important.
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
@@ -296,7 +296,7 @@ public:
         mC = rotl(mC, 24U) + tmp;
         return tmp;
     }
-    
+
         // this is a bit biased, but for our use case that's not important.
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
@@ -383,8 +383,10 @@ struct Int64Hasher
         return hashmix(key);
 #elif FIB_HASH == 5
         return rrxmrrxmsx_0(key);
-#elif FIB_HASH > 100
+#elif FIB_HASH > 10000
         return key % FIB_HASH; //bad hash
+#elif FIB_HASH > 100
+        return key / FIB_HASH; //bad hash
 #elif FIB_HASH == 6
         return wyhash64(key, KC);
 #else
@@ -449,6 +451,19 @@ struct WyRand
     {
         return wyrand(&seed);
     }
+
+        // this is a bit biased, but for our use case that's not important.
+    uint64_t operator()(uint64_t boundExcluded) noexcept {
+#ifdef __SIZEOF_INT128__
+        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+#elif _MSC_VER
+        uint64_t high;
+        uint64_t a = operator()();
+        _umul128(a, boundExcluded, &high);
+        return high;
+#endif
+    }
+
 };
 #endif
 

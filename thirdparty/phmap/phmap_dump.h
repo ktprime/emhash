@@ -42,6 +42,8 @@ struct IsTriviallyCopyable<std::pair<T1, T2>> {
 
 namespace priv {
 
+#if !defined(PHMAP_NON_DETERMINISTIC) && !defined(PHMAP_DISABLE_DUMP)
+
 // ------------------------------------------------------------------------
 // dump/load for raw_hash_set
 // ------------------------------------------------------------------------
@@ -95,7 +97,7 @@ bool raw_hash_set<Policy, Hash, Eq, Alloc>::load(InputArchive& ar) {
     }
 
     // allocate memory for ctrl_ and slots_
-    initialize_slots();
+    initialize_slots(capacity_);
     if (!ar.load(reinterpret_cast<char*>(ctrl_),
         sizeof(ctrl_t) * (capacity_ + Group::kWidth + 1))) {
         std::cerr << "Failed to load ctrl" << std::endl;
@@ -166,6 +168,9 @@ bool parallel_hash_set<N, RefSet, Mtx_, Policy, Hash, Eq, Alloc>::load(InputArch
     }
     return true;
 }
+
+#endif // !defined(PHMAP_NON_DETERMINISTIC) && !defined(PHMAP_DISABLE_DUMP)
+
 } // namespace priv
 
 

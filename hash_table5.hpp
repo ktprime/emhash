@@ -297,8 +297,8 @@ public:
         typedef std::ptrdiff_t            difference_type;
         typedef value_pair                value_type;
 
-        typedef value_pair*               pointer;
-        typedef value_pair&               reference;
+        typedef const value_pair*         pointer;
+        typedef const value_pair&         reference;
 
         //const_iterator() { }
         const_iterator(const iterator& proto) : _map(proto._map), _bucket(proto._bucket) { }
@@ -573,7 +573,7 @@ public:
 
 #ifdef EMH_STATIS
     //Returns the bucket number where the element with key k is located.
-    size_type bucket(const KeyT& key) const
+    size_type bucket_slot(const KeyT& key) const
     {
         const auto bucket = hash_bucket(key);
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1108,7 +1108,7 @@ public:
             clear_empty();
         clearkv();
 #else
-        if (is_triviall_destructable() || sizeof(PairT) > EMH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 2)
+        if (is_triviall_destructable() || sizeof(PairT) > EMH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 8)
             clearkv();
         else
             memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
@@ -1119,7 +1119,7 @@ public:
 
     void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4)
     {
-        if (load_factor() < min_factor && bucket_count() > 10) //safe guard
+        if (load_factor() < min_factor) //safe guard
             rehash(_num_filled);
     }
 
@@ -1542,7 +1542,7 @@ one-way seach strategy.
             return bucket;
 
 #ifdef EMH_LPL
-        constexpr auto linear_probe_length = std::max((unsigned int)(192 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
+        constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
 #ifdef EMH_QUADRATIC
@@ -1576,8 +1576,8 @@ one-way seach strategy.
         }
 
 #else
-        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 4;
-        for (uint32_t step = 2, slot = bucket + 1; ;slot += 2, step ++) {
+        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 5;
+        for (uint32_t step = 2, slot = bucket + 1; ; slot += 2, step ++) {
             auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                 return bucket1;
@@ -1586,7 +1586,7 @@ one-way seach strategy.
                 if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
                     return _last++;
                 ++_last &= _mask;
-#if 1
+#if 0
                 auto tail = _mask - _last;
                 if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                     return tail;
@@ -1642,7 +1642,7 @@ one-way seach strategy.
     }
 
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    static inline uint64_t hash64(uint64_t key)
+    static uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__ && EMH_FIBONACCI_HASH == 1
         __uint128_t r = key; r *= KC;
@@ -1734,6 +1734,7 @@ private:
     uint32_t  _loadlf;
 };
 } // namespace emhash
+
 #if __cplusplus > 199711
 //template <class Key, class Val> using emhash5 = ehmap<Key, Val, std::hash<Key>>;
 #endif

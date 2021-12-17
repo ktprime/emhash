@@ -981,9 +981,10 @@ public:
                           const allocator_type& alloc = allocator_type())
         : ctrl_(EmptyGroup()), settings_(0, hashfn, eq, alloc) {
         if (bucket_cnt) {
-            capacity_ = NormalizeCapacity(bucket_cnt);
-            reset_growth_left();
-            initialize_slots();
+            size_t new_capacity = NormalizeCapacity(bucket_cnt);
+            reset_growth_left(new_capacity);
+            initialize_slots(new_capacity);
+            capacity_ = new_capacity;
         }
     }
 
@@ -1202,8 +1203,8 @@ public:
                 }
             }
             size_ = 0;
-            reset_ctrl();
-            reset_growth_left();
+            reset_ctrl(capacity_);
+            reset_growth_left(capacity_);
         }
         assert(empty());
         infoz_.RecordStorageChanged(0, capacity_);
@@ -1576,7 +1577,7 @@ public:
         }
     }
 
-#ifndef PHMAP_NON_DETERMINISTIC
+#if !defined(PHMAP_NON_DETERMINISTIC) && !defined(PHMAP_DISABLE_DUMP)
     template<typename OutputArchive>
     bool dump(OutputArchive&) const;
 
@@ -1882,21 +1883,21 @@ private:
         infoz_.RecordErase();
     }
 
-    void initialize_slots() {
-        assert(capacity_);
+    void initialize_slots(size_t new_capacity) {
+        assert(new_capacity);
         if (std::is_same<SlotAlloc, std::allocator<slot_type>>::value && 
             slots_ == nullptr) {
             infoz_ = Sample();
         }
 
-        auto layout = MakeLayout(capacity_);
+        auto layout = MakeLayout(new_capacity);
         char* mem = static_cast<char*>(
             Allocate<Layout::Alignment()>(&alloc_ref(), layout.AllocSize()));
         ctrl_ = reinterpret_cast<ctrl_t*>(layout.template Pointer<0>(mem));
         slots_ = layout.template Pointer<1>(mem);
-        reset_ctrl();
-        reset_growth_left();
-        infoz_.RecordStorageChanged(size_, capacity_);
+        reset_ctrl(new_capacity);
+        reset_growth_left(new_capacity);
+        infoz_.RecordStorageChanged(size_, new_capacity);
     }
 
     void destroy_slots() {
@@ -1922,8 +1923,8 @@ private:
         auto* old_ctrl = ctrl_;
         auto* old_slots = slots_;
         const size_t old_capacity = capacity_;
+        initialize_slots(new_capacity);
         capacity_ = new_capacity;
-        initialize_slots();
 
         for (size_t i = 0; i != old_capacity; ++i) {
             if (IsFull(old_ctrl[i])) {
@@ -2004,7 +2005,7 @@ private:
                 --i;  // repeat
             }
         }
-        reset_growth_left();
+        reset_growth_left(capacity_);
     }
 
     void rehash_and_grow_if_necessary() {
@@ -2145,14 +2146,14 @@ private:
     }
 
     // Reset all ctrl bytes back to kEmpty, except the sentinel.
-    void reset_ctrl() {
-        std::memset(ctrl_, kEmpty, capacity_ + Group::kWidth);
-        ctrl_[capacity_] = kSentinel;
-        SanitizerPoisonMemoryRegion(slots_, sizeof(slot_type) * capacity_);
+    void reset_ctrl(size_t capacity) {
+        std::memset(ctrl_, kEmpty, capacity + Group::kWidth);
+        ctrl_[capacity] = kSentinel;
+        SanitizerPoisonMemoryRegion(slots_, sizeof(slot_type) * capacity);
     }
 
-    void reset_growth_left() {
-        growth_left() = CapacityToGrowth(capacity()) - size_;
+    void reset_growth_left(size_t capacity) {
+        growth_left() = CapacityToGrowth(capacity) - size_;
     }
 
     // Sets the control byte, and if `i < Group::kWidth`, set the cloned byte at
@@ -3094,6 +3095,29 @@ public:
         return std::get<2>(res);
     }
 
+    // Extension API: support iterating over all values
+    //
+    // flat_hash_set<std::string> s;
+    // s.insert(...);
+    // s.for_each([](auto const & key) {
+    //    // Safely iterates over all the keys
+    // });
+    template <class F>
+    void for_each(F&& fCallback) const {
+        for (auto const& inner : sets_) {
+            typename Lockable::SharedLock m(const_cast<Inner&>(inner));
+            std::for_each(inner.set_.begin(), inner.set_.end(), fCallback);
+        }
+    }
+
+    // this version allows to modify the values
+    void for_each_m(std::function<void (value_type&)> && fCallback) {
+        for (auto& inner : sets_) {
+            typename Lockable::UniqueLock m(const_cast<Inner&>(inner));
+            std::for_each(inner.set_.begin(), inner.set_.end(), fCallback);
+        }
+    }
+
     // Extension API: support for heterogeneous keys.
     //
     //   std::unordered_set<std::string> s;
@@ -3343,7 +3367,7 @@ public:
         return HashElement{hash_ref()}(key);
     }
 
-#ifndef PHMAP_NON_DETERMINISTIC
+#if !defined(PHMAP_NON_DETERMINISTIC) && !defined(PHMAP_DISABLE_DUMP)
     template<typename OutputArchive>
     bool dump(OutputArchive& ar) const;
 

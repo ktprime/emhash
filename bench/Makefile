@@ -6,7 +6,7 @@ ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX?=clang++
 endif
 
-CXXFLAGS = -O2 -mavx -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include
+CXXFLAGS = -O3 -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include
 
 ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly
@@ -68,6 +68,9 @@ ifneq ($(AVX2),)
 CXXFLAGS += -DAVX2_EHASH=$(AVX2) -mavx2
 endif
 
+ifneq ($(H2),)
+CXXFLAGS += -DEMH_H2=1
+endif
 
 all:
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench

@@ -356,8 +356,8 @@ public:
         typedef std::ptrdiff_t            difference_type;
         typedef value_pair                value_type;
 
-        typedef value_pair*               pointer;
-        typedef value_pair&               reference;
+        typedef const value_pair*         pointer;
+        typedef const value_pair&         reference;
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket) { init(); }
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }

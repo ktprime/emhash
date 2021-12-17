@@ -40,9 +40,9 @@ using namespace std;
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600
 #include "martin/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
-#include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 
 #if ET
+#include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 #include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
 #include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
 //#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
@@ -102,13 +102,13 @@ static const char* find(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
     #define MRNG sfc64
 #elif RT == 2
-    #define MRNG WyRnd
+    #define MRNG WyRand
 #elif RT == 3
     #define MRNG RomuDuoJr
 #else
@@ -981,17 +981,14 @@ int main(int argc, char* argv[])
                 show_name.erase("ska");
             else if (c == 'h')
                 show_name.erase("hrd7");
-            else if (c == 'e')
+            else if (c == 'e') {
                 show_name.erase("emilib");
-            else if (c == 'b')
+//                show_name.erase("emilib");
+            } else if (c == 'b')
                 sflags = atoi(&argv[1][++i]);
             else if (c == 'd')
                 eflags = atoi(&argv[1][++i]);
         }
-    }
-    if (argc > 2) {
-        int n = argc > 1 ? atoi(argv[2]) : 12345678;
-        return 0;
     }
 
     puts("test hash:");

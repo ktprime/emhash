@@ -337,8 +337,8 @@ public:
         typedef value_pair&               reference;
 
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
-        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { }
+        iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
 
         void init()
         {
@@ -434,12 +434,12 @@ public:
         typedef std::ptrdiff_t            difference_type;
         typedef value_pair                value_type;
 
-        typedef value_pair*               pointer;
-        typedef value_pair&               reference;
+        typedef const value_pair*          pointer;
+        typedef const value_pair&          reference;
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
-        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { }
+        const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
 
         void init()
         {
@@ -512,7 +512,7 @@ public:
         size_t    _bmask;
         size_type _bucket;
         size_type _from;
-    };
+     };
 
     void init(size_type bucket, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
@@ -582,7 +582,6 @@ public:
     ~HashMap()
     {
         if (is_triviall_destructable()) {
-            //clearkv();
             for (auto it = cbegin(); _num_filled; ++it) {
                 _num_filled --;
                 it->~PairT();
@@ -634,11 +633,11 @@ public:
     iterator begin()
     {
         if (0 == _num_filled)
-            return {this, _num_buckets, false};
+            return {this, _num_buckets};
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this, CTZ(bmask) };
+            return {this, CTZ(bmask), true};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -648,9 +647,9 @@ public:
     {
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this, CTZ(bmask)};
+            return {this, CTZ(bmask), true};
         else if (0 == _num_filled)
-            return {this, _num_buckets, false};
+            return {this, _num_buckets};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -663,7 +662,7 @@ public:
 
         auto bucket = _mask;
         while (EMH_EMPTY(_pairs, bucket)) bucket--;
-        return {this, bucket};
+        return {this, bucket, true};
     }
 
     const_iterator begin() const
@@ -673,12 +672,12 @@ public:
 
     iterator end()
     {
-        return {this, _num_buckets, false};
+        return {this, _num_buckets};
     }
 
     const_iterator cend() const
     {
-        return {this, _num_buckets, false};
+        return {this, _num_buckets};
     }
 
     const_iterator end() const
@@ -923,13 +922,13 @@ public:
     template<typename Key>
     iterator find(const Key& key) noexcept
     {
-        return {this, find_filled_bucket(key), false};
+        return {this, find_filled_bucket(key)};
     }
 
     template<typename Key = KeyT>
     const_iterator find(const Key& key) const noexcept
     {
-        return {this, find_filled_bucket(key), false};
+        return {this, find_filled_bucket(key)};
     }
 
     template<typename Key = KeyT>
@@ -963,7 +962,7 @@ public:
     template<typename Key = KeyT>
     std::pair<iterator, iterator> equal_range(const Key& key) const noexcept
     {
-        const auto found = find(key);
+        const auto found = {this, find_filled_bucket(key), true};
         if (found == end())
             return { found, found };
         else
@@ -1042,7 +1041,7 @@ public:
         } else {
             EMH_VAL(_pairs, bucket) = std::move(value);
         }
-        return { {this, bucket, false}, found };
+        return { {this, bucket}, found };
     }
 
     template<typename K = KeyT, typename V = ValueT>
@@ -1053,7 +1052,7 @@ public:
         if (found) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         }
-        return { {this, bucket, false}, found };
+        return { {this, bucket}, found };
     }
 
     std::pair<iterator, bool> insert(const value_type& p)
@@ -1306,7 +1305,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable() || _num_filled < _num_buckets / 8)
+        if (is_triviall_destructable())
             clearkv();
         else if (_num_filled > 0)
             memset(_bitmask, 0xFFFFFFFF, _num_buckets / 8);
@@ -1695,8 +1694,8 @@ private:
         }
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1) {
 #if 0
+        if (1) {
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
             if (EMH_LIKELY(bmask2 != 0))
@@ -1707,8 +1706,8 @@ private:
             const auto beginw = *(size_t*)((uint8_t*)_bitmask + begino / 8);
             if (beginw != 0)
                 return begino + CTZ(beginw);//reverse beginw
-#endif
         }
+#endif
 
         auto& _last = EMH_BUCKET(_pairs, _num_buckets);
         for (size_t i = 2; ; i++) {
