@@ -168,7 +168,7 @@ public:
     typedef ValueT val_type;
     typedef KeyT   key_type;
 
-#ifdef EMH_H2
+#ifndef EMH_H2
     #define hash2_key(key_hash, key) ((uint8_t)(key_hash >> 25)) >> 1
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
@@ -180,7 +180,7 @@ public:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash2_key(uint64_t key_hash, const UType& key) const
     {
-#if _WIN32
+#if _WIN32 && _MSC_VER
         return (uint8_t)(_byteswap_uint64(((uint64_t)key) * 0xA24BAED4963EE407)) >> 1;
 #else
         return (uint8_t)(__builtin_bswap64(((uint64_t)key) * 0xA24BAED4963EE407)) >> 1;

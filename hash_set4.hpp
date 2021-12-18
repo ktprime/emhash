@@ -143,8 +143,8 @@ public:
         typedef value_type&               reference;
 
         iterator(const const_iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
-        iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { init(); }
-        iterator(const htype* hash_set, uint32_t bucket, bool) : _set(hash_set), _bucket(bucket) { _from = _bmask = 0; }
+        iterator(const htype* hash_set, uint32_t bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
+        iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { _from = _bmask = 0; }
 
         void init()
         {
@@ -158,17 +158,32 @@ public:
             }
         }
 
+        iterator& next()
+        {
+            goto_next_element();
+            _bmask &= _bmask - 1;
+            return *this;
+        }
+
+        void erase(size_type bucket)
+        {
+            assert (_bucket / SIZE_BIT == bucket / SIZE_BIT);
+            _bmask &= ~(1ull << (bucket % SIZE_BIT));
+        }
+
         iterator& operator++()
         {
+            _bmask &= _bmask - 1;
             goto_next_element();
             return *this;
         }
 
         iterator operator++(int)
         {
-            auto old_index = _bucket;
+            iterator old = *this;
+            _bmask &= _bmask - 1;
             goto_next_element();
-            return {_set, old_index};
+            return old;
         }
 
         reference operator*() const
@@ -199,7 +214,6 @@ public:
     private:
         void goto_next_element()
         {
-            _bmask &= _bmask - 1;
             if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
@@ -229,8 +243,8 @@ public:
         typedef value_type&               reference;
 
         const_iterator(const iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
-        const_iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { init(); }
-        const_iterator(const htype* hash_set, uint32_t bucket, bool) : _set(hash_set), _bucket(bucket) { _from = _bmask = 0; }
+        const_iterator(const htype* hash_set, uint32_t bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
+        const_iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { _from = _bmask = 0; }
 
         void init()
         {
@@ -252,9 +266,9 @@ public:
 
         const_iterator operator++(int)
         {
-            auto old_index = _bucket;
+            const_iterator old = *this;
             goto_next_element();
-            return {_set, old_index};
+            return old;
         }
 
         reference operator*() const
@@ -343,8 +357,8 @@ public:
     HashSet(std::initializer_list<value_type> il, size_t n = 8)
     {
         init((uint32_t)il.size());
-        for (auto begin = il.begin(); begin != il.end(); ++begin)
-            insert(*begin);
+        for (auto it = il.begin(); it != il.end(); ++it)
+            insert(*it);
     }
 
     HashSet& operator=(const HashSet& other)
@@ -434,7 +448,7 @@ public:
         while (_bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))) {
             ++bucket;
         }
-        return {this, bucket};
+        return {this, bucket, true};
     }
 
     const_iterator cbegin() const
@@ -446,7 +460,7 @@ public:
         while (_bitmask[bucket / MASK_BIT] & (1 << (bucket % MASK_BIT))) {
             ++bucket;
         }
-        return {this, bucket};
+        return {this, bucket, true};
     }
 
     const_iterator begin() const
@@ -690,9 +704,9 @@ public:
         const auto bucket = find_or_allocate(key);
         if (_pairs[bucket].second == INACTIVE) {
             new_key(key, bucket);
-            return { {this, bucket, false}, true };
+            return { {this, bucket}, true };
         } else {
-            return { {this, bucket, false}, false };
+            return { {this, bucket}, false };
         }
     }
 
@@ -702,9 +716,9 @@ public:
         const auto bucket = find_or_allocate(key);
         if (_pairs[bucket].second == INACTIVE) {
             new_key(std::move(key), bucket);
-            return { {this, bucket, false}, true };
+            return { {this, bucket}, true };
         } else {
-            return { {this, bucket, false}, false };
+            return { {this, bucket}, false };
         }
     }
 
@@ -882,8 +896,9 @@ public:
         //move last bucket to current
         clear_bucket(bucket);
 
+        it.erase(bucket);
         //erase from main bucket, return main bucket as next
-        return (bucket == it._bucket) ? ++it : it;
+        return (bucket == it._bucket) ? it.next() : it;
     }
 
     void _erase(const_iterator it)

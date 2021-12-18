@@ -383,11 +383,11 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
 
     auto mins = rscore_hash.begin()->first;
     for (auto& v : rscore_hash) {
-        hash_score[v.second] += (int)((mins * 100) / (v.first + 0));
+        hash_score[v.second] += (int)((mins * 100) / (v.first + 1e-3));
 
         //hash_func_score[v.second][func] = (int)((mins * 100) / (v.first + 1));
         hash_func_score[v.second][func] = v.first / test_case;
-        printf("        %-20s   %-2.1f%%\n", /*(int)(v.first / test_case),*/ v.second.data(), ((mins * 100.0f) / v.first));
+        printf("%4d        %-20s   %-2.1f%%\n", (int)(v.first / test_case), v.second.data(), ((mins * 100.0f) / v.first));
     }
     putchar('\n');
 }
@@ -808,7 +808,7 @@ void find_erase_50(const hash_type& ht_hash, const std::string& hash_name, const
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
         sum += ht_hash.count(v);
-        sum -= ht_hash.find(v) != ht_hash.end();
+        sum += ht_hash.find(v) != ht_hash.end();
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -1092,9 +1092,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         find_hit_50<hash_type>(hash, hash_name, nList);
         find_hit_50_erase<hash_type>(hash, hash_name, nList);
         erase_50<hash_type>(hash, hash_name, nList);
+        find_erase_50<hash_type>(hash, hash_name, oList);
         insert_find_erase<hash_type>(hash, hash_name, nList);
 
-        find_erase_50<hash_type>(hash, hash_name, oList);
         erase_reinsert<hash_type>(hash, hash_name, oList);
         hash_iter<hash_type>(hash, hash_name);
 
@@ -1716,7 +1716,7 @@ int main(int argc, char* argv[])
         printf("  %s\n", m.second.data());
     putchar('\n');
 
-    int n = (srng() % 2*minn) + minn;
+    int n = (srng() % (2*minn)) + minn;
     while (true) {
         if (run_type == 2) {
             printf(">>");

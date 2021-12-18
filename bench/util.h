@@ -109,7 +109,8 @@ static int ilog(int x, const int n = 2)
 
 static uint64_t randomseed() {
     std::random_device rd;
-    return std::uniform_int_distribution<uint64_t>{}(rd);
+    std::mt19937 g(rd());
+    return g();
 }
 
 #if __SIZEOF_INT128__

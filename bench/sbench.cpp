@@ -745,7 +745,7 @@ void find_erase_50(const hash_type& ht_hash, const std::string& hash_name, const
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
         sum += ht_hash.count(v);
-        sum -= ht_hash.find(v) != ht_hash.end();
+        sum += ht_hash.find(v) != ht_hash.end();
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -925,9 +925,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         find_hit_50<hash_type>(hash, hash_name, nList);
         find_hit_50_erase<hash_type>(hash, hash_name, nList);
         erase_50<hash_type>(hash, hash_name, nList);
+        find_erase_50<hash_type>(hash, hash_name, oList);
         insert_find_erase<hash_type>(hash, hash_name, nList);
 
-        find_erase_50<hash_type>(hash, hash_name, oList);
         erase_reinsert<hash_type>(hash, hash_name, oList);
         hash_iter<hash_type>(hash, hash_name);
 
@@ -1245,7 +1245,7 @@ int main(int argc, char* argv[])
         printf("  %s\n", m.second.data());
     putchar('\n');
 
-    int n = (srng() % 2*minn) + minn;
+    int n = (srng() % (2*minn)) + minn;
     while (true) {
         if (run_type == 2) {
             printf(">>");
