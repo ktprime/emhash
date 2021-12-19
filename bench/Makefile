@@ -73,9 +73,9 @@ CXXFLAGS += -DEMH_H2=1
 endif
 
 all:
+	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
-	$(CXX) $(CXXFLAGS) martin_bench.cpp -lpthread -o mbench
 	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench

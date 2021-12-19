@@ -442,10 +442,17 @@ struct WyIntHasher
 
 struct WyRand
 {
+    using result_type = uint64_t;
     uint64_t seed;
     WyRand(uint64_t seed1 = randomseed())
     {
         seed = seed1;
+    }
+    static constexpr uint64_t(min)() {
+        return 0;
+    }
+    static constexpr uint64_t(max)() {
+        return UINT64_C(0xffffffffffffffff);
     }
 
     uint64_t operator()()
@@ -453,7 +460,7 @@ struct WyRand
         return wyrand(&seed);
     }
 
-        // this is a bit biased, but for our use case that's not important.
+    // this is a bit biased, but for our use case that's not important.
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);

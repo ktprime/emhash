@@ -271,7 +271,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
 {
     // random bits to set for the mask
     std::vector<int> bits(64, 0);
-//    std::iota(bits.begin(), bits.end(), 0);
+    std::iota(bits.begin(), bits.end(), 0);
     MRNG rng(999);
 
 #if 0
@@ -308,8 +308,8 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
             map.erase(rng() & bitMask);
         }
 
-        printf("    %02ld bits %2zd M cycles time use %.4lf sec map %d size\n",
-                std::bitset<64>(bitMask).count(), (max_n / 1000'000), ((int)(now2ms() - ts)) / 1000.0, (int)map.size());
+        printf("    %02ld bits %2zd M cycles time use %.4lf sec map size %d loadf = %.2f\n",
+                std::bitset<64>(bitMask).count(), (max_n / 1000'000), ((int)(now2ms() - ts)) / 1000.0, (int)map.size(), map.load_factor());
 
 #ifndef _MSC_VER
         //assert(RND != 123 || map.size() == expectedFinalSizes[i]);
