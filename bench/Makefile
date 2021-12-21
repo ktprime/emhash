@@ -72,6 +72,10 @@ ifneq ($(H2),)
 CXXFLAGS += -DEMH_H2=1
 endif
 
+ifneq ($(MAP),)
+CXXFLAGS += -DSMAP=1
+endif
+
 all:
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench

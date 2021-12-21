@@ -48,7 +48,7 @@ using namespace std;
 //#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
 
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
-#include "ska/bytell_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
+//#include "ska/bytell_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
 
 #if FOLLY
@@ -56,7 +56,7 @@ using namespace std;
 #endif
 #endif
 
-static auto RND = time(0);
+static auto RND = getus();
 
 static std::map<std::string, std::string> show_name =
 {
@@ -201,9 +201,9 @@ class sfc64 {
         uint64_t m_counter;
 };
 
-static inline int64_t now2ms()
+static inline double now2sec()
 {
-    return getus() / 1000;
+    return getus() / 1000000.0;
 }
 
 template<class MAP> void bench_insert(MAP& map)
@@ -213,42 +213,45 @@ template<class MAP> void bench_insert(MAP& map)
         return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    constexpr int maxn = 100'000'000;
-    auto nowms = now2ms();
-    MRNG rng(RND);
-    {
-        {
-            auto ts = now2ms();
-            for (size_t n = 0; n < maxn; ++n) {
-                map[static_cast<int>(rng())];
-            }
-            printf("    insert 100M int %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
-        }
+    size_t maxn = 10000000;
 
+    for (int  i = 0; i < 2; i++) {
+        auto nows = now2sec();
+        MRNG rng(maxn);
         {
-            auto ts = now2ms();
-            map.clear();
-            printf("    clear 100M int %.4lf\n", ((int)(now2ms() - ts)) / 1000.0);
-        }
-
-        {
-            auto ts = now2ms();
-            for (size_t n = 0; n < maxn; ++n) {
-                map[static_cast<int>(rng())];
+            {
+                auto ts = now2sec();
+                for (size_t n = 0; n < maxn; ++n) {
+                    map[static_cast<int>(rng())];
+                }
+                printf("    insert %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
             }
-            printf("    reinsert 100M int %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
-        }
 
-        {
-            auto ts = now2ms();
-            for (size_t n = 0; n < maxn; ++n) {
-                map.erase(static_cast<int>(rng()));
+            {
+                auto ts = now2sec();
+                map.clear();
+                printf("    clear %.4lf\n", now2sec() - ts );
             }
-            printf("    remove 100M int %.4lf sec, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, (int)map.size());
+
+            {
+                auto ts = now2sec();
+                for (size_t n = 0; n < maxn; ++n) {
+                    map[static_cast<int>(rng())];
+                }
+                printf("    reinsert %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+            }
+
+            {
+                auto ts = now2sec();
+                for (size_t n = 0; n < maxn; ++n) {
+                    map.erase(static_cast<int>(rng()));
+                }
+                printf("    remove %.4lf s, size = %d\n", now2sec() - ts , (int)map.size());
+            }
         }
+        printf("total %dM int time = %.2lf s\n\n", int(maxn / 1000000), now2sec() - nows);
+        maxn *= 10;
     }
-
-    printf("total time = %.2lf s\n\n", (now2ms() - nowms) / 1000.0);
 }
 
 template <typename T>
@@ -267,6 +270,21 @@ std::ostream& operator<<(std::ostream& os, as_bits_t<T> const& t) {
     return os;
 }
 
+template<class RandomIt, class URBG>
+void rshuffle(RandomIt first, RandomIt last, URBG&& g)
+{
+    typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
+    typedef std::uniform_int_distribution<diff_t> distr_t;
+    typedef typename distr_t::param_type param_t;
+ 
+    distr_t D;
+    diff_t n = last - first;
+    for (diff_t i = n-1; i > 0; --i) {
+        using std::swap;
+        swap(first[i], first[D(g, param_t(0, i))]);
+    }
+}
+
 template<class MAP> void bench_randomInsertErase(MAP& map)
 {
     // random bits to set for the mask
@@ -277,14 +295,14 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
 #if 0
     for (auto &v : bits) v = rng();
 #else
-    std::shuffle(bits.begin(), bits.end(), rng);
+    rshuffle(bits.begin(), bits.end(), rng);
 #endif
 
     uint64_t bitMask = 0;
     auto bitsIt = bits.begin();
 
     size_t const expectedFinalSizes[] = {7, 127, 2084, 32722, 524149, 8367491};
-    size_t const max_n = 50'000'000;
+    size_t const max_n = 50000000;
 
     //    map.max_load_factor(7.0 / 8);
     auto map_name = find(typeid(MAP).name());
@@ -292,7 +310,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
         return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    auto nowms = now2ms();
+    auto nows = now2sec();
     for (int i = 0; i < 6; ++i) {
         // each iteration, set 4 new random bits.
         for (int b = 0; b < 4; ++b) {
@@ -301,21 +319,21 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
 
         // std::cout << (i + 1) << ". " << as_bits(bitMask) << std::endl;
 
-        auto ts = now2ms();
+        auto ts = now2sec();
         // benchmark randomly inserting & erasing
         for (size_t i = 0; i < max_n; ++i) {
             map.emplace(rng() & bitMask, i);
             map.erase(rng() & bitMask);
         }
 
-        printf("    %02ld bits %2zd M cycles time use %.4lf sec map size %d loadf = %.2f\n",
-                std::bitset<64>(bitMask).count(), (max_n / 1000'000), ((int)(now2ms() - ts)) / 1000.0, (int)map.size(), map.load_factor());
+        printf("    %02ld bits %2d M cycles time %.4lf s map size %d loadf = %.2f\n",
+                std::bitset<64>(bitMask).count(), int(max_n / 1000000), now2sec() - ts , (int)map.size(), map.load_factor());
 
 #ifndef _MSC_VER
         //assert(RND != 123 || map.size() == expectedFinalSizes[i]);
 #endif
     }
-    printf("total time = %.2lf s\n\n", (now2ms() - nowms) / 1000.0);
+    printf("total time = %.2lf s\n\n", now2sec() - nows);
 }
 
 template<class MAP> void bench_randomDistinct2(MAP& map)
@@ -325,67 +343,67 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         return ;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    constexpr size_t const n = 50'000'000;
+    constexpr size_t const n = 50000000;
 
-    auto nowms = now2ms();
-    MRNG rng(RND);
+    auto nows = now2sec();
+    MRNG rng(RND + 6);
 
     //    map.max_load_factor(7.0 / 8);
     int checksum;
     {
-        auto ts = now2ms();
+        auto ts = now2sec();
         checksum = 0;
         size_t const max_rng = n / 20;
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     05%% distinct %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
+        printf("     05%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 549985352 == checksum);
     }
 
     {
         map.clear();
-        auto ts = now2ms();
+        auto ts = now2sec();
         checksum = 0;
         size_t const max_rng = n / 4;
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     25%% distinct %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
+        printf("     25%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 149979034 == checksum);
     }
 
     {
         map.clear();
-        auto ts = now2ms();
+        auto ts = now2sec();
         size_t const max_rng = n / 2;
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     50%% distinct %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
+        printf("     50%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 249981806 == checksum);
     }
 
     {
         map.clear();
-        auto ts = now2ms();
+        auto ts = now2sec();
         checksum = 0;
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng())];
         }
-        printf("    100%% distinct %.4lf sec loadf = %.2f, size = %d\n", ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
+        printf("    100%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 50291811 == checksum);
     }
     //#endif
 
-    printf("total time = %.2lf s\n\n", (now2ms() - nowms) / 1000.0);
+    printf("total time = %.2lf s\n\n", now2sec() - nows);
 }
 
 template<class MAP>
 size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 {
     //printf("%s map = %s\n", __FUNCTION__, typeid(MAP).name());
-    MRNG rng(RND);
+    MRNG rng(RND + 4);
 
     // time measured part
     size_t verifier = 0;
@@ -399,7 +417,7 @@ size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 
     MAP map;
 //    map.reserve(bitMask / 8);
-    auto ts = now2ms();
+    auto ts = now2sec();
     for (size_t i = 0; i < max_n; ++i) {
         *strData32 = rng() & bitMask;
 #if 0
@@ -418,7 +436,7 @@ size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 #endif
     }
 
-    printf("    %016x time = %.2lf, loadf = %.2lf %d\n", bitMask, ((int)(now2ms() - ts)) / 1000.0, map.load_factor(), (int)map.size());
+    printf("    %016x time = %.2lf, loadf = %.2lf %d\n", bitMask, now2sec() - ts , map.load_factor(), (int)map.size());
     return verifier;
 }
 
@@ -434,7 +452,7 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
     ss << (numSequential * 100 / NumTotal) << "% " << length << " byte";
     auto title = ss.str();
 
-    sfc64 rng(RND);
+    sfc64 rng(RND + 3);
 
     size_t num_found = 0;
 
@@ -452,7 +470,7 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
     auto const idx32 = (length / 4) - 1;
     auto const strData32 = reinterpret_cast<uint32_t*>(&str[0]) + idx32;
 
-    auto ts = now2ms();
+    auto ts = now2sec();
     MAP map;
     {
         size_t i = 0;
@@ -487,7 +505,7 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
         } while (i < numInserts);
     }
 
-    printf("    %s success time = %.2lf s %d loadf = %.2lf\n", title.c_str(), ((int)(now2ms() - ts)) / 1000.0, (int)num_found, map.load_factor());
+    printf("    %s success time = %.2lf s %d loadf = %.2lf\n", title.c_str(), now2sec() - ts , (int)num_found, map.load_factor());
     return num_found;
 }
 
@@ -499,16 +517,16 @@ void bench_randomFindString(MAP& map)
         return ;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    static constexpr size_t numInserts = 100'000;
+    static constexpr size_t numInserts = 100000;
     static constexpr size_t numFindsPerInsert = 1000;
-    auto nowms = now2ms();
+    auto nows = now2sec();
 
     randomFindInternalString<MAP>(4, 100, numInserts, numFindsPerInsert);
     randomFindInternalString<MAP>(3, 100, numInserts, numFindsPerInsert);
     randomFindInternalString<MAP>(2, 100, numInserts, numFindsPerInsert);
     randomFindInternalString<MAP>(1, 100, numInserts, numFindsPerInsert);
     randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
-    printf("total time = %.2lf\n\n", ((int)(now2ms() - nowms))/1000.0);
+    printf("total time = %.2lf\n\n", now2sec() - nows);
 }
 
 template<class MAP>
@@ -519,14 +537,14 @@ void bench_randomEraseString(MAP& map)
         return ;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    auto nowms = now2ms();
-    { runRandomString<MAP> (20'000'000, 7, 0xfffff); }
-    { runRandomString<MAP>(6'000'000, 1000, 0x1ffff); }
-    { runRandomString<MAP>(20'000'000, 8, 0xfffff); }
-    { runRandomString<MAP>(20'000'000, 13, 0xfffff); }
-    { runRandomString<MAP>(12'000'000, 100, 0x7ffff); }
+    auto nows = now2sec();
+    { runRandomString<MAP> (20000000, 7, 0xfffff); }
+    { runRandomString<MAP>(6000000, 1000, 0x1ffff); }
+    { runRandomString<MAP>(20000000, 8, 0xfffff); }
+    { runRandomString<MAP>(20000000, 13, 0xfffff); }
+    { runRandomString<MAP>(12000000, 100, 0x7ffff); }
 
-    printf("total time = %.2lf s\n\n", (now2ms() - nowms) / 1000.0);
+    printf("total time = %.2lf s\n\n", now2sec() - nows);
 }
 
 template<class MAP>
@@ -536,7 +554,7 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
 
     size_t const numFindsPerIter = numFindsPerInsert * NumTotal;
 
-    sfc64 rng(RND);
+    sfc64 rng(RND + 2);
 
     size_t num_found = 0;
     MAP map;
@@ -549,7 +567,7 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
     sfc64 anotherUnrelatedRng(987654321);
     auto const anotherUnrelatedRngInitialState = anotherUnrelatedRng.state();
     sfc64 findRng(anotherUnrelatedRngInitialState);
-    auto ts = now2ms();
+    auto ts = now2sec();
 
     {
         size_t i = 0;
@@ -575,15 +593,12 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
                     findCount = 0;
                     findRng.state(anotherUnrelatedRngInitialState);
                 }
-                auto it = map.find(findRng() & bitMask);
-                if (it != map.end()) {
-                    num_found += it->second;
-                }
+                num_found += map.count(findRng() & bitMask);
             }
         } while (i < numInserts);
     }
 
-    printf("    %3lu%% %016lx success time = %.2lf s, %8d loadf = %.2lf\n", numSequential * 100 / NumTotal, bitMask, ((int)(now2ms() - ts)) / 1000.0, (int)num_found, map.load_factor());
+    printf("    %3lu%% %016lx success time = %.2lf s, %8d loadf = %.2lf\n", numSequential * 100 / NumTotal, bitMask, now2sec() - ts , (int)num_found, map.load_factor());
     return num_found;
 }
 
@@ -595,13 +610,13 @@ void bench_IterateIntegers(MAP& map)
         return ;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    MRNG rng(RND);
+    MRNG rng(RND + 1);
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
     //Map<uint64_t, uint64_t> map;
 
-    auto ts = now2ms();
+    auto ts = now2sec();
     for (size_t n = 0; n < num_iters; ++n) {
         map[rng()] = n;
         for (auto & keyVal : map) {
@@ -609,14 +624,14 @@ void bench_IterateIntegers(MAP& map)
         }
     }
 
-    auto ts1 = now2ms();
+    auto ts1 = now2sec();
     for (size_t n = 0; n < num_iters; ++n) {
         map.erase(rng());
         for (auto const& keyVal : map) {
             result += keyVal.second;
         }
     }
-    printf("    total iterate/removing time = %.2lf, %.2lf|%lu\n\n", (ts1 - ts) / 1000.0, (now2ms() - ts) /1000.0, result);
+    printf("    total iterate/removing time = %.2lf, %.2lf|%lu\n\n", (ts1 - ts), now2sec() - ts, result);
 }
 
 template<class MAP>
@@ -629,10 +644,8 @@ void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
 
     static constexpr auto lower32bit = UINT64_C(0x00000000FFFFFFFF);
     static constexpr auto upper32bit = UINT64_C(0xFFFFFFFF00000000);
-    //    static constexpr size_t numInserts = 2000;
-    //    static constexpr size_t numFindsPerInsert = 500'000;
 
-    auto ts = now2ms();
+    auto ts = now2sec();
 
     randomFindInternal<MAP>(4, lower32bit, numInserts, numFindsPerInsert);
     randomFindInternal<MAP>(4, upper32bit, numInserts, numFindsPerInsert);
@@ -649,12 +662,12 @@ void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
     randomFindInternal<MAP>(0, lower32bit, numInserts, numFindsPerInsert);
     randomFindInternal<MAP>(0, upper32bit, numInserts, numFindsPerInsert);
 
-    printf("nums = %zd, total time = %.2lf\n", numInserts, ((int)(now2ms() - ts))/1000.0);
+    printf("nums = %zd, total time = %.2lf\n", numInserts, now2sec() - ts);
 }
 
 void runTest(int sflags, int eflags)
 {
-    const auto start = now2ms();
+    const auto start = now2sec();
 
     if (sflags <= 1 && eflags >= 1)
     {
@@ -783,9 +796,9 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<size_t> hash_func;
 #endif
 
-        static constexpr size_t numInserts[] = { 200, 2000, 500'000 };
-        static constexpr size_t numFindsPerInsert[] = { 5'000'000, 500'000, 1000 };
-        for (int i = 0; i < 3; i++)
+        static constexpr size_t numInserts[] = { /*200,*/ 2000, 500000 };
+        static constexpr size_t numFindsPerInsert[] = { /*5000000,*/ 500000, 1000 };
+        for (int i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
         {
 #if ET
             { tsl::robin_map  <size_t, size_t, hash_func> rmap;  bench_randomFind(rmap, numInserts[i], numFindsPerInsert[i]); }
@@ -795,7 +808,7 @@ void runTest(int sflags, int eflags)
             //        { hrd7::hash_map <size_t, size_t, hash_func> hmap;  bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
             { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
-            { emilib::HashMap<size_t, size_t, hash_func> emap;  bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { emilib::HashMap<size_t, size_t,  hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash6::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash7::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -935,28 +948,15 @@ void runTest(int sflags, int eflags)
         putchar('\n');
     }
 
-    printf("total time = %.3lf s", (now2ms() - start) / 1000.0);
+    printf("total time = %.3lf s", now2sec() - start );
 }
 
 int main(int argc, char* argv[])
 {
     puts("./test [23456mptseb0d2] n");
-    srand(time(0));
 
     for (auto& m : show_name)
         printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
-
-#if TCPU
-#if _WIN32
-    SetThreadAffinityMask(GetCurrentThread(), 0x2);
-#elif __linux__
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(0x2, &cpuset);
-    pthread_t current_thread = pthread_self();
-    pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
-#endif
-#endif
 
     int sflags = 1, eflags = 7;
     if (argc > 1) {

@@ -512,7 +512,7 @@ public:
         size_t    _bmask;
         size_type _bucket;
         size_type _from;
-     };
+    };
 
     void init(size_type bucket, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {

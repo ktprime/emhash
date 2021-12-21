@@ -1224,7 +1224,7 @@ static int benchHashMap(int n)
     }
 
     {
-        func_first = func_first % func_size + 1;
+        func_first = (func_first + 2) % func_size + 1;
         func_last  = (func_first + 3) % func_size + 1;
 
 #if ET > 2
