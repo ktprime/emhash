@@ -49,7 +49,7 @@ static const std::size_t SMALL_STRING_MAX_SIZE = 20;
 static const std::size_t STRING_MIN_SIZE = 20;
 static const std::size_t STRING_MAX_SIZE = 100;
 
-static const std::int64_t SEED = 2021;
+static const std::int64_t SEED = 2022;
 static std::mt19937_64 generator(SEED);
 static std::int64_t num_keys;
 static std::string test_type;
