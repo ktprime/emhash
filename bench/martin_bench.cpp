@@ -37,6 +37,7 @@ using namespace std;
 
 #include "emilib/emilib.hpp"
 #include "emilib/emilib2.hpp"
+//#include "old/ktprime_hash.hpp"
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600
 #include "martin/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
@@ -285,11 +286,20 @@ void rshuffle(RandomIt first, RandomIt last, URBG&& g)
     }
 }
 
+
+template<class ForwardIt, class T>
+void iotas(ForwardIt first, ForwardIt last, T value)
+{
+    while(first != last) {
+        *first++ = value;
+        ++value;
+    }
+}
 template<class MAP> void bench_randomInsertErase(MAP& map)
 {
     // random bits to set for the mask
     std::vector<int> bits(64, 0);
-    std::iota(bits.begin(), bits.end(), 0);
+    iotas(bits.begin(), bits.end(), 0);
     MRNG rng(999);
 
 #if 0

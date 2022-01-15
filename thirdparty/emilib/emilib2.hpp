@@ -124,7 +124,7 @@ public:
     typedef ValueT val_type;
     typedef KeyT   key_type;
 
-#ifdef EMH_H2
+#ifndef EMH_H2
     #define hash_key2(key_hash, key) (((uint8_t)(key_hash >> 24)) << 1)
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>

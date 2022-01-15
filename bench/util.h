@@ -34,8 +34,8 @@
     # include <sys/time.h>
 #endif
 
-#if __cplusplus > 201402L || _MSVC_LANG >= 201402L
-   #define STR_VIEW  1
+#if __cplusplus > 201402L
+//   #define STR_VIEW  1
    #include <string_view>
 #endif
 
