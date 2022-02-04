@@ -1,3 +1,5 @@
+#define _HAS_STD_BYTE 0
+
 #include <sstream>
 
 #ifndef _WIN32
@@ -57,6 +59,10 @@ using namespace std;
 #endif
 #endif
 
+#if QC_HASH
+#include "qchash/qc-hash.hpp"
+#endif
+
 static auto RND = getus();
 
 static std::map<std::string, std::string> show_name =
@@ -72,6 +78,7 @@ static std::map<std::string, std::string> show_name =
     {"emhash5", "emhash5"},
     {"emilib", "emilib"},
     {"emilib2", "emilib2"},
+    {"qc", "qchash"},
     //    {"emhash6", "emhash6"},
 #if ABSL
     {"absl", "absl flat"},
@@ -277,7 +284,7 @@ void rshuffle(RandomIt first, RandomIt last, URBG&& g)
     typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
     typedef std::uniform_int_distribution<diff_t> distr_t;
     typedef typename distr_t::param_type param_t;
- 
+
     distr_t D;
     diff_t n = last - first;
     for (diff_t i = n-1; i > 0; --i) {
@@ -728,13 +735,17 @@ void runTest(int sflags, int eflags)
         typedef std::hash<std::string> hash_func;
 #endif
 
+#if QC_HASH
+//        {qc::hash::RawMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+#endif
+
         {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #if EM3
         {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emhash4::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #endif
-        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+//        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
@@ -771,6 +782,9 @@ void runTest(int sflags, int eflags)
         {emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+#endif
+#if QC_HASH
+        {qc::hash::RawMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
         {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
         {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
@@ -818,6 +832,9 @@ void runTest(int sflags, int eflags)
             //        { hrd7::hash_map <size_t, size_t, hash_func> hmap;  bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
             { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+#if QC_HASH
+            { qc::hash::RawMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+#endif
             { emilib::HashMap<size_t, size_t,  hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash6::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -851,12 +868,15 @@ void runTest(int sflags, int eflags)
 #endif
 
 #if ABSL //failed on other hash
-        { absl::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
+        { absl::flat_hash_map <int, int, hash_func> amap; bench_insert(amap); }
 #endif
 #if FOLLY
         { folly::F14VectorMap <int, int, hash_func> pmap; bench_insert(pmap); }
 #endif
         { emhash7::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+#if QC_HASH
+        { qc::hash::RawMap<int, int, hash_func> qmap; bench_insert(qmap); }
+#endif
         { emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         { emhash8::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         { emhash5::HashMap<int, int, hash_func> emap; bench_insert(emap); }
@@ -893,6 +913,9 @@ void runTest(int sflags, int eflags)
         { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+#if QC_HASH
+        { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+#endif
 #if EM3
         { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
@@ -900,7 +923,7 @@ void runTest(int sflags, int eflags)
 #endif
 
         { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emilib::HashMap<uint64_t, uint64_t, hash_func> emap;  bench_randomInsertErase(emap); }
+        { emilib::HashMap<uint64_t, uint64_t, hash_func>  emap; bench_randomInsertErase(emap); }
 #if ET
         //        { hrd7::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
@@ -927,6 +950,10 @@ void runTest(int sflags, int eflags)
         typedef std::hash<int> hash_func;
 #else
         typedef robin_hood::hash<int> hash_func;
+#endif
+
+#if QC_HASH
+        { qc::hash::RawMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #endif
         { emhash6::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { emhash5::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }

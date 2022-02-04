@@ -6,7 +6,7 @@ ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX?=clang++
 endif
 
-CXXFLAGS = -O3 -march=native -flto -mtune=native -std=c++17 -I.. -I../thirdparty -I/usr/local/include
+CXXFLAGS = -O3 -march=native -flto -mtune=native -std=c++14 -I.. -I../thirdparty -I/usr/local/include
 
 ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly
@@ -77,6 +77,7 @@ CXXFLAGS += -DSMAP=1
 endif
 
 all:
+	#$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb

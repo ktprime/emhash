@@ -40,6 +40,9 @@
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
 
+#if QC_HASH
+#include "qchash/qc-hash.hpp"
+#endif
 using namespace std::chrono;
 
 #ifndef _WIN32
@@ -186,13 +189,13 @@ void bench_map(const char* name, size_t count)
     auto data = get_random<typename Map::key_type,typename Map::mapped_type>(count);
     auto t1 = system_clock::now();
     for (auto &ent : data) {
-        ht.insert(ht.end(), pair_type(ent.first, ent.second));
+        ht.emplace(ent.first, ent.second);
     }
     auto t2 = system_clock::now();
     ht.clear();
     auto t3 = system_clock::now();
     for (auto &ent : data) {
-        ht.insert(ht.end(), pair_type(ent.first, ent.second));
+        ht.emplace(ent.first, ent.second);
     }
     auto t4 = system_clock::now();
     for (auto &ent : data) {
@@ -279,6 +282,11 @@ int main(int argc, char **argv)
 #if ABSL
     bench_spread<absl::flat_hash_map<size_t,size_t>>("absl::flat_hash_map::operator[]",count);
 #endif
+
+#if QC_HASH
+    bench_spread<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap::operator[]",count);
+#endif
+
     bench_spread<emhash5::HashMap<size_t,size_t>>("emhash5::HashMap::operator[]",count);
     bench_spread<emhash7::HashMap<size_t,size_t>>("emhash7::HashMap::operator[]",count);
     bench_spread<emilib2::HashMap<size_t,size_t>>("emilib2::HashMap::operator[]",count);
@@ -311,6 +319,9 @@ int main(int argc, char **argv)
     bench_map<ska::flat_hash_map<size_t,size_t>>("ska::flat_hash_hash",count);
     bench_map<ska::bytell_hash_map<size_t,size_t>>("ska::bytell_hash_map",count);
 
+#if QC_HASH
+    bench_map<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap",count);
+#endif
     return 0;
 }
 

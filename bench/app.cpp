@@ -22,6 +22,10 @@
 #include "phmap/phmap.h"
 #include "phmap/btree.h"
 
+#if QC_HASH
+#include "qchash/qc-hash.hpp"
+#endif
+
 #if ABSL
 #include "absl/container/btree_map.h"
 #endif
@@ -246,7 +250,7 @@ Samples getSource(size_t elementCount)
     {
         source[i] = i;
     }
-    std::random_shuffle(begin(source), end(source));
+    shuffle(std::begin(source), std::end(source));
     return source;
 }
 
@@ -308,6 +312,11 @@ int main(__attribute__((unused)) int argc,
 #if ABSL
     benchmarkMap<absl::flat_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount);
 #endif
+
+#if QC_HASH
+    benchmarkMap<qc::hash::RawMap<Sample, Sample, hash_t>>(ulongArray, runCount);
+#endif
+
     benchmarkMap<tsl::robin_map<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<tsl::robin_pg_map<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<ska::flat_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount);

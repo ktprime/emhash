@@ -20,13 +20,14 @@ std::map<std::string, std::string> maps =
 //    {"stl_hash", "unordered_map"},
     {"stl_map", "stl_map"},
     {"btree", "btree_map"},
+    {"qchash", "qchash"},
 
     {"emhash2", "emhash2"},
     {"emhash3", "emhash3"},
     {"emhash4", "emhash4"},
 
     {"emhash5", "emhash5"},
-//    {"emhash6", "emhash6"},
+    {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
 //    {"emhash8", "emhash8"},
 
@@ -66,7 +67,7 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT 1  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 3  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP       1
@@ -156,6 +157,10 @@ std::map<std::string, std::string> maps =
 #endif
 #if PHMAP_HASH
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
+#endif
+
+#if QC_HASH
+#include "qchash/qc-hash.hpp"
 #endif
 
 #if 1
@@ -798,7 +803,7 @@ void find_hit_50_erase(const hash_type& ht_hash, const std::string& hash_name, c
 {
     auto tmp = ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto& v : vList) {
+    for (auto& v : vList) {
         auto it = tmp.find(v);
         if (it != tmp.end())
             tmp.erase(it);
@@ -848,7 +853,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#ifndef ABSL
+#if ABSL == 0 && __cplusplus < 201802L
     auto tmp = ht_hash;
     for (auto it = tmp.begin(); it != tmp.end(); )
         it = tmp.erase(it);
@@ -1309,9 +1314,12 @@ static int benchHashMap(int n)
 #if CUCKOO_HASHMAP
         {  benOneHash<libcuckoo::cuckoohash_map <keyType, valueType, ehash_func>>("cuckoo", vList); }
 #endif
-        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
+//        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
+#if QC_HASH
+        {  benOneHash<qc::hash::RawMap<keyType, valueType, ehash_func>>("qchash", vList); }
+#endif
 
         if (vList.size() & 1) {
             {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
@@ -1764,7 +1772,7 @@ int main(int argc, char* argv[])
         }
 
         auto pow2 = 1 << ilog(n, 2);
-        hlf = 1.0 * n / pow2;
+        hlf = 1.0 * n / pow2 / 2;
         if (load_factor > 0.2 && load_factor < 1) {
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
         }

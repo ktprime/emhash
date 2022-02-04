@@ -312,6 +312,8 @@ struct linkedhashmap
 
     iterator insert(const value_type& val) { return insert(end(), val); }
     iterator insert(Key key, Value val) { return insert(end(), value_type(key, val)); }
+    iterator emplace(const Key key, const Value& val) { return insert(value_type(key, val)); }
+    iterator emplace(const Key key, Value&& val) { return insert(std::move(value_type(key, val))); }
 
     iterator insert(iterator h, const value_type& v)
     {
