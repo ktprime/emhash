@@ -412,6 +412,8 @@ cc_library(
     name = "cord",
     srcs = [
         "cord.cc",
+        "cord_analysis.cc",
+        "cord_analysis.h",
     ],
     hdrs = [
         "cord.h",
@@ -436,6 +438,7 @@ cc_library(
         "//absl/container:inlined_vector",
         "//absl/functional:function_ref",
         "//absl/meta:type_traits",
+        "//absl/numeric:bits",
         "//absl/types:optional",
         "//absl/types:span",
     ],

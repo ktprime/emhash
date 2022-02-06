@@ -76,6 +76,10 @@ ifneq ($(MAP),)
 CXXFLAGS += -DSMAP=1
 endif
 
+ifneq ($(QCH),)
+CXXFLAGS += -DQC_HASH=1 -std=c++20
+endif
+
 #$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
 all:
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
