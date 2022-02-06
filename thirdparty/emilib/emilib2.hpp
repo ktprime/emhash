@@ -342,7 +342,7 @@ public:
         }
     }
 
-    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
+    HashMap(std::initializer_list<value_type> il)
     {
         reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
@@ -579,12 +579,22 @@ public:
         return insert(key, std::move(value));
     }
 
-    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> emplace(value_type&& v)
+    {
+        return insert(std::move(v.first), std::move(v.second));
+    }
+
+    std::pair<iterator, bool> emplace(const value_type& v)
+    {
+        return insert(v.first, v.second);
+    }
+
+    std::pair<iterator, bool> insert(const value_type& p)
     {
         return insert(p.first, p.second);
     }
 
-    std::pair<iterator, bool> insert(iterator it, const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(iterator it, const value_type& p)
     {
         return insert(p.first, p.second);
     }
@@ -628,12 +638,12 @@ public:
         new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
     }
 
-    void insert_unique(std::pair<KeyT, ValueT>&& p)
+    void insert_unique(value_type&& p)
     {
         insert_unique(std::move(p.first), std::move(p.second));
     }
 
-    void insert_unique(std::pair<KeyT, ValueT>& p)
+    void insert_unique(const value_type & p)
     {
         insert_unique(p.first, p.second);
     }

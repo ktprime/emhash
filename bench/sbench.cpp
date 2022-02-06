@@ -2,7 +2,7 @@
 #include <algorithm>
 
 #ifndef TKey
-    #define TKey              1
+    #define TKey           1
 #endif
 
 #if __GNUC__ > 4 && __linux__
@@ -18,6 +18,7 @@ std::map<std::string, std::string> maps =
     {"stl_hset", "unordered_set"},
     {"stl_set", "stl_set"},
     {"btree", "btree_set"},
+    {"qchash", "qc-hash"},
 
 //    {"emhash7", "emhash7"},
 //    {"emhash2", "emhash2"},
@@ -134,6 +135,9 @@ std::map<std::string, std::string> maps =
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
+#if QC_HASH
+#include "qchash/qc-hash.hpp"
+#endif
 
 #ifndef PACK
 #define PACK 128
@@ -562,7 +566,7 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 
     for (auto & v : vList) {
 #if KEY_INT
-        auto v2 = v % 2 == 0 ? v + sum : v - sum;
+        auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
 #elif KEY_CLA
         auto v2(v.lScore + sum);
 #elif TKey != 4
@@ -572,7 +576,9 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
         const keyType v2(v.data(), v.size() - 1);
 #endif
         auto it = tmp.emplace(v2);
+#if QC_HASH == 0
         sum += tmp.count(v2);
+#endif
         tmp.erase(it.first);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1, 3);
@@ -758,7 +764,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#ifndef ABSL
+#if ABSL == 0 && QC_HASH == 0
     int flag = 0;
     for (auto it = tmp.begin(); it != tmp.end(); ) {
        if (++flag & 1)
@@ -1100,6 +1106,9 @@ static int benchHashSet(int n)
         {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
+#if QC_HASH && KEY_INT
+        {  benOneHash<qc::hash::RawSet<keyType,  ehash_func>>("qchash", vList); }
+#endif
     }
 
     auto pow2 = 1 << ilog(vList.size(), 2);

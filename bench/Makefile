@@ -76,8 +76,8 @@ ifneq ($(MAP),)
 CXXFLAGS += -DSMAP=1
 endif
 
+#$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
 all:
-	#$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb

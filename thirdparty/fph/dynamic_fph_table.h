@@ -1,0 +1,3938 @@
+// Dynamic Flash Perfect Hash Table
+
+/**
+ * This file provides dynamic perfect hash set and map, which are ultra-fast in query but slow in
+ * insert. The flash perfect hash table has no collisions in its hash, so there will be one shot in
+ * fetching from the main slots memory.
+ *
+ *
+ * The api of DynamicFphMap is almost the same with the std::unordered_map, but there are
+ * some differences (so is DynamicFphSet):
+ * 1. The template parameter SeedHash is different from the Hash in STL, it has to be a functor
+ * accept two arguments: both the key and the seed
+ * 2. If the key type is not a arithmetic type, you will have to provide a random generator for the
+ * key with the template parameter RandomKeyGenerator
+ * 3. The keys have to be CopyConstructible
+ * 4. The values have to be MoveConstructible
+ * 5. May invalidates any references and pointers to elements within the table after rehash
+ *
+ * We use an exponential multiple of 2 size for slots. Saying that the number of slots is m and the
+ * element number is n. n <= m and the size of slots will be sizeof(value_type) * m bytes
+ *
+ * The speed of insertion is very sensitive to the max_load_factor parameter, if you will use
+ * insert() function to construct a table and you do care a little about the insert time. We suggest
+ * that you use the default max_load_factor, which is around 0.6. But if you don't care about the
+ * insert time, or you will use the Build() to construct the table, and most importantly, you want
+ * to save the memory size and cache size (which would probably accelerate the querying), you can
+ * set a max_load_factor no larger than max_load_factor_upper_limit(), which should be 0.98.
+ *
+ * If the range of your keys are limited and they won't change at some time of your program,
+ * you can set a large max_load_factor and then call rehash(element_size) to rehash the elements to
+ * smaller slots if the load_factor can be larger in that case. (Make sure almost no new keys will
+ * be added to the table after this because the insert operation will be very slow when the
+ * load_factor is very large.)
+ *
+ * The extra hot memory space except slots during querying is the space for buckets, the size of
+ * this extra memory is about c * n / (log2(n) + 1) * sizeof(BucketParamType) bytes. c is a
+ * parameter that must be larger than 1.5. The larger c is, the quicker it will be for the
+ * insert operations. BucketParamType is a unsigned type and it must meet the condition that
+ * 2^(number of bits of BucketParamType) is bigger than the element number. So you should choose
+ * the BucketParamType that is just large enough but not too large if you don't want to waste the
+ * memory and cache size. The memory size for this extra hot memory space will be slightly
+ * larger than c * n bits.
+ *
+ *
+ * We provide three kinds of SeedHash function for basic types: fph::SimpleSeedHash<T>,
+ * fph::MixSeedHash<T> and fph::StrongSeedHash<T>;
+ * The SimpleSeedHash has the fastest calculation speed and the weakest hash distribution, while the
+ * StrongSeedHash is the slowest of them to calculate but has the best distribution of hash value.
+ * The MixSeedHash is in the mid of them.
+ * Take integer for an example, if the keys you want to insert is not uniformly distributed in
+ * the integer interval of that type, then the hash value may probably not be uniformly distributed
+ * in the hash type interval as well for a weak hash function. But with a strong hash function,
+ * you can easily produce uniformly distributed hash values regardless of your input distribution.
+ * If the hash values of the input keys are not uniformly distributed, there may be a failure in the
+ * building of the hash table.
+ * Tips: know your input keys patterns before choosing the seed hash function. If your keys may
+ * cause a failure in the building of the table, use a stronger seed hash function.
+ *
+ * If you want to write your a custom seed hash function for your own class, refer to the
+ * fph::SimpleSeedHash<T>; the functor needs to take both a key and a seed (size_t) as input and
+ * return a size_t type hash value;
+ *
+ */
+
+#pragma once
+
+#include <stdexcept>
+#include <cmath>
+#include <limits>
+#include <tuple>
+#include <cassert>
+#include <iterator>
+#include <vector>
+#include <string>
+#include <random>
+#include <cstring>
+#include <deque>
+#include <chrono>
+#include <algorithm>
+
+
+// flash perfect map
+namespace fph {
+
+#ifndef FPH_ENABLE_ITERATOR
+#define FPH_ENABLE_ITERATOR 1
+#endif
+
+#ifndef FPH_DY_DUAL_BUCKET_SET
+#define FPH_DY_DUAL_BUCKET_SET 0
+#endif
+
+#ifndef FPH_DEBUG_FLAG
+#define FPH_DEBUG_FLAG 0
+#endif
+
+#ifndef FPH_DEBUG_ERROR
+#define FPH_DEBUG_ERROR 0
+#endif
+
+#ifdef __has_builtin
+#define FPH_HAVE_BUILTIN(x) __has_builtin(x)
+#else
+#define FPH_HAVE_BUILTIN(x) 0
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#   define FPH_HAS_BUILTIN_OR_GCC_CLANG(x) 1
+#else
+#   define FPH_HAS_BUILTIN_OR_GCC_CLANG(x) FPH_HAVE_BUILTIN(x)
+#endif
+
+
+#ifndef FPH_LIKELY
+#   if FPH_HAS_BUILTIN_OR_GCC_CLANG(__builtin_expect)
+#       define FPH_LIKELY(x) (__builtin_expect((x), 1))
+#   else
+#       define FPH_LIKELY(x) (x)
+#   endif
+#endif
+
+#ifndef FPH_UNLIKELY
+#   if FPH_HAS_BUILTIN_OR_GCC_CLANG(__builtin_expect)
+#       define FPH_UNLIKELY(x) (__builtin_expect((x), 0))
+#   else
+#       define FPH_UNLIKELY(x) (x)
+#   endif
+#endif
+
+#ifndef FPH_ALWAYS_INLINE
+#   ifdef _MSC_VER
+#       define FPH_ALWAYS_INLINE __forceinline
+#   else
+#       define FPH_ALWAYS_INLINE inline __attribute__((__always_inline__))
+#   endif
+#endif
+
+#ifdef _MSC_VER
+#   define FPH_RESTRICT
+#else
+#   define FPH_RESTRICT __restrict
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#   define FPH_FUNC_RESTRICT __restrict
+#else
+#   define FPH_FUNC_RESTRICT
+#endif
+
+// From absl library
+// A function-like feature checking macro that accepts C++11 style attributes.
+// It's a wrapper around `__has_cpp_attribute`, defined by ISO C++ SD-6
+// (https://en.cppreference.com/w/cpp/experimental/feature_test). If we don't
+// find `__has_cpp_attribute`, will evaluate to 0.
+#if defined(__cplusplus) && defined(__has_cpp_attribute)
+// NOTE: requiring __cplusplus above should not be necessary, but
+// works around https://bugs.llvm.org/show_bug.cgi?id=23435.
+#   define FPH_HAVE_CPP_ATTRIBUTE(x) __has_cpp_attribute(x)
+#else
+#   define FPH_HAVE_CPP_ATTRIBUTE(x) 0
+#endif
+
+#ifndef FPH_FALLTHROUGH_INTENDED
+#   if FPH_HAVE_CPP_ATTRIBUTE(fallthrough)
+#       define FPH_FALLTHROUGH_INTENDED [[fallthrough]]
+#   elif FPH_HAVE_CPP_ATTRIBUTE(clang::fallthrough)
+#       define FPH_FALLTHROUGH_INTENDED [[clang::fallthrough]]
+#   elif FPH_HAVE_CPP_ATTRIBUTE(gnu::fallthrough)
+#       define FPH_FALLTHROUGH_INTENDED [[gnu::fallthrough]]
+#   else
+#define FPH_FALLTHROUGH_INTENDED \
+          do {                            \
+          } while (0)
+#   endif
+#endif
+
+    namespace dynamic::detail {
+        template <typename> inline constexpr bool always_false_v = false;
+
+#if FPH_HAS_BUILTIN_OR_GCC_CLANG(__builtin_clz) && FPH_HAS_BUILTIN_OR_GCC_CLANG(__builtin_clzll)
+#define FPH_INTERNAL_CONSTEXPR_CLZ constexpr
+#define FPH_INTERNAL_HAS_CONSTEXPR_CLZ 1
+#else
+        #define FPH_INTERNAL_CONSTEXPR_CLZ
+#define FPH_INTERNAL_HAS_CONSTEXPR_CLZ 0
+#endif
+
+        FPH_INTERNAL_CONSTEXPR_CLZ inline int CountLeadingZero64(uint64_t x) {
+#if FPH_HAS_BUILTIN_OR_GCC_CLANG(__builtin_clzll)
+            return __builtin_clzll(x);
+#elif defined(_MSC_VER)
+            unsigned long result = 0;  // NOLINT(runtime/int)
+            if ((x >> 32) &&
+                _BitScanReverse(&result, static_cast<unsigned long>(x >> 32))) {
+                return 31 - result;
+            }
+            if (_BitScanReverse(&result, static_cast<unsigned long>(x))) {
+                return 63 - result;
+            }
+            return 64;
+#endif
+        }
+
+        FPH_INTERNAL_CONSTEXPR_CLZ inline int CountLeadingZero32(uint32_t x) {
+#if FPH_HAS_BUILTIN_OR_GCC_CLANG(__builtin_clz)
+            return __builtin_clz(x);
+#elif defined(_MSC_VER)
+            unsigned long result = 0;  // NOLINT(runtime/int)
+            if (_BitScanReverse(&result, x)) {
+                return 31 - result;
+            }
+            return 32;
+#endif
+        }
+
+        FPH_INTERNAL_CONSTEXPR_CLZ inline uint64_t RoundUp64Log2(uint64_t x) {
+            if (x <= 1ULL) {
+                return x;
+            }
+            return 64ULL - CountLeadingZero64(x - 1ULL);
+        }
+
+        FPH_INTERNAL_CONSTEXPR_CLZ inline uint32_t RoundUp32Log2(uint32_t x) {
+            if (x <= 1U) {
+                return x;
+            }
+            return 32U - CountLeadingZero32(x - 1U);
+        }
+
+        template<typename T>
+        FPH_INTERNAL_CONSTEXPR_CLZ T RoundUpLog2(T x) {
+            static_assert(std::is_unsigned<T>::value, "RoundUpLog2 type must be unsigned");
+            if constexpr (sizeof(T) == 8) {
+                return RoundUp64Log2(x);
+            }
+            else if constexpr (sizeof(T) == 4) {
+                return RoundUp32Log2(x);
+            }
+            else {
+                static_assert(always_false_v<T>, "Not supported size for RoundUpLog2");
+            }
+        }
+
+#if FPH_INTERNAL_HAS_CONSTEXPR_CLZ
+        static_assert(RoundUpLog2(0U) == 0);
+        static_assert(RoundUpLog2(1U) == 1U);
+        static_assert(RoundUpLog2(15U) == 4U);
+        static_assert(RoundUpLog2(16U) == 4U);
+        static_assert(RoundUpLog2(31ULL) == 5ULL);
+        static_assert(RoundUpLog2(32ULL) == 5ULL);
+#endif
+
+        template<typename T>
+        constexpr T GenBitMask(unsigned mask_len) {
+            static_assert(std::is_unsigned<T>::value, "Type T is not unsigned for mask");
+            constexpr uint32_t num_bits = std::numeric_limits<T>::digits;
+            static_assert(static_cast<uint32_t>(-1) == 0xffffffffU);
+            T ret = mask_len >= num_bits ? -1 : (static_cast<T>(1U) << mask_len) - 1;
+            return ret;
+        }
+
+        static_assert(GenBitMask<uint32_t>(0) == 0x0U);
+        static_assert(GenBitMask<uint32_t>(4) == 0xfU);
+        static_assert(GenBitMask<uint32_t>(32) == 0xffffffffU);
+
+        /**
+         * Calculates the smallest integral power of two that is not smaller than x.
+         * @tparam T
+         * @param x
+         * @return
+         */
+        template<typename T>
+        FPH_INTERNAL_CONSTEXPR_CLZ T Ceil2(T x) {
+            static_assert(std::is_unsigned<T>::value, "Ceil2 type must be unsigned");
+            auto roundup_log_2 = RoundUpLog2(x);
+            return (T(1U)) << roundup_log_2;
+        }
+
+#if FPH_INTERNAL_HAS_CONSTEXPR_CLZ
+        static_assert(Ceil2(1U) == 2U);
+        static_assert(Ceil2(0U) == 1U);
+        static_assert(Ceil2(32U) == 32U);
+        static_assert(Ceil2(33U) == 64U);
+#endif
+
+        /**
+         * Get the mask value in the format of (1ULL << num_bits) - 1 and no less than the x
+         * @tparam T
+         * @param x
+         * @return
+         */
+        template<typename T>
+        FPH_INTERNAL_CONSTEXPR_CLZ T CeilToMask(T x) {
+            static_assert(std::is_unsigned<T>::value, "x is not unsigned");
+            auto roundup_log_2 = RoundUpLog2(x);
+            return x == std::numeric_limits<T>::max() ? x :
+                   ( x == (T(1U) << roundup_log_2) ? GenBitMask<T>(roundup_log_2 + 1) :
+                     GenBitMask<T>(roundup_log_2));
+        }
+
+#if FPH_INTERNAL_HAS_CONSTEXPR_CLZ
+        static_assert(CeilToMask(0U) == 0U);
+        static_assert(CeilToMask(5U) == 7U);
+        static_assert(CeilToMask(8U) == 15U);
+        static_assert(CeilToMask(15U) == 15U);
+        static_assert(CeilToMask(0xffffffffU) == 0xffffffffU);
+#endif
+
+        template <typename T, typename U>
+        constexpr T RotateR (T v, U b)
+        {
+            static_assert(std::is_integral<T>::value, "rotate of non-integral type");
+            static_assert(! std::is_signed<T>::value, "rotate of signed type");
+            static_assert(std::is_integral<U>::value, "rotate of non-integral type");
+            constexpr unsigned int num_bits {std::numeric_limits<T>::digits};
+            static_assert(0 == (num_bits & (num_bits - 1)), "rotate value bit length not power of two");
+            constexpr unsigned int count_mask {num_bits - 1};
+            // to make sure mb < num_bits
+            const U mb {b & count_mask};
+            using promoted_type = typename std::common_type<int, T>::type;
+            using unsigned_promoted_type = typename std::make_unsigned<promoted_type>::type;
+            return ((unsigned_promoted_type{v} >> mb)
+                    | (unsigned_promoted_type{v} << (-mb & count_mask)));
+        }
+
+
+    } // namespace dynamic::detail
+
+
+
+    namespace dynamic::detail {
+
+        // from robin_hood hash
+        template <typename T>
+        inline T UnalignedLoad(void const* ptr) noexcept {
+            // using memcpy so we don't get into unaligned load problems.
+            // compiler should optimize this very well anyways.
+            T t;
+            std::memcpy(&t, ptr, sizeof(T));
+            return t;
+        }
+
+        inline size_t HashBytes(void const* ptr, size_t len, uint64_t seed) noexcept {
+            static constexpr uint64_t m = UINT64_C(0xc6a4a7935bd1e995);
+//            static constexpr uint64_t seed = UINT64_C(0xe17a1465);
+            static constexpr unsigned int r = 47;
+
+            auto const* const data64 = static_cast<uint64_t const*>(ptr);
+            uint64_t h = seed ^ (len * m);
+
+            size_t const n_blocks = len / 8;
+            for (size_t i = 0; i < n_blocks; ++i) {
+                auto k = detail::UnalignedLoad<uint64_t>(data64 + i);
+
+                k *= m;
+                k ^= k >> r;
+                k *= m;
+
+                h ^= k;
+                h *= m;
+            }
+
+            auto const* const data8 = reinterpret_cast<uint8_t const*>(data64 + n_blocks);
+            switch (len & 7U) {
+                case 7:
+                    h ^= static_cast<uint64_t>(data8[6]) << 48U;
+                    FPH_FALLTHROUGH_INTENDED;
+                case 6:
+                    h ^= static_cast<uint64_t>(data8[5]) << 40U;
+                    FPH_FALLTHROUGH_INTENDED;
+                case 5:
+                    h ^= static_cast<uint64_t>(data8[4]) << 32U;
+                    FPH_FALLTHROUGH_INTENDED;
+                case 4:
+                    h ^= static_cast<uint64_t>(data8[3]) << 24U;
+                    FPH_FALLTHROUGH_INTENDED;
+                case 3:
+                    h ^= static_cast<uint64_t>(data8[2]) << 16U;
+                    FPH_FALLTHROUGH_INTENDED;
+                case 2:
+                    h ^= static_cast<uint64_t>(data8[1]) << 8U;
+                    FPH_FALLTHROUGH_INTENDED;
+                case 1:
+                    h ^= static_cast<uint64_t>(data8[0]);
+                    h *= m;
+                    FPH_FALLTHROUGH_INTENDED;
+                default:
+                    break;
+            }
+
+            h ^= h >> r;
+
+            // not doing the final step here, because this will be done by keyToIdx anyways
+            // h *= m;
+            // h ^= h >> r;
+            return static_cast<size_t>(h);
+        }
+
+        template<class T>
+        class SimpleSeedHash64 {
+        public:
+
+            FPH_ALWAYS_INLINE uint64_t operator() (T key, uint64_t seed) const {
+                static_assert(sizeof(T) == 8, "sizeof(T) should be 64-bit");
+                static_assert(std::is_unsigned<T>::value, "T should be unsigned type");
+                key ^= key >> 33U;
+                key *= (seed + 0xff51afd7ed558ccdULL);
+                key ^= key >> 33U;
+                return key;
+            }
+        };
+
+        template<class T>
+        class SimpleSeed2Hash64 {
+        public:
+
+            FPH_ALWAYS_INLINE uint64_t operator() (T key, uint64_t seed) const {
+                static_assert(sizeof(T) == 8, "sizeof(T) should be 64-bit");
+                static_assert(std::is_unsigned<T>::value, "T should be unsigned type");
+                key ^= key >> 33U;
+                key *= seed;
+                key ^= key >> 33U;
+                return key;
+            }
+        };
+
+        FPH_ALWAYS_INLINE uint64_t AnoSeedHash64(uint64_t key, uint64_t seed) {
+            key ^= key >> 33U;
+            key *= (seed + 0xff51afd7ed558ccdULL);
+            key ^= key >> 33U;
+            return key;
+        }
+
+        FPH_ALWAYS_INLINE uint64_t Ano2SeedHash64(uint64_t key, uint64_t seed) {
+            key ^= key >> 33U;
+            key *= seed;
+            key ^= key >> 33U;
+            return key;
+        }
+
+        FPH_ALWAYS_INLINE uint64_t Ano5SeedHash64(uint64_t key, uint64_t seed) {
+            key ^= key >> 33U;
+            key *= seed;
+            key ^= key << 33U;
+            return key;
+        }
+
+        FPH_ALWAYS_INLINE uint64_t Ano4SeedHash64(uint64_t key, uint64_t seed) {
+            key ^= key >> 37U;
+            key *= seed;
+            key ^= key >> 32U;
+            return key;
+        }
+
+        FPH_ALWAYS_INLINE uint64_t Ano2SeedHash32(uint32_t key, uint64_t seed) {
+            uint64_t m = uint64_t(key) * seed;
+            auto ret = m ^ (m >> 33U);
+            return ret;
+        }
+
+        FPH_ALWAYS_INLINE uint64_t Ano2SeedHash16(uint16_t key, uint64_t seed) {
+//            key ^= key >> 33U;
+            uint64_t m = uint64_t(key) * seed;
+            auto ret = m ^ (m >> 33U);
+            return ret;
+        }
+
+
+
+        // from absl
+        FPH_ALWAYS_INLINE constexpr size_t Ano3SeedHash16(uint16_t key, size_t seed) {
+#if defined(__aarch64__)
+            // On AArch64, calculating a 128-bit product is inefficient, because it
+            // requires a sequence of two instructions to calculate the upper and lower
+            // halves of the result.
+            using MultType = uint64_t;
+#else
+            using MultType = uint64_t;
+#endif
+            MultType m = uint64_t(key) + 0xff51afd7ed558ccdULL;
+            m *= seed;
+            return static_cast<size_t>(m ^ (m >> (sizeof(m) * 8 / 2)));
+        }
+
+        FPH_ALWAYS_INLINE uint64_t MulSeedHash64(uint64_t key, uint64_t seed) {
+            key = RotateR((key +0xff51afd7ed558ccdULL) * seed, 33U);
+            return key;
+        }
+
+        constexpr FPH_ALWAYS_INLINE size_t RotMulSeedHash64(uint64_t key, uint64_t seed) {
+            key = RotateR(key * seed, 33U);
+            return key;
+        }
+
+        constexpr FPH_ALWAYS_INLINE uint64_t MulOnlyHash64(uint64_t key, uint64_t seed) {
+            uint64_t ret = key * seed;
+            return ret;
+        }
+
+        constexpr FPH_ALWAYS_INLINE uint64_t IdentitySeedHash64(uint64_t key, uint64_t /* seed */) {
+            return key;
+        }
+
+        FPH_ALWAYS_INLINE size_t RotMul3SeedHash64(uint64_t key, uint64_t seed) {
+            uint64_t mul = key * seed;
+            key = mul ^ RotateR(mul, 48U);
+            return key;
+        }
+
+        FPH_ALWAYS_INLINE size_t RotMulSeedHash16(uint16_t key, size_t seed) {
+            size_t mul = size_t(key) * seed;
+            auto ret = (mul & size_t(0xffffffff00000000ULL)) ^ (RotateR(uint32_t(mul), 7U));
+            return ret;
+        }
+
+        template<class T>
+        FPH_ALWAYS_INLINE T ReverseOrder64(T x) noexcept {
+#ifdef _MSC_VER
+            return _byteswap_uint64(x);
+#else
+            return __builtin_bswap64(x);
+#endif
+        }
+
+        FPH_ALWAYS_INLINE size_t RevMulSeedHash64(uint64_t key, uint64_t seed) {
+            uint64_t mul = key * seed;
+            auto ret = mul ^ ReverseOrder64(mul);
+            return ret;
+        }
+
+        FPH_ALWAYS_INLINE size_t RevMul2SeedHash64(uint64_t key, uint64_t seed) {
+            key = key ^ ReverseOrder64(key);
+            auto ret = key * seed;
+            return ret;
+        }
+
+        FPH_ALWAYS_INLINE size_t MulMovSeedHash64(uint64_t key, uint64_t seed) {
+            key ^= (key >> 33U);
+            auto ret = (seed * key) >> 33U;
+            return ret;
+        }
+
+        FPH_ALWAYS_INLINE size_t ShiftMulSeedHash64(uint64_t key, uint64_t seed) {
+            key ^= (key >> 33U);
+            auto ret = (seed * key);
+            return ret;
+        }
+
+        FPH_ALWAYS_INLINE uint64_t NaiveMulSeedHash64(uint64_t key, uint64_t seed) {
+            auto ret = key * (seed & 1ULL) ;
+            return ret;
+        }
+
+        FPH_ALWAYS_INLINE uint64_t XorMulSeedHash64(uint64_t key, uint64_t seed) {
+            auto ret = key ^ RotateR(key * seed, 33U);
+            return ret;
+        }
+
+//        FPH_ALWAYS_INLINE uint64_t Mul2SeedHash64(uint64_t key, uint64_t seed) {
+//            __uint128_t mul = key;
+//            mul *= seed;
+//            return uint64_t(mul) ^ uint64_t(mul >> 64U);
+//        }
+
+        FPH_ALWAYS_INLINE uint64_t DualRotMulSeedHash64(uint64_t key, uint64_t seed) {
+            uint64_t mul = key * seed;
+            auto ret = mul ^ RotateR(mul, 48U);
+            return ret;
+        }
+
+        FPH_ALWAYS_INLINE uint32_t MulSeedHash32(uint32_t key, uint32_t seed) {
+            key = RotateR(key * seed, 17U);
+            return key;
+        }
+
+
+        template<class T>
+        class SimpleMulSeedHash64 {
+        public:
+
+            FPH_ALWAYS_INLINE uint64_t operator() (T key, uint64_t seed) const {
+                static_assert(sizeof(T) == 8, "sizeof(T) should be 64-bit");
+                static_assert(std::is_unsigned<T>::value, "T should be unsigned type");
+                return MulSeedHash64(key, seed);
+            }
+        };
+
+        constexpr FPH_ALWAYS_INLINE size_t ChosenSimpleSeedHash64(uint64_t key, size_t seed) {
+//            return RotMulSeedHash64(key, seed);
+//            return MulOnlyHash64(key, seed);
+            return IdentitySeedHash64(key, seed);
+        }
+
+        size_t ChosenMixSeedHash64(uint64_t key, size_t seed) {
+//            return RevMulSeedHash64(key, seed);
+//            return MulMovSeedHash64(key, seed);
+            return ShiftMulSeedHash64(key, seed);
+//            return Ano4SeedHash64(key, seed);
+        }
+
+        size_t ChosenStrongSeedHash64(uint64_t key, size_t seed) {
+            return Ano2SeedHash64(key, seed);
+        }
+
+        size_t ChosenSimpleSeedHash16(uint16_t key, size_t seed) {
+            return RotMulSeedHash64(key, seed);
+        }
+
+
+
+        size_t ChosenSeedHash16(uint16_t key, size_t seed) {
+//            return RotMulSeedHash16(key, seed);
+            return AnoSeedHash64(key, seed);
+//            return Ano3SeedHash16(key, seed);
+        }
+
+        size_t ChosenSeedHash32(uint32_t key, size_t seed) {
+            return Ano2SeedHash32(key, seed);
+        }
+
+        template<class T, typename = void>
+        struct SimpleSeedHash {
+            constexpr FPH_ALWAYS_INLINE size_t operator()(const T& x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenSimpleSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct SimpleSeedHash<uint32_t> {
+            size_t operator()(uint32_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenSimpleSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct SimpleSeedHash<int32_t> {
+            size_t operator()(int32_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenSimpleSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct SimpleSeedHash<uint16_t> {
+            size_t operator()(uint16_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenSimpleSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct SimpleSeedHash<int16_t> {
+            size_t operator()(int16_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenSimpleSeedHash64(x, seed);
+            }
+        };
+
+        template<class T>
+        struct SimpleSeedHash<T*> {
+            size_t operator()(T* x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenSimpleSeedHash64(reinterpret_cast<size_t>(x), seed);
+            }
+        };
+
+        template<class CharT>
+        struct SimpleSeedHash<std::basic_string<CharT>> {
+            size_t operator()(const std::basic_string<CharT> &str, size_t seed) const noexcept {
+                return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
+            }
+        };
+
+        template<class CharT>
+        struct SimpleSeedHash<std::basic_string_view<CharT>> {
+            size_t operator()(const std::basic_string_view<CharT> &str, size_t seed) const noexcept {
+                return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
+            }
+        };
+
+        template<class T, typename = void>
+        struct MixSeedHash {
+            size_t operator()(const T& x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenMixSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct MixSeedHash<uint32_t> {
+            size_t operator()(uint32_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenMixSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct MixSeedHash<int32_t> {
+            size_t operator()(int32_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenMixSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct MixSeedHash<uint16_t> {
+            size_t operator()(uint16_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenMixSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct MixSeedHash<int16_t> {
+            size_t operator()(int16_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenMixSeedHash64(x, seed);
+            }
+        };
+
+        template<class T>
+        struct MixSeedHash<T*> {
+            size_t operator()(T* x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenMixSeedHash64(reinterpret_cast<size_t>(x), seed);
+            }
+        };
+
+        template<class CharT>
+        struct MixSeedHash<std::basic_string<CharT>> {
+            size_t operator()(const std::basic_string<CharT> &str, size_t seed) const noexcept {
+                return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
+            }
+        };
+
+        template<class CharT>
+        struct MixSeedHash<std::basic_string_view<CharT>> {
+            size_t operator()(const std::basic_string_view<CharT> &str, size_t seed) const {
+                return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
+            }
+        };
+
+        template<class T, typename = void>
+        struct StrongSeedHash {
+            size_t operator()(const T& x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenStrongSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct StrongSeedHash<uint32_t> {
+            size_t operator()(uint32_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenStrongSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct StrongSeedHash<int32_t> {
+            size_t operator()(int32_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenStrongSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct StrongSeedHash<uint16_t> {
+            size_t operator()(uint16_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenStrongSeedHash64(x, seed);
+            }
+        };
+
+        template<>
+        struct StrongSeedHash<int16_t> {
+            size_t operator()(int16_t x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenStrongSeedHash64(x, seed);
+            }
+        };
+
+        template<class T>
+        struct StrongSeedHash<T*> {
+            size_t operator()(T* x, size_t seed) const noexcept {
+                return dynamic::detail::ChosenStrongSeedHash64(reinterpret_cast<size_t>(x), seed);
+            }
+        };
+
+        template<class CharT>
+        struct StrongSeedHash<std::basic_string<CharT>> {
+            size_t operator()(const std::basic_string<CharT> &str, size_t seed) const noexcept {
+                return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
+            }
+        };
+
+        template<class CharT>
+        struct StrongSeedHash<std::basic_string_view<CharT>> {
+            size_t operator()(const std::basic_string_view<CharT> &str, size_t seed) const noexcept {
+                return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
+            }
+        };
+
+        template<class T>
+        std::string ToString(const T& t) {
+            return std::to_string(t);
+        }
+
+
+        std::string ToString(const std::string& t) {
+            return t;
+        }
+
+        std::string ToString(const char* src) {
+            return src;
+        }
+
+    } // namespace dynamic::detail
+
+    template<class T>
+    using SimpleSeedHash = dynamic::detail::SimpleSeedHash<T>;
+
+    template<class T>
+    using MixSeedHash = dynamic::detail::MixSeedHash<T>;
+
+    template<class T>
+    using StrongSeedHash = dynamic::detail::StrongSeedHash<T>;
+
+    namespace dynamic::detail {
+
+        template<class T>
+        class BaseNode {
+        public:
+            constexpr BaseNode() noexcept: value_ptr_(nullptr) {};
+            explicit constexpr BaseNode(T *value_ptr) noexcept: value_ptr_(value_ptr) {}
+
+            BaseNode(const BaseNode<T> &other) noexcept: value_ptr_(other.value_ptr_) {}
+            BaseNode<T>& operator=(const BaseNode<T> &other) noexcept {
+                this->value_ptr_ = other.value_ptr_;
+                return *this;
+            }
+
+            BaseNode(BaseNode<T> &&other) noexcept: value_ptr_(other.value_ptr_) {
+                other.value_ptr_ = nullptr;
+            }
+            BaseNode<T>& operator=(BaseNode<T> &&other) noexcept {
+                this->value_ptr_ = other.value_ptr_;
+                other.value_ptr_ = nullptr;
+                return *this;
+            }
+
+            T *value_ptr() const {
+                return this->value_ptr_;
+            }
+
+        protected:
+            T *value_ptr_;
+        };
+
+        template<class T>
+        class IteratorBase: public BaseNode<T> {
+        public:
+
+            using difference_type   = std::ptrdiff_t;
+            using value_type        = T;
+            using pointer           = T*;
+            using reference         = T&;
+
+            constexpr IteratorBase() noexcept: BaseNode<T>() {}
+            constexpr explicit IteratorBase(T *value_ptr) noexcept: BaseNode<T>(value_ptr) {}
+
+            reference operator*() const {return *this->value_ptr_;};
+            pointer operator->() {return this->value_ptr_;}
+            friend bool operator== (const IteratorBase<T>& a, const IteratorBase<T>& b) {
+                return a.value_ptr_ == b.value_ptr_;
+            }
+
+            friend bool operator!= (const IteratorBase<T>& a, const IteratorBase<T>& b) {
+                return a.value_ptr_ != b.value_ptr_;
+            }
+        };
+
+        template<class T>
+        class ForwardLinkNode {
+        public:
+            constexpr ForwardLinkNode() noexcept: next_node_(nullptr), value_ptr_(nullptr) {};
+            explicit constexpr ForwardLinkNode(T *value_ptr) noexcept: value_ptr_(value_ptr), next_node_(nullptr) {}
+            explicit constexpr ForwardLinkNode(T *value_ptr, ForwardLinkNode<T> *next_node) noexcept: value_ptr_(value_ptr),
+                                                                                                      next_node_(next_node) {}
+
+            ForwardLinkNode(const ForwardLinkNode<T> &other) noexcept:
+                    value_ptr_(other.value_ptr_), next_node_(other.next_node_) {}
+
+            ForwardLinkNode<T>& operator=(const ForwardLinkNode<T> &other) noexcept {
+                this->value_ptr_ = other.value_ptr_;
+                this->next_node_ = other.next_node_;
+                return *this;
+            }
+
+            ForwardLinkNode(ForwardLinkNode<T> &&other) noexcept:
+                    value_ptr_(other.value_ptr_), next_node_(other.next_node_) {
+                other.value_ptr_ = nullptr;
+                other.next_node_ = nullptr;
+            }
+
+            ForwardLinkNode<T>& operator=(ForwardLinkNode<T> &&other) noexcept {
+                this->value_ptr_ = other.value_ptr_;
+                this->next_node_ = other.next_node_;
+                other.value_ptr_ = nullptr;
+                other.next_node_ = nullptr;
+                return *this;
+            }
+
+            ForwardLinkNode<T>& operator++() {
+                if FPH_UNLIKELY(this->next_node_ == nullptr) {
+                    this->value_ptr_ = nullptr;
+                    this->next_node_ = nullptr;
+                }
+                else {
+                    *this = *(this->next_node_);
+                }
+                return *this;
+            }
+
+            ForwardLinkNode<T> operator++(int) {
+                ForwardLinkNode<T> ret = *this;
+                ++(*this);
+                return ret;
+            }
+
+            void SetNext(ForwardLinkNode<T> *next) noexcept {
+                this->next_node_ = next;
+            }
+
+            T *value_ptr() const {
+                return this->value_ptr_;
+            }
+
+            ForwardLinkNode<T> *next_node() const {
+                return this->next_node_;
+            }
+
+        protected:
+            T *value_ptr_;
+            ForwardLinkNode<T> *next_node_;
+
+
+        }; // class ForwardLinkNode
+
+        template<class T>
+        class ForwardIteratorBase: public ForwardLinkNode<T> {
+        public:
+            // tags
+            using iterator_category = std::forward_iterator_tag;
+            using difference_type   = std::ptrdiff_t;
+            using value_type        = T;
+            using pointer           = T*;
+            using reference         = T&;
+
+            using ForwardIteratorBaseType = ForwardLinkNode<T>;
+
+            explicit constexpr ForwardIteratorBase(pointer ptr) noexcept: ForwardLinkNode<T>(ptr) {}
+            constexpr ForwardIteratorBase() noexcept: ForwardLinkNode<T>() {}
+
+            reference operator*() const {return *this->value_ptr_;};
+
+            pointer operator->() {return this->value_ptr_;}
+
+
+
+            friend bool operator== (const ForwardIteratorBase<T>& a, const ForwardIteratorBase<T>& b) {
+                return a.value_ptr_ == b.value_ptr_;
+            }
+
+            friend bool operator!= (const ForwardIteratorBase<T>& a, const ForwardIteratorBase<T>& b) {
+                return a.value_ptr_ != b.value_ptr_;
+            }
+
+
+        protected:
+
+
+        }; // class ForwardIteratorBase
+
+    } // namespace dynamic::detail
+
+    namespace dynamic::detail {
+
+        template<class Key, class KeyPointerAllocator=std::allocator<const Key *>,
+                class SizeTAllocator=std::allocator<size_t>>
+        struct FphBucket {
+        public:
+            size_t entry_cnt;
+            size_t index;
+            std::vector<const Key *, KeyPointerAllocator> key_array;
+
+            explicit FphBucket(size_t index) noexcept: entry_cnt(0), index(index) {}
+
+            FphBucket() noexcept: entry_cnt(0), index(0) {}
+
+            void AddKey(const Key *key_ptr) {
+                key_array.push_back(key_ptr);
+            }
+
+        protected:
+
+        };
+    } // namespace dynamic::detail
+
+    namespace dynamic::detail {
+
+        template<class T>
+        struct SimpleGetKey {
+            T operator()(const T& x) const {
+                return x;
+            }
+        };
+
+        template<class Bucket>
+        struct BucketGetKey {
+            size_t operator()(const Bucket& x) const {
+                return x.entry_cnt;
+            }
+        };
+
+        /**
+         * Counting sort,
+         * @tparam GetKey
+         * @tparam is_descend
+         * @tparam SizeTAllocator
+         * @tparam T
+         * @tparam RandomIt
+         * @tparam OutputIt
+         * @param first
+         * @param last
+         * @param d_first the output array consisting of the index of sorted array, first[d_first[0]]
+         * will be the first element in the sorted array
+         * @param max_key
+         */
+        template<class GetKey, bool is_descend=true, class SizeTAllocator = std::allocator<size_t>, class T, class RandomIt, class OutputIt>
+        void CountSortOutIndex(RandomIt first, RandomIt last, OutputIt d_first, T max_key) {
+            if (first >= last) {
+                return;
+            }
+            size_t array_num = std::distance(first, last);
+            GetKey get_key{};
+
+            std::vector<size_t, SizeTAllocator> count_array(max_key + 1, 0);
+
+            for (auto it = first; it != last; ++it) {
+                auto temp_key = get_key(*it);
+                ++count_array[temp_key];
+            }
+            for (size_t i = 1; i <= max_key; ++i) {
+                count_array[i] += count_array[i - 1];
+            }
+            if constexpr (!is_descend) {
+                for (size_t i = array_num; i-- > 0;) {
+                    auto temp_key = get_key(*(first + i));
+                    d_first[--count_array[temp_key]] =  i;
+                }
+            }
+            else {
+                for (size_t i = array_num; i-- > 0;) {
+                    auto temp_key = get_key(*(first + i));
+                    d_first[array_num - (--count_array[temp_key]) - 1] = i;
+                }
+            }
+        }
+
+        template<class GetKey, bool is_descend=true, class SizeTAllocator = std::allocator<size_t>, class RandomIt, class OutputIt>
+        void CountSortOutIndex(RandomIt first, RandomIt last, OutputIt d_first) {
+            if (first >= last) {
+                return;
+            }
+            GetKey get_key{};
+            using ValueType = decltype(get_key(*first));
+            static_assert(std::is_integral<ValueType>::value, "Key type should be integer");
+            ValueType max_key = std::numeric_limits<ValueType>::min();
+            for (auto it = first; it < last; ++it) {
+                auto temp_key = get_key(*it);
+                if (max_key < temp_key) {
+                    max_key = temp_key;
+                }
+            }
+
+            CountSortOutIndex<GetKey, is_descend, SizeTAllocator>(first, last, d_first, max_key);
+
+        }
+
+        template<class GetKey, bool is_descend=true, class SizeTAllocator = std::allocator<size_t>, class T, class RandomIt, class OutputIt>
+        void CountSort(RandomIt first, RandomIt last, OutputIt d_first, T max_key) {
+            if (first >= last) {
+                return;
+            }
+            size_t array_num = std::distance(first, last);
+            GetKey get_key{};
+
+            std::vector<size_t, SizeTAllocator> count_array(max_key + 1, 0);
+
+            for (auto it = first; it != last; ++it) {
+                auto temp_key = get_key(*it);
+                ++count_array[temp_key];
+            }
+            for (size_t i = 1; i <= max_key; ++i) {
+                count_array[i] += count_array[i - 1];
+            }
+            if constexpr (!is_descend) {
+                for (auto it = last - 1; it >= first; --it) {
+                    auto temp_key = get_key(*it);
+                    d_first[--count_array[temp_key]] = std::move(*it);
+                }
+            }
+            else {
+                for (auto it = last - 1; it >= first; --it) {
+                    auto temp_key = get_key(*it);
+                    d_first[array_num - (--count_array[temp_key]) - 1] = std::move(*it);
+                }
+            }
+        }
+
+        template<class GetKey, bool is_descend=true, class SizeTAllocator = std::allocator<size_t>, class RandomIt, class OutputIt>
+        void CountSort(RandomIt first, RandomIt last, OutputIt d_first) {
+            if (first >= last) {
+                return;
+            }
+            GetKey get_key{};
+            using ValueType = decltype(get_key(*first));
+            static_assert(std::is_integral<ValueType>::value, "Key type should be integer");
+            ValueType max_key = std::numeric_limits<ValueType>::min();
+            for (auto it = first; it < last; ++it) {
+                auto temp_key = get_key(*it);
+                if (max_key < temp_key) {
+                    max_key = temp_key;
+                }
+            }
+
+            CountSort<GetKey, is_descend, SizeTAllocator>(first, last, d_first, max_key);
+
+        }
+
+
+    } // namespace dynamic::detail
+
+    namespace dynamic {
+
+        /**
+          * Generate a random T when call in the functor style
+          * @tparam T
+          */
+        template<class T, typename = void>
+        class RandomGenerator {
+            static_assert(detail::always_false_v<T>, "Not implemented random generator for type T");
+        };
+
+
+        template<class T>
+        class RandomGenerator<T, typename std::enable_if<std::is_integral<T>::value>::type> {
+        public:
+
+            RandomGenerator(): init_seed(std::random_device{}()), random_engine(init_seed) {}
+
+            RandomGenerator(size_t seed): init_seed(seed), random_engine(seed) {}
+
+            RandomGenerator(const RandomGenerator& other): init_seed(other.init_seed),
+                                                           random_engine(other.random_engine) {}
+
+            RandomGenerator(RandomGenerator&& other) noexcept:
+                    init_seed(std::exchange(other.init_seed, 0)),
+                    random_engine(std::move(other.random_engine)){}
+
+            RandomGenerator& operator=(RandomGenerator&& other) noexcept {
+                this->init_seed = std::exchange(other.init_seed, 0);
+                this->random_engine = std::move(other.random_engine);
+                return *this;
+            }
+
+            uint64_t operator()() {
+                auto ret = random_gen(random_engine);
+                return ret;
+            }
+
+            void seed(uint64_t seed = 0) {
+                init_seed = seed;
+                random_engine.seed(seed);
+            }
+
+            size_t init_seed;
+
+        protected:
+            std::mt19937_64 random_engine;
+            std::uniform_int_distribution<T> random_gen;
+
+//
+        };
+
+        template<>
+        class RandomGenerator<std::string> {
+        public:
+
+            RandomGenerator(): init_seed(std::random_device{}()), random_engine(init_seed) {}
+            RandomGenerator(const RandomGenerator& other): init_seed(other.init_seed),
+                                                           random_engine(other.random_engine) {}
+
+            RandomGenerator(size_t seed): init_seed(seed), random_engine(seed) {}
+
+            RandomGenerator(RandomGenerator&& other) noexcept:
+                    init_seed(std::exchange(other.init_seed, 0)),
+                    random_engine(std::move(other.random_engine)){}
+
+            RandomGenerator& operator=(RandomGenerator&& other) noexcept {
+                this->init_seed = std::exchange(other.init_seed, 0);
+                this->random_engine = std::move(other.random_engine);
+                return *this;
+            }
+
+            std::string operator()(size_t length) {
+                static constexpr char alphanum[] =
+                        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&\'"
+                        "()*+,-./:;<=>?@[\\]^_`{|}~ "
+                        ;
+                std::string ret(length, 0);
+                for (size_t i = 0; i < length; ++i) {
+                    ret[i] = alphanum[random_gen(random_engine) % (sizeof(alphanum) - 1)];
+                }
+                static_assert(sizeof(alphanum) == 96);
+                return ret;
+            }
+
+            template<size_t length>
+            std::string RandomGenStr() {
+                static constexpr char alphanum[] =
+                        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&\'"
+                        "()*+,-./:;<=>?@[\\]^_`{|}~ "
+                ;
+                std::string ret(length, 0);
+                for (size_t i = 0; i < length; ++i) {
+                    ret[i] = alphanum[random_gen(random_engine) % (sizeof(alphanum) - 1)];
+                }
+                return ret;
+            }
+
+            /**
+             * random generate a string consists of alpha num with fixed (default 10) or random length (default max 10)
+             * @return
+             */
+            std::string operator()() {
+                // TODO: change default size to bigger number if needed,
+                // now use fix length, change it if you need random len
+                constexpr bool USE_FIX_LEN = true;
+                constexpr size_t DEFAULT_LENGTH = 10U;
+                if constexpr(USE_FIX_LEN) {
+                    return RandomGenStr<DEFAULT_LENGTH>();
+                }
+                else {
+                    size_t random_len = 1UL + random_gen(random_engine) % DEFAULT_LENGTH;
+                    return (*this)(random_len);
+                }
+            }
+
+            void seed(uint64_t seed = 0) {
+                init_seed = seed;
+                random_engine.seed(seed);
+            }
+
+            size_t init_seed;
+
+        protected:
+            std::minstd_rand random_engine;
+            std::uniform_int_distribution<uint32_t> random_gen;
+        };
+
+    } // namespace dynamic
+
+    namespace dynamic::detail {
+
+        template<class Table, class slot_type>
+        class ForwardIterator : public dynamic::detail::IteratorBase<slot_type> {
+        public:
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = typename slot_type::value_type;
+            using pointer    = value_type*;
+            using reference  = value_type&;
+
+            constexpr ForwardIterator() noexcept
+                    : dynamic::detail::IteratorBase<slot_type>(), map_ptr_(
+                    nullptr), iterate_cnt(0) {}
+
+
+            constexpr explicit ForwardIterator(slot_type *slot_ptr,
+                                               const Table *map_ptr) noexcept:
+                    dynamic::detail::IteratorBase<slot_type>(slot_ptr), map_ptr_(map_ptr),
+                    iterate_cnt(0) {}
+
+            reference operator*() const {return this->value_ptr_->value;};
+
+            pointer operator->() {return std::addressof(this->value_ptr_->value);}
+
+            ForwardIterator<Table, slot_type> &operator++() {
+                if FPH_UNLIKELY(++iterate_cnt >= map_ptr_->size()) {
+                    this->value_ptr_ = nullptr;
+                } else {
+                    this->value_ptr_ = map_ptr_->GetNextSlotAddress(this->value_ptr_);
+                }
+                return *this;
+            }
+
+            ForwardIterator<Table, slot_type> operator++(int) {
+                auto ret = *this;
+                ++(*this);
+                return ret;
+            }
+
+            void SetTable(const Table *new_table_ptr) {
+                map_ptr_ = new_table_ptr;
+            }
+
+
+        protected:
+            const Table *map_ptr_;
+            size_t iterate_cnt;
+
+
+        };
+
+    } // namespace detail
+
+    namespace dynamic::detail {
+
+        template<class Policy, class SeedHash, class KeyEqual, class Allocator, class BucketParamType,
+                class RandomKeyGenerator>
+        class DynamicRawSet {
+        public:
+
+            using key_type = typename Policy::key_type;
+            using value_type = typename Policy::value_type;
+            using size_type = std::size_t;
+            using difference_type = std::ptrdiff_t;
+            using hasher = SeedHash;
+            using key_equal = KeyEqual;
+            using allocator_type = Allocator;
+            using reference = value_type &;
+            using const_reference = const value_type &;
+            using pointer = typename std::allocator_traits<Allocator>::pointer;
+            using const_pointer = typename std::allocator_traits<Allocator>::const_pointer;
+
+#if FPH_ENABLE_ITERATOR
+
+            using iterator = ForwardIterator<DynamicRawSet, typename Policy::slot_type>;
+            friend iterator;
+            using const_iterator = const iterator;
+#endif
+
+            explicit DynamicRawSet(size_type bucket_count, const SeedHash& hash = SeedHash(),
+                                   const key_equal& equal = key_equal(),
+                                   const Allocator& alloc = Allocator()) :
+#if FPH_DY_DUAL_BUCKET_SET
+                    p1_(0), p2_(0), p2_plus_1_(0), p2_remain_(0),
+                                keys_first_part_ratio_(DEFAULT_KEYS_FIRST_PART_RATIO),
+                                buckets_first_part_ratio_(DEFAULT_BUCKETS_FIRST_PART_RATIO),
+#else
+//                    bucket_mask_(0),
+                    bucket_index_policy_{0},
+#endif
+//                    item_num_mask_(bucket_count - 1U),
+                    slot_index_policy_{bucket_count},
+                    seed0_(0),
+                    seed1_(0), seed2_(0),
+                    bucket_p_array_{nullptr},
+                    slot_(nullptr),
+                    param_(nullptr) {
+
+                TableParamAllocator  param_alloc{};
+                param_ = param_alloc.allocate(1);
+                std::allocator_traits<TableParamAllocator>::construct(param_alloc, param_,
+#if FPH_DY_DUAL_BUCKET_SET
+                        ,DEFAULT_KEYS_FIRST_PART_RATIO, DEFAULT_BUCKETS_FIRST_PART_RATIO,
+#endif
+                                                                      DEFAULT_MAX_LOAD_FACTOR, DEFAULT_BITS_PER_KEY, alloc
+                );
+                param_->item_num_ceil_ = dynamic::detail::Ceil2(std::max(bucket_count, size_type(4U)));
+//                item_num_mask_ = param_->item_num_ceil_ - 1U;
+                slot_index_policy_ = IndexMapPolicy(param_->item_num_ceil_);
+
+                Build<false, true>(end(), end(), 0, false, DEFAULT_BITS_PER_KEY,
+                                   DEFAULT_KEYS_FIRST_PART_RATIO,
+                                   DEFAULT_BUCKETS_FIRST_PART_RATIO);
+                (void)hash;
+                (void)equal;
+            }
+
+            DynamicRawSet(): DynamicRawSet(DEFAULT_INIT_ITEM_NUM_CEIL) {}
+
+            DynamicRawSet(size_type bucket_count, const Allocator& alloc):
+                    DynamicRawSet(bucket_count, SeedHash(), key_equal(), alloc) {}
+
+            DynamicRawSet(size_type bucket_count, const SeedHash& seed_hash, const Allocator& alloc):
+                    DynamicRawSet(bucket_count, seed_hash, key_equal(), alloc) {}
+
+            explicit DynamicRawSet(const Allocator& alloc):
+                    DynamicRawSet(DEFAULT_INIT_ITEM_NUM_CEIL, SeedHash(), key_equal(), alloc) {}
+
+            template< class InputIt >
+            DynamicRawSet(InputIt first, InputIt last,
+                          size_type bucket_count = DEFAULT_INIT_ITEM_NUM_CEIL,
+                          const SeedHash& hash = SeedHash(),
+                          const key_equal& equal = key_equal(),
+                          const Allocator& alloc = Allocator()):
+                    DynamicRawSet(std::max(size_type(std::distance(first, last)), bucket_count), hash, equal, alloc) {
+                insert(first, last);
+            }
+
+            template< class InputIt >
+            DynamicRawSet(InputIt first, InputIt last,
+                          size_type bucket_count, const Allocator& alloc ):
+                    DynamicRawSet(first, last, bucket_count, SeedHash(), key_equal(), alloc) {}
+
+            template< class InputIt >
+            DynamicRawSet(InputIt first, InputIt last, size_type bucket_count,
+                          const SeedHash& hash, const Allocator& alloc ):
+                    DynamicRawSet(first, last, bucket_count, hash, key_equal(), alloc) {}
+
+            DynamicRawSet(const DynamicRawSet &other, const Allocator& alloc):
+#if FPH_DY_DUAL_BUCKET_SET
+                    p1_(other.p1_), p2(other.p2_), p2_plus_1_(other.p2_plus_1_), p2_remain_(other.p2_remain_),
+                keys_first_part_ratio_(other.keys_first_part_ratio_),
+                buckets_first_part_ratio_(other.buckets_first_part_ratio_),
+#else
+//                    bucket_mask_(other.bucket_mask_),
+                    bucket_index_policy_(other.bucket_index_policy_),
+#endif
+//                    item_num_mask_(other.item_num_mask_),
+                    slot_index_policy_(other.slot_index_policy_),
+                    seed0_(other.seed0_),
+                    seed1_(other.seed1_),
+                    seed2_(other.seed2_),
+                    bucket_p_array_(nullptr),
+                    slot_(nullptr),
+                    param_(nullptr)
+            {
+                if (other.param_ != nullptr) {
+                    TableParamAllocator param_alloc{};
+                    param_ = param_alloc.allocate(1);
+                    std::allocator_traits<TableParamAllocator>::construct(param_alloc, param_,
+                                                                          *other.param_, alloc);
+
+
+                    slot_ = SlotAllocator{}.allocate(param_->slot_capacity_);
+
+                    if (other.param_->default_fill_key_address_ != nullptr) {
+                        param_->default_fill_key_address_ =
+                                slot_ + (other.param_->default_fill_key_address_ - other.slot_);
+                    }
+
+                    bucket_p_array_ = BucketParamAllocator{}.allocate(param_->bucket_capacity_);
+                    memcpy(bucket_p_array_, other.bucket_p_array_,
+                           sizeof(BucketParamType) * param_->bucket_num_);
+
+                    KeyAllocator key_alloc;
+                    for (size_t i = 0; i < param_->item_num_ceil_; ++i) {
+                        if (!other.IsSlotEmpty(i)) {
+                            std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                        std::addressof(
+                                                                                slot_[i].mutable_value),
+                                                                        other.slot_[i].mutable_value);
+                        } else {
+                            std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                           std::addressof(
+                                                                                   slot_[i].key),
+                                                                           other.slot_[i].key);
+                        }
+                    }
+                    if (other.param_->begin_it_.value_ptr() != nullptr) {
+                        param_->begin_it_ = iterator(
+                                slot_ + (other.param_->begin_it_.value_ptr() - other.slot_), this);
+                    }
+                    for (size_t k = 0; k < param_->bucket_num_; ++k) {
+                        auto &temp_bucket = param_->bucket_array_[k];
+                        for (size_t i = 0; i < temp_bucket.key_array.size(); ++i) {
+                            temp_bucket.key_array[i] = std::addressof(slot_[GetSlotPos(
+                                    *(other.param_->bucket_array_[k].key_array[i]))].key);
+                        }
+                    }
+                }
+            }
+
+            DynamicRawSet(const DynamicRawSet &other):
+                    DynamicRawSet(other,
+                                  other.param_ != nullptr ?
+                                  std::allocator_traits<Allocator>::select_on_container_copy_construction(other.param_->alloc_)
+                                                          : Allocator() ) {}
+
+            DynamicRawSet(DynamicRawSet&& other) noexcept:
+#if FPH_DY_DUAL_BUCKET_SET
+                    p1_(std::exchange(other.p1_, 0)),
+                p2_(std::exchange(other.p2_, 0)),
+                p2_plus_1_(std::exchange(other.p2_plus_1_, 1)),
+                p2_remain_(std::exchange(other.p2_remain_, 0)),
+                keys_first_part_ratio_(std::exchange(other.keys_first_part_ratio_, DEFAULT_KEYS_FIRST_PART_RATIO)),
+                buckets_first_part_ratio_(std::exchange(other.buckets_first_part_ratio_,DEFAULT_BUCKETS_FIRST_PART_RATIO)),
+
+#else
+//                    bucket_mask_(std::exchange(other.bucket_mask_, 0)),
+                    bucket_index_policy_(std::move(other.bucket_index_policy_)),
+#endif
+//                    item_num_mask_(std::exchange(other.item_num_mask_, 0)),
+                    slot_index_policy_(std::move(other.slot_index_policy_)),
+                    seed0_(std::exchange(other.seed0_, 0x3284723912901723ULL)),
+                    seed1_(std::exchange(other.seed1_, 0x123456797291071ULL)),
+                    seed2_(std::exchange(other.seed2_, 0x832748923732847ULL)),
+                    bucket_p_array_(std::exchange(other.bucket_p_array_, nullptr)),
+                    slot_(std::exchange(other.slot_, nullptr)),
+                    param_(std::exchange(other.param_, nullptr))
+
+            {
+                if (param_ != nullptr) {
+                    param_->begin_it_.SetTable(this);
+                }
+
+
+            }
+
+            DynamicRawSet(DynamicRawSet&& other, const Allocator& alloc):
+//                    item_num_mask_(std::exchange(other.item_num_mask_, 0)),
+                    slot_index_policy_(std::move(other.slot_index_policy_)),
+                    slot_(std::exchange(other.slot_, nullptr)),
+                    param_(std::exchange(other.param_, nullptr)),
+
+#if FPH_DY_DUAL_BUCKET_SET
+                    p1_(std::exchange(other.p1_, 0)),
+                p2_(std::exchange(other.p2_, 0)),
+                p2_plus_1_(std::exchange(other.p2_plus_1_, 1)),
+                p2_remain_(std::exchange(other.p2_remain_, 0)),
+                keys_first_part_ratio_(std::exchange(other.keys_first_part_ratio_, DEFAULT_KEYS_FIRST_PART_RATIO)),
+                buckets_first_part_ratio_(std::exchange(other.buckets_first_part_ratio_,DEFAULT_BUCKETS_FIRST_PART_RATIO)),
+
+#else
+//                    bucket_mask_(std::exchange(other.bucket_mask_, 0)),
+                    bucket_index_policy_(std::move(other.bucket_index_policy_)),
+#endif
+                    seed0_(std::exchange(other.seed0_, 0x3284723912901723ULL)),
+                    seed1_(std::exchange(other.seed1_, 0x123456797291071ULL)),
+                    seed2_(std::exchange(other.seed2_, 0x832748923732847ULL)),
+
+                    bucket_p_array_(std::exchange(other.bucket_p_array_, nullptr))
+
+            {
+                if (param_ != nullptr) {
+                    param_->begin_it_.SetTable(this);
+                    param_->alloc_ = alloc;
+                }
+            }
+
+            DynamicRawSet(std::initializer_list<value_type> init,
+                          size_type bucket_count = DEFAULT_INIT_ITEM_NUM_CEIL,
+                          const SeedHash& hash = SeedHash(), const key_equal& equal = key_equal(),
+                          const Allocator& alloc = Allocator())
+                    : DynamicRawSet(init.begin(), init.end(), bucket_count, hash, equal, alloc){}
+
+            DynamicRawSet(std::initializer_list<value_type> init,
+                          size_type bucket_count, const Allocator& alloc)
+                    : DynamicRawSet(init.begin(), init.end(), bucket_count, SeedHash(), key_equal(), alloc){}
+
+            DynamicRawSet(std::initializer_list<value_type> init, size_type bucket_count,
+                          const SeedHash& hash, const Allocator& alloc)
+                    : DynamicRawSet(init.begin(), init.end(), bucket_count, hash, key_equal(), alloc){}
+
+            DynamicRawSet& operator=(const DynamicRawSet& other) {
+                auto tmp(other);
+                this->swap(tmp);
+                return *this;
+            }
+
+            DynamicRawSet& operator=(DynamicRawSet&& other) noexcept {
+                this->swap(other);
+                return *this;
+            }
+
+            DynamicRawSet& operator=(std::initializer_list<value_type> ilist) {
+                clear();
+                insert(ilist);
+                return *this;
+            }
+
+            allocator_type get_allocator() const noexcept {
+                return param_->alloc_;
+            }
+
+            void swap(DynamicRawSet& other) noexcept {
+                SwapImp(other);
+            }
+
+
+            template<bool is_rehash, bool use_move=false, bool last_element_only_has_key=false, class InputIt>
+            void Build(InputIt pair_begin, InputIt pair_end, uint64_t seed = 0,
+                       bool verbose = false, double c = DEFAULT_BITS_PER_KEY,
+                       double keys_first_part_ratio = DEFAULT_KEYS_FIRST_PART_RATIO, double buckets_first_part_ratio = DEFAULT_BUCKETS_FIRST_PART_RATIO,
+                       size_t max_try_seed2_time = 1000, size_t max_reseed2_time = 1000) {
+                constexpr size_t max_try_seed0_time = 20;
+                constexpr size_t max_try_seed1_time = 100;
+                BuildImp<is_rehash, use_move, last_element_only_has_key>(pair_begin, pair_end, seed,
+                                                                         verbose, c, keys_first_part_ratio,
+                                                                         buckets_first_part_ratio,
+                                                                         max_try_seed0_time,
+                                                                         max_try_seed1_time, max_try_seed2_time, max_reseed2_time);
+            }
+
+            void rehash(size_type count) {
+
+                size_type new_item_ceil_num = dynamic::detail::Ceil2(
+                        size_t(std::ceil(param_->item_num_ / param_->max_load_factor_)));
+                if (count > new_item_ceil_num) {
+                    new_item_ceil_num = dynamic::detail::Ceil2(count);
+                }
+                new_item_ceil_num = std::min(new_item_ceil_num, MAX_ITEM_NUM_CEIL_LIMIT);
+                new_item_ceil_num = std::max(new_item_ceil_num, DEFAULT_INIT_ITEM_NUM_CEIL);
+                if (new_item_ceil_num != param_->item_num_ceil_) {
+                    slot_index_policy_.UpdateBySlotNum(new_item_ceil_num);
+//                    item_num_mask_ = new_item_ceil_num - 1;
+                    param_->temp_pair_buf_.resize(param_->item_num_ * sizeof(value_type));
+                    value_type *temp_value_buf_start = reinterpret_cast<value_type*>(param_->temp_pair_buf_.data());
+                    value_type *temp_value_buf = temp_value_buf_start;
+                    for (auto it = begin(); it != end(); ++it) {
+                        std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                    temp_value_buf++, std::move(*it));
+                    }
+
+                    Build<true, true>(temp_value_buf_start, temp_value_buf_start + param_->item_num_, seed1_,
+#if FPH_DEBUG_FLAG
+                            true,
+#else
+                                      false,
+#endif
+                                      param_->bits_per_key_,
+#if FPH_DY_DUAL_BUCKET_SET
+                            keys_first_part_ratio_, buckets_first_part_ratio_
+#else
+                                      DEFAULT_KEYS_FIRST_PART_RATIO, DEFAULT_BUCKETS_FIRST_PART_RATIO
+#endif
+                    );
+                    for (auto *temp_buf_ptr = temp_value_buf_start; temp_buf_ptr != temp_value_buf_start + param_->item_num_; temp_buf_ptr++) {
+                        std::allocator_traits<Allocator>::destroy(param_->alloc_, temp_buf_ptr);
+                    }
+                }
+
+
+            }
+
+            void reserve(size_type count) {
+                rehash(std::ceil(count / param_->max_load_factor_));
+            }
+
+            void max_load_factor(float ml) {
+                if (ml > 0.0 && ml < 1.0) {
+                    param_->max_load_factor_ = ml;
+                    param_->should_expand_item_num_ = std::ceil(param_->item_num_ceil_ * ml);
+                }
+            }
+
+            float max_load_factor() const {
+                return param_->max_load_factor_;
+            }
+
+            static float max_load_factor_upper_limit() {
+                return MAX_LOAD_FACTOR_UPPER_LIMIT;
+            }
+
+            float load_factor() const {
+                return static_cast<double>(param_->item_num_) / param_->item_num_ceil_;
+            }
+
+            hasher hash_function() const {
+                return hash_;
+            }
+
+            key_equal key_eq() const {
+                return key_equal_;
+            }
+
+
+#if FPH_ENABLE_ITERATOR
+
+            std::pair<iterator, bool> insert(const value_type &value) {
+                return InsertImp(value);
+
+            } // insert
+
+            std::pair<iterator, bool> insert(value_type &&value) {
+                return InsertImp(std::move(value));
+            } // insert
+
+            iterator insert(const_iterator, const value_type &value) {
+                return insert(value).first;
+            }
+
+            iterator insert(const_iterator, value_type &&value) {
+                return insert(std::move(value)).first;
+            }
+
+            template <class InputIt>
+            void insert(InputIt first, InputIt last) {
+//
+                if (param_->item_num_ != 0) {
+                    for (; first != last; ++first) emplace(*first);
+                }
+                else {
+                    Build<false, false>(first, last, seed1_, false, param_->bits_per_key_);
+                }
+
+            }
+
+            void insert(std::initializer_list<value_type> ilist) {
+                insert(ilist.begin(), ilist.end());
+            }
+
+            iterator erase(const_iterator iter) {
+                return EraseImp(iter);
+            }
+
+
+
+            iterator erase(const_iterator first, const_iterator last) {
+                return EraseImp(first, last);
+            }
+
+            size_type erase(const key_type& key) {
+                return EraseImp(key);
+            }
+
+
+
+
+            template<class... Args>
+            std::pair<iterator, bool> emplace(Args&&... args) {
+                return EmplaceImp(std::forward<Args>(args)...);
+            }
+
+            template <class... Args>
+            iterator emplace_hint(const_iterator, Args&&... args ) {
+                return emplace(std::forward<Args>(args)...).first;
+            }
+
+            iterator begin() noexcept {
+                if FPH_UNLIKELY(param_ == nullptr) {
+                    return iterator(nullptr, nullptr);
+                }
+                return param_->begin_it_;
+            }
+
+            const_iterator begin() const noexcept {
+                if FPH_UNLIKELY(param_ == nullptr) {
+                    return iterator(nullptr, nullptr);
+                }
+                return param_->begin_it_;
+            }
+
+            const_iterator cbegin() const noexcept {
+                return begin();
+            }
+
+            constexpr iterator end() noexcept {
+                return iterator(nullptr, nullptr);
+            }
+
+            constexpr const_iterator end() const noexcept {
+                return iterator(nullptr, nullptr);
+            }
+
+            constexpr const_iterator cend() const noexcept {
+                return end();
+            }
+
+            FPH_ALWAYS_INLINE iterator find(const key_type& FPH_RESTRICT key) FPH_FUNC_RESTRICT noexcept {
+                auto slot_pos = GetSlotPos(key);
+                slot_type *pair_address = slot_ + slot_pos;
+                if FPH_LIKELY(key_equal_(pair_address->key, key)) {
+                    return iterator(pair_address, this);
+                }
+                return end();
+            }
+
+            FPH_ALWAYS_INLINE const_iterator find(const key_type& FPH_RESTRICT key) const FPH_FUNC_RESTRICT noexcept {
+                auto slot_pos = GetSlotPos(key);
+                slot_type *pair_address = slot_ + slot_pos;
+                if FPH_LIKELY(key_equal_(pair_address->key, key)) {
+                    return iterator(pair_address, this);
+                }
+                return end();
+            }
+
+            // TODO: support transparent key
+//            template<class K>
+//            iterator find(const K &x) {
+//
+//            }
+
+#endif
+
+            size_type size() const noexcept {
+                if FPH_UNLIKELY(param_ == nullptr) {
+                    return 0;
+                }
+                return param_->item_num_;
+            }
+
+            bool empty() const noexcept {
+                if FPH_UNLIKELY(param_ == nullptr) {
+                    return true;
+                }
+                return param_->item_num_ == 0U;
+            }
+
+            constexpr size_type max_size() const noexcept {
+                return MAX_ITEM_NUM_CEIL_LIMIT;
+            }
+
+
+
+            void clear() noexcept {
+                if (param_ == nullptr) {
+                    TableParamAllocator param_alloc{};
+                    param_ = param_alloc.allocate(1);
+                    std::allocator_traits<TableParamAllocator>::construct(param_alloc, param_,
+#if FPH_DY_DUAL_BUCKET_SET
+                            ,DEFAULT_KEYS_FIRST_PART_RATIO, DEFAULT_BUCKETS_FIRST_PART_RATIO,
+#endif
+                                                                          DEFAULT_MAX_LOAD_FACTOR, DEFAULT_BITS_PER_KEY, Allocator()
+                    );
+                }
+                param_->item_num_ = 0;
+                if (param_->item_num_ceil_ > 0) {
+                    slot_index_policy_.UpdateBySlotNum(param_->item_num_ceil_);
+//                    item_num_mask_ = param_->item_num_ceil_ - 1U;
+                }
+                else {
+                    slot_index_policy_.UpdateBySlotNum(0);
+//                    item_num_mask_ = 0;
+                }
+#if FPH_ENABLE_ITERATOR
+                param_->begin_it_ = iterator(nullptr, nullptr);
+#endif
+
+
+                if (param_->default_fill_key_ != nullptr) {
+//                    for (size_t i = 0; i < param_->filled_count_; ++i) {
+//                        std::allocator_traits<Allocator>::destroy(param_->alloc_,
+//                                          std::addressof(slot_[param_->random_table_[i]].mutable_value));
+//                    }
+                    DestroySlots();
+                    KeyAllocator key_alloc{};
+                    for (size_t i = 0; i < param_->item_num_ceil_; ++i) {
+                        std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                       std::addressof(slot_[i].key), *param_->default_fill_key_);
+                    }
+                    if (param_->item_num_ceil_ > 0) {
+                        auto default_key_slot_index = GetSlotPos(*param_->default_fill_key_);
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc,
+                                                                     std::addressof(slot_[default_key_slot_index].key));
+                        std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                       std::addressof(slot_[default_key_slot_index].key), *param_->second_default_key_);
+                        param_->default_fill_key_bucket_index_ = CompleteGetBucketIndex(*param_->default_fill_key_);
+                        param_->default_fill_key_address_ = slot_ + default_key_slot_index;
+                    }
+                }
+                param_->filled_count_ = 0;
+                for (size_t i = 0; i < param_->bucket_num_; ++i ) {
+                    auto &temp_bucket = param_->bucket_array_[i];
+                    temp_bucket.key_array.clear();
+                    temp_bucket.entry_cnt = 0;
+                }
+            }
+
+            size_t count(const key_type &key) const {
+                auto pos = GetSlotPos(key);
+                if (key_equal_(key, slot_[pos].key)) {
+                    return 1U;
+                }
+                return 0U;
+            }
+
+            bool contains(const key_type& key ) const {
+                auto pos = GetSlotPos(key);
+                if (key_equal_(key, slot_[pos].key)) {
+                    return true;
+                }
+                return false;
+            }
+
+            bool HasElement(const value_type& ele) const{
+                return contains(slot_type::GetSlotAddressByValueAddress(std::addressof(ele))->key);
+            }
+
+            std::pair<iterator,iterator> equal_range( const key_type& key ) {
+                auto it = find(key);
+                if (it != end()) {
+                    return {it, std::next(it)};
+                }
+                return {it, it};
+            }
+
+            std::pair<const_iterator,const_iterator> equal_range( const key_type& key ) const {
+                auto it = find(key);
+                if (it != end()) {return {it, std::next(it)};}
+                return {it, it};
+            }
+
+            size_type bucket_count() const {
+                return param_->item_num_ceil_;
+            }
+
+            size_type max_bucket_count() const {
+                return MAX_ITEM_NUM_CEIL_LIMIT;
+            }
+
+            friend bool operator==(const DynamicRawSet&a, const DynamicRawSet&b) {
+                if (a.size() != b.size()) return false;
+                const auto* a_ptr = &a;
+                const auto* b_ptr = &b;
+                // small capacity is faster in iterating
+                if (a_ptr->capacity() > b_ptr->capacity()) {
+                    std::swap(a_ptr, b_ptr);
+                }
+                for (const auto& ele: *a_ptr) {
+                    if (!b_ptr->HasElement(ele)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            friend bool operator!=(const DynamicRawSet&a, const DynamicRawSet&b) {
+                return !(a == b);
+            }
+
+            friend void swap(DynamicRawSet &a, DynamicRawSet &b) noexcept {
+                a.swap(b);
+            }
+
+            /**
+             * Get the pointer of the value without checking whether the two keys are equal.
+             * Only use this function when you are sure that the key is in the table and you don't
+             * want to waste cpu cycles in comparing the keys.
+             * @param key
+             * @return
+             */
+            FPH_ALWAYS_INLINE pointer GetPointerNoCheck(const key_type& FPH_RESTRICT key)
+            FPH_FUNC_RESTRICT noexcept {
+                size_t pos = GetSlotPos(key);
+                return std::addressof(slot_[pos].value);
+            }
+
+            FPH_ALWAYS_INLINE const_pointer GetPointerNoCheck(const key_type& FPH_RESTRICT key)
+            const FPH_FUNC_RESTRICT noexcept {
+                size_t pos = GetSlotPos(key);
+                return std::addressof(slot_[pos].value);
+            }
+
+
+            /**
+             * Get the position in the underlying slot of one key
+             * @param key
+             * @return
+             */
+            FPH_ALWAYS_INLINE size_t GetSlotPos(const key_type &key) const FPH_FUNC_RESTRICT noexcept {
+                auto k_seed0_hash = hash_(key, seed0_);
+                size_t bucket_index = GetBucketIndex(k_seed0_hash);
+                auto bucket_param = bucket_p_array_[bucket_index];
+                auto temp_offset = bucket_param >> 1U;
+                auto optional_bit = bucket_param & 0x1U;
+
+
+                auto temp_hash_value = MidHash(k_seed0_hash, MixSeedAndBit(seed2_, optional_bit));
+//                auto temp_hash_value = hash_(key, seed2_ + optional_bit);
+
+                auto reverse_offset = slot_index_policy_.ReverseMap(temp_offset);
+                auto slot_pos = slot_index_policy_.MapToIndex(temp_hash_value + reverse_offset);
+//                auto slot_pos = (temp_hash_value + temp_offset) & item_num_mask_;
+                return slot_pos;
+            }
+
+            FPH_ALWAYS_INLINE size_t GetSlotPosBySeed0Hash(size_t k_seed0_hash) const FPH_FUNC_RESTRICT noexcept {
+//                auto k_seed0_hash = hash_(key, seed0_);
+                size_t bucket_index = GetBucketIndex(k_seed0_hash);
+                auto bucket_param = bucket_p_array_[bucket_index];
+                auto temp_offset = bucket_param >> 1U;
+                auto optional_bit = bucket_param & 0x1U;
+
+
+                auto temp_hash_value = MidHash(k_seed0_hash, MixSeedAndBit(seed2_, optional_bit));
+//                auto temp_hash_value = hash_(key, seed2_ + optional_bit);
+
+                auto reverse_offset = slot_index_policy_.ReverseMap(temp_offset);
+                auto slot_pos = slot_index_policy_.MapToIndex(temp_hash_value + reverse_offset);
+//                auto slot_pos = (temp_hash_value + temp_offset) & item_num_mask_;
+                return slot_pos;
+            }
+
+            FPH_ALWAYS_INLINE size_t GetSlotPos(const key_type &key, size_t offset, size_t optional_bit)
+            const FPH_FUNC_RESTRICT noexcept {
+                auto k_seed0_hash = hash_(key, seed0_);
+                auto temp_hash_value = MidHash(k_seed0_hash, MixSeedAndBit(seed2_, optional_bit));
+                //  auto temp_hash_value = (hash_(key, seed2_ + optional_bit));
+                size_t reverse_offset = slot_index_policy_.ReverseMap(offset);
+                auto slot_pos = slot_index_policy_.MapToIndex(temp_hash_value + reverse_offset);
+//                auto slot_pos = (temp_hash_value + offset) & item_num_mask_;
+                return slot_pos;
+            }
+
+            ~DynamicRawSet() {
+                if (slot_ != nullptr) {
+                    DestroySlots();
+                    SlotAllocator{}.deallocate(slot_, param_->slot_capacity_);
+                    slot_ = nullptr;
+                }
+
+                if (bucket_p_array_ != nullptr) {
+                    BucketParamAllocator{}.deallocate(bucket_p_array_, param_->bucket_capacity_);
+                    bucket_p_array_ = nullptr;
+                }
+
+                if (param_ != nullptr) {
+
+                    TableParamAllocator param_alloc{};
+                    std::allocator_traits<TableParamAllocator>::destroy(param_alloc, param_);
+                    param_alloc.deallocate(param_, 1);
+                    param_ = nullptr;
+                }
+            }
+
+#if FPH_DEBUG_ERROR
+
+
+
+            void PrintTableParams() {
+                fprintf(stderr, "Fph table item_num: %lu, item_num_ceil: %lu, seed1: %lu, seed2: %lu,"
+                                "bucket_num: %lu, "
+                                //                                "default_fill_key: %s, second_default_key: %s, "
+                                "random init seed: %lu\n",
+                        param_->item_num_, param_->item_num_ceil_, seed1_, seed2_,
+                        param_->bucket_num_,
+//                                detail::ToString(*param_->default_fill_key_).c_str(),
+//                                detail::ToString(*param_->second_default_key_).c_str(),
+                        param_->key_gen_->init_seed);
+            }
+#endif
+
+
+
+        protected:
+
+            static_assert(std::is_unsigned<BucketParamType>::value,
+                          "BucketParamType should be unsigned type");
+
+
+
+
+#if FPH_DY_DUAL_BUCKET_SET
+            // p2_remain_ + p2 == bucket_num_
+            size_t p1_, p2_, p2_plus_1_, p2_remain_; // direct
+#else
+            using IndexMapPolicy = typename Policy::index_map_policy;
+            IndexMapPolicy bucket_index_policy_;
+//            size_t bucket_mask_; // direct
+#endif
+
+            // item_num_mask_ is no less than item_num_ and is in the format of (1UL << n) - 1UL
+//            size_t item_num_mask_; // direct
+            IndexMapPolicy slot_index_policy_;
+
+            size_t seed0_;
+            size_t seed1_, seed2_; // direct
+
+            using BucketParamAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<BucketParamType>;
+//            using BucketParamArray = std::vector<BucketParamType, BucketParamAllocator>;
+            BucketParamType *bucket_p_array_; // direct
+
+            using slot_type = typename Policy::slot_type;
+            slot_type *slot_ = nullptr; // direct
+
+            using SlotAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<slot_type>;
+            using KeyPointerAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<const key_type *>;
+
+            using BoolAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<bool>;
+            using SizeTAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<size_t>;
+            using KeyRNGAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<RandomKeyGenerator>;
+            using KeyAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<key_type>;
+            using CharAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<char>;
+
+            using BucketType = detail::FphBucket<key_type, KeyPointerAllocator>;
+            using BucketAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<BucketType>;
+
+            using SizeTVector = std::vector<size_t, SizeTAllocator>;
+            using CharVector = std::vector<char, CharAllocator>;
+
+            // all the member variables that are used in non-look-up operations will be put in the
+            // FphTableParam, so all the lookup operations will not use dereference of pointer
+            struct FphTableParam {
+
+                FphTableParam(
+#if FPH_DY_DUAL_BUCKET_SET
+                        double keys_first_part_ratio, double buckets_first_part_ratio,
+#endif
+                        float max_load_factor,
+                        float bits_per_key,
+                        const Allocator& alloc
+
+                ): item_num_(0), item_num_ceil_(0),
+                   bucket_num_(0), slot_capacity_(0), bucket_capacity_(0),
+#if FPH_DY_DUAL_BUCKET_SET
+                        keys_first_part_ratio_(keys_first_part_ratio),
+                                buckets_first_part_ratio_(buckets_first_part_ratio),
+#endif
+                   should_expand_item_num_(0),
+                   filled_count_(0),
+                   default_fill_key_(nullptr),
+                   second_default_key_(nullptr),
+                   default_fill_key_address_(nullptr),
+                   default_fill_key_bucket_index_(0),
+                   alloc_{alloc},
+                   key_gen_(nullptr),
+                   max_load_factor_(max_load_factor),
+                   bits_per_key_(bits_per_key),
+                   begin_it_{nullptr, nullptr},
+                   seed2_test_table_{},
+                   tested_hash_vec_{},
+                   random_table_{},
+                   map_table_{},
+                   bucket_array_{},
+                   temp_byte_buf_vec_{},
+                   temp_pair_buf_{}
+                {
+                    KeyRNGAllocator key_gen_alloc;
+                    key_gen_ = key_gen_alloc.allocate(1);
+                    std::allocator_traits<KeyRNGAllocator>::construct(key_gen_alloc, key_gen_);
+                }
+
+                FphTableParam(const FphTableParam& o, const Allocator& alloc) : item_num_(o.item_num_),
+                                                                                item_num_ceil_(o.item_num_ceil_),
+                                                                                bucket_num_(o.bucket_num_),
+                                                                                slot_capacity_(o.slot_capacity_),
+                                                                                bucket_capacity_(o.bucket_capacity_),
+#if FPH_DY_DUAL_BUCKET_SET
+                        keys_first_part_ratio_(o.keys_first_part_ratio_),
+                        buckets_first_part_ratio_(o.buckets_first_part_ratio_),
+#endif
+                                                                                should_expand_item_num_(o.should_expand_item_num_),
+                                                                                filled_count_(o.filled_count_),
+                                                                                default_fill_key_(nullptr),
+                                                                                second_default_key_(nullptr),
+                                                                                default_fill_key_address_(nullptr),
+                                                                                default_fill_key_bucket_index_(o.default_fill_key_bucket_index_),
+                                                                                alloc_(alloc),
+                                                                                key_gen_(nullptr),
+                                                                                max_load_factor_(o.max_load_factor_),
+                                                                                bits_per_key_(o.bits_per_key_),
+                                                                                begin_it_(nullptr, nullptr),
+                                                                                seed2_test_table_(o.seed2_test_table_),
+                                                                                tested_hash_vec_(o.tested_hash_vec_),
+                                                                                random_table_(o.random_table_),
+                                                                                map_table_(o.map_table_),
+                                                                                bucket_array_(o.bucket_array_),
+                                                                                temp_byte_buf_vec_(o.temp_byte_buf_vec_),
+                                                                                temp_pair_buf_(o.temp_pair_buf_) {
+                    if (o.default_fill_key_ != nullptr) {
+                        KeyAllocator key_alloc{};
+                        default_fill_key_ = key_alloc.allocate(2);
+                        std::allocator_traits<KeyAllocator>::construct(key_alloc, default_fill_key_,
+                                                                       *o.default_fill_key_);
+                        second_default_key_ = default_fill_key_ + 1;
+                        std::allocator_traits<KeyAllocator>::construct(key_alloc, second_default_key_,
+                                                                       *o.second_default_key_);
+
+                    }
+                    KeyRNGAllocator key_gen_alloc;
+                    key_gen_ = key_gen_alloc.allocate(1);
+                    std::allocator_traits<KeyRNGAllocator>::construct(key_gen_alloc, key_gen_, *o.key_gen_);
+
+                }
+
+                FphTableParam(const FphTableParam& o):
+                        FphTableParam(o, std::allocator_traits<Allocator>::select_on_container_copy_construction(o.alloc_)) {}
+
+
+                ~FphTableParam() {
+                    KeyAllocator key_alloc{};
+                    if (default_fill_key_ != nullptr) {
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc, default_fill_key_);
+                        assert(second_default_key_ != nullptr);
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc, second_default_key_);
+                        key_alloc.deallocate(default_fill_key_, 2);
+                        default_fill_key_ = nullptr;
+                        second_default_key_ = nullptr;
+                    }
+                    if (key_gen_ != nullptr) {
+                        KeyRNGAllocator key_rng_alloc{};
+                        std::allocator_traits<KeyRNGAllocator>::destroy(key_rng_alloc, key_gen_);
+                        key_rng_alloc.deallocate(key_gen_, 1);
+                        key_gen_ = nullptr;
+                    }
+
+                }
+
+
+                // the number of items
+                size_t item_num_;
+                // max item num for current capacity, power of 2, equal to item_num_mas_ + 1
+                size_t item_num_ceil_;
+
+                size_t bucket_num_;
+                size_t slot_capacity_;
+                size_t bucket_capacity_;
+
+#if FPH_DY_DUAL_BUCKET_SET
+                double keys_first_part_ratio_;
+                double buckets_first_part_ratio_;
+#endif
+
+                // equals to item_num_ceil * max_load_factor
+                size_t should_expand_item_num_;
+
+                size_t filled_count_;
+
+
+                // key used to fill the empty slots except for the slot belongs to the default key itself
+                key_type *default_fill_key_;
+                key_type *second_default_key_;
+
+                slot_type *default_fill_key_address_;
+                size_t default_fill_key_bucket_index_;
+
+                Allocator alloc_;
+
+                RandomKeyGenerator *key_gen_;
+
+                float max_load_factor_;
+                float bits_per_key_;
+
+#if FPH_ENABLE_ITERATOR
+                iterator begin_it_;
+#endif
+
+                std::vector<bool, BoolAllocator> seed2_test_table_;
+                SizeTVector tested_hash_vec_;
+
+                SizeTVector random_table_;
+                SizeTVector map_table_;
+                std::vector<BucketType, BucketAllocator> bucket_array_;
+//                BucketType *bucket_array_;
+                // TODO: may use pointer to replace vector to save space
+
+                CharVector temp_byte_buf_vec_;
+                // buffer for rehash
+                CharVector temp_pair_buf_;
+
+            }; // struct FphTableParam
+            // can switch vector to pointer array to save more space
+//            static_assert(sizeof(FphTableParam) < 330);
+
+            FphTableParam *param_;
+
+            using TableParamAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<FphTableParam>;
+
+
+            constexpr static double DEFAULT_KEYS_FIRST_PART_RATIO = 0.5;
+            constexpr static double DEFAULT_BUCKETS_FIRST_PART_RATIO = 0.3;
+
+            static constexpr SeedHash hash_{}; // direct
+
+            static constexpr KeyEqual key_equal_{}; // direct
+
+            constexpr static double DEFAULT_MAX_LOAD_FACTOR = 0.6;
+            constexpr static double MAX_LOAD_FACTOR_UPPER_LIMIT = 0.98;
+            constexpr static double DEFAULT_BITS_PER_KEY = 2.0;
+            constexpr static size_t DEFAULT_INIT_ITEM_NUM_CEIL = 8;
+            constexpr static size_t DEFAULT_INIT_ITEM_NUM_MASK = 7;
+            static_assert(DEFAULT_INIT_ITEM_NUM_CEIL == DEFAULT_INIT_ITEM_NUM_MASK + 1U);
+
+
+            static constexpr size_t bucket_param_type_num_bits_ =
+                    std::numeric_limits<BucketParamType>::digits - 1;
+            static constexpr BucketParamType BUCKET_PARAM_MASK = dynamic::detail::GenBitMask<BucketParamType>(
+                    bucket_param_type_num_bits_);
+            static constexpr size_t MAX_ITEM_NUM_CEIL_LIMIT =
+                    size_t(1U) << bucket_param_type_num_bits_;
+            static_assert(BUCKET_PARAM_MASK + 1U == MAX_ITEM_NUM_CEIL_LIMIT);
+            static_assert(DEFAULT_INIT_ITEM_NUM_CEIL <= MAX_ITEM_NUM_CEIL_LIMIT);
+
+
+
+
+
+
+            void SwapImp(DynamicRawSet &o) noexcept {
+                using std::swap;
+                swap(slot_index_policy_, o.slot_index_policy_);
+//                swap(item_num_mask_, o.item_num_mask_);
+                swap(slot_, o.slot_);
+                swap(param_, o.param_);
+#if FPH_DY_DUAL_BUCKET_SET
+                swap(p1_, o.p1_); swap(p2_, o.p2_);
+                swap(p2_plus_1_, o.p2_plus_1_);
+                swap(p2_remain_, o.p2_remain_);
+#else
+//                swap(bucket_mask_, o.bucket_mask_);
+                swap(bucket_index_policy_, o.bucket_index_policy_);
+#endif
+                if (param_ != nullptr) {
+                    param_->begin_it_.SetTable(this);
+                }
+                if (o.param_ != nullptr) {
+                    o.param_->begin_it_.SetTable(std::addressof(o));
+                }
+                swap(seed0_, o.seed0_);
+                swap(seed1_, o.seed1_);
+                swap(seed2_, o.seed2_);
+                swap(bucket_p_array_, o.bucket_p_array_);
+
+            }
+
+            FPH_ALWAYS_INLINE size_t GetBucketIndex(size_t k_seed0_hash) const FPH_FUNC_RESTRICT noexcept {
+//                size_t temp_hash1 = hash_(key, seed1_);
+                size_t temp_hash1 = MidHash(k_seed0_hash, seed1_);
+#if FPH_DY_DUAL_BUCKET_SET
+                size_t temp_value = temp_hash1 & item_num_mask_;
+                size_t ret = temp_value < p1_ ? (temp_hash1 & p2_) : p2_plus_1_ + (temp_hash1 & p2_remain_);
+#else
+//                size_t ret = temp_hash1 & bucket_mask_;
+                size_t ret = bucket_index_policy_.MapToIndex(temp_hash1);
+#endif
+                return ret;
+            }
+
+            FPH_ALWAYS_INLINE size_t CompleteGetBucketIndex(const key_type& FPH_RESTRICT key) const FPH_FUNC_RESTRICT noexcept {
+//                size_t temp_hash1 = hash_(key, seed1_);
+                auto k_seed0_hash = hash_(key, seed0_);
+                size_t temp_hash1 = MidHash(k_seed0_hash, seed1_);
+#if FPH_DY_DUAL_BUCKET_SET
+                size_t temp_value = temp_hash1 & item_num_mask_;
+                size_t ret = temp_value < p1_ ? (temp_hash1 & p2_) : p2_plus_1_ + (temp_hash1 & p2_remain_);
+#else
+//                size_t ret = temp_hash1 & bucket_mask_;
+                size_t ret = bucket_index_policy_.MapToIndex(temp_hash1);
+#endif
+                return ret;
+            }
+
+
+
+            bool IsSlotEmpty(size_t pos) const FPH_FUNC_RESTRICT {
+                if FPH_LIKELY(slot_ + pos != param_->default_fill_key_address_) {
+                    return key_equal_(slot_[pos].key, *param_->default_fill_key_);
+                } else {
+                    return key_equal_(slot_[pos].key, *param_->second_default_key_);
+                }
+            }
+
+            bool IsSlotEmpty(const slot_type* FPH_RESTRICT slot_ptr) const FPH_FUNC_RESTRICT {
+                if FPH_LIKELY(slot_ptr != param_->default_fill_key_address_) {
+                    return key_equal_(slot_ptr->key, *param_->default_fill_key_);
+                } else {
+                    return key_equal_(slot_ptr->key, *param_->second_default_key_);
+                }
+            }
+
+            slot_type *GetNextSlotAddress(slot_type* FPH_RESTRICT pair_ptr) const FPH_FUNC_RESTRICT {
+                const auto *slot_end = slot_ + param_->item_num_ceil_;
+                for (size_t slot_dis = 1; slot_dis < param_->item_num_ceil_; ++slot_dis) {
+                    // TODO: test whether using branch-less will be faster
+//                    pair_ptr = slot_ + (++pair_ptr - slot_) & item_num_ceil_;
+                    if FPH_UNLIKELY(++pair_ptr >= slot_end) {
+                        pair_ptr = slot_;
+                    }
+                    if (!IsSlotEmpty(pair_ptr)) {
+                        return pair_ptr;
+                    }
+                }
+                return nullptr;
+            }
+
+            size_t GetNextSlotPos(size_t now_pos) const FPH_FUNC_RESTRICT {
+
+                size_t new_pos = now_pos;
+                for (size_t slot_dis = 1; slot_dis < param_->item_num_ceil_; ++slot_dis) {
+//                    new_pos = (++new_pos) & item_num_mask_;
+                    ++new_pos;
+                    if FPH_UNLIKELY(new_pos >= param_->item_num_ceil_) {
+                        new_pos = 0;
+                    }
+                    if (!IsSlotEmpty(new_pos)) {
+                        return new_pos;
+                    }
+                }
+                return std::numeric_limits<size_t>::max();
+
+            }
+
+            FPH_ALWAYS_INLINE static size_t MixSeedAndBit(size_t seed, uint32_t optional_bit) {
+                return seed + optional_bit;
+            }
+
+            static FPH_ALWAYS_INLINE size_t MixValue(size_t hash_value, size_t seed) {
+                return hash_value * seed;
+            }
+
+            static FPH_ALWAYS_INLINE size_t MidHash(size_t hash_k_seed0, size_t seed) {
+                return MixValue(hash_k_seed0, seed);
+            }
+
+            FPH_ALWAYS_INLINE size_t CompleteHash(const key_type& FPH_RESTRICT key, size_t seed) const FPH_FUNC_RESTRICT noexcept {
+                auto hash_k_seed0 = hash_(key, seed0_);
+                return MixValue(hash_k_seed0, seed);
+            }
+
+#if FPH_ENABLE_ITERATOR
+
+            // change begin()
+            void AddNewIterator(slot_type *address) {
+                param_->begin_it_ = iterator(address, this);
+            }
+
+#endif
+
+
+            /**
+             * Test whether there is collision in this bucket
+             * @tparam Bucket
+             * @tparam SeedTestTable make sure this is all zero, this will still be all zero after call
+             * @tparam TestedHashVec make sure this is empty, this will still be empty after call
+             * @param testing_bucket
+             * @param seed2_test_table
+             * @param tested_hash_vec
+             * @param seed
+             * @return true if pass the test
+             */
+            template<class Bucket, class SeedTestTable, class TestedHashVec>
+            bool
+            TestBucketSelfCollision(const Bucket &testing_bucket, SeedTestTable &seed2_test_table,
+                                    TestedHashVec &tested_hash_vec, size_t seed) {
+                bool test_pass_flag = true;
+                assert(tested_hash_vec.empty());
+                for (const key_type *key_ptr: testing_bucket.key_array) {
+                    // TODO: test whether test optional bit will accelerate the construction
+//                    auto temp_hash_value = hash_(*key_ptr, seed) & item_num_mask_;
+                    auto temp_hash_value = slot_index_policy_.MapToIndex(CompleteHash(*key_ptr, seed));
+//                    auto temp_hash_value = slot_index_policy_.MapToIndex(hash_(*key_ptr, seed));
+                    if FPH_UNLIKELY(seed2_test_table[temp_hash_value]) {
+                        test_pass_flag = false;
+                        break;
+                    }
+                    seed2_test_table[temp_hash_value] = true;
+                    tested_hash_vec.push_back(temp_hash_value);
+                }
+                while (!tested_hash_vec.empty()) {
+                    seed2_test_table[tested_hash_vec.back()] = false;
+                    tested_hash_vec.pop_back();
+                }
+                return test_pass_flag;
+            }
+
+            /**
+             * Test whether there is collision in this hash value vector
+             * @tparam HashVec
+             * @tparam SeedTestTable make sure this is all zero, this will still be all zero after call
+             * @tparam TestedHashVec make sure this is empty, this will still be empty after call
+             * @param hash_vec
+             * @param seed2_test_table
+             * @param tested_hash_vec
+             * @return true if pass the test
+             */
+            template<class HashVec, class SeedTestTable, class TestedHashVec>
+            bool TestHashVecSelfCollision(const HashVec &hash_vec, SeedTestTable &seed2_test_table,
+                                          TestedHashVec &tested_hash_vec) {
+                tested_hash_vec.clear();
+                bool test_pass_flag = true;
+                for (auto temp_hash: hash_vec) {
+                    auto temp_pos = slot_index_policy_.MapToIndex(temp_hash);
+                    if FPH_UNLIKELY(seed2_test_table[temp_pos]) {
+                        test_pass_flag = false;
+                        break;
+                    }
+                    seed2_test_table[temp_pos] = true;
+                    tested_hash_vec.push_back(temp_pos);
+                }
+                for (auto hash_value: tested_hash_vec) {
+                    seed2_test_table[hash_value] = false;
+                }
+                tested_hash_vec.clear();
+                return test_pass_flag;
+            }
+
+            template<class RandomTable, class MapTable>
+            static bool
+            IsRandomTableValid(const RandomTable &random_table, const MapTable &map_table) {
+                for (size_t i = 0; i < map_table.size(); ++i) {
+                    if (random_table[map_table[i]] != i) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            template<class BucketIt, class TestTable>
+            bool TestBucketsCollision(BucketIt bucket_begin, BucketIt bucket_end,
+                                      TestTable &test_table) {
+                bool test_passed_flag = true;
+                std::fill(test_table.begin(), test_table.end(), false);
+                for (auto bucket_it = bucket_begin; bucket_it != bucket_end; ++bucket_it) {
+                    auto &test_bucket = *bucket_it;
+                    for (const auto *key_ptr: test_bucket.key_array) {
+                        const auto &temp_key = *key_ptr;
+                        auto slot_pos = GetSlotPos(temp_key);
+                        if (test_table[slot_pos]) {
+                            test_passed_flag = false;
+                            break;
+                        }
+                        test_table[slot_pos] = true;
+                    }
+                    if (!test_passed_flag) {
+                        break;
+                    }
+                }
+                std::fill(test_table.begin(), test_table.end(), false);
+                return test_passed_flag;
+            }
+
+            template<class K, class... Args>
+            std::pair<iterator, bool> TryEmplaceImp(K&& key, Args&&... args) {
+                auto [slot_address, alloc_happen] = FindOrAlloc(key);
+                if (alloc_happen) {
+                    KeyAllocator key_alloc{};
+                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_address->key));
+                    std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                std::addressof(slot_address->mutable_value),
+                                                                std::piecewise_construct,
+                                                                std::forward_as_tuple(std::forward<K>(key)),
+                                                                std::forward_as_tuple(std::forward<Args>(args)...));
+                }
+                return {iterator(slot_address, this), alloc_happen};
+            }
+
+            template<int K, typename... Ts> using KthTypeOf =
+            typename std::tuple_element<K, std::tuple<Ts...>>::type;
+
+            template <int K, class... Ts>
+            constexpr static auto GetTupleElement(Ts&&... ts) {
+                return std::get<K>(std::forward_as_tuple(ts...));
+            }
+
+
+            template < std::size_t... Ns , typename... Ts >
+            static auto TupleTailImp( std::index_sequence<Ns...> , std::tuple<Ts...> t )
+            {
+                return std::make_tuple( std::get<Ns + 1u>(t)... );
+            }
+
+            template < typename... Ts >
+            static auto TupleTail( std::tuple<Ts...> t )
+            {
+                return  TupleTailImp( std::make_index_sequence<sizeof...(Ts) - 1u>() , t );
+            }
+
+            template<typename T>
+            using base_type = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+
+            template<typename T1, typename T2, typename = void>
+            struct is_base_same : std::false_type {};
+
+            template<typename T1, typename T2>
+            struct is_base_same<T1, T2, typename
+            std::enable_if<std::is_same<base_type<T1>, base_type<T2>>::value>::type> : std::true_type {};
+
+            template<class... Args, typename std::enable_if<is_base_same<KthTypeOf<0, Args...>, key_type>::value, int>::type = 0>
+            std::pair<iterator, bool> EmplaceImp(Args&&... args) {
+                auto [slot_address, alloc_happen] = FindOrAlloc(std::get<0>(std::forward_as_tuple(args...)));
+                if (alloc_happen) {
+                    KeyAllocator key_alloc{};
+                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_address->key));
+                    std::allocator_traits<Allocator>::construct(param_->alloc_, std::addressof(slot_address->mutable_value), std::forward<Args>(args)...);
+                }
+                return {iterator{slot_address, this}, alloc_happen};
+            }
+
+            template<class... Args, typename std::enable_if<!is_base_same<KthTypeOf<0, Args...>, key_type>::value, int>::type = 0>
+            std::pair<iterator, bool> EmplaceImp(Args&&... args) {
+                alignas(slot_type) uint8_t temp_slot_buf[sizeof(slot_type)];
+                slot_type* slot_ptr = reinterpret_cast<slot_type*>(temp_slot_buf);
+                std::allocator_traits<Allocator>::construct(param_->alloc_, std::addressof(slot_ptr->mutable_value), std::forward<Args>(args)...);
+                auto [slot_address, alloc_happen] = FindOrAlloc(slot_ptr->key);
+                if (alloc_happen) {
+                    KeyAllocator key_alloc{};
+                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_address->key));
+                    std::allocator_traits<Allocator>::construct(param_->alloc_, std::addressof(slot_address->mutable_value), std::move(slot_ptr->mutable_value));
+                }
+                std::allocator_traits<Allocator>::destroy(param_->alloc_, std::addressof(slot_ptr->mutable_value));
+                return {iterator(slot_address, this), alloc_happen};
+            }
+
+            std::pair<iterator, bool> InsertImp(const value_type &value) {
+                const slot_type& src_slot = *slot_type::GetSlotAddressByValueAddress(&value);
+                auto [slot_address, alloc_happen] = FindOrAlloc(src_slot.key);
+                if (alloc_happen) {
+                    KeyAllocator key_alloc{};
+                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_address->key));
+                    std::allocator_traits<Allocator>::construct(param_->alloc_, std::addressof(slot_address->mutable_value), value);
+                }
+                return {iterator(slot_address, this), alloc_happen};
+            }
+
+            std::pair<iterator, bool> InsertImp(value_type &&value) {
+                const slot_type& src_slot = *slot_type::GetSlotAddressByValueAddress(&value);
+                auto [slot_address, alloc_happen] = FindOrAlloc(src_slot.key);
+                if (alloc_happen) {
+                    KeyAllocator key_alloc{};
+                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_address->key));
+                    std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                std::addressof(slot_address->mutable_value), std::move(value));
+                }
+                return {iterator(slot_address, this), alloc_happen};
+            }
+
+            iterator EraseImp(const_iterator iter) {
+                auto *slot_ptr = iter.value_ptr();
+                size_t bucket_index = CompleteGetBucketIndex(slot_ptr->key);
+                auto &temp_bucket = param_->bucket_array_[bucket_index];
+#ifndef NDEBUG
+                bool find_key_flag = false;
+#endif
+                for (size_t i = 0; i < temp_bucket.key_array.size(); ++i) {
+                    if FPH_UNLIKELY(temp_bucket.key_array[i] == std::addressof(slot_ptr->key)) {
+                        temp_bucket.key_array.erase(temp_bucket.key_array.begin() + i);
+#ifndef NDEBUG
+                        find_key_flag = true;
+#endif
+                        break;
+                    }
+                }
+#ifndef NDEBUG
+                assert(find_key_flag);
+#endif
+                --temp_bucket.entry_cnt;
+                auto slot_pos = slot_ptr - slot_;
+                assert(slot_pos >= 0 && size_t(slot_pos) < (param_->item_num_ceil_));
+                auto y_pos = param_->map_table_[slot_pos];
+                assert(y_pos < param_->filled_count_);
+                std::swap(param_->random_table_[param_->filled_count_ - 1],
+                          param_->random_table_[y_pos]);
+                std::swap(param_->map_table_[param_->random_table_[param_->filled_count_ - 1]],
+                          param_->map_table_[param_->random_table_[y_pos]]);
+                --param_->filled_count_;
+
+
+                std::allocator_traits<Allocator>::destroy(param_->alloc_, std::addressof(slot_ptr->mutable_value));
+                KeyAllocator key_alloc{};
+                if FPH_LIKELY(size_t(slot_ptr - slot_) != GetSlotPos(*param_->default_fill_key_)) {
+                    std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                   std::addressof(slot_ptr->key),
+                                                                   *param_->default_fill_key_);
+                }
+                else {
+                    std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                   std::addressof(slot_ptr->key),
+                                                                   *param_->second_default_key_);
+                }
+
+                --param_->item_num_;
+#if FPH_DEBUG_ERROR
+                if FPH_UNLIKELY(!IsSlotEmpty(slot_ptr)) {
+                    fprintf(stderr, "Error, slot not empty after erase\n");
+                }
+#endif
+                auto *next_slot_ptr = GetNextSlotAddress(slot_ptr);
+
+//                if (param_->begin_it_.value_ptr() == slot_ptr) {
+                param_->begin_it_ = iterator(next_slot_ptr, this);
+//                }
+                return iterator(next_slot_ptr, this);
+            }
+
+            iterator EraseImp(const_iterator first, const_iterator last) {
+                const_iterator it = first;
+                for (; it != last; ) {
+                    it = this->EraseImp(it);
+                }
+                return iterator(it.value_ptr(), this);
+            }
+
+            size_type EraseImp(const key_type& key) {
+                size_t ret = 0U;
+                auto pos = GetSlotPos(key);
+                auto *slot_ptr = slot_ + pos;
+                if (key_equal_(slot_ptr->key, key)) {
+                    ret = 1U;
+                    this->EraseImp(iterator(slot_ptr, this));
+#if FPH_DEBUG_ERROR
+                    if FPH_UNLIKELY(!IsSlotEmpty(slot_ptr)) {
+                        fprintf(stderr, "Error, slot not empty after erase const key&\n");
+                    }
+#endif
+                }
+                return ret;
+            }
+
+
+
+            std::pair<slot_type*, bool> FindOrAlloc(const key_type& key) {
+
+                if FPH_UNLIKELY(param_->item_num_ + 1U > param_->should_expand_item_num_ &&
+                                dynamic::detail::Ceil2(param_->item_num_ceil_ + 1U) <=
+                                MAX_ITEM_NUM_CEIL_LIMIT) {
+                    rehash(param_->item_num_ceil_ + 1U);
+                }
+                auto k_seed0_hash = hash_(key, seed0_);
+                auto possible_pos = GetSlotPosBySeed0Hash(k_seed0_hash);
+//                auto possible_pos = GetSlotPos(key);
+                auto *insert_address = slot_ + possible_pos;
+                bool insert_flag;
+                if (key_equal_(insert_address->key, key)) {
+                    insert_flag = false;
+                }
+                else {
+
+
+
+
+                    if (IsSlotEmpty(possible_pos)) {
+                        auto y_pos = param_->map_table_[possible_pos];
+                        assert(y_pos >= param_->filled_count_);
+                        std::swap(param_->random_table_[param_->filled_count_], param_->random_table_[y_pos]);
+                        std::swap(param_->map_table_[param_->random_table_[param_->filled_count_]],
+                                  param_->map_table_[param_->random_table_[y_pos]]);
+                        ++param_->filled_count_;
+                        auto bucket_index = GetBucketIndex(k_seed0_hash);
+//                        auto bucket_index = GetBucketIndex(key);
+                        auto &temp_bucket = param_->bucket_array_[bucket_index];
+                        temp_bucket.key_array.push_back(&(insert_address->key));
+                        ++temp_bucket.entry_cnt;
+                        insert_flag = true;
+                        AddNewIterator(insert_address);
+                        ++param_->item_num_;
+                        return {insert_address, true};
+                    }
+                    else {
+                        insert_flag = false;
+
+                        // for later use
+                        size_t original_default_key_pos = GetSlotPos(*param_->default_fill_key_);
+                        assert(original_default_key_pos + slot_ == param_->default_fill_key_address_);
+                        // 1 for empty, 0 for filled
+                        int original_default_key_pos_empty_status = IsSlotEmpty(original_default_key_pos);
+                        auto bucket_index = GetBucketIndex(k_seed0_hash);
+//                        size_t bucket_index = GetBucketIndex(key);
+                        auto bucket_param = bucket_p_array_[bucket_index];
+                        auto bucket_offset = bucket_param >> 1U;
+                        auto optional_bit = bucket_param & 0x1U;
+
+                        bool pattern_matched_flag = false;
+
+                        auto &temp_bucket = param_->bucket_array_[bucket_index];
+
+                        temp_bucket.key_array.push_back(&key);
+                        bool is_first_try = true;
+
+                        std::vector<size_t, SizeTAllocator> bucket_pattern;
+
+                        for (auto bucket_try_bit = optional_bit; bucket_try_bit < 2U; ++bucket_try_bit) {
+
+                            auto try_seed = MixSeedAndBit(seed2_, bucket_try_bit);
+
+
+                            bucket_pattern.clear();
+
+                            for (const auto *key_ptr: temp_bucket.key_array) {
+                                size_t temp_hash = CompleteHash(*key_ptr, try_seed);
+//                                size_t temp_hash = hash_(*key_ptr, try_seed);
+//                                size_t temp_hash = hash_(*key_ptr, try_seed) & item_num_mask_;
+                                bucket_pattern.push_back(temp_hash);
+                            }
+
+                            if (is_first_try) {
+                                size_t total_pattern_num = bucket_pattern.size();
+                                if (total_pattern_num < 1) {
+                                    // error should at least be 1
+                                    break;
+                                }
+                                for (size_t i = 0; i < total_pattern_num - 1U; ++i) {
+                                    auto original_hash = bucket_pattern[i];
+                                    auto temp_pos = slot_index_policy_.MapToIndex(original_hash + slot_index_policy_.ReverseMap(bucket_offset));
+//                                    auto temp_pos =
+//                                            (original_hash + bucket_offset) & item_num_mask_;
+                                    auto y_pos = param_->map_table_[temp_pos];
+                                    assert(y_pos < param_->filled_count_);
+                                    std::swap(param_->random_table_[param_->filled_count_ - 1],
+                                              param_->random_table_[y_pos]);
+                                    std::swap(param_->map_table_[param_->random_table_[param_->filled_count_ - 1]],
+                                              param_->map_table_[param_->random_table_[y_pos]]);
+                                    --param_->filled_count_;
+                                }
+                            }
+                            is_first_try = false;
+
+                            // test collision in this bucket if try_bit == 1
+
+                            bool self_collision_flag = !TestHashVecSelfCollision(bucket_pattern,
+                                                                                 param_->seed2_test_table_,
+                                                                                 param_->tested_hash_vec_);
+                            if (self_collision_flag) {
+                                continue;
+                            }
+
+                            size_t item_num_mask = param_->item_num_ceil_ - size_t(1ULL);
+
+                            for (size_t search_pos_begin = param_->filled_count_;
+                                 search_pos_begin < param_->item_num_ceil_; ++search_pos_begin) {
+//                                size_t temp_offset =
+//                                        (param_->item_num_ceil_ + param_->random_table_[search_pos_begin]
+//                                         - bucket_pattern[0]) & item_num_mask_;
+                                size_t temp_offset = (param_->item_num_ceil_ + param_->random_table_[search_pos_begin]
+                                                      - slot_index_policy_.MapToIndex(bucket_pattern[0])) & item_num_mask;
+
+                                bool this_offset_passed_flag = true;
+                                for (auto temp_hash_value: bucket_pattern) {
+                                    auto temp_pos = slot_index_policy_.MapToIndex(temp_hash_value +
+                                                                                  slot_index_policy_.ReverseMap(temp_offset));
+//                                    auto temp_pos =
+//                                            (temp_hash_value + temp_offset) & item_num_mask_;
+                                    if (param_->map_table_[temp_pos] < param_->filled_count_) {
+                                        this_offset_passed_flag = false;
+                                        break;
+                                    }
+                                }
+                                if (this_offset_passed_flag) {
+                                    pattern_matched_flag = true;
+                                    for (auto temp_hash_value: bucket_pattern) {
+                                        auto temp_pos = slot_index_policy_.MapToIndex(temp_hash_value +
+                                                                                      slot_index_policy_.ReverseMap(temp_offset));
+//                                        auto temp_pos =
+//                                                (temp_hash_value + temp_offset) & item_num_mask_;
+                                        auto y_pos = param_->map_table_[temp_pos];
+                                        std::swap(param_->random_table_[param_->filled_count_],
+                                                  param_->random_table_[y_pos]);
+                                        std::swap(param_->map_table_[param_->random_table_[param_->filled_count_]],
+                                                  param_->map_table_[param_->random_table_[y_pos]]);
+                                        ++param_->filled_count_;
+                                    }
+                                    bucket_p_array_[temp_bucket.index] =
+                                            (temp_offset << 1) | bucket_try_bit;
+
+                                    break;
+                                }
+                            }
+
+                            if (pattern_matched_flag) {
+                                break;
+                            }
+
+                        } // for bucket_try_bit
+
+                        if (!pattern_matched_flag) {
+                            assert(param_->item_num_ < param_->item_num_ceil_);
+                            param_->temp_pair_buf_.resize((param_->item_num_ + 1) * sizeof(value_type));
+                            value_type *temp_value_buf_start =
+                                    reinterpret_cast<value_type*>(param_->temp_pair_buf_.data());
+                            value_type *temp_value_buf = temp_value_buf_start;
+                            KeyAllocator key_alloc;
+                            for (auto it = begin(); it != end(); ) {
+                                std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                            temp_value_buf++, std::move(*it));
+                                ++it;
+                            }
+
+                            slot_type* temp_slot_ptr =
+                                    slot_type::GetSlotAddressByValueAddress(temp_value_buf);
+                            std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                           std::addressof(temp_slot_ptr->key), key);
+
+                            ++param_->item_num_;
+                            Build<true, true, true>(temp_value_buf_start,
+                                                    temp_value_buf_start + param_->item_num_, seed1_,
+#if FPH_DEBUG_FLAG
+                                    true, // verbose
+#else
+                                                    false,
+#endif
+                                                    param_->bits_per_key_,
+#if FPH_DY_DUAL_BUCKET_SET
+                                    keys_first_part_ratio_, buckets_first_part_ratio_
+#else
+                                                    DEFAULT_KEYS_FIRST_PART_RATIO, DEFAULT_BUCKETS_FIRST_PART_RATIO
+#endif
+                            );
+                            size_t temp_value_cnt = 0;
+                            for(auto *temp_value_ptr = temp_value_buf_start; temp_value_ptr != temp_value_buf_start + param_->item_num_; temp_value_ptr++) {
+                                ++temp_value_cnt;
+                                if (temp_value_cnt < param_->item_num_) {
+                                    std::allocator_traits<Allocator>::destroy(param_->alloc_,
+                                                                              temp_value_ptr);
+                                }
+                                else {
+                                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_type::GetSlotAddressByValueAddress(temp_value_ptr)->key));
+                                }
+                            }
+                            auto temp_pos = GetSlotPos(key);
+                            insert_address = slot_ + temp_pos;
+                        }
+                        else {
+
+                            param_->temp_byte_buf_vec_.resize(
+                                    sizeof(slot_type) * temp_bucket.key_array.size());
+                            auto *temp_pair_buf = reinterpret_cast<slot_type *>(param_->temp_byte_buf_vec_.data());
+                            bool contain_default_fill_key_flag = false, contain_second_fill_key_flag = false;
+                            const auto temp_new_default_fill_key_pos = GetSlotPos(
+                                    *param_->default_fill_key_);
+                            KeyAllocator key_alloc;
+
+                            bool fill_new_default_key_pos_with_second_key_flag = false;
+
+                            // prevent overlap from elements in the same bucket in slots
+                            for (size_t i = 0; i + 1U < temp_bucket.key_array.size(); ++i) {
+                                const key_type *key_ptr = temp_bucket.key_array[i];
+                                auto original_slot_pos = GetSlotPos(*key_ptr, bucket_offset,
+                                                                    optional_bit);
+                                slot_type *temp_pair_ptr = temp_pair_buf + i;
+                                if FPH_UNLIKELY(key_equal_(*key_ptr, *param_->default_fill_key_)) {
+                                    contain_default_fill_key_flag = true;
+                                }
+                                if FPH_UNLIKELY(key_equal_(*key_ptr, *param_->second_default_key_)) {
+                                    contain_second_fill_key_flag = true;
+                                }
+                                auto *original_slot_address = slot_ + original_slot_pos;
+
+                                std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                            std::addressof(temp_pair_ptr->mutable_value),
+                                                                            std::move(original_slot_address->mutable_value));
+                                // fill the free slot with default fill key
+                                std::allocator_traits<Allocator>::destroy(param_->alloc_,
+                                                                          std::addressof(original_slot_address->mutable_value));
+                                if FPH_LIKELY(original_slot_pos != temp_new_default_fill_key_pos) {
+                                    std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                                   std::addressof(original_slot_address->key), *param_->default_fill_key_);
+                                } else {
+                                    std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                                   std::addressof(original_slot_address->key), *param_->second_default_key_);
+                                    fill_new_default_key_pos_with_second_key_flag = true;
+                                    if FPH_UNLIKELY(original_slot_pos == original_default_key_pos) {
+                                        original_default_key_pos_empty_status = 1;
+                                    }
+                                }
+
+                            }
+                            for (size_t i = 0; i + 1U < temp_bucket.key_array.size(); ++i) {
+                                slot_type *src_pair_ptr = temp_pair_buf + i;
+                                auto new_slot_pos = GetSlotPos(src_pair_ptr->key);
+                                std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_[new_slot_pos].key));
+                                std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                            std::addressof(slot_[new_slot_pos].mutable_value),
+                                                                            std::move(src_pair_ptr->mutable_value));
+                                std::allocator_traits<Allocator>::destroy(param_->alloc_, std::addressof(src_pair_ptr->mutable_value));
+                                temp_bucket.key_array[i] = &slot_[new_slot_pos].key;
+                                if FPH_UNLIKELY(new_slot_pos == original_default_key_pos) {
+                                    original_default_key_pos_empty_status = 0;
+                                }
+                            }
+
+
+                            // when default fill key bucket param changes or second fill key
+                            // param changes, default_fill_key position may equal to second_default_key
+                            // position, then need to re generate second_default_key
+
+
+                            size_t cur_default_fill_key_pos = GetSlotPos(*param_->default_fill_key_);
+                            if (cur_default_fill_key_pos == GetSlotPos(*param_->second_default_key_)) {
+                                auto new_second_fill_key = (*param_->key_gen_)();
+
+                                size_t try_gen_second_key_cnt = 0;
+                                while (cur_default_fill_key_pos ==
+                                       GetSlotPos(new_second_fill_key) || key_equal_(new_second_fill_key, param_->default_fill_key_address_->key) ) {
+                                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, &new_second_fill_key);
+                                    std::allocator_traits<KeyAllocator>::construct(key_alloc, &new_second_fill_key, (*param_->key_gen_)());
+//                                    new_second_fill_key = (*param_->key_gen_)();
+#if !defined(NDEBUG) && FPH_DEBUG_FLAG
+                                    if (try_gen_second_key_cnt > 100ULL) {
+                                        int a = 0;
+                                    }
+#endif
+                                    // TODO: free the memory when throw
+                                    if FPH_UNLIKELY(++try_gen_second_key_cnt > 10000ULL) {
+                                        throw std::runtime_error("Failed to find second default key "
+                                                                 "with different position than the first default key, maybe "
+                                                                 "the seed hash is not strong enough or the key generator "
+                                                                 "cannot generate enough different keys");
+                                    }
+                                }
+                                if (original_default_key_pos_empty_status) {
+                                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(param_->default_fill_key_address_->key));
+                                    std::allocator_traits<KeyAllocator>::construct(key_alloc, std::addressof(param_->default_fill_key_address_->key), new_second_fill_key);
+                                }
+                                if (!contain_second_fill_key_flag && fill_new_default_key_pos_with_second_key_flag
+                                    && key_equal_(slot_[cur_default_fill_key_pos].key, *param_->second_default_key_)) {
+                                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_[cur_default_fill_key_pos].key));
+                                    std::allocator_traits<KeyAllocator>::construct(key_alloc, std::addressof(slot_[cur_default_fill_key_pos].key), new_second_fill_key);
+                                }
+                                std::allocator_traits<KeyAllocator>::destroy(key_alloc, param_->second_default_key_);
+                                std::allocator_traits<KeyAllocator>::construct(key_alloc, param_->second_default_key_, new_second_fill_key);
+                            }
+
+                            if (bucket_index == param_->default_fill_key_bucket_index_) {
+                                size_t new_bucket_param = bucket_p_array_[bucket_index];
+                                if (new_bucket_param != bucket_param) {
+                                    auto new_default_key_pos = GetSlotPos(*param_->default_fill_key_);
+                                    auto new_default_key_address = slot_ + new_default_key_pos;
+                                    if (!contain_default_fill_key_flag) {
+                                        if (key_equal_(slot_[new_default_key_pos].key,
+                                                       *param_->default_fill_key_)) {
+                                            std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_[new_default_key_pos].key));
+                                            std::allocator_traits<KeyAllocator>::construct(key_alloc, std::addressof(slot_[new_default_key_pos].key), *param_->second_default_key_);
+                                        }
+
+                                        auto second_default_key_pos = GetSlotPos(*param_->second_default_key_);
+                                        auto second_default_key_address = slot_ + second_default_key_pos;
+                                        // fill the old address
+                                        if (new_default_key_address != param_->default_fill_key_address_ &&
+                                            key_equal_(param_->default_fill_key_address_->key,
+                                                       *param_->second_default_key_) &&
+                                            !(contain_second_fill_key_flag && param_->default_fill_key_address_ ==
+                                                                              second_default_key_address)) {
+                                            std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(param_->default_fill_key_address_->key));
+                                            std::allocator_traits<KeyAllocator>::construct(key_alloc, std::addressof(param_->default_fill_key_address_->key), *param_->default_fill_key_);
+                                        }
+                                    }
+
+                                    param_->default_fill_key_address_ = new_default_key_address;
+                                }
+#ifndef NDEBUG
+                                {
+                                    auto temp_default_key_pos = GetSlotPos(*param_->default_fill_key_);
+                                    assert(slot_ + temp_default_key_pos ==
+                                           param_->default_fill_key_address_);
+                                }
+#endif
+                            }
+
+
+                            auto temp_pos = GetSlotPos(key);
+                            insert_address = slot_ + temp_pos;
+#ifndef NDEBUG
+                            assert(IsSlotEmpty(temp_pos));
+#endif
+
+                            temp_bucket.key_array.back() = std::addressof(insert_address->key);
+                            ++temp_bucket.entry_cnt;
+                            AddNewIterator(insert_address);
+                            ++param_->item_num_;
+                        } // else of if (!pattern_matched_flag)
+
+                        insert_flag = true;
+
+                    } // else of if IsSlotEmpty(possible_pos)
+
+                } // else of if FPH_UNLIKELY(key_equal_(insert_address->key, key))
+
+
+                return std::make_pair(insert_address, insert_flag);
+            }
+
+            void DestroySlots() {
+                if (slot_ != nullptr) {
+                    KeyAllocator key_alloc{};
+                    for (size_t i = 0; i < param_->item_num_ceil_; ++i) {
+                        if (IsSlotEmpty(i)) {
+                            std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_[i].key));
+                        }
+                        else {
+                            std::allocator_traits<Allocator>::destroy(param_->alloc_, std::addressof(slot_[i].mutable_value));
+                        }
+                    }
+                }
+            }
+
+
+            template<bool is_rehash, bool use_move, bool last_element_only_has_key=false, class InputIt>
+            void BuildImp(InputIt pair_begin, InputIt pair_end, uint64_t seed = 0,
+                          bool verbose = false, double c = 3.0,
+                          double keys_first_part_ratio = 0.6, double buckets_first_part_ratio = 0.3,
+                          size_t max_try_seed0_time = 10,
+                          size_t max_try_seed1_time = 10, size_t max_try_seed2_time = 1000,
+                          size_t max_reseed2_time = 1000) {
+
+
+                auto build_start_time = std::chrono::high_resolution_clock::now();
+
+                if FPH_UNLIKELY(c < 1.45) {
+                    throw std::invalid_argument("c must be no less than 1.45");
+                }
+
+                if FPH_UNLIKELY(keys_first_part_ratio < 0.0 || keys_first_part_ratio > 1.0) {
+                    throw std::invalid_argument("keys_first_part_ratio must be in [0.0, 1.0]");
+                }
+
+                if FPH_UNLIKELY(buckets_first_part_ratio < 0.0 || buckets_first_part_ratio > 1.0) {
+                    throw std::invalid_argument("buckets_first_part_ratio must be in [0.0, 1.0]");
+                }
+
+
+                param_->bits_per_key_ = c;
+
+                auto temp_key_num = std::distance(pair_begin, pair_end);
+
+
+                if FPH_UNLIKELY(temp_key_num < 0) {
+                    throw std::invalid_argument("Input pair_begin > pair_end");
+                    return;
+                }
+
+                if (is_rehash) {
+#ifndef NDEBUG
+//                    if (temp_key_num != param_->item_num_) {
+//                        fprintf(stderr, "Error, temp_key_num(%lld) != param_->item_num_(%zu)\n",
+//                                temp_key_num, param_->item_num_);
+//                    }
+                    assert(size_t(temp_key_num) == param_->item_num_);
+#endif
+
+                }
+
+
+                size_t key_num = temp_key_num;
+
+                const size_t old_slot_capacity = param_->slot_capacity_;
+                const size_t old_bucket_capacity = param_->bucket_capacity_;
+
+                // destroy the previous slot objects
+                DestroySlots();
+
+                param_->item_num_ = key_num;
+
+                if (key_num != 0) {
+//                    size_t temp_slot_num = size_t((double)key_num / MAX_LOAD_FACTOR_UPPER_LIMIT);
+                    if (!is_rehash) {
+                        slot_index_policy_.UpdateBySlotNum(size_t((double)key_num / MAX_LOAD_FACTOR_UPPER_LIMIT));
+//                        item_num_mask_ = dynamic::detail::CeilToMask(size_t(key_num / MAX_LOAD_FACTOR_UPPER_LIMIT));
+                    } else {
+                        // item_num_mask_ should be set before call Build()
+                    }
+                    size_t temp_slot_num = slot_index_policy_.slot_num();
+                    temp_slot_num = std::max(temp_slot_num, DEFAULT_INIT_ITEM_NUM_CEIL);
+                    temp_slot_num = std::min(temp_slot_num, MAX_ITEM_NUM_CEIL_LIMIT);
+                    slot_index_policy_.UpdateBySlotNum(temp_slot_num);
+//                    item_num_mask_ = std::max(item_num_mask_, DEFAULT_INIT_ITEM_NUM_MASK);
+//                    item_num_mask_ = std::min(item_num_mask_, size_t(BUCKET_PARAM_MASK));
+                } else {
+                    if (!is_rehash) {
+                        slot_index_policy_.UpdateBySlotNum(DEFAULT_INIT_ITEM_NUM_CEIL);
+//                        item_num_mask_ = DEFAULT_INIT_ITEM_NUM_MASK;
+                    }
+                }
+                param_->item_num_ceil_ = slot_index_policy_.slot_num();
+//                param_->item_num_ceil_ = item_num_mask_ + 1U;
+
+                param_->should_expand_item_num_ = std::ceil(param_->item_num_ceil_ * param_->max_load_factor_);
+
+                if (key_num > param_->item_num_ceil_) {
+                    throw std::invalid_argument("BucketParamType num_bits: " +
+                                                std::to_string(bucket_param_type_num_bits_) +
+                                                " ,key number: " + std::to_string(key_num));
+                    return;
+
+                }
+
+                param_->slot_capacity_ = std::max(param_->item_num_ceil_, param_->slot_capacity_);
+
+
+                // mapping
+
+
+                size_t temp_bucket_num = (key_num > 0 && !is_rehash) ?
+                                         std::ceil(param_->bits_per_key_ * key_num /
+                                                   std::ceil(std::log2(key_num) + 1))
+                                                                     :
+                                         std::ceil(param_->bits_per_key_ * param_->item_num_ceil_ /
+                                                   std::ceil(std::log2(param_->item_num_ceil_) + 1));
+
+#if FPH_DY_DUAL_BUCKET_SET
+                buckets_first_part_ratio_ = buckets_first_part_ratio;
+                keys_first_part_ratio_ = keys_first_part_ratio;
+
+                size_t temp_p2 = std::llround((double) temp_bucket_num * buckets_first_part_ratio_);
+                p2_ = dynamic::detail::CeilToMask(temp_p2);
+                p2_plus_1_ = p2_ + 1U;
+
+                size_t temp_p2_remain = p2_ + 2U <= temp_bucket_num ? (temp_bucket_num - p2_ - 2U) : 0;
+                p2_remain_ = dynamic::detail::CeilToMask(temp_p2_remain);
+
+                param_->bucket_num_ = p2_ + p2_remain_ + 2U;
+
+                double real_keys_first_part_ratio = keys_first_part_ratio *
+                                (double(p2_) / param_->bucket_num_ / buckets_first_part_ratio_ );
+                size_t temp_p1 = std::llround(param_->item_num_ceil_ * real_keys_first_part_ratio);
+                p1_ = temp_p1;
+
+#else
+                param_->bucket_num_ = dynamic::detail::Ceil2(temp_bucket_num);
+                if (param_->bucket_num_ <= 1UL) {
+                    param_->bucket_num_ = 2U;
+                }
+//                bucket_mask_ = param_->bucket_num_ - 1U;
+                bucket_index_policy_.UpdateBySlotNum(param_->bucket_num_);
+#endif
+
+                param_->bucket_capacity_ = std::max(param_->bucket_num_, param_->bucket_capacity_);
+
+                if (old_bucket_capacity < param_->bucket_capacity_ || bucket_p_array_ == nullptr) {
+                    BucketParamAllocator bucket_param_alloc;
+                    if (bucket_p_array_ != nullptr) {
+                        bucket_param_alloc.deallocate(bucket_p_array_, old_bucket_capacity);
+                        bucket_p_array_ = nullptr;
+                    }
+                    bucket_p_array_ = bucket_param_alloc.allocate(param_->bucket_capacity_);
+                }
+
+
+                if (verbose) {
+                    size_t buckets_use_bytes = param_->bucket_num_ * sizeof(BucketParamType);
+                    fprintf(stderr, "dynamic fph map, is_rehash: %d, c: %.3f,  use %zu bucket num, "
+                                    "%zu ceil item num, %zu item num, %zu key num, "
+                                    "buckets use memory: %zu bytes, %.3f bits per key up-bound, ",
+                            is_rehash, c, param_->bucket_num_, param_->item_num_ceil_, param_->item_num_, key_num,
+                            buckets_use_bytes, buckets_use_bytes * 8.0 / param_->item_num_ceil_);
+#if FPH_DY_DUAL_BUCKET_SET
+                    fprintf(stderr, "p1: %lu, p2: %lu, ", p1_, p2_);
+#endif
+                }
+
+
+                param_->bucket_array_.reserve(param_->bucket_num_);
+
+                std::mt19937_64 random_engine(seed);
+                std::uniform_int_distribution<size_t> random_dis;
+
+                bool build_succeed_flag = false;
+
+                for (size_t try_seed0_time = 0; try_seed0_time < max_try_seed0_time; ++ try_seed0_time) {
+
+                    seed0_ = random_dis(random_engine);
+                    seed0_ |= size_t(1ULL);
+
+                    for (size_t try_seed1_time = 0; try_seed1_time < max_try_seed1_time; ++try_seed1_time) {
+
+#if !defined(NDEBUG) && FPH_DEBUG_FLAG
+                        if (try_seed1_time >= max_try_seed1_time / 2) {
+                            (void)0;
+                        }
+#endif
+
+                        seed1_ = random_dis(random_engine);
+                        seed1_ |= size_t(1ULL);
+
+                        // ordering
+
+
+                        size_t max_bucket_size = 0;
+
+
+                        param_->bucket_array_.resize(0);
+                        for (size_t i = 0; i < param_->bucket_num_; ++i) {
+                            param_->bucket_array_.emplace_back(i);
+                        }
+
+                        auto update_bucket_func = [&](const value_type &value) {
+                            const auto *slot_ptr = reinterpret_cast<const slot_type *>(&value);
+//                            size_t hash_value = GetBucketIndex(slot_ptr->key);
+                            size_t hash_value = CompleteGetBucketIndex(slot_ptr->key);
+                            assert(hash_value < param_->bucket_num_);
+                            auto &temp_bucket = param_->bucket_array_[hash_value];
+                            ++temp_bucket.entry_cnt;
+                            max_bucket_size =
+                                    temp_bucket.entry_cnt > max_bucket_size ? temp_bucket.entry_cnt
+                                                                            : max_bucket_size;
+                            temp_bucket.AddKey(&(slot_ptr->key));
+                        };
+
+                        for (auto it = pair_begin; it != pair_end; ++it) {
+                            update_bucket_func(*it);
+                        }
+
+                        std::vector<size_t, SizeTAllocator> sorted_index_array;
+                        sorted_index_array.resize(param_->bucket_num_);
+
+                        detail::CountSortOutIndex<BucketGetKey<BucketType>, true, SizeTAllocator>
+                                                                                  (param_->bucket_array_.begin(), param_->bucket_array_.end(), sorted_index_array.begin(),
+                                                                                          max_bucket_size);
+
+
+                        // searching
+
+
+                        // try to find seed2_ which makes no collision per bucket
+                        param_->seed2_test_table_.resize(param_->item_num_ceil_, false);
+                        param_->tested_hash_vec_.clear();
+
+                        param_->random_table_.resize(param_->item_num_ceil_);
+                        param_->map_table_.resize(param_->item_num_ceil_);
+
+
+
+                        for (size_t try_seed2_time = 0; try_seed2_time < max_try_seed2_time; ++try_seed2_time) {
+
+                            bool found_useful_seed2 = false;
+                            for (size_t seed_time = 0; seed_time < max_reseed2_time; ++seed_time) {
+                                seed2_ = random_dis(random_engine);
+                                seed2_ |= size_t(1ULL);
+
+                                bool pass_test_flag = true;
+                                for (size_t i = 0; i < param_->bucket_num_; ++i) {
+                                    auto &testing_bucket = param_->bucket_array_[sorted_index_array[i]];
+                                    pass_test_flag &= TestBucketSelfCollision(testing_bucket,
+                                                                              param_->seed2_test_table_,
+                                                                              param_->tested_hash_vec_, seed2_);
+
+                                    if (!pass_test_flag) {
+                                        break;
+                                    }
+                                }
+                                if (pass_test_flag) {
+                                    found_useful_seed2 = true;
+                                    break;
+                                }
+
+                            }
+                            if (!found_useful_seed2) {
+                                continue;
+                            }
+
+
+                            for (size_t i = 0; i < param_->item_num_ceil_; ++i) {
+                                param_->random_table_[i] = i;
+                            }
+                            std::shuffle(param_->random_table_.begin(), param_->random_table_.end(), random_engine);
+                            for (size_t i = 0; i < param_->item_num_ceil_; ++i) {
+                                param_->map_table_[param_->random_table_[i]] = i;
+                            }
+
+                            //                        assert(IsRandomTableValid(param_->random_table_, param_->map_table_));
+                            param_->filled_count_ = 0;
+
+                            std::vector<size_t, SizeTAllocator> bucket_pattern;
+                            bucket_pattern.reserve(max_bucket_size);
+
+                            bool this_try_seed2_succeed_flag = true;
+
+                            for (size_t bucket_index = 0; bucket_index < param_->bucket_num_; ++bucket_index) {
+                                auto &temp_bucket = param_->bucket_array_[sorted_index_array[bucket_index]];
+                                if (temp_bucket.entry_cnt == 0) {
+                                    continue;
+                                }
+
+                                bool pattern_matched_flag = false;
+
+                                for (size_t bucket_try_bit = 0; bucket_try_bit < 2U; ++bucket_try_bit) {
+
+                                    auto try_seed = MixSeedAndBit(seed2_, bucket_try_bit);
+
+                                    bucket_pattern.clear();
+
+                                    for (const auto *key_ptr: temp_bucket.key_array) {
+                                        size_t temp_hash = CompleteHash(*key_ptr, try_seed);
+//                                        size_t temp_hash = hash_(*key_ptr, try_seed);
+                                        //                                    size_t temp_hash = hash_(*key_ptr, try_seed) & item_num_mask_;
+                                        bucket_pattern.push_back(temp_hash);
+                                    }
+
+                                    // test collision in this bucket if try_bit == 1
+
+                                    if (bucket_try_bit > 0) {
+                                        bool self_collision_flag = !TestHashVecSelfCollision(
+                                                bucket_pattern,
+                                                param_->seed2_test_table_,
+                                                param_->tested_hash_vec_);
+                                        if (self_collision_flag) {
+                                            break;
+                                        }
+                                    }
+
+                                    size_t item_num_mask = slot_index_policy_.slot_num() - size_t(1ULL);
+
+                                    for (size_t search_pos_begin = param_->filled_count_;
+                                         search_pos_begin < param_->item_num_ceil_; ++search_pos_begin) {
+                                        //                                    size_t temp_offset =
+                                        //                                            (param_->item_num_ceil_ + param_->random_table_[search_pos_begin]
+                                        //                                             - bucket_pattern[0]) & item_num_mask_;
+                                        size_t temp_offset = (param_->item_num_ceil_ + param_->random_table_[search_pos_begin]
+                                                              - slot_index_policy_.MapToIndex(bucket_pattern[0]) ) & item_num_mask;
+                                        bool this_offset_passed_flag = true;
+                                        for (auto temp_hash_value: bucket_pattern) {
+                                            auto temp_pos = slot_index_policy_.MapToIndex(temp_hash_value + slot_index_policy_.ReverseMap(temp_offset));
+                                            //                                        auto temp_pos =
+                                            //                                                (temp_hash_value + temp_offset) & item_num_mask_;
+                                            if (param_->map_table_[temp_pos] < param_->filled_count_) {
+                                                this_offset_passed_flag = false;
+                                                break;
+                                            }
+                                        }
+                                        if (this_offset_passed_flag) {
+                                            pattern_matched_flag = true;
+                                            for (auto temp_hash_value: bucket_pattern) {
+                                                auto temp_pos = slot_index_policy_.MapToIndex(temp_hash_value + slot_index_policy_.ReverseMap(temp_offset));
+                                                //                                            auto temp_pos =
+                                                //                                                    (temp_hash_value + temp_offset) & item_num_mask_;
+                                                auto y_pos = param_->map_table_[temp_pos];
+                                                std::swap(param_->random_table_[param_->filled_count_],
+                                                          param_->random_table_[y_pos]);
+                                                std::swap(param_->map_table_[param_->random_table_[param_->filled_count_]],
+                                                          param_->map_table_[param_->random_table_[y_pos]]);
+                                                ++param_->filled_count_;
+                                            }
+                                            bucket_p_array_[temp_bucket.index] =
+                                                    (temp_offset << 1U) | bucket_try_bit;
+
+                                            break;
+                                        }
+                                    }
+
+                                    if (pattern_matched_flag) {
+                                        break;
+                                    }
+
+                                } // for bucket_try_bit
+
+                                if (!pattern_matched_flag) {
+                                    this_try_seed2_succeed_flag = false;
+                                    break;
+                                }
+
+                            } // for bucket_index
+
+                            if (this_try_seed2_succeed_flag) {
+                                build_succeed_flag = true;
+                                break;
+                            }
+
+
+                        } // for try_seed2_time
+
+                        if (build_succeed_flag) {
+                            break;
+                        }
+
+                    } // for try_seed1_time
+
+                    if (build_succeed_flag) {
+                        break;
+                    }
+
+
+                } // for try_seed0_time
+
+                if (!build_succeed_flag) {
+                    throw std::invalid_argument("timeout when try to build fph map, consider using a stronger seed hash function, key_num: "
+                                                + std::to_string(key_num) + ", item_num_ceil: " + std::to_string(param_->item_num_ceil_)
+                                                + ", bucket num: " + std::to_string(param_->bucket_num_));
+                }
+
+
+
+                // allocate
+                if (old_slot_capacity < param_->slot_capacity_ || slot_ == nullptr) {
+
+                    if (slot_ != nullptr) {
+                        SlotAllocator{}.deallocate(slot_, old_slot_capacity);
+                        slot_ = nullptr;
+                    }
+
+                    slot_ = SlotAllocator().allocate(param_->slot_capacity_);
+                }
+
+
+
+                // fill all the slots with one default key (e.g. zero) except the slot of that default key
+                // fill the key in the slot of the default key with other key
+                {
+                    auto default_key = (*param_->key_gen_)();
+
+                    KeyAllocator key_alloc;
+                    for (size_t i = 0; i < param_->item_num_ceil_; ++i) {
+                        std::allocator_traits<KeyAllocator>::construct(key_alloc,
+                                                                       std::addressof(slot_[i].key), default_key);
+                    }
+
+                    auto default_key_slot_index = GetSlotPos(default_key);
+
+                    uint64_t try_fill_key_time = 0ULL;
+
+                    key_type fill_key = (*param_->key_gen_)();
+                    while (GetSlotPos(fill_key) == default_key_slot_index) {
+#if !defined(NDEBUG) && FPH_DEBUG_FLAG
+                        if (try_fill_key_time > 1000) {
+                            int a = 0;
+                        }
+#endif
+                        if (++try_fill_key_time > 100000ULL) {
+                            throw std::invalid_argument("Failed to find a valid fill for key zero");
+                        }
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc, &fill_key);
+                        if constexpr(std::is_move_constructible<key_type>::value) {
+                            std::allocator_traits<KeyAllocator>::construct(key_alloc, &fill_key, ((*param_->key_gen_)()));
+                        }
+                        else {
+                            std::allocator_traits<KeyAllocator>::construct(key_alloc, &fill_key, static_cast<const key_type&>((*param_->key_gen_)()));
+                        }
+                    }
+
+
+                    if (param_->default_fill_key_ == nullptr) {
+                        param_->default_fill_key_ = key_alloc.allocate(2);
+                        param_->second_default_key_ = param_->default_fill_key_ + 1;
+                    }
+                    else {
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc, param_->default_fill_key_);
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc, param_->second_default_key_);
+                    }
+                    std::allocator_traits<KeyAllocator>::construct(
+                            key_alloc, param_->default_fill_key_, default_key);
+                    std::allocator_traits<KeyAllocator>::construct(
+                            key_alloc, param_->second_default_key_, fill_key);
+
+                    std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_[default_key_slot_index].key));
+                    std::allocator_traits<KeyAllocator>::construct(
+                            key_alloc, std::addressof(slot_[default_key_slot_index].key),
+                            *param_->second_default_key_);
+
+                    param_->default_fill_key_address_ = slot_ + default_key_slot_index;
+                    param_->default_fill_key_bucket_index_ = CompleteGetBucketIndex(default_key);
+//                    param_->default_fill_key_bucket_index_ = GetBucketIndex(default_key);
+                }
+
+
+
+                if constexpr (use_move || (is_rehash && std::is_move_constructible<value_type>::value)) {
+                    auto construct_pair_func_move = [&](value_type &&value, bool only_key) {
+                        slot_type* slot_ptr = slot_type::GetSlotAddressByValueAddress(std::addressof(value));
+                        auto slot_pos = GetSlotPos(slot_ptr->key);
+                        auto *insert_address = slot_ + slot_pos;
+                        KeyAllocator key_alloc{};
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(insert_address->key));
+                        if (only_key) {
+                            std::allocator_traits<KeyAllocator>::construct(key_alloc, std::addressof(insert_address->key), std::move(slot_ptr->key));
+                        }
+                        else {
+                            std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                        std::addressof(insert_address->mutable_value),
+                                                                        std::move(value));
+                        }
+                    };
+                    if constexpr (is_rehash) {
+                        size_t temp_key_cnt = 0;
+                        for (auto it = pair_begin; it != pair_end; ++it) {
+                            ++temp_key_cnt;
+                            bool only_key = last_element_only_has_key && (temp_key_cnt == key_num);
+                            static_assert(std::is_move_constructible<value_type>::value);
+                            construct_pair_func_move(std::move(*it), only_key);
+
+                        }
+                    }
+                    else {
+                        static_assert(use_move);
+                        size_t temp_key_cnt = 0;
+                        for (auto it = pair_begin; it != pair_end; ++it) {
+                            ++temp_key_cnt;
+                            bool only_key = last_element_only_has_key && (temp_key_cnt == key_num);
+                            construct_pair_func_move(std::move(*it), only_key);
+                        }
+                    }
+                }
+                else {
+                    auto construct_pair_func = [&](InputIt it, bool only_key) {
+                        const slot_type* slot_ptr = slot_type::GetSlotAddressByValueAddress(std::addressof(*it));
+                        auto slot_pos = GetSlotPos(slot_ptr->key);
+                        auto *insert_address = slot_ + slot_pos;
+                        KeyAllocator key_alloc{};
+                        std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(insert_address->key));
+                        if (only_key) {
+                            std::allocator_traits<KeyAllocator>::construct(key_alloc, std::addressof(insert_address->key), slot_ptr->key);
+                        }
+                        else {
+                            std::allocator_traits<Allocator>::construct(param_->alloc_,
+                                                                        std::addressof(insert_address->mutable_value),
+                                                                        *it);
+                        }
+                    };
+
+                    if constexpr (!is_rehash) {
+                        size_t temp_key_cnt = 0;
+                        for (auto it = pair_begin; it != pair_end; ++it) {
+                            ++temp_key_cnt;
+                            bool only_key = last_element_only_has_key && (temp_key_cnt == key_num);
+                            construct_pair_func(it, only_key);
+                        }
+                    }
+                    else {
+                        size_t temp_key_cnt = 0;
+                        for (auto it = pair_begin; it != pair_end; ++it) {
+                            ++temp_key_cnt;
+                            bool only_key = last_element_only_has_key && (temp_key_cnt == key_num);
+                            assert(!std::is_move_constructible<value_type>::value);
+                            construct_pair_func(it, only_key);
+                        }
+                    }
+                }
+
+
+
+#if FPH_ENABLE_ITERATOR
+                if (param_->item_num_ > 0) {
+                    auto begin_it_pos = param_->random_table_[0];
+#ifndef NDEBUG
+                    assert(!IsSlotEmpty(begin_it_pos));
+#endif
+                    param_->begin_it_ = iterator(slot_ + begin_it_pos, this);
+                } else {
+                    param_->begin_it_ = iterator(nullptr, nullptr);
+                }
+
+                for (auto &bucket_param: param_->bucket_array_) {
+                    bucket_param.key_array.clear();
+                }
+                for (auto it = begin(); it != end(); ++it) {
+                    const auto* slot_address = slot_type::GetSlotAddressByValueAddress(std::addressof(*it));
+                    auto bucket_index = CompleteGetBucketIndex(slot_address->key);
+//                    auto bucket_index = this->GetBucketIndex(slot_address->key);
+                    auto &key_array = param_->bucket_array_[bucket_index].key_array;
+                    key_array.push_back(&(slot_address->key));
+                }
+#endif
+
+                if (verbose) {
+                    auto build_end_time = std::chrono::high_resolution_clock::now();
+                    size_t build_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            build_end_time - build_start_time).count();
+                    fprintf(stderr, "build use time: %.6f seconds\n", build_ns / (1e+9));
+                }
+
+
+            } // function Build
+
+        }; // class raw set
+
+
+    } // namespace detail
+
+    namespace detail {
+
+        template<class T>
+        union DynamicSetSlotType {
+
+            ~DynamicSetSlotType() = delete;
+
+            using value_type = T;
+            using mutable_value_type = T;
+
+            value_type value;
+            mutable_value_type mutable_value;
+            value_type key;
+
+            static DynamicSetSlotType<T>* GetSlotAddressByValueAddress(value_type *value_ptr) {
+                return reinterpret_cast<DynamicSetSlotType<T>*>(value_ptr);
+            }
+
+            static const DynamicSetSlotType<T>* GetSlotAddressByValueAddress(const value_type *value_ptr) {
+                return reinterpret_cast<const DynamicSetSlotType<T>*>(value_ptr);
+            }
+
+        };
+
+        class HighBitsIndexMapPolicy {
+        public:
+
+            HighBitsIndexMapPolicy(size_t element_num) noexcept: shift_bits_(0) {
+                UpdateBySlotNum(element_num);
+            }
+
+            // takes the high bits
+            FPH_ALWAYS_INLINE size_t MapToIndex(size_t hash) const noexcept {
+                return hash >> shift_bits_;
+
+//                return (11400714819323198485llu * hash) >> shift_bits_;
+            }
+
+            FPH_ALWAYS_INLINE size_t ReverseMap(size_t index) const noexcept {
+                return index << shift_bits_;
+            }
+
+            size_t slot_num() const noexcept {
+                return size_t(1UL) << (std::numeric_limits<size_t>::digits - shift_bits_);
+            }
+
+            void UpdateBySlotNum(size_t element_num) {
+                size_t round_up_log2_slot_num = dynamic::detail::RoundUpLog2(element_num);
+                shift_bits_ = std::numeric_limits<size_t>::digits - round_up_log2_slot_num;
+            }
+
+        protected:
+            uint32_t shift_bits_;
+        };
+
+        // using low bits of hash as slot index
+        class LowBitsIndexMapPolicy {
+        public:
+
+            LowBitsIndexMapPolicy(size_t element_num) noexcept: mask_(0) {
+                UpdateBySlotNum(element_num);
+            }
+
+            // takes the low bits
+            FPH_ALWAYS_INLINE size_t MapToIndex(size_t hash) const noexcept {
+                return hash & mask_;
+            }
+
+            FPH_ALWAYS_INLINE size_t ReverseMap(size_t index) const noexcept {
+                return index;
+            }
+
+            size_t slot_num() const noexcept {
+                return mask_ + size_t(1UL);
+            }
+
+            void UpdateBySlotNum(size_t element_num) {
+                mask_ = dynamic::detail::GenBitMask<size_t>(dynamic::detail::RoundUpLog2(element_num));
+            }
+
+        protected:
+            size_t mask_;
+        };
+
+        template<class T>
+        class DynamicFphSetPolicy {
+        public:
+            using key_type = T;
+            using value_type = T;
+            using slot_type = DynamicSetSlotType<T>;
+            using index_map_policy = HighBitsIndexMapPolicy;
+//            using index_map_policy = LowBitsIndexMapPolicy;
+        };
+
+    } // namespace detail
+
+    /**
+     * The dynamic perfect hash set container
+     * @tparam Key
+     * @tparam SeedHash the operator() takes two arguments: key and a size_t seed
+     * @tparam KeyEqual
+     * @tparam Allocator
+     * @tparam BucketParamType
+     * @tparam RandomKeyGenerator the operator() returns a random key
+     */
+    template<class Key,
+            class SeedHash = SimpleSeedHash<Key>,
+            class KeyEqual = std::equal_to<Key>,
+            class Allocator = std::allocator<Key>,
+            class BucketParamType = uint32_t,
+            class RandomKeyGenerator = dynamic::RandomGenerator<Key> >
+    class DynamicFphSet: public dynamic::detail::DynamicRawSet<detail::DynamicFphSetPolicy<Key>,
+            SeedHash, KeyEqual, Allocator, BucketParamType, RandomKeyGenerator> {
+        using Base = typename DynamicFphSet::DynamicRawSet;
+    public:
+        using Base::Base;
+
+        using Base::begin;
+
+
+    protected:
+
+    };
+
+    namespace detail {
+
+        namespace memory {
+
+            // If Pair is a standard-layout type, OffsetOf<Pair>::k_first and
+            // OffsetOf<Pair>::k_second are equivalent to offsetof(Pair, first) and
+            // offsetof(Pair, second) respectively. Otherwise they are -1.
+            //
+            // The purpose of OffsetOf is to avoid calling offsetof() on non-standard-layout
+            // type, which is non-portable.
+            template<class Pair, class = std::true_type>
+            struct OffsetOf {
+                static constexpr size_t k_first = static_cast<size_t>(-1);
+                static constexpr size_t k_second = static_cast<size_t>(-1);
+            };
+
+            template<class Pair>
+            struct OffsetOf<Pair, typename std::is_standard_layout<Pair>::type> {
+                static constexpr size_t k_first = offsetof(Pair, first);
+                static constexpr size_t k_second = offsetof(Pair, second);
+            };
+
+        } // namespace memory
+
+        template <class K, class V>
+        struct IsLayoutCompatible {
+        private:
+            struct Pair {
+                K first;
+                V second;
+            };
+
+            // Is P layout-compatible with Pair?
+            template <class P>
+            static constexpr bool LayoutCompatible() {
+                return std::is_standard_layout<P>() && sizeof(P) == sizeof(Pair) &&
+                       alignof(P) == alignof(Pair) &&
+                       memory::OffsetOf<P>::k_first ==
+                       memory::OffsetOf<Pair>::k_first &&
+                       memory::OffsetOf<P>::k_second ==
+                       memory::OffsetOf<Pair>::k_second;
+            }
+
+        public:
+            // Whether pair<const K, V> and pair<K, V> are layout-compatible. If they are,
+            // then it is safe to store them in a union and read from either.
+            static constexpr bool value = std::is_standard_layout<K>() &&
+                                          std::is_standard_layout<Pair>() &&
+                                          memory::OffsetOf<Pair>::k_first == 0 &&
+                                          LayoutCompatible<std::pair<K, V>>() &&
+                                          LayoutCompatible<std::pair<const K, V>>();
+        };
+
+
+        template<class K, class V>
+        union DynamicMapSlotType {
+
+            ~DynamicMapSlotType() = delete;
+
+            using value_type = std::pair<const K, V>;
+            using mutable_value_type =
+            std::pair<typename std::remove_const<K>::type, typename std::remove_const<V>::type>;
+
+            value_type value;
+            mutable_value_type mutable_value;
+            typename std::remove_const<K>::type key;
+
+            static DynamicMapSlotType<K, V>* GetSlotAddressByValueAddress(value_type *value_ptr) {
+                return reinterpret_cast<DynamicMapSlotType<K, V>*>(value_ptr);
+            }
+
+            static const DynamicMapSlotType<K, V>* GetSlotAddressByValueAddress(const value_type *value_ptr) {
+                return reinterpret_cast<const DynamicMapSlotType<K, V>*>(value_ptr);
+            }
+
+            // TODO: handle the situation when Layout is not compatible
+//            static_assert(IsLayoutCompatible<K, V>::value,
+//                          "layout of Key and Value is not compatible");
+
+        };
+
+        template<class K, class V>
+        class DynamicFphMapPolicy {
+        public:
+            using key_type = K;
+            using value_type = std::pair<const K, V>;
+            using slot_type = DynamicMapSlotType<K, V>;
+//            using index_map_policy = LowBitsIndexMapPolicy;
+            using index_map_policy = HighBitsIndexMapPolicy;
+        };
+
+    } // namespace detail
+
+    /**
+     * The dynamic perfect hash map container
+     * @tparam Key
+     * @tparam T
+     * @tparam SeedHash the operator() takes two arguments: key and a size_t seed
+     * @tparam KeyEqual
+     * @tparam Allocator
+     * @tparam BucketParamType
+     * @tparam RandomKeyGenerator the operator() returns a random key
+     */
+    template <class Key, class T,
+            class SeedHash = SimpleSeedHash<Key>,
+            class KeyEqual = std::equal_to<Key>,
+            class Allocator = std::allocator<std::pair<const Key, T>>,
+            class BucketParamType = uint32_t,
+            class RandomKeyGenerator = fph::dynamic::RandomGenerator<Key>
+    >
+    class DynamicFphMap : public dynamic::detail::DynamicRawSet<detail::DynamicFphMapPolicy<Key, T>,
+            SeedHash, KeyEqual, Allocator, BucketParamType, RandomKeyGenerator> {
+        using Base = typename DynamicFphMap::DynamicRawSet;
+    public:
+
+        using mapped_type = T;
+
+        using Base::Base;
+
+        using iterator = typename Base::iterator;
+        using key_type = typename Base::key_type;
+
+
+
+        using Base::find;
+
+        using Base::emplace;
+
+        using Base::insert;
+
+
+        template<class... Args>
+        std::pair<iterator, bool> try_emplace(const key_type& k, Args&&... args) {
+            return this-> template TryEmplaceImp<>(k, std::forward<Args>(args)...);
+        }
+
+        template<class... Args>
+        std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args) {
+            return this-> template TryEmplaceImp<>(std::move(k), std::forward<Args>(args)...);
+        }
+
+        T& operator[] (const Key &key) {
+            return this->try_emplace(key).first->second;
+        }
+
+        T& operator[] (Key&& key) {
+            return this->try_emplace(std::move(key)).first->second;
+        }
+
+        const T& operator[] (const Key &key) const noexcept {
+            return this->GetPointerNoCheck(key)->second;
+        }
+
+        T& at (const Key& key) {
+            auto *pair_ptr = this->GetPointerNoCheck(key);
+
+            if FPH_LIKELY(this->key_equal_(key, pair_ptr->first)) {
+                return pair_ptr->second;
+            }
+            else {
+                throw std::out_of_range("Can not find key in at");
+            }
+        }
+
+        const T& at (const Key& key) const {
+            const auto *pair_ptr = this->GetPointerNoCheck(key);
+
+            if FPH_LIKELY(this->key_equal_(key, pair_ptr->first)) {
+                return pair_ptr->second;
+            }
+            else {
+                throw std::out_of_range("Can not find key in at");
+            }
+        }
+
+    protected:
+    };
+
+
+} // namespace fph
+

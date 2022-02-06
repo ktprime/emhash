@@ -24,6 +24,7 @@
 
 #if QC_HASH
 #include "qchash/qc-hash.hpp"
+#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #endif
 
 #if ABSL
@@ -270,6 +271,9 @@ void benchmarkAllUnorderedSets(const Samples& ulongArray,
     benchmarkSet<emhash2::HashSet<Sample>>(ulongArray, runCount);
     benchmarkSet<emhash9::HashSet<Sample>>(ulongArray, runCount);
     benchmarkSet<phmap::flat_hash_set<Sample>>(ulongArray, runCount);
+#if QC_HASH
+//    benchmarkSet<qc::hash::RawSet<Sample>>(ulongArray, runCount);
+#endif
     benchmarkSet<emilib::HashSet<Sample>>(ulongArray, runCount);
 }
 
@@ -277,7 +281,7 @@ int main(__attribute__((unused)) int argc,
          __attribute__((unused)) const char* argv[],
          __attribute__((unused)) const char* envp[])
 {
-    size_t elementCount = 1234567; ///< Number of elements.
+    size_t elementCount = 2234567; ///< Number of elements.
     const size_t runCount = 3;          ///< Number of runs per benchmark.
     if (argc > 1)
         elementCount = atoi(argv[1]);
@@ -314,6 +318,7 @@ int main(__attribute__((unused)) int argc,
 #endif
 
 #if QC_HASH
+    benchmarkMap<fph::DynamicFphMap<Sample, Sample, fph::MixSeedHash<Sample>>>(ulongArray, runCount);
     benchmarkMap<qc::hash::RawMap<Sample, Sample, hash_t>>(ulongArray, runCount);
 #endif
 

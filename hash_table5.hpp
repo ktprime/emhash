@@ -130,6 +130,8 @@ const constexpr uint32_t INACTIVE = 0xFAAAAAAA;
 
 template <typename First, typename Second>
 struct entry {
+    using first_type =  First;
+    using second_type = Second;
     entry(const First& key, const Second& value, uint32_t ibucket)
         :second(value),first(key)
     {
@@ -189,6 +191,11 @@ struct entry {
         return *this;
     }
 
+    bool operator == (const entry<First, Second>& p) const
+    {
+        return first == p.first && second == p.second;
+    }
+
     void swap(entry<First, Second>& o)
     {
         std::swap(second, o.second);
@@ -223,7 +230,8 @@ public:
     typedef KeyT   key_type;
     typedef ValueT val_type;
     typedef ValueT mapped_type;
-
+    typedef HashT  hasher;
+    typedef EqT    key_equal;
     typedef uint32_t     size_type;
     typedef PairT&       reference;
     typedef const PairT& const_reference;

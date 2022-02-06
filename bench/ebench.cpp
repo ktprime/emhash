@@ -20,7 +20,8 @@ std::map<std::string, std::string> maps =
 //    {"stl_hash", "unordered_map"},
     {"stl_map", "stl_map"},
     {"btree", "btree_map"},
-    {"qchash", "qchash"},
+    {"qchash", "qc-hash"},
+    {"fph", "fph-table"},
 
     {"emhash2", "emhash2"},
     {"emhash3", "emhash3"},
@@ -53,7 +54,7 @@ std::map<std::string, std::string> maps =
     {"phmap", "phmap_flat"},
 //    {"hrdset", "hrdset"},
 
-//    {"robin", "tsl_robin"},
+//    {"tsl", "tsl_robin"},
 //    {"flat", "ska_flat"},
 
     {"hopsco", "tsl_hopsco"},
@@ -160,7 +161,11 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if QC_HASH
-#include "qchash/qc-hash.hpp"
+#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
+#endif
+
+#if FPH_HASH
+#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #endif
 
 #if 1
@@ -648,7 +653,7 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 
     for (auto & v : vList) {
 #if KEY_INT
-        auto v2 = v % 2 == 0 ? v + sum : v - sum;
+        auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
 #elif KEY_CLA
         auto v2(v.lScore + sum);
 #elif TKey != 4
@@ -1317,25 +1322,23 @@ static int benchHashMap(int n)
 //        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
-#if QC_HASH
+#if QC_HASH && KEY_INT
         {  benOneHash<qc::hash::RawMap<keyType, valueType, ehash_func>>("qchash", vList); }
 #endif
 
-        if (vList.size() & 1) {
-            {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
-//            {  benOneHash<emilib1::HashMap      <keyType, valueType, ehash_func>>("emilib1", vList); }
-            {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
-        } else {
-            {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
-//            {  benOneHash<emilib1::HashMap      <keyType, valueType, ehash_func>>("emilib1", vList); }
-            {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
-        }
+#if FPH_HASH
+        {  benOneHash<fph::DynamicFphMap<keyType, valueType, fph::MixSeedHash<keyType>>>("fph", vList); }
+#endif
+
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
+        //            {  benOneHash<emilib1::HashMap      <keyType, valueType, ehash_func>>("emilib1", vList); }
+        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
-//        {  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
+        //        {  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
 
-        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("robin", vList); }
+        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("tsl", vList); }
         //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
 #if FHT_HMAP
@@ -1707,7 +1710,7 @@ int main(int argc, char* argv[])
                 else if (c == 'p')
                     maps.erase("phmap");
                 else if (c == 't')
-                    maps.erase("robin");
+                    maps.erase("tsl");
                 else if (c == 's')
                     maps.erase("flat");
                 else if (c == 'a')

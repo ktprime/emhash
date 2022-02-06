@@ -42,6 +42,7 @@
 
 #if QC_HASH
 #include "qchash/qc-hash.hpp"
+#include "fph/dynamic_fph_table.h"
 #endif
 using namespace std::chrono;
 
@@ -268,7 +269,6 @@ int main(int argc, char **argv)
 
     heading();
     bench_spread<std::unordered_map<size_t,size_t>>("std::unordered_map::operator[]",count);
-
     bench_spread<tsl::robin_map<size_t,size_t>>("tsl::robin_map::operator[]",count);
     bench_spread<tsl::hopscotch_map<size_t,size_t>>("tsl::hopscotch_map::operator[]",count);
     bench_spread<tsl::bhopscotch_map<size_t,size_t>>("tsl::bhopscotch_map::operator[]",count);
@@ -285,6 +285,7 @@ int main(int argc, char **argv)
 
 #if QC_HASH
     bench_spread<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap::operator[]",count);
+    bench_spread<fph::DynamicFphMap<size_t,size_t,fph::MixSeedHash<size_t>>>("fph::DynamicFph::operator[]",count);
 #endif
 
     bench_spread<emhash5::HashMap<size_t,size_t>>("emhash5::HashMap::operator[]",count);
@@ -321,6 +322,7 @@ int main(int argc, char **argv)
 
 #if QC_HASH
     bench_map<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap",count);
+    bench_map<fph::DynamicFphMap<size_t,size_t, fph::SimpleSeedHash<size_t>>>("fph::DynamicFphMap",count);
 #endif
     return 0;
 }

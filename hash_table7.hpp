@@ -223,6 +223,8 @@ inline static size_type CTZ(size_t n)
 
 template <typename First, typename Second>
 struct entry {
+    using first_type =  First;
+    using second_type = Second;
     entry(const First& key, const Second& value, size_type ibucket)
         :second(value),first(key)
     {
@@ -280,6 +282,16 @@ struct entry {
         return *this;
     }
 
+    bool operator == (const std::pair<First, Second>& p) const
+    {
+        return first == p.first && second == p.second;
+    }
+
+    bool operator == (const entry<First, Second>& p) const
+    {
+        return first == p.first && second == p.second;
+    }
+
     void swap(entry<First, Second>& o)
     {
         std::swap(second, o.second);
@@ -296,6 +308,17 @@ struct entry {
     Second second;//int
 #endif
 };// __attribute__ ((packed));
+
+template <typename A, typename B>
+inline constexpr bool operator==(std::pair<A, B> const& x, entry<A, B> const& y) {
+    return (x.first == y.first) && (x.second == y.second);
+}
+
+template <typename A, typename B>
+inline constexpr bool operator==(entry<A, B> const& x, entry<A, B> const& y) {
+    return (x.first == y.first) && (x.second == y.second);
+}
+
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -319,6 +342,7 @@ public:
     static constexpr bool bInCacheLine = sizeof(value_pair) < (2 * EMH_CACHE_LINE_SIZE) / 3;
 
     typedef KeyT   key_type;
+    typedef ValueT val_type;
     typedef ValueT mapped_type;
     typedef HashT  hasher;
     typedef EqT    key_equal;
@@ -1018,6 +1042,7 @@ public:
         return do_insert(std::move(key), std::move(value));
     }
 
+#if 0
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
     {
         reserve(_num_filled);
@@ -1029,6 +1054,7 @@ public:
         reserve(_num_filled);
         return do_insert(std::move(key), value);
     }
+#endif
 
     template<typename K = KeyT, typename V = ValueT>
     inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
@@ -1061,16 +1087,16 @@ public:
         return do_insert(p.first, p.second);
     }
 
-    std::pair<iterator, bool> insert(value_type && p)
-    {
-        check_expand_need();
-        return do_insert(std::move(p.first), std::move(p.second));
-    }
-
     std::pair<iterator, bool> insert(iterator it, const value_type& p)
     {
         check_expand_need();
         return do_insert(p.first, p.second);
+    }
+
+    std::pair<iterator, bool> insert(value_type && p)
+    {
+        check_expand_need();
+        return do_insert(std::move(p.first), std::move(p.second));
     }
 
     void insert(std::initializer_list<value_type> ilist)
@@ -1128,28 +1154,31 @@ public:
     /// Same as above, but contains(key) MUST be false
     size_type insert_unique(KeyT&& key, ValueT&& value)
     {
+        check_expand_need();
         return do_insert_unqiue(std::move(key), std::move(value));
     }
 
     size_type insert_unique(const KeyT& key, const ValueT& value)
     {
+        check_expand_need();
         return do_insert_unqiue(key, value);
     }
 
     size_type insert_unique(value_type&& p)
     {
+        check_expand_need();
         return do_insert_unqiue(std::move(p.first), std::move(p.second));
     }
 
     size_type insert_unique(const value_type& p)
     {
+        check_expand_need();
         return do_insert_unqiue(p.first, p.second);
     }
 
     template<typename K, typename V>
     inline size_type do_insert_unqiue(K&& key, V&& value)
     {
-        check_expand_need();
         auto bucket = find_unique_bucket(key);
         EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         return bucket;
@@ -1158,14 +1187,27 @@ public:
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
 
-#if 1
-    template <class... Args>
+#if 0
+    template <typename... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
+
 #else
+    inline std::pair<iterator, bool> emplace(const value_type& v)
+    {
+        check_expand_need();
+        return do_insert(v.first, v.second);
+    }
+
+    inline std::pair<iterator, bool> emplace(value_type&& v)
+    {
+        check_expand_need();
+        return do_insert(std::move(v.first), std::move(v.second));
+    }
+
     template <class Key, class Val>
     inline std::pair<iterator, bool> emplace(Key&& key, Val&& value)
     {
@@ -1338,7 +1380,6 @@ public:
         return true;
     }
 
-private:
     void rehash(uint64_t required_buckets)
     {
         if (required_buckets < _num_filled)

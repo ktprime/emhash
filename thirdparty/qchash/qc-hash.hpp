@@ -1314,7 +1314,7 @@ namespace qc::hash
     template <typename... KArgs>
     inline auto RawMap<K, V, H, A>::emplace(KArgs &&... keyArgs) -> std::pair<iterator, bool> requires (std::is_same_v<V, void>)
     {
-        return try_emplace(K{std::forward<KArgs>(keyArgs)...});
+        return try_emplace(std::forward<KArgs>(keyArgs)...);
     }
 
     template <Rawable K, typename V, typename H, typename A>
@@ -1355,7 +1355,7 @@ namespace qc::hash
         }
         else {
             // Rehash if we're at capacity
-            if ((_size - _haveSpecial[0] - _haveSpecial[1]) >= (_slotCount * 9 / 10)) [[unlikely]] {
+            if ((_size - _haveSpecial[0] - _haveSpecial[1]) >= (_slotCount * 7 / 8)) [[unlikely]] {
                 _rehash(_slotCount << 1);
                 findResult = _findKey<true>(key);
             }
