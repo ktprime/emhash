@@ -626,3 +626,6 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #endif
 #endif
 
+#if QC_HASH
+#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
+#endif

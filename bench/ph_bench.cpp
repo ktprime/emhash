@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include "util.h"
 #include "wyhash.h"
 //#define THR 1
 
@@ -15,8 +16,9 @@
     #define MAPNAME emhash6::HashMap
     #define EXTRAARGS
 #elif ABSL
-    #include "absl/container/flat_hash_map.h"
-    #include "absl/container/internal/raw_hash_set.cc"
+#include "absl/hash/internal/low_level_hash.cc"
+#include "absl/hash/internal/hash.cc"
+#include "absl/hash/internal/city.cc"
     #define MAPNAME absl::flat_hash_map
     #define EXTRAARGS
 #elif FOLLY

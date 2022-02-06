@@ -298,10 +298,10 @@ static int run_table(std::vector<test_key_t> & insert_keys,
     for (uint32_t i = 0; i < TEST_LEN; i++) {
         test_table[insert_keys[i]] = dvalue;
         for (uint32_t j = i * QUERY_RATE; j < (i + 1) * QUERY_RATE; j++) {
-            sum += test_table.find(query_keys[j]) != test_table.end();
+            sum += test_table.count(query_keys[j]);
         }
         if (i == next_remove) {
-            volatile auto sink = test_table.erase(remove_keys[remove_iter++]);
+            auto sink = test_table.erase(remove_keys[remove_iter++]);
             next_remove += remove_incr;
             if (remove_iter >= remove_keys.size())
                 remove_iter = 1;
@@ -344,7 +344,7 @@ report(double ns_diff, const char * header, float lf, int sum) {
                 (float)REMOVE_FAILURE_RATE);
     }
 
-    fprintf(stderr, "%s Perf -> \n", header);
+    fprintf(stderr, "%s -> \n", header);
     const uint64_t ns_mult = 1000 * 1000 * 1000;
 
     if (ns_diff > ns_mult*10)
@@ -490,6 +490,9 @@ int main(int argc, char* argv[])
 #if ABSL
         run_udb2<absl::flat_hash_map<uint32_t, uint32_t, Hash32>>("absl");
 #endif
+#if QC_HASH
+        run_udb2<qc::hash::RawMap<uint32_t, uint32_t, Hash32>>("qchash");
+#endif
 
 #if __linux__ && AVX2
         run_udb2<fht_table<uint32_t, uint32_t>>("fht_table");
@@ -552,6 +555,7 @@ int main(int argc, char* argv[])
     if (ret == run_table <absl::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
 #endif
 
+
 //    if (ret == run_table <std::unordered_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <ska::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
     if (ret == run_table <ska::bytell_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
@@ -568,6 +572,10 @@ int main(int argc, char* argv[])
 //    if (ret == run_table <whash::patchmap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
 #if __GNUC__
     // run_table <__gnu_pbds::gp_hash_table<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys);
+#endif
+
+#if QC_HASH
+    if (ret == run_table <qc::hash::RawMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
 #endif
 
 

@@ -41,7 +41,7 @@ std::map<std::string, std::string> maps =
 //    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
-    //    {"ktprime", "ktprime"},
+//    {"ktprime", "ktprime"},
     {"fht", "fht"},
     {"absl", "absl_flat"},
 //    {"f14_value", "f14_value"},
@@ -160,9 +160,7 @@ std::map<std::string, std::string> maps =
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 #endif
 
-#if QC_HASH
-#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
-#endif
+//#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 
 #if FPH_HASH
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
@@ -300,7 +298,7 @@ struct StuHasher
     #define sValueType  "int64_t"
 #elif TVal == 2
     typedef std::string valueType;
-    #define TO_VAL(i)   #i
+    #define TO_VAL(i)   ""
     #define TO_SUM(i)   i.size()
     #define sValueType  "string"
 #elif TValue == 3
@@ -719,6 +717,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     int minn = (max_loadf - 0.2f) * pow2, maxn = int(max_loadf * pow2);
     int i = 0;
 
+	//fill data to min factor
     for (; i < minn; i++) {
         if (i < (int)vList.size())
             tmp.emplace(vList[i], TO_VAL(0));
@@ -1099,8 +1098,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #if 1
         multi_small_ife <hash_type>(hash_name, oList);
 
-        insert_erase      <hash_type>(hash_name, oList);
-        insert_high_load  <hash_type>(hash_name, oList);
+        insert_erase     <hash_type>(hash_name, oList);
+        insert_high_load <hash_type>(hash_name, oList);
 
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
 //        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", l2_size, l2_size + 1000);
@@ -1306,11 +1305,11 @@ static int benchHashMap(int n)
         {  benOneHash<emhash4::HashMap <keyType, valueType, ehash_func>>("emhash4", vList); }
         {  benOneHash<emhash3::HashMap <keyType, valueType, ehash_func>>("emhash3", vList); }
 #endif
-        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
 #if ABSL
         {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("absl", vList); }
 #endif
 
+        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
 #if FOLLY
         {  benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
         {  benOneHash<folly::F14VectorMap<keyType, valueType, ehash_func>>("f14_vector", vList); }
@@ -1660,8 +1659,8 @@ int main(int argc, char* argv[])
     int run_type = 0;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;
-    auto minn = (1000 * 100 * 2) + 10000;
-    auto maxn = 100*minn;
+    int minn = (1000 * 100 * 8) / sizeof(keyType) + 10000;
+    int maxn = 100*minn;
     if (TKey < 3)
         minn *= 2;
 

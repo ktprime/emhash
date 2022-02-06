@@ -32,6 +32,23 @@
 #endif
 //#include "patchmap/patchmap.hpp"
 
+#if QC_HASH
+#include "qchash/qc-hash.hpp"
+#endif
+
+#if ABSL
+//#define _HAS_DEPRECATED_RESULT_OF 1
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/internal/raw_hash_set.cc"
+//#endif
+
+//#if ABSL_HASH
+#include "absl/hash/internal/low_level_hash.cc"
+#include "absl/hash/internal/hash.cc"
+#include "absl/hash/internal/city.cc"
+#endif
+
+
 #include "hash_set2.hpp"
 #include "hash_set3.hpp"
 #include "hash_set4.hpp"
@@ -98,6 +115,12 @@ int main(int argc, char* argv[])
 
     bench<emilib::HashMap<int, std::string>>("emilib::hashMap");
     bench<emilib2::HashMap<int, std::string>>("emilib2::hashMap");
+#if QC_HASH
+    //bench<qc::hash::RawMap<int, std::string>>("qc::hashmap");
+#endif
+#if ABSL
+    bench<absl::flat_hash_map<int, std::string>>("absl::flat_hash_map");
+#endif
 
     bench<emhash2::HashMap<int, std::string>>("emhash2::hashMap");
     bench<emhash3::HashMap<int, std::string>>("emhash3::hashMap");

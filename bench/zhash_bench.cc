@@ -8,6 +8,10 @@
 #include <vector>
 #include <functional>
 
+#if QC_HASH
+#include "qchash/qc-hash.hpp"
+#endif
+
 #if ABSL
 //#define _HAS_DEPRECATED_RESULT_OF 1
 #include "absl/container/flat_hash_map.h"
@@ -41,7 +45,6 @@
 #include "ska/bytell_hash_map.hpp"
 
 #if QC_HASH
-#include "qchash/qc-hash.hpp"
 #include "fph/dynamic_fph_table.h"
 #endif
 using namespace std::chrono;

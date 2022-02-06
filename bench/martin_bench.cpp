@@ -60,7 +60,6 @@ using namespace std;
 #endif
 
 #if QC_HASH
-#include "qchash/qc-hash.hpp"
 #include "fph/dynamic_fph_table.h"
 #endif
 

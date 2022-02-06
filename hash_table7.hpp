@@ -1042,7 +1042,6 @@ public:
         return do_insert(std::move(key), std::move(value));
     }
 
-#if 0
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
     {
         reserve(_num_filled);
@@ -1054,7 +1053,6 @@ public:
         reserve(_num_filled);
         return do_insert(std::move(key), value);
     }
-#endif
 
     template<typename K = KeyT, typename V = ValueT>
     inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
@@ -1154,31 +1152,28 @@ public:
     /// Same as above, but contains(key) MUST be false
     size_type insert_unique(KeyT&& key, ValueT&& value)
     {
-        check_expand_need();
         return do_insert_unqiue(std::move(key), std::move(value));
     }
 
     size_type insert_unique(const KeyT& key, const ValueT& value)
     {
-        check_expand_need();
         return do_insert_unqiue(key, value);
     }
 
     size_type insert_unique(value_type&& p)
     {
-        check_expand_need();
         return do_insert_unqiue(std::move(p.first), std::move(p.second));
     }
 
     size_type insert_unique(const value_type& p)
     {
-        check_expand_need();
         return do_insert_unqiue(p.first, p.second);
     }
 
     template<typename K, typename V>
     inline size_type do_insert_unqiue(K&& key, V&& value)
     {
+        check_expand_need();
         auto bucket = find_unique_bucket(key);
         EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         return bucket;
@@ -1187,15 +1182,13 @@ public:
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
 
-#if 0
+#if 1
     template <typename... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
-
-#else
     inline std::pair<iterator, bool> emplace(const value_type& v)
     {
         check_expand_need();
@@ -1207,6 +1200,7 @@ public:
         check_expand_need();
         return do_insert(std::move(v.first), std::move(v.second));
     }
+#else
 
     template <class Key, class Val>
     inline std::pair<iterator, bool> emplace(Key&& key, Val&& value)
@@ -1707,8 +1701,7 @@ private:
         }
 
         //find a new empty and link it to tail, TODO link after main bucket?
-        const auto new_bucket = //next_bucket < bucket + 256 / sizeof(PairT) ?
-            find_empty_bucket(bucket + 1);// : find_empty_bucket(bucket + 1);
+        const auto new_bucket = find_empty_bucket(bucket);// : find_empty_bucket(next_bucketx);
         return EMH_BUCKET(_pairs, next_bucket) = new_bucket;
     }
 
@@ -1726,12 +1719,12 @@ private:
         const auto bmask = *(size_t*)(start) >> boset;
         if (EMH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
-//            if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
-                return bucket_from + offset;
+            //if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
+            return bucket_from + offset;
 
             //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
             //return bucket_from - boset + 7 - CTZ(rerverse_bit);
-//            return bucket_from - boset + CTZ(begin[0]);
+            //return bucket_from - boset + CTZ(begin[0]);
         }
 
         const auto qmask = _mask / SIZE_BIT;
@@ -1750,13 +1743,13 @@ private:
         }
 #endif
 
-        auto& _last = EMH_BUCKET(_pairs, _num_buckets);
         for (size_t i = 2; ; i++) {
             const auto step = (bucket_from + i * SIZE_BIT) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
                 return step * SIZE_BIT + CTZ(bmask3);
 
+            auto& _last = EMH_BUCKET(_pairs, _num_buckets);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);

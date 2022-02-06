@@ -23,7 +23,6 @@
 #include "phmap/btree.h"
 
 #if QC_HASH
-#include "qchash/qc-hash.hpp"
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #endif
 

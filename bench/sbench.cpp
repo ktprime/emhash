@@ -135,10 +135,6 @@ std::map<std::string, std::string> maps =
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
-#if QC_HASH
-#include "qchash/qc-hash.hpp"
-#endif
-
 #ifndef PACK
 #define PACK 128
 #endif

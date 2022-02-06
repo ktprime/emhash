@@ -364,6 +364,12 @@ int main()
 #endif
 
     uint64_t ret = 0;
+#if ABSL
+    { absl::flat_hash_map<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nabsl::flat_hash_map"); }
+#endif
+#if QC_HASH
+    { qc::hash::RawMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nqc::hash::map"); }
+#endif
     { robin_hood::unordered_flat_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_flat_map"); }
     { emilib::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib::HashMap"); }
     { emilib2::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib2::HashMap"); }
@@ -378,9 +384,6 @@ int main()
     { ska::bytell_hash_map<uint64_t, Value, hash_t> m0; ret -= test(m0, "\nska::bytell_hash_map"); }
  //   { emhash2::HashMap<uint64_t, Value, hash_t> m2; ret -= test(m2, "\nemhash2::HashMap"); }
     { emhash7::HashMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nemhash7::HashMap"); }
-#if ABSL
-    { absl::flat_hash_map<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nabsl::flat_hash_map"); }
-#endif
 
     //google::dense_hash_map<uint64_t, Value, hash_t> m2;ret -= test(m2, "\ngoogle::dense_hash_map");
     { phmap::flat_hash_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nparallel-hashmap::flat_map"); }
