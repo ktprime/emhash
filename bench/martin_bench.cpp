@@ -59,10 +59,6 @@ using namespace std;
 #endif
 #endif
 
-#if QC_HASH
-#include "fph/dynamic_fph_table.h"
-#endif
-
 static auto RND = getus();
 
 static std::map<std::string, std::string> show_name =

@@ -22,10 +22,6 @@
 #include "phmap/phmap.h"
 #include "phmap/btree.h"
 
-#if QC_HASH
-#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
-#endif
-
 #if ABSL
 #include "absl/container/btree_map.h"
 #endif
@@ -271,6 +267,7 @@ void benchmarkAllUnorderedSets(const Samples& ulongArray,
     benchmarkSet<emhash9::HashSet<Sample>>(ulongArray, runCount);
     benchmarkSet<phmap::flat_hash_set<Sample>>(ulongArray, runCount);
 #if QC_HASH
+    benchmarkSet<fph::DynamicFphSet<Sample, fph::MixSeedHash<Sample>>>(ulongArray, runCount);
 //    benchmarkSet<qc::hash::RawSet<Sample>>(ulongArray, runCount);
 #endif
     benchmarkSet<emilib::HashSet<Sample>>(ulongArray, runCount);

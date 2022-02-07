@@ -6,7 +6,7 @@ ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX?=clang++
 endif
 
-CXXFLAGS = -O3 -march=native -flto -mtune=native -std=c++14 -I.. -I../thirdparty -I/usr/local/include
+CXXFLAGS = -O3 -march=native -flto -mtune=native -I.. -I../thirdparty -I/usr/local/include
 
 ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly
@@ -80,37 +80,24 @@ ifneq ($(QCH),)
 CXXFLAGS += -DQC_HASH=1 -std=c++20
 endif
 
-#$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
 all:
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
-	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
-	$(CXX) $(CXXFLAGS) -DK_$(K) -DV_$(V) fbench.cpp -o fbench
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
-
-fb:
-	./fbench
-
-hb:
-	./hbench
+	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
+	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
+	$(CXX) $(CXXFLAGS) -I. -DQC_HASH -std=c++20 qbench.cpp -o qbench
 
 eb:
 	./ebench
-
 mb:
 	./mbench
 
-sib:
-	./simbench
-	
-sb:
-	./sb
-
 clean:
-	rm -rf ebench sb mbench hbench setbench simbench pabench phbench fbench
+	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench

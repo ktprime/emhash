@@ -10,6 +10,7 @@
 
 #if QC_HASH
 #include "qchash/qc-hash.hpp"
+#include "fph/dynamic_fph_table.h"
 #endif
 
 #if ABSL
@@ -44,9 +45,6 @@
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
 
-#if QC_HASH
-#include "fph/dynamic_fph_table.h"
-#endif
 using namespace std::chrono;
 
 #ifndef _WIN32

@@ -172,31 +172,12 @@ static double QUERY_FAILURE_RATE = 0.3;
 static double REMOVE_FAILURE_RATE = 0.25;
 #endif
 
+static void report(double ns_diff, const char * header, float lf, int sum);
+
 static int64_t inline now2ns()
 {
     return getus() * 1000;
 }
-
-static void init_keys(std::vector<test_key_t> & insert_keys);
-static void init_query_keys(std::vector<test_key_t> & insert_keys,
-                            std::vector<test_key_t> & query_keys);
-static void init_remove_keys(std::vector<test_key_t> & insert_keys,
-                             std::vector<test_key_t> & remove_keys);
-
-
-template<typename ht>
-static int run_table(std::vector<test_key_t> & insert_keys,
-                           std::vector<test_val_t> & insert_vals,
-                           std::vector<test_key_t> & query_keys,
-                           std::vector<test_key_t> & remove_keys);
-
-
-static void report(double,
-                   const char *      header, float lf,  int sum);
-
-static void clear_cache();
-//std::uniform_int_distribution<uint64_t> dis;
-
 
 inline static uint32_t
 rnd_above_perc(int r) {
@@ -492,6 +473,7 @@ int main(int argc, char* argv[])
 #endif
 #if QC_HASH
         run_udb2<qc::hash::RawMap<uint32_t, uint32_t, Hash32>>("qchash");
+		run_udb2<fph::DynamicFphMap<uint32_t, uint32_t, fph::MixSeedHash<uint32_t>>>("fph");
 #endif
 
 #if __linux__ && AVX2
@@ -545,41 +527,42 @@ int main(int argc, char* argv[])
     init_query_keys(insert_keys, query_keys);
     init_remove_keys(insert_keys, remove_keys);
 
-    auto   ret =  run_table<emhash6::HashMap<test_key_t, test_val_t, hash_t>>  (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table<emhash6::HashMap<test_key_t, test_val_t, hash_t>>  (insert_keys, insert_vals, query_keys, remove_keys);
 #if __linux__ && AVX2
-    if ( ret ==  run_table<fht_table<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    run_table<fht_table<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 
 
 #if ABSL
-    if (ret == run_table <absl::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    run_table <absl::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 
 
-//    if (ret == run_table <std::unordered_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <ska::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <ska::bytell_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <emhash5::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <emilib::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <emilib2::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <emhash7::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-//    if (ret == run_table <robin_hood::unordered_node_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <phmap::flat_hash_map<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys));
-//    if (ret == run_table <phmap::node_hash_map<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <tsl::robin_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
-    if (ret == run_table <tsl::hopscotch_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
-//    if (ret == run_table <whash::patchmap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+//    run_table <std::unordered_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <ska::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <ska::bytell_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <emhash5::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <emilib::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <emilib2::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <emhash7::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+//    run_table <robin_hood::unordered_node_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <phmap::flat_hash_map<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys);
+//    run_table <phmap::node_hash_map<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <tsl::robin_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <tsl::hopscotch_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+//    run_table <whash::patchmap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
 #if __GNUC__
     // run_table <__gnu_pbds::gp_hash_table<test_key_t, test_val_t, hash_t>> (insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 
 #if QC_HASH
-    if (ret == run_table <qc::hash::RawMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys));
+    run_table <qc::hash::RawMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <fph::DynamicFphMap<test_key_t, test_val_t, fph::MixSeedHash<test_key_t>>>(insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 
 
-//    if (ret == run_table <emilib4::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys));
+//    run_table <emilib4::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
     int n = TEST_LEN;
     printf(">> "); scanf("%u", &n);
     if (n < 0)

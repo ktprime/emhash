@@ -161,10 +161,7 @@ std::map<std::string, std::string> maps =
 #endif
 
 //#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
-
-#if FPH_HASH
-#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
-#endif
+//#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #if 1
 #include "ahash/ahash.c"

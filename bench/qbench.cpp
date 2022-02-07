@@ -1,5 +1,3 @@
-#include <array>
-#include <chrono>
 #include <filesystem>
 //#include <format>
 #include <fstream>
@@ -7,8 +5,6 @@
 #include <iostream>
 #include <map>
 #include <span>
-#include <unordered_set>
-#include <vector>
 
 #include "qchash/qc-hash.hpp"
 #include "qc-core/memory.hpp"
@@ -17,6 +13,7 @@
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"
 #include "emilib/emilib2.hpp"
+#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #pragma warning(push)
 #pragma warning(disable: 4127 4458 4324 4293 4309 4305 4244)
@@ -352,13 +349,13 @@ static void printTypicalChartable(const Stats & results, std::ostream & ofs)
 
         for (const size_t containerI : results.presentContainerIndices()) {
             ofs << results.containerName(containerI);
-            ofs << ',' << results.at(containerI, elementCount, Stat::insertReserved);
-            ofs << ',' << results.at(containerI, elementCount, Stat::accessPresent);
-            ofs << ',' << results.at(containerI, elementCount, Stat::erase);
-            ofs << ',' << results.at(containerI, elementCount, Stat::iterateFull);
+            ofs << ", " << results.at(containerI, elementCount, Stat::insertReserved);
+            ofs << ", " << results.at(containerI, elementCount, Stat::accessPresent);
+            ofs << ", " << results.at(containerI, elementCount, Stat::erase);
+            ofs << ", " << results.at(containerI, elementCount, Stat::iterateFull);
             ofs << std::endl;
         }
-		ofs << std::endl;
+        ofs << std::endl;
     }
 }
 
@@ -944,7 +941,7 @@ struct RobinHoodSetInfo
     using Container = robin_hood::unordered_set<K>;
     using AllocatorContainer = void;
 
-    static inline const std::string name{"robin_hood::unordered_set"};
+    static inline const std::string name{"martin::unordered_set"};
 };
 
 template <typename K, typename V>
@@ -953,7 +950,7 @@ struct RobinHoodMapInfo
     using Container = robin_hood::unordered_flat_map<K, V>;
     using AllocatorContainer = void;
 
-    static inline const std::string name{"robin_hood::flatmap"};
+    static inline const std::string name{"martin::flat_map"};
 };
 
 template <typename K>
@@ -971,7 +968,7 @@ struct SkaMapInfo
     using Container = ska::flat_hash_map<K, V>;
     using AllocatorContainer = ska::flat_hash_map<K, V, typename ska::flat_hash_map<K, V>::hasher, typename ska::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
-    static inline const std::string name{"ska::flat_hash_map"};
+    static inline const std::string name{"ska:flat_hashmap"};
 };
 
 template <typename K>
@@ -989,7 +986,7 @@ struct TslRobinMapInfo
     using Container = tsl::robin_map<K, V>;
     using AllocatorContainer = tsl::robin_map<K, V, typename tsl::robin_map<K, V>::hasher, typename tsl::robin_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
-    static inline const std::string name{"tsl::robin_map "};
+    static inline const std::string name{"tsl::robin_map  "};
 };
 
 template <typename K>
@@ -1035,6 +1032,14 @@ struct EmiLib2MapInfo
     static inline const std::string name{"emilib2::HashMap"};
 };
 
+template <typename K, typename V>
+struct FphDyamicMapInfo
+{
+    using Container = fph::DynamicFphMap<K, V, fph::MixSeedHash<K>>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"fph::DynamicFph "};
+};
+
 int main()
 {
     // 1v1
@@ -1064,6 +1069,7 @@ int main()
             //AbslMapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
             QcHashMapInfo<K, V>,
+            FphDyamicMapInfo<K,V>,
             SkaMapInfo<K, V>,
             TslRobinMapInfo<K, V>,
             //TslSparseMapInfo<K, V>,

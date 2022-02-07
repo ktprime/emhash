@@ -1189,6 +1189,7 @@ public:
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
+
     inline std::pair<iterator, bool> emplace(const value_type& v)
     {
         check_expand_need();
@@ -1201,7 +1202,6 @@ public:
         return do_insert(std::move(v.first), std::move(v.second));
     }
 #else
-
     template <class Key, class Val>
     inline std::pair<iterator, bool> emplace(Key&& key, Val&& value)
     {

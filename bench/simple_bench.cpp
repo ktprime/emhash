@@ -34,6 +34,7 @@
 
 #if QC_HASH
 #include "qchash/qc-hash.hpp"
+#include "fph/dynamic_fph_table.h"
 #endif
 
 #if ABSL
@@ -52,6 +53,8 @@
 #include "hash_set2.hpp"
 #include "hash_set3.hpp"
 #include "hash_set4.hpp"
+
+using k_value = int;
 
 using my_clock = std::chrono::high_resolution_clock;
 
@@ -72,7 +75,7 @@ void bench(char const* title)
             map.clear();
             for (int32_t j = 0; j < 1000000; j++)
             {
-                map.emplace(i + j, "abcd");
+                map.emplace(i + j, j);
             }
         }
     }
@@ -85,7 +88,7 @@ void bench(char const* title)
         for (size_t i = 0; i < trials; ++i) {
             for (auto const& keyVal : map)
             {
-                result += keyVal.second.size();
+                result += keyVal.second;
             }
         }
     }
@@ -109,41 +112,43 @@ void bench(char const* title)
 
 int main(int argc, char* argv[])
 {
-    bench<std::unordered_map<int, std::string>>("std::unordered_map");
-    bench<robin_hood::unordered_node_map<int, std::string>>("robin_hood::unordered_node_map");
-    bench<robin_hood::unordered_flat_map<int, std::string>>("robin_hood::unordered_flat_map");
+    bench<std::unordered_map<int, k_value>>("std::unordered_map");
+    bench<robin_hood::unordered_node_map<int, k_value>>("robin_hood::unordered_node_map");
+    bench<robin_hood::unordered_flat_map<int, k_value>>("robin_hood::unordered_flat_map");
 
-    bench<emilib::HashMap<int, std::string>>("emilib::hashMap");
-    bench<emilib2::HashMap<int, std::string>>("emilib2::hashMap");
+    bench<emilib::HashMap<int, k_value>>("emilib::hashMap");
+    bench<emilib2::HashMap<int, k_value>>("emilib2::hashMap");
 #if QC_HASH
-    //bench<qc::hash::RawMap<int, std::string>>("qc::hashmap");
+    bench<fph::DynamicFphMap<int, k_value, fph::MixSeedHash<int>>>("fph::mixmap");
+    //bench<qc::hash::RawMap<int, k_value>>("qc::hashmap");
 #endif
 #if ABSL
-    bench<absl::flat_hash_map<int, std::string>>("absl::flat_hash_map");
+    bench<absl::flat_hash_map<int, k_value>>("absl::flat_hash_map");
 #endif
 
-    bench<emhash2::HashMap<int, std::string>>("emhash2::hashMap");
-    bench<emhash3::HashMap<int, std::string>>("emhash3::hashMap");
-    bench<emhash4::HashMap<int, std::string>>("emhash4::hashMap");
-    bench<emhash5::HashMap<int, std::string>>("emhash5::hashMap");
-    bench<emhash6::HashMap<int, std::string>>("emhash6::hashMap");
-    bench<emhash6::HashMap<int, std::string, robin_hood::hash<int> >>("emhash6::hashMap");
-    bench<emhash7::HashMap<int, std::string>>("emhash7::hashMap");
+    bench<emhash2::HashMap<int, k_value>>("emhash2::hashMap");
+    bench<emhash3::HashMap<int, k_value>>("emhash3::hashMap");
+    bench<emhash4::HashMap<int, k_value>>("emhash4::hashMap");
 
-    bench<tsl::robin_map<int, std::string>>("tsl::robin_map");
-    bench<tsl::hopscotch_map<int, std::string>>("tsl::hops_map");
+    bench<emhash5::HashMap<int, k_value>>("emhash5::hashMap");
+    bench<emhash6::HashMap<int, k_value>>("emhash6::hashMap");
+    bench<emhash6::HashMap<int, k_value, robin_hood::hash<int> >>("emhash6::hashMap");
+    bench<emhash7::HashMap<int, k_value>>("emhash7::hashMap");
 
-    bench<phmap::flat_hash_map<int, std::string>>("phmap::hpmap");
-    bench<phmap::node_hash_map<int, std::string>>("phmap::nodemap");
+    bench<tsl::robin_map<int, k_value>>("tsl::robin_map");
+    bench<tsl::hopscotch_map<int, k_value>>("tsl::hops_map");
 
-    bench<ska::flat_hash_map<int, std::string>>("ska::flat_map");
-    bench<ska::bytell_hash_map<int, std::string>>("ska::byte_map");
+    bench<phmap::flat_hash_map<int, k_value>>("phmap::hpmap");
+    bench<phmap::node_hash_map<int, k_value>>("phmap::nodemap");
+
+    bench<ska::flat_hash_map<int, k_value>>("ska::flat_map");
+    bench<ska::bytell_hash_map<int, k_value>>("ska::byte_map");
 
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
-    bench<hrd7::hash_map<int, std::string>>("hrd7::hash_map");
+    bench<hrd7::hash_map<int, k_value>>("hrd7::hash_map");
 #endif
-//    bench<emilib3::HashMap<int, std::string>>("emilib3::hashMap");
-//    bench<whash::patchmap<int, std::string>>("whash::patchmap");
+//    bench<emilib3::HashMap<int, k_value>>("emilib3::hashMap");
+//    bench<whash::patchmap<int, k_value>>("whash::patchmap");
 
     //bench_wyhash(3234567, 32);
 
@@ -151,10 +156,10 @@ int main(int argc, char* argv[])
 
     if (argc > 4)
     {
-        //phmap::flat_hash_map<int, std::string> mmap;
-        robin_hood::unordered_node_map<int, std::string> mmap;
-        //tsl::robin_map<int, std::string> mmap;
-        //ska::flat_hash_map<int, std::string> mmap;
+        //phmap::flat_hash_map<int, k_value> mmap;
+        robin_hood::unordered_node_map<int, k_value> mmap;
+        //tsl::robin_map<int, k_value> mmap;
+        //ska::flat_hash_map<int, k_value> mmap;
         for (int i = 0; i < 10000; i ++)
             mmap[rand()] = mmap[rand()];
     }

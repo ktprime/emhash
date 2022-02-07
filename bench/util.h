@@ -628,4 +628,5 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 
 #if QC_HASH
 #include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
+#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #endif

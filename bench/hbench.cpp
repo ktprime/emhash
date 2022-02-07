@@ -369,6 +369,7 @@ int main()
 #endif
 #if QC_HASH
     { qc::hash::RawMap<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nqc::hash::map"); }
+//    { fph::DynamicFphMap<uint64_t, Value, fph::MixSeedHash<uint64_t>> m6; ret -= test(m6, "\nfph::FphMap"); }
 #endif
     { robin_hood::unordered_flat_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_flat_map"); }
     { emilib::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib::HashMap"); }
