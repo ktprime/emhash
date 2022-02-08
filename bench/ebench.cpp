@@ -1095,7 +1095,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #if 1
         multi_small_ife <hash_type>(hash_name, oList);
 
+#ifndef QC_HASH
         insert_erase     <hash_type>(hash_name, oList);
+#endif
         insert_high_load <hash_type>(hash_name, oList);
 
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);

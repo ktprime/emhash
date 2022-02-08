@@ -342,8 +342,8 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
             map.erase(rng() & bitMask);
         }
 
-        printf("    %02ld bits %2d M cycles time %.4lf s map size %d loadf = %.2f\n",
-                std::bitset<64>(bitMask).count(), int(max_n / 1000000), now2sec() - ts , (int)map.size(), map.load_factor());
+        printf("    %02d bits %2d M cycles time %.4lf s map size %d loadf = %.2f\n",
+                int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts , (int)map.size(), map.load_factor());
 
 #ifndef _MSC_VER
         //assert(RND != 123 || map.size() == expectedFinalSizes[i]);
@@ -614,7 +614,8 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
         } while (i < numInserts);
     }
 
-    printf("    %3lu%% %016lx success time = %.2lf s, %8d loadf = %.2lf\n", numSequential * 100 / NumTotal, bitMask, now2sec() - ts , (int)num_found, map.load_factor());
+    printf("    %3lu%% %016lx success time = %.2lf s, %8d loadf = %.2lf\n", 
+            numSequential * 100 / NumTotal, bitMask, now2sec() - ts , (int)num_found, map.load_factor());
     return num_found;
 }
 
@@ -695,6 +696,11 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<uint64_t> hash_func;
 #endif
 
+#if QC_HASH
+        { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
+        { fph::DynamicFphMap<uint64_t, uint64_t, fph::MixSeedHash<uint64_t>> emap; bench_IterateIntegers(emap); }
+#endif
+
 #if EM3
         { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
@@ -742,6 +748,9 @@ void runTest(int sflags, int eflags)
 #endif
 //        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+#if QC_HASH
+        {fph::DynamicFphMap<std::string, int, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
+#endif
         {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomFindString(bench); }
@@ -825,7 +834,7 @@ void runTest(int sflags, int eflags)
 #endif
             { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #if QC_HASH
-			{ fph::DynamicFphMap<size_t, size_t, fph::MixSeedHash<size_t>> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { fph::DynamicFphMap<size_t, size_t, fph::MixSeedHash<size_t>> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { qc::hash::RawMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
             { emilib::HashMap<size_t, size_t,  hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -908,7 +917,8 @@ void runTest(int sflags, int eflags)
         { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 #if QC_HASH
-        { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+        { fph::DynamicFphMap<uint64_t, uint64_t, fph::MixSeedHash<uint64_t>> emap; bench_randomInsertErase(emap); }
+//        { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hang
 #endif
 #if EM3
         { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
@@ -948,7 +958,7 @@ void runTest(int sflags, int eflags)
 
 #if QC_HASH
         { qc::hash::RawMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-        { fph::DynamicFphMap<int, int, fph::MixSeedHash<int>> emap; bench_randomDistinct2(emap); }
+//        { fph::DynamicFphMap<int, int, fph::MixSeedHash<int>> emap; bench_randomDistinct2(emap); } //hang
 #endif
         { emhash6::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { emhash5::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }

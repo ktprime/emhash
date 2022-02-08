@@ -1355,7 +1355,7 @@ namespace qc::hash
         }
         else {
             // Rehash if we're at capacity
-            if ((_size - _haveSpecial[0] - _haveSpecial[1]) >= (_slotCount * 4 / 8)) [[unlikely]] {
+            if ((_size - _haveSpecial[0] - _haveSpecial[1]) >= (_slotCount * 7 / 8)) [[unlikely]] {
                 _rehash(_slotCount << 1);
                 findResult = _findKey<true>(key);
             }

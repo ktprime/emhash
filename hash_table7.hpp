@@ -679,7 +679,7 @@ public:
         return it.next();
     }
 
-    iterator last()
+    iterator last() const
     {
         if (_num_filled == 0)
             return end();
