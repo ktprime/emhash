@@ -366,7 +366,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     static constexpr bool isSet{!IsMap<Container>};
 
-    static volatile size_t v{};
+//    static volatile size_t v{};
 
     const std::span<const K> firstHalfPresentKeys{&presentKeys[0], presentKeys.size() / 2};
     const std::span<const K> secondHalfPresentKeys{&presentKeys[presentKeys.size() / 2], presentKeys.size() / 2};
@@ -911,7 +911,7 @@ struct StdSetInfo
 template <typename K, typename V>
 struct StdMapInfo
 {
-    using Container = std::unordered_map<K, V>;
+    using Container = std::unordered_map<K, V, typename qc::hash::RawMap<K, V>::hasher>;
     using AllocatorContainer = std::unordered_map<K, V, typename std::unordered_map<K, V>::hasher, typename std::unordered_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
     static inline const std::string name{"std::unordered_map"};
@@ -929,7 +929,7 @@ struct AbslSetInfo
 template <typename K, typename V>
 struct AbslMapInfo
 {
-    using Container = absl::flat_hash_map<K, V>;
+    using Container = absl::flat_hash_map<K, V, typename qc::hash::RawMap<K, V>::hasher>;
     using AllocatorContainer = std::conditional_t<sizeof(size_t) == 8, std::unordered_map<K, V, typename absl::flat_hash_map<K, V>::hasher, typename absl::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>, void>;
 
     static inline const std::string name{"absl::flat_hash_map"};
@@ -947,7 +947,7 @@ struct RobinHoodSetInfo
 template <typename K, typename V>
 struct RobinHoodMapInfo
 {
-    using Container = robin_hood::unordered_flat_map<K, V>;
+    using Container = robin_hood::unordered_flat_map<K, V, typename qc::hash::RawMap<K, V>::hasher>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"martin::flat_map"};
@@ -965,8 +965,9 @@ struct SkaSetInfo
 template <typename K, typename V>
 struct SkaMapInfo
 {
-    using Container = ska::flat_hash_map<K, V>;
-    using AllocatorContainer = ska::flat_hash_map<K, V, typename ska::flat_hash_map<K, V>::hasher, typename ska::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    using Container = ska::flat_hash_map<K, V, typename qc::hash::RawMap<K, V>::hasher>;
+    using AllocatorContainer = void;
+    //using AllocatorContainer = ska::flat_hash_map<K, V, typename qc::hash::RawMap<K, V>::hasher, typename ska::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
     static inline const std::string name{"ska:flat_hashmap"};
 };
@@ -975,7 +976,8 @@ template <typename K>
 struct TslRobinSetInfo
 {
     using Container = tsl::robin_set<K>;
-    using AllocatorContainer = tsl::robin_set<K, typename tsl::robin_set<K>::hasher, typename tsl::robin_set<K>::key_equal, qc::memory::RecordAllocator<K>>;
+    //using AllocatorContainer = tsl::robin_set<K, typename tsl::robin_set<K>::hasher, typename tsl::robin_set<K>::key_equal, qc::memory::RecordAllocator<K>>;
+    using AllocatorContainer = void;
 
     static inline const std::string name{"tsl::robin_set"};
 };
@@ -983,8 +985,9 @@ struct TslRobinSetInfo
 template <typename K, typename V>
 struct TslRobinMapInfo
 {
-    using Container = tsl::robin_map<K, V>;
-    using AllocatorContainer = tsl::robin_map<K, V, typename tsl::robin_map<K, V>::hasher, typename tsl::robin_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    using Container = tsl::robin_map<K, V, typename qc::hash::RawMap<K, V>::hasher>;
+    //using AllocatorContainer = tsl::robin_map<K, V, typename tsl::robin_map<K, V>::hasher, typename tsl::robin_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    using AllocatorContainer = void;
 
     static inline const std::string name{"tsl::robin_map  "};
 };
@@ -993,7 +996,8 @@ template <typename K>
 struct TslSparseSetInfo
 {
     using Container = tsl::sparse_set<K>;
-    using AllocatorContainer = tsl::sparse_set<K, typename tsl::sparse_set<K>::hasher, typename tsl::sparse_set<K>::key_equal, qc::memory::RecordAllocator<K>>;
+    //using AllocatorContainer = tsl::sparse_set<K, typename tsl::sparse_set<K>::hasher, typename tsl::sparse_set<K>::key_equal, qc::memory::RecordAllocator<K>>;
+    using AllocatorContainer = void;
 
     static inline const std::string name{"tsl::sparse_hash_set"};
 };
@@ -1001,7 +1005,7 @@ struct TslSparseSetInfo
 template <typename K, typename V>
 struct TslSparseMapInfo
 {
-    using Container = tsl::sparse_map<K, V>;
+    using Container = tsl::sparse_map<K, V, typename qc::hash::RawMap<K, V>::hasher>;
     using AllocatorContainer = tsl::sparse_map<K, V, typename tsl::sparse_map<K, V>::hasher, typename tsl::sparse_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
     static inline const std::string name{"tsl::sparse_hash_map"};
@@ -1010,7 +1014,7 @@ struct TslSparseMapInfo
 template <typename K, typename V>
 struct EmHash5MapInfo
 {
-    using Container = emhash5::HashMap<K, V>;
+    using Container = emhash5::HashMap<K, V, typename qc::hash::RawMap<K, V>::hasher>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"emhash5::HashMap"};
@@ -1019,7 +1023,7 @@ struct EmHash5MapInfo
 template <typename K, typename V>
 struct EmHash7MapInfo
 {
-    using Container = emhash7::HashMap<K, V>;
+    using Container = emhash7::HashMap<K, V, typename qc::hash::RawMap<K, V>::hasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"emhash7::HashMap"};
 };
@@ -1027,7 +1031,7 @@ struct EmHash7MapInfo
 template <typename K, typename V>
 struct EmiLib2MapInfo
 {
-    using Container = emilib2::HashMap<K, V>;
+    using Container = emilib2::HashMap<K, V, typename qc::hash::RawMap<K, V>::hasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"emilib2::HashMap"};
 };
@@ -1065,7 +1069,7 @@ int main()
         using K = size_t;
         using V = size_t;// std::string;
         compare<CompareMode::typical, K,
-            //StdMapInfo<K, V>,
+            StdMapInfo<K, V>,
             //AbslMapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
             QcHashMapInfo<K, V>,

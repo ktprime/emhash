@@ -349,7 +349,7 @@ void test_delay()
         int* arr2 = new int[LEN]; int sum = 1;
         for (int i = 1; i < LEN; i += len) sum += arr2[i];
         auto end_time = now2ns();
-        printf("time[%5d] use %4ld ms [%d] ns / op = %.2lf\n", len, (end_time - start_time) / 1000000, sum, (double)(end_time - start_time) / (LEN / len));
+        printf("time[%5d] use %4d ms [%d] ns / op = %.2lf\n", len, int(end_time - start_time) / 1000000, sum, (double)(end_time - start_time) / (LEN / len));
 #if 0
         start_time = now2ns();
         for (int i = 1; i < LEN; i += len) sum += arr2[i];
@@ -561,7 +561,6 @@ int main(int argc, char* argv[])
     run_table <fph::DynamicFphMap<test_key_t, test_val_t, fph::MixSeedHash<test_key_t>>>(insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 
-
 //    run_table <emilib4::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
     int n = TEST_LEN;
     printf(">> "); scanf("%u", &n);
@@ -572,16 +571,6 @@ int main(int argc, char* argv[])
     else if (n > 100000)
         TEST_LEN = n;
     }
-
-
-//    start_time = now2ns();
-//    for (int i = 1; i < LEN; i += 1)
-//        arr1[i] += 11;
-
-
-//    start_time = now2ns();
-//    for (int i = 1; i < LEN; i += 16) arr2[i] += 11;
-//    printf("time2 use %ld ms\n", (now2ns() - start_time) / 1000000);
 
     return 0;
 }
