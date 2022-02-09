@@ -714,7 +714,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     int minn = (max_loadf - 0.2f) * pow2, maxn = int(max_loadf * pow2);
     int i = 0;
 
-	//fill data to min factor
+    //fill data to min factor
     for (; i < minn; i++) {
         if (i < (int)vList.size())
             tmp.emplace(vList[i], TO_VAL(0));
@@ -1095,7 +1095,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #if 1
         multi_small_ife <hash_type>(hash_name, oList);
 
-#ifndef QC_HASH
+#if QC_HASH == 0 || QC_HASH == 2
         insert_erase     <hash_type>(hash_name, oList);
 #endif
         insert_high_load <hash_type>(hash_name, oList);
