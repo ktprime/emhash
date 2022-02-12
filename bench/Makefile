@@ -77,10 +77,13 @@ CXXFLAGS += -DSMAP=1
 endif
 
 ifneq ($(QCH),)
-CXXFLAGS += -DQC_HASH=1 -std=c++20
+CXXFLAGS += -DQC_HASH=$(QCH) -std=c++20
 endif
 
 all:
+ifneq ($(QCH),)
+	$(CXX) $(CXXFLAGS) -I. -DQC_HASH -std=c++20 qbench.cpp -o qbench
+endif
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
@@ -92,7 +95,6 @@ all:
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
 	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
 	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
-	$(CXX) $(CXXFLAGS) -I. -DQC_HASH -std=c++20 qbench.cpp -o qbench
 
 eb:
 	./ebench

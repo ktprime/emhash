@@ -13,7 +13,7 @@
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"
 #include "emilib/emilib2.hpp"
-#include "emilib/emiset2.hpp"
+//#include "emilib/emiset2.hpp"
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #pragma warning(push)
@@ -1037,14 +1037,15 @@ struct EmiLib2MapInfo
     static inline const std::string name{"emilib2::HashMap"};
 };
 
+#if 0
 template <typename K>
 struct EmiLib2SetInfo
 {
-    using Container = emilib::HashSet<K, typename qc::hash::RawSet<K>::hasher>;
+    using Container = emilib2::HashSet<K, typename qc::hash::RawSet<K>::hasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"emilib2::HashSet"};
 };
-
+#endif
 
 template <typename K, typename V>
 struct FphDyamicMapInfo
@@ -1060,7 +1061,7 @@ int main()
     if constexpr (true) {
         using K = size_t;
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, AbslSetInfo<K>>();
-        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
+//        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
         compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
         compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
         compare<CompareMode::oneVsOne, K, EmHash5MapInfo<K,int>, EmHash7MapInfo<K, int>>();

@@ -1451,7 +1451,7 @@ public:
     }
 
     template <class K = key_type, class F>
-    iterator lazy_emplace_with_hash(const key_arg<K>& key, size_t &hashval, F&& f) {
+    iterator lazy_emplace_with_hash(const key_arg<K>& key, size_t hashval, F&& f) {
         auto res = find_or_prepare_insert(key, hashval);
         if (res.second) {
             lazy_emplace_at(res.first, std::forward<F>(f));
@@ -1464,6 +1464,15 @@ public:
         slot_type* slot = slots_ + idx;
         std::forward<F>(f)(constructor(&alloc_ref(), &slot));
         assert(!slot);
+    }
+
+    template <class K = key_type, class F>
+    void emplace_single_with_hash(const key_arg<K>& key, size_t hashval, F&& f) {
+        auto res = find_or_prepare_insert(key, hashval);
+        if (res.second)
+            lazy_emplace_at(res.first, std::forward<F>(f));
+        else
+            _erase(iterator_at(res.first));
     }
 
 
@@ -1577,12 +1586,12 @@ public:
         }
     }
 
-#if !defined(PHMAP_NON_DETERMINISTIC) && !defined(PHMAP_DISABLE_DUMP)
+#if !defined(PHMAP_NON_DETERMINISTIC)
     template<typename OutputArchive>
-    bool dump(OutputArchive&) const;
+    bool phmap_dump(OutputArchive&) const;
 
     template<typename InputArchive>
-    bool load(InputArchive&);
+    bool  phmap_load(InputArchive&);
 #endif
 
     void rehash(size_t n) {
@@ -2451,6 +2460,19 @@ protected:
     // --------------------------------------------------------------------
     struct Inner : public Lockable
     {
+        struct Params
+        {
+            size_t bucket_cnt;
+            const hasher& hashfn;
+            const key_equal& eq;
+            const allocator_type& alloc;
+        };
+
+        Inner() {}
+
+        Inner(Params const &p) : set_(p.bucket_cnt, p.hashfn, p.eq, p.alloc)
+        {}
+
         bool operator==(const Inner& o) const
         {
             typename Lockable::SharedLocks l(const_cast<Inner &>(*this), const_cast<Inner &>(o));
@@ -2625,6 +2647,20 @@ public:
         std::is_nothrow_default_constructible<key_equal>::value&&
         std::is_nothrow_default_constructible<allocator_type>::value) {}
 
+#if  (__cplusplus >= 201703L || _MSVC_LANG >= 201402) && (defined(_MSC_VER) || defined(__clang__) || (defined(__GNUC__) && __GNUC__ > 6))
+    explicit parallel_hash_set(size_t bucket_cnt, 
+                               const hasher& hash_param    = hasher(),
+                               const key_equal& eq         = key_equal(),
+                               const allocator_type& alloc = allocator_type()) :
+        parallel_hash_set(typename Inner::Params{bucket_cnt, hash_param, eq, alloc}, 
+                          phmap::make_index_sequence<num_tables>{})
+    {}
+
+    template <std::size_t... i>
+    parallel_hash_set(typename Inner::Params const &p,
+                      phmap::index_sequence<i...>) : sets_{((void)i, p)...}
+    {}
+#else
     explicit parallel_hash_set(size_t bucket_cnt, 
                                const hasher& hash_param    = hasher(),
                                const key_equal& eq         = key_equal(),
@@ -2632,6 +2668,7 @@ public:
         for (auto& inner : sets_)
             inner.set_ = EmbeddedSet(bucket_cnt / N, hash_param, eq, alloc);
     }
+#endif
 
     parallel_hash_set(size_t bucket_cnt, 
                       const hasher& hash_param,
@@ -2920,7 +2957,7 @@ public:
     };
 
     // --------------------------------------------------------------------
-    // phmap expension: emplace_with_hash
+    // phmap extension: emplace_with_hash
     // ----------------------------------
     // same as emplace, but hashval is provided
     // --------------------------------------------------------------------
@@ -3072,6 +3109,8 @@ public:
         return {iterator(inner, &sets_[0] + num_tables, res.first), res.second};
     }
 
+    // lazy_emplace
+    // ------------
     template <class K = key_type, class F>
     iterator lazy_emplace(const key_arg<K>& key, F&& f) {
         auto hashval = this->hash(key);
@@ -3080,7 +3119,96 @@ public:
         typename Lockable::UniqueLock m(inner);
         return make_iterator(&inner, set.lazy_emplace_with_hash(key, hashval, std::forward<F>(f)));
     }
+    
+    // emplace_single
+    // --------------
+    template <class K = key_type, class F>
+    void emplace_single_with_hash(const key_arg<K>& key, size_t hashval, F&& f) {
+        Inner& inner = sets_[subidx(hashval)];
+        auto&  set   = inner.set_;
+        typename Lockable::UniqueLock m(inner);
+        set.emplace_single_with_hash(key, hashval, std::forward<F>(f));
+    }
 
+    template <class K = key_type, class F>
+    void emplace_single(const key_arg<K>& key, F&& f) {
+        auto hashval = this->hash(key);
+        emplace_single_with_hash<K, F>(key, hashval, std::forward<F>(f));
+    }
+
+    // if set contains key, lambda is called with the value_type (under read lock protection),
+    // and if_contains returns true. This is a const API and lambda should not modify the value
+    // -----------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool if_contains(const key_arg<K>& key, F&& f) const {
+        return const_cast<parallel_hash_set*>(this)->template 
+            modify_if_impl<K, F, typename Lockable::SharedLock>(key, std::forward<F>(f));
+    }
+
+    // if set contains key, lambda is called with the value_type  without read lock protection,
+    // and if_contains_unsafe returns true. This is a const API and lambda should not modify the value
+    // This should be used only if we know that no other thread may be mutating the set at the time.
+    // -----------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool if_contains_unsafe(const key_arg<K>& key, F&& f) const {
+        return const_cast<parallel_hash_set*>(this)->template 
+            modify_if_impl<K, F, LockableBaseImpl<phmap::NullMutex>::DoNothing>(key, std::forward<F>(f));
+    }
+
+    // if map contains key, lambda is called with the value_type  (under write lock protection),
+    // and modify_if returns true. This is a non-const API and lambda is allowed to modify the mapped value
+    // ----------------------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool modify_if(const key_arg<K>& key, F&& f) {
+        return modify_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
+    }
+
+    // -----------------------------------------------------------------------------------------
+    template <class K = key_type, class F, class L>
+    bool modify_if_impl(const key_arg<K>& key, F&& f) {
+#if __cplusplus >= 201703L
+        static_assert(std::is_invocable<F, value_type&>::value);
+#endif
+        L m;
+        auto ptr = this->template find_ptr<K, L>(key, this->hash(key), m);
+        if (ptr == nullptr)
+            return false;
+        std::forward<F>(f)(*ptr);
+        return true;
+    }
+
+    // if map contains key, lambda is called with the mapped value  (under write lock protection).
+    // If the lambda returns true, the key is subsequently erased from the map (the write lock
+    // is only released after erase).
+    // returns true if key was erased, false otherwise.
+    // ----------------------------------------------------------------------------------------------------
+    template <class K = key_type, class F>
+    bool erase_if(const key_arg<K>& key, F&& f) {
+        return erase_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
+    }
+
+    template <class K = key_type, class F, class L>
+    bool erase_if_impl(const key_arg<K>& key, F&& f) {
+#if __cplusplus >= 201703L
+        static_assert(std::is_invocable<F, value_type&>::value);
+#endif
+        L m;
+        auto it = this->template find<K, L>(key, this->hash(key), m);
+        if (it == this->end()) return false;
+        if (std::forward<F>(f)(const_cast<value_type &>(*it)))
+        {
+            this->erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    // if map does not contains key, it is inserted and the mapped value is value-constructed 
+    // with the provided arguments (if any), as with try_emplace. 
+    // if map already  contains key, then the lambda is called with the mapped value (under 
+    // write lock protection) and can update the mapped value.
+    // returns true if key was not already present, false otherwise.
+    // ---------------------------------------------------------------------------------------
     template <class K = key_type, class FExists, class FEmplace>
     bool lazy_emplace_l(const key_arg<K>& key, FExists&& fExists, FEmplace&& fEmplace) {
         typename Lockable::UniqueLock m;
@@ -3090,7 +3218,7 @@ public:
             inner->set_.lazy_emplace_at(std::get<1>(res), std::forward<FEmplace>(fEmplace));
         else {
             auto it = this->iterator_at(inner, inner->set_.iterator_at(std::get<1>(res)));
-            std::forward<FExists>(fExists)(Policy::value(&*it));
+            std::forward<FExists>(fExists)(const_cast<value_type &>(*it)); // in case of the set, non "key" part of value_type can be changed
         }
         return std::get<2>(res);
     }
@@ -3367,12 +3495,12 @@ public:
         return HashElement{hash_ref()}(key);
     }
 
-#if !defined(PHMAP_NON_DETERMINISTIC) && !defined(PHMAP_DISABLE_DUMP)
+#if !defined(PHMAP_NON_DETERMINISTIC)
     template<typename OutputArchive>
-    bool dump(OutputArchive& ar) const;
+    bool phmap_dump(OutputArchive& ar) const;
 
     template<typename InputArchive>
-    bool load(InputArchive& ar);
+    bool phmap_load(InputArchive& ar);
 #endif
 
 private:
@@ -3550,8 +3678,9 @@ class parallel_hash_map : public parallel_hash_set<N, RefSet, Mtx_, Policy, Hash
     using Lockable = phmap::LockableImpl<Mtx_>;
 
 public:
-    using key_type = typename Policy::key_type;
+    using key_type    = typename Policy::key_type;
     using mapped_type = typename Policy::mapped_type;
+    using value_type  = typename Base::value_type;
     template <class K>
     using key_arg = typename KeyArgImpl::template type<K, key_type>;
 
@@ -3688,44 +3817,6 @@ public:
         return try_emplace_with_hash(hashval, k, std::forward<Args>(args)...).first;
     }
 
-    // if map contains key, lambda is called with the mapped value (under read lock protection),
-    // and if_contains returns true. This is a const API and lambda should not modify the value
-    // -----------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool if_contains(const key_arg<K>& key, F&& f) const {
-        return const_cast<parallel_hash_map*>(this)->template 
-            modify_if_impl<K, F, typename Lockable::SharedLock>(key, std::forward<F>(f));
-    }
-
-    // if map contains key, lambda is called with the mapped value without read lock protection,
-    // and if_contains_unsafe returns true. This is a const API and lambda should not modify the value
-    // This should be used only if we know that no other thread may be mutating the map at the time.
-    // -----------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool if_contains_unsafe(const key_arg<K>& key, F&& f) const {
-        return const_cast<parallel_hash_map*>(this)->template 
-            modify_if_impl<K, F, LockableBaseImpl<phmap::NullMutex>::DoNothing>(key, std::forward<F>(f));
-    }
-
-    // if map contains key, lambda is called with the mapped value  (under write lock protection),
-    // and modify_if returns true. This is a non-const API and lambda is allowed to modify the mapped value
-    // ----------------------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool modify_if(const key_arg<K>& key, F&& f) {
-        return modify_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
-    }
-
-
-    // if map contains key, lambda is called with the mapped value  (under write lock protection).
-    // If the lambda returns true, the key is subsequently erased from the map (the write lock
-    // is only released after erase).
-    // returns true if key was erased, false otherwise.
-    // ----------------------------------------------------------------------------------------------------
-    template <class K = key_type, class F>
-    bool erase_if(const key_arg<K>& key, F&& f) {
-        return erase_if_impl<K, F, typename Lockable::UniqueLock>(key, std::forward<F>(f));
-    }
-
     // if map does not contains key, it is inserted and the mapped value is value-constructed 
     // with the provided arguments (if any), as with try_emplace. 
     // if map already  contains key, then the lambda is called with the mapped value (under 
@@ -3743,7 +3834,7 @@ public:
                                    std::forward_as_tuple(std::forward<Args>(args)...));
         else {
             auto it = this->iterator_at(inner, inner->set_.iterator_at(std::get<1>(res)));
-            std::forward<F>(f)(Policy::value(&*it));
+            std::forward<F>(f)(const_cast<value_type &>(*it)); // in case of the set, non "key" part of value_type can be changed
         }
         return std::get<2>(res);
     }
@@ -3761,35 +3852,6 @@ public:
     }
 
 private:
-    template <class K = key_type, class F, class L>
-    bool modify_if_impl(const key_arg<K>& key, F&& f) {
-#if __cplusplus >= 201703L
-        static_assert(std::is_invocable<F, mapped_type&>::value);
-#endif
-        L m;
-        auto ptr = this->template find_ptr<K, L>(key, this->hash(key), m);
-        if (ptr == nullptr)
-            return false;
-        std::forward<F>(f)(Policy::value(ptr));
-        return true;
-    }
-
-    template <class K = key_type, class F, class L>
-    bool erase_if_impl(const key_arg<K>& key, F&& f) {
-#if __cplusplus >= 201703L
-        static_assert(std::is_invocable<F, mapped_type&>::value);
-#endif
-        L m;
-        auto it = this->template find<K, L>(key, this->hash(key), m);
-        if (it == this->end()) return false;
-        if (std::forward<F>(f)(Policy::value(&*it)))
-        {
-            this->erase(it);
-            return true;
-        }
-        return false;
-    }
-
 
     template <class K, class V>
     std::pair<iterator, bool> insert_or_assign_impl(K&& k, V&& v) {

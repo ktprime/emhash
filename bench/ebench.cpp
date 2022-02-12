@@ -14,12 +14,19 @@
 #ifndef ET
 #define ET                 1
 #endif
+
+#if SMAP
+#include "flat_map.hpp"
+#endif
+
 static void printInfo(char* out);
 std::map<std::string, std::string> maps =
 {
 //    {"stl_hash", "unordered_map"},
-    {"stl_map", "stl_map"},
-    {"btree", "btree_map"},
+//    {"stl_map", "stl_map"},
+//    {"fmap", "flat_map"},
+//    {"btree", "btree_map"},
+
     {"qchash", "qc-hash"},
     {"fph", "fph-table"},
 
@@ -43,7 +50,7 @@ std::map<std::string, std::string> maps =
 //    {"emilib3", "emilib3"},
 //    {"ktprime", "ktprime"},
     {"fht", "fht"},
-    {"absl", "absl_flat"},
+    {"abslf", "absl_flat"},
 //    {"f14_value", "f14_value"},
     {"f14_vector", "f14_vector"},
     {"cuckoo", "cuckoo hash"},
@@ -54,8 +61,8 @@ std::map<std::string, std::string> maps =
     {"phmap", "phmap_flat"},
 //    {"hrdset", "hrdset"},
 
-//    {"tsl", "tsl_robin"},
-//    {"flat", "ska_flat"},
+    {"tslr", "tsl_robin"},
+    {"skaf", "ska_flat"},
 
     {"hopsco", "tsl_hopsco"},
     {"byte", "ska_byte"},
@@ -226,6 +233,8 @@ struct StructValue
     {
         return lScore < r.lScore;
     }
+
+    int64_t operator + (int64_t r) const { return lScore + r; }
 
     int64_t lUid;
     int64_t lScore;
@@ -678,8 +687,8 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
     const auto lsize = cache_size + vList.size() % min_size;
     hash_type tmp, empty;
 #ifndef SMAP
-    if (vList.size() % 4 == 0)
-        empty.max_load_factor(0.80);
+//    if (vList.size() % 4 == 0)
+//        empty.max_load_factor(0.80);
 //    if (vList.size() % 8 == 0)
 //        empty.reserve(cache_size);
 #endif
@@ -778,7 +787,7 @@ void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const st
         sum += ht_hash.count(skey);
 #endif
 #else
-        keyType v2 = TO_KEY(v + 2048 - (v % 4096));
+        keyType v2(v + 1);
         sum += ht_hash.find(v2) != ht_hash.end();
 #endif
     }
@@ -1282,7 +1291,7 @@ static int benchHashMap(int n)
         //{  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
 
 #if __x86_64__ || _M_X64
-        {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("flat", vList); }
+        {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("skaf", vList); }
 #if __cplusplus > 201402L || _MSVC_LANG >= 201402L
         {  benOneHash<hrd7::hash_map     <keyType, valueType, ehash_func>>("hrdset", vList); }
 #endif
@@ -1290,7 +1299,8 @@ static int benchHashMap(int n)
 #endif
 
 #ifdef SMAP
-        {  benOneHash<std::map<keyType, valueType>>         ("stl_map", vList); }
+        {  benOneHash<std::map<keyType, valueType>>          ("stl_map", vList); }
+//        {  benOneHash<std::flat_map<keyType, valueType>>     ("fmap", vList); }
 
 #if __GNUC__ && __linux__
 //        {  benOneHash<__gnu_pbds::gp_hash_table<keyType, valueType>>("gp_hash", vList) };
@@ -1307,7 +1317,7 @@ static int benchHashMap(int n)
         {  benOneHash<emhash3::HashMap <keyType, valueType, ehash_func>>("emhash3", vList); }
 #endif
 #if ABSL
-        {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("absl", vList); }
+        {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("abslf", vList); }
 #endif
 
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
@@ -1335,7 +1345,7 @@ static int benchHashMap(int n)
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
-        {  benOneHash<robin_hood::unordered_flat_map <keyType, valueType, ehash_func>>("martin", vList); }
+        {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martin", vList); }
         //        {  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
 
         {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("tsl", vList); }
@@ -1712,7 +1722,7 @@ int main(int argc, char* argv[])
                 else if (c == 't')
                     maps.erase("tsl");
                 else if (c == 's')
-                    maps.erase("flat");
+                    maps.erase("skaf");
                 else if (c == 'a')
                     maps.erase("absl");
                 else if (c == 'f')
@@ -1732,7 +1742,8 @@ int main(int argc, char* argv[])
                     maps.emplace("ktprime", "ktprime");
                 else if (c == 'b') {
                     maps.emplace("btree", "btree_map");
-                    maps.emplace("smap", "stl_map");
+                    maps.emplace("stl_map", "stl_map");
+                    maps.emplace("fmap", "flat_map");
                 } else if (c == 'u')
                     maps.emplace("stl_hash", "unordered_map");
             }

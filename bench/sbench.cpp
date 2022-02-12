@@ -15,8 +15,8 @@
 static void printInfo(char* out);
 std::map<std::string, std::string> maps =
 {
-    {"stl_hset", "unordered_set"},
-    {"stl_set", "stl_set"},
+//    {"stl_hset", "unordered_set"},
+//    {"stl_set", "stl_set"},
     {"btree", "btree_set"},
     {"qchash", "qc-hash"},
 
@@ -35,8 +35,8 @@ std::map<std::string, std::string> maps =
     {"phmap", "phmap_flat"},
     {"hrdset",   "hrdset"},
 
-    {"robin", "tsl_robin"},
-    {"flat", "ska_flat"},
+    {"tslr", "tsl_robin"},
+    {"skaf", "ska_flat"},
 
     {"hopsco", "tsl_hopsco"},
     {"byte", "ska_byte"},
@@ -106,6 +106,9 @@ std::map<std::string, std::string> maps =
 //http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
 //https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
+//https://gankra.github.io/blah/hashbrown-tldr/ swiss
+//https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
+
 
 #if HOOD_HASH
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
@@ -135,6 +138,7 @@ std::map<std::string, std::string> maps =
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
+
 #ifndef PACK
 #define PACK 128
 #endif
@@ -161,6 +165,8 @@ struct StructValue
     {
         return lScore < r.lScore;
     }
+
+    int64_t operator + (int64_t r) const { return lScore + r; }
 
     int64_t lUid;
     int64_t lScore;
@@ -230,7 +236,7 @@ struct StuHasher
     #define sValueType  "int64_t"
 #elif TVal == 2
     typedef std::string valueType;
-    #define TO_VAL(i)   #i
+    #define TO_VAL(i)   ""
     #define TO_SUM(i)   i.size()
     #define sValueType  "string"
 #elif TValue == 3
@@ -269,23 +275,27 @@ static void check_func_result(const std::string& hash_name, const std::string& f
 
     long ts = (getus() - ts1) / 1000;
 
-    if (func_index == func_first)
-        printf("%8s  (%.3f): %8s %4ld, ", hash_name.data(), hlf, func.data(), ts);
-
-    for (int i = 0; i <= 3; i++) {
-        if (func_index == (func_first + i) % func_size + 1) {
+    if (func_first < func_last)  {
+        if (func_index == func_first)
+            printf("%8s  (%.3f): ", hash_name.data(), hlf);
+        if (func_index >= func_first && func_index <= func_last)
             printf("%8s %4ld, ", func.data(), ts);
-            break;
-        }
+        if (func_index == func_last)
+            printf("\n");
+    } else {
+        if (func_index == 1)
+            printf("%8s  (%.3f): ", hash_name.data(), hlf);
+        if (func_index >= func_first || func_index <= func_last)
+            printf("%8s %4ld, ", func.data(), ts);
+        if (func_index == func_size)
+            printf("\n");
     }
-    if (func_index == func_last)
-        printf("\n");
 }
 
 static void inline hash_convert(const std::map<std::string, int64_t>& hash_score, std::multimap <int64_t, std::string>& score_hash)
 {
     for (const auto& v : hash_score)
-        score_hash.insert(std::pair<int64_t, std::string>(v.second, v.first));
+        score_hash.emplace(v.second, v.first);
 }
 
 static void add_hash_func_time(std::map<std::string, std::map<std::string, int64_t>>& func_hash_score, std::multimap <int64_t, std::string>& once_score_hash, int vsize)
@@ -323,11 +333,11 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
 
     auto mins = rscore_hash.begin()->first;
     for (auto& v : rscore_hash) {
-        hash_score[v.second] += (int)((mins * 100) / (v.first + 0));
+        hash_score[v.second] += (int)((mins * 100) / (v.first + 1e-3));
 
         //hash_func_score[v.second][func] = (int)((mins * 100) / (v.first + 1));
         hash_func_score[v.second][func] = v.first / test_case;
-        printf("        %-20s   %-2.1f%%\n", /*(int)(v.first / test_case),*/ v.second.data(), ((mins * 100.0f) / v.first));
+        printf("%4d        %-20s   %-2.1f%%\n", (int)(v.first / test_case), v.second.data(), ((mins * 100.0f) / v.first));
     }
     putchar('\n');
 }
@@ -526,7 +536,18 @@ void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std:
 }
 
 template<class hash_type>
-void multi_small_bench(const std::string& hash_name, const std::vector<keyType>& vList)
+void insert_hit(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+{
+    auto ts1 = getus(); size_t sum = 0;
+    for (auto& v : vList) {
+        ht_hash.emplace(v);
+        sum ++;
+    }
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+}
+
+template<class hash_type>
+void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& vList)
 {
 #if KEY_INT
     size_t sum = 0;
@@ -587,8 +608,8 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
     const auto lsize = cache_size + vList.size() % min_size;
     hash_type tmp, empty;
 #ifndef SMAP
-    if (vList.size() % 4 == 0)
-        empty.max_load_factor(0.80);
+//    if (vList.size() % 4 == 0)
+//        empty.max_load_factor(0.80);
 //    if (vList.size() % 8 == 0)
 //        empty.reserve(cache_size);
 #endif
@@ -623,6 +644,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     int minn = (max_loadf - 0.2f) * pow2, maxn = int(max_loadf * pow2);
     int i = 0;
 
+    //fill data to min factor
     for (; i < minn; i++) {
         if (i < (int)vList.size())
             tmp.emplace(vList[i]);
@@ -653,7 +675,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 #else
         const keyType v2(v.data(), v.size() - 1);
 #endif
-//        tmp[v2];
+        tmp.emplace(v2);
         sum += tmp.count(v2);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -685,7 +707,7 @@ void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const st
         sum += ht_hash.count(skey);
 #endif
 #else
-        keyType v2 = TO_KEY(v + 2048 - (v % 4096));
+        keyType v2(v + 1);
         sum += ht_hash.find(v2) != ht_hash.end();
 #endif
     }
@@ -794,12 +816,16 @@ void copy_clear(hash_type& ht_hash, const std::string& hash_name)
     ht_hash = thash;
     sum  += ht_hash.size();
 
+    ht_hash = std::move(ht_hash);
     ht_hash = std::move(thash);
     sum  += ht_hash.size();
+    assert(ht_hash.size() > 0 && thash.size() == 0);
 
     ht_hash.clear(); thash.clear();
     ht_hash.clear(); thash.clear();
     sum  += ht_hash.size();
+
+    assert(ht_hash.size() == thash.size());
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -822,7 +848,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #elif (RT == 4 && __SIZEOF_INT128__)
     Lehmer64 srng(size);
 #else
-    std::mt19937_64 srng; srng.seed(size);
+    std::mt19937_64 srng(size);
 #endif
 
 #ifdef KEY_STR
@@ -895,18 +921,19 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
         func_index = 0;
-        multi_small_bench <hash_type>(hash_name, oList);
-
-        insert_erase      <hash_type>(hash_name, oList);
-        insert_high_load  <hash_type>(hash_name, oList);
+        multi_small_ife <hash_type>(hash_name, oList);
+#if QC_HASH == 0 || QC_HASH == 2
+        insert_erase     <hash_type>(hash_name, oList);
+#endif
+        insert_high_load <hash_type>(hash_name, oList);
 
         insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", l2_size, l2_size + 1000);
+//        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", l2_size, l2_size + 1000);
         insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l3_size, l3_size + 1000);
 
         insert_no_reserve <hash_type>(hash_name, oList);
 
-        insert_reserve<hash_type>(hash,hash_name, oList);
+        insert_hit<hash_type>(hash,hash_name, oList);
         find_hit_100  <hash_type>(hash,hash_name, oList);
         find_hit_0  <hash_type>(hash,hash_name, oList);
 
@@ -1026,7 +1053,7 @@ static int benchHashSet(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if ABSL_HASH
+#if ABSL_HASH && ABSL
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
@@ -1071,10 +1098,10 @@ static int benchHashSet(int n)
         {  benOneHash<std::unordered_set<keyType,  ehash_func>>("stl_hset", vList); }
         //{  benOneHash<emilib2::HashSet     <keyType,  ehash_func>>("emilib2", vList); }
 
-        {  benOneHash<tsl::robin_set     <keyType,  ehash_func>>("robin", vList); }
+        {  benOneHash<tsl::robin_set     <keyType,  ehash_func>>("tslr", vList); }
+        {  benOneHash<ska::flat_hash_set <keyType,  ehash_func>>("skaf", vList); }
 #if __x86_64__
-        {  benOneHash<ska::flat_hash_set <keyType,  ehash_func>>("flat", vList); }
-        {  benOneHash<hrd7::hash_set     <keyType,  ehash_func>>("hrdset", vList); }
+        //{  benOneHash<hrd7::hash_set     <keyType,  ehash_func>>("hrdset", vList); }
 #endif
 #endif
 
@@ -1092,12 +1119,12 @@ static int benchHashSet(int n)
 #if ET
         {  benOneHash<phmap::flat_hash_set <keyType,  ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_set <keyType,  ehash_func>>("martin", vList); }
+#endif
 #if ASBL
         {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
 #endif
-#endif
 
-        {  benOneHash<emilib::HashSet <keyType,  ehash_func>>("emiset", vList); }
+        {  benOneHash<emilib::HashSet  <keyType,  ehash_func>>("emiset", vList); }
         {  benOneHash<emilib2::HashSet <keyType,  ehash_func>>("emiset2", vList); }
         {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
@@ -1254,7 +1281,7 @@ int main(int argc, char* argv[])
     while (true) {
         if (run_type == 2) {
             printf(">>");
-            if (scanf("%u", &n) <= 1)
+            if (scanf("%u", &n) == 0)
                 break;
             if (n <= 1)
                 run_type = 0;
@@ -1270,8 +1297,9 @@ int main(int argc, char* argv[])
                 n = (srng() % maxn) + minn;
         }
 
+        auto pow2 = 1 << ilog(n, 2);
+        hlf = 1.0 * n / pow2 / 2;
         if (load_factor > 0.2 && load_factor < 1) {
-            auto pow2 = 1 << ilog(n, 2);
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
         }
         if (n < 1000 || n > 1234567890)

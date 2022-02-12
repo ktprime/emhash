@@ -30,7 +30,7 @@
 #    define EMH_UNLIKELY(condition) condition
 #endif
 
-namespace emilib {
+namespace emilib2 {
 
 #define KEYHASH_MASK(key_hash) ((uint8_t)(key_hash >> 24) << 1)
 
