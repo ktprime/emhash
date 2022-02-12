@@ -1231,7 +1231,7 @@ static int benchHashMap(int n)
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
-#elif KEY_INT && FIB_HASH >= 0
+#elif KEY_INT && FIB_HASH > 0
     using ehash_func = Int64Hasher<keyType>;
 #elif KEY_CLA
     using ehash_func = StuHasher;
@@ -1239,6 +1239,8 @@ static int benchHashMap(int n)
     using ehash_func = phmap::Hash<keyType>;
 #elif HOOD_HASH
     using ehash_func = robin_hood::hash<keyType>;
+#elif QCH && KEY_INT
+    using ehash_func = qc::hash::RawMap<keyType, valueType>::hasher;
 #else
     using ehash_func = std::hash<keyType>;
 #endif

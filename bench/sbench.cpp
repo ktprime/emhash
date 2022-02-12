@@ -1030,7 +1030,7 @@ static int benchHashSet(int n)
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
-#elif KEY_INT && FIB_HASH >= 0
+#elif KEY_INT && FIB_HASH > 0
     using ehash_func = Int64Hasher<keyType>;
 #elif KEY_CLA
     using ehash_func = StuHasher;

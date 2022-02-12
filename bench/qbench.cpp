@@ -13,6 +13,7 @@
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"
 #include "emilib/emilib2.hpp"
+#include "emilib/emiset2.hpp"
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #pragma warning(push)
@@ -298,19 +299,19 @@ static void reportComparison(const Stats & results, const size_t container1I, co
     const size_t c4Width{std::max(c4Header.size(), size_t(8u))};
 
 //    std::cout << std::format(" {:^{}} | {:^{}} | {:^{}} | {:^{}} ", c1Header, c1Width, name1, c2Width, name2, c3Width, c4Header, c4Width) << std::endl;
-    printf(" %s:%zd | %s:%zd | %s:%zd | %s:%zd\n", 
-            c1Header.data(), c1Width, 
-            name1.data(), c2Width, 
-            name2.data(), c3Width, 
+    printf("%20s:%zd | %s:%zd | %s:%zd | %s:%zd\n",
+            c1Header.data(), c1Width,
+            name1.data(), c2Width,
+            name2.data(), c3Width,
             c4Header.data(), c4Width);
-    std::cout << std::setfill('-') << std::setw(c1Width + 3u) << "+" << std::setw(c2Width + 3u) << "+" << std::setw(c3Width + 3u) << "+" << std::setw(c4Width + 2u) << "" << std::setfill(' ') << std::endl;
+    std::cout << std::setfill('-') << std::setw(c1Width + 5u) << "+" << std::setw(c2Width + 5u) << "+" << std::setw(c3Width + 5u) << "+" << std::setw(c4Width + 2u) << "" << std::setfill(' ') << std::endl;
 
     for (const Stat stat : results.presentStats()) {
         const s64 t1{s64(std::round(results.at(container1I, elementCount, stat)))};
         const s64 t2{s64(std::round(results.at(container2I, elementCount, stat)))};
 
 //        std::cout << std::format(" {:^{}} | ", statNames[size_t(stat)], c1Width);
-    printf(" %s:%zd | ", statNames[size_t(stat)].data(), c1Width);
+    printf("%20s:%zd | ", statNames[size_t(stat)].data(), c1Width);
         printTime(t1, c2Width);
         std::cout << " | ";
         printTime(t2, c3Width);
@@ -1036,6 +1037,15 @@ struct EmiLib2MapInfo
     static inline const std::string name{"emilib2::HashMap"};
 };
 
+template <typename K>
+struct EmiLib2SetInfo
+{
+    using Container = emilib::HashSet<K, typename qc::hash::RawSet<K>::hasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"emilib2::HashSet"};
+};
+
+
 template <typename K, typename V>
 struct FphDyamicMapInfo
 {
@@ -1047,9 +1057,14 @@ struct FphDyamicMapInfo
 int main()
 {
     // 1v1
-    if constexpr (false) {
+    if constexpr (true) {
         using K = size_t;
-        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, AbslSetInfo<K>>();
+//        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, AbslSetInfo<K>>();
+        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
+        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, EmHash5MapInfo<K,int>, EmHash7MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, RobinHoodMapInfo<K,int>, EmHash7MapInfo<K, int>>();
     }
     // Set comparison
     else if constexpr (false) {
@@ -1088,7 +1103,7 @@ int main()
         compare<CompareMode::typical, K, QcHashSetInfo<K>>();
     }
     // Set vs map
-    else if constexpr (false) {
+    if constexpr (false) {
         compare<CompareMode::detailed, size_t,
             QcHashSetInfo<size_t, true>,
             QcHashMapInfo<size_t, Trivial<8>, true>,
