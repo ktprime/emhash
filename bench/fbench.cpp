@@ -538,7 +538,7 @@ int main(int argc, char* argv[])
 #endif
 
 
-//    run_table <std::unordered_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <std::unordered_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <ska::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <ska::bytell_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <emhash5::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);

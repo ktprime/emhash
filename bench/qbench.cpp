@@ -7,6 +7,7 @@
 #include <span>
 
 #include "qchash/qc-hash.hpp"
+#include "jg/dense_hash_map.hpp"
 #include "qc-core/memory.hpp"
 #include "qc-core/random.hpp"
 
@@ -1037,6 +1038,15 @@ struct EmiLib2MapInfo
     static inline const std::string name{"emilib2::HashMap"};
 };
 
+template <typename K, typename V>
+struct JgDenseMapInfo
+{
+    using Container = jg::dense_hash_map<K, V, typename qc::hash::RawMap<K, V>::hasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"jg::den_hash_map"};
+};
+
+
 #if 0
 template <typename K>
 struct EmiLib2SetInfo
@@ -1064,7 +1074,7 @@ int main()
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
         compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
         compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
-        compare<CompareMode::oneVsOne, K, EmHash5MapInfo<K,int>, EmHash7MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, JgDenseMapInfo<K,int>, EmHash7MapInfo<K, int>>();
         compare<CompareMode::oneVsOne, K, RobinHoodMapInfo<K,int>, EmHash7MapInfo<K, int>>();
     }
     // Set comparison
@@ -1081,7 +1091,7 @@ int main()
         >();
     }
     // Map comparison
-    else if constexpr (true) {
+    if constexpr (true) {
         using K = size_t;
         using V = size_t;// std::string;
         compare<CompareMode::typical, K,
@@ -1095,6 +1105,7 @@ int main()
             //TslSparseMapInfo<K, V>,
             EmHash5MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
+            JgDenseMapInfo<K, V>,
             EmiLib2MapInfo<K, V>
         >();
     }

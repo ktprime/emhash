@@ -37,6 +37,7 @@ std::map<std::string, std::string> maps =
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
+    {"jg_dense", "jg_dense"},
 //    {"emhash8", "emhash8"},
 
 //    {"lru_time", "lru_time"},
@@ -57,7 +58,7 @@ std::map<std::string, std::string> maps =
 
 #if ET
     {"zhashmap", "zhashmap"},
-    {"martin", "martin_flat"},
+    {"martinf", "martin_flat"},
     {"phmap", "phmap_flat"},
 //    {"hrdset", "hrdset"},
 
@@ -65,7 +66,7 @@ std::map<std::string, std::string> maps =
     {"skaf", "ska_flat"},
 
     {"hopsco", "tsl_hopsco"},
-    {"byte", "ska_byte"},
+    {"sbyte", "ska_byte"},
 #endif
 };
 
@@ -659,7 +660,7 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 #if KEY_INT
         auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
 #elif KEY_CLA
-        auto v2(v.lScore + sum);
+        int64_t v2(v.lScore + sum);
 #elif TKey != 4
         v += char(128 + (int)v[0]);
         const auto &v2 = v;
@@ -863,7 +864,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#if ABSL == 0 && __cplusplus < 201802L
+#if ABSL == 0 && QC_HASH == 0
     auto tmp = ht_hash;
     for (auto it = tmp.begin(); it != tmp.end(); )
         it = tmp.erase(it);
@@ -1275,18 +1276,15 @@ static int benchHashMap(int n)
 
 #if ET > 2
         {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
-#if __x86_64__ || _M_X64
-        {  benOneHash<ska::bytell_hash_map <keyType, valueType, ehash_func>>("byte", vList); }
+#if (__x86_64__ || _M_X64) && __cplusplus >= 201402L
+        {  benOneHash<ska::bytell_hash_map <keyType, valueType, ehash_func>>("sbyte", vList); }
 #endif
-#endif
-
-        {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
-#if ET > 1
-#if ET > 2
         {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
         {  benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
 #endif
 
+        {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
+#if ET > 1
         //{  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
         //{  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
 
@@ -1332,6 +1330,10 @@ static int benchHashMap(int n)
 //        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
+#if __cplusplus > 201704
+        {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
+#endif
+
 #if QC_HASH && KEY_INT
         {  benOneHash<qc::hash::RawMap<keyType, valueType, ehash_func>>("qchash", vList); }
 #endif
@@ -1345,10 +1347,10 @@ static int benchHashMap(int n)
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
-        {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martin", vList); }
+        {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
         //        {  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
 
-        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("tsl", vList); }
+        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("tslr", vList); }
         //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
 #if FHT_HMAP
@@ -1716,11 +1718,11 @@ int main(int argc, char* argv[])
                         maps[hash_name] = hash_name;
                 }
                 else if (c == 'm')
-                    maps.erase("martin");
+                    maps.erase("martinf");
                 else if (c == 'p')
                     maps.erase("phmap");
                 else if (c == 't')
-                    maps.erase("tsl");
+                    maps.erase("tslr");
                 else if (c == 's')
                     maps.erase("skaf");
                 else if (c == 'a')

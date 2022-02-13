@@ -585,7 +585,7 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 #if KEY_INT
         auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
 #elif KEY_CLA
-        auto v2(v.lScore + sum);
+        int64_t v2(v.lScore + sum);
 #elif TKey != 4
         v += char(128 + (int)v[0]);
         const auto &v2 = v;
@@ -1129,6 +1129,7 @@ static int benchHashSet(int n)
         {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
+
 #if QC_HASH && KEY_INT
         {  benOneHash<qc::hash::RawSet<keyType,  ehash_func>>("qchash", vList); }
 #endif

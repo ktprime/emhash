@@ -659,7 +659,7 @@ public:
         return find_filled_bucket(key) != _num_buckets;
     }
 
-    size_type count(const KeyT& key) noexcept
+    size_type count(const KeyT& key) const noexcept
     {
         return find_filled_bucket(key) == _num_buckets ? 0 : 1;
     }

@@ -1,4 +1,5 @@
 #pragma once
+#define _HAS_STD_BYTE 0
 
 #include <random>
 #include <cstdint>
@@ -20,11 +21,12 @@
 #endif
 #define NDEBUG                1
 #ifdef _WIN32
+    # define _CRT_SECURE_NO_WARNINGS 1
+    #pragma warnning(disable:4996)
     #ifndef NOMINMAX
     #define NOMINMAX
     #endif
     # define CONSOLE "CON"
-    # define _CRT_SECURE_NO_WARNINGS 1
     # include <windows.h>
 
 #else
@@ -629,4 +631,8 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #if QC_HASH
 #include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
+#endif
+
+#if __cplusplus > 201704LL
+#include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #endif
