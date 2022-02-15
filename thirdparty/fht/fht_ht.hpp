@@ -7,7 +7,7 @@
 
 #include <assert.h>
 #include <stdint.h>
-#include <sys/mman.h>
+//#include <sys/mman.h>
 #include <string>
 #include <type_traits>
 
@@ -396,7 +396,7 @@ struct fht_iterator_t {
 
     inline fht_iterator_t &
     operator++(int) {
-        ++(this);
+        ++this;
         return *this;
     }
 
@@ -444,12 +444,14 @@ struct fht_iterator_t {
                (((uint64_t)(this->cur_tag)) & (FHT_TAGS_PER_CLINE - 1));
     }
 
-    inline const std::pair<K, V> & operator*() const {
+    inline const std::pair<K, V> &
+    operator*() const {
         return *(this->to_address());
     }
 
 
-    inline const std::pair<K, V> * operator->() const {
+    inline const std::pair<K, V> *
+    operator->() const {
         return this->to_address();
     }
 
@@ -566,12 +568,12 @@ struct fht_table {
 
     inline constexpr double
     load_factor() const {
-        return ((double)this->size()) / max_size();
+        return ((double)this->size()) / ((double)this->max_size());
     }
 
     // aint gunna do anything about this
     inline constexpr double
-    max_load_factor() const {
+    max_load_factor(float lf) const {
         return 1.0;
     }
     //////////////////////////////////////////////////////////////////////
@@ -786,6 +788,10 @@ struct fht_table {
         }
     }
 
+    void reserve(size_t ) {
+
+	}
+
     // standard rehash which copies all elements
     template<typename _K         = K,
              typename _V         = V,
@@ -966,7 +972,8 @@ struct fht_table {
         }
     }
 
-    inline constexpr V & operator[](const K & key) {
+    inline constexpr V &
+    operator[](const K & key) {
         const uint64_t res = ((const uint64_t)add(key)) & (~(((1UL) << 48)));
         fht_chunk<K, V> * const temp_chunk =
             (fht_chunk<K, V> * const)(res & (~(FHT_TAGS_PER_CLINE - 1)));
@@ -974,7 +981,8 @@ struct fht_table {
             V *)(temp_chunk->get_val_n_ptr(res & (FHT_TAGS_PER_CLINE - 1)));
     }
 
-    inline constexpr V & operator[](K && key) {
+    inline constexpr V &
+    operator[](K && key) {
         const uint64_t res =
             ((const uint64_t)add(std::move(key))) & (~(((1UL) << 48)));
         fht_chunk<K, V> * const temp_chunk =
@@ -1119,7 +1127,7 @@ struct fht_table {
         for (uint32_t j = 0; j < FHT_MM_ITER_LINE; ++j) {
             // seeded with start_idx we go through idx function
             const uint32_t outer_idx = (j + start_idx) & FHT_MM_LINE_MASK;
-            slot_mask = chunk->get_tag_matches(tag, outer_idx);
+            slot_mask                = chunk->get_tag_matches(tag, outer_idx);
 
             if (slot_mask) {
                 node_prefetch<K>(slot_mask,
@@ -1217,7 +1225,7 @@ struct fht_table {
         uint32_t idx, slot_mask;
         for (uint32_t j = 0; j < FHT_MM_ITER_LINE; ++j) {
             const uint32_t outer_idx = (j + start_idx) & FHT_MM_LINE_MASK;
-            slot_mask = chunk->get_tag_matches(tag, outer_idx);
+            slot_mask                = chunk->get_tag_matches(tag, outer_idx);
             if (slot_mask) {
                 node_prefetch<K>(slot_mask,
                                  (const int8_t * const)(chunk->get_key_n_ptr(
@@ -1620,7 +1628,8 @@ struct DEFAULT_ALLOC {
         int8_t * const ret = (int8_t * const)aligned_alloc(
             FHT_TAGS_PER_CLINE,
             size * sizeof(fht_chunk<K, V>) +
-                1);  // + 1 is in a sense null term for iterator
+                FHT_TAGS_PER_CLINE);  // + FHT_TAGS_PER_CLINE is in a sense null
+                                      // term for iterator
         ret[size * sizeof(fht_chunk<K, V>)] = 0;
         return (fht_chunk<K, V> *)ret;
     }

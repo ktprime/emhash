@@ -16,6 +16,7 @@
 #include "emilib/emilib2.hpp"
 //#include "emilib/emiset2.hpp"
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
+#include "rigtorp/rigtorp.hpp" //https://github.com/renzibei/fph-table
 
 #pragma warning(push)
 #pragma warning(disable: 4127 4458 4324 4293 4309 4305 4244)
@@ -1046,6 +1047,14 @@ struct JgDenseMapInfo
     static inline const std::string name{"jg::den_hash_map"};
 };
 
+template <typename K, typename V>
+struct RigtorpMapInfo
+{
+    using Container = rigtorp::HashMap<K, V, typename qc::hash::RawMap<K, V>::hasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"rigtorp::HashMap"};
+};
+
 
 #if 0
 template <typename K>
@@ -1106,6 +1115,7 @@ int main()
             EmHash5MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
             JgDenseMapInfo<K, V>,
+            RigtorpMapInfo<K, V>,
             EmiLib2MapInfo<K, V>
         >();
     }

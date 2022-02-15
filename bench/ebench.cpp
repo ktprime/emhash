@@ -19,6 +19,7 @@
 #include "flat_map.hpp"
 #endif
 
+
 static void printInfo(char* out);
 std::map<std::string, std::string> maps =
 {
@@ -38,6 +39,8 @@ std::map<std::string, std::string> maps =
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
     {"jg_dense", "jg_dense"},
+    {"rigtorp", "rigtorp"},
+
 //    {"emhash8", "emhash8"},
 
 //    {"lru_time", "lru_time"},
@@ -113,6 +116,7 @@ std::map<std::string, std::string> maps =
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
 
+//https://en.wikipedia.org/wiki/Hash_table
 //https://zhuanlan.zhihu.com/p/363213858
 //https://www.zhihu.com/question/46156495
 //http://www.brendangregg.com/index.html
@@ -135,8 +139,6 @@ std::map<std::string, std::string> maps =
 
 //https://attractivechaos.wordpress.com/2018/01/13/revisiting-hash-table-performance/
 //https://attractivechaos.wordpress.com/2019/12/28/deletion-from-hash-tables-without-tombstones/#comment-9548
-//https://attractivechaos.wordpress.com/2008/08/28/comparison-of-hash-table-libraries/
-//https://en.wikipedia.org/wiki/Hash_table
 //https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html
 //https://probablydance.com/2017/02/26/i-wrote-the-fastest-hashtable/
 //https://andre.arko.net/2017/08/24/robin-hood-hashing/
@@ -147,10 +149,9 @@ std::map<std::string, std::string> maps =
 //https://gankra.github.io/blah/hashbrown-tldr/ swiss
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
 
-#if __linux__ && AVX2
+#if FHT_HMAP
 #include <sys/mman.h>
-#include "fht/fht_ht.hpp" //https://github.com/goldsteinn/hashtable_test/blob/master/my_table/fht_ht.hpp
-#define FHT_HMAP          1
+#include "fht/fht_ht.hpp" // https://github.com/goldsteinn/hashtable_test/blob/master/my_table/fht_ht.hpp
 #endif
 
 #if FOLLY
@@ -864,7 +865,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#if ABSL == 0 && QC_HASH == 0
+#if ABSL == 0 && QC_HASH == 1
     auto tmp = ht_hash;
     for (auto it = tmp.begin(); it != tmp.end(); )
         it = tmp.erase(it);
@@ -1141,7 +1142,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_find_erase<hash_type>(hash, hash_name, nList);
 
         erase_reinsert<hash_type>(hash, hash_name, oList);
-        hash_iter<hash_type>(hash, hash_name);
+//        hash_iter<hash_type>(hash, hash_name);
 
 #ifndef UF
         copy_clear <hash_type>(hash, hash_name);
@@ -1330,8 +1331,9 @@ static int benchHashMap(int n)
 //        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
-#if __cplusplus > 201704
+#if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
+        {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
 #endif
 
 #if QC_HASH && KEY_INT
@@ -1731,6 +1733,10 @@ int main(int argc, char* argv[])
                     maps.erase("f14_vector");
                 else if (c == 'h')
                     maps.erase("hrdset");
+                else if (c == 'j')
+                    maps.erase("jg_dense");
+                else if (c == 'r')
+                    maps.erase("rigtorp");
                 else if (c == 'e') {
                     maps.erase("emilib");
 //                    maps.erase("emilib1");

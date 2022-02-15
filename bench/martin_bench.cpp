@@ -76,9 +76,11 @@ static std::map<std::string, std::string> show_name =
     {"emilib2", "emilib2"},
 #if QC_HASH
     {"qc", "qchash"},
-    {"jg", "jg_dense"},
     {"fph", "fph"},
 #endif
+
+    {"jg", "jg_dense"},
+    {"rigtorp", "rigtorp"},
     //    {"emhash6", "emhash6"},
 #if ABSL
     {"absl", "absl flat"},
@@ -699,7 +701,6 @@ void runTest(int sflags, int eflags)
 
 #if QC_HASH
         { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
-        { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { fph::DynamicFphMap<uint64_t, uint64_t, fph::MixSeedHash<uint64_t>> emap; bench_IterateIntegers(emap); }
 #endif
 
@@ -712,6 +713,10 @@ void runTest(int sflags, int eflags)
         { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
+#if CXX20
+        { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
+        { rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
+#endif
 #if ET
         //        { hrd7::hash_map <uint64_t, uint64_t, hash_func> hmap;  bench_IterateIntegers(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
@@ -742,6 +747,10 @@ void runTest(int sflags, int eflags)
         typedef std::hash<std::string> hash_func;
 #endif
 
+#if CXX20
+        {jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {rigtorp::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+#endif
         {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #if EM3
         {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
@@ -752,7 +761,6 @@ void runTest(int sflags, int eflags)
         {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #if QC_HASH
         {fph::DynamicFphMap<std::string, int, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
-        {jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
 #endif
         {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
@@ -797,6 +805,15 @@ void runTest(int sflags, int eflags)
         {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 
+#if CXX20
+        {rigtorp::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+#endif
+
+#if QC_HASH
+        {fph::DynamicFphMap<std::string, int, fph::MixSeedHash<std::string>> bench; bench_randomEraseString(bench); }
+#endif
+
 #if ET
         //        {hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
         {tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
@@ -839,7 +856,10 @@ void runTest(int sflags, int eflags)
 #if QC_HASH
             { fph::DynamicFphMap<size_t, size_t, fph::MixSeedHash<size_t>> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { qc::hash::RawMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+#endif
+#if CXX20
             { jg::dense_hash_map<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { rigtorp::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
             { emilib::HashMap<size_t, size_t,  hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -881,8 +901,12 @@ void runTest(int sflags, int eflags)
 #endif
         { emhash7::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 
-#if QC_HASH
+#if CXX20
         { jg::dense_hash_map<int, int, hash_func> qmap; bench_insert(qmap); }
+        { rigtorp::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+#endif
+
+#if QC_HASH
         { qc::hash::RawMap<int, int, hash_func> qmap; bench_insert(qmap); }
 
 #endif
@@ -924,7 +948,6 @@ void runTest(int sflags, int eflags)
         { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 #if QC_HASH
         { fph::DynamicFphMap<uint64_t, uint64_t, fph::MixSeedHash<uint64_t>> emap; bench_randomInsertErase(emap); }
-        { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 #if QC_HASH==2
         { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hang
 #endif
@@ -950,6 +973,10 @@ void runTest(int sflags, int eflags)
 #if FOLLY
         { folly::F14VectorMap <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
 #endif
+#if CXX20
+        { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+        //{ rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hange
+#endif
         putchar('\n');
     }
 
@@ -967,9 +994,14 @@ void runTest(int sflags, int eflags)
 
 #if QC_HASH
         { qc::hash::RawMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-        { jg::dense_hash_map<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 //        { fph::DynamicFphMap<int, int, fph::MixSeedHash<int>> emap; bench_randomDistinct2(emap); } //hang
 #endif
+
+#if CXX20
+        { jg::dense_hash_map<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+        { rigtorp::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+#endif
+
         { emhash6::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { emhash5::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { emhash7::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
@@ -1034,9 +1066,14 @@ int main(int argc, char* argv[])
                 show_name.erase("ska");
             else if (c == 'h')
                 show_name.erase("hrd7");
-            else if (c == 'e') {
+            else if (c == 'e')
                 show_name.erase("emilib");
-//                show_name.erase("emilib");
+            else if (c == 'c') {
+                show_name.erase("jg");
+                show_name.erase("rigtorp");
+            } else if (c == 'q') {
+                show_name.erase("qc");
+                show_name.erase("fph");
             } else if (c == 'b')
                 sflags = atoi(&argv[1][++i]);
             else if (c == 'd')

@@ -11,8 +11,10 @@
 #if QC_HASH
 #include "qchash/qc-hash.hpp"
 #include "fph/dynamic_fph_table.h"
-#include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #endif
+
+#include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
+#include "rigtorp/rigtorp.hpp" //https://github.com/Jiwan/dense_hash_map
 
 #if ABSL
 //#define _HAS_DEPRECATED_RESULT_OF 1
@@ -285,9 +287,11 @@ int main(int argc, char **argv)
     bench_spread<absl::flat_hash_map<size_t,size_t>>("absl::flat_hash_map::operator[]",count);
 #endif
 
+    bench_spread<jg::dense_hash_map<size_t,size_t>>("jg::dense_hash_map::operator[]",count);
+    //bench_spread<rigtorp::HashMap<size_t,size_t>>("rigtorp::HashMap::operator[]",count);
+
 #if QC_HASH
     bench_spread<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap::operator[]",count);
-    bench_spread<jg::dense_hash_map<size_t,size_t>>("jg::dense_hash_map::operator[]",count);
     bench_spread<fph::DynamicFphMap<size_t,size_t,fph::MixSeedHash<size_t>>>("fph::DynamicFph::operator[]",count);
 #endif
 
@@ -323,9 +327,11 @@ int main(int argc, char **argv)
     bench_map<ska::flat_hash_map<size_t,size_t>>("ska::flat_hash_hash",count);
     bench_map<ska::bytell_hash_map<size_t,size_t>>("ska::bytell_hash_map",count);
 
+    bench_map<jg::dense_hash_map<size_t,size_t>>("jg::dense_hash_map",count);
+    bench_map<rigtorp::HashMap<size_t,size_t>>("rigtorp::HashMap",count);
+
 #if QC_HASH
     bench_map<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap",count);
-    bench_map<jg::dense_hash_map<size_t,size_t>>("jg::dense_hash_map",count);
     bench_map<fph::DynamicFphMap<size_t,size_t, fph::SimpleSeedHash<size_t>>>("fph::DynamicFphMap",count);
 #endif
     return 0;
