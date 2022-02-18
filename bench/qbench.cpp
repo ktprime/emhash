@@ -8,6 +8,9 @@
 
 #include "qchash/qc-hash.hpp"
 #include "jg/dense_hash_map.hpp"
+#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
+#include "rigtorp/rigtorp.hpp"
+
 #include "qc-core/memory.hpp"
 #include "qc-core/random.hpp"
 
@@ -15,8 +18,6 @@
 #include "hash_table7.hpp"
 #include "emilib/emilib2.hpp"
 //#include "emilib/emiset2.hpp"
-#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
-#include "rigtorp/rigtorp.hpp" //https://github.com/renzibei/fph-table
 
 #pragma warning(push)
 #pragma warning(disable: 4127 4458 4324 4293 4309 4305 4244)

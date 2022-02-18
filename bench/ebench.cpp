@@ -53,13 +53,13 @@ std::map<std::string, std::string> maps =
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
 //    {"ktprime", "ktprime"},
-    {"fht", "fht"},
     {"abslf", "absl_flat"},
 //    {"f14_value", "f14_value"},
-    {"f14_vector", "f14_vector"},
-    {"cuckoo", "cuckoo hash"},
 
 #if ET
+    {"f14_vector", "f14_vector"},
+    {"fht", "fht"},
+    {"cuckoo", "cuckoo hash"},
     {"zhashmap", "zhashmap"},
     {"martinf", "martin_flat"},
     {"phmap", "phmap_flat"},
@@ -557,7 +557,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 #if TVal < 2
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    const auto vsmall = 1024;
+    const auto vsmall = 1024 + vList.size() % 1024;
     for (size_t i = 0; i < vList.size(); i++) {
         sum += ht_hash.emplace(vList[i], TO_VAL(0)).second;
         if (i > vsmall)
@@ -865,7 +865,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#if ABSL == 0 && QC_HASH == 1
+#if ABSL == 0 && QC_HASH == 0
     auto tmp = ht_hash;
     for (auto it = tmp.begin(); it != tmp.end(); )
         it = tmp.erase(it);
@@ -1286,6 +1286,7 @@ static int benchHashMap(int n)
 
         {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
 #if ET > 1
+        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("tslr", vList); }
         //{  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
         //{  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
 
@@ -1352,7 +1353,6 @@ static int benchHashMap(int n)
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
         //        {  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
 
-        {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("tslr", vList); }
         //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
 #if FHT_HMAP
@@ -1603,7 +1603,14 @@ static void testHashString(int size, int str_min, int str_max)
             sum += wyhash(v.data(), v.size(), 1);
         t_find = (getus() - start) / 1000;
         printf("wyhash   = %4d ms\n", t_find);
+#endif
 
+#if KOMI_HESH
+        start = getus();
+        for (auto& v : rndstring)
+            sum += komihash(v.data(), v.size(), 1);
+        t_find = (getus() - start) / 1000;
+        printf("komi_hash   = %4d ms\n", t_find);
 #endif
 
 #ifdef AHASH_AHASH_H

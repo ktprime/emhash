@@ -26,11 +26,9 @@
     #ifndef NOMINMAX
     #define NOMINMAX
     #endif
-    # define CONSOLE "CON"
     # include <windows.h>
 
 #else
-    # define CONSOLE "/dev/tty"
     # include <unistd.h>
     # include <sys/resource.h>
     # include <sys/time.h>
@@ -44,6 +42,10 @@
 #ifdef __has_include
     #if __has_include("wyhash.h")
     #include "wyhash.h"
+    #endif
+    #if __has_include("komihash.h")
+    #include "komihash.h"
+	#define KOMI_HESH 1
     #endif
 #endif
 
@@ -418,6 +420,16 @@ void shuffle(RandomIt first, RandomIt last)
         swap(first[i], first[D(g, param_t(0, i))]);
     }
 }
+
+#if KOMI_HESH
+struct KomiHasher
+{
+    std::size_t operator()(const std::string& str) const
+    {
+        return komihash(str.data(), str.size(), str.size());
+    }
+};
+#endif
 
 #if WYHASH_LITTLE_ENDIAN
 struct WysHasher
