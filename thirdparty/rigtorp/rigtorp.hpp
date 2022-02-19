@@ -129,8 +129,43 @@ public:
     }
   }
 
+  HashMap(const HashMap& other)
+      : HashMap(other.size(), other.empty_key_, other.get_allocator()) {
+    for (auto it = other.begin(); it != other.end(); ++it) {
+      insert(*it);
+    }
+  }
+
+  HashMap(HashMap&& other)
+  {
+    if (this != &other) {
+      swap(other);
+      other.clear();
+    }
+  }
+
+  HashMap& operator=(const HashMap& other)  {
+    if (this != &other) {
+      clear();
+      empty_key_ = other.empty_key_;
+      for (auto it = other.begin(); it != other.end(); ++it) {
+        insert(*it);
+      }
+    }
+    return *this;
+  }
+
+  HashMap& operator=(HashMap&& other)
+  {
+    if (this != &other) {
+      swap(other);
+      other.clear();
+    }
+    return *this;
+  }
+
   allocator_type get_allocator() const noexcept {
-    return buckets_.get_allocator();
+      return buckets_.get_allocator();
   }
 
   // Iterators

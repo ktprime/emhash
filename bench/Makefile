@@ -80,6 +80,10 @@ ifneq ($(QCH),)
 CXXFLAGS += -DQC_HASH=$(QCH) -std=c++20
 endif
 
+ifneq ($(std),)
+CXXFLAGS += -std=c++$(std)
+endif
+
 all:
 ifneq ($(QCH),)
 	$(CXX) $(CXXFLAGS) -I. -DQC_HASH -std=c++20 qbench.cpp -o qbench

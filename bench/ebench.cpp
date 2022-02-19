@@ -47,7 +47,7 @@ std::map<std::string, std::string> maps =
 //    {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
-    {"emilib", "emilib"},
+//    {"emilib", "emilib"},
     {"emilib1", "emilib1"},
 //    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
@@ -148,6 +148,7 @@ std::map<std::string, std::string> maps =
 //https://bigdata.uni-saarland.de/publications/p249-richter.pdf
 //https://gankra.github.io/blah/hashbrown-tldr/ swiss
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
+//https://jguegant.github.io/blogs/tech/dense-hash-map.html
 
 #if FHT_HMAP
 #include <sys/mman.h>
@@ -172,7 +173,7 @@ std::map<std::string, std::string> maps =
 //#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 //#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
-#if 1
+#if AH64
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
 #endif
@@ -865,7 +866,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#if ABSL == 0 && QC_HASH == 0
+#if ABSL == 0 && QC_HASH == 0 && CXX20 == 0
     auto tmp = ht_hash;
     for (auto it = tmp.begin(); it != tmp.end(); )
         it = tmp.erase(it);
@@ -986,13 +987,13 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 static int TestHashMap(int n, int max_loops = 1234567)
 {
-#if 0
+#if 1
 
 #ifndef KEY_CLA
     emhash5::HashMap <keyType, int> ehash5;
-    emilib::HashMap <keyType, int> ehash2;
+    emilib2::HashMap <keyType, int> ehash2;
 
-    Sfc4 srng(time(NULL));
+    Sfc4 srng(n);
 #if 1
     emhash7::HashMap <keyType, int> unhash;
 #else
@@ -1025,7 +1026,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
             else
                 id = ehash5.begin()->first;
 
-            ehash5.erase(ehash5.find(id));
+            ehash5.erase(id);
             unhash.erase(id);
             ehash2.erase(id);
 
@@ -1242,6 +1243,8 @@ static int benchHashMap(int n)
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
+#elif AHASH_AHASH_H && KEY_STR
+    using ehash_func = Ahash64er;
 #elif KEY_INT && FIB_HASH > 0
     using ehash_func = Int64Hasher<keyType>;
 #elif KEY_CLA
@@ -1274,6 +1277,7 @@ static int benchHashMap(int n)
     {
         func_first = (func_first + 2) % func_size + 1;
         func_last  = (func_first + 3) % func_size + 1;
+
 
 #if ET > 2
         {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
@@ -1587,7 +1591,7 @@ static void testHashString(int size, int str_min, int str_max)
     for (int i = 1; i <= 4; i++)
     {
         rndstring.clear();
-        buildRandString(size * i, rndstring, str_min * i, str_max * i);
+        buildRandString(size * i, rndstring, str_min + i, str_max * i);
         int64_t start = 0;
         int t_find = 0;
 
@@ -1714,11 +1718,11 @@ int main(int argc, char* argv[])
             minn = value;
         else if (cmd == 'b') {
             testHashRand(1e8+8);
-            testHashString(1e6+6, 2, 32);
+            testHashString(1e6+6, 6, 16);
         }
         else if (cmd == 'd') {
             for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
-                if (c >= '2' && c <= '9') {
+                if (c >= '5' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;
                     if (maps.find(hash_name) != maps.end())
@@ -1745,9 +1749,15 @@ int main(int argc, char* argv[])
                 else if (c == 'r')
                     maps.erase("rigtorp");
                 else if (c == 'e') {
-                    maps.erase("emilib");
+                    const std::string emistr = "emilib";
+                    if (maps.find(emistr) != maps.end()) maps.erase(emistr);
+                    else maps.emplace(emistr, emistr);
 //                    maps.erase("emilib1");
-//                    maps.erase("emilib2");
+                }
+                else if (c == '2') {
+                    const std::string emistr = "emilib2";
+                    if (maps.find(emistr) != maps.end()) maps.erase(emistr);
+                    else maps.emplace(emistr, emistr);
                 }
                 else if (c == 'l') {
                     maps.emplace("lru_size", "lru_size");

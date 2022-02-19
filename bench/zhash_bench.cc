@@ -13,7 +13,9 @@
 #include "fph/dynamic_fph_table.h"
 #endif
 
+#if CXX20 || __cplusplus > 201703L
 #include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
+#endif
 #include "rigtorp/rigtorp.hpp" //https://github.com/Jiwan/dense_hash_map
 
 #if ABSL
@@ -287,7 +289,9 @@ int main(int argc, char **argv)
     bench_spread<absl::flat_hash_map<size_t,size_t>>("absl::flat_hash_map::operator[]",count);
 #endif
 
+#if CXX20 || __cplusplus > 201703L
     bench_spread<jg::dense_hash_map<size_t,size_t>>("jg::dense_hash_map::operator[]",count);
+#endif
     //bench_spread<rigtorp::HashMap<size_t,size_t>>("rigtorp::HashMap::operator[]",count);
 
 #if QC_HASH
@@ -327,7 +331,10 @@ int main(int argc, char **argv)
     bench_map<ska::flat_hash_map<size_t,size_t>>("ska::flat_hash_hash",count);
     bench_map<ska::bytell_hash_map<size_t,size_t>>("ska::bytell_hash_map",count);
 
+#if CXX20 || __cplusplus > 201703L
     bench_map<jg::dense_hash_map<size_t,size_t>>("jg::dense_hash_map",count);
+#endif
+
     bench_map<rigtorp::HashMap<size_t,size_t>>("rigtorp::HashMap",count);
 
 #if QC_HASH

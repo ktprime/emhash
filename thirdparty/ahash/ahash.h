@@ -1,5 +1,5 @@
 #ifndef AHASH_AHASH_H
-#define AHASH_AHASH_H
+#define AHASH_AHASH_H 1
 #include "definitions.h"
 
 #ifndef AHASH_USE_FALLBACK

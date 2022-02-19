@@ -140,7 +140,10 @@ inline static uint32_t CTZ(uint64_t n)
     #if defined(_WIN64)
     _BitScanForward64(&index, n);
     #else
-    _BitScanForward(&index, n);
+    if ((uint32_t)n)
+        _BitScanForward(&index, (uint32_t)n);
+    else
+        {_BitScanForward(&index, n >> 32); index += 32; }
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
@@ -390,7 +393,7 @@ public:
         }
     }
 
-    HashMap(std::initializer_list<std::pair<KeyT, ValueT>> il)
+    HashMap(std::initializer_list<value_type> il)
     {
         reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
@@ -472,15 +475,15 @@ public:
     iterator begin()
     {
         if (_num_filled == 0)
-            return { this, _num_buckets, false };
-        return { this, find_filled_slot(0) };
+            return {this, _num_buckets, false};
+        return {this, find_filled_slot(0)};
     }
 
     const_iterator cbegin() const
     {
         if (_num_filled == 0)
-            return { this, _num_buckets, false };
-        return { this, find_filled_slot(0) };
+            return {this, _num_buckets, false};
+        return {this, find_filled_slot(0)};
     }
 
     const_iterator begin() const
@@ -490,12 +493,12 @@ public:
 
     iterator end()
     {
-        return { this, _num_buckets, false };
+        return {this, _num_buckets, false};
     }
 
     const_iterator cend() const
     {
-        return { this, _num_buckets, false };
+        return {this, _num_buckets, false};
     }
 
     const_iterator end() const
@@ -627,12 +630,22 @@ public:
         return insert(key, std::move(value));
     }
 
-    std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> emplace(value_type&& v)
+    {
+        return insert(std::move(v.first), std::move(v.second));
+    }
+
+    std::pair<iterator, bool> emplace(const value_type& v)
+    {
+        return insert(v.first, v.second);
+    }
+
+    std::pair<iterator, bool> insert(const value_type& p)
     {
         return insert(p.first, p.second);
     }
 
-    std::pair<iterator, bool> insert(iterator it, const std::pair<KeyT, ValueT>& p)
+    std::pair<iterator, bool> insert(iterator it, const value_type& p)
     {
         return insert(p.first, p.second);
     }
@@ -676,12 +689,12 @@ public:
         new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
     }
 
-    void insert_unique(std::pair<KeyT, ValueT>&& p)
+    void insert_unique(value_type&& p)
     {
         insert_unique(std::move(p.first), std::move(p.second));
     }
 
-    void insert_unique(std::pair<KeyT, ValueT>& p)
+    void insert_unique(const value_type & p)
     {
         insert_unique(p.first, p.second);
     }
@@ -756,8 +769,8 @@ public:
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
 
-        _states[bucket] = State::EDELETE;
-#if 0
+//        _states[bucket] = State::EDELETE;
+#if 1
         auto state = _states[bucket] = (_states[bucket + 1] & EMPTY_MASK) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
         if (state == State::EEMPTY) {
             while (bucket > 1 && _states[--bucket] == State::EDELETE)
@@ -818,9 +831,8 @@ public:
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
-        auto state_size = (simd_gaps + num_buckets) * sizeof(State::EFILLED);
+        auto state_size = (simd_gaps + num_buckets) * sizeof(State);
 //        state_size += (simd_gaps - state_size % simd_gaps) % 8;
-        assert(state_size % 8 == 0);
 
         const auto* new_data  = (char*)malloc(pairs_size + state_size);
 #if 1
@@ -846,7 +858,7 @@ public:
         //init last packet zero
         memset(_pairs + num_buckets, 0, sizeof(_pairs[0]));
 
-        //init empty
+        //init empty tombstone
         std::fill_n(_states, num_buckets, State::EEMPTY);
         //memset(_states, 0-1u, num_buckets);
 

@@ -19,7 +19,7 @@
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
-#define NDEBUG                1
+//#define NDEBUG                1
 #ifdef _WIN32
     # define _CRT_SECURE_NO_WARNINGS 1
     #pragma warnning(disable:4996)
@@ -45,8 +45,36 @@
     #endif
     #if __has_include("komihash.h")
     #include "komihash.h"
-	#define KOMI_HESH 1
+    #define KOMI_HESH 1
     #endif
+#endif
+
+#if _WIN32 && _WIN64 == 0 
+uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_hi) 
+{
+    // multiplier   = ab = a * 2^32 + b
+    // multiplicand = cd = c * 2^32 + d
+    // ab * cd = a * c * 2^64 + (a * d + b * c) * 2^32 + b * d
+    uint64_t a = multiplier >> 32;
+    uint64_t b = multiplier & 0xFFFFFFFF;
+    uint64_t c = multiplicand >> 32;
+    uint64_t d = multiplicand & 0xFFFFFFFF;
+
+    //uint64_t ac = a * c;
+    uint64_t ad = a * d;
+    //uint64_t bc = b * c;
+    uint64_t bd = b * d;
+
+    uint64_t adbc = ad + (b * c);
+    uint64_t adbc_carry = adbc < ad ? 1 : 0;
+
+    // multiplier * multiplicand = product_hi * 2^64 + product_lo
+    uint64_t product_lo = bd + (adbc << 32);
+    uint64_t product_lo_carry = product_lo < bd ? 1 : 0;
+    *product_hi = (a * c) + (adbc >> 32) + (adbc_carry << 32) + product_lo_carry;
+
+    return product_lo;
+}
 #endif
 
 static int64_t getus()
@@ -164,7 +192,7 @@ class Lehmer64 {
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
+#elif _WIN32
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
@@ -205,7 +233,7 @@ public:
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
+#elif _WIN32
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
@@ -255,7 +283,7 @@ public:
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
+#elif _WIN32
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
@@ -306,7 +334,7 @@ public:
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
+#elif _WIN32
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
@@ -421,6 +449,16 @@ void shuffle(RandomIt first, RandomIt last)
     }
 }
 
+#if AHASH_AHASH_H
+struct Ahash64er
+{
+    std::size_t operator()(const std::string& str) const
+    {
+        return ahash64(str.data(), str.size(), str.size());
+    }
+};
+#endif
+
 #if KOMI_HESH
 struct KomiHasher
 {
@@ -478,7 +516,7 @@ struct WyRand
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
+#elif _WIN32
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
@@ -645,7 +683,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #endif
 
-#if __cplusplus > 201704L || _MSC_VER > 1900
+#if __cplusplus > 201704L || CXX20
 #define CXX20 1
 #include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #include "rigtorp/rigtorp.hpp"   //https://github.com/rigtorp/HashMap/blob/master/include/rigtorp/HashMap.h

@@ -1,20 +1,22 @@
-#define _HAS_STD_BYTE 0
-
 #include <sstream>
 
 #ifndef _WIN32
-#include <sched.h>
-#include <pthread.h>
+//#include <sched.h>
+//#include <pthread.h>
 //#include <cpuid.h>
-#include <signal.h>
-#include <unistd.h>
+//#include <signal.h>
+//#include <unistd.h>
 #include <sys/resource.h>
 #endif
 
-#if 0
+#if A64
+#if __x86_64__ || _M_X64
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
 #endif
+#endif
+
+#include "util.h"
 
 #include "wyhash.h"
 using namespace std;
@@ -27,11 +29,12 @@ using namespace std;
 //#define ABSL_HASH 1
 
 //#define EMH_HIGH_LOAD 123456
-
-#include "util.h"
+#if EM3
 #include "old/hash_table2.hpp"
 #include "old/hash_table3.hpp"
 #include "old/hash_table4.hpp"
+#endif
+
 #include "hash_table5.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
@@ -112,7 +115,7 @@ static const char* find(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 1  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -177,7 +180,7 @@ class sfc64 {
         uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
             return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _MSC_VER
+#elif _WIN32
             uint64_t high;
             uint64_t a = operator()();
             _umul128(a, boundExcluded, &high);
@@ -536,15 +539,30 @@ void bench_randomFindString(MAP& map)
         return ;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    static constexpr size_t numInserts = 100000;
-    static constexpr size_t numFindsPerInsert = 1000;
     auto nows = now2sec();
+    if (1)
+    {
+        static constexpr size_t numInserts = 100000;
+        static constexpr size_t numFindsPerInsert = 1000;
 
-    randomFindInternalString<MAP>(4, 100, numInserts, numFindsPerInsert);
-    randomFindInternalString<MAP>(3, 100, numInserts, numFindsPerInsert);
-    randomFindInternalString<MAP>(2, 100, numInserts, numFindsPerInsert);
-    randomFindInternalString<MAP>(1, 100, numInserts, numFindsPerInsert);
-    randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(4, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(3, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(2, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(1, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
+    }
+
+    {
+        static constexpr size_t numInserts = 1000000 / 2;
+        static constexpr size_t numFindsPerInsert = 200 / 2;
+
+        randomFindInternalString<MAP>(4, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(3, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(2, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(1, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(0, 13, numInserts, numFindsPerInsert);
+    }
+
     printf("total time = %.2lf\n\n", now2sec() - nows);
 }
 
@@ -617,7 +635,7 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
         } while (i < numInserts);
     }
 
-    printf("    %3lu%% %016lx success time = %.2lf s, %8d loadf = %.2lf\n", 
+    printf("    %3lu%% %016lx success time = %.2lf s, %8d loadf = %.2lf\n",
             numSequential * 100 / NumTotal, bitMask, now2sec() - ts , (int)num_found, map.load_factor());
     return num_found;
 }
@@ -741,29 +759,27 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<std::string> hash_func;
 #elif ABSL_HASH
         typedef absl::Hash<std::string> hash_func;
+#elif AHASH_AHASH_H
+        typedef Ahash64er hash_func;
 #elif WYHASH_LITTLE_ENDIAN
         typedef WysHasher hash_func;
 #else
         typedef std::hash<std::string> hash_func;
 #endif
 
-#if CXX20
-        {jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
-        {rigtorp::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
-#endif
-        {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if EM3
-        {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
-        {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
-        {emhash4::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emhash2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        {emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        {emhash4::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
-//        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
-        {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+//        {emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        {emhash5::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if QC_HASH
-        {fph::DynamicFphMap<std::string, int, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
+        {fph::DynamicFphMap<std::string, size_t, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
 #endif
-        {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
-        {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        {emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomFindString(bench); }
 #if ET
         //        {hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
@@ -771,6 +787,10 @@ void runTest(int sflags, int eflags)
         {robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         {ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench); }
         {phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+#endif
+#if CXX20
+        {jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        {rigtorp::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if FOLLY
         {folly::F14VectorMap<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
@@ -787,6 +807,8 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<std::string> hash_func;
 #elif ABSL_HASH
         typedef absl::Hash<std::string> hash_func;
+#elif AHASH_AHASH_H
+        typedef Ahash64er hash_func;
 #elif WYHASH_LITTLE_ENDIAN
         typedef WysHasher hash_func;
 #else

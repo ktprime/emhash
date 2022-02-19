@@ -54,7 +54,7 @@ namespace emilib2 {
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
 #elif 1
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
-    const static auto simd_detele = _mm256_set1_epi8(EDELETE);
+    const static auto simd_delete = _mm256_set1_epi8(EDELETE);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm256_set1_epi8
@@ -63,7 +63,7 @@ namespace emilib2 {
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
 #elif AVX512_EHASH
     const static auto simd_empty  = _mm512_set1_epi8(EEMPTY);
-    const static auto simd_detele = _mm512_set1_epi8(EDELETE);
+    const static auto simd_delete = _mm512_set1_epi8(EDELETE);
     constexpr static uint8_t simd_gaps = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm512_set1_epi8
@@ -96,7 +96,10 @@ inline static uint32_t CTZ(uint64_t n)
     #if defined(_WIN64)
     _BitScanForward64(&index, n);
     #else
-    _BitScanForward(&index, n);
+    if ((uint32_t)n)
+        _BitScanForward(&index, (uint32_t)n);
+    else
+        {_BitScanForward(&index, n >> 32); index += 32; }
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
@@ -125,7 +128,8 @@ public:
     typedef KeyT   key_type;
 
 #ifndef EMH_H2
-    #define hash_key2(key_hash, key) (((uint8_t)(key_hash >> 24)) << 1)
+    #define hash_key2(key_hash, key) ((uint8_t)(key_hash >> 24)) << 1
+    //#define hash_key2(key_hash, key) (((uint8_t)(key_hash >> 57)) << 1)
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
@@ -136,7 +140,7 @@ public:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
-        return (uint8_t)(((uint64_t)key) * 0xA24BAED4963EE407 >> 32) << 1;
+        return (uint8_t)(((uint64_t)key) * 0xA24BAED4963EE407ull >> 32) << 1;
     }
 #endif
 
@@ -425,7 +429,7 @@ public:
     {
         if (_num_filled == 0)
             return {this, _num_buckets, false};
-        return {this, find_filled_slot(0) };
+        return {this, find_filled_slot(0)};
     }
 
     const_iterator cbegin() const
@@ -714,6 +718,7 @@ public:
 
     void _erase(size_t bucket)
     {
+        _num_filled -= 1;
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
         auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
@@ -721,7 +726,6 @@ public:
             while (bucket > 1 && _states[--bucket] == State::EDELETE)
                 _states[bucket] = State::EEMPTY;
         }
-        _num_filled -= 1;
     }
 
     static constexpr bool is_triviall_destructable()
@@ -777,7 +781,7 @@ public:
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
-        auto state_size = (simd_gaps + num_buckets) * sizeof(State::EFILLED);
+        auto state_size = (simd_gaps + num_buckets) * sizeof(State);
         //assert(state_size % 8 == 0);
 
         const auto* new_data  = (char*)malloc(pairs_size + state_size);
