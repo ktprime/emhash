@@ -73,9 +73,6 @@ std::map<std::string, std::string> maps =
 #endif
 };
 
-#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
-#define PHMAP_HAVE_SSSE3      1
-#endif
 
 //rand data type
 #ifndef RT
@@ -150,7 +147,7 @@ std::map<std::string, std::string> maps =
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
 //https://jguegant.github.io/blogs/tech/dense-hash-map.html
 
-#if FHT_HMAP
+#if FHT_HMAP && __linux__
 #include <sys/mman.h>
 #include "fht/fht_ht.hpp" // https://github.com/goldsteinn/hashtable_test/blob/master/my_table/fht_ht.hpp
 #endif
@@ -173,27 +170,29 @@ std::map<std::string, std::string> maps =
 //#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 //#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
-#if AH64
+#if AH64 && X86
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
 #endif
 
+#if X86
 #include "emilib/emilib2.hpp"
 #include "emilib/emilib.hpp"
+#endif
 //#include "emilib/emilib21.hpp"
 
 #if ET
 //    #include "emilib/emilib32.hpp"
 //    #include "zhashmap/hashmap.h"
 
-#if __x86_64__ || _WIN64
+#if X86_64
 
 #if __cplusplus > 201402L || _MSVC_LANG >= 201402L
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
 #endif
     #include "emilib/emilib33.hpp"
-//    #include "simd_hash_map/simd_hash_map.hpp"
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
+//    #include "simd_hash_map/simd_hash_map.hpp"
 #endif
 
     #include "tsl/robin_map.h"        //https://github.com/tessil/robin-map
@@ -1281,7 +1280,7 @@ static int benchHashMap(int n)
 
 #if ET > 2
         {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
-#if (__x86_64__ || _M_X64) && __cplusplus >= 201402L
+#if X86_64 && __cplusplus >= 201402L
         {  benOneHash<ska::bytell_hash_map <keyType, valueType, ehash_func>>("sbyte", vList); }
 #endif
         {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
@@ -1294,7 +1293,7 @@ static int benchHashMap(int n)
         //{  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
         //{  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
 
-#if __x86_64__ || _M_X64
+#if X86_64
         {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("skaf", vList); }
 #if __cplusplus > 201402L || _MSVC_LANG >= 201402L
         {  benOneHash<hrd7::hash_map     <keyType, valueType, ehash_func>>("hrdset", vList); }
@@ -1349,9 +1348,11 @@ static int benchHashMap(int n)
         {  benOneHash<fph::DynamicFphMap<keyType, valueType, fph::MixSeedHash<keyType>>>("fph", vList); }
 #endif
 
+#if X86
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
         //            {  benOneHash<emilib1::HashMap      <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
+#endif
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }

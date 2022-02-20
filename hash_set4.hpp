@@ -167,7 +167,7 @@ public:
 
         void erase(size_type bucket)
         {
-            assert (_bucket / SIZE_BIT == bucket / SIZE_BIT);
+            //assert (_bucket / SIZE_BIT == bucket / SIZE_BIT);
             _bmask &= ~(1ull << (bucket % SIZE_BIT));
         }
 

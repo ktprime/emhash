@@ -49,6 +49,17 @@
     #endif
 #endif
 
+#if __x86_64__ || __amd64__ || _M_X64
+    #define X86 1
+    #define X86_64 1
+    #define PHMAP_HAVE_SSSE3                      1
+#endif
+#if  _M_IX86 || __i386__
+    #define X86 1
+    #define X86_32 1
+    #define PHMAP_HAVE_SSSE3                      1
+#endif
+
 #if _WIN32 && _WIN64 == 0 
 uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_hi) 
 {
@@ -529,7 +540,7 @@ struct WyRand
 
 static void cpuidInfo(int regs[4], int id, int ext)
 {
-#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
+#if X86_64
 #if _MSC_VER >= 1600 //2010
     __cpuidex(regs, id, ext);
 #elif __GNUC__
@@ -583,9 +594,9 @@ static void printInfo(char* out)
     info += sprintf(info, " __cplusplus = %d", static_cast<int>(__cplusplus));
 #endif
 
-#if __x86_64__ || __amd64__ || _M_X64
+#if X86_64
     info += sprintf(info, " x86-64");
-#elif __i386__ || _M_IX86
+#elif X86_32
     info += sprintf(info, " x86");
 #elif __arm64__ || __aarch64__
     info += sprintf(info, " arm64");
@@ -663,7 +674,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #endif
 
 #if ABSL
-#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
+#if X86
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE2 1
 #endif

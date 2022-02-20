@@ -215,7 +215,7 @@ public:
             }
         }
 
-        size_t operator - (iterator& r) const
+        size_t operator - (const iterator& r) const
         {
             return _bucket - r._bucket;
         }
@@ -290,7 +290,7 @@ public:
         using pointer           = value_type*;
         using reference         = value_type&;
 
-        explicit const_iterator(iterator it)
+        explicit const_iterator(const iterator& it)
             : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
         const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
         const_iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
@@ -312,7 +312,7 @@ public:
             return _bucket;
         }
 
-        size_t operator - (const_iterator& r) const
+        size_t operator - (const const_iterator& r) const
         {
             return _bucket - r._bucket;
         }

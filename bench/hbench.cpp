@@ -1,9 +1,5 @@
 #include "util.h"
 
-#if __x86_64__
-//#include "hrd/hash_set7.h"
-#endif
-
 #include "martin/robin_hood.h"
 #include "tsl/robin_map.h"
 #include "tsl/hopscotch_map.h"

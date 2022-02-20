@@ -168,7 +168,7 @@ public:
             }
         }
 
-        size_t operator - (iterator& r) const
+        size_t operator - (const iterator& r) const
         {
             return _bucket - r._bucket;
         }
@@ -243,7 +243,7 @@ public:
         using pointer           = value_type*;
         using reference         = value_type&;
 
-        explicit const_iterator(iterator it)
+        explicit const_iterator(const iterator& it)
             : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
         const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
         const_iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
@@ -265,7 +265,7 @@ public:
             return _bucket;
         }
 
-        size_t operator - (const_iterator& r) const
+        size_t operator - (const const_iterator& r) const
         {
             return _bucket - r._bucket;
         }
@@ -402,7 +402,7 @@ public:
         } else {
             clear();
             reserve(other._num_buckets / 2);
-            for (auto it = other.cbegin();  it != other.cend(); ++it)
+            for (auto it = other.cbegin();  it.bucket() != _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
         }
         //assert(_num_buckets == other._num_buckets);
@@ -698,7 +698,7 @@ public:
         return 1;
     }
 
-    iterator erase(const_iterator cit)
+    iterator erase(const const_iterator& cit)
     {
         _erase(cit._bucket);
         iterator it(cit);
@@ -711,7 +711,7 @@ public:
         return ++it;
     }
 
-    void _erase(iterator it)
+    void _erase(iterator& it)
     {
         _erase(it._bucket);
     }

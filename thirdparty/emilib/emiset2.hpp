@@ -85,7 +85,10 @@ inline static uint32_t CTZ(uint64_t n)
     #if defined(_WIN64)
     _BitScanForward64(&index, n);
     #else
-    _BitScanForward(&index, n);
+    if ((uint32_t)n)
+        _BitScanForward(&index, (uint32_t)n);
+    else
+        {_BitScanForward(&index, n >> 32); index += 32; }
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
@@ -184,7 +187,7 @@ public:
         using pointer           = value_type*;
         using reference         = value_type&;
 
-        const_iterator(iterator proto) : _set(proto._set), _bucket(proto._bucket)  { }
+        const_iterator(const iterator& proto) : _set(proto._set), _bucket(proto._bucket)  { }
         const_iterator(const htype* hash_set, size_t bucket) : _set(hash_set), _bucket(bucket)
         {
         }
@@ -563,7 +566,7 @@ public:
         return 1;
     }
 
-    iterator erase(const_iterator cit)
+    iterator erase(const const_iterator& cit)
     {
         _erase(cit._bucket);
         iterator it(this, cit._bucket);
@@ -576,7 +579,7 @@ public:
         return ++it;
     }
 
-    void _erase(iterator it)
+    void _erase(const iterator& it)
     {
         _erase(it._bucket);
     }

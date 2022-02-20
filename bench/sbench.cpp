@@ -43,10 +43,6 @@ std::map<std::string, std::string> maps =
 #endif
 };
 
-#if __x86_64__ || _M_X64 || _M_IX86 || __i386__
-#define PHMAP_HAVE_SSSE3      1
-#define ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
-#endif
 
 //rand data type
 #ifndef RT
@@ -119,23 +115,19 @@ std::map<std::string, std::string> maps =
 
 #include "emilib/emiset.hpp"
 #include "emilib/emiset2.hpp"
-#include "ska/bytell_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 
 #if ET
-    #define  _CPP11_HASH    1
-
-#if __x86_64__ || _WIN64
+#if X86_64
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
     #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
-    #include "tsl/robin_set.h"        //https://github.com/tessil/robin-map
-#endif
-
-#if ET > 1
-    #include "tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
     #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
+    #include "tsl/robin_set.h"        //https://github.com/tessil/robin-map
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#if ET > 1
+    #include "tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
+#endif
 #endif
 
 
@@ -448,7 +440,7 @@ void hash_iter(const hash_type& ht_hash, const std::string& hash_name)
 #elif KEY_CLA
     sum += *it.lScore;
 #else
-    sum += *it.size();
+    sum += (*it).size();
 #endif
 
     for (auto it = ht_hash.cbegin(); it != ht_hash.cend(); ++it)
@@ -457,7 +449,7 @@ void hash_iter(const hash_type& ht_hash, const std::string& hash_name)
 #elif KEY_CLA
     sum += *it.lScore;
 #else
-    sum += *it.size();
+    sum += (*it).size();
 #endif
 
 #ifndef SMAP
@@ -1089,7 +1081,7 @@ static int benchHashSet(int n)
 
 #if ET > 2
         {  benOneHash<tsl::hopscotch_set   <keyType,  ehash_func>>("hopsco", vList); }
-#if __x86_64__
+#if X86_64
         {  benOneHash<ska::bytell_hash_set <keyType,  ehash_func>>("byte", vList); }
 #endif
 #endif
@@ -1099,8 +1091,8 @@ static int benchHashSet(int n)
         //{  benOneHash<emilib2::HashSet     <keyType,  ehash_func>>("emilib2", vList); }
 
         {  benOneHash<tsl::robin_set     <keyType,  ehash_func>>("tslr", vList); }
+#if X86_64
         {  benOneHash<ska::flat_hash_set <keyType,  ehash_func>>("skaf", vList); }
-#if __x86_64__
         //{  benOneHash<hrd7::hash_set     <keyType,  ehash_func>>("hrdset", vList); }
 #endif
 #endif
@@ -1120,7 +1112,8 @@ static int benchHashSet(int n)
         {  benOneHash<phmap::flat_hash_set <keyType,  ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_set <keyType,  ehash_func>>("martin", vList); }
 #endif
-#if ASBL
+
+#if ABSL
         {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
 #endif
 
@@ -1170,6 +1163,7 @@ static void high_load()
             std::cout << "emhash loop " << rep << " time use " << (getus() - t1) / 1000000.000 << " sec\n";
         }
 
+#if X86_64
         {
             auto rng = std::mt19937(rep);
             ska::bytell_hash_set<uint32_t> set;
@@ -1188,6 +1182,7 @@ static void high_load()
             }
             std::cout << "skaset loop " << rep << " time use " << (getus() - t1) / 1000000.000 << "sec\n\n";
         }
+#endif
     }
 }
 

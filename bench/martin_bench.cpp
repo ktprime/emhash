@@ -1,25 +1,17 @@
+#include "util.h"
 #include <sstream>
 
 #ifndef _WIN32
-//#include <sched.h>
-//#include <pthread.h>
-//#include <cpuid.h>
-//#include <signal.h>
-//#include <unistd.h>
 #include <sys/resource.h>
 #endif
 
-#if A64
-#if __x86_64__ || _M_X64
+#if A64 && X86_64
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
 #endif
-#endif
 
-#include "util.h"
 
 #include "wyhash.h"
-using namespace std;
 
 //#define EMH_STATIS 1
 //#define ET            1
@@ -51,9 +43,10 @@ using namespace std;
 #include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 #include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
 #include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
-//#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
-
+#if X86
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
+//#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
+#endif
 //#include "ska/bytell_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
 
@@ -75,8 +68,11 @@ static std::map<std::string, std::string> show_name =
     //    {"emhash8", "emhash8"},
 
     {"emhash5", "emhash5"},
+#if X86
     {"emilib", "emilib"},
     {"emilib2", "emilib2"},
+#endif
+
 #if QC_HASH
     {"qc", "qchash"},
     {"fph", "fph"},
@@ -214,7 +210,7 @@ class sfc64 {
         uint64_t m_counter;
 };
 
-static inline double now2sec()
+static inline float now2sec()
 {
     return getus() / 1000000.0;
 }
@@ -226,7 +222,11 @@ template<class MAP> void bench_insert(MAP& map)
         return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
+#if X86_64
     size_t maxn = 10000000;
+#else
+    size_t maxn = 10000000 / 5;
+#endif
 
     for (int  i = 0; i < 2; i++) {
         auto nows = now2sec();
@@ -237,13 +237,13 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map[static_cast<int>(rng())];
                 }
-                printf("    insert %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+                printf("    insert %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
             }
 
             {
                 auto ts = now2sec();
                 map.clear();
-                printf("    clear %.4lf\n", now2sec() - ts );
+                printf("    clear %.4f\n", now2sec() - ts );
             }
 
             {
@@ -251,7 +251,7 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map[static_cast<int>(rng())];
                 }
-                printf("    reinsert %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+                printf("    reinsert %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
             }
 
             {
@@ -259,10 +259,10 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map.erase(static_cast<int>(rng()));
                 }
-                printf("    remove %.4lf s, size = %d\n", now2sec() - ts , (int)map.size());
+                printf("    remove %.4f s, size = %d\n", now2sec() - ts , (int)map.size());
             }
         }
-        printf("total %dM int time = %.2lf s\n\n", int(maxn / 1000000), now2sec() - nows);
+        printf("total %dM int time = %.2f s\n\n", int(maxn / 1000000), now2sec() - nows);
         maxn *= 10;
     }
 }
@@ -348,14 +348,14 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
             map.erase(rng() & bitMask);
         }
 
-        printf("    %02d bits %2d M cycles time %.4lf s map size %d loadf = %.2f\n",
+        printf("    %02d bits %2d M cycles time %.4f s map size %d loadf = %.2f\n",
                 int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts , (int)map.size(), map.load_factor());
 
 #ifndef _MSC_VER
         //assert(RND != 123 || map.size() == expectedFinalSizes[i]);
 #endif
     }
-    printf("total time = %.2lf s\n\n", now2sec() - nows);
+    printf("total time = %.2f s\n\n", now2sec() - nows);
 }
 
 template<class MAP> void bench_randomDistinct2(MAP& map)
@@ -365,8 +365,11 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         return ;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
+#if X86_64
     constexpr size_t const n = 50000000;
-
+#else
+    constexpr size_t const n = 50000000 / 2;
+#endif
     auto nows = now2sec();
     MRNG rng(RND + 6);
 
@@ -379,7 +382,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     05%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     05%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 549985352 == checksum);
     }
 
@@ -391,7 +394,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     25%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     25%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 149979034 == checksum);
     }
 
@@ -402,7 +405,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     50%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     50%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 249981806 == checksum);
     }
 
@@ -413,12 +416,12 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng())];
         }
-        printf("    100%% distinct %.4lf s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("    100%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 50291811 == checksum);
     }
     //#endif
 
-    printf("total time = %.2lf s\n\n", now2sec() - nows);
+    printf("total time = %.2f s\n\n", now2sec() - nows);
 }
 
 template<class MAP>
@@ -458,7 +461,7 @@ size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 #endif
     }
 
-    printf("    %016x time = %.2lf, loadf = %.2lf %d\n", bitMask, now2sec() - ts , map.load_factor(), (int)map.size());
+    printf("    %016x time = %.2f, loadf = %.2f %d\n", bitMask, now2sec() - ts , map.load_factor(), (int)map.size());
     return verifier;
 }
 
@@ -527,7 +530,7 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
         } while (i < numInserts);
     }
 
-    printf("    %s success time = %.2lf s %d loadf = %.2lf\n", title.c_str(), now2sec() - ts , (int)num_found, map.load_factor());
+    printf("    %s success time = %.2f s %d loadf = %.2f\n", title.c_str(), now2sec() - ts , (int)num_found, map.load_factor());
     return num_found;
 }
 
@@ -563,7 +566,7 @@ void bench_randomFindString(MAP& map)
         randomFindInternalString<MAP>(0, 13, numInserts, numFindsPerInsert);
     }
 
-    printf("total time = %.2lf\n\n", now2sec() - nows);
+    printf("total time = %.2f\n\n", now2sec() - nows);
 }
 
 template<class MAP>
@@ -575,13 +578,13 @@ void bench_randomEraseString(MAP& map)
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     auto nows = now2sec();
-    { runRandomString<MAP> (20000000, 7, 0xfffff); }
-    { runRandomString<MAP>(6000000, 1000, 0x1ffff); }
+//    { runRandomString<MAP>(6000000,  1000, 0x1ffff); }
+    { runRandomString<MAP>(20000000, 7, 0xfffff); }
     { runRandomString<MAP>(20000000, 8, 0xfffff); }
     { runRandomString<MAP>(20000000, 13, 0xfffff); }
     { runRandomString<MAP>(12000000, 100, 0x7ffff); }
 
-    printf("total time = %.2lf s\n\n", now2sec() - nows);
+    printf("total time = %.2f s\n\n", now2sec() - nows);
 }
 
 template<class MAP>
@@ -635,7 +638,7 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
         } while (i < numInserts);
     }
 
-    printf("    %3lu%% %016lx success time = %.2lf s, %8d loadf = %.2lf\n",
+    printf("    %3lu%% %016lx success time = %.2f s, %8d loadf = %.2f\n",
             numSequential * 100 / NumTotal, bitMask, now2sec() - ts , (int)num_found, map.load_factor());
     return num_found;
 }
@@ -669,7 +672,7 @@ void bench_IterateIntegers(MAP& map)
             result += keyVal.second;
         }
     }
-    printf("    total iterate/removing time = %.2lf, %.2lf|%lu\n\n", (ts1 - ts), now2sec() - ts, result);
+    printf("    total iterate/removing time = %.2f, %.2f|%lu\n\n", (ts1 - ts), now2sec() - ts, result);
 }
 
 template<class MAP>
@@ -700,7 +703,7 @@ void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
     randomFindInternal<MAP>(0, lower32bit, numInserts, numFindsPerInsert);
     randomFindInternal<MAP>(0, upper32bit, numInserts, numFindsPerInsert);
 
-    printf("nums = %zd, total time = %.2lf\n", numInserts, now2sec() - ts);
+    printf("nums = %zd, total time = %.2f\n", numInserts, now2sec() - ts);
 }
 
 void runTest(int sflags, int eflags)
@@ -739,11 +742,15 @@ void runTest(int sflags, int eflags)
         //        { hrd7::hash_map <uint64_t, uint64_t, hash_func> hmap;  bench_IterateIntegers(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
+#if X86_64
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_IterateIntegers(fmap); }
+#endif
         { phmap::flat_hash_map<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
 #endif
+#if X86
         { emilib::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
+#endif
 #if ABSL
         { absl::flat_hash_map<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
 #endif
@@ -779,13 +786,17 @@ void runTest(int sflags, int eflags)
         {fph::DynamicFphMap<std::string, size_t, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
 #endif
         {emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+#if X86
         {emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomFindString(bench); }
+#endif
 #if ET
         //        {hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
         {tsl::robin_map  <std::string, size_t, hash_func> bench;     bench_randomFindString(bench); }
         {robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+#if X86_64
         {ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench); }
+#endif
         {phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if CXX20
@@ -820,8 +831,10 @@ void runTest(int sflags, int eflags)
         {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
-        {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
+#if X86
         {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
+#endif
         {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
@@ -840,7 +853,9 @@ void runTest(int sflags, int eflags)
         //        {hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
         {tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         {robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+#if X86_64
         {ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+#endif
         {phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
 #if FOLLY
@@ -868,13 +883,14 @@ void runTest(int sflags, int eflags)
         for (int i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
         {
 #if ET
-            { tsl::robin_map  <size_t, size_t, hash_func> rmap;  bench_randomFind(rmap, numInserts[i], numFindsPerInsert[i]); }
+            { tsl::robin_map <size_t, size_t, hash_func> rmap; bench_randomFind(rmap, numInserts[i], numFindsPerInsert[i]); }
             { robin_hood::unordered_map <size_t, size_t, hash_func> martin; bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]); }
+#if X86_64
             { ska::flat_hash_map <size_t, size_t, hash_func> fmap; bench_randomFind(fmap, numInserts[i], numFindsPerInsert[i]); }
-            { phmap::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
-            //        { hrd7::hash_map <size_t, size_t, hash_func> hmap;  bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
-            { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { phmap::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
+            //        { hrd7::hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
+#endif
 #if QC_HASH
             { fph::DynamicFphMap<size_t, size_t, fph::MixSeedHash<size_t>> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { qc::hash::RawMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -883,7 +899,10 @@ void runTest(int sflags, int eflags)
             { jg::dense_hash_map<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { rigtorp::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
-            { emilib::HashMap<size_t, size_t,  hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+#if X86
+            { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { emilib::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+#endif
             { emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash6::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash7::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -940,13 +959,17 @@ void runTest(int sflags, int eflags)
         { emhash4::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         { emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #endif
+#if X86
         { emilib::HashMap<int, int, hash_func>  emap; bench_insert(emap); }
         { emilib2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+#endif
 #if ET
         //        { hrd7::hash_map <int, int, hash_func> hmap;  bench_insert(hmap); }
         { tsl::robin_map  <int, int, hash_func> rmap; bench_insert(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_insert(martin); }
+#if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_insert(fmap); }
+#endif
         { phmap::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
 #endif
         putchar('\n');
@@ -980,13 +1003,17 @@ void runTest(int sflags, int eflags)
         { emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 #endif
 
+#if X86
         { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emilib::HashMap<uint64_t, uint64_t, hash_func>  emap; bench_randomInsertErase(emap); }
+#endif
 #if ET
         //        { hrd7::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
+#if X86_64
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
+#endif
         { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
 #endif
 #if ABSL
@@ -1035,13 +1062,17 @@ void runTest(int sflags, int eflags)
 #endif
 
 
+#if X86
         { emilib::HashMap<int, int, hash_func> emap;  bench_randomDistinct2(emap); }
         { emilib2::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+#endif
 #if ET
         //        { hrd7::hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
         { tsl::robin_map     <int, int, hash_func> rmap; bench_randomDistinct2(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
+#if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_randomDistinct2(fmap); }
+#endif
         { phmap::flat_hash_map <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
 #endif
 #if ABSL
@@ -1055,13 +1086,21 @@ void runTest(int sflags, int eflags)
         putchar('\n');
     }
 
-    printf("total time = %.3lf s", now2sec() - start );
+    printf("total time = %.3f s", now2sec() - start);
+}
+
+static void checkSet(const std::string& map_name)
+{
+    if (show_name.count(map_name) == 1)
+        show_name.erase(map_name);
+    else
+        show_name.emplace(map_name, map_name);
 }
 
 int main(int argc, char* argv[])
 {
-    puts("./test [23456mptseb0d2] n");
-
+    printInfo(nullptr);
+    puts("./test [2-9mptseb0d2 rjqf] n");
     for (auto& m : show_name)
         printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
 
@@ -1069,34 +1108,35 @@ int main(int argc, char* argv[])
     if (argc > 1) {
         printf("cmd agrs = %s\n", argv[1]);
         for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
-            if (c >= '2' && c < '9') {
-                string map_name("emhash");
+            if (c >= '3' && c < '9') {
+                std::string map_name("emhash");
                 map_name += c;
-                if (show_name.count(map_name) == 1)
-                    show_name.erase(map_name);
-                else
-                    show_name.emplace(map_name, map_name);
+                checkSet(map_name);
             } else if (c == 'm')
-                show_name.erase("robin_hood");
+                checkSet("robin_hood");
             else if (c == 'p')
-                show_name.erase("phmap");
+                checkSet("phmap");
             else if (c == 'a')
-                show_name.erase("absl");
+                checkSet("absl");
             else if (c == 't')
-                show_name.erase("robin_map");
+                checkSet("robin_map");
             else if (c == 's')
-                show_name.erase("ska");
+                checkSet("ska");
             else if (c == 'h')
-                show_name.erase("hrd7");
+                checkSet("hrd7");
             else if (c == 'e')
-                show_name.erase("emilib");
-            else if (c == 'c') {
-                show_name.erase("jg");
-                show_name.erase("rigtorp");
-            } else if (c == 'q') {
-                show_name.erase("qc");
-                show_name.erase("fph");
-            } else if (c == 'b')
+                checkSet("emilib");
+            else if (c == '2')
+                checkSet("emilib2");
+            else if (c == 'j')
+                checkSet("jg");
+            else if (c == 'r')
+                checkSet("rigtorp");
+            else if (c == 'q')
+                checkSet("qc");
+            else if (c == 'f')
+                checkSet("fph");
+            else if (c == 'b')
                 sflags = atoi(&argv[1][++i]);
             else if (c == 'd')
                 eflags = atoi(&argv[1][++i]);
