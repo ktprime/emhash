@@ -6,7 +6,8 @@ ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX?=clang++
 endif
 
-CXXFLAGS = -O3 -march=native -flto -mtune=native -I.. -I../thirdparty -I/usr/local/include
+CXXFLAGS = -O3 -march=native -flto -mtune=native -I.. -I../thirdparty
+#-I/usr/local/include
 
 ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly

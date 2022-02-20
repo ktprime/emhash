@@ -55,7 +55,7 @@
 #endif
 #endif
 
-static auto RND = getus();
+static const auto RND = getus();
 
 static std::map<std::string, std::string> show_name =
 {
@@ -543,18 +543,8 @@ void bench_randomFindString(MAP& map)
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     auto nows = now2sec();
+    auto now1 = nows, now2 = nows;
     if (1)
-    {
-        static constexpr size_t numInserts = 100000;
-        static constexpr size_t numFindsPerInsert = 1000;
-
-        randomFindInternalString<MAP>(4, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(3, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(2, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(1, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
-    }
-
     {
         static constexpr size_t numInserts = 1000000 / 2;
         static constexpr size_t numFindsPerInsert = 200 / 2;
@@ -564,9 +554,21 @@ void bench_randomFindString(MAP& map)
         randomFindInternalString<MAP>(2, 13, numInserts, numFindsPerInsert);
         randomFindInternalString<MAP>(1, 13, numInserts, numFindsPerInsert);
         randomFindInternalString<MAP>(0, 13, numInserts, numFindsPerInsert);
+        now1 = now2sec();
     }
 
-    printf("total time = %.2f\n\n", now2sec() - nows);
+    {
+        static constexpr size_t numInserts = 100000;
+        static constexpr size_t numFindsPerInsert = 1000;
+
+        randomFindInternalString<MAP>(4, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(3, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(2, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(1, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
+        now2 = now2sec();
+    }
+    printf("13byte time = %.2f, total time %.2f\n\n", now1 - nows, now2 - nows);
 }
 
 template<class MAP>
@@ -578,7 +580,7 @@ void bench_randomEraseString(MAP& map)
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     auto nows = now2sec();
-//    { runRandomString<MAP>(6000000,  1000, 0x1ffff); }
+    { runRandomString<MAP>(6000000,  1000, 0x1ffff); }
     { runRandomString<MAP>(20000000, 7, 0xfffff); }
     { runRandomString<MAP>(20000000, 8, 0xfffff); }
     { runRandomString<MAP>(20000000, 13, 0xfffff); }
@@ -638,8 +640,13 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
         } while (i < numInserts);
     }
 
-    printf("    %3lu%% %016lx success time = %.2f s, %8d loadf = %.2f\n",
-            numSequential * 100 / NumTotal, bitMask, now2sec() - ts , (int)num_found, map.load_factor());
+#if _WIN32
+    printf("    %3u%% %016llx success time = %.2f s, %8d loadf = %.2f\n",
+#else
+    printf("    %3u%% %016lx success time = %.2f s, %8d loadf = %.2f\n",
+#endif
+            uint32_t(numSequential * 100 / NumTotal), bitMask, now2sec() - ts , (int)num_found, map.load_factor());
+
     return num_found;
 }
 
@@ -672,7 +679,7 @@ void bench_IterateIntegers(MAP& map)
             result += keyVal.second;
         }
     }
-    printf("    total iterate/removing time = %.2f, %.2f|%lu\n\n", (ts1 - ts), now2sec() - ts, result);
+    printf("    total iterate/removing time = %.2f, %.2f|%u\n\n", (ts1 - ts), now2sec() - ts, (uint32_t)result);
 }
 
 template<class MAP>
