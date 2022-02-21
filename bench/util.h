@@ -139,9 +139,9 @@ static int64_t getus()
 #endif
 }
 
-static int ilog(int x, const int n = 2)
+static inline uint32_t ilog(uint32_t x, uint32_t n = 2)
 {
-    int logn = 0;
+    uint32_t logn = 0;
     while (x / n) {
         logn ++;
         x /= n;
@@ -150,7 +150,7 @@ static int ilog(int x, const int n = 2)
     return logn;
 }
 
-static uint64_t randomseed() {
+static inline uint64_t randomseed() {
     std::random_device rd;
     std::mt19937 g(rd());
     return g();

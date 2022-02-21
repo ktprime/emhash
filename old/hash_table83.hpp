@@ -93,16 +93,16 @@
 #define EMH_INDEX(i,n)   i[n]
 #define EMH_BUCKET(i,n)  i[n].bucket
 #define EMH_HSLOT(i,n)   i[n].slot
-#define EMH_SLOT(i,n)    (i[n].slot & _mask)
+#define EMH_SLOT(i,n)    (i[n].slot & SLOT_SMASK)
 #define EMH_PREVET(i,n)  i[n].slot
 
-#define EMH_EQHASH(n, key_hash) ((size_type)key_hash & ~_mask) == (_index[n].slot & ~_mask)
+#define EMH_EQHASH(n, key_hash) ((size_type)key_hash & SLOT_KMASK) == (_index[n].slot & SLOT_KMASK)
 #undef  EMH_NEW
-#define EMH_NEW(key, value, bucket, key_hash) new(_pairs + _num_filled) PairT(key, value); _index[bucket] = {bucket, _num_filled++ | (key_hash & ~_mask)}
+#define EMH_NEW(key, value, bucket, key_hash) new(_pairs + _num_filled) PairT(key, value); _index[bucket] = {bucket, _num_filled++ | (key_hash & SLOT_KMASK)}
 
 #define EMH_EMPTY(i, n) (0 > (int)i[n].bucket)
 
-namespace emhash8 {
+namespace emhash6 {
 #if SLOT_BITS < 10 || SLOT_BITS >= 30
 constexpr uint32_t SLOT_BITS  = 28;
 #endif
@@ -1142,7 +1142,7 @@ public:
             const auto bucket = key_hash & _mask;
             auto& next_bucket = EMH_BUCKET(_index, bucket);
             if ((int)next_bucket < 0)
-                EMH_INDEX(_index, bucket) = {1, slot | (key_hash & ~_mask)};
+                EMH_INDEX(_index, bucket) = {1, slot | (key_hash & SLOT_KMASK)};
             else
                next_bucket ++;
         }
@@ -1156,6 +1156,7 @@ public:
 
         uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
+        assert(num_buckets < SLOT_SMASK);
 
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         auto new_index = (Index*)(new_pairs + num_buckets);
@@ -1193,7 +1194,7 @@ public:
             const auto& key = EMH_KEY(old_pairs, slot);
             const auto key_hash = (size_type)hash_key(key);
             const auto bucket = find_unique_bucket(key, key_hash);
-            EMH_INDEX(_index, bucket) = {bucket, slot | (key_hash & ~_mask)};
+            EMH_INDEX(_index, bucket) = {bucket, slot | (key_hash & SLOT_KMASK)};
 
             //if (!is_copy_trivially())
             new(_pairs + slot) PairT(std::move(old_pairs[slot]));
@@ -1248,7 +1249,7 @@ private:
             else
                 EMH_KV(_pairs, slot) = EMH_KV(_pairs, last_slot);
             //EMH_SLOT(_index, last_bucket) = slot;
-            EMH_HSLOT(_index, last_bucket) = slot | (EMH_HSLOT(_index, last_bucket) & ~_mask);
+            EMH_HSLOT(_index, last_bucket) = slot | (EMH_HSLOT(_index, last_bucket) & SLOT_KMASK);
         }
 
         if (is_triviall_destructable())

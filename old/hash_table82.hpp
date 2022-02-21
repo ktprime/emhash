@@ -90,24 +90,21 @@
 #define EMH_VAL(p,n)     p[n].second
 #define EMH_KV(p,n)      p[n]
 
-#define EMH_INDEX(i,n)   i[n]
 #define EMH_BUCKET(i,n)  i[n].bucket
-#define EMH_HSLOT(i,n)   i[n].slot
-#define EMH_SLOT(i,n)    (i[n].slot & _mask)
+#define EMH_SLOT(i,n)    i[n].slot
+#define EMH_HASH(i,n)    i[n].hash
+#define EMH_INDEX(i,n)   i[n]
 #define EMH_PREVET(i,n)  i[n].slot
 
-#define EMH_EQHASH(n, key_hash) ((size_type)key_hash & ~_mask) == (_index[n].slot & ~_mask)
+#define EMH_EQHASH(n, key_hash) (uint8_t)(key_hash >> HASH_OFF) == _index[n].hash
 #undef  EMH_NEW
-#define EMH_NEW(key, value, bucket, key_hash) new(_pairs + _num_filled) PairT(key, value); _index[bucket] = {bucket, _num_filled++ | (key_hash & ~_mask)}
+#define EMH_NEW(key, value, bucket, key_hash) new(_pairs + _num_filled) PairT(key, value); _index[bucket] = {bucket, _num_filled++, key_hash >> HASH_OFF}
 
 #define EMH_EMPTY(i, n) (0 > (int)i[n].bucket)
 
-namespace emhash8 {
-#if SLOT_BITS < 10 || SLOT_BITS >= 30
-constexpr uint32_t SLOT_BITS  = 28;
-#endif
-constexpr uint32_t SLOT_KMASK = ~((1 << SLOT_BITS) - 1);
-constexpr uint32_t SLOT_SMASK = ~SLOT_KMASK;
+namespace emhash7 {
+constexpr uint32_t BUCKSIZE = 24;
+constexpr uint32_t HASH_OFF = 24;
 
 constexpr uint32_t INACTIVE = 0xAAAAAAAA;
 constexpr uint32_t END      = 0-1;
@@ -134,7 +131,8 @@ public:
     struct Index
     {
         size_type bucket;
-        size_type slot;
+        size_type slot : BUCKSIZE;
+        size_type hash : (32 - BUCKSIZE);
     };
 
     class iterator
@@ -1142,7 +1140,7 @@ public:
             const auto bucket = key_hash & _mask;
             auto& next_bucket = EMH_BUCKET(_index, bucket);
             if ((int)next_bucket < 0)
-                EMH_INDEX(_index, bucket) = {1, slot | (key_hash & ~_mask)};
+                EMH_INDEX(_index, bucket) = {1, slot, key_hash >> HASH_OFF};
             else
                next_bucket ++;
         }
@@ -1156,6 +1154,7 @@ public:
 
         uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
+        assert(num_buckets < (1 << BUCKSIZE));
 
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         auto new_index = (Index*)(new_pairs + num_buckets);
@@ -1193,7 +1192,7 @@ public:
             const auto& key = EMH_KEY(old_pairs, slot);
             const auto key_hash = (size_type)hash_key(key);
             const auto bucket = find_unique_bucket(key, key_hash);
-            EMH_INDEX(_index, bucket) = {bucket, slot | (key_hash & ~_mask)};
+            EMH_INDEX(_index, bucket) = {bucket, slot, key_hash >> HASH_OFF};
 
             //if (!is_copy_trivially())
             new(_pairs + slot) PairT(std::move(old_pairs[slot]));
@@ -1247,14 +1246,13 @@ private:
                  std::swap(EMH_KV(_pairs, slot), EMH_KV(_pairs, last_slot));
             else
                 EMH_KV(_pairs, slot) = EMH_KV(_pairs, last_slot);
-            //EMH_SLOT(_index, last_bucket) = slot;
-            EMH_HSLOT(_index, last_bucket) = slot | (EMH_HSLOT(_index, last_bucket) & ~_mask);
+            EMH_SLOT(_index, last_bucket) = slot;
         }
 
         if (is_triviall_destructable())
             _pairs[last_slot].~PairT();
 
-        EMH_INDEX(_index, ebucket) = {INACTIVE, END};
+        EMH_INDEX(_index, ebucket) = { INACTIVE, 0, 0 };
 
 #if EMH_HIGH_LOAD
         if (_ehead) {
@@ -1278,7 +1276,8 @@ private:
                 EMH_INDEX(_index, main_bucket) =
                 {
                     (nbucket == next_bucket) ? main_bucket : nbucket,
-                    EMH_HSLOT(_index, next_bucket)
+                    EMH_SLOT(_index, next_bucket),
+                    EMH_HASH(_index, next_bucket)
                 };
             }
             return next_bucket;
@@ -1380,7 +1379,7 @@ private:
     {
         const auto hashk = hash_key(key);
         const auto bucket = hashk & _mask;
-        auto slot  = (int)(EMH_SLOT(_index, bucket)); //TODO
+        auto slot  = (int)EMH_SLOT(_index, bucket);
         if (slot < 0 /**|| key < EMH_KEY(_pairs, slot)*/)
             return END;
 
@@ -1418,11 +1417,13 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket);
         const auto prev_bucket = find_prev_bucket(obmain, bucket);
 
-        const auto oslot = EMH_HSLOT(_index, bucket);
+        const auto oslot = EMH_SLOT(_index, bucket);
+        const auto ohash = EMH_HASH(_index, bucket);
+        assert(oslot < _num_filled);
         if (next_bucket == bucket)
-            EMH_INDEX(_index, new_bucket) = {new_bucket, oslot};
+            EMH_INDEX(_index, new_bucket) = { new_bucket, oslot, ohash };
         else
-            EMH_INDEX(_index, new_bucket) = {next_bucket, oslot};
+            EMH_INDEX(_index, new_bucket) = { next_bucket, oslot, ohash };
 
         EMH_BUCKET(_index, prev_bucket) = new_bucket;
         EMH_BUCKET(_index, bucket) = INACTIVE;
