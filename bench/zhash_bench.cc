@@ -42,6 +42,7 @@
 #include "zhashmap/hashmap.h"
 #include "zhashmap/linkedhashmap.h"
 #include "hash_table7.hpp"
+#include "hash_table8.hpp"
 #include "hash_table5.hpp"
 #include "emilib/emilib2.hpp"
 #include "emilib/emilib.hpp"
@@ -336,6 +337,7 @@ int main(int argc, char **argv)
 #endif
 
     bench_map<rigtorp::HashMap<size_t,size_t>>("rigtorp::HashMap",count);
+    bench_map<emhash8::HashMap<size_t,size_t>>("emhash8::HashMap",count);
 
 #if QC_HASH
     bench_map<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap",count);

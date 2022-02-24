@@ -21,7 +21,7 @@
 #endif
 //#define NDEBUG                1
 #ifdef _WIN32
-    # define _CRT_SECURE_NO_WARNINGS 1
+    # define _CRT_SECURE_NO_WARNINGS
     #pragma warnning(disable:4996)
     #ifndef NOMINMAX
     #define NOMINMAX

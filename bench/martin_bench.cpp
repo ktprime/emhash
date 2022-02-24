@@ -43,7 +43,7 @@
 #include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 #include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
 #include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
-#if X86
+#if X86_64
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 //#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
 #endif
@@ -65,11 +65,11 @@ static std::map<std::string, std::string> show_name =
     {"emhash4", "emhash4"},
 #endif
     {"emhash7", "emhash7"},
-    //    {"emhash8", "emhash8"},
+	{"emhash8", "emhash8"},
 
-    {"emhash5", "emhash5"},
+    //{"emhash5", "emhash5"},
 #if X86
-    {"emilib", "emilib"},
+//    {"emilib", "emilib"},
     {"emilib2", "emilib2"},
 #endif
 
@@ -79,13 +79,13 @@ static std::map<std::string, std::string> show_name =
 #endif
 
     {"jg", "jg_dense"},
-    {"rigtorp", "rigtorp"},
     //    {"emhash6", "emhash6"},
 #if ABSL
     {"absl", "absl flat"},
 #endif
 //    {"folly", "f14_vector"},
 #if ET
+    {"rigtorp", "rigtorp"},
     {"phmap", "phmap flat"},
     {"robin_hood", "martin flat"},
     //    {"hrd7", "hrd7map"},

@@ -371,20 +371,11 @@ public:
 
     ~HashMap()
     {
-        if (!is_triviall_destructable())
+        if (is_triviall_destructable())
             clear();
 
         _num_filled = 0;
         free(_states);
-    }
-
-    static constexpr bool is_copy_trivially()
-    {
-#if __cplusplus >= 201103L || _MSC_VER > 1600
-        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
-#else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
-#endif
     }
 
     void clone(const HashMap& other)
@@ -730,8 +721,17 @@ public:
 
     static constexpr bool is_triviall_destructable()
     {
-#if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+#if __cplusplus >= 201402L || _MSC_VER > 1600
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+#else
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+#endif
+    }
+
+    static constexpr bool is_copy_trivially()
+    {
+#if __cplusplus >= 201402L || _MSC_VER > 1600
+        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
@@ -740,7 +740,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (!is_triviall_destructable()) {
+        if (is_triviall_destructable()) {
             for (size_t bucket=0; _num_filled; ++bucket) {
                 if (_states[bucket] % 2 == State::EFILLED) {
                     _pairs[bucket].~PairT();

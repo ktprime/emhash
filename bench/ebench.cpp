@@ -31,17 +31,17 @@ std::map<std::string, std::string> maps =
     {"qchash", "qc-hash"},
     {"fph", "fph-table"},
 
-    {"emhash2", "emhash2"},
-    {"emhash3", "emhash3"},
-    {"emhash4", "emhash4"},
+//    {"emhash2", "emhash2"},
+//    {"emhash3", "emhash3"},
+//    {"emhash4", "emhash4"},
 
     {"emhash5", "emhash5"},
-    {"emhash6", "emhash6"},
+//    {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
     {"jg_dense", "jg_dense"},
     {"rigtorp", "rigtorp"},
 
-//    {"emhash8", "emhash8"},
+    {"emhash8", "emhash8"},
 
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
@@ -106,9 +106,10 @@ std::map<std::string, std::string> maps =
 #include "old/hash_table2.hpp"
 #include "old/hash_table3.hpp"
 #include "old/hash_table4.hpp"
+//#include "old/hash_table557.hpp"
 #endif
 #include "hash_table5.hpp"
-//#include "old/hash_table557.hpp"
+#include "hash_table5.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
@@ -1332,9 +1333,9 @@ static int benchHashMap(int n)
 #if CUCKOO_HASHMAP
         {  benOneHash<libcuckoo::cuckoohash_map <keyType, valueType, ehash_func>>("cuckoo", vList); }
 #endif
-//        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
+//        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
         {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
@@ -1489,7 +1490,7 @@ static void testHashRand(int loops = 100000009)
 #endif
 }
 
-static void testHashInt(int loops = 100000009)
+static void testHashInt(int loops = 500000009)
 {
     printf("%s loops = %d\n", __FUNCTION__, loops);
     auto ts = getus();
@@ -1674,7 +1675,7 @@ int main(int argc, char* argv[])
     //find_test();
 #endif
     auto start = getus();
-    testHashInt(1e7+8);
+    testHashInt(5e7+8);
 
 #ifdef AHASH_AHASH_H
     printf("ahash_version = %s", ahash_version());

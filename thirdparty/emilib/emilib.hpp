@@ -418,7 +418,7 @@ public:
 
     ~HashMap()
     {
-        if (!is_triviall_destructable())
+        if (is_triviall_destructable())
             clear();
 
         _num_filled = 0;
@@ -783,16 +783,16 @@ public:
     static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (!is_triviall_destructable()) {
+        if (is_triviall_destructable()) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _states[it.bucket()] = State::EEMPTY;
                 (*it).~PairT();

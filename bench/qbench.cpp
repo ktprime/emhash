@@ -16,6 +16,7 @@
 
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"
+#include "hash_table8.hpp"
 #include "emilib/emilib2.hpp"
 //#include "emilib/emiset2.hpp"
 
@@ -1033,6 +1034,15 @@ struct EmHash7MapInfo
 };
 
 template <typename K, typename V>
+struct EmHash8MapInfo
+{
+    using Container = emhash8::HashMap<K, V, typename qc::hash::RawMap<K, V>::hasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"emhash8::HashMap"};
+};
+
+
+template <typename K, typename V>
 struct EmiLib2MapInfo
 {
     using Container = emilib2::HashMap<K, V, typename qc::hash::RawMap<K, V>::hasher>;
@@ -1075,10 +1085,10 @@ struct FphDyamicMapInfo
     static inline const std::string name{"fph::DynamicFph "};
 };
 
-int main()
+int main(int argc, const char* argv[])
 {
     // 1v1
-    if constexpr (true) {
+    if (argc == 2) {
         using K = size_t;
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, AbslSetInfo<K>>();
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
@@ -1105,7 +1115,7 @@ int main()
         using K = size_t;
         using V = size_t;// std::string;
         compare<CompareMode::typical, K,
-            StdMapInfo<K, V>,
+//            StdMapInfo<K, V>,
             //AbslMapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
             QcHashMapInfo<K, V>,
@@ -1115,6 +1125,7 @@ int main()
             //TslSparseMapInfo<K, V>,
             EmHash5MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
+            EmHash8MapInfo<K, V>,
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
             EmiLib2MapInfo<K, V>

@@ -293,7 +293,7 @@ public:
 
     ~HashSet()
     {
-        if (!is_triviall_destructable())
+        if (is_triviall_destructable())
             clear();
 
         _num_filled = 0;
@@ -599,16 +599,16 @@ public:
     static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
-        return (std::is_trivially_destructible<KeyT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value);
 #else
-        return (std::is_pod<KeyT>::value);
+        return !(std::is_pod<KeyT>::value);
 #endif
     }
 
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (!is_triviall_destructable()) {
+        if (is_triviall_destructable()) {
             for (size_t bucket=0; _num_filled; ++bucket) {
                 if (_states[bucket] % 2 == State::EFILLED) {
                     _keys[bucket].~KeyT();

@@ -157,9 +157,9 @@ public:
 
         iterator operator++(int)
         {
-            auto old_index = _slot;
+            auto old_slot = _slot;
             goto_next_element();
-            return {_map, old_index};
+            return {_map, old_slot};
         }
 
         iterator& operator--()
@@ -230,9 +230,9 @@ public:
 
         const_iterator operator++(int)
         {
-            auto old_index = _slot;
+            auto old_slot = _slot;
             goto_next_element();
-            return {_map, old_index};
+            return {_map, old_slot};
         }
 
         const_iterator& operator--()
@@ -1191,7 +1191,7 @@ public:
         _index       = new_index;
         for (size_type slot = 0; slot < _num_filled; slot++) {
             const auto& key = EMH_KEY(old_pairs, slot);
-            const auto key_hash = (size_type)hash_key(key);
+            const auto key_hash = (size_type)hash_key(key); //? old_index[slot].slot
             const auto bucket = find_unique_bucket(key, key_hash);
             EMH_INDEX(_index, bucket) = {bucket, slot | (key_hash & ~_mask)};
 
@@ -1299,14 +1299,14 @@ private:
             return END;
 
         auto slot = EMH_SLOT(_index, bucket);
-        if (EMH_EQHASH(bucket, key_hash) && _eq(key, EMH_KEY(_pairs, slot)))
+        if (EMH_EQHASH(bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
             return bucket;
         else if (next_bucket == bucket)
             return END;
 
         while (true) {
             slot = EMH_SLOT(_index, next_bucket);
-            if (EMH_EQHASH(next_bucket, key_hash) && _eq(key, EMH_KEY(_pairs, slot)))
+            if (EMH_EQHASH(next_bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
                 return next_bucket;
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
@@ -1327,14 +1327,14 @@ private:
             return END;
 
         auto slot = EMH_SLOT(_index, bucket);
-        if (EMH_EQHASH(bucket, key_hash) && _eq(key, EMH_KEY(_pairs, slot)))
+        if (EMH_EQHASH(bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
             return slot;
         else if (next_bucket == bucket)
             return END;
 
         while (true) {
             slot = EMH_SLOT(_index, next_bucket);
-            if (EMH_EQHASH(next_bucket, key_hash) && _eq(key, EMH_KEY(_pairs, slot)))
+            if (EMH_EQHASH(next_bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
                 return slot;
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
@@ -1451,7 +1451,7 @@ private:
 
         const auto slot = EMH_SLOT(_index, bucket);
         const auto& bucket_key = EMH_KEY(_pairs, slot);
-        if (EMH_EQHASH(bucket, key_hash) && _eq(key, bucket_key))
+        if (EMH_EQHASH(bucket, key_hash) && EMH_LIKELY(_eq(key, bucket_key)))
             return bucket;
 
         //check current bucket_key is in main bucket or not
@@ -1464,7 +1464,7 @@ private:
         //find next linked bucket and check key
         while (true) {
             const auto slot = EMH_SLOT(_index, next_bucket);
-            if (EMH_EQHASH(next_bucket, key_hash) && _eq(key, EMH_KEY(_pairs, slot))) {
+            if (EMH_EQHASH(next_bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot)))) {
                 return next_bucket;
             }
 
@@ -1493,9 +1493,9 @@ private:
 
         //check current bucket_key is in main bucket or not
         const auto obmain = hash_main(bucket);
-        if (obmain != bucket)
+        if (EMH_UNLIKELY(obmain != bucket))
             return kickout_bucket(obmain, bucket);
-        else if (next_bucket != bucket)
+        else if (EMH_UNLIKELY(next_bucket != bucket))
             next_bucket = find_last_bucket(next_bucket);
 
         //find a new empty and link it to tail
