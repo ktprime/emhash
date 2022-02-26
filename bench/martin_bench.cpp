@@ -65,7 +65,7 @@ static std::map<std::string, std::string> show_name =
     {"emhash4", "emhash4"},
 #endif
     {"emhash7", "emhash7"},
-	{"emhash8", "emhash8"},
+    {"emhash8", "emhash8"},
 
     //{"emhash5", "emhash5"},
 #if X86
@@ -223,9 +223,9 @@ template<class MAP> void bench_insert(MAP& map)
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
 #if X86_64
-    size_t maxn = 10000000;
+    size_t maxn = 1000000;
 #else
-    size_t maxn = 10000000 / 5;
+    size_t maxn = 1000000 / 5;
 #endif
 
     for (int  i = 0; i < 2; i++) {
@@ -237,21 +237,21 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map[static_cast<int>(rng())];
                 }
-                printf("    insert %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+                printf("insert %.4f", now2sec() - ts);
             }
 
             {
                 auto ts = now2sec();
                 map.clear();
-                printf("    clear %.4f\n", now2sec() - ts );
+                printf(", clear %.4f", now2sec() - ts);
             }
 
             {
                 auto ts = now2sec();
                 for (size_t n = 0; n < maxn; ++n) {
-                    map[static_cast<int>(rng())];
+                    map.emplace(static_cast<int>(rng()), 0);
                 }
-                printf("    reinsert %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+                printf(", reinsert %.4f", now2sec() - ts);
             }
 
             {
@@ -259,12 +259,14 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map.erase(static_cast<int>(rng()));
                 }
-                printf("    remove %.4f s, size = %d\n", now2sec() - ts , (int)map.size());
+                printf(", remove %.4f", now2sec() - ts);
             }
         }
-        printf("total %dM int time = %.2f s\n\n", int(maxn / 1000000), now2sec() - nows);
-        maxn *= 10;
+        printf(", loadf = %.2f size = %d, total %dM int time = %.2f s\n",
+                map.load_factor(), (int)map.size(), int(maxn / 1000000), now2sec() - nows);
+        maxn *= 100;
     }
+    printf("\n");
 }
 
 template <typename T>

@@ -170,7 +170,7 @@ public:
 
         iterator operator--(int)
         {
-            return {_map, _slot++};
+            return {_map, ++_slot};
         }
 
         reference operator*() const
@@ -199,7 +199,7 @@ public:
         }
 
     private:
-        void goto_next_element()
+        inline void goto_next_element()
         {
             _slot --;
         }
@@ -243,7 +243,7 @@ public:
 
         const_iterator operator--(int)
         {
-            return {_map, _slot++};
+            return {_map, ++_slot};
         }
 
         reference operator*() const
@@ -272,7 +272,7 @@ public:
         }
 
     private:
-        void goto_next_element()
+        inline void goto_next_element()
         {
             _slot --;
         }
@@ -315,8 +315,8 @@ public:
     HashMap(std::initializer_list<value_type> ilist)
     {
         init((uint32_t)ilist.size());
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
-            do_insert(begin->first, begin->second);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(it->first, it->second);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -391,7 +391,7 @@ public:
     }
 
     // -------------------------------------------------------------
-    inline iterator last()
+    inline iterator first() const
     {
         if (_num_filled == 0)
             return end();
@@ -399,19 +399,19 @@ public:
         return {this, 0};
     }
 
-    inline iterator first()
+    inline iterator last() const
     {
         return {this, _num_filled - 1};
     }
 
     iterator begin()
     {
-        return first();
+        return last();
     }
 
     const_iterator cbegin() const
     {
-        return {this, _num_filled - 1};
+        return last();
     }
 
     const_iterator begin() const
@@ -947,25 +947,31 @@ public:
     /// return 0 if element was not found
     size_type erase(const KeyT& key)
     {
-        auto slot = find_filled_slot(key);
-        if (slot == END)
+        const auto key_hash = hash_key(key);
+        const auto sbucket = find_filled_bucket(key, key_hash);
+        if (sbucket == END)
             return 0;
 
-        erase_slot(slot);
+        const auto main_bucket = key_hash & _mask;
+        erase_slot(sbucket, main_bucket);
         return 1;
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
     iterator erase(const const_iterator& cit)
     {
-        const auto slot = erase_slot(cit._slot);
-        iterator it(this, cit._slot);
-        return ++it;
+        const auto& key = EMH_KEY(_pairs, cit._slot);
+        const auto key_hash = hash_key(key);
+        const auto sbucket = find_filled_bucket(key, key_hash); //TODO
+        const auto main_bucket = key_hash & _mask;
+
+        erase_slot(sbucket, main_bucket);
+        return {this, cit._slot - 1};
     }
 
-    void _erase(const const_iterator& it)
+    void _erase(const const_iterator& cit)
     {
-        erase_slot(it._slot);
+        return erase(cit);
     }
 
     static constexpr bool is_triviall_destructable()
@@ -1124,14 +1130,14 @@ public:
         _ehead = _last = 0;
 
         std::sort(_pairs, _pairs + _num_filled, [this](const PairT & l, const PairT & r) {
-           const auto hashl = hash_key(l.first), hashr = hash_key(r.first);
-           auto diff = int64_t((hashl & _mask) - (hashr & _mask));
-           if (diff != 0)
-              return diff < 0;
+            const auto hashl = hash_key(l.first), hashr = hash_key(r.first);
+            auto diff = int64_t((hashl & _mask) - (hashr & _mask));
+            if (diff != 0)
+                return diff < 0;
 #if 0
-           return hashl < hashr;
+            return hashl < hashr;
 #else
-           return l.first < r.first;
+            return l.first < r.first;
 #endif
         });
 
@@ -1144,7 +1150,7 @@ public:
             if ((int)next_bucket < 0)
                 EMH_INDEX(_index, bucket) = {1, slot | (key_hash & ~_mask)};
             else
-               next_bucket ++;
+                next_bucket ++;
         }
         return true;
     }
@@ -1181,7 +1187,7 @@ public:
             const auto hashl = hash_key(l.first), hashr = hash_key(r.first);
             auto diff = int64_t((hashl & _mask) - (hashr & _mask));
             if (diff != 0)
-               return diff < 0;
+                return diff < 0;
             return hashl < hashr;
 //          return l.first < r.first;
         });
@@ -1201,7 +1207,6 @@ public:
             if (bucket != hash_main(bucket))
                 collision ++;
 #endif
-
             if (is_triviall_destructable())
                 old_pairs[slot].~PairT();
         }
@@ -1233,20 +1238,22 @@ private:
     size_type slot_to_bucket(const size_type slot) const
     {
         const auto& key = EMH_KEY(_pairs, slot);
-        return find_filled_bucket(key); //TODO
+        const auto key_hash = hash_key(key);
+        return find_filled_bucket(key, key_hash); //TODO
     }
 
-    size_type erase_slot(const size_type slot)
+    //very slow
+    size_type erase_slot(const size_type sbucket, const size_type main_bucket)
     {
-        const auto sbucket = slot_to_bucket(slot);
-        const auto ebucket = erase_bucket(sbucket);
+        const auto slot = EMH_SLOT(_index, sbucket);
+        const auto ebucket = erase_bucket(sbucket, main_bucket);
         const auto last_slot = --_num_filled;
         if (slot != last_slot) {
             const auto last_bucket = slot_to_bucket(last_slot);
-            if (is_triviall_destructable())
-                 std::swap(EMH_KV(_pairs, slot), EMH_KV(_pairs, last_slot));
-            else
+            if (is_copy_trivially())
                 EMH_KV(_pairs, slot) = EMH_KV(_pairs, last_slot);
+            else
+                std::swap(EMH_KV(_pairs, slot), EMH_KV(_pairs, last_slot));
             //EMH_SLOT(_index, last_bucket) = slot;
             EMH_HSLOT(_index, last_bucket) = slot | (EMH_HSLOT(_index, last_bucket) & ~_mask);
         }
@@ -1268,15 +1275,13 @@ private:
         return last_slot;
     }
 
-    size_type erase_bucket(const size_type bucket)
+    size_type erase_bucket(const size_type bucket, const size_type main_bucket)
     {
         const auto next_bucket = EMH_BUCKET(_index, bucket);
-        const auto main_bucket = hash_main(bucket);
         if (bucket == main_bucket) {
             if (main_bucket != next_bucket) {
                 const auto nbucket = EMH_BUCKET(_index, next_bucket);
-                EMH_INDEX(_index, main_bucket) =
-                {
+                EMH_INDEX(_index, main_bucket) = {
                     (nbucket == next_bucket) ? main_bucket : nbucket,
                     EMH_HSLOT(_index, next_bucket)
                 };
@@ -1290,24 +1295,27 @@ private:
     }
 
     // Find the slot with this key, or return bucket size
-    size_type find_filled_bucket(const KeyT& key) const
+    size_type find_filled_bucket(const KeyT& key, size_type key_hash) const
     {
-        const auto key_hash = hash_key(key);
         const auto bucket = key_hash & _mask;
         auto next_bucket  = EMH_BUCKET(_index, bucket);
         if ((int)next_bucket < 0)
             return END;
 
-        auto slot = EMH_SLOT(_index, bucket);
-        if (EMH_EQHASH(bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
+        if (EMH_EQHASH(bucket, key_hash)) {
+            const auto slot = EMH_SLOT(_index, bucket);
+            if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
             return bucket;
+        }
         else if (next_bucket == bucket)
             return END;
 
         while (true) {
-            slot = EMH_SLOT(_index, next_bucket);
-            if (EMH_EQHASH(next_bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
+            if (EMH_EQHASH(next_bucket, key_hash)) {
+                const auto slot = EMH_SLOT(_index, next_bucket);
+                if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
                 return next_bucket;
+            }
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
             if (nbucket == next_bucket)
@@ -1326,16 +1334,19 @@ private:
         if ((int)next_bucket < 0)
             return END;
 
-        auto slot = EMH_SLOT(_index, bucket);
-        if (EMH_EQHASH(bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
+        if (EMH_EQHASH(bucket, key_hash)) {
+            const auto slot = EMH_SLOT(_index, bucket);
+            if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
             return slot;
-        else if (next_bucket == bucket)
+        } else if (next_bucket == bucket)
             return END;
 
         while (true) {
-            slot = EMH_SLOT(_index, next_bucket);
-            if (EMH_EQHASH(next_bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
+            if (EMH_EQHASH(next_bucket, key_hash)) {
+                const auto slot = EMH_SLOT(_index, next_bucket);
+                if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
                 return slot;
+            }
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
             if (nbucket == next_bucket)
@@ -1366,11 +1377,11 @@ private:
 
             const auto hasho = hash_key(okey);
             if (hasho > hashk)
-               break;
+                break;
             else if ((hasho & _mask) != bucket)
-               break;
+                break;
             else if (slot >= _num_filled)
-               break;
+                break;
         }
 
         return END;
@@ -1451,7 +1462,8 @@ private:
 
         const auto slot = EMH_SLOT(_index, bucket);
         const auto& bucket_key = EMH_KEY(_pairs, slot);
-        if (EMH_EQHASH(bucket, key_hash) && EMH_LIKELY(_eq(key, bucket_key)))
+        if (EMH_EQHASH(bucket, key_hash))
+            if (EMH_LIKELY(_eq(key, bucket_key)))
             return bucket;
 
         //check current bucket_key is in main bucket or not
@@ -1464,7 +1476,8 @@ private:
         //find next linked bucket and check key
         while (true) {
             const auto slot = EMH_SLOT(_index, next_bucket);
-            if (EMH_EQHASH(next_bucket, key_hash) && EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot)))) {
+            if (EMH_UNLIKELY(EMH_EQHASH(next_bucket, key_hash))) {
+                if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
                 return next_bucket;
             }
 
