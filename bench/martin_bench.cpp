@@ -244,6 +244,7 @@ template<class MAP> void bench_insert(MAP& map)
                 auto ts = now2sec();
                 map.clear();
                 printf(", clear %.4f", now2sec() - ts);
+                fflush(stdout);
             }
 
             {
@@ -252,6 +253,7 @@ template<class MAP> void bench_insert(MAP& map)
                     map.emplace(static_cast<int>(rng()), 0);
                 }
                 printf(", reinsert %.4f", now2sec() - ts);
+                fflush(stdout);
             }
 
             {
@@ -260,6 +262,7 @@ template<class MAP> void bench_insert(MAP& map)
                     map.erase(static_cast<int>(rng()));
                 }
                 printf(", remove %.4f", now2sec() - ts);
+                fflush(stdout);
             }
         }
         printf(", loadf = %.2f size = %d, total %dM int time = %.2f s\n",
@@ -783,40 +786,40 @@ void runTest(int sflags, int eflags)
         typedef std::hash<std::string> hash_func;
 #endif
 
-        {emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if EM3
-        {emhash2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        {emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        {emhash4::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emhash2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emhash4::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
-//        {emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        {emhash5::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+//        { emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emhash5::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if QC_HASH
-        {fph::DynamicFphMap<std::string, size_t, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
+        { fph::DynamicFphMap<std::string, size_t, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
 #endif
-        {emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if X86
-        {emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomFindString(bench); }
+        { emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emilib::HashMap<std::string,  int, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if ET
-        //        {hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
-        {tsl::robin_map  <std::string, size_t, hash_func> bench;     bench_randomFindString(bench); }
-        {robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        //        { hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
+        { tsl::robin_map  <std::string, size_t, hash_func> bench;     bench_randomFindString(bench); }
+        { robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if X86_64
-        {ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench); }
+        { ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench); }
 #endif
-        {phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if CXX20
-        {jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
-        {rigtorp::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
+        { rigtorp::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if FOLLY
-        {folly::F14VectorMap<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
+        { folly::F14VectorMap<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
 #endif
 #if ABSL
-        {absl::flat_hash_map<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
+        { absl::flat_hash_map<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
 #endif
         putchar('\n');
     }
@@ -836,42 +839,42 @@ void runTest(int sflags, int eflags)
 #endif
 
 #if EM3
-        {emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
 #if X86
-        {emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {emilib::HashMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
+        { emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emilib::HashMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
-        {emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emhash6::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 
 #if CXX20
-        {rigtorp::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { rigtorp::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
 
 #if QC_HASH
-        {fph::DynamicFphMap<std::string, int, fph::MixSeedHash<std::string>> bench; bench_randomEraseString(bench); }
+        { fph::DynamicFphMap<std::string, int, fph::MixSeedHash<std::string>> bench; bench_randomEraseString(bench); }
 #endif
 
 #if ET
-        //        {hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
-        {tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        {robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        //        { hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
+        { tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #if X86_64
-        {ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
-        {phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
 #if FOLLY
-        {folly::F14VectorMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { folly::F14VectorMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
 #if ABSL
-        {absl::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { absl::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
     }
 

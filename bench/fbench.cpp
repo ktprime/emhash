@@ -26,7 +26,7 @@
 
 #include "hash_table7.hpp"
 #include "hash_table5.hpp"
-#include "hash_table6.hpp"
+#include "hash_table8.hpp"
 
 static std::random_device rd;
 static std::mt19937_64 rnd(rd());
@@ -416,6 +416,7 @@ static uint32_t test_int(const uint32_t n, const uint32_t x0)
 {
     uint32_t i, x, z = 0;
     ht h;
+    h.max_load_factor(0.90);
     for (i = 0, x = x0; i < n; ++i) {
         x = hash32(x);
 #ifndef UDB2_TEST_DEL
@@ -429,11 +430,12 @@ static uint32_t test_int(const uint32_t n, const uint32_t x0)
     return h.load_factor() * 100;
 }
 
+auto static rda = now2ns() % 4096;
 //https://github.com/attractivechaos/udb2
 template<typename ht>
 int run_udb2(const char* str)
 {
-    uint32_t m = 5, max = 50000000, n = 10000000 + rand() % 1001;
+    uint32_t m = 5, max = 50000000, n = 10000000 + rda;
     const auto step = (max - n) / m;
 
     auto now = now2ns();
@@ -442,7 +444,7 @@ int run_udb2(const char* str)
         auto t = now2ns();
         auto lf = test_int<ht>(n, x0);
         t = now2ns() - t;
-        printf("    %d\t%.3f\t\t%.2f\t  %2d\n", n, t / 1000000000.0, (double)t / n, lf);
+        printf("    %d\t%.3f\t\t%.2f\t  0.%2d\n", n, t / 1000000000.0, (double)t / n, lf);
     }
 
     printf("%s : %.2lf sec\n\n", str, (now2ns() - now) / 1000000000.0);
@@ -456,7 +458,7 @@ int main(int argc, char* argv[])
     //test_delay();
     if (argc == 1)
     {
-        run_udb2<emhash6::HashMap<uint32_t, uint32_t, Hash32>>("emhash6");
+        run_udb2<emhash8::HashMap<uint32_t, uint32_t, Hash32>>("emhash8");
 //        run_udb2<whash::patchmap<uint32_t, uint32_t, Hash32>>("patchmap");
         run_udb2<ska::flat_hash_map<uint32_t, uint32_t, Hash32>>("ska_flat");
         run_udb2<ska::bytell_hash_map<uint32_t, uint32_t, Hash32>>("ska_byte");
@@ -473,7 +475,7 @@ int main(int argc, char* argv[])
 #endif
 #if QC_HASH
         run_udb2<qc::hash::RawMap<uint32_t, uint32_t, Hash32>>("qchash");
-		run_udb2<fph::DynamicFphMap<uint32_t, uint32_t, fph::MixSeedHash<uint32_t>>>("fph");
+        run_udb2<fph::DynamicFphMap<uint32_t, uint32_t, fph::MixSeedHash<uint32_t>>>("fph");
 #endif
 
 #if __linux__ && AVX2
@@ -527,7 +529,7 @@ int main(int argc, char* argv[])
     init_query_keys(insert_keys, query_keys);
     init_remove_keys(insert_keys, remove_keys);
 
-    run_table<emhash6::HashMap<test_key_t, test_val_t, hash_t>>  (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table<emhash8::HashMap<test_key_t, test_val_t, hash_t>>  (insert_keys, insert_vals, query_keys, remove_keys);
 #if __linux__ && AVX2
     run_table<fht_table<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
 #endif

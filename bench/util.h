@@ -19,7 +19,7 @@
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
-//#define NDEBUG                1
+#define NDEBUG                1
 #ifdef _WIN32
     # define _CRT_SECURE_NO_WARNINGS
     #pragma warnning(disable:4996)
