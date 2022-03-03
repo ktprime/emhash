@@ -67,7 +67,7 @@ static std::map<std::string, std::string> show_name =
     {"emhash7", "emhash7"},
     {"emhash8", "emhash8"},
 
-    //{"emhash5", "emhash5"},
+    {"emhash5", "emhash5"},
 #if X86
 //    {"emilib", "emilib"},
     {"emilib2", "emilib2"},
@@ -237,13 +237,13 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map[static_cast<int>(rng())];
                 }
-                printf("insert %.4f", now2sec() - ts);
+                printf("insert %.2f", now2sec() - ts);
             }
 
             {
                 auto ts = now2sec();
                 map.clear();
-                printf(", clear %.4f", now2sec() - ts);
+                printf(", clear %.3f", now2sec() - ts);
                 fflush(stdout);
             }
 
@@ -252,7 +252,7 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map.emplace(static_cast<int>(rng()), 0);
                 }
-                printf(", reinsert %.4f", now2sec() - ts);
+                printf(", reinsert %.2f", now2sec() - ts);
                 fflush(stdout);
             }
 
@@ -261,7 +261,7 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map.erase(static_cast<int>(rng()));
                 }
-                printf(", remove %.4f", now2sec() - ts);
+                printf(", remove %.2f", now2sec() - ts);
                 fflush(stdout);
             }
         }
@@ -353,7 +353,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
             map.erase(rng() & bitMask);
         }
 
-        printf("    %02d bits %2d M cycles time %.4f s map size %d loadf = %.2f\n",
+        printf("    %02d bits %2d M cycles time %.3f s map size %d loadf = %.2f\n",
                 int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts , (int)map.size(), map.load_factor());
 
 #ifndef _MSC_VER
@@ -387,7 +387,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     05%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     05%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 549985352 == checksum);
     }
 
@@ -399,7 +399,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     25%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     25%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 149979034 == checksum);
     }
 
@@ -410,7 +410,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     50%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     50%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 249981806 == checksum);
     }
 
@@ -421,7 +421,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng())];
         }
-        printf("    100%% distinct %.4f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("    100%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
         assert(RND != 123 || 50291811 == checksum);
     }
     //#endif

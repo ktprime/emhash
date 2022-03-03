@@ -260,7 +260,7 @@ struct entry {
         bucket = pairt.bucket;
     }
 
-    entry(entry&& pairt)
+    entry(entry&& pairt) noexcept
         :second(std::move(pairt.second)),first(std::move(pairt.first))
     {
         bucket = pairt.bucket;

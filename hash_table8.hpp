@@ -1299,15 +1299,15 @@ private:
     {
         const auto bucket = key_hash & _mask;
         auto next_bucket  = EMH_BUCKET(_index, bucket);
-        if ((int)next_bucket < 0)
+        if (EMH_UNLIKELY((int)next_bucket < 0))
             return END;
 
         if (EMH_EQHASH(bucket, key_hash)) {
             const auto slot = EMH_SLOT(_index, bucket);
             if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
-            return bucket;
+                return bucket;
         }
-        else if (next_bucket == bucket)
+        if (next_bucket == bucket)
             return END;
 
         while (true) {
@@ -1318,7 +1318,7 @@ private:
             }
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
-            if (nbucket == next_bucket)
+            if (EMH_UNLIKELY(nbucket == next_bucket))
                 return END;
             next_bucket = nbucket;
         }
@@ -1337,8 +1337,9 @@ private:
         if (EMH_EQHASH(bucket, key_hash)) {
             const auto slot = EMH_SLOT(_index, bucket);
             if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
-            return slot;
-        } else if (next_bucket == bucket)
+                return slot;
+        }
+        if (next_bucket == bucket)
             return END;
 
         while (true) {
@@ -1349,7 +1350,7 @@ private:
             }
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
-            if (nbucket == next_bucket)
+            if (EMH_UNLIKELY(nbucket == next_bucket))
                 return END;
             next_bucket = nbucket;
         }
@@ -1540,7 +1541,7 @@ one-way seach strategy.
             return bucket;
 
 #if 0
-        constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
+        constexpr auto linear_probe_length = 4;
         auto offset = 2u;
 
 #ifdef EMH_QUADRATIC
@@ -1562,35 +1563,40 @@ one-way seach strategy.
             if (EMH_EMPTY(_index, _last++) || EMH_EMPTY(_index, _last++))
                 return _last++ - 1;
 
-#if EMH_LINEAR3 || 1
+#if 1
             auto tail = _mask - (_last & _mask);
             if (EMH_EMPTY(_index, tail) || EMH_EMPTY(_index, ++tail))
                 return tail;
 #endif
+#if 0
             auto medium = (_num_filled + _last) & _mask;
             if (EMH_EMPTY(_index, medium) || EMH_EMPTY(_index, ++medium))
                 return medium;
+#endif
         }
 #else
-        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 4;
-        for (size_type step = 2, slot = bucket + 1; ;slot += ++step) {
+        constexpr auto linear_probe_length = 2 + 2;
+        //for (size_type step = 2, slot = bucket + 1; ;slot += ++step) {
+        for (size_type step = 2, slot = bucket + 1; ; slot += 2, step ++) {
             auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_index, bucket1) || EMH_EMPTY(_index, ++bucket1))
                 return bucket1;
 
             if (step > linear_probe_length) {
                 _last &= _mask;
-                if (EMH_EMPTY(_index, ++_last) || EMH_EMPTY(_index, ++_last))
+                if (EMH_EMPTY(_index, ++_last) /*|| EMH_EMPTY(_index, ++_last)*/)
                     return _last ++;
 
-#if 1
                 auto tail = (_mask / 2 + _last) & _mask;
-                if (EMH_EMPTY(_index, tail) || EMH_EMPTY(_index, ++tail))
+                //auto tail = _mask - (_last & _mask);
+                if (EMH_EMPTY(_index, tail) /*|| EMH_EMPTY(_index, ++tail) **/)
                     return tail;
-#endif
+#if 0
                 auto medium = (_num_filled + _last) & _mask;
+                //auto medium = (_mask / 2 + _last) & _mask;
                 if (EMH_EMPTY(_index, medium) || EMH_EMPTY(_index, ++medium))
                     return medium;
+#endif
             }
         }
 #endif

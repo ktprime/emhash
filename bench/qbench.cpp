@@ -1,5 +1,5 @@
 #include <filesystem>
-//#include <format>
+#include <fstream>
 #include <iomanip>
 #include <span>
 
@@ -17,26 +17,20 @@
 #include "emilib/emilib2.hpp"
 //#include "emilib/emiset2.hpp"
 
-//#pragma warning(push)
-//#pragma warning(disable: 4127 4458 4324 4293 4309 4305 4244)
-
-//#include "absl/container/flat_hash_set.h"
-//#include "absl/hash/internal/low_level_hash.cc"
-//#include "absl/hash/internal/hash.cc"
-//#include "absl/hash/internal/city.cc"
 #include "absl/container/flat_hash_map.h"
-
 #include "martin/robin_hood.h"
 #include "ska/flat_hash_map.hpp"
 #include "tsl/robin_map.h"
 #include "tsl/robin_set.h"
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
-//#pragma warning(pop)
 
+#if FIB_HASH || ABSL
 #include "util.h"
-//#define qc_hasher typename qc::hash::RawMap<K, V>::hasher
-#define qc_hasher Int64Hasher<K>
+#define QintHasher Int64Hasher<K>
+#else
+#define QintHasher typename qc::hash::RawMap<K, V>::hasher
+#endif
 
 using namespace qc::types;
 
@@ -80,13 +74,16 @@ static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease
 
 static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {         10u, 1'000'000u},
-    {        100u,   1000'000u},
+#if 1
+    {        100u,  1'00'000u},
     {      1'000u,    10'000u},
     {     10'000u,     1'000u},
     {    100'000u,       100u},
     {  1'000'000u,        10u},
-    { 10'000'000u,         4u},
+    { 10'000'000u,         3u},
     { 50'000'000u,         2u},
+//    { 100'000'000u,        1u},
+#endif
 };
 
 enum class Stat : size_t
@@ -245,7 +242,7 @@ class Stats
         return _containerNames.at(containerI);
     }
 
-    private:
+//    private:
 
     std::map<size_t, std::map<size_t, std::map<Stat, double>>> _table{};
     std::set<size_t> _presentContainerIndices{};
@@ -357,12 +354,13 @@ static void printOpsChartable(const Stats & results, std::ostream & ofs)
 static void printTypicalChartable(const Stats & results, std::ostream & ofs)
 {
     for (const size_t elementCount : results.presentElementCounts()) {
-        ofs << elementCount << ",Insert,Access,Erase,Iterate" << std::endl;
-
+        ofs << elementCount << ",          Insert,Find_Hit,Find_Mis,Erase,Iterator" << std::endl << std::setprecision(4);
+        //ofs.fill('0');
         for (const size_t containerI : results.presentContainerIndices()) {
             ofs << results.containerName(containerI);
             ofs << ", " << results.at(containerI, elementCount, Stat::insertReserved);
             ofs << ", " << results.at(containerI, elementCount, Stat::accessPresent);
+            ofs << ", " << results.at(containerI, elementCount, Stat::accessEmpty);
             ofs << ", " << results.at(containerI, elementCount, Stat::erase);
             ofs << ", " << results.at(containerI, elementCount, Stat::iterateFull);
             ofs << std::endl;
@@ -647,7 +645,8 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     static volatile size_t v{};
 
     Container container{};
-    container.reserve(keys.size());
+    container.max_load_factor(0.9);
+    container.reserve(keys.size() / 2);
 
     const s64 t0{now()};
 
@@ -662,14 +661,21 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     }
 
     const s64 t1{now()};
-
     // Access
     for (const K & key : keys) {
         v = v + container.count(key);
     }
 
-    const s64 t2{now()};
+//    if (keys.size() > 5234567)
+//        printf("size = %d, lf = %.2f\n", (int)container.size(), (float)container.load_factor());
 
+    const s64 t2{now()};
+    // AccessEmpty
+    for (const K & key : keys) {
+        v = v + container.count(key + t2);
+    }
+
+    const s64 t3{now()};
     // Iterate
     for (const auto & element : container) {
         // Important to actually use the value as to load the memory
@@ -681,21 +687,19 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
         }
     }
 
-    const s64 t3{now()};
-
+    const s64 t4{now()};
     // Erase
     for (const K & key : keys) {
         container.erase(key);
     }
 
-    const s64 t4{now()};
-
+    const s64 t5{now()};
     const double invElementCount{1.0 / double(keys.size())};
-
-    results.get(containerI, keys.size(), Stat::insertReserved) += double(t1 - t0) * invElementCount;
+    results.get(containerI, keys.size(), Stat::insertReserved)+= double(t1 - t0) * invElementCount;
     results.get(containerI, keys.size(), Stat::accessPresent) += double(t2 - t1) * invElementCount;
-    results.get(containerI, keys.size(), Stat::iterateFull) += double(t3 - t2) * invElementCount;
-    results.get(containerI, keys.size(), Stat::erase) += double(t4 - t3) * invElementCount;
+    results.get(containerI, keys.size(), Stat::accessEmpty)   += double(t3 - t2) * invElementCount;
+    results.get(containerI, keys.size(), Stat::iterateFull)   += double(t4 - t3) * invElementCount;
+    results.get(containerI, keys.size(), Stat::erase)         += double(t5 - t4) * invElementCount;
 }
 
 template <typename CommonKey, typename ContainerInfo, typename... ContainerInfos>
@@ -904,7 +908,7 @@ template <typename K, typename V, bool sizeMode = false, bool doTrivialComplex =
 struct QcHashMapInfo
 {
     using Container = qc::hash::RawMap<K, V>;
-    using AllocatorContainer = qc::hash::RawMap<K, V, qc_hasher, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    using AllocatorContainer = qc::hash::RawMap<K, V, QintHasher, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
     static constexpr bool isKeyTrivial{std::is_same_v<K, Trivial<sizeof(K)>>};
     static constexpr bool isValTrivial{std::is_same_v<V, Trivial<sizeof(V)>>};
@@ -924,7 +928,7 @@ struct StdSetInfo
 template <typename K, typename V>
 struct StdMapInfo
 {
-    using Container = std::unordered_map<K, V, qc_hasher>;
+    using Container = std::unordered_map<K, V, QintHasher>;
     using AllocatorContainer = std::unordered_map<K, V, typename std::unordered_map<K, V>::hasher, typename std::unordered_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
     static inline const std::string name{"std::unordered_map"};
@@ -943,11 +947,11 @@ struct AbslSetInfo
 template <typename K, typename V>
 struct AbslMapInfo
 {
-    using Container = absl::flat_hash_map<K, V, qc_hasher>;
+    using Container = absl::flat_hash_map<K, V, QintHasher>;
     //using AllocatorContainer = std::conditional_t<sizeof(size_t) == 8, std::unordered_map<K, V, typename absl::flat_hash_map<K, V>::hasher, typename absl::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>, void>;
     using AllocatorContainer = void;
 
-    static inline const std::string name{"absl::flat_hash_map"};
+    static inline const std::string name{"absl::f_hash_map"};
 };
 
 template <typename K>
@@ -962,7 +966,7 @@ struct RobinHoodSetInfo
 template <typename K, typename V>
 struct RobinHoodMapInfo
 {
-    using Container = robin_hood::unordered_flat_map<K, V, qc_hasher>;
+    using Container = robin_hood::unordered_flat_map<K, V, QintHasher>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"martin::flat_map"};
@@ -980,9 +984,9 @@ struct SkaSetInfo
 template <typename K, typename V>
 struct SkaMapInfo
 {
-    using Container = ska::flat_hash_map<K, V, qc_hasher>;
+    using Container = ska::flat_hash_map<K, V, QintHasher>;
     using AllocatorContainer = void;
-    //using AllocatorContainer = ska::flat_hash_map<K, V, qc_hasher, typename ska::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    //using AllocatorContainer = ska::flat_hash_map<K, V, QintHasher, typename ska::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
     static inline const std::string name{"ska:flat_hashmap"};
 };
@@ -1000,7 +1004,7 @@ struct TslRobinSetInfo
 template <typename K, typename V>
 struct TslRobinMapInfo
 {
-    using Container = tsl::robin_map<K, V, qc_hasher>;
+    using Container = tsl::robin_map<K, V, QintHasher>;
     //using AllocatorContainer = tsl::robin_map<K, V, typename tsl::robin_map<K, V>::hasher, typename tsl::robin_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
     using AllocatorContainer = void;
 
@@ -1020,7 +1024,7 @@ struct TslSparseSetInfo
 template <typename K, typename V>
 struct TslSparseMapInfo
 {
-    using Container = tsl::sparse_map<K, V, qc_hasher>;
+    using Container = tsl::sparse_map<K, V, QintHasher>;
     using AllocatorContainer = tsl::sparse_map<K, V, typename tsl::sparse_map<K, V>::hasher, typename tsl::sparse_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
     static inline const std::string name{"tsl::sparse_hash_map"};
@@ -1029,7 +1033,7 @@ struct TslSparseMapInfo
 template <typename K, typename V>
 struct EmHash5MapInfo
 {
-    using Container = emhash5::HashMap<K, V, qc_hasher>;
+    using Container = emhash5::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"emhash5::HashMap"};
@@ -1038,7 +1042,7 @@ struct EmHash5MapInfo
 template <typename K, typename V>
 struct EmHash7MapInfo
 {
-    using Container = emhash7::HashMap<K, V, qc_hasher>;
+    using Container = emhash7::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"emhash7::HashMap"};
 };
@@ -1046,7 +1050,7 @@ struct EmHash7MapInfo
 template <typename K, typename V>
 struct EmHash8MapInfo
 {
-    using Container = emhash8::HashMap<K, V, qc_hasher>;
+    using Container = emhash8::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"emhash8::HashMap"};
 };
@@ -1055,7 +1059,7 @@ struct EmHash8MapInfo
 template <typename K, typename V>
 struct EmiLib2MapInfo
 {
-    using Container = emilib2::HashMap<K, V, qc_hasher>;
+    using Container = emilib2::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"emilib2::HashMap"};
 };
@@ -1063,7 +1067,7 @@ struct EmiLib2MapInfo
 template <typename K, typename V>
 struct JgDenseMapInfo
 {
-    using Container = jg::dense_hash_map<K, V, qc_hasher>;
+    using Container = jg::dense_hash_map<K, V, QintHasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"jg::den_hash_map"};
 };
@@ -1071,7 +1075,7 @@ struct JgDenseMapInfo
 template <typename K, typename V>
 struct RigtorpMapInfo
 {
-    using Container = rigtorp::HashMap<K, V, qc_hasher>;
+    using Container = rigtorp::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"rigtorp::HashMap"};
 };
@@ -1126,10 +1130,10 @@ int main(int argc, const char* argv[])
         using V = size_t;// std::string;
         compare<CompareMode::typical, K,
 //            StdMapInfo<K, V>,
-#if ABSL
+#ifdef ABSL
             AbslMapInfo<K, V>,
 #endif
-//            QcHashMapInfo<K, V>,
+            EmiLib2MapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
 //            FphDyamicMapInfo<K,V>,
 //            SkaMapInfo<K, V>,
@@ -1139,7 +1143,7 @@ int main(int argc, const char* argv[])
             EmHash7MapInfo<K, V>,
             EmHash8MapInfo<K, V>,
             JgDenseMapInfo<K, V>,
-            EmiLib2MapInfo<K, V>,
+            QcHashMapInfo<K, V>,
             RigtorpMapInfo<K, V>
         >();
     }

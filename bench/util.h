@@ -125,13 +125,13 @@ static int64_t getus()
     getrusage(RUSAGE_SELF, &rup);
     long sec  = rup.ru_utime.tv_sec  + rup.ru_stime.tv_sec;
     long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
-    return sec * 1000000 + usec;
-#elif LINUX_TICK || __APPLE__
-    return clock();
+    return sec * 1000000ull + usec;
+//#elif LINUX_TICK || __APPLE__
+//    return clock();
 #elif __linux__
     struct timespec ts = {0};
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+    return ts.tv_sec * 1000000ull + ts.tv_nsec / 1000;
 #elif __unix__
     struct timeval start;
     gettimeofday(&start, NULL);
