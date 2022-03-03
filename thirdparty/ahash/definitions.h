@@ -232,7 +232,7 @@ static AHASH_FAST_PATH uint64_t folded_multiply(uint64_t s, uint64_t by)
   // this should pass for most 64 bit machines
   __int128 result = (__int128)(s) * (__int128)(by);
   return (uint64_t)(result & 0xffffffffffffffff) ^ (uint64_t)(result >> 64);
-#  elif defined(_MSC_VER) && !defined(_M_ARM) && !defined(_M_ARM64)
+#  elif defined(_MSC_VER) && _M_X64
   uint64_t high, low;
   low = _umul128(s, by, &high);
   return high ^ low;

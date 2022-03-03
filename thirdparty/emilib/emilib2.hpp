@@ -127,7 +127,7 @@ public:
     typedef ValueT val_type;
     typedef KeyT   key_type;
 
-#ifndef EMH_H2
+#ifdef EMH_H2
     #define hash_key2(key_hash, key) ((uint8_t)(key_hash >> 24)) << 1
     //#define hash_key2(key_hash, key) (((uint8_t)(key_hash >> 57)) << 1)
 #else
@@ -140,7 +140,7 @@ public:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
-        return (uint8_t)(((uint64_t)key) * 0xA24BAED4963EE407ull >> 32) << 1;
+        return (uint8_t)(((uint64_t)key + key_hash) * 0xA24BAED4963EE407ull >> 32) << 1;
     }
 #endif
 
@@ -862,50 +862,36 @@ private:
     {
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
-        if (0 && _max_probe_length < simd_gaps / 4) {
-            for (int offset = 0; offset <= _max_probe_length; ) {
-                if (_states[next_bucket] % 2 == State::EFILLED) {
-                    if (_eq(_pairs[next_bucket].first, key)) {
-                        return next_bucket;
-                    }
-                }
-                else if (_states[next_bucket] % 4 == State::EEMPTY) {
-                    return _num_buckets; // End of the chain!
-                }
-                next_bucket = (key_hash + ++offset) & _mask;
+        const auto filled = SET1_EPI8(hash_key2(key_hash, key));
+        int i = _max_probe_length;
+
+        for ( ; ; ) {
+            const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+
+            while (maskf != 0) {
+                const auto fbucket = next_bucket + CTZ(maskf);
+                if (EMH_UNLIKELY(fbucket >= _num_buckets))
+                    break; //overflow
+                else if (_eq(_pairs[fbucket].first, key))
+                    return fbucket;
+                maskf &= maskf - 1;
             }
-        } else {
-            const auto filled = SET1_EPI8(hash_key2(key_hash, key));
-            int i = _max_probe_length;
-
-            for ( ; ; ) {
-                const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
-                auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
-
-                while (maskf != 0) {
-                    const auto fbucket = next_bucket + CTZ(maskf);
-                    if (EMH_UNLIKELY(fbucket >= _num_buckets))
-                        break; //overflow
-                    else if (_eq(_pairs[fbucket].first, key))
-                        return fbucket;
-                    maskf &= maskf - 1;
-                }
 
 //                if (_max_probe_length >= simd_gaps) {
-                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-                if (maske != 0)
-                    break;
+            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            if (maske != 0)
+                break;
 //                }
 
-                next_bucket += simd_gaps;
-                if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
-                    i += next_bucket - _num_buckets;
-                    next_bucket = 0;
-                }
-
-                if (EMH_UNLIKELY((i -= simd_gaps) < 0))
-                    break;
+            next_bucket += simd_gaps;
+            if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
+                i += next_bucket - _num_buckets;
+                next_bucket = 0;
             }
+
+            if (EMH_UNLIKELY((i -= simd_gaps) < 0))
+                break;
         }
 
         return _num_buckets;
@@ -917,28 +903,6 @@ private:
     size_t find_or_allocate(const KeyLike& key, uint64_t key_hash)
     {
         size_t hole = (size_t)-1;
-        int offset = 0;
-        if (0) {
-            for (; offset <= _max_probe_length; ++offset) {
-                auto bucket = (key_hash + offset) & _mask;
-                if (_states[bucket] % 2 == State::EFILLED) {
-                    if (_eq(_pairs[bucket].first, key)) {
-                        return bucket;
-                    }
-                }
-                else if (_states[bucket] % 4 == State::EEMPTY) {
-                    return bucket;
-                }
-                else if (hole == (size_t)-1) {
-                    hole = bucket;
-                }
-            }
-
-            if (hole != (size_t)-1)
-                return hole;
-            return find_empty_slot((key_hash + offset) & _mask, offset);
-        }
-
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         const auto bucket = (size_t)(key_hash & _mask);
         const auto round  = bucket + _max_probe_length;

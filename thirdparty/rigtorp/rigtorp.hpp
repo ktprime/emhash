@@ -110,6 +110,7 @@ public:
       pow2 <<= 1;
     }
     buckets_.resize(pow2, std::make_pair(empty_key_, T()));
+    mask_ = buckets_.size() - 1;
   }
 
   HashMap(size_type bucket_count, key_type empty_key,
@@ -120,6 +121,7 @@ public:
       pow2 <<= 1;
     }
     buckets_.resize(pow2, std::make_pair(empty_key_, T()));
+    mask_ = buckets_.size() - 1;
   }
 
   HashMap(const HashMap &other, size_type bucket_count)
@@ -230,6 +232,7 @@ public:
   void swap(HashMap &other) noexcept {
     std::swap(buckets_, other.buckets_);
     std::swap(size_, other.size_);
+    std::swap(mask_, other.mask_);
     std::swap(empty_key_, other.empty_key_);
   }
 
@@ -290,7 +293,7 @@ public:
 private:
   template <typename K, typename... Args>
   std::pair<iterator, bool> emplace_impl(const K &key, Args &&... args) {
-    assert(!key_equal()(empty_key_, key) && "empty key shouldn't be used");
+    //assert(!key_equal()(empty_key_, key) && "empty key shouldn't be used");
     reserve(size_ + 1);
     for (size_t idx = key_to_idx(key);; idx = probe_next(idx)) {
       if (key_equal()(buckets_[idx].first, empty_key_)) {
@@ -347,7 +350,7 @@ private:
   }
 
   template <typename K> iterator find_impl(const K &key) {
-    assert(!key_equal()(empty_key_, key) && "empty key shouldn't be used");
+    //assert(!key_equal()(empty_key_, key) && "empty key shouldn't be used");
     for (size_t idx = key_to_idx(key);; idx = probe_next(idx)) {
       if (key_equal()(buckets_[idx].first, key)) {
         return iterator(this, idx);
@@ -364,23 +367,21 @@ private:
 
   template <typename K>
   size_t key_to_idx(const K &key) const noexcept(noexcept(hasher()(key))) {
-    const size_t mask = buckets_.size() - 1;
-    return hasher()(key) & mask;
+    return hasher()(key) & mask_;
   }
 
   size_t probe_next(size_t idx) const noexcept {
-    const size_t mask = buckets_.size() - 1;
-    return (idx + 1) & mask;
+    return (idx + 1) & mask_;
   }
 
   size_t diff(size_t a, size_t b) const noexcept {
-    const size_t mask = buckets_.size() - 1;
-    return (buckets_.size() + (a - b)) & mask;
+    return (mask_ + 1 + (a - b)) & mask_;
   }
 
 private:
   key_type empty_key_;
+  uint32_t size_ = 0;
+  uint32_t mask_ = 0;
   buckets buckets_;
-  size_t size_ = 0;
 };
 } // namespace rigtorp

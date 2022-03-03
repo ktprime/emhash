@@ -32,11 +32,6 @@
 #include <iterator>
 #include <ctime>
 
-#if EMHASH_TAF_LOG
-    #include "servant/AutoLog.h"
-    #include "servant/RollLogHelper.h"
-#endif
-
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
 #    define EMHASH_LIKELY(condition) __builtin_expect(condition, 1)
@@ -1052,13 +1047,13 @@ public:
             old_pairs[src_bucket].~PairT();
         }
 
-#if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
+#if EMHASH_REHASH_LOG || EMHASH_USER_LOG
         if (_num_filled > 1000000) {
             auto mbucket = _num_filled;
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
-#if EMHASH_TAF_LOG
+#if EMHASH_USER_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else

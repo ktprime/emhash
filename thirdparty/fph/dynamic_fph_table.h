@@ -253,15 +253,16 @@ namespace fph {
         template<typename T>
         constexpr T GenBitMask(unsigned mask_len) {
             static_assert(std::is_unsigned<T>::value, "Type T is not unsigned for mask");
-            constexpr uint32_t num_bits = std::numeric_limits<T>::digits;
+            constexpr unsigned num_bits = std::numeric_limits<T>::digits;
             static_assert(static_cast<uint32_t>(-1) == 0xffffffffU);
-            T ret = mask_len >= num_bits ? -1 : (static_cast<T>(1U) << mask_len) - 1;
+            T ret = mask_len >= num_bits ? static_cast<T>(-1) : (static_cast<T>(1U) << mask_len) - static_cast<T>(1U);
             return ret;
         }
 
         static_assert(GenBitMask<uint32_t>(0) == 0x0U);
         static_assert(GenBitMask<uint32_t>(4) == 0xfU);
         static_assert(GenBitMask<uint32_t>(32) == 0xffffffffU);
+        static_assert(GenBitMask<uint64_t>(64) == 0xffffffffffffffffULL);
 
         /**
          * Calculates the smallest integral power of two that is not smaller than x.
@@ -546,6 +547,11 @@ namespace fph {
             return ret;
         }
 
+        FPH_ALWAYS_INLINE size_t ShiftXorSeedHash64(uint64_t key, uint64_t /* seed */) {
+            key ^= (key >> 32U);
+            return key;
+        }
+
         FPH_ALWAYS_INLINE uint64_t NaiveMulSeedHash64(uint64_t key, uint64_t seed) {
             auto ret = key * (seed & 1ULL) ;
             return ret;
@@ -591,30 +597,31 @@ namespace fph {
             return IdentitySeedHash64(key, seed);
         }
 
-        size_t ChosenMixSeedHash64(uint64_t key, size_t seed) {
+        FPH_ALWAYS_INLINE size_t ChosenMixSeedHash64(uint64_t key, size_t seed) {
 //            return RevMulSeedHash64(key, seed);
 //            return MulMovSeedHash64(key, seed);
-            return ShiftMulSeedHash64(key, seed);
+//            return ShiftMulSeedHash64(key, seed);
+            return ShiftXorSeedHash64(key, seed);
 //            return Ano4SeedHash64(key, seed);
         }
 
-        size_t ChosenStrongSeedHash64(uint64_t key, size_t seed) {
+        FPH_ALWAYS_INLINE size_t ChosenStrongSeedHash64(uint64_t key, size_t seed) {
             return Ano2SeedHash64(key, seed);
         }
 
-        size_t ChosenSimpleSeedHash16(uint16_t key, size_t seed) {
+        FPH_ALWAYS_INLINE size_t ChosenSimpleSeedHash16(uint16_t key, size_t seed) {
             return RotMulSeedHash64(key, seed);
         }
 
 
 
-        size_t ChosenSeedHash16(uint16_t key, size_t seed) {
+        FPH_ALWAYS_INLINE size_t ChosenSeedHash16(uint16_t key, size_t seed) {
 //            return RotMulSeedHash16(key, seed);
             return AnoSeedHash64(key, seed);
 //            return Ano3SeedHash16(key, seed);
         }
 
-        size_t ChosenSeedHash32(uint32_t key, size_t seed) {
+        FPH_ALWAYS_INLINE size_t ChosenSeedHash32(uint32_t key, size_t seed) {
             return Ano2SeedHash32(key, seed);
         }
 
@@ -792,11 +799,11 @@ namespace fph {
         }
 
 
-        std::string ToString(const std::string& t) {
+        inline std::string ToString(const std::string& t) {
             return t;
         }
 
-        std::string ToString(const char* src) {
+        inline std::string ToString(const char* src) {
             return src;
         }
 
@@ -847,7 +854,7 @@ namespace fph {
         public:
 
             using difference_type   = std::ptrdiff_t;
-            using value_type        = T;
+            using value_type        = typename std::remove_cv<T>::type;
             using pointer           = T*;
             using reference         = T&;
 
@@ -855,7 +862,7 @@ namespace fph {
             constexpr explicit IteratorBase(T *value_ptr) noexcept: BaseNode<T>(value_ptr) {}
 
             reference operator*() const {return *this->value_ptr_;};
-            pointer operator->() {return this->value_ptr_;}
+            pointer operator->() const {return this->value_ptr_;}
             friend bool operator== (const IteratorBase<T>& a, const IteratorBase<T>& b) {
                 return a.value_ptr_ == b.value_ptr_;
             }
@@ -865,107 +872,6 @@ namespace fph {
             }
         };
 
-        template<class T>
-        class ForwardLinkNode {
-        public:
-            constexpr ForwardLinkNode() noexcept: next_node_(nullptr), value_ptr_(nullptr) {};
-            explicit constexpr ForwardLinkNode(T *value_ptr) noexcept: value_ptr_(value_ptr), next_node_(nullptr) {}
-            explicit constexpr ForwardLinkNode(T *value_ptr, ForwardLinkNode<T> *next_node) noexcept: value_ptr_(value_ptr),
-                                                                                                      next_node_(next_node) {}
-
-            ForwardLinkNode(const ForwardLinkNode<T> &other) noexcept:
-                    value_ptr_(other.value_ptr_), next_node_(other.next_node_) {}
-
-            ForwardLinkNode<T>& operator=(const ForwardLinkNode<T> &other) noexcept {
-                this->value_ptr_ = other.value_ptr_;
-                this->next_node_ = other.next_node_;
-                return *this;
-            }
-
-            ForwardLinkNode(ForwardLinkNode<T> &&other) noexcept:
-                    value_ptr_(other.value_ptr_), next_node_(other.next_node_) {
-                other.value_ptr_ = nullptr;
-                other.next_node_ = nullptr;
-            }
-
-            ForwardLinkNode<T>& operator=(ForwardLinkNode<T> &&other) noexcept {
-                this->value_ptr_ = other.value_ptr_;
-                this->next_node_ = other.next_node_;
-                other.value_ptr_ = nullptr;
-                other.next_node_ = nullptr;
-                return *this;
-            }
-
-            ForwardLinkNode<T>& operator++() {
-                if FPH_UNLIKELY(this->next_node_ == nullptr) {
-                    this->value_ptr_ = nullptr;
-                    this->next_node_ = nullptr;
-                }
-                else {
-                    *this = *(this->next_node_);
-                }
-                return *this;
-            }
-
-            ForwardLinkNode<T> operator++(int) {
-                ForwardLinkNode<T> ret = *this;
-                ++(*this);
-                return ret;
-            }
-
-            void SetNext(ForwardLinkNode<T> *next) noexcept {
-                this->next_node_ = next;
-            }
-
-            T *value_ptr() const {
-                return this->value_ptr_;
-            }
-
-            ForwardLinkNode<T> *next_node() const {
-                return this->next_node_;
-            }
-
-        protected:
-            T *value_ptr_;
-            ForwardLinkNode<T> *next_node_;
-
-
-        }; // class ForwardLinkNode
-
-        template<class T>
-        class ForwardIteratorBase: public ForwardLinkNode<T> {
-        public:
-            // tags
-            using iterator_category = std::forward_iterator_tag;
-            using difference_type   = std::ptrdiff_t;
-            using value_type        = T;
-            using pointer           = T*;
-            using reference         = T&;
-
-            using ForwardIteratorBaseType = ForwardLinkNode<T>;
-
-            explicit constexpr ForwardIteratorBase(pointer ptr) noexcept: ForwardLinkNode<T>(ptr) {}
-            constexpr ForwardIteratorBase() noexcept: ForwardLinkNode<T>() {}
-
-            reference operator*() const {return *this->value_ptr_;};
-
-            pointer operator->() {return this->value_ptr_;}
-
-
-
-            friend bool operator== (const ForwardIteratorBase<T>& a, const ForwardIteratorBase<T>& b) {
-                return a.value_ptr_ == b.value_ptr_;
-            }
-
-            friend bool operator!= (const ForwardIteratorBase<T>& a, const ForwardIteratorBase<T>& b) {
-                return a.value_ptr_ != b.value_ptr_;
-            }
-
-
-        protected:
-
-
-        }; // class ForwardIteratorBase
 
     } // namespace dynamic::detail
 
@@ -1263,7 +1169,7 @@ namespace fph {
         class ForwardIterator : public dynamic::detail::IteratorBase<slot_type> {
         public:
             using iterator_category = std::forward_iterator_tag;
-            using value_type = typename slot_type::value_type;
+            using value_type = typename std::remove_cv<typename slot_type::value_type>::type;
             using pointer    = value_type*;
             using reference  = value_type&;
 
@@ -1279,7 +1185,7 @@ namespace fph {
 
             reference operator*() const {return this->value_ptr_->value;};
 
-            pointer operator->() {return std::addressof(this->value_ptr_->value);}
+            pointer operator->() const {return std::addressof(this->value_ptr_->value);}
 
             ForwardIterator<Table, slot_type> &operator++() {
                 if FPH_UNLIKELY(++iterate_cnt >= map_ptr_->size()) {
@@ -1291,6 +1197,55 @@ namespace fph {
             }
 
             ForwardIterator<Table, slot_type> operator++(int) {
+                auto ret = *this;
+                ++(*this);
+                return ret;
+            }
+
+            void SetTable(const Table *new_table_ptr) {
+                map_ptr_ = new_table_ptr;
+            }
+
+
+        protected:
+            const Table *map_ptr_;
+            size_t iterate_cnt;
+
+
+        };
+
+        template<class Table, class slot_type>
+        class ConstForwardIterator : public dynamic::detail::IteratorBase<slot_type> {
+        public:
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = typename std::remove_cv<typename slot_type::value_type>::type;
+            using pointer    = const value_type*;
+            using reference  = const value_type&;
+
+            constexpr ConstForwardIterator() noexcept
+                    : dynamic::detail::IteratorBase<slot_type>(), map_ptr_(
+                    nullptr), iterate_cnt(0) {}
+
+
+            constexpr explicit ConstForwardIterator(slot_type *slot_ptr,
+                                               const Table *map_ptr) noexcept:
+                    dynamic::detail::IteratorBase<slot_type>(slot_ptr), map_ptr_(map_ptr),
+                    iterate_cnt(0) {}
+
+            reference operator*() const {return this->value_ptr_->value;};
+
+            pointer operator->() const {return std::addressof(this->value_ptr_->value);}
+
+            ConstForwardIterator<Table, slot_type> &operator++() {
+                if FPH_UNLIKELY(++iterate_cnt >= map_ptr_->size()) {
+                    this->value_ptr_ = nullptr;
+                } else {
+                    this->value_ptr_ = map_ptr_->GetNextSlotAddress(this->value_ptr_);
+                }
+                return *this;
+            }
+
+            ConstForwardIterator<Table, slot_type> operator++(int) {
                 auto ret = *this;
                 ++(*this);
                 return ret;
@@ -1333,7 +1288,8 @@ namespace fph {
 
             using iterator = ForwardIterator<DynamicRawSet, typename Policy::slot_type>;
             friend iterator;
-            using const_iterator = const iterator;
+            using const_iterator = ConstForwardIterator<DynamicRawSet, typename Policy::slot_type>;
+            friend const_iterator;
 #endif
 
             explicit DynamicRawSet(size_type bucket_count, const SeedHash& hash = SeedHash(),
@@ -1698,8 +1654,12 @@ namespace fph {
                 insert(ilist.begin(), ilist.end());
             }
 
-            iterator erase(const_iterator iter) {
+            iterator erase(iterator iter) {
                 return EraseImp(iter);
+            }
+
+            iterator erase(const_iterator iter) {
+                return EraseImp(ConstIteratorToIterator(iter));
             }
 
 
@@ -1734,9 +1694,9 @@ namespace fph {
 
             const_iterator begin() const noexcept {
                 if FPH_UNLIKELY(param_ == nullptr) {
-                    return iterator(nullptr, nullptr);
+                    return const_iterator(nullptr, nullptr);
                 }
-                return param_->begin_it_;
+                return const_iterator( param_->begin_it_.value_ptr() , this);
             }
 
             const_iterator cbegin() const noexcept {
@@ -1748,7 +1708,7 @@ namespace fph {
             }
 
             constexpr const_iterator end() const noexcept {
-                return iterator(nullptr, nullptr);
+                return const_iterator(nullptr, nullptr);
             }
 
             constexpr const_iterator cend() const noexcept {
@@ -1768,7 +1728,7 @@ namespace fph {
                 auto slot_pos = GetSlotPos(key);
                 slot_type *pair_address = slot_ + slot_pos;
                 if FPH_LIKELY(key_equal_(pair_address->key, key)) {
-                    return iterator(pair_address, this);
+                    return const_iterator(pair_address, this);
                 }
                 return end();
             }
@@ -2270,9 +2230,9 @@ namespace fph {
             static_assert(BUCKET_PARAM_MASK + 1U == MAX_ITEM_NUM_CEIL_LIMIT);
             static_assert(DEFAULT_INIT_ITEM_NUM_CEIL <= MAX_ITEM_NUM_CEIL_LIMIT);
 
-
-
-
+            iterator ConstIteratorToIterator(const_iterator const_it) {
+                return iterator(const_it.value_ptr(), this);
+            }
 
 
             void SwapImp(DynamicRawSet &o) noexcept {
@@ -2347,7 +2307,7 @@ namespace fph {
                 }
             }
 
-            slot_type *GetNextSlotAddress(slot_type* FPH_RESTRICT pair_ptr) const FPH_FUNC_RESTRICT {
+            slot_type *GetNextSlotAddress(const slot_type* FPH_RESTRICT pair_ptr) const FPH_FUNC_RESTRICT {
                 const auto *slot_end = slot_ + param_->item_num_ceil_;
                 for (size_t slot_dis = 1; slot_dis < param_->item_num_ceil_; ++slot_dis) {
                     // TODO: test whether using branch-less will be faster
@@ -2356,7 +2316,7 @@ namespace fph {
                         pair_ptr = slot_;
                     }
                     if (!IsSlotEmpty(pair_ptr)) {
-                        return pair_ptr;
+                        return const_cast<slot_type*>(pair_ptr);
                     }
                 }
                 return nullptr;
@@ -2603,7 +2563,7 @@ namespace fph {
                 return {iterator(slot_address, this), alloc_happen};
             }
 
-            iterator EraseImp(const_iterator iter) {
+            iterator EraseImp(iterator iter) {
                 auto *slot_ptr = iter.value_ptr();
                 size_t bucket_index = CompleteGetBucketIndex(slot_ptr->key);
                 auto &temp_bucket = param_->bucket_array_[bucket_index];
@@ -2666,7 +2626,7 @@ namespace fph {
                 for (; it != last; ) {
                     it = this->EraseImp(it);
                 }
-                return iterator(it.value_ptr(), this);
+                return iterator(ConstIteratorToIterator(it));
             }
 
             size_type EraseImp(const key_type& key) {

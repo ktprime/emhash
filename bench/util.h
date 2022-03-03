@@ -21,8 +21,6 @@
 #endif
 #define NDEBUG                1
 #ifdef _WIN32
-    # define _CRT_SECURE_NO_WARNINGS
-    #pragma warnning(disable:4996)
     #ifndef NOMINMAX
     #define NOMINMAX
     #endif
@@ -58,6 +56,11 @@
     #define X86 1
     #define X86_32 1
     #define PHMAP_HAVE_SSSE3                      1
+#endif
+
+#if X86
+#include "ahash/ahash.c"
+#include "ahash/random_state.c"
 #endif
 
 #if _WIN32 && _WIN64 == 0 
@@ -430,7 +433,7 @@ struct Int64Hasher
 #elif FIB_HASH > 10000
         return key % FIB_HASH; //bad hash
 #elif FIB_HASH > 100
-        return key / FIB_HASH; //bad hash
+        return key * FIB_HASH; //bad hash
 #elif FIB_HASH == 6
         return wyhash64(key, KC);
 #else

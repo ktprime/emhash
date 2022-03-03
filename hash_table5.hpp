@@ -1378,7 +1378,7 @@ private:
 #else
                 if (nbucket == next_bucket) {
                     EMH_BUCKET(_pairs, prev_bucket) = prev_bucket;
-                    return nbucket;
+                    return next_bucket;
                 }
 
                 const auto last = EMH_BUCKET(_pairs, nbucket);
@@ -1619,26 +1619,27 @@ one-way seach strategy.
         }
 
 #else
-        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 5;
+        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 2 : 4;
         for (uint32_t step = 2, slot = bucket + 1; ; slot += 2, step ++) {
             auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                 return bucket1;
 
             if (step > linear_probe_length) {
-                if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
+                if (EMH_EMPTY(_pairs, _last))// || EMH_EMPTY(_pairs, ++_last))
                     return _last++;
                 ++_last &= _mask;
-#if 0
+#if 1
                 auto tail = _mask - _last;
-                if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
+                if (EMH_EMPTY(_pairs, tail))// || EMH_EMPTY(_pairs, ++tail))
                     return tail;
 #endif
-#if EMH_LINEAR3
-                //auto medium = (_num_filled + _last) & _mask;
-                auto medium = (_num_buckets / 2 + _last) & _mask;
-                if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
-                    return _last = medium;
+#if 0
+                auto medium = (_num_filled + _last) & _mask;
+                //auto medium = (_num_buckets / 2 + _last) & _mask;
+                //if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium)) return _last = medium;
+                if (EMH_EMPTY(_pairs, medium))
+                    return medium;
 #endif
             }
         }

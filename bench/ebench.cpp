@@ -12,7 +12,7 @@
 #endif
 
 #ifndef ET
-#define ET                 1
+//#define ET                 1
 #endif
 
 #if SMAP
@@ -76,7 +76,7 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT 3  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 4  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP       1
@@ -108,7 +108,6 @@ std::map<std::string, std::string> maps =
 #include "old/hash_table4.hpp"
 //#include "old/hash_table557.hpp"
 #endif
-#include "hash_table5.hpp"
 #include "hash_table5.hpp"
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
@@ -170,11 +169,6 @@ std::map<std::string, std::string> maps =
 
 //#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 //#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
-
-#if AH64 && X86
-#include "ahash/ahash.c"
-#include "ahash/random_state.c"
-#endif
 
 #if X86
 #include "emilib/emilib2.hpp"
@@ -665,9 +659,9 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
         int64_t v2(v.lScore + sum);
 #elif TKey != 4
         v += char(128 + (int)v[0]);
-        const auto &v2 = v;
+        auto &v2 = v;
 #else
-        const keyType v2(v.data(), v.size() - 1);
+        keyType v2(v.data(), v.size() - 1);
 #endif
 
 #ifndef SMAP
@@ -739,9 +733,9 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 #elif TKey != 4
             auto v2 = v; v2[0] += '2';
 #else
-            const keyType v2(v.data(), v.size() - 1);
+            keyType v2(v.data(), v.size() - 1);
 #endif
-            tmp.emplace(v2, TO_VAL(0));
+            tmp.emplace(std::move(v2), TO_VAL(0));
         }
     }
 
@@ -755,11 +749,11 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 #elif TKey != 4
         auto v2 = v; v2[0] += '1';
 #else
-        const keyType v2(v.data(), v.size() - 1);
+        keyType v2(v.data(), v.size() - 1);
 #endif
         //tmp[v2] = TO_VAL(0);
-        tmp.emplace(v2, TO_VAL(0));
         sum += tmp.count(v2);
+        tmp.emplace(std::move(v2), TO_VAL(0));
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -771,7 +765,7 @@ template<class hash_type>
 void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto n = ht_hash.size();
-    size_t pow2 = 2u << ilog(n, 2), sum = 0;
+    size_t sum = 0;
 
 #if KEY_STR
 #if TKey != 4
@@ -945,7 +939,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #if AR > 0
     const auto iRation = AR;
 #else
-    const auto iRation = 1;
+    const auto iRation = 10;
 #endif
 
     auto flag = 0;
@@ -1100,7 +1094,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
     {
         hash_type hash;
         const uint32_t l1_size = (32 * 1024)   / (sizeof(keyType) + sizeof(valueType));
-        const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
+        //const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
         const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
         func_index = 0;
@@ -1136,12 +1130,13 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #endif
         }
 
+        shuffle(nList.begin(), nList.end());
         find_hit_50<hash_type>(hash, hash_name, nList);
         find_hit_50_erase<hash_type>(hash, hash_name, nList);
         erase_50<hash_type>(hash, hash_name, nList);
         find_erase_50<hash_type>(hash, hash_name, oList);
-        insert_find_erase<hash_type>(hash, hash_name, nList);
 
+        insert_find_erase<hash_type>(hash, hash_name, nList);
         erase_reinsert<hash_type>(hash, hash_name, oList);
 //        hash_iter<hash_type>(hash, hash_name);
 
@@ -1438,9 +1433,10 @@ static void testHashRand(int loops = 100000009)
     long sum = 0;
     auto ts = getus();
 
+    auto rseed = randomseed();
     {
         ts = getus();
-        Sfc4 srng(randomseed());
+        Sfc4 srng(rseed);
         for (int i = 1; i < loops; i++)
             sum += srng();
         printf("Sfc4       = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
@@ -1448,14 +1444,14 @@ static void testHashRand(int loops = 100000009)
 
     {
         ts = getus();
-        RomuDuoJr srng(randomseed());
+        RomuDuoJr srng(rseed);
         for (int i = 1; i < loops; i++)
             sum += srng();
         printf("RomuDuoJr  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
     {
         ts = getus();
-        Orbit srng(randomseed());
+        Orbit srng(rseed);
         for (int i = 1; i < loops; i++)
             sum += srng();
         printf("Orbit      = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
@@ -1464,7 +1460,7 @@ static void testHashRand(int loops = 100000009)
 #if __SIZEOF_INT128__
     {
         ts = getus();
-        Lehmer64 srng(randomseed());
+        Lehmer64 srng(rseed);
         for (int i = 1; i < loops; i++)
             sum += srng();
         printf("Lehmer64    = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
@@ -1473,7 +1469,7 @@ static void testHashRand(int loops = 100000009)
 
     {
         ts = getus();
-        std::mt19937_64 srng(randomseed());
+        std::mt19937_64 srng(rseed);
         for (int i = 1; i < loops; i++)
             sum += srng();
         printf("mt19937_64 = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
@@ -1482,7 +1478,7 @@ static void testHashRand(int loops = 100000009)
 #if WYHASH_LITTLE_ENDIAN
     {
         ts = getus();
-        WyRand srng;
+        WyRand srng(rseed);
         for (int i = 1; i < loops; i++)
             sum += srng();
         printf("wyrand     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
@@ -1669,12 +1665,27 @@ static void testHashString(int size, int str_min, int str_max)
     printf("sum = %ld\n", sum);
 }
 
+static int test_lru(int n)
+{
+#if ET
+    emlru_size::lru_cache<uint64_t, int> elru(1 << 10, 1<<20);
+    Sfc4 srng(n);
+    auto ts = getus();
+    for (int i = 0; i < n ; i++) {
+        elru.emplace(i, i);
+    }
+    printf("n = %d, hsize = %zd, time use = %d ms\n", n, elru.size(), (int)(getus() - ts) / 1000);
+#endif
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
     //find_test();
 #endif
     auto start = getus();
+//    test_lru(100'000'000);
     testHashInt(5e7+8);
 
 #ifdef AHASH_AHASH_H
@@ -1718,6 +1729,8 @@ int main(int argc, char* argv[])
             rnd = value;
         else if (cmd == 'n')
             minn = value;
+        else if (cmd == 'm')
+            maxn = value;
         else if (cmd == 'b') {
             testHashRand(1e8+8);
             testHashString(1e6+6, 6, 16);
@@ -1782,11 +1795,7 @@ int main(int argc, char* argv[])
         TestHashMap(tn);
 #endif
 
-#if WYHASH_LITTLE_ENDIAN
-    WyRand srng(rnd);
-#else
     Sfc4 srng(rnd);
-#endif
 
     for (auto& m : maps)
         printf("  %s\n", m.second.data());
@@ -1805,17 +1814,18 @@ int main(int argc, char* argv[])
                 n = -n;
             }
         } else if (run_type == 1) {
-            n = (srng() % maxn) + minn;
+            n = (srng() % (maxn - minn)) + minn;
         } else {
             n += n * 2 / 13;
             if (n > maxn)
-                n = (srng() % maxn) + minn;
+                n = (srng() % (maxn - minn)) + minn;
         }
 
-        auto pow2 = 1 << ilog(n, 2);
-        hlf = 1.0 * n / pow2 / 2;
+        auto pow2 = 2 << ilog(n, 2);
+        hlf = 1.0 * n / pow2;
         if (load_factor > 0.2 && load_factor < 1) {
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
+            hlf = 1.0 * n / pow2;
         }
         if (n < 1000 || n > 1234567890)
             n = 1234567 + srng() % 1234567;

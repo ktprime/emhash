@@ -977,8 +977,14 @@ public:
         if (EMHASH_LIKELY(required_buckets < _num_buckets))
             return false;
 
-        if (_num_filled >= _max_buckets * 2)
-            return remove_half();
+        if (_num_filled >= _max_buckets * 2) {
+            auto ret = remove_half();
+#if EMHASH_SAVE_MEMORY
+            if (_num_filled < _num_buckets / 4)
+                rehash(_num_filled);
+#endif
+            return ret;
+        }
 
         rehash(required_buckets + 2);
         return true;
@@ -1022,11 +1028,11 @@ public:
                 src_bucket --;
         }
 
-#if EMHASH_REHASH_LOG || EMHASH_TAF_LOG
+#if EMHASH_REHASH_LOG || EMHASH_USE_LOG
         char buff[256] = {0};
         snprintf(buff, sizeof(buff), "    _num_filled medium_id.pack_size.erase_ids load_factor|%u %u %zu %u %.3f|, time_use = %d ms",
                 _num_filled, medium_id, sizeof(_pairs[0]), erase_ids - _num_filled, load_factor(), (int)(clock() - ts));
-#if EMHASH_TAF_LOG
+#if EMHASH_USE_LOG
         static uint32_t iremoves = 0;
         FDLOG("lru_size") << __FUNCTION__ << " removes = " << iremoves ++ << "|" << buff << endl;
 #else
@@ -1077,7 +1083,7 @@ public:
             char buff[255] = {0};
             snprintf(buff, sizeof(buff), "    _num_filled/load_factor/K.V/pack/nextid = %u/%.3f/%s.%s/%zd|%u",
                     _num_filled, load_factor(), typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), entry<KeyT, ValueT>::nextid());
-#if EMHASH_TAF_LOG
+#if EMHASH_USE_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
@@ -1099,7 +1105,7 @@ private:
 
     void clear_bucket(uint32_t bucket)
     {
-        update_orderid(-_pairs[bucket].orderid);
+        update_orderid(0-_pairs[bucket].orderid);
         if (is_notrivially())
             _pairs[bucket].~PairT();
 
