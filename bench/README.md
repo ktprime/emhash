@@ -6,7 +6,7 @@ set c++ compiler and absl hash/some hash map(ET=1 : martin/phmap/ska/tsl. ET=2..
  ###  make CXX=clang++ ET=1 ABSL=1
 
 set key=string,val=int (0-uint32_t 1-int64_t 2-std::string/(view) 4-struct)
- ##  make Key=2 Val=0
+ ###  make Key=2 Val=0
 
 use hood hash and rand function (RT=1-5)
  ###  make HH=1 RT=3
