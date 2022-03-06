@@ -1588,7 +1588,7 @@ one-way seach strategy.
         constexpr auto linear_probe_length = std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
-#ifdef EMH_QUADRATIC
+#ifndef EMH_QUADRATIC
         for (; offset < linear_probe_length; offset += 2) {
             auto bucket1 = (bucket + offset) & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))

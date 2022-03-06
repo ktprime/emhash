@@ -101,10 +101,11 @@ static const char* find(const std::string& map_name)
 {
     for (const auto& kv : show_name)
     {
+        if (map_name.find("emilib2") < 10)
+            return "emilib2";
+
         if (map_name.find(kv.first) < 10)
-        {
             return kv.second.c_str();
-        }
     }
 
     return nullptr;
@@ -243,8 +244,7 @@ template<class MAP> void bench_insert(MAP& map)
             {
                 auto ts = now2sec();
                 map.clear();
-                printf(", clear %.3f", now2sec() - ts);
-                fflush(stdout);
+                printf(", clear %.3f", now2sec() - ts); fflush(stdout);
             }
 
             {
@@ -252,8 +252,7 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map.emplace(static_cast<int>(rng()), 0);
                 }
-                printf(", reinsert %.2f", now2sec() - ts);
-                fflush(stdout);
+                printf(", reinsert %.2f", now2sec() - ts); fflush(stdout);
             }
 
             {
@@ -261,8 +260,7 @@ template<class MAP> void bench_insert(MAP& map)
                 for (size_t n = 0; n < maxn; ++n) {
                     map.erase(static_cast<int>(rng()));
                 }
-                printf(", remove %.2f", now2sec() - ts);
-                fflush(stdout);
+                printf(", remove %.2f", now2sec() - ts); fflush(stdout);
             }
         }
         printf(", loadf = %.2f size = %d, total %dM int time = %.2f s\n",
@@ -780,10 +778,10 @@ void runTest(int sflags, int eflags)
         typedef absl::Hash<std::string> hash_func;
 #elif AHASH_AHASH_H
         typedef Ahash64er hash_func;
-#elif WYHASH_LITTLE_ENDIAN
-        typedef WysHasher hash_func;
-#else
+#elif STD_HASH
         typedef std::hash<std::string> hash_func;
+#else
+        typedef WysHasher hash_func;
 #endif
 
         { emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
@@ -800,7 +798,7 @@ void runTest(int sflags, int eflags)
         { emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if X86
         { emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        { emilib::HashMap<std::string,  int, hash_func> bench; bench_randomFindString(bench); }
+        { emilib::HashMap<std::string,  size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if ET
         //        { hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
@@ -832,10 +830,10 @@ void runTest(int sflags, int eflags)
         typedef absl::Hash<std::string> hash_func;
 #elif AHASH_AHASH_H
         typedef Ahash64er hash_func;
-#elif WYHASH_LITTLE_ENDIAN
-        typedef WysHasher hash_func;
-#else
+#elif STD_HASH
         typedef std::hash<std::string> hash_func;
+#else
+        typedef WysHasher hash_func;
 #endif
 
 #if EM3

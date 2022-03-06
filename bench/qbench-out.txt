@@ -1,96 +1,104 @@
 10,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 30.99, 4.884, 4.939, 13.03, 6.384
-emilib2::HashMap, 23.07, 4.396, 5.928, 13.58, 3.29
-martin::flat_map, 31.42, 8.781, 4.839, 9.488, 3.773
-tsl::robin_map  , 27.78, 7.57, 9.766, 10.05, 7.599
-emhash5::HashMap, 24.17, 6.176, 7.801, 6.162, 7.399
-emhash7::HashMap, 29.82, 6.036, 8.591, 6.494, 2.422
-emhash8::HashMap, 24.37, 6.281, 8.138, 10.46, 2.312
-jg::den_hash_map, 34.82, 5.943, 8.386, 10.17, 2.139
-qc::hash::RawMap, 12.92, 4.747, 8.433, 4.681, 11.46
-rigtorp::HashMap, 8.974, 7.068, 14.2, 12.01, 7.986
+phmap::fhash_map, 29.26, 4.815, 4.958, 15.51, 5.253
+emilib::HashMap , 23.36, 4.256, 4.368, 16.63, 3.506
+emilib2::HashMap, 22.37, 4.470, 6.693, 15.61, 3.505
+martin::flat_map, 27.18, 8.534, 5.774, 8.677, 4.424
+tsl::robin_map  , 22.72, 6.808, 9.007, 8.226, 6.843
+emhash7::HashMap, 23.22, 5.695, 6.978, 6.664, 3.332
+emhash5::HashMap, 21.14, 5.291, 6.639, 5.643, 6.766
+emhash8::HashMap, 20.92, 7.512, 8.309, 9.090, 2.947
+jg::den_hash_map, 25.26, 5.671, 7.088, 7.895, 2.993
+rigtorp::HashMap, 8.293, 5.958, 11.68, 11.54, 6.530
+qc::hash::RawMap, 11.74, 4.214, 9.040, 4.524, 10.05
 
-100,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 25.63, 3.624, 5.264, 10.29, 2.883
-emilib2::HashMap, 11.07, 3.182, 6.089, 8.648, 1.815
-martin::flat_map, 25.87, 10.14, 5.281, 11.67, 2.729
-tsl::robin_map  , 25.29, 9.736, 10.56, 12.82, 3.184
-emhash5::HashMap, 18.62, 5.05, 5.607, 4.756, 3.061
-emhash7::HashMap, 15.77, 4.555, 6.022, 4.547, 1.342
-emhash8::HashMap, 18.02, 4.766, 5.738, 8.91, 1.297
-jg::den_hash_map, 13.21, 4.909, 6.798, 8.352, 1.305
-qc::hash::RawMap, 12.65, 7.731, 14.12, 7.64, 2.947
-rigtorp::HashMap, 9.914, 6.912, 13.9, 15.4, 3.53
+200,          Insert,Find_Hit,Find_Mis,Erase,Iterator
+phmap::fhash_map, 19.91, 2.854, 5.598, 9.931, 1.980
+emilib::HashMap , 12.33, 2.857, 7.154, 4.431, 1.499
+emilib2::HashMap, 10.97, 2.341, 7.015, 8.327, 1.710
+martin::flat_map, 22.35, 9.813, 5.707, 10.03, 2.097
+tsl::robin_map  , 22.04, 8.631, 9.495, 9.858, 2.679
+emhash7::HashMap, 13.29, 4.326, 5.263, 3.987, 0.9900
+emhash5::HashMap, 16.56, 4.203, 5.030, 3.701, 2.630
+emhash8::HashMap, 15.55, 4.383, 6.036, 8.227, 0.7109
+jg::den_hash_map, 10.86, 4.447, 6.030, 6.612, 0.6384
+rigtorp::HashMap, 7.720, 6.520, 14.24, 15.05, 2.590
+qc::hash::RawMap, 9.929, 6.431, 12.95, 6.475, 2.555
 
-1000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 28.22, 3.065, 2.445, 5.636, 4.659
-emilib2::HashMap, 9.737, 2.534, 2.913, 9.9, 2.527
-martin::flat_map, 26.98, 6.01, 2.545, 7.073, 2.583
-tsl::robin_map  , 31.58, 5.379, 7.357, 7.431, 6.122
-emhash5::HashMap, 19.35, 3.838, 5.306, 3.928, 6.329
-emhash7::HashMap, 16.04, 3.306, 5.72, 3.617, 1.245
-emhash8::HashMap, 18.15, 3.321, 5.15, 7.474, 1.216
-jg::den_hash_map, 13.2, 3.655, 5.315, 6.207, 1.223
-qc::hash::RawMap, 23.22, 4.87, 9.489, 4.788, 6.008
-rigtorp::HashMap, 20.07, 4.218, 9.25, 9.022, 7.298
+3000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
+phmap::fhash_map, 21.73, 2.665, 4.673, 7.660, 2.202
+emilib::HashMap , 11.29, 2.544, 5.728, 2.711, 1.423
+emilib2::HashMap, 9.901, 1.926, 5.162, 7.303, 1.708
+martin::flat_map, 22.41, 9.459, 4.829, 8.911, 1.960
+tsl::robin_map  , 25.33, 8.702, 9.897, 9.281, 3.010
+emhash7::HashMap, 13.33, 4.098, 5.280, 3.911, 0.8414
+emhash5::HashMap, 16.92, 3.932, 5.082, 3.588, 3.092
+emhash8::HashMap, 15.79, 3.931, 5.741, 8.250, 0.3202
+jg::den_hash_map, 14.92, 4.531, 6.253, 6.545, 0.4886
+rigtorp::HashMap, 7.517, 5.966, 13.84, 13.69, 2.854
+qc::hash::RawMap, 9.769, 5.803, 12.29, 5.860, 2.840
 
-10000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 28.7, 3.771, 2.852, 6.778, 3.792
-emilib2::HashMap, 11, 2.779, 3.268, 8.849, 2.012
-martin::flat_map, 25.58, 8.286, 3.217, 8.701, 2.467
-tsl::robin_map  , 33.03, 8.362, 10.5, 10.23, 4.584
-emhash5::HashMap, 20.97, 4.945, 6.555, 4.797, 4.67
-emhash7::HashMap, 17.24, 4.465, 6.767, 4.711, 1.23
-emhash8::HashMap, 19.92, 4.019, 5.676, 8.764, 1.223
-jg::den_hash_map, 17.94, 5.067, 7.571, 8.535, 1.218
-qc::hash::RawMap, 13.13, 6.531, 12.15, 6.386, 4.367
-rigtorp::HashMap, 8.282, 5.592, 11.7, 11.7, 5.337
+40000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
+phmap::fhash_map, 25.64, 3.911, 3.340, 6.989, 3.054
+emilib::HashMap , 15.53, 3.419, 3.159, 3.740, 1.484
+emilib2::HashMap, 13.84, 2.871, 2.871, 8.780, 1.992
+martin::flat_map, 24.99, 8.232, 3.247, 7.604, 1.970
+tsl::robin_map  , 29.77, 7.659, 9.989, 8.006, 4.446
+emhash7::HashMap, 21.43, 4.683, 5.856, 4.376, 0.8602
+emhash5::HashMap, 22.23, 4.041, 5.550, 3.838, 4.551
+emhash8::HashMap, 21.07, 4.073, 6.131, 9.703, 0.3061
+jg::den_hash_map, 16.74, 5.301, 7.183, 8.227, 0.4793
+rigtorp::HashMap, 7.829, 5.665, 14.52, 12.26, 4.094
+qc::hash::RawMap, 12.72, 5.486, 13.73, 5.579, 4.026
 
-100000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 36.65, 6.491, 5.478, 11.79, 2.711
-emilib2::HashMap, 16.13, 5.255, 6.242, 8.598, 1.616
-martin::flat_map, 32.51, 13.12, 6.214, 12.69, 2.437
-tsl::robin_map  , 42.04, 12.99, 14.89, 15.04, 2.84
-emhash5::HashMap, 30.38, 6.326, 7.167, 5.871, 2.946
-emhash7::HashMap, 29.36, 6.225, 7.909, 6, 1.291
-emhash8::HashMap, 29.79, 6.432, 6.655, 12.37, 1.369
-jg::den_hash_map, 33.75, 8.681, 10.62, 12.22, 1.295
-qc::hash::RawMap, 23.54, 10.28, 21.53, 10.51, 2.926
-rigtorp::HashMap, 15.24, 9.022, 21.1, 18.89, 3.358
+500000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
+phmap::fhash_map, 47.29, 16.45, 4.550, 19.59, 4.097
+emilib::HashMap , 26.94, 12.71, 3.895, 13.01, 2.098
+emilib2::HashMap, 26.56, 13.54, 3.506, 16.78, 2.574
+martin::flat_map, 39.49, 13.29, 3.987, 13.06, 2.390
+tsl::robin_map  , 46.34, 11.86, 16.43, 15.10, 6.196
+emhash7::HashMap, 43.80, 12.85, 10.19, 12.44, 2.056
+emhash5::HashMap, 37.48, 11.59, 11.11, 9.709, 6.469
+emhash8::HashMap, 33.77, 5.951, 7.502, 13.65, 0.7668
+jg::den_hash_map, 39.98, 11.08, 10.90, 20.25, 1.586
+rigtorp::HashMap, 27.46, 8.186, 18.57, 15.20, 5.704
+qc::hash::RawMap, 30.56, 7.491, 18.28, 7.598, 5.524
 
-1000000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 64.21, 21.63, 7.813, 43.43, 6.268
-emilib2::HashMap, 31.05, 17.42, 7.107, 30.86, 3.035
-martin::flat_map, 51.9, 19.91, 6.366, 21.01, 3.277
-tsl::robin_map  , 80.17, 19.86, 23.84, 29.58, 7.813
-emhash5::HashMap, 67.86, 16.76, 18.71, 24.96, 8.075
-emhash7::HashMap, 54.28, 17.37, 14.18, 26.53, 3.445
-emhash8::HashMap, 78.5, 16.07, 15.86, 52.44, 1.731
-jg::den_hash_map, 89.75, 19.16, 21.93, 75.01, 2.709
-qc::hash::RawMap, 66.28, 17.89, 29.91, 22.34, 7.199
-rigtorp::HashMap, 61.31, 17.84, 29.46, 35.42, 8.608
+6000000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
+phmap::fhash_map, 75.04, 27.92, 12.69, 40.53, 2.301
+emilib::HashMap , 36.22, 22.06, 11.24, 26.24, 1.534
+emilib2::HashMap, 37.69, 20.17, 10.88, 27.85, 1.841
+martin::flat_map, 62.64, 24.02, 11.50, 30.22, 2.058
+tsl::robin_map  , 77.39, 24.85, 32.36, 35.94, 3.277
+emhash7::HashMap, 57.56, 17.85, 18.51, 19.00, 1.377
+emhash5::HashMap, 65.76, 15.42, 16.53, 19.32, 3.663
+emhash8::HashMap, 77.69, 16.34, 16.15, 48.09, 0.6817
+jg::den_hash_map, 76.46, 21.07, 23.38, 47.15, 1.231
+rigtorp::HashMap, 40.68, 27.83, 90.24, 51.54, 2.962
+qc::hash::RawMap, 51.76, 25.94, 91.14, 30.37, 2.941
 
 10000000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 100.1, 36.78, 17.33, 143.5, 5.173
-emilib2::HashMap, 89.81, 28.32, 15.45, 111.9, 2.658
-martin::flat_map, 75.72, 31.1, 19.57, 39.67, 3.202
-tsl::robin_map  , 84.3, 24.35, 28.5, 35.08, 5.897
-emhash5::HashMap, 71.23, 22.22, 22.3, 33.53, 5.871
-emhash7::HashMap, 61.68, 23.91, 19.56, 37.45, 2.713
-emhash8::HashMap, 103.6, 20.4, 19.93, 77.5, 1.541
-jg::den_hash_map, 112.4, 23.09, 30.48, 107.6, 2.466
-qc::hash::RawMap, 50.86, 24.33, 48.3, 29.2, 5.098
-rigtorp::HashMap, 40.44, 23.75, 46.55, 44.31, 6.046
+phmap::fhash_map, 83.94, 31.57, 15.11, 51.96, 3.469
+emilib::HashMap , 48.82, 27.45, 11.80, 32.12, 1.656
+emilib2::HashMap, 47.98, 24.42, 11.85, 38.58, 2.142
+martin::flat_map, 64.24, 22.14, 14.33, 28.72, 2.134
+tsl::robin_map  , 74.71, 19.09, 25.17, 30.10, 4.666
+emhash7::HashMap, 60.69, 19.11, 17.21, 18.24, 1.588
+emhash5::HashMap, 65.21, 14.34, 15.34, 19.91, 4.855
+emhash8::HashMap, 85.21, 16.30, 15.77, 49.35, 0.6481
+jg::den_hash_map, 78.65, 19.74, 21.10, 48.37, 1.152
+rigtorp::HashMap, 36.96, 20.39, 78.57, 43.04, 4.273
+qc::hash::RawMap, 45.80, 18.56, 83.59, 23.52, 4.144
 
 50000000,          Insert,Find_Hit,Find_Mis,Erase,Iterator
-absl::f_hash_map, 147.7, 43.08, 24.51, 157.3, 3.248
-emilib2::HashMap, 129.5, 35.04, 25.05, 161.4, 2.081
-martin::flat_map, 93.24, 48.13, 30.52, 57.61, 2.8
-tsl::robin_map  , 88.68, 40.56, 41.22, 51.6, 3.635
-emhash5::HashMap, 84.78, 26.94, 26.61, 49.57, 4.756
-emhash7::HashMap, 81.42, 39.25, 37.66, 68.83, 2.196
-emhash8::HashMap, 117.6, 23.34, 24.45, 90.37, 1.562
-jg::den_hash_map, 121.3, 29.93, 43.98, 130, 2.285
-qc::hash::RawMap, 64.19, 41.23, 96.97, 44, 3.314
-rigtorp::HashMap, 57.85, 43.5, 109.7, 63.22, 4.167
+phmap::fhash_map, 97.07, 37.96, 26.74, 59.33, 2.079
+emilib::HashMap , 66.22, 30.39, 23.81, 40.57, 1.450
+emilib2::HashMap, 62.94, 27.59, 22.45, 46.92, 1.781
+martin::flat_map, 80.35, 33.41, 25.66, 41.93, 2.047
+tsl::robin_map  , 83.62, 30.23, 37.92, 40.23, 2.810
+emhash7::HashMap, 67.96, 21.75, 22.73, 26.60, 1.343
+emhash5::HashMap, 68.43, 16.52, 17.84, 20.09, 2.945
+emhash8::HashMap, 86.24, 19.02, 18.83, 53.92, 0.6556
+jg::den_hash_map, 82.73, 22.57, 25.75, 51.97, 1.193
+rigtorp::HashMap, 47.57, 34.76, 110.4, 61.57, 2.663
+qc::hash::RawMap, 60.68, 31.36, 114.2, 36.08, 2.641
 

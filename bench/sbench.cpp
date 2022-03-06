@@ -474,7 +474,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 {
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    const auto vsmall = 1024;
+    const auto vsmall = 1024 + vList.size() % 1024;
     for (size_t i = 0; i < vList.size(); i++) {
         sum += ht_hash.emplace(vList[i]).second;
         if (i > vsmall)
@@ -943,6 +943,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #endif
         }
 
+        shuffle(nList.begin(), nList.end());
         find_hit_50<hash_type>(hash, hash_name, nList);
         find_hit_50_erase<hash_type>(hash, hash_name, nList);
         erase_50<hash_type>(hash, hash_name, nList);
@@ -1049,6 +1050,8 @@ static int benchHashSet(int n)
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
+#elif AHASH_AHASH_H && KEY_STR
+    using ehash_func = Ahash64er;
 #elif KEY_INT && FIB_HASH > 0
     using ehash_func = Int64Hasher<keyType>;
 #elif KEY_CLA
@@ -1057,6 +1060,8 @@ static int benchHashSet(int n)
     using ehash_func = phmap::Hash<keyType>;
 #elif HOOD_HASH
     using ehash_func = robin_hood::hash<keyType>;
+#elif QCH && KEY_INT
+    using ehash_func = qc::hash::RawMap<keyType>::hasher;
 #else
     using ehash_func = std::hash<keyType>;
 #endif
@@ -1195,17 +1200,18 @@ int main(int argc, char* argv[])
     int run_type = 0;
     int tn = 0, rnd = randomseed();
     auto maxc = 500;
-    auto minn = (1000 * 100 * 1) + 10000;
+    auto minn = 10000*10;
     auto maxn = 100*minn;
     if (TKey < 3)
         minn *= 2;
 
-    const int type_size = (sizeof(keyType));
+    constexpr int type_size = sizeof(keyType);
     if (maxn > 1024*1024*1024 / type_size)
         maxn = 1024*1024*1024 / type_size;
 
-    float load_factor = 0.0945f;
-    printf("./sbench maxn = %d c(0-1000) f(0-100) d[2-9 mpatsebu] a(0-3) b t(n %dkB - %dMB)\n", (int)maxn, minn*type_size >> 10, maxn*type_size >> 20);
+    float loadf = 0.0945f;
+    printf("./sbench maxn = %d c(0-1000) f(0-100) d[2-9 mpatsebu] a(0-3) b t(n %dkB - %dMB)\n",
+			(int)maxn, minn*type_size >> 10, maxn*type_size >> 20);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];
@@ -1214,7 +1220,7 @@ int main(int argc, char* argv[])
         if (isdigit(cmd))
             maxn = atoll(argv[i]) + 1000;
         else if (cmd == 'f' && value > 0)
-            load_factor = atof(&argv[i][0] + 1) / 100.0f;
+            loadf = atof(&argv[i][0] + 1) / 100.0f;
         else if (cmd == 't' && value > 0)
             tn = value;
         else if (cmd == 'c' && value > 0)
@@ -1286,20 +1292,21 @@ int main(int argc, char* argv[])
                 n = -n;
             }
         } else if (run_type == 1) {
-            n = (srng() % maxn) + minn;
+            n = (srng() % (maxn - minn)) + minn;
         } else {
-            n = n * 9 / 8;
+            n += n / 8;
             if (n > maxn)
-                n = (srng() % maxn) + minn;
+                n = (srng() % (maxn - minn)) + minn;
         }
 
-        auto pow2 = 1 << ilog(n, 2);
-        hlf = 1.0 * n / pow2 / 2;
-        if (load_factor > 0.2 && load_factor < 1) {
-            n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
+        auto pow2 = 2 << ilog(n, 2);
+        hlf = 1.0 * n / pow2;
+        if (loadf > 0.2 && loadf < 1) {
+            n = int(pow2 * loadf) - (1 << 10) + (srng()) % (1 << 8);
+            hlf = 1.0 * n / pow2;
         }
         if (n < 1000 || n > 1234567890)
-            n = 1234567 + srng() % 1234567;
+            n = minn + srng() % minn;
 
         int tc = benchHashSet(n);
         if (tc >= maxc)

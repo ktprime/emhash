@@ -39,7 +39,7 @@ std::map<std::string, std::string> maps =
 //    {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
     {"jg_dense", "jg_dense"},
-    {"rigtorp", "rigtorp"},
+//    {"rigtorp", "rigtorp"},
 
     {"emhash8", "emhash8"},
 
@@ -47,7 +47,7 @@ std::map<std::string, std::string> maps =
 //    {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
-//    {"emilib", "emilib"},
+    {"emilib", "emilib"},
     {"emilib1", "emilib1"},
 //    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
@@ -171,8 +171,8 @@ std::map<std::string, std::string> maps =
 //#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #if X86
-#include "emilib/emilib2.hpp"
 #include "emilib/emilib.hpp"
+#include "emilib/emilib2.hpp"
 #endif
 //#include "emilib/emilib21.hpp"
 
@@ -939,7 +939,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #if AR > 0
     const auto iRation = AR;
 #else
-    const auto iRation = 10;
+    const auto iRation = 1;
 #endif
 
     auto flag = 0;
@@ -1138,9 +1138,10 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 
         insert_find_erase<hash_type>(hash, hash_name, nList);
         erase_reinsert<hash_type>(hash, hash_name, oList);
+
+#ifdef UF
 //        hash_iter<hash_type>(hash, hash_name);
 
-#ifndef UF
         copy_clear <hash_type>(hash, hash_name);
         //hash_clear<hash_type>(hash, hash_name);
 #endif
@@ -1270,9 +1271,10 @@ static int benchHashMap(int n)
     }
 
     {
-        func_first = (func_first + 2) % func_size + 1;
-        func_last  = (func_first + 3) % func_size + 1;
+        func_first = (func_first + 3) % func_size + 1;
+        func_last  = (func_first + 4) % func_size + 1;
 
+        shuffle(vList.begin(), vList.end());
 
 #if ET > 2
         {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
@@ -1345,9 +1347,9 @@ static int benchHashMap(int n)
 #endif
 
 #if X86
-        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
         //            {  benOneHash<emilib1::HashMap      <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
 #endif
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
@@ -1504,7 +1506,7 @@ static void testHashInt(int loops = 500000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += absl::Hash<uint64_t>()(i + r);
-    printf("absl hash = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    printf("absl hash  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 #endif
 
 #ifdef WYHASH_LITTLE_ENDIAN
@@ -1535,7 +1537,7 @@ static void testHashInt(int loops = 500000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += hashfib(i + r);
-    printf("hashfib     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    printf("hashfib    = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
@@ -1545,7 +1547,7 @@ static void testHashInt(int loops = 500000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += hashmix(i + r);
-    printf("hashmix   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    printf("hashmix    = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
@@ -1597,14 +1599,14 @@ static void testHashString(int size, int str_min, int str_max)
         for (auto& v : rndstring)
             sum += std::hash<std::string>()(v);
         t_find = (getus() - start) / 1000;
-        printf("std hash = %4d ms\n", t_find);
+        printf("std hash    = %4d ms\n", t_find);
 
 #ifdef WYHASH_LITTLE_ENDIAN
         start = getus();
         for (auto& v : rndstring)
             sum += wyhash(v.data(), v.size(), 1);
         t_find = (getus() - start) / 1000;
-        printf("wyhash   = %4d ms\n", t_find);
+        printf("wyhash      = %4d ms\n", t_find);
 #endif
 
 #if KOMI_HESH
@@ -1620,21 +1622,7 @@ static void testHashString(int size, int str_min, int str_max)
         for (auto& v : rndstring)
             sum += ahash64(v.data(), v.size(), 1);
         t_find = (getus() - start) / 1000;
-        printf("ahash   = %4d ms\n", t_find);
-#endif
-
-#if ABSL_HASH
-        constexpr uint64_t kHashSalt[5] = {
-            uint64_t{0x243F6A8885A308D3}, uint64_t{0x13198A2E03707344},
-            uint64_t{0xA4093822299F31D0}, uint64_t{0x082EFA98EC4E6C89},
-            uint64_t{0x452821E638D01377},
-        };
-
-        start = getus();
-        for (auto& v : rndstring)
-            sum += absl::hash_internal::LowLevelHash(v.data(), v.size(), 1, kHashSalt);
-        t_find = (getus() - start) / 1000;
-        printf("absl low = %4d ms\n", t_find);
+        printf("ahash       = %4d ms\n", t_find);
 #endif
 
 #ifdef ROBIN_HOOD_H_INCLUDED
@@ -1642,7 +1630,7 @@ static void testHashString(int size, int str_min, int str_max)
         for (auto& v : rndstring)
             sum += robin_hood::hash_bytes(v.data(), v.size());
         t_find = (getus() - start) / 1000;
-        printf("martin hash = %4d ms\n", t_find);
+        printf("martius hash= %4d ms\n", t_find);
 #endif
 
 #if ABSL_HASH && ABSL
@@ -1650,7 +1638,7 @@ static void testHashString(int size, int str_min, int str_max)
         for (auto& v : rndstring)
             sum += absl::Hash<std::string>()(v);
         t_find = (getus() - start) / 1000;
-        printf("absl hash = %4d ms\n", t_find);
+        printf("absl hash   = %4d ms\n", t_find);
 #endif
 
 #ifdef PHMAP_VERSION_MAJOR
@@ -1828,7 +1816,7 @@ int main(int argc, char* argv[])
             hlf = 1.0 * n / pow2;
         }
         if (n < 1000 || n > 1234567890)
-            n = 1234567 + srng() % 1234567;
+            n = minn + srng() % minn;
 
         int tc = benchHashMap(n);
         if (tc >= maxc)

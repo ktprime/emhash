@@ -5,7 +5,7 @@
 
 #include "qchash/qc-hash.hpp"
 #include "jg/dense_hash_map.hpp"
-#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
+#include "fph/dynamic_fph_table.h"
 #include "rigtorp/rigtorp.hpp"
 
 #include "qc-core/memory.hpp"
@@ -15,19 +15,24 @@
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
 #include "emilib/emilib2.hpp"
+#include "emilib/emilib2s.hpp"
 //#include "emilib/emiset2.hpp"
 
 #include "absl/container/flat_hash_map.h"
 #include "martin/robin_hood.h"
 #include "ska/flat_hash_map.hpp"
+#include "phmap/phmap.h"
 #include "tsl/robin_map.h"
 #include "tsl/robin_set.h"
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
 
-#if FIB_HASH || ABSL
 #include "util.h"
+
+#ifdef FIB_HASH
 #define QintHasher Int64Hasher<K>
+#elif HOOD_HASH
+#define QintHasher robin_hood::hash<K>
 #else
 #define QintHasher typename qc::hash::RawMap<K, V>::hasher
 #endif
@@ -75,15 +80,15 @@ static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease
 static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {         10u, 1'000'000u},
 #if 1
-    {        100u,  1'00'000u},
-    {      1'000u,    10'000u},
-    {     10'000u,     1'000u},
-    {    100'000u,       100u},
-    {  1'000'000u,        10u},
+    {        200u,  1'00'000u},
+    {      3'000u,    10'000u},
+    {     40'000u,     1'000u},
+    {    500'000u,       100u},
+    {  6'000'000u,         5u},
     { 10'000'000u,         3u},
-    { 50'000'000u,         2u},
-//    { 100'000'000u,        1u},
 #endif
+    { 50'000'000u,         2u},
+//    {100'000'000u,         1u},
 };
 
 enum class Stat : size_t
@@ -168,7 +173,7 @@ class Complex : public Trivial<size>
     Complex & operator=(const Complex &) = delete;
 
     Complex && operator=(Complex && other) noexcept {
-        Trivial::val = std::exchange(other.val, {});
+        //Trivial::val = std::exchange(other.val, {});
     }
 
     constexpr ~Complex() noexcept {}
@@ -357,7 +362,7 @@ static void printTypicalChartable(const Stats & results, std::ostream & ofs)
         ofs << elementCount << ",          Insert,Find_Hit,Find_Mis,Erase,Iterator" << std::endl << std::setprecision(4);
         //ofs.fill('0');
         for (const size_t containerI : results.presentContainerIndices()) {
-            ofs << results.containerName(containerI);
+            ofs << results.containerName(containerI) << std::showpoint;
             ofs << ", " << results.at(containerI, elementCount, Stat::insertReserved);
             ofs << ", " << results.at(containerI, elementCount, Stat::accessPresent);
             ofs << ", " << results.at(containerI, elementCount, Stat::accessEmpty);
@@ -672,7 +677,7 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     const s64 t2{now()};
     // AccessEmpty
     for (const K & key : keys) {
-        v = v + container.count(key + t2);
+        v = v + container.count(key + 1);
     }
 
     const s64 t3{now()};
@@ -890,6 +895,7 @@ static void compare()
         std::ofstream ofs{outFilePath};
         printTypicalChartable(results, ofs);
         std::cout << "Wrote results to " << outFilePath << std::endl;
+        printTypicalChartable(results, std::cout);
     }
 }
 
@@ -944,6 +950,7 @@ struct AbslSetInfo
     static inline const std::string name{"absl::flat_hash_set"};
 };
 
+#if ABSL
 template <typename K, typename V>
 struct AbslMapInfo
 {
@@ -953,6 +960,18 @@ struct AbslMapInfo
 
     static inline const std::string name{"absl::f_hash_map"};
 };
+#endif
+
+template <typename K, typename V>
+struct PhMapInfo
+{
+    using Container = phmap::flat_hash_map<K, V, QintHasher>;
+    //using AllocatorContainer = std::conditional_t<sizeof(size_t) == 8, std::unordered_map<K, V, typename absl::flat_hash_map<K, V>::hasher, typename absl::flat_hash_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>, void>;
+    using AllocatorContainer = void;
+
+    static inline const std::string name{"phmap::fhash_map"};
+};
+
 
 template <typename K>
 struct RobinHoodSetInfo
@@ -1064,6 +1083,15 @@ struct EmiLib2MapInfo
     static inline const std::string name{"emilib2::HashMap"};
 };
 
+
+template <typename K, typename V>
+struct EmiLibMapInfo
+{
+    using Container = emilib::HashMap<K, V, QintHasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"emilib::HashMap "};
+};
+
 template <typename K, typename V>
 struct JgDenseMapInfo
 {
@@ -1130,21 +1158,29 @@ int main(int argc, const char* argv[])
         using V = size_t;// std::string;
         compare<CompareMode::typical, K,
 //            StdMapInfo<K, V>,
+            PhMapInfo<K, V>,
+            EmiLibMapInfo<K, V>,
+            EmiLib2MapInfo<K, V>,
 #ifdef ABSL
             AbslMapInfo<K, V>,
 #endif
-            EmiLib2MapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
+
+//            TslSparseMapInfo<K, V>,
 //            FphDyamicMapInfo<K,V>,
 //            SkaMapInfo<K, V>,
+#if 1
             TslRobinMapInfo<K, V>,
-            //TslSparseMapInfo<K, V>,
-            EmHash5MapInfo<K, V>,
+
             EmHash7MapInfo<K, V>,
+            EmHash5MapInfo<K, V>,
             EmHash8MapInfo<K, V>,
+#if CXX20
             JgDenseMapInfo<K, V>,
-            QcHashMapInfo<K, V>,
-            RigtorpMapInfo<K, V>
+            RigtorpMapInfo<K, V>,
+#endif
+#endif
+            QcHashMapInfo<K, V>
         >();
     }
     // Architecture comparison
