@@ -1124,16 +1124,15 @@ public:
 
     bool reserve(uint32_t required_buckets)
     {
-        if (_num_filled != required_buckets || _num_filled == 0)
+        if (_num_filled != required_buckets)
             return reserve(required_buckets, true);
 
         _ehead = _last = 0;
 
         std::sort(_pairs, _pairs + _num_filled, [this](const PairT & l, const PairT & r) {
-            const auto hashl = hash_key(l.first), hashr = hash_key(r.first);
-            auto diff = int64_t((hashl & _mask) - (hashr & _mask));
-            if (diff != 0)
-                return diff < 0;
+            const auto hashl = (size_type)hash_key(l.first) & _mask, hashr = (size_type)hash_key(r.first) & _mask;
+            if (hashl != hashr)
+                return hashl < hashr;
 #if 0
             return hashl < hashr;
 #else
@@ -1149,8 +1148,10 @@ public:
             auto& next_bucket = EMH_BUCKET(_index, bucket);
             if ((int)next_bucket < 0)
                 EMH_INDEX(_index, bucket) = {1, slot | (key_hash & ~_mask)};
-            else
+            else {
+                EMH_HSLOT(_index, bucket) |= (key_hash & ~_mask);
                 next_bucket ++;
+            }
         }
         return true;
     }
@@ -1359,8 +1360,8 @@ private:
 
     size_type find_hash_bucket(const KeyT& key) const
     {
-        const auto hashk = hash_key(key);
-        const auto bucket = hashk & _mask;
+        const auto key_hash = hash_key(key);
+        const auto bucket = key_hash & _mask;
         const auto next_bucket = EMH_BUCKET(_index, bucket);
         if ((int)next_bucket < 0)
             return END;
@@ -1377,11 +1378,11 @@ private:
                 return slot;
 
             const auto hasho = hash_key(okey);
-            if (hasho > hashk)
+            if ((hasho & _mask) != bucket)
                 break;
-            else if ((hasho & _mask) != bucket)
+            else if (hasho > key_hash)
                 break;
-            else if (slot >= _num_filled)
+            else if (EMH_UNLIKELY(slot >= _num_filled))
                 break;
         }
 
@@ -1390,31 +1391,34 @@ private:
 
     size_type find_sorted_bucket(const KeyT& key) const
     {
-        const auto hashk = hash_key(key);
-        const auto bucket = hashk & _mask;
-        auto slot  = (int)(EMH_SLOT(_index, bucket)); //TODO
-        if (slot < 0 /**|| key < EMH_KEY(_pairs, slot)*/)
+        const auto key_hash = hash_key(key);
+        const auto bucket = size_type(key_hash & _mask);
+        const auto slots = (int)(EMH_BUCKET(_index, bucket)); //TODO
+        if (slots < 0 /**|| key < EMH_KEY(_pairs, slot)*/)
             return END;
 
-        const auto slots = EMH_BUCKET(_index, bucket);
+        const auto slot = EMH_SLOT(_index, bucket);
+        auto ormask = _index[bucket].slot & ~_mask;
+        auto hmask  = ((size_type)key_hash) & ~_mask;
+        if ((hmask | ormask) != ormask)
+            return END;
+
         if (_eq(key, EMH_KEY(_pairs, slot)))
             return slot;
-        else if (slots == 1)
+        else if (slots == 1 || key < EMH_KEY(_pairs, slot))
             return END;
 
-#if 1
+#if 0
         if (key < EMH_KEY(_pairs, slot) || key > EMH_KEY(_pairs, slots + slot - 1))
             return END;
 #endif
 
-        for (int i = 0; i < slots; i++) {
+        for (size_type i = 1; i < slots; i++) {
             const auto& okey = EMH_KEY(_pairs, slot + i);
             if (_eq(key, okey))
-                return slot;
-#if 0
-            else if (okey > key)
-                return END;
-#endif
+                return slot + i;
+//            else if (okey > key)
+//                return END;
         }
 
         return END;
@@ -1541,17 +1545,18 @@ one-way seach strategy.
             return bucket;
 
         auto offset = 2u;
-        constexpr auto linear_probe_length = 2 + EMH_CACHE_LINE_SIZE / 16;//8 cache line TODO
 
 #ifndef EMH_QUADRATIC
+        constexpr auto linear_probe_length = 2 + EMH_CACHE_LINE_SIZE / 16;//2 4 6 8
         for (; offset < linear_probe_length; offset += 2) {
             auto bucket1 = (bucket + offset) & _mask;
             if (EMH_EMPTY(_index, bucket1) || EMH_EMPTY(_index, ++bucket1))
                 return bucket1;
         }
 #else
-        for (auto next = offset; offset < linear_probe_length; next += ++offset) {
-            auto bucket1 = (bucket + next) & _mask;
+        constexpr auto linear_probe_length = 10;//2 4 7 11
+        for (auto step = offset; offset < linear_probe_length; offset += ++step) {
+            auto bucket1 = (bucket + offset) & _mask;
             if (EMH_EMPTY(_index, bucket1) || EMH_EMPTY(_index, ++bucket1))
                 return bucket1;
         }
@@ -1578,11 +1583,11 @@ one-way seach strategy.
         //for (auto slot = bucket + offset; ;slot += offset++) {
         for (auto slot = bucket + offset; ; slot++) {
             _last &= _mask;
-            if (EMH_EMPTY(_index, ++_last) || EMH_EMPTY(_index, ++_last))
+            if (EMH_EMPTY(_index, ++_last))// || EMH_EMPTY(_index, ++_last))
                 return _last ++;
 
             auto bucket1 = slot++ & _mask;
-            if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket1)) || EMH_UNLIKELY(EMH_EMPTY(_index, ++bucket1)))
+            if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket1)))// || EMH_UNLIKELY(EMH_EMPTY(_index, ++bucket1)))
                 return bucket1;
 
 #if 0

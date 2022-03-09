@@ -47,8 +47,8 @@ std::map<std::string, std::string> maps =
 //    {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
-    {"emilib", "emilib"},
     {"emilib1", "emilib1"},
+    {"emilib3", "emilib3"},
 //    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
@@ -75,8 +75,8 @@ std::map<std::string, std::string> maps =
 
 
 //rand data type
-#ifndef RT
-    #define RT 4  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+#ifndef  RT
+    #define RT 1  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP       1
@@ -171,8 +171,9 @@ std::map<std::string, std::string> maps =
 //#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #if X86
-#include "emilib/emilib.hpp"
 #include "emilib/emilib2.hpp"
+#include "emilib/emilib2s.hpp"
+#include "emilib/emilib.hpp"
 #endif
 //#include "emilib/emilib21.hpp"
 
@@ -561,7 +562,9 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 
     if (vList.size() % 3 == 0)
         ht_hash.clear();
-    const auto vmedium = vList.size() / 100;
+
+    //load_factor = 0.5
+    const auto vmedium = (1u << ilog(vList.size() / 100, 2)) * 5 / 10;
     for (size_t i = 0; i < vList.size(); i++) {
         auto it = ht_hash.emplace(vList[i], TO_VAL(0));
         if (i > vmedium)
@@ -570,7 +573,9 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 
     if (vList.size() % 2 == 0)
         ht_hash.clear();
-    const auto vsize = vList.size() / 8;
+
+    //load_factor = 0.8
+    const auto vsize = (1u << ilog(vList.size() / 8, 2)) * 8 / 10;
     for (size_t i = 0; i < vList.size(); i++) {
         ht_hash[vList[i]] = TO_VAL(0);
         if (i > vsize)
@@ -597,7 +602,7 @@ void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std:
 {
     auto ts1 = getus(); size_t sum = 0;
 #ifndef SMAP
-    //ht_hash.max_load_factor(0.99f);
+    ht_hash.max_load_factor(0.9f);
     ht_hash.reserve(vList.size());
 #endif
 
@@ -683,12 +688,6 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
     auto ts1 = getus(); size_t sum = 0;
     const auto lsize = cache_size + vList.size() % min_size;
     hash_type tmp, empty;
-#ifndef SMAP
-//    if (vList.size() % 4 == 0)
-//        empty.max_load_factor(0.80);
-//    if (vList.size() % 8 == 0)
-//        empty.reserve(cache_size);
-#endif
 
     tmp = empty;
     for (const auto& v : vList)
@@ -936,10 +935,10 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     return 0;
 #else
 
-#if AR > 0
-    const auto iRation = AR;
+#if RA > 0
+    const auto iRation = RA;
 #else
-    const auto iRation = 1;
+    const auto iRation = 5;
 #endif
 
     auto flag = 0;
@@ -1140,8 +1139,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         erase_reinsert<hash_type>(hash, hash_name, oList);
 
 #ifdef UF
-//        hash_iter<hash_type>(hash, hash_name);
-
+        hash_iter<hash_type>(hash, hash_name);
         copy_clear <hash_type>(hash, hash_name);
         //hash_clear<hash_type>(hash, hash_name);
 #endif
@@ -1349,7 +1347,8 @@ static int benchHashMap(int n)
 #if X86
         //            {  benOneHash<emilib1::HashMap      <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
-        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib", vList); }
+        {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
@@ -1465,7 +1464,7 @@ static void testHashRand(int loops = 100000009)
         Lehmer64 srng(rseed);
         for (int i = 1; i < loops; i++)
             sum += srng();
-        printf("Lehmer64    = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+        printf("Lehmer64   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
 #endif
 
@@ -1552,7 +1551,7 @@ static void testHashInt(int loops = 500000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += rrxmrrxmsx_0(i + r);
-    printf("rrxmrrxmsx_0 = %4d ms [%ld]\n\n", (int)(getus() - ts) / 1000, sum);
+    printf("rrxmrrxmsx_0= %3d ms [%ld]\n\n", (int)(getus() - ts) / 1000, sum);
 
 #if 0
     const int buff_size = 1024*1024 * 16;
@@ -1674,10 +1673,11 @@ int main(int argc, char* argv[])
 #endif
     auto start = getus();
 //    test_lru(100'000'000);
-    testHashInt(5e7+8);
+    testHashInt(2e7+8);
+    testHashRand(1e8+8);
 
 #ifdef AHASH_AHASH_H
-    printf("ahash_version = %s", ahash_version());
+    printf("ahash_version = %s\n", ahash_version());
 #endif
 
     //srand((unsigned)time(0));
@@ -1720,7 +1720,6 @@ int main(int argc, char* argv[])
         else if (cmd == 'm')
             maxn = value;
         else if (cmd == 'b') {
-            testHashRand(1e8+8);
             testHashString(1e6+6, 6, 16);
         }
         else if (cmd == 'd') {
@@ -1742,7 +1741,7 @@ int main(int argc, char* argv[])
                 else if (c == 's')
                     maps.erase("skaf");
                 else if (c == 'a')
-                    maps.erase("absl");
+                    maps.erase("abslf");
                 else if (c == 'f')
                     maps.erase("f14_vector");
                 else if (c == 'h')
@@ -1751,14 +1750,8 @@ int main(int argc, char* argv[])
                     maps.erase("jg_dense");
                 else if (c == 'r')
                     maps.erase("rigtorp");
-                else if (c == 'e') {
-                    const std::string emistr = "emilib";
-                    if (maps.find(emistr) != maps.end()) maps.erase(emistr);
-                    else maps.emplace(emistr, emistr);
-//                    maps.erase("emilib1");
-                }
-                else if (c == '2') {
-                    const std::string emistr = "emilib2";
+                else if (c >= '1' && c <= '3') {
+                    const std::string emistr = std::string("emilib") + c;
                     if (maps.find(emistr) != maps.end()) maps.erase(emistr);
                     else maps.emplace(emistr, emistr);
                 }

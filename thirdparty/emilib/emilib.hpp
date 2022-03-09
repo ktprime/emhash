@@ -171,19 +171,19 @@ public:
     typedef ValueT val_type;
     typedef KeyT   key_type;
 
-#ifdef EMH_H2
-    #define hash2_key(key_hash, key) ((uint8_t)(key_hash >> 24)) >> 1
+#ifndef EMH_H2
+    #define key2_hash(key_hash, key) ((uint8_t)(key_hash >> 24)) >> 1
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash2_key(uint64_t key_hash, const UType& key) const
+    inline uint8_t key2_hash(uint64_t key_hash, const UType& key) const
     {
         return (uint8_t)(key_hash >> 28) >> 1;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash2_key(uint64_t key_hash, const UType& key) const
+    inline uint8_t key2_hash(uint64_t key_hash, const UType& key) const
     {
-        return (uint8_t)(key * 0x9FB21C651E98DF25ull >> 28) >> 1;
+        return (uint8_t)(key * 0x9FB21C651E98DF25ull >> 48) >> 1;
 #if _WIN32 && _MSC_VER
 //        return (uint8_t)(_byteswap_uint64(((uint64_t)key) * 0xA24BAED4963EE407)) >> 1;
 #else
@@ -673,7 +673,7 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = hash2_key(key_hash, key);
+        _states[bucket] = key2_hash(key_hash, key);
         new(_pairs + bucket) PairT(key, value); _num_filled++;
     }
 
@@ -684,7 +684,7 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = hash2_key(key_hash, key);
+        _states[bucket] = key2_hash(key_hash, key);
         new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
     }
 
@@ -868,7 +868,7 @@ public:
 
 #if 0
         if constexpr (std::is_integral<KeyT>::value) {
-            auto key_h2 = (hash2_key(_hasher(0), (KeyT)(0))) - 1;
+            auto key_h2 = (key2_hash(_hasher(0), (KeyT)(0))) - 1;
             if ((key_h2 & EEMPTY) == State::EEMPTY)
                 key_h2 = State::SENTINEL;
             std::fill_n(_states + num_buckets, simd_bytes, key_h2);
@@ -897,7 +897,7 @@ public:
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
                 collisions += (_states[key_hash & _mask] & FILLED_MASK) == State::EFILLED;
 #endif
-                _states[dst_bucket] = hash2_key(key_hash, src_pair.first);
+                _states[dst_bucket] = key2_hash(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 if (is_triviall_destructable())
                     src_pair.~PairT();
@@ -926,7 +926,7 @@ public:
                 } else
                     check_offset(offset);
 #endif
-                _states[dst_bucket] = hash2_key(key_hash, src_pair.first);
+                _states[dst_bucket] = key2_hash(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 if (is_triviall_destructable())
                     src_pair.~PairT();
@@ -957,7 +957,7 @@ private:
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
 
-        const char key_h2 = hash2_key(key_hash, key);
+        const char key_h2 = key2_hash(key_hash, key);
         const auto filled = SET1_EPI8(key_h2);
         /*****
           1. start at bucket h1 (mod n)
@@ -968,31 +968,6 @@ private:
           6. if there was any matches, return false
           7. otherwise (every entry was FULL or ERASEDD), probe (mod n) and GOTO 2 **/
 
-#if 0
-        const auto headsize = next_bucket % simd_bytes;
-        if (1) {
-            next_bucket -= headsize;
-            const auto head_mask = ~((1 << headsize) - 1);
-            const auto vec = LOADU_EPI8((decltype(&simd_empty))(_states + next_bucket));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & head_mask;
-            while (maskf != 0) {
-                const auto fbucket = next_bucket + CTZ(maskf);
-                if (!std::is_integral<KeyLike>::value && EMH_UNLIKELY(fbucket >= _num_buckets))
-                    break; //overflow
-                if (_eq(_pairs[fbucket].first, key))
-                    return fbucket;
-                maskf &= maskf - 1;
-            }
-
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)) & head_mask;
-            if (maske != 0)
-                return _num_buckets;
-            next_bucket += simd_bytes;
-        }
-
-        const int round = max_search_gap(next_bucket) - (simd_bytes - headsize) % simd_bytes;
-        assert(next_bucket % simd_bytes == 0);
-#endif
         int i = max_search_gap(next_bucket);
         //for (int i = round; i >= 0; i -= simd_bytes) {
         for ( ; ; ) {
@@ -1089,8 +1064,8 @@ private:
 
         const auto key_hash = _hasher(key);
         //TODO:same
-        key_h2 = hash2_key(key_hash, key);
-        //const char key_h2 = hash2_key(key_hash, (KeyT&)key);
+        key_h2 = key2_hash(key_hash, key);
+        //const char key_h2 = key2_hash(key_hash, (KeyT&)key);
 
         const auto filled = SET1_EPI8(key_h2);
         const auto bucket = (size_t)(key_hash & _mask);
@@ -1151,7 +1126,7 @@ private:
 
 
         offset = i - bucket;
-#if 0
+#ifndef EMH_RBI
         next_bucket = find_empty_slot(next_bucket, offset);
 #elif 1
         next_bucket = find_empty_slot2(next_bucket, offset);

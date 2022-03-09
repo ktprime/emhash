@@ -91,7 +91,7 @@ uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_
 }
 #endif
 
-static int64_t getus()
+int64_t getus()
 {
 #if 0
     auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();

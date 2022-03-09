@@ -15,6 +15,7 @@
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
 #include "emilib/emilib2.hpp"
+#include "emilib/emilib.hpp"
 #include "emilib/emilib2s.hpp"
 //#include "emilib/emiset2.hpp"
 
@@ -84,8 +85,8 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
     {    500'000u,       100u},
-    {  6'000'000u,         5u},
-    { 10'000'000u,         3u},
+    {  6'000'000u,         4u},
+    { 10'000'000u,         2u},
 #endif
     { 50'000'000u,         2u},
 //    {100'000'000u,         1u},
@@ -647,6 +648,7 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
 
     static constexpr bool isSet{!IsMap<Container>};
 
+    const double invElementCount{1.0 / double(keys.size())};
     static volatile size_t v{};
 
     Container container{};
@@ -665,7 +667,11 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
         }
     }
 
-    const s64 t1{now()};
+    s64 t1{now()};
+    results.get(containerI, keys.size(), Stat::insertReserved)+= double(t1 - t0) * invElementCount;
+
+    //container.reserve(2);
+    t1 = now();
     // Access
     for (const K & key : keys) {
         v = v + container.count(key);
@@ -699,8 +705,6 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     }
 
     const s64 t5{now()};
-    const double invElementCount{1.0 / double(keys.size())};
-    results.get(containerI, keys.size(), Stat::insertReserved)+= double(t1 - t0) * invElementCount;
     results.get(containerI, keys.size(), Stat::accessPresent) += double(t2 - t1) * invElementCount;
     results.get(containerI, keys.size(), Stat::accessEmpty)   += double(t3 - t2) * invElementCount;
     results.get(containerI, keys.size(), Stat::iterateFull)   += double(t4 - t3) * invElementCount;
@@ -1083,13 +1087,21 @@ struct EmiLib2MapInfo
     static inline const std::string name{"emilib2::HashMap"};
 };
 
+template <typename K, typename V>
+struct EmiLib3MapInfo
+{
+    using Container = emilib3::HashMap<K, V, QintHasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"emilib3::HashMap"};
+};
+
 
 template <typename K, typename V>
-struct EmiLibMapInfo
+struct EmiLib1MapInfo
 {
     using Container = emilib::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
-    static inline const std::string name{"emilib::HashMap "};
+    static inline const std::string name{"emilib1::HashMap"};
 };
 
 template <typename K, typename V>
@@ -1157,24 +1169,26 @@ int main(int argc, const char* argv[])
         using K = size_t;
         using V = size_t;// std::string;
         compare<CompareMode::typical, K,
-//            StdMapInfo<K, V>,
-            PhMapInfo<K, V>,
-            EmiLibMapInfo<K, V>,
+            EmiLib1MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
+            EmiLib3MapInfo<K, V>,
+//            StdMapInfo<K, V>,
 #ifdef ABSL
             AbslMapInfo<K, V>,
 #endif
+#if ET
+            PhMapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
+            TslRobinMapInfo<K, V>,
+#endif
 
 //            TslSparseMapInfo<K, V>,
 //            FphDyamicMapInfo<K,V>,
 //            SkaMapInfo<K, V>,
-#if 1
-            TslRobinMapInfo<K, V>,
-
+#if 0
+            EmHash8MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
             EmHash5MapInfo<K, V>,
-            EmHash8MapInfo<K, V>,
 #if CXX20
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,

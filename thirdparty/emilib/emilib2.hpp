@@ -140,7 +140,7 @@ public:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 28) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 52) << 1;
     }
 #endif
 

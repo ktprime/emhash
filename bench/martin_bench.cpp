@@ -34,6 +34,7 @@
 
 #include "emilib/emilib.hpp"
 #include "emilib/emilib2.hpp"
+#include "emilib/emilib2s.hpp"
 //#include "old/ktprime_hash.hpp"
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600
@@ -64,13 +65,13 @@ static std::map<std::string, std::string> show_name =
     //{"emhash3", "emhash3"},
     {"emhash4", "emhash4"},
 #endif
-    {"emhash7", "emhash7"},
-    {"emhash8", "emhash8"},
-
-    {"emhash5", "emhash5"},
+   {"emhash7", "emhash7"},
+   {"emhash8", "emhash8"},
+   {"emhash5", "emhash5"},
 #if X86
 //    {"emilib", "emilib"},
     {"emilib2", "emilib2"},
+    {"emilib3", "emilib3"},
 #endif
 
 #if QC_HASH
@@ -78,7 +79,7 @@ static std::map<std::string, std::string> show_name =
     {"fph", "fph"},
 #endif
 
-    {"jg", "jg_dense"},
+//    {"jg", "jg_dense"},
     //    {"emhash6", "emhash6"},
 #if ABSL
     {"absl", "absl flat"},
@@ -103,6 +104,8 @@ static const char* find(const std::string& map_name)
     {
         if (map_name.find("emilib2") < 10)
             return "emilib2";
+        if (map_name.find("emilib3") < 10)
+            return "emilib3";
 
         if (map_name.find(kv.first) < 10)
             return kv.second.c_str();
@@ -112,7 +115,7 @@ static const char* find(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -759,6 +762,7 @@ void runTest(int sflags, int eflags)
 #endif
 #if X86
         { emilib::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
+        { emilib3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
 #if ABSL
@@ -797,6 +801,7 @@ void runTest(int sflags, int eflags)
 #endif
         { emhash7::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if X86
+        { emilib3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { emilib::HashMap<std::string,  size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
@@ -844,6 +849,7 @@ void runTest(int sflags, int eflags)
 #if X86
         { emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { emilib::HashMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
+        { emilib3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
         { emhash8::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { emhash7::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
@@ -911,6 +917,7 @@ void runTest(int sflags, int eflags)
 #endif
 #if X86
             { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { emilib3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emilib::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
             { emhash5::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -972,6 +979,7 @@ void runTest(int sflags, int eflags)
 #if X86
         { emilib::HashMap<int, int, hash_func>  emap; bench_insert(emap); }
         { emilib2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+        { emilib3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #endif
 #if ET
         //        { hrd7::hash_map <int, int, hash_func> hmap;  bench_insert(hmap); }
@@ -1014,6 +1022,7 @@ void runTest(int sflags, int eflags)
 #endif
 
 #if X86
+        { emilib3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emilib::HashMap<uint64_t, uint64_t, hash_func>  emap; bench_randomInsertErase(emap); }
 #endif
@@ -1075,6 +1084,7 @@ void runTest(int sflags, int eflags)
 #if X86
         { emilib::HashMap<int, int, hash_func> emap;  bench_randomDistinct2(emap); }
         { emilib2::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+        { emilib3::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #endif
 #if ET
         //        { hrd7::hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
@@ -1134,10 +1144,12 @@ int main(int argc, char* argv[])
                 checkSet("ska");
             else if (c == 'h')
                 checkSet("hrd7");
-            else if (c == 'e')
+            else if (c == 'e' || c == '1')
                 checkSet("emilib");
             else if (c == '2')
                 checkSet("emilib2");
+            else if (c == '3')
+                checkSet("emilib3");
             else if (c == 'j')
                 checkSet("jg");
             else if (c == 'r')
