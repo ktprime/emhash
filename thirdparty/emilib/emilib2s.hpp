@@ -65,13 +65,12 @@ namespace emilib3 {
     const static auto simd_delete = _mm512_set1_epi8(EDELETE);
     const static auto simd_filled = _mm512_set1_epi8(EFILLED);
 
-
     #define SET1_EPI8      _mm512_set1_epi8
     #define LOAD_UEPI8     _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
     #define CMPEQ_EPI8     _mm512_test_epi8_mask
 #else
-    //TODO arm neon
+    //TODO sse2neon
 #endif
 
 //find filled or empty
@@ -749,12 +748,10 @@ public:
     void clear()
     {
         if (is_triviall_destructable()) {
-            for (size_t bucket=0; _num_filled; ++bucket) {
-                if (_states[bucket] % 2 == State::EFILLED) {
-                    _pairs[bucket].~PairT();
-                    _num_filled --;
-                }
+            for (auto it = begin();  it.bucket() != _num_buckets; ++it) {
+                const auto bucket = it.bucket();
                 _states[bucket] = State::EEMPTY;
+                _pairs[bucket].~PairT();
             }
         } else if (_num_filled)
             std::fill_n(_states, _num_buckets, State::EEMPTY);
@@ -841,7 +838,7 @@ public:
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 const auto key_hash = _hasher(src_pair.first);
-                const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
+                const auto dst_bucket = find_empty_only(key_hash & _mask);
                 //collision += _states[key_hash & _mask] % 2 == State::EFILLED;
 
                 _states[dst_bucket] = key_2hash(key_hash, src_pair.first);
@@ -893,7 +890,7 @@ private:
 
             if (group_mask(next_bucket) == State::EEMPTY)
                 break;
-			else if (EMH_UNLIKELY((i -= simd_bytes) < 0))
+            else if (EMH_UNLIKELY((i -= simd_bytes) < 0))
                 break;
 
             next_bucket = (next_bucket + simd_bytes) & _mask;
@@ -939,7 +936,7 @@ private:
                 const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
-                    _max_probe_length = offset;
+                    _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
 
                 _states[ebucket] = key_h2;
                 return ebucket;
@@ -974,13 +971,32 @@ private:
         next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = empty_delete(next_bucket);
+            if (maske != 0) {
+                const auto probe = CTZ(maske);
+                offset += probe;
+                if (EMH_LIKELY(offset > _max_probe_length))
+                    _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
+                return next_bucket + probe;
+            }
+            offset      += simd_bytes;
+            next_bucket = (next_bucket + simd_bytes) & _mask;
+        }
+        return 0;
+    }
+
+    size_t find_empty_only(size_t next_bucket)
+    {
+        int offset = 0;
+        next_bucket -= next_bucket % simd_bytes;
+        while (true) {
+            const auto vec = LOAD_UEPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (EMH_LIKELY(maske != 0)) {
                 const auto probe = CTZ(maske);
                 offset += probe;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
-                    _max_probe_length = offset;
-                const auto ebucket = next_bucket + probe;
-                return ebucket;
+                    _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
+                return next_bucket + probe;
             }
             offset      += simd_bytes;
             next_bucket = (next_bucket + simd_bytes) & _mask;

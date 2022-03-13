@@ -101,9 +101,9 @@
     #define EMH_NEW(key, value, bucket, next) new(_pairs + bucket) PairT(key, value, next), _num_filled ++; EMH_SET(bucket)
 #endif
 
-#define EMH_MASK(bucket)               1 << (bucket % MASK_BIT)
-#define EMH_SET(bucket)                _bitmask[bucket / MASK_BIT] &= ~(EMH_MASK(bucket))
-#define EMH_CLS(bucket)                _bitmask[bucket / MASK_BIT] |= EMH_MASK(bucket)
+#define EMH_MASK(bucket) 1 << (bucket % MASK_BIT)
+#define EMH_SET(bucket)  _bitmask[bucket / MASK_BIT] &= ~(EMH_MASK(bucket))
+#define EMH_CLS(bucket)  _bitmask[bucket / MASK_BIT] |= EMH_MASK(bucket)
 //#define EMH_EMPTY(bitmask, bucket)     (_bitmask[bucket / MASK_BIT] & (EMH_MASK(bucket))) != 0
 
 #if _WIN32
@@ -243,6 +243,7 @@ public:
     static constexpr bool bInCacheLine = sizeof(value_pair) < (2 * EMH_CACHE_LINE_SIZE) / 3;
 
     typedef KeyT   key_type;
+    typedef ValueT val_type;
     typedef ValueT mapped_type;
     typedef HashT  hasher;
     typedef EqT    key_equal;
@@ -586,7 +587,7 @@ public:
         return it.next();
     }
 
-    iterator last()
+    iterator last() const
     {
         if (_num_filled == 0)
             return end();
@@ -613,7 +614,7 @@ public:
 
     const_iterator end() const
     {
-        return cend();
+        return {this, _mask + 1};
     }
 
     size_type size() const
@@ -1313,7 +1314,8 @@ private:
             _pairs[bucket].~PairT();
             EMH_ADDR(_pairs, bucket) = INACTIVE;
         }
-        _bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
+        //_bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
+        EMH_CLS(bucket);
         _num_filled--;
     }
 
@@ -1326,7 +1328,6 @@ private:
 
         if (next_bucket == bucket * 2) {
             const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
-            if (eqkey)
 #if EMH_SAFE_HASH
             return eqkey ? (_num_main --, bucket) : empty_bucket;
 #else
@@ -1373,13 +1374,11 @@ private:
 
         if (next_bucket == bucket * 2) { //only one main bucket
             const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
-            if (eqkey) {
 #if EMH_SAFE_HASH
-                _num_main --;
+            return eqkey ? (_num_main --, bucket) : empty_bucket;
+#else
+            return eqkey ? bucket : empty_bucket;
 #endif
-                return bucket;
-            }
-            return empty_bucket;
         }
         else if (next_bucket % 2 > 0)
             return empty_bucket;
@@ -1562,19 +1561,11 @@ private:
         const auto boset = bucket_from % 8;
         const auto begin = (uint8_t*)_bitmask + bucket_from / 8;
         const auto bmask = *(size_t*)begin >> boset;
-        if (EMH_LIKELY(bmask != 0)) {
-            const auto offset = CTZ(bmask);
-//            if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
-                return bucket_from + offset;
-
-            //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
-            //return bucket_from - boset + 7 - CTZ(rerverse_bit);
-//            return bucket_from - boset + CTZ(begin[0]);
-        }
+        if (EMH_LIKELY(bmask != 0))
+            return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1)
-        {
+        if (1) {
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
             if (EMH_LIKELY(bmask2 != 0))
@@ -1587,12 +1578,13 @@ private:
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
 
-            const auto next1 = qmask - _last;
-            const auto bmask1 = *((size_t*)_bitmask + next1);
-            if (bmask1 != 0)
-                return next1 * SIZE_BIT + CTZ(bmask1);
-
-            _last = (_last + 1) & qmask;
+            const auto tail = (_last + qmask / 2) & qmask;
+            const auto bmask1 = *((size_t*)_bitmask + tail);
+            if (bmask1 != 0) {
+                _last = tail;
+                return tail * SIZE_BIT + CTZ(bmask1);
+            }
+            _last = ++_last & qmask;
         }
         return 0;
     }

@@ -28,17 +28,17 @@ std::map<std::string, std::string> maps =
 //    {"fmap", "flat_map"},
 //    {"btree", "btree_map"},
 
-    {"qchash", "qc-hash"},
-    {"fph", "fph-table"},
+//    {"qchash", "qc-hash"},
+//    {"fph", "fph-table"},
 
 //    {"emhash2", "emhash2"},
 //    {"emhash3", "emhash3"},
 //    {"emhash4", "emhash4"},
 
     {"emhash5", "emhash5"},
-//    {"emhash6", "emhash6"},
+    {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
-    {"jg_dense", "jg_dense"},
+//    {"jg_dense", "jg_dense"},
 //    {"rigtorp", "rigtorp"},
 
     {"emhash8", "emhash8"},
@@ -171,8 +171,8 @@ std::map<std::string, std::string> maps =
 //#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #if X86
-#include "emilib/emilib2.hpp"
 #include "emilib/emilib2s.hpp"
+#include "emilib/emilib2.hpp"
 #include "emilib/emilib.hpp"
 #endif
 //#include "emilib/emilib21.hpp"
@@ -571,11 +571,13 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
             ht_hash.erase(it.first);
     }
 
-    if (vList.size() % 2 == 0)
+    if (test_case % 2 == 0)
         ht_hash.clear();
 
+    ht_hash.max_load_factor(0.75);
     //load_factor = 0.8
-    const auto vsize = (1u << ilog(vList.size() / 8, 2)) * 8 / 10;
+    const auto vsize = (1u << ilog(vList.size() / 8, 2)) * 75 / 100;
+    ht_hash.reserve(vsize / 2);
     for (size_t i = 0; i < vList.size(); i++) {
         ht_hash[vList[i]] = TO_VAL(0);
         if (i > vsize)
@@ -583,6 +585,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
     }
 
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
+//    printf(" = %.2f\n", ht_hash.load_factor());
 #endif
 }
 
@@ -616,8 +619,7 @@ void insert_hit(hash_type& ht_hash, const std::string& hash_name, const std::vec
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
-        ht_hash[v] = TO_VAL(0);
-        sum ++;
+        sum += ht_hash.emplace(v, TO_VAL(0)).second;
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -627,26 +629,37 @@ void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& v
 {
 #if KEY_INT
     size_t sum = 0;
-    const auto hash_size = vList.size() / 10003 + 200;
+    const auto hash_size = vList.size() / 1003 + 10;
     const auto ts1 = getus();
 
-    auto mh = new hash_type[hash_size];
-    for (const auto& v : vList) {
-        auto hash_id = ((uint64_t)v) % hash_size;
-        sum += mh[hash_id].emplace(v, TO_VAL(0)).second;
+    if (test_case % 2) {
+        auto mh = new hash_type[hash_size];
+        for (const auto& v : vList) {
+            auto hash_id = ((uint32_t)v) % hash_size;
+            sum += mh[hash_id].emplace(v, TO_VAL(0)).second;
+        }
+
+        for (const auto& v : vList) {
+            auto hash_id = ((uint32_t)v) % hash_size;
+            sum += mh[hash_id].count(v);
+        }
+
+        for (const auto& v : vList) {
+            auto hash_id = ((uint32_t)v) % hash_size;
+            sum += mh[hash_id].erase(v + v % 2);
+        }
+
+        delete []mh;
+    } else {
+        hash_type hashm;
+        for (const auto v : vList) {
+            const keyType v2 = v % hash_size;
+            sum += hashm.emplace(v2, TO_VAL(0)).second;
+            sum += hashm.erase(v2 + 1);
+            sum += hashm.count(v2 / 2);
+        }
     }
 
-    for (const auto& v : vList) {
-        auto hash_id = ((uint64_t)v) % hash_size;
-        sum += mh[hash_id].count(v + v % 2);
-    }
-
-    for (const auto& v : vList) {
-        auto hash_id = ((uint64_t)v) % hash_size;
-        sum += mh[hash_id].erase(v + v % 2);
-    }
-
-    delete []mh;
     check_func_result(hash_name, __FUNCTION__, sum, ts1, 2);
 #endif
 }
@@ -685,11 +698,10 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 template<class hash_type>
 void insert_cache_size(const std::string& hash_name, const std::vector<keyType>& vList, const char* level, const uint32_t cache_size, const uint32_t min_size)
 {
-    auto ts1 = getus(); size_t sum = 0;
     const auto lsize = cache_size + vList.size() % min_size;
     hash_type tmp, empty;
 
-    tmp = empty;
+    auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
     {
         sum += tmp.emplace(v, TO_VAL(0)).second;
@@ -697,8 +709,9 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
         if (tmp.size() > lsize) {
             if (lsize % 2 == 0)
                 tmp.clear();
-            else
+            else {
                 tmp = std::move(empty);
+            }
         }
     }
     check_func_result(hash_name, level, sum, ts1);
@@ -711,7 +724,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     size_t pow2 = 2u << ilog(vList.size(), 2);
     hash_type tmp;
 
-    const auto max_loadf = 0.99f;
+    const auto max_loadf = 1 - 0.01;
 #ifndef SMAP
     tmp.max_load_factor(max_loadf);
     tmp.reserve(pow2 / 2);
@@ -754,6 +767,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
         sum += tmp.count(v2);
         tmp.emplace(std::move(v2), TO_VAL(0));
     }
+
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -809,12 +823,12 @@ void find_hit_50_erase(const hash_type& ht_hash, const std::string& hash_name, c
 {
     auto tmp = ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    for (auto& v : vList) {
+    for (const auto& v : vList) {
         auto it = tmp.find(v);
-        if (it != tmp.end())
-            tmp.erase(it);
-        else
+        if (it == tmp.end())
             sum ++;
+        else
+            tmp.erase(it);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -938,7 +952,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 #if RA > 0
     const auto iRation = RA;
 #else
-    const auto iRation = 5;
+    const auto iRation = 1;
 #endif
 
     auto flag = 0;
@@ -984,11 +998,11 @@ static int TestHashMap(int n, int max_loops = 1234567)
 
 #ifndef KEY_CLA
     emhash5::HashMap <keyType, int> ehash5;
-    emilib2::HashMap <keyType, int> ehash2;
+    emilib::HashMap <keyType, int> ehash2;
 
     Sfc4 srng(n);
 #if 1
-    emhash7::HashMap <keyType, int> unhash;
+    emhash8::HashMap <keyType, int> unhash;
 #else
     std::unordered_map<long,int> unhash;
 #endif
@@ -1112,11 +1126,11 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_no_reserve <hash_type>(hash_name, oList);
 
         insert_hit<hash_type>(hash,hash_name, oList);
-        find_hit_100  <hash_type>(hash,hash_name, oList);
+        find_hit_100<hash_type>(hash,hash_name, oList);
         find_hit_0  <hash_type>(hash,hash_name, oList);
 
         auto nList = oList;
-        for (size_t v = 0; v < nList.size(); v += 2) {
+        for (size_t v = 0; v < nList.size() / 2; v ++) {
             auto& next = nList[v];
 #if KEY_INT
             next += nList.size() / 2 - v;
@@ -1330,7 +1344,7 @@ static int benchHashMap(int n)
 #endif
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
-//        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
+        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
         {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
@@ -1723,55 +1737,59 @@ int main(int argc, char* argv[])
             testHashString(1e6+6, 6, 16);
         }
         else if (cmd == 'd') {
-            for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
-                if (c >= '5' && c <= '9') {
-                    std::string hash_name("emhash");
-                    hash_name += c;
-                    if (maps.find(hash_name) != maps.end())
-                        maps.erase(hash_name);
-                    else
-                        maps[hash_name] = hash_name;
-                }
-                else if (c == 'm')
-                    maps.erase("martinf");
-                else if (c == 'p')
-                    maps.erase("phmap");
-                else if (c == 't')
-                    maps.erase("tslr");
-                else if (c == 's')
-                    maps.erase("skaf");
-                else if (c == 'a')
-                    maps.erase("abslf");
-                else if (c == 'f')
-                    maps.erase("f14_vector");
-                else if (c == 'h')
-                    maps.erase("hrdset");
-                else if (c == 'j')
-                    maps.erase("jg_dense");
-                else if (c == 'r')
-                    maps.erase("rigtorp");
-                else if (c >= '1' && c <= '3') {
-                    const std::string emistr = std::string("emilib") + c;
-                    if (maps.find(emistr) != maps.end()) maps.erase(emistr);
-                    else maps.emplace(emistr, emistr);
-                }
-                else if (c == 'l') {
-                    maps.emplace("lru_size", "lru_size");
-                    maps.emplace("lru_time", "lru_time");
-                }
-                else if (c == 'k')
-                    maps.emplace("ktprime", "ktprime");
-                else if (c == 'b') {
-                    maps.emplace("btree", "btree_map");
-                    maps.emplace("stl_map", "stl_map");
-                    maps.emplace("fmap", "flat_map");
-                } else if (c == 'u')
-                    maps.emplace("stl_hash", "unordered_map");
+        for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
+            if (c >= '5' && c <= '9') {
+                std::string hash_name("emhash");
+                hash_name += c;
+                if (maps.find(hash_name) != maps.end())
+                    maps.erase(hash_name);
+                else
+                    maps[hash_name] = hash_name;
             }
-        }
+            else if (c == 'm')
+                maps.erase("martinf");
+            else if (c == 'p')
+                maps.erase("phmap");
+            else if (c == 't')
+                maps.erase("tslr");
+            else if (c == 's')
+                maps.erase("skaf");
+            else if (c == 'a')
+                maps.erase("abslf");
+            else if (c == 'v')
+                maps.erase("f14_vector");
+            else if (c == 'h')
+                maps.erase("hrdset");
+            else if (c == 'j')
+                maps.erase("jg_dense");
+            else if (c == 'r')
+                maps.erase("rigtorp");
+            else if (c == 'q')
+                maps.erase("qchash");
+            else if (c == 'f')
+                maps.erase("fph");
+
+            else if (c >= '1' && c <= '3') {
+                const std::string emistr = std::string("emilib") + c;
+                if (maps.find(emistr) != maps.end()) maps.erase(emistr);
+                else maps.emplace(emistr, emistr);
+            }
+            else if (c == 'l') {
+                maps.emplace("lru_size", "lru_size");
+                maps.emplace("lru_time", "lru_time");
+            }
+            else if (c == 'k')
+                maps.emplace("ktprime", "ktprime");
+            else if (c == 'b') {
+                maps.emplace("btree", "btree_map");
+                maps.emplace("stl_map", "stl_map");
+                maps.emplace("fmap", "flat_map");
+            } else if (c == 'u')
+                maps.emplace("stl_hash", "unordered_map");
+        }}
     }
 
-#ifndef KEY_CLA
+#ifdef KEY_CLA
     if (tn > 100000)
         TestHashMap(tn);
 #endif
@@ -1797,7 +1815,7 @@ int main(int argc, char* argv[])
         } else if (run_type == 1) {
             n = (srng() % (maxn - minn)) + minn;
         } else {
-            n += n * 2 / 13;
+            n += n * 2 / 11;
             if (n > maxn)
                 n = (srng() % (maxn - minn)) + minn;
         }

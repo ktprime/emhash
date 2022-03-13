@@ -12,6 +12,7 @@
 #include "qc-core/random.hpp"
 
 #include "hash_table5.hpp"
+#include "hash_table6.hpp"
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
 #include "emilib/emilib2.hpp"
@@ -80,15 +81,15 @@ static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease
 
 static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {         10u, 1'000'000u},
-#if 1
     {        200u,  1'00'000u},
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
     {    500'000u,       100u},
-    {  6'000'000u,         4u},
+    {  7'200'000u,         5u},
+#if 1
     { 10'000'000u,         2u},
-#endif
     { 50'000'000u,         2u},
+#endif
 //    {100'000'000u,         1u},
 };
 
@@ -360,7 +361,7 @@ static void printOpsChartable(const Stats & results, std::ostream & ofs)
 static void printTypicalChartable(const Stats & results, std::ostream & ofs)
 {
     for (const size_t elementCount : results.presentElementCounts()) {
-        ofs << elementCount << ",          Insert,Find_Hit,Find_Mis,Erase,Iterator" << std::endl << std::setprecision(4);
+        ofs << elementCount << ",        Insert,Find_Hit,Find_Mis,Erase,Iterator,LoadFactor" << std::endl << std::setprecision(3);
         //ofs.fill('0');
         for (const size_t containerI : results.presentContainerIndices()) {
             ofs << results.containerName(containerI) << std::showpoint;
@@ -369,6 +370,7 @@ static void printTypicalChartable(const Stats & results, std::ostream & ofs)
             ofs << ", " << results.at(containerI, elementCount, Stat::accessEmpty);
             ofs << ", " << results.at(containerI, elementCount, Stat::erase);
             ofs << ", " << results.at(containerI, elementCount, Stat::iterateFull);
+            ofs << "  " << results.at(containerI, elementCount, Stat::iterateHalf);
             ofs << std::endl;
         }
         ofs << std::endl;
@@ -651,8 +653,8 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     const double invElementCount{1.0 / double(keys.size())};
     static volatile size_t v{};
 
-    Container container{};
-    container.max_load_factor(0.9);
+    Container container;
+    container.max_load_factor(0.88);
     container.reserve(keys.size() / 2);
 
     const s64 t0{now()};
@@ -698,6 +700,7 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
         }
     }
 
+    auto lf = container.load_factor();
     const s64 t4{now()};
     // Erase
     for (const K & key : keys) {
@@ -709,6 +712,7 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     results.get(containerI, keys.size(), Stat::accessEmpty)   += double(t3 - t2) * invElementCount;
     results.get(containerI, keys.size(), Stat::iterateFull)   += double(t4 - t3) * invElementCount;
     results.get(containerI, keys.size(), Stat::erase)         += double(t5 - t4) * invElementCount;
+    results.get(containerI, keys.size(), Stat::iterateHalf)   += lf * 100;
 }
 
 template <typename CommonKey, typename ContainerInfo, typename... ContainerInfos>
@@ -1063,6 +1067,15 @@ struct EmHash5MapInfo
 };
 
 template <typename K, typename V>
+struct EmHash6MapInfo
+{
+    using Container = emhash6::HashMap<K, V, QintHasher>;
+    using AllocatorContainer = void;
+
+    static inline const std::string name{"emhash6::HashMap"};
+};
+
+template <typename K, typename V>
 struct EmHash7MapInfo
 {
     using Container = emhash7::HashMap<K, V, QintHasher>;
@@ -1146,10 +1159,10 @@ int main(int argc, const char* argv[])
         using K = size_t;
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, AbslSetInfo<K>>();
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
-        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
+//        compare<CompareMode::oneVsOne, K, EmiLib3MapInfo<K,int>, EmiLib2MapInfo<K, int>>();
 //        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
-        compare<CompareMode::oneVsOne, K, JgDenseMapInfo<K,int>, EmHash5MapInfo<K, int>>();
-        compare<CompareMode::oneVsOne, K, RobinHoodMapInfo<K,int>, EmHash7MapInfo<K, int>>();
+//        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, RobinHoodMapInfo<K,int>, EmHash5MapInfo<K, int>>();
     }
     // Set comparison
     else if constexpr (false) {
@@ -1167,31 +1180,34 @@ int main(int argc, const char* argv[])
     // Map comparison
     if constexpr (true) {
         using K = size_t;
-        using V = size_t;// std::string;
+        using V = std::pair<long, long>;
         compare<CompareMode::typical, K,
-            EmiLib1MapInfo<K, V>,
+#if 1
+//            EmiLib1MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
+#endif
 //            StdMapInfo<K, V>,
 #ifdef ABSL
             AbslMapInfo<K, V>,
+            PhMapInfo<K, V>,
 #endif
 #if ET
-            PhMapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
             TslRobinMapInfo<K, V>,
+            SkaMapInfo<K, V>,
 #endif
 
 //            TslSparseMapInfo<K, V>,
 //            FphDyamicMapInfo<K,V>,
-//            SkaMapInfo<K, V>,
-#if 0
-            EmHash8MapInfo<K, V>,
-            EmHash7MapInfo<K, V>,
+#if 1
             EmHash5MapInfo<K, V>,
-#if CXX20
-            JgDenseMapInfo<K, V>,
+            EmHash6MapInfo<K, V>,
+            EmHash7MapInfo<K, V>,
+//            EmHash8MapInfo<K, V>,
+#if CXX2
             RigtorpMapInfo<K, V>,
+            JgDenseMapInfo<K, V>,
 #endif
 #endif
             QcHashMapInfo<K, V>

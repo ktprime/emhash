@@ -43,7 +43,7 @@
 #if ET
 #include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 #include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
-#include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
+//#include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
 #if X86_64
 #include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 //#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
@@ -98,15 +98,15 @@ static std::map<std::string, std::string> show_name =
 #endif
 };
 
-static const char* find(const std::string& map_name)
+static const char* find_hash(const std::string& map_name)
 {
+    if (map_name.find("emilib2") < 10)
+        return show_name.count("emilib2") ? show_name["emilib2"].data() : nullptr;
+    if (map_name.find("emilib3") < 10)
+        return show_name.count("emilib3") ? show_name["emilib3"].data() : nullptr;
+
     for (const auto& kv : show_name)
     {
-        if (map_name.find("emilib2") < 10)
-            return "emilib2";
-        if (map_name.find("emilib3") < 10)
-            return "emilib3";
-
         if (map_name.find(kv.first) < 10)
             return kv.second.c_str();
     }
@@ -219,9 +219,9 @@ static inline float now2sec()
     return getus() / 1000000.0;
 }
 
-template<class MAP> void bench_insert(MAP& map)
+template<class MAP> void bench_insert(MAP map)
 {
-    auto map_name = find(typeid(MAP).name());
+    auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
@@ -234,7 +234,7 @@ template<class MAP> void bench_insert(MAP& map)
 
     for (int  i = 0; i < 2; i++) {
         auto nows = now2sec();
-        MRNG rng(maxn);
+        MRNG rng(RND + 5 + i);
         {
             {
                 auto ts = now2sec();
@@ -313,62 +313,82 @@ void iotas(ForwardIt first, ForwardIt last, T value)
         ++value;
     }
 }
-template<class MAP> void bench_randomInsertErase(MAP& map)
+template<class MAP> void bench_randomInsertErase(MAP map)
 {
-    // random bits to set for the mask
-    std::vector<int> bits(64, 0);
-    iotas(bits.begin(), bits.end(), 0);
-    MRNG rng(999);
-
-#if 0
-    for (auto &v : bits) v = rng();
-#else
-    rshuffle(bits.begin(), bits.end(), rng);
-#endif
-
-    uint64_t bitMask = 0;
-    auto bitsIt = bits.begin();
-
-    size_t const expectedFinalSizes[] = {7, 127, 2084, 32722, 524149, 8367491};
-    size_t const max_n = 50000000;
-
-    //    map.max_load_factor(7.0 / 8);
-    auto map_name = find(typeid(MAP).name());
+    auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
-
     auto nows = now2sec();
-    for (int i = 0; i < 6; ++i) {
-        // each iteration, set 4 new random bits.
-        for (int b = 0; b < 4; ++b) {
-            bitMask |= UINT64_C(1) << *bitsIt++;
+
+    {
+        uint32_t min_n    = 1 << 20;
+        uint32_t max_loop = min_n << 5;
+//        map.max_load_factor(0.87);
+        for (int j = 0; j < 5; ++j) {
+            MRNG rng(RND + 6 + j);
+            MRNG rng2(RND + 6 + j);
+            // each iteration, set 4 new random bits.
+            // std::cout << (i + 1) << ". " << as_bits(bitMask) << std::endl;
+            auto maxn = min_n * (50 + j * 9) / 100;
+            for (size_t i = 0; i < maxn; ++i) {
+                map.emplace(rng(), 0);
+            }
+
+            auto ts = now2sec();
+            maxn = max_loop * 10 / (10 + 4*j);
+            // benchmark randomly inserting & erasing
+            for (size_t i = 0; i < maxn; ++i) {
+                map.emplace(rng(), 0);
+                map.erase(rng2());
+            }
+            printf("    %8u %2d M cycles time %.3f s map size %8d loadf = %.2f\n",
+                    maxn, int(min_n / 1000000), now2sec() - ts, (int)map.size(), map.load_factor());
+            min_n *= 2;
+            map.clear();
         }
-
-        // std::cout << (i + 1) << ". " << as_bits(bitMask) << std::endl;
-
-        auto ts = now2sec();
-        // benchmark randomly inserting & erasing
-        for (size_t i = 0; i < max_n; ++i) {
-            map.emplace(rng() & bitMask, i);
-            map.erase(rng() & bitMask);
-        }
-
-        printf("    %02d bits %2d M cycles time %.3f s map size %d loadf = %.2f\n",
-                int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts , (int)map.size(), map.load_factor());
-
-#ifndef _MSC_VER
-        //assert(RND != 123 || map.size() == expectedFinalSizes[i]);
-#endif
     }
+
+    {
+        MAP map2;
+        std::vector<int> bits(64, 0);
+        iotas(bits.begin(), bits.end(), 0);
+        sfc64 rng(999);
+
+#if 0
+        for (auto &v : bits) v = rng();
+#else
+        rshuffle(bits.begin(), bits.end(), rng);
+#endif
+
+        uint64_t bitMask = 0;
+        auto bitsIt = bits.begin();
+        size_t const expectedFinalSizes[] = {7, 127, 2084, 32722, 524149, 8367491};
+        size_t const max_n = 50000000;
+
+        for (int i = 0; i < 6; ++i) {
+            for (int b = 0; b < 4; ++b) {
+                bitMask |= UINT64_C(1) << *bitsIt++;
+            }
+
+            auto ts = now2sec();
+            for (size_t i = 0; i < max_n; ++i) {
+                map2.emplace(rng() & bitMask, i);
+                map2.erase(rng() & bitMask);
+            }
+            printf("    %02d bits  %2d M cycles time %.3f s map size %d loadf = %.2f\n",
+                    int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts, (int)map2.size(), map2.load_factor());
+        }
+    }
+
     printf("total time = %.2f s\n\n", now2sec() - nows);
 }
 
-template<class MAP> void bench_randomDistinct2(MAP& map)
+template<class MAP> void bench_randomDistinct2(MAP map)
 {
-    auto map_name = find(typeid(MAP).name());
+    auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
-        return ;
+        return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
 #if X86_64
@@ -377,7 +397,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
     constexpr size_t const n = 50000000 / 2;
 #endif
     auto nows = now2sec();
-    MRNG rng(RND + 6);
+    MRNG rng(RND + 7);
 
     //    map.max_load_factor(7.0 / 8);
     int checksum;
@@ -388,7 +408,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     05%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     05%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
         assert(RND != 123 || 549985352 == checksum);
     }
 
@@ -400,7 +420,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     25%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     25%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
         assert(RND != 123 || 149979034 == checksum);
     }
 
@@ -411,7 +431,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
         }
-        printf("     50%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("     50%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
         assert(RND != 123 || 249981806 == checksum);
     }
 
@@ -422,7 +442,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng())];
         }
-        printf("    100%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts , map.load_factor(), (int)map.size());
+        printf("    100%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
         assert(RND != 123 || 50291811 == checksum);
     }
     //#endif
@@ -467,7 +487,7 @@ size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 #endif
     }
 
-    printf("    %016x time = %.2f, loadf = %.2f %d\n", bitMask, now2sec() - ts , map.load_factor(), (int)map.size());
+    printf("    %016x time = %.2f, loadf = %.2f %d\n", bitMask, now2sec() - ts, map.load_factor(), (int)map.size());
     return verifier;
 }
 
@@ -536,16 +556,16 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
         } while (i < numInserts);
     }
 
-    printf("    %s success time = %.2f s %d loadf = %.2f\n", title.c_str(), now2sec() - ts , (int)num_found, map.load_factor());
+    printf("    %s success time = %.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
     return num_found;
 }
 
 template<class MAP>
-void bench_randomFindString(MAP& map)
+void bench_randomFindString(MAP map)
 {
-    auto map_name = find(typeid(MAP).name());
+    auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
-        return ;
+        return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     auto nows = now2sec();
@@ -578,15 +598,15 @@ void bench_randomFindString(MAP& map)
 }
 
 template<class MAP>
-void bench_randomEraseString(MAP& map)
+void bench_randomEraseString(MAP map)
 {
-    auto map_name = find(typeid(MAP).name());
+    auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
-        return ;
+        return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     auto nows = now2sec();
-    { runRandomString<MAP>(6000000,  1000, 0x1ffff); }
+    { runRandomString<MAP>(6000000, 1000, 0x1ffff); }
     { runRandomString<MAP>(20000000, 7, 0xfffff); }
     { runRandomString<MAP>(20000000, 8, 0xfffff); }
     { runRandomString<MAP>(20000000, 13, 0xfffff); }
@@ -651,17 +671,17 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
 #else
     printf("    %3u%% %016lx success time = %.2f s, %8d loadf = %.2f\n",
 #endif
-            uint32_t(numSequential * 100 / NumTotal), bitMask, now2sec() - ts , (int)num_found, map.load_factor());
+            uint32_t(numSequential * 100 / NumTotal), bitMask, now2sec() - ts, (int)num_found, map.load_factor());
 
     return num_found;
 }
 
 template<class MAP>
-void bench_IterateIntegers(MAP& map)
+void bench_IterateIntegers(MAP map)
 {
-    auto map_name = find(typeid(MAP).name());
+    auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
-        return ;
+        return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     MRNG rng(RND + 1);
@@ -691,7 +711,7 @@ void bench_IterateIntegers(MAP& map)
 template<class MAP>
 void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
 {
-    auto map_name = find(typeid(MAP).name());
+    auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
     printf("\n%s map = %s\n", __FUNCTION__, map_name);
@@ -752,7 +772,7 @@ void runTest(int sflags, int eflags)
         { rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
 #if ET
-        //        { hrd7::hash_map <uint64_t, uint64_t, hash_func> hmap;  bench_IterateIntegers(hmap); }
+        //        { hrd7::hash_map <uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
 #if X86_64
@@ -794,7 +814,7 @@ void runTest(int sflags, int eflags)
         { emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { emhash4::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
-//        { emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { emhash5::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if QC_HASH
         { fph::DynamicFphMap<std::string, size_t, fph::MixSeedHash<std::string>> bench; bench_randomFindString(bench); }
@@ -1005,6 +1025,9 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<uint64_t> hash_func;
 #endif
 
+#if ABSL
+        { absl::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+#endif
         { emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
@@ -1034,9 +1057,6 @@ void runTest(int sflags, int eflags)
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
 #endif
         { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
-#endif
-#if ABSL
-        { absl::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
 #endif
 #if FOLLY
         { folly::F14VectorMap <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
@@ -1128,7 +1148,7 @@ int main(int argc, char* argv[])
     if (argc > 1) {
         printf("cmd agrs = %s\n", argv[1]);
         for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
-            if (c >= '3' && c < '9') {
+            if (c > '3' && c < '9') {
                 std::string map_name("emhash");
                 map_name += c;
                 checkSet(map_name);

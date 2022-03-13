@@ -1362,7 +1362,7 @@ public:
             return false;
 
 #if EMH_HIGH_LOAD
-        if (required_buckets < 256 && _num_filled < _num_buckets)
+        if (required_buckets < 64 && _num_filled < _num_buckets)
             return false;
 #endif
 
@@ -1700,7 +1700,7 @@ private:
         }
 
         //find a new empty and link it to tail, TODO link after main bucket?
-        const auto new_bucket = find_empty_bucket(bucket);// : find_empty_bucket(next_bucketx);
+        const auto new_bucket = find_empty_bucket(next_bucket);// : find_empty_bucket(next_bucketx);
         return EMH_BUCKET(_pairs, next_bucket) = new_bucket;
     }
 
@@ -1727,8 +1727,8 @@ private:
         }
 
         const auto qmask = _mask / SIZE_BIT;
-#if 0
         if (1) {
+#if 1
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
             if (EMH_LIKELY(bmask2 != 0))
@@ -1739,20 +1739,15 @@ private:
             const auto beginw = *(size_t*)((uint8_t*)_bitmask + begino / 8);
             if (beginw != 0)
                 return begino + CTZ(beginw);//reverse beginw
-        }
 #endif
+        }
 
-        for (size_t i = 2; ; i++) {
-            const auto step = (bucket_from + i * SIZE_BIT) & qmask;
-            const auto bmask3 = *((size_t*)_bitmask + step);
-            if (bmask3 != 0)
-                return step * SIZE_BIT + CTZ(bmask3);
-
+        for (size_t s = 2; ; s += 1) { //2.4.7
             auto& _last = EMH_BUCKET(_pairs, _num_buckets);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
-#if 0
+#if 1
             const auto next1 = (qmask / 2 + _last)  & qmask;
 //            const auto next1 = qmask - _last;
             const auto bmask1 = *((size_t*)_bitmask + next1);

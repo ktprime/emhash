@@ -51,11 +51,13 @@
     #define X86 1
     #define X86_64 1
     #define PHMAP_HAVE_SSSE3                      1
+    #define PHMAP_NON_DETERMINISTIC               1
 #endif
 #if  _M_IX86 || __i386__
     #define X86 1
     #define X86_32 1
     #define PHMAP_HAVE_SSSE3                      1
+    #define PHMAP_NON_DETERMINISTIC               1
 #endif
 
 #if X86
@@ -63,8 +65,8 @@
 #include "ahash/random_state.c"
 #endif
 
-#if _WIN32 && _WIN64 == 0 
-uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_hi) 
+#if _WIN32 && _WIN64 == 0
+uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_hi)
 {
     // multiplier   = ab = a * 2^32 + b
     // multiplicand = cd = c * 2^32 + d
