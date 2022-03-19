@@ -171,7 +171,8 @@ inline static size_type CTZ(size_t n)
 
 template <typename First, typename Second>
 struct entry {
-
+    using first_type =  First;
+    using second_type = Second;
     entry(const First& key, const Second& value, size_type ibucket) :second(value),first(key) { bucket = ibucket; }
     entry(First&& key, Second&& value, size_type ibucket) :second(std::move(value)), first(std::move(key)) { bucket = ibucket; }
 
@@ -204,6 +205,16 @@ struct entry {
         return *this;
     }
 
+    bool operator == (const std::pair<First, Second>& p) const
+    {
+        return first == p.first && second == p.second;
+    }
+
+    bool operator == (const entry<First, Second>& p) const
+    {
+        return first == p.first && second == p.second;
+    }
+
     void swap(entry<First, Second>& o)
     {
         std::swap(second, o.second);
@@ -220,6 +231,17 @@ struct entry {
     Second second;//int
 #endif
 };// __attribute__ ((packed));
+
+template <typename A, typename B>
+inline constexpr bool operator==(std::pair<A, B> const& x, entry<A, B> const& y) {
+    return (x.first == y.first) && (x.second == y.second);
+}
+
+template <typename A, typename B>
+inline constexpr bool operator==(entry<A, B> const& x, entry<A, B> const& y) {
+    return (x.first == y.first) && (x.second == y.second);
+}
+
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -510,9 +532,10 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable() && _num_filled > 0) {
-            for (auto it = begin(); it.bucket() <= _mask; ++it) {
-                _pairs[it.bucket()].~PairT();
+        if (is_triviall_destructable()) {
+            for (auto it = cbegin(); _num_filled; ++it) {
+                _num_filled --;
+                it->~PairT();
             }
         }
         free(_pairs);
@@ -795,25 +818,25 @@ public:
 #endif
 
     // ------------------------------------------------------------
-    template<typename Key>
+    template<typename Key = KeyT>
     iterator find(const Key& key, size_t hash_v) noexcept
     {
         return {this, find_filled_hash(key, hash_v)};
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     const_iterator find(const Key& key, size_t hash_v) const noexcept
     {
         return {this, find_filled_hash(key, hash_v)};
     }
 
     template<typename Key>
-    iterator find(const KeyT& key) noexcept
+    iterator find(const Key& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     const_iterator find(const Key& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
@@ -835,19 +858,19 @@ public:
         return EMH_VAL(_pairs, bucket);
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     bool contains(const Key& key) const noexcept
     {
         return find_filled_bucket(key) <= _mask;
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     size_type count(const Key& key) const noexcept
     {
         return find_filled_bucket(key) <= _mask ? 1 : 0;
     }
 
-    template<typename Key>
+    template<typename Key = KeyT>
     std::pair<iterator, iterator> equal_range(const Key& key) const noexcept
     {
         const auto found = find(key);
@@ -1319,7 +1342,7 @@ private:
         _num_filled--;
     }
 
-    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto empty_bucket = INACTIVE;
@@ -1365,7 +1388,7 @@ private:
         return empty_bucket;
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto empty_bucket = INACTIVE;
@@ -1551,7 +1574,7 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(next_bucket);
+        const auto new_bucket = find_empty_bucket(bucket);
         return EMH_ADDR(_pairs, next_bucket) = new_bucket * 2 + 1;
     }
 

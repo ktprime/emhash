@@ -32,9 +32,11 @@
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
 
+#if X86
 #include "emilib/emilib.hpp"
 #include "emilib/emilib2.hpp"
 #include "emilib/emilib2s.hpp"
+#endif
 //#include "old/ktprime_hash.hpp"
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600

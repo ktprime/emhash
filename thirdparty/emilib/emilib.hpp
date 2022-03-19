@@ -1117,7 +1117,7 @@ private:
                 next_bucket = 0;
             }
 
-            if (EMH_UNLIKELY((i += simd_bytes) >= round))
+            if (EMH_UNLIKELY((i += simd_bytes) > round))
                 break;
         }
 

@@ -683,8 +683,8 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 #endif
 
 #ifndef SMAP
-        auto it = tmp.emplace(v2, TO_VAL(0)).first;
         sum += tmp.count(v2);
+        auto it = tmp.emplace(std::move(v2), TO_VAL(0)).first;
         tmp.erase(it);
 #else
         tmp[v2] = TO_VAL(0);
@@ -724,7 +724,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     size_t pow2 = 2u << ilog(vList.size(), 2);
     hash_type tmp;
 
-    const auto max_loadf = 1 - 0.01;
+    const auto max_loadf = 1 - 0.001;
 #ifndef SMAP
     tmp.max_load_factor(max_loadf);
     tmp.reserve(pow2 / 2);
@@ -994,19 +994,19 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 static int TestHashMap(int n, int max_loops = 1234567)
 {
-#if 1
-
+#if X86
 #ifndef KEY_CLA
-    emhash5::HashMap <keyType, int> ehash5;
-    emilib::HashMap <keyType, int> ehash2;
 
-    Sfc4 srng(n);
-#if 1
-    emhash8::HashMap <keyType, int> unhash;
+    emhash5::HashMap <keyType, int> ehash5;
+#if X86
+    emilib2::HashMap <keyType, int> ehash2;
 #else
-    std::unordered_map<long,int> unhash;
+    emhash7::HashMap <keyType, int> ehash2;
 #endif
 
+    emhash8::HashMap <keyType, int> unhash;
+
+    Sfc4 srng(n);
     const auto step = n % 2 + 1;
     for (int i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
@@ -1367,7 +1367,7 @@ static int benchHashMap(int n)
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
-        //        {  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
+        //{  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
 
         //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
 
@@ -1789,10 +1789,8 @@ int main(int argc, char* argv[])
         }}
     }
 
-#ifdef KEY_CLA
     if (tn > 100000)
         TestHashMap(tn);
-#endif
 
     Sfc4 srng(rnd);
 

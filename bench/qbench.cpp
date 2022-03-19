@@ -1180,10 +1180,10 @@ int main(int argc, const char* argv[])
     // Map comparison
     if constexpr (true) {
         using K = size_t;
-        using V = std::pair<long, long>;
+        using V = size_t;
         compare<CompareMode::typical, K,
-#if 1
-//            EmiLib1MapInfo<K, V>,
+#if X86
+            EmiLib1MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
 #endif
@@ -1204,7 +1204,7 @@ int main(int argc, const char* argv[])
             EmHash5MapInfo<K, V>,
             EmHash6MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
-//            EmHash8MapInfo<K, V>,
+            EmHash8MapInfo<K, V>,
 #if CXX2
             RigtorpMapInfo<K, V>,
             JgDenseMapInfo<K, V>,

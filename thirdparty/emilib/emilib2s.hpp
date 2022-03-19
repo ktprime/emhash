@@ -819,7 +819,10 @@ public:
         //init empty tombstone
         std::fill_n(_states, num_buckets, State::EEMPTY);
         //set filled tombstone
-        std::fill_n(_states + num_buckets, simd_bytes, State::EFILLED + PACK_STAT);
+        if (num_buckets >= simd_bytes)
+        std::fill_n(_states + num_buckets, 1, State::EFILLED + PACK_STAT);
+        else
+        std::fill_n(_states + num_buckets, simd_bytes - num_buckets + 1, State::EFILLED + PACK_STAT);
 //        if (num_buckets < simd_bytes) std::fill_n(_states, simd_bytes, State::EEMPTY);
 
 #if 0

@@ -1445,7 +1445,7 @@ private:
         _num_filled--;
     }
 
-    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
@@ -1486,7 +1486,7 @@ private:
         return INACTIVE;
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
