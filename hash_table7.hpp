@@ -608,7 +608,7 @@ public:
         if (is_triviall_destructable()) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _num_filled --;
-                it->~PairT();
+                it->~value_pair();
             }
         }
         free(_pairs);
@@ -942,7 +942,7 @@ public:
         return {this, find_filled_hash(key, hash_v)};
     }
 
-    template<typename Key>
+    template<typename Key=KeyT>
     iterator find(const Key& key) noexcept
     {
         return {this, find_filled_bucket(key)};
@@ -1181,7 +1181,7 @@ public:
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
 
-#if 1
+#if 0
     template <typename... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
@@ -1189,6 +1189,7 @@ public:
         return do_insert(std::forward<Args>(args)...);
     }
 
+#else
     inline std::pair<iterator, bool> emplace(const value_type& v)
     {
         check_expand_need();
@@ -1200,7 +1201,6 @@ public:
         check_expand_need();
         return do_insert(std::move(v.first), std::move(v.second));
     }
-#else
     template <class Key, class Val>
     inline std::pair<iterator, bool> emplace(Key&& key, Val&& value)
     {
@@ -1445,7 +1445,7 @@ private:
         _num_filled--;
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto bucket = hash_bucket(key) & _mask;
@@ -1486,7 +1486,7 @@ private:
         return INACTIVE;
     }
 
-    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto bucket = hash_bucket(key) & _mask;

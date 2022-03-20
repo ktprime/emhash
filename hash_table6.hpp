@@ -535,7 +535,7 @@ public:
         if (is_triviall_destructable()) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _num_filled --;
-                it->~PairT();
+                it->~value_pair();
             }
         }
         free(_pairs);
