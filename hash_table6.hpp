@@ -1072,16 +1072,14 @@ public:
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        check_expand_need();
-        return do_insert(std::forward<Args>(args)...);
+        return insert(std::forward<Args>(args)...);
     }
 
     //no any optimize for position
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
-        check_expand_need();
-        return do_insert(std::forward<Args>(args)...).first;
+        return insert(std::forward<Args>(args)...).first;
     }
 
     template<class... Args>

@@ -972,8 +972,7 @@ public:
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
-        check_expand_need();
-        return do_insert(std::forward<Args>(args)...).first;
+        return insert(std::forward<Args>(args)...).first;
     }
 
     template<class... Args>
@@ -1167,76 +1166,6 @@ public:
         return true;
     }
 
-private:
-
-    static inline PairT* alloc_bucket(uint32_t num_buckets)
-    {
-        auto* new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
-        return (PairT *)(new_pairs);
-    }
-
-#if EMH_HIGH_LOAD
-    void set_empty()
-    {
-        auto prev = 0;
-        for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
-            if (EMH_EMPTY(_pairs, bucket)) {
-                if (prev != 0) {
-                    EMH_PREVET(_pairs, bucket) = prev;
-                    EMH_BUCKET(_pairs, prev) = -bucket;
-                }
-                else
-                    _ehead = bucket;
-                prev = bucket;
-            }
-        }
-
-        EMH_PREVET(_pairs, _ehead) = prev;
-        EMH_BUCKET(_pairs, prev) = 0-_ehead;
-        _ehead = 0-EMH_BUCKET(_pairs, _ehead);
-    }
-
-    void clear_empty()
-    {
-        auto prev = EMH_PREVET(_pairs, _ehead);
-        while (prev != _ehead) {
-            EMH_BUCKET(_pairs, prev) = INACTIVE;
-            prev = EMH_PREVET(_pairs, prev);
-        }
-        EMH_BUCKET(_pairs, _ehead) = INACTIVE;
-        _ehead = 0;
-    }
-
-    //prev-ehead->next
-    uint32_t pop_empty(const uint32_t bucket)
-    {
-        const auto prev_bucket = EMH_PREVET(_pairs, bucket);
-        int next_bucket = (int)(0-EMH_BUCKET(_pairs, bucket));
-//        assert(next_bucket > 0 && _ehead > 0);
-//        assert(next_bucket <= _mask && prev_bucket <= _mask);
-
-        EMH_PREVET(_pairs, next_bucket) = prev_bucket;
-        EMH_BUCKET(_pairs, prev_bucket) = -next_bucket;
-
-        _ehead = next_bucket;
-        return bucket;
-    }
-
-    //ehead->bucket->next
-    void push_empty(const int32_t bucket)
-    {
-        const int next_bucket = 0-EMH_BUCKET(_pairs, _ehead);
-        assert(next_bucket > 0);
-
-        EMH_PREVET(_pairs, bucket) = _ehead;
-        EMH_BUCKET(_pairs, bucket) = -next_bucket;
-
-        EMH_PREVET(_pairs, next_bucket) = bucket;
-        EMH_BUCKET(_pairs, _ehead) = -bucket;
-        //        _ehead = bucket;
-    }
-#endif
-
     void rehash(uint32_t required_buckets)
     {
         if (required_buckets < _num_filled)
@@ -1321,6 +1250,76 @@ private:
         free(old_pairs);
         assert(old_num_filled == _num_filled);
     }
+
+private:
+
+    static inline PairT* alloc_bucket(uint32_t num_buckets)
+    {
+        auto* new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
+        return (PairT *)(new_pairs);
+    }
+
+#if EMH_HIGH_LOAD
+    void set_empty()
+    {
+        auto prev = 0;
+        for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
+            if (EMH_EMPTY(_pairs, bucket)) {
+                if (prev != 0) {
+                    EMH_PREVET(_pairs, bucket) = prev;
+                    EMH_BUCKET(_pairs, prev) = -bucket;
+                }
+                else
+                    _ehead = bucket;
+                prev = bucket;
+            }
+        }
+
+        EMH_PREVET(_pairs, _ehead) = prev;
+        EMH_BUCKET(_pairs, prev) = 0-_ehead;
+        _ehead = 0-EMH_BUCKET(_pairs, _ehead);
+    }
+
+    void clear_empty()
+    {
+        auto prev = EMH_PREVET(_pairs, _ehead);
+        while (prev != _ehead) {
+            EMH_BUCKET(_pairs, prev) = INACTIVE;
+            prev = EMH_PREVET(_pairs, prev);
+        }
+        EMH_BUCKET(_pairs, _ehead) = INACTIVE;
+        _ehead = 0;
+    }
+
+    //prev-ehead->next
+    uint32_t pop_empty(const uint32_t bucket)
+    {
+        const auto prev_bucket = EMH_PREVET(_pairs, bucket);
+        int next_bucket = (int)(0-EMH_BUCKET(_pairs, bucket));
+//        assert(next_bucket > 0 && _ehead > 0);
+//        assert(next_bucket <= _mask && prev_bucket <= _mask);
+
+        EMH_PREVET(_pairs, next_bucket) = prev_bucket;
+        EMH_BUCKET(_pairs, prev_bucket) = -next_bucket;
+
+        _ehead = next_bucket;
+        return bucket;
+    }
+
+    //ehead->bucket->next
+    void push_empty(const int32_t bucket)
+    {
+        const int next_bucket = 0-EMH_BUCKET(_pairs, _ehead);
+        assert(next_bucket > 0);
+
+        EMH_PREVET(_pairs, bucket) = _ehead;
+        EMH_BUCKET(_pairs, bucket) = -next_bucket;
+
+        EMH_PREVET(_pairs, next_bucket) = bucket;
+        EMH_BUCKET(_pairs, _ehead) = -bucket;
+        //        _ehead = bucket;
+    }
+#endif
 
     // Can we fit another element?
     inline bool check_expand_need()
