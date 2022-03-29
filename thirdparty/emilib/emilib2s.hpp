@@ -531,19 +531,6 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
-    {
-        check_expand_need();
-
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
-        if (bnofind) {
-            new(_pairs + bucket) PairT(key, value); _num_filled++;
-        }
-
-        return { iterator(this, bucket, false), bnofind };
-    }
-
     std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
     {
         check_expand_need();
@@ -551,19 +538,31 @@ public:
         const auto bucket = find_or_allocate(key, bnofind);
 
         if (bnofind) {
-            new(_pairs + bucket) PairT(key, std::move(value)); _num_filled++;
+            new(_pairs + bucket) PairT(key, std::forward<ValueT>(value)); _num_filled++;
         }
         return { iterator(this, bucket, false), bnofind };
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key, const ValueT& value)
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
-        return insert(key, value);
+        check_expand_need();
+        bool bnofind = true;
+        const auto bucket = find_or_allocate(key, bnofind);
+
+        if (bnofind) {
+            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(value)); _num_filled++;
+        }
+        return { iterator(this, bucket, false), bnofind };
     }
 
     std::pair<iterator, bool> emplace(const KeyT& key, ValueT&& value)
     {
-        return insert(key, std::move(value));
+        return insert(key, std::forward < ValueT > (value));
+    }
+
+    std::pair<iterator, bool> emplace(KeyT&& key, ValueT&& value)
+    {
+        return insert(std::move(key), std::forward < ValueT >(value));
     }
 
     std::pair<iterator, bool> emplace(value_type&& v)
@@ -602,18 +601,6 @@ public:
         }
     }
 
-    /// Same as above, but contains(key) MUST be false
-    void insert_unique(const KeyT& key, const ValueT& value)
-    {
-        check_expand_need();
-
-        const auto key_hash = _hasher(key);
-        const auto bucket = find_empty_slot(key_hash & _mask, 0);
-
-        _states[bucket] = key_2hash(key_hash, key);
-        new(_pairs + bucket) PairT(key, value); _num_filled++;
-    }
-
     void insert_unique(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
@@ -622,7 +609,7 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = key_2hash(key_hash, key);
-        new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
+        new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(value)); _num_filled++;
     }
 
     void insert_unique(value_type&& p)
@@ -635,7 +622,7 @@ public:
         insert_unique(p.first, p.second);
     }
 
-    void insert_or_assign(const KeyT& key, ValueT&& value)
+    void insert_or_assign(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
 
@@ -644,7 +631,7 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (bnofind) {
-            new(_pairs + bucket) PairT(key, value); _num_filled++;
+            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(value)); _num_filled++;
         } else {
             _pairs[bucket].second = value;
         }
@@ -659,6 +646,19 @@ public:
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bnofind) {
             new(_pairs + bucket) PairT(key, ValueT()); _num_filled++;
+        }
+
+        return _pairs[bucket].second;
+    }
+
+    ValueT& operator[](KeyT&& key)
+    {
+        check_expand_need();
+        bool bnofind = true;
+        const auto bucket = find_or_allocate(key, bnofind);
+        /* Check if inserting a new value rather than overwriting an old entry */
+        if (bnofind) {
+            new(_pairs + bucket) PairT(std::move(key), ValueT()); _num_filled++;
         }
 
         return _pairs[bucket].second;

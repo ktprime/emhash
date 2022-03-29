@@ -381,7 +381,7 @@ public:
             return _bucket;
         }
 
-        void erase(size_type bucket)
+        void clear(size_type bucket)
         {
             if (_bucket / SIZE_BIT == bucket / SIZE_BIT)
                 _bmask &= ~(1ull << (bucket % SIZE_BIT));
@@ -1025,66 +1025,42 @@ public:
     }
 
     // -----------------------------------------------------
-
-    /// Returns a pair consisting of an iterator to the inserted element
-    /// (or to the element that prevented the insertion)
-    /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
-    {
-        reserve(_num_filled);
-        return do_insert(key, value);
-    }
-
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        reserve(_num_filled);
-        return do_insert(std::move(key), std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
-    {
-        reserve(_num_filled);
-        return do_insert(key, std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
-    {
-        reserve(_num_filled);
-        return do_insert(std::move(key), value);
-    }
-
     template<typename K = KeyT, typename V = ValueT>
     inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
         reserve(_num_filled);
         const auto bucket = find_or_allocate(key);
-        const auto found = EMH_EMPTY(_pairs, bucket);
-        if (found) {
+        const auto isempty = EMH_EMPTY(_pairs, bucket);
+        if (isempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         } else {
             EMH_VAL(_pairs, bucket) = std::move(value);
         }
-        return { {this, bucket}, found };
+        return { {this, bucket}, isempty };
+    }
+
+    inline std::pair<iterator, bool> do_insert(value_type&& v)
+    {
+        const auto bucket = find_or_allocate(v.first);
+        const auto isempty = EMH_EMPTY(_pairs, bucket);
+        if (isempty) {
+            EMH_NEW(std::forward<KeyT>(v.first), std::forward<ValueT>(v.second), bucket);
+        }
+        return { {this, bucket}, isempty };
     }
 
     template<typename K = KeyT, typename V = ValueT>
     inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto bucket = find_or_allocate(key);
-        const auto found = EMH_EMPTY(_pairs, bucket);
-        if (found) {
+        const auto isempty = EMH_EMPTY(_pairs, bucket);
+        if (isempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(value), bucket);
         }
-        return { {this, bucket}, found };
+        return { {this, bucket}, isempty };
     }
 
     std::pair<iterator, bool> insert(const value_type& p)
-    {
-        check_expand_need();
-        return do_insert(p.first, p.second);
-    }
-
-    std::pair<iterator, bool> insert(iterator it, const value_type& p)
     {
         check_expand_need();
         return do_insert(p.first, p.second);
@@ -1151,12 +1127,12 @@ public:
     /// Same as above, but contains(key) MUST be false
     size_type insert_unique(KeyT&& key, ValueT&& value)
     {
-        return do_insert_unqiue(std::move(key), std::move(value));
+        return do_insert_unqiue(std::move(key), std::forward<ValueT>(value));
     }
 
-    size_type insert_unique(const KeyT& key, const ValueT& value)
+    size_type insert_unique(const KeyT& key, ValueT&& value)
     {
-        return do_insert_unqiue(key, value);
+        return do_insert_unqiue(key, std::forward<ValueT>(value));
     }
 
     size_type insert_unique(value_type&& p)
@@ -1178,17 +1154,16 @@ public:
         return bucket;
     }
 
-    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::forward<ValueT>(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::forward<ValueT>(value)); }
 
-#if 0
+#if 1
     template <typename... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
-
 #else
     inline std::pair<iterator, bool> emplace(const value_type& v)
     {
@@ -1201,16 +1176,12 @@ public:
         check_expand_need();
         return do_insert(std::move(v.first), std::move(v.second));
     }
+
     template <class Key, class Val>
     inline std::pair<iterator, bool> emplace(Key&& key, Val&& value)
     {
-        return insert(std::move(key), std::move(value));
-    }
-
-    template <class Key, class Val>
-    inline std::pair<iterator, bool> emplace(const Key& key, const Val& value)
-    {
-        return insert(key, value);
+        check_expand_need();
+        return do_insert(std::forward<Key>(key), std::forward<Val>(value));
     }
 #endif
 
@@ -1218,13 +1189,15 @@ public:
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
-        return insert(std::forward<Args>(args)...).first;
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...).first;
     }
 
     template<class... Args>
-    std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args)
+    std::pair<iterator, bool> try_emplace(key_type&& key, Args&&... args)
     {
-        return insert(k, std::forward<Args>(args)...).first;
+        check_expand_need();
+        return do_insert(std::forward<key_type>(key), std::forward<Args>(args)...).first;
     }
 
     template <class... Args>
@@ -1300,9 +1273,13 @@ public:
     {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
-        it.erase(bucket);
-        //erase from main bucket, return main bucket as next
-        return (bucket == it._bucket) ? it.next() : it;
+        if (bucket == it._bucket) {
+            return ++it;
+        } else {
+            //erase main bucket as next
+            it.clear(bucket);
+            return it;
+        }
     }
 
     /// Erase an element typedef an iterator without return next iterator
@@ -1439,9 +1416,9 @@ private:
 
     void clear_bucket(size_type bucket)
     {
-        EMH_CLS(bucket);
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
+        EMH_CLS(bucket);
         _num_filled--;
     }
 

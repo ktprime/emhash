@@ -80,6 +80,7 @@ static const std::vector<std::pair<size_t, size_t>> & detailedElementRoundCounts
 static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease.size(), detailedElementRoundCountsDebug.size())};
 
 static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
+#if 0
     {         10u, 1'000'000u},
     {        200u,  1'00'000u},
     {      3'000u,    10'000u},
@@ -91,6 +92,41 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     { 50'000'000u,         2u},
 #endif
 //    {100'000'000u,         1u},
+#endif
+
+    {10,  1000000},
+    {32,  1000000},
+    {110,  100000},
+    {240,  100000},
+    {500,  100000},
+    {800,  100000},
+    {1024, 100000},
+    {1500, 10000 },
+    {2048, 10000 },
+    {3000, 10000 },
+    {6000, 10000 },
+    {8192, 10000 },
+    {12000, 1000 },
+    {16384, 1000 },
+    {25000, 1000 },
+    {32768, 100 },
+    {45000, 100 },
+    {60000, 100 },
+    {100000, 100 },
+    {150000, 50 },
+    {200000, 50 },
+    {300000, 20 },
+    {400000, 20 },
+    {600000,  10 },
+    {800000,  10 },
+    {1200000, 10 },
+    {2200000, 10 },
+    {3100000, 10 },
+#if 1
+    {6000000, 5 },
+    {10000000,5},
+    {50000000,2},
+#endif
 };
 
 enum class Stat : size_t
@@ -120,37 +156,37 @@ enum class Stat : size_t
 
 static const std::array<std::string, size_t(Stat::_n)> statNames{
     "ObjectSize",
-    "IteratorSize",
-    "MemoryOverhead",
-    "Construct",
-    "Insert",
-    "InsertReserved",
-    "InsertPresent",
-    "AccessPresent",
-    "AccessAbsent",
-    "AccessEmpty",
-    "IterateFull",
-    "IterateHalf",
-    "iterateEmpty",
-    "Erase",
-    "EraseAbsent",
-    "Refill",
-    "Clear",
-    "LoneBegin",
-    "LoneEnd",
-    "Destruction"
+        "IteratorSize",
+        "MemoryOverhead",
+        "Construct",
+        "Insert",
+        "InsertReserved",
+        "InsertPresent",
+        "AccessPresent",
+        "AccessAbsent",
+        "AccessEmpty",
+        "IterateFull",
+        "IterateHalf",
+        "iterateEmpty",
+        "Erase",
+        "EraseAbsent",
+        "Refill",
+        "Clear",
+        "LoneBegin",
+        "LoneEnd",
+        "Destruction"
 };
 
 template <size_t size> struct Trivial;
 
 template <size_t size> requires (size <= 8)
-struct Trivial<size>
+    struct Trivial<size>
 {
     typename qc::sized<size>::utype val;
 };
 
 template <size_t size> requires (size > 8)
-struct Trivial<size>
+    struct Trivial<size>
 {
     std::array<u64, size / 8> val;
 };
@@ -162,7 +198,7 @@ static_assert(std::is_trivial_v<Trivial<64>>);
 template <size_t size>
 class Complex : public Trivial<size>
 {
-    public:
+public:
 
     constexpr Complex() : Trivial<size>{} {}
 
@@ -205,7 +241,7 @@ struct qc::hash::IdentityHash<Complex<size>>
 
 class Stats
 {
-    public:
+public:
 
     double & get(const size_t containerI, const size_t elementCount, const Stat stat)
     {
@@ -1190,10 +1226,13 @@ int main(int argc, const char* argv[])
 //            StdMapInfo<K, V>,
 #ifdef ABSL
             AbslMapInfo<K, V>,
-            PhMapInfo<K, V>,
 #endif
 #if ET
             RobinHoodMapInfo<K, V>,
+            PhMapInfo<K, V>,
+#endif
+
+#if ET > 1
             TslRobinMapInfo<K, V>,
             SkaMapInfo<K, V>,
 #endif
@@ -1205,9 +1244,9 @@ int main(int argc, const char* argv[])
             EmHash6MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
             EmHash8MapInfo<K, V>,
-#if CXX2
-            RigtorpMapInfo<K, V>,
+#if CXX20
             JgDenseMapInfo<K, V>,
+            RigtorpMapInfo<K, V>,
 #endif
 #endif
             QcHashMapInfo<K, V>

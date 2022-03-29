@@ -304,7 +304,7 @@ public:
             return _bucket;
         }
 
-        void erase(size_type bucket)
+        void clear(size_type bucket)
         {
             if (_bucket / SIZE_BIT == bucket / SIZE_BIT)
                 _bmask &= ~(1ull << (bucket % SIZE_BIT));
@@ -316,7 +316,6 @@ public:
             _bmask &= _bmask - 1;
             return *this;
         }
-
         iterator& operator++()
         {
             _bmask &= _bmask - 1;
@@ -830,7 +829,7 @@ public:
         return {this, find_filled_hash(key, hash_v)};
     }
 
-    template<typename Key>
+    template<typename Key=KeyT>
     iterator find(const Key& key) noexcept
     {
         return {this, find_filled_bucket(key)};
@@ -917,30 +916,18 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
+    inline std::pair<iterator, bool> do_insert(value_type&& p)
     {
-        reserve(_num_filled);
-        return do_insert(key, value);
+        const auto bucket = find_or_allocate(p.first);
+        const auto next   = bucket / 2;
+        const auto found  = EMH_EMPTY(_pairs, next);
+        if (found) {
+            EMH_NEW(std::forward<KeyT>(p.first), std::forward<ValueT>(p.second), next, bucket);
+        }
+        return { {this, next}, found };
     }
 
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        reserve(_num_filled);
-        return do_insert(std::move(key), std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
-    {
-        reserve(_num_filled);
-        return do_insert(key, std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
-    {
-        reserve(_num_filled);
-        return do_insert(std::move(key), value);
-    }
-
+	
     template<typename K, typename V>
     inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
@@ -983,11 +970,10 @@ public:
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
-            do_insert(begin->first, begin->second);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(it->first, it->second);
     }
 
-#if 0
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
@@ -996,6 +982,7 @@ public:
             do_insert(*begin);
     }
 
+#if 0
     size_type try_insert_mainbucket(const KeyT& key, const ValueT& value)
     {
         const auto bucket = hash_key(key) & _mask;
@@ -1039,12 +1026,12 @@ public:
     /// Same as above, but contains(key) MUST be false
     size_type insert_unique(KeyT&& key, ValueT&& value)
     {
-        return do_insert_unqiue(std::move(key), std::move(value));
+        return do_insert_unqiue(std::move(key), std::forward<ValueT>(value));
     }
 
-    size_type insert_unique(const KeyT& key, const ValueT& value)
+    size_type insert_unique(const KeyT& key, ValueT&& value)
     {
-        return do_insert_unqiue(key, value);
+        return do_insert_unqiue(key, std::forward<ValueT>(value));
     }
 
     size_type insert_unique(value_type&& p)
@@ -1066,27 +1053,30 @@ public:
         return bucket;
     }
 
-    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::move(value)); }
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value)      { return do_assign(std::move(key), std::move(value)); }
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value) { return do_assign(key, std::forward<ValueT>(value)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value) { return do_assign(std::move(key), std::forward<ValueT>(value)); }
 
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(std::forward<Args>(args)...);
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...);
     }
 
     //no any optimize for position
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
-        return insert(std::forward<Args>(args)...).first;
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...).first;
     }
 
     template<class... Args>
-    std::pair<iterator, bool> try_emplace(const key_type& k, Args&&... args) { return insert(k, std::forward<Args>(args)...).first; }
-
-    template<class... Args>
-    std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args) { return insert(std::move(k), std::forward<Args>(args)...).first; }
+    std::pair<iterator, bool> try_emplace(key_type&& key, Args&&... args)
+    {
+        check_expand_need();
+        return do_insert(std::forward<key_type>(key), std::forward<Args>(args)...).first;
+    }
 
     template <class... Args>
     inline std::pair<iterator, bool> emplace_unique(Args&&... args)
@@ -1147,9 +1137,13 @@ public:
     {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
-        it.erase(bucket);
-        //erase from main bucket, return main bucket as next
-        return (bucket == it._bucket) ? it.next() : it;
+        if (bucket == it._bucket) {
+            return ++it;
+        } else {
+            //erase main bucket as next
+            it.clear(bucket);
+            return it;
+        }
     }
 
     /// Erase an element typedef an iterator without return next iterator
@@ -1235,7 +1229,6 @@ public:
 #endif
 
         //assert(num_buckets > _num_filled);
-        auto old_num_buckets = _mask > 0 ? _mask + 1 : 0;
         auto old_num_filled  = _num_filled;
         auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_buckets / 8 + BIT_PACK);
 #if EMH_EXCEPT
@@ -1340,7 +1333,7 @@ private:
         _num_filled--;
     }
 
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto empty_bucket = INACTIVE;
@@ -1386,7 +1379,7 @@ private:
         return empty_bucket;
     }
 
-    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
         const auto empty_bucket = INACTIVE;
@@ -1495,8 +1488,8 @@ private:
     // Find the bucket with this key, or return bucket size
     //1. next_bucket = INACTIVE, empty bucket
     //2. next_bucket % 2 == 0 is main bucket
-    template<typename Key>
-    size_type find_filled_bucket(const Key& key) const
+    template<typename Key=KeyT>
+    inline size_type find_filled_bucket(const Key& key) const
     {
         return find_filled_hash(key, hash_key(key));
     }

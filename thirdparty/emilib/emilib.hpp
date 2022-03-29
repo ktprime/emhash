@@ -77,41 +77,32 @@ namespace emilib {
 
 #elif __aarch64__
     //https://github.com/DLTcollab/sse2neon/blob/master/sse2neon.h
-    const static auto simd_empty  = vreinterpretq_s64_s8(vdupq_n_s8(EEMPTY));
-    const static auto simd_detele = vreinterpretq_s64_s8(vdupq_n_s8(EDELETE));
+    const static auto simd_empty  = vreinterpretq_m128i_s8(vdupq_n_s8(EEMPTY));
+    const static auto simd_detele = vreinterpretq_m128i_s8(vdupq_n_s8(EDELETE));
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
-    #define SET1_EPI8(a)      vreinterpretq_s64_s8(vdupq_n_s8(a))
-    #define LOADU_EPI8(a)     vreinterpretq_s64_s32(vld1q_s32((const int32_t *)a))
+    #define SET1_EPI8(a)      vreinterpretq_m128i_s8(vdupq_n_s8(a))
+    #define LOADU_EPI8(a)     vreinterpretq_m128i_s32(vld1q_s32((const int32_t *)a))
     int MOVEMASK_EPI8(__m128i _a)
     {
-        uint8x16_t input = vreinterpretq_u8_s32(_a);
-        static const int8_t xr[8] = { -7, -6, -5, -4, -3, -2, -1, 0 };
-        uint8x8_t mask_and = vdup_n_u8(0x80);
-        int8x8_t mask_shift = vld1_s8(xr);
+        uint8x16_t input = vreinterpretq_u8_m128i(a);
 
-        uint8x8_t lo = vget_low_u8(input);
-        uint8x8_t hi = vget_high_u8(input);
+        uint16x8_t high_bits = vreinterpretq_u16_u8(vshrq_n_u8(input, 7));
 
-        lo = vand_u8(lo, mask_and);
-        lo = vshl_u8(lo, mask_shift);
+        uint32x4_t paired16 =
+            vreinterpretq_u32_u16(vsraq_n_u16(high_bits, high_bits, 7));
 
-        hi = vand_u8(hi, mask_and);
-        hi = vshl_u8(hi, mask_shift);
+        uint64x2_t paired32 =
+            vreinterpretq_u64_u32(vsraq_n_u32(paired16, paired16, 14));
 
-        lo = vpadd_u8(lo, lo);
-        lo = vpadd_u8(lo, lo);
-        lo = vpadd_u8(lo, lo);
+        uint8x16_t paired64 =
+            vreinterpretq_u8_u64(vsraq_n_u64(paired32, paired32, 28));
 
-        hi = vpadd_u8(hi, hi);
-        hi = vpadd_u8(hi, hi);
-        hi = vpadd_u8(hi, hi);
-
-        return ((hi[0] << 8) | (lo[0] & 0xFF));
+        return vgetq_lane_u8(paired64, 0) | ((int) vgetq_lane_u8(paired64, 8) << 8);
     }
 
-    #define CMPEQ_EPI8(a, b)  vreinterpretq_s64_u8(vceqq_s8(vreinterpretq_s8_s64(a), vreinterpretq_s8_s64(b)))
-    #define CMPGT_EPI8(a, b)  vreinterpretq_s64_u8(vcgtq_s8(vreinterpretq_s8_s64(a), vreinterpretq_s8_s64(b)))
+    #define CMPEQ_EPI8(a, b)  vreinterpretq_m128i_u8(vceqq_s8(vreinterpretq_s8_s64(a), vreinterpretq_s8_s64(b)))
+    #define CMPGT_EPI8(a, b)  vreinterpretq_m128i_u8(vcgtq_s8(vreinterpretq_s8_s64(a), vreinterpretq_s8_s64(b)))
 #endif
 
 

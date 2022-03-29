@@ -146,7 +146,8 @@ std::map<std::string, std::string> maps =
 //https://gankra.github.io/blah/hashbrown-tldr/ swiss
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
 //https://jguegant.github.io/blogs/tech/dense-hash-map.html
-
+//https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
+//
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
 #include "fht/fht_ht.hpp" // https://github.com/goldsteinn/hashtable_test/blob/master/my_table/fht_ht.hpp
@@ -874,9 +875,20 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
         sum += ht_hash.erase(v);
 
 #if ABSL == 0 && QC_HASH == 0 && CXX20 == 0
-    auto tmp = ht_hash;
-    for (auto it = tmp.begin(); it != tmp.end(); )
-        it = tmp.erase(it);
+    auto tmp = ht_hash; auto id = 1;
+    for (auto it = tmp.begin(); it != tmp.end(); ) {
+#if KEY_INT
+        if (it->first % 2 == 0)
+#else
+        if (id++ % 2 == 0)
+#endif
+            it = tmp.erase(it);
+        else
+            it++;
+    }
+#if KEY_INT
+    sum += tmp.size();
+#endif
 #endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -1143,7 +1155,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #endif
         }
 
-        shuffle(nList.begin(), nList.end());
+        //shuffle(nList.begin(), nList.end());
         find_hit_50<hash_type>(hash, hash_name, nList);
         find_hit_50_erase<hash_type>(hash, hash_name, nList);
         erase_50<hash_type>(hash, hash_name, nList);
@@ -1286,7 +1298,7 @@ static int benchHashMap(int n)
         func_first = (func_first + 3) % func_size + 1;
         func_last  = (func_first + 4) % func_size + 1;
 
-        shuffle(vList.begin(), vList.end());
+        //shuffle(vList.begin(), vList.end());
 
 #if ET > 2
         {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
@@ -1333,7 +1345,6 @@ static int benchHashMap(int n)
         {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("abslf", vList); }
 #endif
 
-        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
 #if FOLLY
         {  benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
         {  benOneHash<folly::F14VectorMap<keyType, valueType, ehash_func>>("f14_vector", vList); }
@@ -1344,7 +1355,6 @@ static int benchHashMap(int n)
 #endif
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
-        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
         {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
@@ -1364,6 +1374,8 @@ static int benchHashMap(int n)
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
+        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
+        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
@@ -1680,6 +1692,133 @@ static int test_lru(int n)
     return 0;
 }
 
+static void unit_test()
+{
+    {
+        emhash7::HashMap<int, std::string> dict = {{1, "one"}, {2, "two"}};
+        dict.insert({3, "three"});
+        dict.insert(std::make_pair(4, "four"));
+        dict.insert({{4, "another four"}, {5, "five"}});
+
+        bool ok = dict.insert({1, "another one"}).second;
+        std::cout << "inserting 1 -> \"another one\" "
+            << (ok ? "succeeded" : "failed") << '\n';
+
+        std::cout << "contents:\n";
+        for(auto& p: dict)
+            std::cout << " " << p.first << " => " << p.second << '\n';
+    }
+
+    {
+        emhash7::HashMap<std::string, std::string> m;
+        // uses pair's move constructor
+        m.emplace(std::make_pair(std::string("a"), std::string("a")));
+        // uses pair's converting move constructor
+        m.emplace(std::make_pair("b", "abcd"));
+        m.emplace(std::move(std::make_pair("b", "abcd")));
+        // uses pair's template constructor
+        m.emplace("d", "ddd");
+        /*
+        // uses pair's piecewise constructor
+        m.emplace(std::piecewise_construct,
+        std::forward_as_tuple("c"),
+        std::forward_as_tuple(10, 'c'));
+        // as of C++17, m.try_emplace("c", 10, 'c'); can be used
+        */
+
+        for (const auto& p : m) {
+            std::cout << p.first << " => " << p.second << '\n';
+        }
+    }
+
+    {
+        auto print_node = [&](const auto &node) {
+            std::cout << "[" << node.first << "] = " << node.second << '\n';
+        };
+
+        auto print_result = [&](auto const &pair) {
+            std::cout << (pair.second ? "inserted: " : "assigned: ");
+            print_node(*pair.first);
+        };
+
+        emhash7::HashMap<std::string, std::string> myMap;
+        print_result( myMap.insert_or_assign("a", "apple"     ) );
+        print_result( myMap.insert_or_assign("b", "banana"    ) );
+        print_result( myMap.insert_or_assign("c", "cherry"    ) );
+        print_result( myMap.insert_or_assign("c", "clementine") );
+        for (const auto &node : myMap) { print_node(node); }
+    }
+
+    {
+        auto print = [](auto const comment, auto const& map) {
+            std::cout << comment << "{";
+            for (const auto &pair : map) {
+                std::cout << "{" << pair.first << ": " << pair.second << "}";
+            }
+            std::cout << "}\n";
+        };
+
+        emhash7::HashMap<char, int> letter_counts {{'a', 27}, {'b', 3}, {'c', 1}};
+
+        print("letter_counts initially contains: ", letter_counts);
+
+        letter_counts['b'] = 42;  // updates an existing value
+        letter_counts['x'] = 9;  // inserts a new value
+
+        print("after modifications it contains: ", letter_counts);
+
+        // count the number of occurrences of each word
+        // (the first call to operator[] initialized the counter with zero)
+        emhash7::HashMap<std::string, int>  word_map;
+        for (const auto &w : { "this", "sentence", "is", "not", "a", "sentence",
+                "this", "sentence", "is", "a", "hoax"}) {
+            ++word_map[w];
+        }
+        word_map["that"]; // just inserts the pair {"that", 0}
+
+        //for (const auto [word, id, count] : word_map) { std::cout << count << " occurrences of word '" << word << "'\n"; }
+        for (const auto &it : word_map) { std::cout << it.second << " occurrences of word '" << it.first << "'\n"; }
+    }
+
+    {
+        emhash7::HashMap<int, std::string, std::hash<int>> c = {
+            {1, "one" }, {2, "two" }, {3, "three"},
+            {4, "four"}, {5, "five"}, {6, "six"  }
+        };
+
+        // erase all odd numbers from c
+        for(auto it = c.begin(); it != c.end(); ) {
+            printf("%d:%d:%s\n", it->first, (int)it.bucket(), it->second.data());
+            if(it->first % 2 != 0)
+                it = c.erase(it);
+            else
+                ++it;
+        }
+
+        for(auto& p : c) {
+            std::cout << p.second << ' ';
+        }
+    }
+
+    {
+        emhash8::HashMap<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}};
+        auto print = [](std::pair<int, char>& n) {
+            std::cout << " " << n.first << '(' << n.second << ')';
+        };
+
+        std::cout << "Before clear:";
+        std::for_each(container.begin(), container.end(), print);
+        std::cout << "\nSize=" << container.size() << '\n';
+
+        std::cout << "Clear\n";
+        container.clear();
+
+        std::cout << "After clear:";
+        std::for_each(container.begin(), container.end(), print);
+        std::cout << "\nSize=" << container.size() << '\n';
+    }
+}
+
 int main(int argc, char* argv[])
 {
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
@@ -1694,6 +1833,7 @@ int main(int argc, char* argv[])
     printf("ahash_version = %s\n", ahash_version());
 #endif
 
+    unit_test();
     //srand((unsigned)time(0));
     printInfo(nullptr);
 

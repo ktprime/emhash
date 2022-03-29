@@ -99,7 +99,7 @@ int64_t getus()
     auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
 
-#elif WIN32_RSU
+#elif WIN32_RUS
     FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
     GetThreadTimes(GetCurrentThread(), NULL, NULL, &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;

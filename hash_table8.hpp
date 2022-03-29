@@ -715,31 +715,17 @@ public:
 
     // -----------------------------------------------------
 
-    /// Returns a pair consisting of an iterator to the inserted element
-    /// (or to the element that prevented the insertion)
-    /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
+    inline std::pair<iterator, bool> do_insert(value_type&& p)
     {
-        check_expand_need();
-        return do_insert(key, value);
-    }
+        const auto key_hash = (size_type)hash_key(p.first);
+        const auto bucket = find_or_allocate(p.first, key_hash);
+        const auto empty  = EMH_EMPTY(_index, bucket);
+        if (empty) {
+            EMH_NEW(std::forward<KeyT>(p.first), std::forward<ValueT>(p.second), bucket, key_hash);
+        }
 
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(key, std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), value);
+        const auto slot = EMH_SLOT(_index, bucket);
+        return { {this, slot}, empty };
     }
 
     template<typename K, typename V>
@@ -759,6 +745,7 @@ public:
     template<typename K, typename V>
     inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
+        check_expand_need();
         const auto key_hash = (size_type)hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
         const auto empty = EMH_EMPTY(_index, bucket);
@@ -775,20 +762,20 @@ public:
     std::pair<iterator, bool> insert(const value_type& p)
     {
         check_expand_need();
-        return do_insert(p.first, p.second);
+        return do_insert(p);
     }
 
     std::pair<iterator, bool> insert(value_type && p)
     {
         check_expand_need();
-        return do_insert(std::move(p.first), std::move(p.second));
+        return do_insert(std::move(p));
     }
 
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled, false);
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin)
-            do_insert(begin->first, begin->second);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(it->first, it->second);
     }
 
 #if 0
@@ -842,7 +829,7 @@ public:
         check_expand_need();
         const auto key_hash = (size_type)hash_key(key);
         auto bucket = find_unique_bucket(key, key_hash);
-        EMH_NEW(std::move(key), std::move(value), bucket, key_hash);
+        EMH_NEW(std::forward<KeyT>(key), std::forward<ValueT>(value), bucket, key_hash);
         return bucket;
     }
 
@@ -862,7 +849,8 @@ public:
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(std::forward<Args>(args)...);
+        check_expand_need();
+        return do_insert(std::forward<Args>(args)...);
     }
 
     //no any optimize for position
@@ -888,14 +876,12 @@ public:
 
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& value)
     {
-        check_expand_need();
-        return do_assign(key, std::move(value));
+        return do_assign(key, std::forward<ValueT>(value));
     }
 
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& value)
     {
-        check_expand_need();
-        return do_assign(std::move(key), std::move(value));
+        return do_assign(std::move(key), std::forward<ValueT>(value));
     }
 
     /// Return the old value or ValueT() if it didn't exist.

@@ -58,7 +58,7 @@
 #endif
 #endif
 
-static const auto RND = getus();
+static const auto RND = getus() + time(0);
 
 static std::map<std::string, std::string> show_name =
 {
@@ -375,7 +375,7 @@ template<class MAP> void bench_randomInsertErase(MAP map)
 
             auto ts = now2sec();
             for (size_t i = 0; i < max_n; ++i) {
-                map2.emplace(rng() & bitMask, i);
+                map2.emplace(rng() & bitMask, 0);
                 map2.erase(rng() & bitMask);
             }
             printf("    %02d bits  %2d M cycles time %.3f s map size %d loadf = %.2f\n",

@@ -3081,7 +3081,7 @@ namespace fph {
                 if (key_num != 0) {
 //                    size_t temp_slot_num = size_t((double)key_num / MAX_LOAD_FACTOR_UPPER_LIMIT);
                     if (!is_rehash) {
-                        slot_index_policy_.UpdateBySlotNum(size_t((double)key_num / MAX_LOAD_FACTOR_UPPER_LIMIT));
+                        slot_index_policy_.UpdateBySlotNum(size_t((double)key_num / max_load_factor()));
 //                        item_num_mask_ = dynamic::detail::CeilToMask(size_t(key_num / MAX_LOAD_FACTOR_UPPER_LIMIT));
                     } else {
                         // item_num_mask_ should be set before call Build()
