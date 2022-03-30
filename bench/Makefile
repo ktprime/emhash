@@ -85,6 +85,10 @@ ifneq ($(std),)
 CXXFLAGS += -std=c++$(std)
 endif
 
+ifeq ($(fh),)
+CXXFLAGS += -DEMH_FIND_HIT=1
+endif
+
 all:
 ifneq ($(QCH),)
 	$(CXX) $(CXXFLAGS) -I. -DQC_HASH -std=c++20 qbench.cpp -o qbench

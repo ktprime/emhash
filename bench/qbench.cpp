@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iomanip>
 #include <span>
+#include "util.h"
 
 #include "qchash/qc-hash.hpp"
 #include "jg/dense_hash_map.hpp"
@@ -29,7 +30,6 @@
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
 
-#include "util.h"
 
 #ifdef FIB_HASH
 #define QintHasher Int64Hasher<K>
@@ -1244,7 +1244,7 @@ int main(int argc, const char* argv[])
             EmHash6MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
             EmHash8MapInfo<K, V>,
-#if CXX20
+#if CXX201
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
 #endif

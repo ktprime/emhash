@@ -196,6 +196,11 @@ struct entry {
         return first == p.first && second == p.second;
     }
 
+    bool operator == (const std::pair<First, Second>& p) const
+    {
+        return first == p.first && second == p.second;
+    }
+
     void swap(entry<First, Second>& o)
     {
         std::swap(second, o.second);
@@ -388,11 +393,20 @@ public:
         *this = std::move(other);
     }
 
-    HashMap(std::initializer_list<value_type> ilist)
+    template <typename IL=value_type>
+    HashMap(std::initializer_list<IL> ilist)
     {
         init((uint32_t)ilist.size());
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
+    }
+
+    template<class InputIt>
+    HashMap(InputIt first, InputIt last, size_type bucket_count=4)
+    {
+        init(std::distance(first, last) + bucket_count);
+        for (; first != last; ++first)
+            emplace(*first);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -705,7 +719,6 @@ public:
 #endif
 
     // ------------------------------------------------------------
-
     iterator find(const KeyT& key) noexcept
     {
         return {this, find_filled_bucket(key)};
@@ -740,7 +753,7 @@ public:
         return find_filled_bucket(key) == _num_buckets ? 0 : 1;
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key)
+    std::pair<iterator, iterator> equal_range(const KeyT& key) const
     {
         const auto found = find(key);
         if (found.second == _num_buckets)
@@ -803,7 +816,7 @@ public:
         if (bucket == _num_buckets)
             return false;
 
-        EMH_VAL(_pairs, bucket) = std::move(value);
+        EMH_VAL(_pairs, bucket) = std::forward<ValueT>(value);
         return true;
     }
 
@@ -815,36 +828,29 @@ public:
     }
 
     // -----------------------------------------------------
-#if 0
-    /// Returns a pair consisting of an iterator to the inserted element
-    /// (or to the element that prevented the insertion)
-    /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
+#if EMH_BUCKET_INDEX == 1
+    std::pair<iterator, bool> do_insert(const value_pair& v)
     {
-        check_expand_need();
-        return do_insert(key, value);
-    }
-
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
-    {
-        check_expand_need();
-        return do_insert(key, std::move(value));
-    }
-
-    std::pair<iterator, bool> insert(KeyT&& key, const ValueT& value)
-    {
-        check_expand_need();
-        return do_insert(std::move(key), value);
+        const auto bucket = find_or_allocate(v.first);
+        const auto empty = EMH_EMPTY(_pairs, bucket);
+        if (empty) {
+            EMH_NEW(v.first, v.second, bucket);
+        }
+        return { {this, bucket}, empty };
     }
 #endif
 
-    inline std::pair<iterator, bool> do_insert(value_type&& v)
+    std::pair<iterator, bool> do_insert(const value_type& v)
+    {
+        const auto bucket = find_or_allocate(v.first);
+        const auto empty = EMH_EMPTY(_pairs, bucket);
+        if (empty) {
+            EMH_NEW(v.first, v.second, bucket);
+        }
+        return { {this, bucket}, empty };
+    }
+
+    std::pair<iterator, bool> do_insert(value_type&& v)
     {
         const auto bucket = find_or_allocate(v.first);
         const auto empty = EMH_EMPTY(_pairs, bucket);
@@ -855,7 +861,7 @@ public:
     }
 
     template<typename K, typename V>
-    inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
+    std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto bucket = find_or_allocate(key);
         const auto empty = EMH_EMPTY(_pairs, bucket);
@@ -866,7 +872,7 @@ public:
     }
 
     template<typename K, typename V>
-    inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
+    std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -891,14 +897,12 @@ public:
         return do_insert(std::move(p));
     }
 
-#if 0
     template< typename P >
     std::pair<iterator,bool> insert(P&& value)
     {
         check_expand_need();
-        return do_insert(std::move(value.first), std::move(value.second));
+        return do_insert(std::forward<P>(value));
     }
-#endif
 
     std::pair<iterator, bool> insert(iterator it, const value_type& p)
     {
@@ -906,23 +910,23 @@ public:
         return do_insert(p);
     }
 
-    void insert(std::initializer_list<value_type> ilist)
+    template <typename IL=value_type>
+    void insert(std::initializer_list<IL> ilist)
     {
         reserve(ilist.size() + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
+    }
+
+    template <typename Iter>
+    void insert(Iter first, Iter last)
+    {
+        reserve(std::distance(first, last) + _num_filled);
+        for (; first != last; ++first)
+            emplace(*first);
     }
 
 #if 0
-    template <typename Iter>
-    void insert(Iter begin, Iter end)
-    {
-        reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin) {
-            emplace(*begin);
-        }
-    }
-
     template <typename Iter>
     void insert2(Iter begin, Iter end)
     {
@@ -1265,7 +1269,7 @@ public:
 
 private:
 
-    static inline PairT* alloc_bucket(uint32_t num_buckets)
+    static PairT* alloc_bucket(uint32_t num_buckets)
     {
         auto* new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
         return (PairT *)(new_pairs);

@@ -1105,7 +1105,7 @@ private:
     }
 
 /*
-** inserts a new key into a hash table; first, check whether key's main
+** inserts a new key into a hash table; first check whether key's main
 ** bucket/position is free. If not, check whether colliding node/bucket is in its main
 ** position or not: if it is not, move colliding bucket to an empty place and
 ** put new key in its main position; otherwise (colliding bucket is in its main

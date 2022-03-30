@@ -1211,7 +1211,7 @@ int main(int argc, char* argv[])
 
     float loadf = 0.0945f;
     printf("./sbench maxn = %d c(0-1000) f(0-100) d[2-9 mpatsebu] a(0-3) b t(n %dkB - %dMB)\n",
-			(int)maxn, minn*type_size >> 10, maxn*type_size >> 20);
+            (int)maxn, minn*type_size >> 10, maxn*type_size >> 20);
 
     for (int i = 1; i < argc; i++) {
         const auto cmd = argv[i][0];

@@ -95,10 +95,9 @@ uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_
 
 int64_t getus()
 {
-#if 0
+#if STD_HRC
     auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
-
 #elif WIN32_RUS
     FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
     GetThreadTimes(GetCurrentThread(), NULL, NULL, &ptime[2], &ptime[3]);

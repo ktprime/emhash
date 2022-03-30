@@ -309,17 +309,6 @@ struct entry {
 #endif
 };// __attribute__ ((packed));
 
-template <typename A, typename B>
-inline constexpr bool operator==(std::pair<A, B> const& x, entry<A, B> const& y) {
-    return (x.first == y.first) && (x.second == y.second);
-}
-
-template <typename A, typename B>
-inline constexpr bool operator==(entry<A, B> const& x, entry<A, B> const& y) {
-    return (x.first == y.first) && (x.second == y.second);
-}
-
-
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
@@ -552,7 +541,7 @@ public:
         init(bucket, lf);
     }
 
-    inline size_type AllocSize(size_type num_buckets) const
+    size_type AllocSize(size_type num_buckets) const
     {
         return num_buckets * sizeof(PairT) + PACK_SIZE * sizeof(PairT) + num_buckets / 8 + sizeof(uint64_t);
     }
@@ -574,7 +563,7 @@ public:
     {
         init((size_type)ilist.size());
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -1026,7 +1015,7 @@ public:
 
     // -----------------------------------------------------
     template<typename K = KeyT, typename V = ValueT>
-    inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
+    std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
         reserve(_num_filled);
         const auto bucket = find_or_allocate(key);
@@ -1039,7 +1028,17 @@ public:
         return { {this, bucket}, isempty };
     }
 
-    inline std::pair<iterator, bool> do_insert(value_type&& v)
+    std::pair<iterator, bool> do_insert(const value_type& v)
+    {
+        const auto bucket = find_or_allocate(v.first);
+        const auto isempty = EMH_EMPTY(_pairs, bucket);
+        if (isempty) {
+            EMH_NEW(v.first, v.second, bucket);
+        }
+        return { {this, bucket}, isempty };
+    }
+
+    std::pair<iterator, bool> do_insert(value_type&& v)
     {
         const auto bucket = find_or_allocate(v.first);
         const auto isempty = EMH_EMPTY(_pairs, bucket);
@@ -1050,7 +1049,7 @@ public:
     }
 
     template<typename K = KeyT, typename V = ValueT>
-    inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
+    std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto bucket = find_or_allocate(key);
         const auto isempty = EMH_EMPTY(_pairs, bucket);
@@ -1063,20 +1062,20 @@ public:
     std::pair<iterator, bool> insert(const value_type& p)
     {
         check_expand_need();
-        return do_insert(p.first, p.second);
+        return do_insert(p);
     }
 
     std::pair<iterator, bool> insert(value_type && p)
     {
         check_expand_need();
-        return do_insert(std::move(p.first), std::move(p.second));
+        return do_insert(std::move(p));
     }
 
     void insert(std::initializer_list<value_type> ilist)
     {
         reserve(ilist.size() + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
     }
 
     template <typename Iter>
@@ -1416,9 +1415,9 @@ private:
 
     void clear_bucket(size_type bucket)
     {
+        EMH_CLS(bucket);
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
-        EMH_CLS(bucket);
         _num_filled--;
     }
 
@@ -1630,7 +1629,7 @@ private:
     }
 
 /*
-** inserts a new key into a hash table; first, check whether key's main
+** inserts a new key into a hash table; first check whether key's main
 ** bucket/position is free. If not, check whether colliding node/bucket is in its main
 ** position or not: if it is not, move colliding bucket to an empty place and
 ** put new key in its main position; otherwise (colliding bucket is in its main

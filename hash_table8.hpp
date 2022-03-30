@@ -316,7 +316,7 @@ public:
     {
         init((uint32_t)ilist.size());
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -714,8 +714,20 @@ public:
     }
 
     // -----------------------------------------------------
+    std::pair<iterator, bool> do_insert(const value_type& p)
+    {
+        const auto key_hash = (size_type)hash_key(p.first);
+        const auto bucket = find_or_allocate(p.first, key_hash);
+        const auto empty  = EMH_EMPTY(_index, bucket);
+        if (empty) {
+            EMH_NEW(p.first, p.second, bucket, key_hash);
+        }
 
-    inline std::pair<iterator, bool> do_insert(value_type&& p)
+        const auto slot = EMH_SLOT(_index, bucket);
+        return { {this, slot}, empty };
+    }
+
+    std::pair<iterator, bool> do_insert(value_type&& p)
     {
         const auto key_hash = (size_type)hash_key(p.first);
         const auto bucket = find_or_allocate(p.first, key_hash);
@@ -729,7 +741,7 @@ public:
     }
 
     template<typename K, typename V>
-    inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
+    std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto key_hash = (size_type)hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
@@ -743,7 +755,7 @@ public:
     }
 
     template<typename K, typename V>
-    inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
+    std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
         check_expand_need();
         const auto key_hash = (size_type)hash_key(key);
@@ -775,19 +787,19 @@ public:
     {
         reserve(ilist.size() + _num_filled, false);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
     }
 
-#if 0
     template <typename Iter>
     void insert(Iter begin, Iter end)
     {
         reserve(std::distance(begin, end) + _num_filled, false);
         for (; begin != end; ++begin) {
-            emplace(*begin);
+            do_insert(begin->first, begin->second);
         }
     }
 
+#if 0
     template <typename Iter>
     void insert2(Iter begin, Iter end)
     {
@@ -1096,13 +1108,13 @@ public:
         return true;
     }
 
-    static inline PairT* alloc_bucket(size_type num_buckets)
+    static PairT* alloc_bucket(size_type num_buckets)
     {
         auto new_pairs = (char*)malloc(num_buckets * sizeof(PairT) + (EAD + num_buckets) * sizeof(Index));
         return (PairT *)(new_pairs);
     }
 
-    static inline Index* alloc_index(size_type num_buckets)
+    static Index* alloc_index(size_type num_buckets)
     {
         auto new_index = (char*)malloc((EAD + num_buckets) * sizeof(Index));
         return (Index *)(new_index);

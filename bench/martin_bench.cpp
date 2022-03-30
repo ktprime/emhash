@@ -82,7 +82,7 @@ static std::map<std::string, std::string> show_name =
 #endif
 
 //    {"jg", "jg_dense"},
-    //    {"emhash6", "emhash6"},
+     {"emhash6", "emhash6"},
 #if ABSL
     {"absl", "absl flat"},
 #endif

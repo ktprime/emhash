@@ -262,8 +262,6 @@ public:
     typedef entry<KeyT, ValueT>               PairT;
 #endif
 
-    static constexpr bool bInCacheLine = sizeof(value_pair) < (2 * EMH_CACHE_LINE_SIZE) / 3;
-
     typedef KeyT   key_type;
     typedef ValueT val_type;
     typedef ValueT mapped_type;
@@ -478,7 +476,7 @@ public:
         init(bucket, lf);
     }
 
-    inline size_type AllocSize(size_type num_buckets) const
+    size_type AllocSize(size_type num_buckets) const
     {
         return num_buckets * sizeof(PairT) + PACK_SIZE * sizeof(PairT) + num_buckets / 8 + sizeof(uint64_t);
     }
@@ -500,7 +498,7 @@ public:
     {
         init((size_type)ilist.size());
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -912,11 +910,21 @@ public:
     }
 
     // -----------------------------------------------------
-
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    inline std::pair<iterator, bool> do_insert(value_type&& p)
+    std::pair<iterator, bool> do_insert(const value_type& p)
+    {
+        const auto bucket = find_or_allocate(p.first);
+        const auto next   = bucket / 2;
+        const auto found  = EMH_EMPTY(_pairs, next);
+        if (found) {
+            EMH_NEW(p.first, p.second, next, bucket);
+        }
+        return { {this, next}, found };
+    }
+
+    std::pair<iterator, bool> do_insert(value_type&& p)
     {
         const auto bucket = find_or_allocate(p.first);
         const auto next   = bucket / 2;
@@ -927,9 +935,8 @@ public:
         return { {this, next}, found };
     }
 
-	
     template<typename K, typename V>
-    inline std::pair<iterator, bool> do_insert(K&& key, V&& value)
+    std::pair<iterator, bool> do_insert(K&& key, V&& value)
     {
         const auto bucket = find_or_allocate(key);
         const auto next   = bucket / 2;
@@ -941,7 +948,7 @@ public:
     }
 
     template<typename K, typename V>
-    inline std::pair<iterator, bool> do_assign(K&& key, V&& value)
+    std::pair<iterator, bool> do_assign(K&& key, V&& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -971,7 +978,7 @@ public:
     {
         reserve(ilist.size() + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(it->first, it->second);
+            do_insert(*it);
     }
 
     template <typename Iter>
@@ -979,7 +986,7 @@ public:
     {
         reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin)
-            do_insert(*begin);
+            do_insert(begin->first, begin->second);
     }
 
 #if 0
@@ -1257,8 +1264,20 @@ public:
         _num_main = 0;
 #endif
 
-        for (size_type bucket = 0; bucket < num_buckets; bucket++)
+        for (size_type bucket = 0; bucket < num_buckets; bucket++) {
             EMH_ADDR(_pairs, bucket) = INACTIVE;
+#if EMH_FIND_HIT
+            if constexpr (std::is_integral<KeyT>::value)
+                EMH_KEY(_pairs, bucket) = 0;
+#endif
+        }
+
+#if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value) {
+            const auto bucket = hash_key(0) & _mask;
+            reset_key(bucket);
+        }
+#endif
 
         //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
@@ -1321,14 +1340,28 @@ private:
         return reserve(_num_filled);
     }
 
+    void reset_key(size_type bucket)
+    {
+#if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value) {
+            auto& key = EMH_KEY(_pairs, bucket);
+            key = 0;
+            while ((hash_key(key) & _mask) == bucket)
+                key ++;
+        }
+#endif
+    }
+
     void clear_bucket(size_type bucket)
     {
+        reset_key(bucket);
+
         EMH_ADDR(_pairs, bucket) = INACTIVE; //loop call in destructor
         if (is_triviall_destructable()) {
             _pairs[bucket].~PairT();
             EMH_ADDR(_pairs, bucket) = INACTIVE;
         }
-        //_bitmask[bucket / MASK_BIT] |= (1 << (bucket % MASK_BIT));
+
         EMH_CLS(bucket);
         _num_filled--;
     }
@@ -1463,13 +1496,30 @@ private:
         const auto bucket = hashv & _mask;
         auto next_bucket = EMH_ADDR(_pairs, bucket);
         const auto _num_buckets = _mask + 1;
-
+#ifndef EMH_FIND_HIT
         if (next_bucket % 2 > 0)
             return _num_buckets;
         else if (_eq(key, EMH_KEY(_pairs, bucket)))
             return bucket;
         else if (next_bucket == bucket * 2)
             return _num_buckets;
+#else
+        if constexpr (std::is_integral<K>::value) {
+            if (_eq(key, EMH_KEY(_pairs, bucket)))
+                return bucket;
+            else if (next_bucket % 2 > 0 || next_bucket == bucket * 2)
+                return _num_buckets;
+//            else if (next_bucket == bucket * 2)
+//                return _num_buckets;
+        } else {
+            if (next_bucket % 2 > 0)
+                return _num_buckets;
+            else if (_eq(key, EMH_KEY(_pairs, bucket)))
+                return bucket;
+            else if (next_bucket == bucket * 2)
+                return _num_buckets;
+        }
+#endif
 
         next_bucket /= 2;
         while (true) {
@@ -1517,7 +1567,7 @@ private:
     }
 
 /***
-** inserts a new key into a hash table; first, check whether key's main
+** inserts a new key into a hash table; first check whether key's main
 ** bucket/position is free. If not, check whether colliding node/bucket is in its main
 ** position or not: if it is not, move colliding bucket to an empty place and
 ** put new key in its main position; otherwise (colliding bucket is in its main
