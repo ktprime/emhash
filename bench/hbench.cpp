@@ -15,7 +15,7 @@
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
 #include "hash_table5.hpp"
-#include "old/hash_table2.hpp"
+//#include "old/hash_table2.hpp"
 
 #ifdef _WIN32
 class Timer

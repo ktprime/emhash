@@ -19,7 +19,7 @@
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
-#define NDEBUG                1
+//#define NDEBUG                1
 #ifdef _WIN32
     #ifndef NOMINMAX
     #define NOMINMAX
@@ -58,6 +58,11 @@
     #define X86_32 1
     #define PHMAP_HAVE_SSSE3                      1
     #define PHMAP_NON_DETERMINISTIC               1
+#endif
+
+#if X86
+#include "ahash/ahash.c"
+#include "ahash/random_state.c"
 #endif
 
 #if _WIN32 && _WIN64 == 0

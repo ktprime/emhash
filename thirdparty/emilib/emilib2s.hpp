@@ -531,58 +531,58 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
+    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& val)
     {
         check_expand_need();
         bool bnofind = true;
         const auto bucket = find_or_allocate(key, bnofind);
 
         if (bnofind) {
-            new(_pairs + bucket) PairT(key, std::forward<ValueT>(value)); _num_filled++;
+            new(_pairs + bucket) PairT(key, std::forward<ValueT>(val)); _num_filled++;
         }
         return { iterator(this, bucket, false), bnofind };
     }
 
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& val)
     {
         check_expand_need();
         bool bnofind = true;
         const auto bucket = find_or_allocate(key, bnofind);
 
         if (bnofind) {
-            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(value)); _num_filled++;
+            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(val)); _num_filled++;
         }
         return { iterator(this, bucket, false), bnofind };
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key, ValueT&& value)
+    std::pair<iterator, bool> emplace(const KeyT& key, ValueT&& val)
     {
-        return insert(key, std::forward < ValueT > (value));
+        return insert(key, std::forward<ValueT>(val));
     }
 
-    std::pair<iterator, bool> emplace(KeyT&& key, ValueT&& value)
+    std::pair<iterator, bool> emplace(KeyT&& key, ValueT&& val)
     {
-        return insert(std::move(key), std::forward < ValueT >(value));
+        return insert(std::move(key), std::forward<ValueT>(val));
     }
 
-    std::pair<iterator, bool> emplace(value_type&& v)
+    std::pair<iterator, bool> emplace(value_type&& value)
     {
-        return insert(std::move(v.first), std::move(v.second));
+        return insert(std::move(value.first), std::move(value.second));
     }
 
-    std::pair<iterator, bool> emplace(const value_type& v)
+    std::pair<iterator, bool> emplace(const value_type& value)
     {
-        return insert(v.first, v.second);
+        return insert(value.first, value.second);
     }
 
-    std::pair<iterator, bool> insert(const value_type& p)
+    std::pair<iterator, bool> insert(const value_type& value)
     {
-        return insert(p.first, p.second);
+        return insert(value.first, value.second);
     }
 
-    std::pair<iterator, bool> insert(iterator it, const value_type& p)
+    std::pair<iterator, bool> insert(iterator hint, const value_type& value)
     {
-        return insert(p.first, p.second);
+        return insert(value.first, value.second);
     }
 
     void insert(const_iterator beginc, const_iterator endc)
@@ -593,15 +593,7 @@ public:
         }
     }
 
-    void insert_unique(const_iterator beginc, const_iterator endc)
-    {
-        reserve(endc - beginc + _num_filled);
-        for (; beginc != endc; ++beginc) {
-            insert_unique(beginc->first, beginc->second);
-        }
-    }
-
-    void insert_unique(KeyT&& key, ValueT&& value)
+    void insert_unique(KeyT&& key, ValueT&& val)
     {
         check_expand_need();
 
@@ -609,20 +601,20 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = key_2hash(key_hash, key);
-        new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(value)); _num_filled++;
+        new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(val)); _num_filled++;
     }
 
-    void insert_unique(value_type&& p)
+    void insert_unique(value_type&& value)
     {
-        insert_unique(std::move(p.first), std::move(p.second));
+        insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    void insert_unique(const value_type & p)
+    void insert_unique(const value_type & value)
     {
-        insert_unique(p.first, p.second);
+        insert_unique(value.first, value.second);
     }
 
-    void insert_or_assign(KeyT&& key, ValueT&& value)
+    void insert_or_assign(KeyT&& key, ValueT&& val)
     {
         check_expand_need();
 
@@ -631,9 +623,9 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (bnofind) {
-            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(value)); _num_filled++;
+            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(val)); _num_filled++;
         } else {
-            _pairs[bucket].second = value;
+            _pairs[bucket].second = val;
         }
     }
 
@@ -909,7 +901,8 @@ private:
         const auto key_hash = _hasher(key);
         const auto key_h2 = key_2hash(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
-        bucket -= bucket % simd_bytes;
+        const auto boffset = bucket % simd_bytes;
+        bucket -= boffset;
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;
@@ -936,7 +929,11 @@ private:
             //if (group_mask(next_bucket) == State::EEMPTY) {
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
+#if EMH_FIND_HIT0
+                const auto ebucket = hole == -1 ? next_bucket + ((maske & (1 << boffset)) ? boffset : CTZ(maske)) : hole;
+#else
                 const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
+#endif
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;

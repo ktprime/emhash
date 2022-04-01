@@ -727,10 +727,10 @@ void find_hit_50_erase(const hash_type& ht_hash, const std::string& hash_name, c
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
         auto it = tmp.find(v);
-        if (it != tmp.end())
-            tmp.erase(it);
-        else
+        if (it == tmp.end())
             sum ++;
+        else
+            tmp.erase(it);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -854,8 +854,8 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
     return 0;
 #else
 
-#if AR > 0
-    const auto iRation = AR;
+#if RA > 0
+    const auto iRation = RA;
 #else
     const auto iRation = 1;
 #endif

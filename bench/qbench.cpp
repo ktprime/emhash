@@ -88,44 +88,46 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {    500'000u,       100u},
     {  7'200'000u,         5u},
 #if 1
-    { 10'000'000u,         2u},
-    { 50'000'000u,         2u},
+    { 10'000'000u,         3u},
+    { 50'000'000u,         3u},
 #endif
 //    {100'000'000u,         1u},
 #endif
 
-    {10,  1000000},
-    {32,  1000000},
-    {110,  100000},
-    {240,  100000},
-    {500,  100000},
-    {800,  100000},
-    {1024, 100000},
-    {1500, 10000 },
-    {2048, 10000 },
-    {3000, 10000 },
-    {6000, 10000 },
-    {8192, 10000 },
-    {12000, 1000 },
-    {16384, 1000 },
-    {25000, 1000 },
-    {32768, 100 },
-    {45000, 100 },
-    {60000, 100 },
-    {100000, 100 },
-    {150000, 50 },
-    {200000, 50 },
-    {300000, 20 },
-    {400000, 20 },
-    {600000,  10 },
-    {800000,  10 },
-    {1200000, 10 },
-    {2200000, 10 },
-    {3100000, 10 },
 #if 1
+    {4,   2000000},
+    {10,  1200000},
+    {32,   600000},
+    {110,  200000},
+    {240,  120000},
+    {600,  70000},
+    {1024, 40000 },
+    {1500, 30000 },
+    {2048, 20000 },
+    {3000, 15000 },
+    {6000, 7000 },
+    {8192,  5000 },
+    {12000, 3000 },
+    {16384, 2000 },
+    {25000, 1000 },
+    {32768, 600 },
+    {45000, 500 },
+    {60000, 400 },
+    {100000,200 },
+    {150000, 100},
+    {200000, 80 },
+    {300000, 50 },
+    {400000, 40 },
+    {600000,  30 },
+    {800000,  20 },
+    {1200000, 12 },
+    {2200000, 10 },
+#endif
+#if 1
+    {3600000, 8 },
     {6000000, 5 },
-    {10000000,5},
-    {50000000,2},
+    {10000000,4},
+    {50000000,3},
 #endif
 };
 
@@ -859,10 +861,9 @@ static void compareDetailed(Stats & results)
         }
 
         std::cout << "Comparing " << roundCount << " rounds of " << elementCount << " elements...";
-
+		auto nowms = getus();
         compareDetailedSized<CommonKey, ContainerInfos...>(elementCount, roundCount, random, results);
-
-        std::cout << " done" << std::endl;
+        std::cout << " done use " << ((getus() - nowms) / 1e9) << " sec" << std::endl;
     }
 
     results.setContainerNames<ContainerInfos...>();
@@ -898,9 +899,9 @@ static void compareTypical(Stats & results)
 
         std::cout << "Comparing " << roundCount << " rounds of " << elementCount << " elements...";
 
+		auto nowms = getus();
         compareTypicalSized<CommonKey, ContainerInfos...>(elementCount, roundCount, random, results);
-
-        std::cout << " done" << std::endl;
+        std::cout << " done use " << ((getus() - nowms) / 1e6) << " sec" << std::endl;
     }
 
     results.setContainerNames<ContainerInfos...>();
@@ -1219,17 +1220,18 @@ int main(int argc, const char* argv[])
         using V = size_t;
         compare<CompareMode::typical, K,
 #if X86
-            EmiLib1MapInfo<K, V>,
-            EmiLib2MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
+            EmiLib2MapInfo<K, V>,
 #endif
 //            StdMapInfo<K, V>,
 #ifdef ABSL
             AbslMapInfo<K, V>,
 #endif
 #if ET
+            EmiLib1MapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
             PhMapInfo<K, V>,
+            EmHash8MapInfo<K, V>,
 #endif
 
 #if ET > 1
@@ -1242,14 +1244,13 @@ int main(int argc, const char* argv[])
 #if 1
             EmHash5MapInfo<K, V>,
             EmHash6MapInfo<K, V>,
-            EmHash7MapInfo<K, V>,
-            EmHash8MapInfo<K, V>,
 #if CXX201
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
+            QcHashMapInfo<K, V>,
 #endif
 #endif
-            QcHashMapInfo<K, V>
+            EmHash7MapInfo<K, V>
         >();
     }
     // Architecture comparison

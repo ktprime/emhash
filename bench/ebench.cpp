@@ -103,12 +103,13 @@ std::map<std::string, std::string> maps =
 #include "old/hash_table2.hpp"
 #include "old/hash_table3.hpp"
 #include "old/hash_table4.hpp"
-//#include "old/hash_table557.hpp"
+#include "old/hash_table557.hpp"
 #endif
-#include "hash_table5.hpp"
-#include "hash_table6.hpp"
-#include "hash_table7.hpp"
-#include "hash_table8.hpp"
+
+#include "../hash_table5.hpp"
+#include "../hash_table6.hpp"
+#include "../hash_table7.hpp"
+#include "../hash_table8.hpp"
 
 //https://en.wikipedia.org/wiki/Hash_table
 //https://zhuanlan.zhihu.com/p/363213858
@@ -1300,113 +1301,6 @@ static int benchHashMap(int n)
     return test_case;
 }
 
-#if WYHASH_LITTLE_ENDIAN && STR_VIEW
-struct string_hash
-{
-    using is_transparent = void;
-    std::size_t operator()(const char* key)             const { auto ksize = std::strlen(key); return wyhash(key, ksize, ksize); }
-    std::size_t operator()(const std::string& key)      const { return wyhash(key.data(), key.size(), key.size()); }
-    std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size()); }
-};
-
-struct string_equal
-{
-    using is_transparent = int;
-
-#if 1
-    bool operator()(const std::string_view& lhs, const std::string& rhs) const {
-        return lhs.size() == rhs.size() && lhs == rhs;
-    }
-#endif
-
-    bool operator()(const char* lhs, const std::string& rhs) const {
-        return std::strcmp(lhs, rhs.data()) == 0;
-    }
-
-    bool operator()(const char* lhs, const std::string_view& rhs) const {
-        return std::strcmp(lhs, rhs.data()) == 0;
-    }
-
-    bool operator()(const std::string_view& rhs, const char* lhs) const {
-        return std::strcmp(lhs, rhs.data()) == 0;
-    }
-};
-
-static int find_strview_test()
-{
-    emhash6::HashMap<const std::string, char, string_hash, string_equal> map;
-    std::string_view key = "key";
-    std::string     skey = "key";
-    map.emplace(key, 0);
-    const auto it = map.find(key); // fail
-    assert(it == map.find("key"));
-    assert(it == map.find(skey));
-
-    assert(key == "key");
-    assert(key == skey);
-    return 0;
-}
-#endif
-
-static void testHashRand(int loops = 100000009)
-{
-    printf("%s loops = %d\n",__FUNCTION__, loops);
-    long sum = 0;
-    auto ts = getus();
-
-    auto rseed = randomseed();
-    {
-        ts = getus();
-        Sfc4 srng(rseed);
-        for (int i = 1; i < loops; i++)
-            sum += srng();
-        printf("Sfc4       = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-    }
-
-    {
-        ts = getus();
-        RomuDuoJr srng(rseed);
-        for (int i = 1; i < loops; i++)
-            sum += srng();
-        printf("RomuDuoJr  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-    }
-    {
-        ts = getus();
-        Orbit srng(rseed);
-        for (int i = 1; i < loops; i++)
-            sum += srng();
-        printf("Orbit      = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-    }
-
-#if __SIZEOF_INT128__
-    {
-        ts = getus();
-        Lehmer64 srng(rseed);
-        for (int i = 1; i < loops; i++)
-            sum += srng();
-        printf("Lehmer64   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-    }
-#endif
-
-    {
-        ts = getus();
-        std::mt19937_64 srng(rseed);
-        for (int i = 1; i < loops; i++)
-            sum += srng();
-        printf("mt19937_64 = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-    }
-
-#if WYHASH_LITTLE_ENDIAN
-    {
-        ts = getus();
-        WyRand srng(rseed);
-        for (int i = 1; i < loops; i++)
-            sum += srng();
-        printf("wyrand     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-    }
-#endif
-}
-
 static void testHashInt(int loops = 500000009)
 {
     printf("%s loops = %d\n", __FUNCTION__, loops);
@@ -1493,85 +1387,6 @@ static void testHashInt(int loops = 500000009)
 #endif
 }
 
-static void buildRandString(int size, std::vector<std::string>& rndstring, int str_min, int str_max)
-{
-    std::mt19937_64 srng(randomseed());
-    for (int i = 0; i < size; i++)
-        rndstring.emplace_back(get_random_alphanum_string(srng() % (str_max - str_min + 1) + str_min));
-}
-
-static void testHashString(int size, int str_min, int str_max)
-{
-    printf("\n%s loops = %d\n", __FUNCTION__, size);
-    std::vector<std::string> rndstring;
-    rndstring.reserve(size * 4);
-
-    long sum = 0;
-    for (int i = 1; i <= 4; i++)
-    {
-        rndstring.clear();
-        buildRandString(size * i, rndstring, str_min + i, str_max * i);
-        int64_t start = 0;
-        int t_find = 0;
-
-        start = getus();
-        for (auto& v : rndstring)
-            sum += std::hash<std::string>()(v);
-        t_find = (getus() - start) / 1000;
-        printf("std hash    = %4d ms\n", t_find);
-
-#ifdef WYHASH_LITTLE_ENDIAN
-        start = getus();
-        for (auto& v : rndstring)
-            sum += wyhash(v.data(), v.size(), 1);
-        t_find = (getus() - start) / 1000;
-        printf("wyhash      = %4d ms\n", t_find);
-#endif
-
-#if KOMI_HESH
-        start = getus();
-        for (auto& v : rndstring)
-            sum += komihash(v.data(), v.size(), 1);
-        t_find = (getus() - start) / 1000;
-        printf("komi_hash   = %4d ms\n", t_find);
-#endif
-
-#ifdef AHASH_AHASH_H
-        start = getus();
-        for (auto& v : rndstring)
-            sum += ahash64(v.data(), v.size(), 1);
-        t_find = (getus() - start) / 1000;
-        printf("ahash       = %4d ms\n", t_find);
-#endif
-
-#ifdef ROBIN_HOOD_H_INCLUDED
-        start = getus();
-        for (auto& v : rndstring)
-            sum += robin_hood::hash_bytes(v.data(), v.size());
-        t_find = (getus() - start) / 1000;
-        printf("martius hash= %4d ms\n", t_find);
-#endif
-
-#if ABSL_HASH && ABSL
-        start = getus();
-        for (auto& v : rndstring)
-            sum += absl::Hash<std::string>()(v);
-        t_find = (getus() - start) / 1000;
-        printf("absl hash   = %4d ms\n", t_find);
-#endif
-
-#ifdef PHMAP_VERSION_MAJOR
-        start = getus();
-        for (auto& v : rndstring)
-            sum += phmap::Hash<std::string>()(v);
-        t_find = (getus() - start) / 1000;
-        printf("phmap hash  = %4d ms\n", t_find);
-#endif
-        putchar('\n');
-    }
-    printf("sum = %ld\n", sum);
-}
-
 static int test_lru(int n)
 {
 #if ET
@@ -1594,7 +1409,6 @@ int main(int argc, char* argv[])
     auto start = getus();
 //    test_lru(100'000'000);
     testHashInt(2e7+8);
-    testHashRand(1e8+8);
 
 #ifdef AHASH_AHASH_H
     printf("ahash_version = %s\n", ahash_version());
@@ -1638,9 +1452,6 @@ int main(int argc, char* argv[])
             minn = value;
         else if (cmd == 'm')
             maxn = value;
-        else if (cmd == 'b') {
-            testHashString(1e6+6, 6, 16);
-        }
         else if (cmd == 'd') {
         for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
             if (c >= '5' && c <= '9') {

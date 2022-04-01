@@ -19,9 +19,9 @@
 #include "emilib/emilib.hpp"
 #include "emilib/emilib2.hpp"
 
-#include "old/hash_table2.hpp"
-#include "old/hash_table3.hpp"
-#include "old/hash_table4.hpp"
+#include "emhash/hash_table2.hpp"
+#include "emhash/hash_table3.hpp"
+#include "emhash/hash_table4.hpp"
 #include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"

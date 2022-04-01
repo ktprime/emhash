@@ -1334,11 +1334,6 @@ private:
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.data(), key.size(), key.size()) & _mask;
-#elif EMH_BDKR_HASH
-        size_type hash = 0;
-        for (const auto c : key)
-            hash = c + hash * 131;
-        return hash & _mask;
 #else
         return _hasher(key) & _mask;
 #endif

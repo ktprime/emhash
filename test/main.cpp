@@ -22,17 +22,71 @@
  * SOFTWARE.
  */
 
-#if 0
+#ifndef _WIN32
 #define BOOST_TEST_MODULE hash_map_tests
 #include <boost/test/unit_test.hpp>
 #endif
 
+#include "wyhash.h"
 #include "eutil.h"
+#include "utils.h"
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
-#include "../thirdparty/emilib/emilib2.hpp"
+#include "emilib/emilib2.hpp"
+
+
+#include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
+
+#if CXX20
+struct string_hash
+{
+    using is_transparent = void;
+    std::size_t operator()(const char* key)             const { auto ksize = std::strlen(key); return wyhash(key, ksize, ksize); }
+    std::size_t operator()(const std::string& key)      const { return wyhash(key.data(), key.size(), key.size()); }
+    std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size()); }
+};
+
+struct string_equal
+{
+    using is_transparent = int;
+
+#if 1
+    bool operator()(const std::string_view& lhs, const std::string& rhs) const {
+        return lhs.size() == rhs.size() && lhs == rhs;
+    }
+#endif
+
+    bool operator()(const char* lhs, const std::string& rhs) const {
+        return std::strcmp(lhs, rhs.data()) == 0;
+    }
+
+    bool operator()(const char* lhs, const std::string_view& rhs) const {
+        return std::strcmp(lhs, rhs.data()) == 0;
+    }
+
+    bool operator()(const std::string_view& rhs, const char* lhs) const {
+        return std::strcmp(lhs, rhs.data()) == 0;
+    }
+};
+
+static int find_strview_test()
+{
+    emhash6::HashMap<const std::string, char, string_hash, string_equal> map;
+    std::string_view key = "key";
+    std::string     skey = "key";
+    map.emplace(key, 0);
+    const auto it = map.find(key); // fail
+    assert(it == map.find("key"));
+    assert(it == map.find(skey));
+
+    assert(key == "key");
+    assert(key == skey);
+    return 0;
+}
+#endif
 
 struct Key {
     std::string first;
@@ -68,21 +122,26 @@ namespace std {
     };
 }
 
+// print out a std::pair
 template <class Os, class U, class V>
-Os& operator<<(Os& os, const std::pair<U, V>& p) {
-    return os << p.first << ":" << p.second;
+Os& operator<<(Os& os, const std::pair<U,V>& p) {
+    return os << '{' << p.first << ", " << p.second << '}';
 }
 
-// print out a container
-template <class Os, class Co>
-Os& operator<<(Os& os, const Co& co) {
-    os << "{";
-    for (auto const& i : co) { os << ' ' << i; }
-    return os << " }\n";
-}
-
-static void unit_test()
+template<typename Os, typename Container>
+inline Os& operator<<(Os& os, Container const& cont)
 {
+    os << "{";
+    for (const auto& item : cont) {
+        os << "{" << item.first << ", " << item.second << "}";
+    }
+    return os << "}" << std::endl;
+}
+
+static void TestApi()
+{
+	printf("============================== %s ============================\n", __FUNCTION__);
+
     {
         // default constructor: empty map
         emhash5::HashMap<std::string, std::string> m1;
@@ -159,7 +218,7 @@ static void unit_test()
     }
 
     {
-        emhash6::HashMap<std::string, std::string> m;
+        emhash5::HashMap<std::string, std::string> m;
         // uses pair's move constructor
         m.emplace(std::make_pair(std::string("a"), std::string("a")));
         // uses pair's converting move constructor
@@ -167,14 +226,14 @@ static void unit_test()
         m.emplace(std::move(std::make_pair("b", "abcd")));
         // uses pair's template constructor
         m.emplace("d", "ddd");
-        /*
+
+#if 0
         // uses pair's piecewise constructor
         m.emplace(std::piecewise_construct,
         std::forward_as_tuple("c"),
         std::forward_as_tuple(10, 'c'));
         // as of C++17, m.try_emplace("c", 10, 'c'); can be used
-        */
-
+#endif
         for (const auto& p : m) {
             std::cout << p.first << " => " << p.second << '\n';
         }
@@ -341,9 +400,10 @@ static void unit_test()
         }
     }
 
+    //swap.ref
     {
         emhash5::HashMap<int, int> numbers;
-        //        std::cout << std::boolalpha;
+        std::cout << std::boolalpha;
         std::cout << "Initially, numbers.empty(): " << numbers.empty() << '\n';
 
         numbers.emplace(42, 13);
@@ -351,7 +411,7 @@ static void unit_test()
         std::cout << "After adding elements, numbers.empty(): " << numbers.empty() << '\n';
 
 
-        std::unordered_map<std::string, std::string>
+        emhash5::HashMap<std::string, std::string>
             m1 { {"γ", "gamma"}, {"β", "beta"}, {"α", "alpha"}, {"γ", "gamma"}, },
                m2 { {"ε", "epsilon"}, {"δ", "delta"}, {"ε", "epsilon"} };
 
@@ -359,33 +419,77 @@ static void unit_test()
         const auto iter = std::next(m1.cbegin());
 
         std::cout << "──────── before swap ────────\n"
-            << "m1: " << m1 << "m2: " << m2 << "ref: " << ref
-            << "\niter: " << *iter << '\n';
+            << "m1: " << m1 << "m2: " << m2 << "ref: {" << ref.first << "," << ref.second << "}"
+            << "\niter: " << "{" << iter->first << ", " << iter->second << "}" << '\n';
 
         m1.swap(m2);
 
         std::cout << "──────── after swap ────────\n"
-            << "m1: " << m1 << "m2: " << m2 << "ref: " << ref
-            << "\niter: " << *iter << '\n';
+            << "m1: " << m1 << "m2: " << m2 << "ref: {" << ref.first << "," << ref.second << "}"
+            << "\niter: " << "{" << iter->first << ", " << iter->second << "}" << '\n';
     }
+
+    //merge
+    {
+        emhash5::HashMap<std::string, int>
+            p{ {"C", 3}, {"B", 2}, {"A", 1}, {"A", 0} },
+            q{ {"E", 6}, {"E", 7}, {"D", 5}, {"A", 4} };
+
+        std::cout << "p: " << p << "q: " << q;
+        p.merge(q);
+        std::cout << "p.merge(q);\n" << "p: " << p << "q: " << q << std::endl;
+    }
+
+#if 1
+    //erase if
+    {
+        emhash5::HashMap<int, char> data {{1, 'a'},{2, 'b'},{3, 'c'},{4, 'd'},
+            {5, 'e'},{4, 'f'},{5, 'g'},{5, 'g'}};
+        std::cout << "Original:\n" << data << '\n';
+
+        const auto count = data.erase_if([](const auto& item) {
+            auto const [key, _, val] = item;
+            return (key & 1) == 1;
+        });
+        std::cout << "Erase items with odd keys:\n" << data << '\n'
+            << count << " items removed.\n";
+    }
+
+    //hint
+    {
+       emhash5::HashMap<int, char> data {{1, 'a'},{2, 'b'},{3, 'c'},{4, 'd'}, {5, 'e'},{4, 'f'},{5, 'g'},{5, 'g'}};
+       std::cout << "Original:\n" << data << '\n';
+
+       auto it = data.find(1);
+       it = data.emplace_hint(it, 1, 'c');
+       assert(it->second != 'c');
+
+       data.insert_or_assign(it, 1, 'c');
+       assert(it->second == 'c');
+
+      data.emplace_hint(data.end(), 1, 'd');
+    }
+
+#endif
 }
 
 #define TO_KEY(i)  i
-static int TestHashMap(int n, int max_loops = 1234567)
+static int RandTest(size_t n, int max_loops = 1234567)
 {
-	using keyType = long;
+	printf("============================== %s ============================\n", __FUNCTION__);
+    using keyType = long;
 
 #if X86
 #ifndef KEY_CLA
 
     emhash5::HashMap <keyType, int> ehash5;
-#if X86
+#if X860
     emilib2::HashMap <keyType, int> ehash2;
 #else
     emhash7::HashMap <keyType, int> ehash2;
 #endif
 
-    emhash8::HashMap <keyType, int> unhash;
+    emhash6::HashMap <keyType, int> unhash;
 
     Sfc4 srng(n);
     const auto step = n % 2 + 1;
@@ -394,12 +498,17 @@ static int TestHashMap(int n, int max_loops = 1234567)
         ehash5[ki] = unhash[ki] = ehash2[ki] = (int)srng();
     }
 
+    {
+        assert(ehash5 == ehash2);
+        assert(ehash5 == unhash);
+    }
+
     int loops = max_loops;
     while (loops -- > 0) {
         assert(ehash2.size() == unhash.size()); assert(ehash5.size() == unhash.size());
 
         const uint32_t type = srng() % 100;
-        auto rid  = n ++;
+        auto rid  = srng();// n ++;
         auto id   = TO_KEY(rid);
         if (type <= 40 || ehash2.size() < 1000) {
             ehash2[id] += type; ehash5[id] += type; unhash[id] += type;
@@ -415,7 +524,7 @@ static int TestHashMap(int n, int max_loops = 1234567)
                 id = ehash5.begin()->first;
 
             ehash5.erase(id);
-            unhash.erase(id);
+            unhash.erase(unhash.find(id));
             ehash2.erase(id);
 
             assert(ehash5.count(id) == unhash.count(id));
@@ -437,17 +546,19 @@ static int TestHashMap(int n, int max_loops = 1234567)
                 const auto vid = (int)rid;
                 ehash5.emplace(id, vid);
                 assert(ehash5.count(id) == 1);
-                assert(ehash2.count(id) == 0);
 
+                assert(ehash2.count(id) == 0);
                 //if (id == 1043)
-                ehash2.insert(id, vid);
+                ehash2[id] = vid;
                 assert(ehash2.count(id) == 1);
 
+                assert(unhash.count(id) == 0);
                 unhash[id] = ehash2[id];
                 assert(unhash[id] == ehash2[id]);
                 assert(unhash[id] == ehash5[id]);
             } else {
-                unhash[id] = ehash2[id] = ehash5[id] = 1;
+                unhash[id] = ehash2[id] = 1;
+                ehash5.insert_or_assign(id, 1);
                 unhash.erase(id);
                 ehash2.erase(id);
                 ehash5.erase(id);
@@ -455,16 +566,9 @@ static int TestHashMap(int n, int max_loops = 1234567)
         }
         if (loops % 100000 == 0) {
             printf("%d %d\r", loops, (int)ehash2.size());
-#if 0
-            ehash2.shrink_to_fit();
-            //ehash5.shrink_to_fit();
-
-            uint64_t sum1 = 0, sum2 = 0, sum3 = 0;
-            for (auto v : unhash) sum1 += v.first * v.second;
-            for (auto v : ehash2) sum2 += v.first * v.second;
-            for (auto v : ehash5) sum3 += v.first * v.second;
-            assert(sum1 == sum2);
-            assert(sum1 == sum3);
+#if 1
+            assert(ehash5 == ehash2);
+            assert(ehash5 == unhash);
 #endif
         }
     }
@@ -476,9 +580,159 @@ static int TestHashMap(int n, int max_loops = 1234567)
     return 0;
 }
 
-int main()
+static void benchIntRand(int loops = 100000009)
 {
-    unit_test();
-	TestHashMap(1e6);
+	printf("============================== %s ============================\n", __FUNCTION__);
+    printf("%s loops = %d\n",__FUNCTION__, loops);
+    long sum = 0;
+    auto ts = getus();
+
+    auto rseed = randomseed();
+    {
+        ts = getus();
+        Sfc4 srng(rseed);
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("Sfc4       = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+
+    {
+        ts = getus();
+        RomuDuoJr srng(rseed);
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("RomuDuoJr  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+    {
+        ts = getus();
+        Orbit srng(rseed);
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("Orbit      = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+
+#if __SIZEOF_INT128__
+    {
+        ts = getus();
+        Lehmer64 srng(rseed);
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("Lehmer64   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+#endif
+
+    {
+        ts = getus();
+        std::mt19937_64 srng(rseed);
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("mt19937_64 = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+
+#if WYHASH_LITTLE_ENDIAN
+    {
+        ts = getus();
+        WyRand srng(rseed);
+        for (int i = 1; i < loops; i++)
+            sum += srng();
+        printf("wyrand     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    }
+#endif
+}
+
+static void buildRandString(int size, std::vector<std::string>& rndstring, int str_min, int str_max)
+{
+    std::mt19937_64 srng(randomseed());
+    for (int i = 0; i < size; i++)
+        rndstring.emplace_back(get_random_alphanum_string(srng() % (str_max - str_min + 1) + str_min));
+}
+
+static void benchStringHash(int size, int str_min, int str_max)
+{
+	printf("============================== %s ============================\n", __FUNCTION__);
+    printf("\n%s loops = %d\n", __FUNCTION__, size);
+    std::vector<std::string> rndstring;
+    rndstring.reserve(size * 4);
+
+    long sum = 0;
+    for (int i = 1; i <= 4; i++)
+    {
+        rndstring.clear();
+        buildRandString(size * i, rndstring, str_min + i, str_max * i);
+        int64_t start = 0;
+        int t_find = 0;
+
+        start = getus();
+        for (auto& v : rndstring)
+            sum += std::hash<std::string>()(v);
+        t_find = (getus() - start) / 1000;
+        printf("std hash    = %4d ms\n", t_find);
+
+#ifdef WYHASH_LITTLE_ENDIAN
+        start = getus();
+        for (auto& v : rndstring)
+            sum += wyhash(v.data(), v.size(), 1);
+        t_find = (getus() - start) / 1000;
+        printf("wyhash      = %4d ms\n", t_find);
+#endif
+
+#if KOMI_HESH
+        start = getus();
+        for (auto& v : rndstring)
+            sum += komihash(v.data(), v.size(), 1);
+        t_find = (getus() - start) / 1000;
+        printf("komi_hash   = %4d ms\n", t_find);
+#endif
+
+#ifdef AHASH_AHASH_H
+        start = getus();
+        for (auto& v : rndstring)
+            sum += ahash64(v.data(), v.size(), 1);
+        t_find = (getus() - start) / 1000;
+        printf("ahash       = %4d ms\n", t_find);
+#endif
+
+        start = getus();
+        for (auto& v : rndstring)
+            sum += robin_hood::hash_bytes(v.data(), v.size());
+        t_find = (getus() - start) / 1000;
+        printf("martius hash= %4d ms\n", t_find);
+
+#if ABSL_HASH && ABSL
+        start = getus();
+        for (auto& v : rndstring)
+            sum += absl::Hash<std::string>()(v);
+        t_find = (getus() - start) / 1000;
+        printf("absl hash   = %4d ms\n", t_find);
+#endif
+
+#ifdef PHMAP_VERSION_MAJOR
+        start = getus();
+        for (auto& v : rndstring)
+            sum += phmap::Hash<std::string>()(v);
+        t_find = (getus() - start) / 1000;
+        printf("phmap hash  = %4d ms\n", t_find);
+#endif
+        putchar('\n');
+    }
+    printf("sum = %ld\n", sum);
+}
+
+int main(int argc, char* argv[])
+{
+    TestApi();
+
+    benchIntRand(1e8+8);
+    benchStringHash(1e6+6, 6, 16);
+
+    size_t n = (int)1e6, loop = 12345678;
+    if (argc > 1 && isdigit(argv[1][0]))
+        n = atoi(argv[1]);
+    if (argc > 2 && isdigit(argv[2][0]))
+        loop = atoi(argv[2]);
+
+    printf("n = %d, loop = %d\n", (int)n, (int)loop);
+    RandTest(n, loop);
+
     return 0;
 }

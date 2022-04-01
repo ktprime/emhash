@@ -22,8 +22,11 @@
  * SOFTWARE.
  */
 
-#define EMH_BUCKET_INDEX 2
+//#define EMH_BUCKET_INDEX 1
 #include "../hash_table5.hpp"
+#include "../hash_table6.hpp"
+#include "../hash_table7.hpp"
+#include "../hash_table8.hpp"
 
 #include <boost/mpl/list.hpp>
 #include <boost/test/unit_test.hpp>
@@ -44,14 +47,14 @@
 BOOST_AUTO_TEST_SUITE(test_robin_map)
 
 using test_types = boost::mpl::list<
-    emhash5::HashMap<std::int64_t, std::int64_t>
-//    emhash5::HashMap<std::string, std::string>,
+    emhash7::HashMap<std::int64_t, std::int64_t>,
+    emhash6::HashMap<std::string, std::string>,
     // Test with hash having a lot of collisions
-//    emhash5::HashMap<std::int64_t, std::int64_t, mod_hash<9>>,
-//    emhash5::HashMap<std::string, std::string, mod_hash<9>>,
-//    emhash5::HashMap<move_only_test, move_only_test, mod_hash<9>>,
-//    emhash5::HashMap<copy_only_test, copy_only_test, mod_hash<9>>,
-//    emhash5::HashMap<self_reference_member_test, self_reference_member_test, mod_hash<9>>
+    emhash8::HashMap<std::int64_t, std::int64_t, mod_hash<9>>,
+    emhash5::HashMap<std::string, std::string, mod_hash<9>>,
+    emhash5::HashMap<move_only_test, move_only_test, mod_hash<9>>,
+    emhash5::HashMap<copy_only_test, copy_only_test, mod_hash<9>>,
+    emhash5::HashMap<self_reference_member_test, self_reference_member_test, mod_hash<9>>
 	>;
 
 
