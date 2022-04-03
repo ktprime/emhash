@@ -429,7 +429,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -665,7 +665,7 @@ public:
         const auto next_bucket = EMH_ADDR(_pairs, bucket);
         if ((int)next_bucket < 0)
             return 0;
-        else if (bucket == 2 * next_bucket)
+        else if (bucket == next_bucket * 2)
             return bucket + 1;
 
         return hash_bucket(bucket);
@@ -1488,7 +1488,7 @@ private:
     size_type erase_bucket(const size_type bucket)
     {
         auto next_bucket = EMH_ADDR(_pairs, bucket);
-        if (next_bucket == 2 * bucket) {
+        if (next_bucket == bucket * 2) {
 #if EMH_SAFE_HASH
             _num_main--;
 #endif
@@ -1642,7 +1642,7 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(bucket);
+        const auto new_bucket = find_empty_bucket(next_bucket);
         return EMH_ADDR(_pairs, next_bucket) = new_bucket * 2 + 1;
     }
 
@@ -1659,7 +1659,7 @@ private:
         if (1) {
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
-            if (EMH_LIKELY(bmask2 != 0))
+            if (bmask2 != 0)
                 return step * SIZE_BIT + CTZ(bmask2);
         }
 

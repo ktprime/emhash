@@ -481,13 +481,13 @@ public:
     template<typename KeyLike>
     iterator find(const KeyLike& key)
     {
-        return iterator(this, find_filled_bucket(key), false);
+        return {this, find_filled_bucket(key), false};
     }
 
     template<typename KeyLike>
     const_iterator find(const KeyLike& key) const
     {
-        return const_iterator(this, find_filled_bucket(key), false);
+        return {this, find_filled_bucket(key), false};
     }
 
     template<typename KeyLike>
@@ -518,61 +518,33 @@ public:
         return &_pairs[bucket].second;
     }
 
-    /// Convenience function.
-    template<typename KeyLike>
-    ValueT get_or_return_default(const KeyLike& k) const
-    {
-        const ValueT* ret = try_get(k);
-        return ret ? *ret : ValueT();
-    }
-
     // -----------------------------------------------------
 
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& val)
+    template<typename K, typename V>
+    std::pair<iterator, bool> insert(K&& key, V&& val)
     {
         check_expand_need();
         bool bnofind = true;
         const auto bucket = find_or_allocate(key, bnofind);
 
         if (bnofind) {
-            new(_pairs + bucket) PairT(key, std::forward<ValueT>(val)); _num_filled++;
+            new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
-        return { iterator(this, bucket, false), bnofind };
+        return { {this, bucket, false}, bnofind };
     }
 
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& val)
+    template <class... Args>
+    inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
-
-        if (bnofind) {
-            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(val)); _num_filled++;
-        }
-        return { iterator(this, bucket, false), bnofind };
+        return insert(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key, ValueT&& val)
-    {
-        return insert(key, std::forward<ValueT>(val));
-    }
-
-    std::pair<iterator, bool> emplace(KeyT&& key, ValueT&& val)
-    {
-        return insert(std::move(key), std::forward<ValueT>(val));
-    }
-
-    std::pair<iterator, bool> emplace(value_type&& value)
+    std::pair<iterator, bool> insert(value_type&& value)
     {
         return insert(std::move(value.first), std::move(value.second));
-    }
-
-    std::pair<iterator, bool> emplace(const value_type& value)
-    {
-        return insert(value.first, value.second);
     }
 
     std::pair<iterator, bool> insert(const value_type& value)
@@ -580,9 +552,10 @@ public:
         return insert(value.first, value.second);
     }
 
-    std::pair<iterator, bool> insert(iterator hint, const value_type& value)
+    iterator insert(iterator hint, const value_type& value)
     {
-        return insert(value.first, value.second);
+        (void)hint;
+        return insert(value.first, value.second).first;
     }
 
     void insert(const_iterator beginc, const_iterator endc)
@@ -593,7 +566,8 @@ public:
         }
     }
 
-    void insert_unique(KeyT&& key, ValueT&& val)
+    template<typename K, typename V>
+    size_t insert_unique(K&& key, V&& val)
     {
         check_expand_need();
 
@@ -601,20 +575,22 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = key_2hash(key_hash, key);
-        new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(val)); _num_filled++;
+        new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
+        return bucket;
     }
 
-    void insert_unique(value_type&& value)
+    size_t insert_unique(value_type&& value)
     {
-        insert_unique(std::move(value.first), std::move(value.second));
+        return insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    void insert_unique(const value_type & value)
+    size_t insert_unique(const value_type& value)
     {
-        insert_unique(value.first, value.second);
+        return insert_unique(value.first, value.second);
     }
 
-    void insert_or_assign(KeyT&& key, ValueT&& val)
+    template<typename K, typename V>
+    void insert_or_assign(K&& key, V&& val)
     {
         check_expand_need();
 
@@ -623,9 +599,9 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if (bnofind) {
-            new(_pairs + bucket) PairT(std::forward<KeyT>(key), std::forward<ValueT>(val)); _num_filled++;
+            new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         } else {
-            _pairs[bucket].second = val;
+            _pairs[bucket].second = std::forward<V>(val);
         }
     }
 

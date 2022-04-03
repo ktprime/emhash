@@ -399,7 +399,9 @@ static void printOpsChartable(const Stats & results, std::ostream & ofs)
 static void printTypicalChartable(const Stats & results, std::ostream & ofs)
 {
     for (const size_t elementCount : results.presentElementCounts()) {
-        ofs << elementCount << ",        Insert,Find_Hit,Find_Mis,Erase,Iterator,LoadFactor" << std::endl << std::setprecision(3);
+        auto str = std::to_string(elementCount);
+        std::string padding = std::string(10 - str.size(), ' ');
+        ofs << elementCount << "," << padding << "      Insert,Fhit, Fmis, Erase,Iter, LoadFactor" << std::endl << std::setprecision(3);
         //ofs.fill('0');
         for (const size_t containerI : results.presentContainerIndices()) {
             ofs << results.containerName(containerI) << std::showpoint;
@@ -408,7 +410,7 @@ static void printTypicalChartable(const Stats & results, std::ostream & ofs)
             ofs << ", " << results.at(containerI, elementCount, Stat::accessEmpty);
             ofs << ", " << results.at(containerI, elementCount, Stat::erase);
             ofs << ", " << results.at(containerI, elementCount, Stat::iterateFull);
-            ofs << "  " << results.at(containerI, elementCount, Stat::iterateHalf);
+            ofs << ", " << results.at(containerI, elementCount, Stat::iterateHalf);
             ofs << std::endl;
         }
         ofs << std::endl;
@@ -682,23 +684,19 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 }
 
 template <typename Container, typename K>
-static void timeTypical(const size_t containerI, const std::span<const K> keys, Stats & results)
+static void timeTypical(const size_t containerI, Container& container, const std::span<const K> keys, Stats & results)
 {
     static_assert(std::is_same_v<K, typename Container::key_type>);
 
     static constexpr bool isSet{!IsMap<Container>};
 
     const double invElementCount{1.0 / double(keys.size())};
-    static volatile size_t v{};
-
-    Container container;
-    container.max_load_factor(0.88);
-    container.reserve(keys.size() / 2);
+    static size_t volatile v{0};
 
     const s64 t0{now()};
 
     // Insert
-    for (const K & key : keys) {
+    for (const K key : keys) {
         if constexpr (isSet) {
             container.emplace(key);
         }
@@ -713,7 +711,7 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     //container.reserve(2);
     t1 = now();
     // Access
-    for (const K & key : keys) {
+    for (const K key : keys) {
         v = v + container.count(key);
     }
 
@@ -722,8 +720,8 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
 
     const s64 t2{now()};
     // AccessEmpty
-    for (const K & key : keys) {
-        v = v + container.count(key + 1);
+    for (const K key : keys) {
+        v = v + container.count(key + v);
     }
 
     const s64 t3{now()};
@@ -741,7 +739,7 @@ static void timeTypical(const size_t containerI, const std::span<const K> keys, 
     auto lf = container.load_factor();
     const s64 t4{now()};
     // Erase
-    for (const K & key : keys) {
+    for (const K key : keys) {
         container.erase(key);
     }
 
@@ -782,7 +780,10 @@ static void timeContainersTypical(const size_t containerI, const std::vector<Com
         static_assert(sizeof(CommonKey) == sizeof(K) && alignof(CommonKey) == alignof(K));
 
         const std::span<const K> keys_{reinterpret_cast<const K *>(keys.data()), keys.size()};
-        timeTypical<Container>(containerI, keys_, results);
+        Container container;
+        container.max_load_factor(0.88);
+        container.reserve(keys_.size() / 2);
+        timeTypical<Container>(containerI, container, keys_, results);
     }
 
     if constexpr (sizeof...(ContainerInfos) != 0u) {
@@ -860,8 +861,8 @@ static void compareDetailed(Stats & results)
             break;
         }
 
-        std::cout << "Comparing " << roundCount << " rounds of " << elementCount << " elements...";
-		auto nowms = getus();
+        std::cout << "Comparing " << elementCount << " elements " << roundCount << " rounds of ...";
+        auto nowms = getus();
         compareDetailedSized<CommonKey, ContainerInfos...>(elementCount, roundCount, random, results);
         std::cout << " done use " << ((getus() - nowms) / 1e9) << " sec" << std::endl;
     }
@@ -874,10 +875,13 @@ static void compareTypicalSized(const size_t elementCount, const size_t roundCou
 {
     std::vector<CommonKey> keys(elementCount);
 
+    std::cout << "Comparing " << elementCount << " elements " << roundCount << " rounds of ...";
+    auto nowms = getus();
     for (size_t round{0u}; round < roundCount; ++round) {
         for (CommonKey & key : keys) key = random.next<CommonKey>();
         timeContainersTypical<CommonKey, ContainerInfos...>(0u, keys, results);
     }
+    std::cout << " done use " << ((getus() - nowms) / 1e6) << " sec" << std::endl;
 
     const double invRoundCount{1.0 / double(roundCount)};
     for (const size_t containerI : results.presentContainerIndices()) {
@@ -896,12 +900,7 @@ static void compareTypical(Stats & results)
         if (elementCount > std::numeric_limits<qc::utype<CommonKey>>::max()) {
             break;
         }
-
-        std::cout << "Comparing " << roundCount << " rounds of " << elementCount << " elements...";
-
-		auto nowms = getus();
         compareTypicalSized<CommonKey, ContainerInfos...>(elementCount, roundCount, random, results);
-        std::cout << " done use " << ((getus() - nowms) / 1e6) << " sec" << std::endl;
     }
 
     results.setContainerNames<ContainerInfos...>();
@@ -1219,20 +1218,20 @@ int main(int argc, const char* argv[])
         using K = size_t;
         using V = size_t;
         compare<CompareMode::typical, K,
-#if X86
-            EmiLib3MapInfo<K, V>,
-            EmiLib2MapInfo<K, V>,
-#endif
-//            StdMapInfo<K, V>,
 #ifdef ABSL
             AbslMapInfo<K, V>,
 #endif
+#if X86
+            EmiLib2MapInfo<K, V>,
+            EmiLib3MapInfo<K, V>,
+#endif
+//            StdMapInfo<K, V>,
 #if ET
             EmiLib1MapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
-            PhMapInfo<K, V>,
             EmHash8MapInfo<K, V>,
 #endif
+            PhMapInfo<K, V>,
 
 #if ET > 1
             TslRobinMapInfo<K, V>,

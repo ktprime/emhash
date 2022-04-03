@@ -144,6 +144,7 @@ public:
     }
 #endif
 
+    class const_iterator;
     class iterator
     {
     public:
@@ -153,6 +154,7 @@ public:
         using pointer           = value_type*;
         using reference         = value_type&;
 
+        iterator() {}
         iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
         iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
 
@@ -201,15 +203,10 @@ public:
             return _map->_pairs + _bucket;
         }
 
-        bool operator==(const iterator& rhs) const
-        {
-            return _bucket == rhs._bucket;
-        }
-
-        bool operator!=(const iterator& rhs) const
-        {
-            return _bucket != rhs._bucket;
-        }
+        bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
+        bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
+        bool operator==(const const_iterator& rhs) const { return _bucket == rhs._bucket; }
+        bool operator!=(const const_iterator& rhs) const { return _bucket != rhs._bucket; }
 
     private:
         void goto_next_element()
@@ -481,13 +478,13 @@ public:
     template<typename KeyLike>
     iterator find(const KeyLike& key)
     {
-        return iterator(this, find_filled_bucket(key), false);
+        return {this, find_filled_bucket(key), false};
     }
 
     template<typename KeyLike>
     const_iterator find(const KeyLike& key) const
     {
-        return const_iterator(this, find_filled_bucket(key), false);
+        return {this, find_filled_bucket(key), false};
     }
 
     template<typename KeyLike>
@@ -518,72 +515,44 @@ public:
         return &_pairs[bucket].second;
     }
 
-    /// Convenience function.
-    template<typename KeyLike>
-    ValueT get_or_return_default(const KeyLike& k) const
-    {
-        const ValueT* ret = try_get(k);
-        return ret ? *ret : ValueT();
-    }
-
     // -----------------------------------------------------
 
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value)
-    {
-        check_expand_need();
-
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
-        if (bnofind) {
-            new(_pairs + bucket) PairT(key, value); _num_filled++;
-        }
-
-        return { iterator(this, bucket, false), bnofind };
-    }
-
-    std::pair<iterator, bool> insert(const KeyT& key, ValueT&& value)
+    template<typename K, typename V>
+    std::pair<iterator, bool> insert(K&& key, V&& val)
     {
         check_expand_need();
         bool bnofind = true;
         const auto bucket = find_or_allocate(key, bnofind);
 
         if (bnofind) {
-            new(_pairs + bucket) PairT(key, std::move(value)); _num_filled++;
+            new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
         return { iterator(this, bucket, false), bnofind };
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key, const ValueT& value)
+    std::pair<iterator, bool> insert(const value_type& value)
     {
-        return insert(key, value);
+        return insert(value.first, value.second);
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key, ValueT&& value)
+    std::pair<iterator, bool> insert(value_type&& value)
     {
-        return insert(key, std::move(value));
+        return insert(std::move(value.first), std::move(value.second));
     }
 
-    std::pair<iterator, bool> emplace(value_type&& v)
+    iterator insert(const_iterator hint, const value_type& value)
     {
-        return insert(std::move(v.first), std::move(v.second));
+        (void) hint;
+        return insert(value.first, value.second).first;
     }
 
-    std::pair<iterator, bool> emplace(const value_type& v)
+    template <class... Args>
+    inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(v.first, v.second);
-    }
-
-    std::pair<iterator, bool> insert(const value_type& p)
-    {
-        return insert(p.first, p.second);
-    }
-
-    std::pair<iterator, bool> insert(iterator it, const value_type& p)
-    {
-        return insert(p.first, p.second);
+        return insert(std::forward<Args>(args)...);
     }
 
     void insert(const_iterator beginc, const_iterator endc)
@@ -602,8 +571,8 @@ public:
         }
     }
 
-    /// Same as above, but contains(key) MUST be false
-    void insert_unique(const KeyT& key, const ValueT& value)
+    template<typename K, typename V>
+    size_t insert_unique(KeyT&& key, ValueT&& val)
     {
         check_expand_need();
 
@@ -611,42 +580,37 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = hash_key2(key_hash, key);
-        new(_pairs + bucket) PairT(key, value); _num_filled++;
+        new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
+        return bucket;
     }
 
-    void insert_unique(KeyT&& key, ValueT&& value)
+    size_t insert_unique(value_type&& value)
+    {
+        return insert_unique(std::move(value.first), std::move(value.second));
+    }
+
+    size_t insert_unique(const value_type& value)
+    {
+        return insert_unique(value.first, value.second);
+    }
+
+    template <class M>
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) { return do_assign(key, std::forward<M>(val)); }
+    template <class M>
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) { return do_assign(std::move(key), std::forward<M>(val)); }
+
+    template<typename K, typename V>
+    std::pair<iterator, bool> do_assign(K&& key, V&& val)
     {
         check_expand_need();
-
-        const auto key_hash = _hasher(key);
-        const auto bucket = find_empty_slot(key_hash & _mask, 0);
-
-        _states[bucket] = hash_key2(key_hash, key);
-        new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
-    }
-
-    void insert_unique(value_type&& p)
-    {
-        insert_unique(std::move(p.first), std::move(p.second));
-    }
-
-    void insert_unique(const value_type & p)
-    {
-        insert_unique(p.first, p.second);
-    }
-
-    void insert_or_assign(const KeyT& key, ValueT&& value)
-    {
-        check_expand_need();
-
         bool bnofind = true;
         const auto bucket = find_or_allocate(key, bnofind);
 
-        // Check if inserting a new value rather than overwriting an old entry
+        // Check if inserting a new val rather than overwriting an old entry
         if (bnofind) {
-            new(_pairs + bucket) PairT(key, value); _num_filled++;
+            new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         } else {
-            _pairs[bucket].second = value;
+            _pairs[bucket].second = std::forward<V>(val);
         }
     }
 
@@ -706,6 +670,29 @@ public:
             while (bucket > 1 && _states[--bucket] == State::EDELETE)
                 _states[bucket] = State::EEMPTY;
         }
+    }
+
+    iterator erase(const_iterator first, const_iterator last)
+    {
+        auto iend = cend();
+        auto next = first;
+        for (; next != last && next != iend; )
+            next = erase(next);
+
+        return {this, next.bucket()};
+    }
+
+    template<typename Pred>
+    size_t erase_if(Pred pred)
+    {
+        auto old_size = size();
+        for (auto it = begin(), last = end(); it != last; ) {
+            if (pred(*it))
+                it = erase(it);
+            else
+                ++it;
+        }
+        return old_size - size();
     }
 
     static constexpr bool is_triviall_destructable()

@@ -21,8 +21,8 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR}/../thirdparty/)
 
 # Boost::unit_test_framework
-find_package(Boost 1.54.0 REQUIRED COMPONENTS unit_test_framework)
-target_link_libraries(emhash_test PRIVATE Boost::unit_test_framework)
+#find_package(Boost 1.74.0 REQUIRED COMPONENTS unit_test_framework)
+#target_link_libraries(emhash_test PRIVATE Boost::unit_test_framework)
 
 # tsl::robin_maphint(../ ${CMAKE_CURRENT_BINARY_DIR}/emhash)
 #target_link_libraries(emhash_test PRIVATE emhash5::HashMap)

@@ -577,25 +577,28 @@ public:
 #endif
 
     // ------------------------------------------------------------
-
+    template<typename K=KeyT>
     iterator find(const KeyT& key) noexcept
     {
         return {this, find_filled_slot(key)};
     }
 
-    const_iterator find(const KeyT& key) const noexcept
+    template<typename K=KeyT>
+    const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_slot(key)};
     }
 
-    ValueT& at(const KeyT& key)
+    template<typename K=KeyT>
+    ValueT& at(const K& key)
     {
         const auto slot = find_filled_slot(key);
         //throw
         return EMH_VAL(_pairs, slot);
     }
 
-    const ValueT& at(const KeyT& key) const
+    template<typename K=KeyT>
+    const ValueT& at(const K& key) const
     {
         const auto slot = find_filled_slot(key);
         //throw
@@ -616,7 +619,8 @@ public:
         //return find_hash_bucket(key) == END ? 0 : 1;
     }
 
-    std::pair<iterator, iterator> equal_range(const KeyT& key)
+    template<typename K=KeyT>
+    std::pair<iterator, iterator> equal_range(const K& key)
     {
         const auto found = find(key);
         if (found.second == END)
@@ -791,31 +795,19 @@ public:
         }
     }
 
-    /// Same as above, but contains(key) MUST be false
-    size_type insert_unique(const KeyT& key, const ValueT& val)
+    template<typename K, typename V>
+    size_type insert_unique(K&& key, V&& val)
     {
         check_expand_need();
         const auto key_hash = (size_type)hash_key(key);
         auto bucket = find_unique_bucket(key_hash);
-        EMH_NEW(key, val, bucket, key_hash);
-        return bucket;
-    }
-
-    size_type insert_unique(KeyT&& key, ValueT&& val)
-    {
-        check_expand_need();
-        const auto key_hash = (size_type)hash_key(key);
-        auto bucket = find_unique_bucket(key_hash);
-        EMH_NEW(std::forward<KeyT>(key), std::forward<ValueT>(val), bucket, key_hash);
+        EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket, key_hash);
         return bucket;
     }
 
     size_type insert_unique(value_type&& value)
     {
-        const auto key_hash = (size_type)hash_key(value.first);
-        auto bucket = find_unique_bucket(key_hash);
-        EMH_NEW(std::move(value.first), std::move(value.second), bucket, key_hash);
-        return bucket;
+        return insert_unique(std::move(value.first), std::move(value.second));
     }
 
     inline size_type insert_unique(const value_type& value)
@@ -1452,13 +1444,12 @@ private:
         }
 
         const auto slot = EMH_SLOT(_index, bucket);
-        const auto& bucket_key = EMH_KEY(_pairs, slot);
         if (EMH_EQHASH(bucket, key_hash))
-            if (EMH_LIKELY(_eq(key, bucket_key)))
+            if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto obmain = hash_bucket(bucket_key);
+        const auto obmain = hash_bucket(EMH_KEY(_pairs, slot));
         if (obmain != bucket)
             return kickout_bucket(obmain, bucket);
         else if (next_bucket == bucket)

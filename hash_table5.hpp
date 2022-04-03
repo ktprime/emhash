@@ -1007,19 +1007,12 @@ public:
         }
     }
 
-    size_type insert_unique(const KeyT& key, ValueT&& val)
+    template<typename K, typename V>
+    size_type insert_unique(K&& key, V&& val)
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
-        EMH_NEW(key, std::forward<ValueT>(val), bucket);
-        return bucket;
-    }
-
-    size_type insert_unique(KeyT&& key, ValueT&& val)
-    {
-        check_expand_need();
-        auto bucket = find_unique_bucket(key);
-        EMH_NEW(std::forward<KeyT>(key), std::forward<ValueT>(val), bucket);
+        EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket);
         return bucket;
     }
 
@@ -1031,6 +1024,12 @@ public:
     inline size_type insert_unique(const value_type& value)
     {
         return insert_unique(value.first, value.second);
+    }
+
+    template <class... Args>
+    inline size_type emplace_unique(Args&&... args)
+    {
+        return insert_unique(std::forward<Args>(args)...);
     }
 
     template <class... Args>
@@ -1090,12 +1089,6 @@ public:
     {
         (void)hint;
         return try_emplace(std::move(key), std::forward<Args>(args)...).first;
-    }
-
-    template <class... Args>
-    inline size_type emplace_unique(Args&&... args)
-    {
-        return insert_unique(std::forward<Args>(args)...);
     }
 
     template <class M>

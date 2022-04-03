@@ -2,55 +2,111 @@
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-- default load factor is 0.95 and can be set to **0.999** by set marco *EMHASH_HIGH_LOAD == somevalue* (in hash_table[5/6/7/8].hpp)
+- **load factor** can be set **0.999** by set marco *EMHASH_HIGH_LOAD == somevalue* (in hash_table[5-8].hpp)
 
-- **head only** support by c++11/14/17 without any depency, interface is highly compatible with std::unordered_map,some new function is added for performance issiue.
-    - _erase :  without return next iterator after erasion
-    - shrink_to_fit : shrink memory to fit for saving memory
-    - insert_unqiue : insert unique key into hash without find and compare
-    - try_find : check or get key/value without return iterator
-    - set_get : only once find/insert combind
+- **head only** support by c++11/14/17/20, interface is highly compatible with std::unordered_map, some new functions added for performance.
+    - _erase : return void after erasion
+    - shrink_to_fit : shrink fit for saving memory
+    - insert_unqiue : insert unique key without finding
+    - try_find : return value
+    - set_get : once find/insert combined
 
-- more **efficient** than other's hash map implemention if key&value is not aligned (ex sizeof(key) % 8 != sizeof(value) % 8),  hash_map<uint64_t, uint32_t> can save 1/3 memoery than hash_map<uint64_t, uint64_t>.
+- **efficient** than other's hash map if key&value is not aligned (sizeof(key) % 8 != sizeof(value) % 8), hash_map<uint64_t, uint32_t> can save 1/3 memoery than hash_map<uint64_t, uint64_t>.
 
-- **lru** can be used if compile marco EMHASH_LRU_SET set for some special case. for exmaple some key is "frequceny accessed", if the key accessed is not in **main bucket** position, it'll be swaped with main bucket from current position, and it will be founded/probed only once during next access.
+- **lru** marco EMHASH_LRU_SET set. some keys is "frequceny accessed", if keys are not in **main bucket** slot, it'll be swaped with main bucket, and will be probed once.
 
-- **no tombstones** in this hash map. performance will **not deteriorate** even high frequceny insertion and erasion.
+- **no tombstones**. performance will **not deteriorate** even high frequceny of insertion & erasion.
 
-- more than **3 different** implementation to choose, each of them is some tiny different can be used in some case
-for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
+- **4 different** implementation, for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
 
-- the **fastest** hash map for find performance(100% hit) at present, and fast inserting performacne if no rehash (**reserve before insertsion**) and effficient erasion. At present from 6 different benchmark(4 of them in my bench dir) by my bench
+- **find hit** is fastest at present, fast inserting(**reserve**) and effficient erasion from 6 different benchmarks(4 of them in my bench dir) by my bench
 
 - fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, ARM64).
 
-- many optimization with *integer* key, some new and interesting feature is underdeveloping if it's stable to release.
+- many optimization on **integer** key.
 
 # emhash design
 
-- only *one array* allocted, each node/bucket contains a struct/entry (Key key, uint32_t bucket, Value value), bucket is not awalys in the middle between key and value, depend on struct align pack and compiler marco,
-index data(bucket) is not separated from the other hash implemention.
+- **one array&inline entries** node/entry contains a struct(Key key, size_t bucket, Value value) without separate footprint
 
-- a smart **collision algorithm** used for hash collision, collision node is linked after the main bucket with a auxiliary integer index(bucket). main bucket can not be occupyed and all opertion based it.
+- **main bucket** equal to key_hash(key) % size, can not be occupyed(like cockoo hash) and many opertions serarch from it
 
-- **three different ways** of probing is used to seach empty slot. it's not suffered heavily performance loss by primary and secondary clustering.
+- **smart collision resolution**, collision node is linked (bucket) like separate channing.
+it's not suffered heavily performance loss by primary and secondary clustering.
+
+- **3-way combined** probing used to seach empty slot.
    - linear probing search 2-3 cpu cachelines
    - quadratic probing works after limited linear probing
    - linear search both begin&end with last founded empty slot
 
 - a new linear probing is used (in hash_table5.hpp).
-	normaly linear probing is inefficient with high load factor, it use a new 3-way linear
+    normaly linear probing is inefficient with high load factor, it use a new 3-way linear
 probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than traditional seach strategy.
 
-- use the **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *EMHASH_SAFE_HASH* is set to defend hash attack(but 10% performance descrease)
+- **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *EMHASH_SAFE_HASH* is set to defend hash attack(but 10% performance descrease)
 
 - dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be showed from dump info.
 
-- A new cache friendly algorithm of finding multi empty bucket base on cpu bit scanf(ctz) instruction. it filters *64* bucket at once than other's implemention.
+- finding **64 slots** once using x86 instruction bit scanf(ctz).
 
 - choose *different* hash algorithm by set compile marco *EMHASH_FIBONACCI_HASH* or *EMHASH_IDENTITY_HASH* depend on use case.
 
 - A thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is faster than std::hash implementation
+
+# example
+
+```
+        // default constructor: empty map
+        emhash5::HashMap<std::string, std::string> m1;
+        // list constructor
+        emhash5::HashMap<int, std::string> m2 =
+        {
+            {1, "foo"},
+            {3, "bar"},
+            {2, "baz"},
+        };
+
+        // copy constructor
+        emhash5::HashMap<int, std::string> m3 = m2;
+
+        // move constructor
+        emhash5::HashMap<int, std::string> m4 = std::move(m2);
+
+        // range constructor
+        std::vector<std::pair<std::bitset<8>, int>> v = { {0x12, 1}, {0x01,-1} };
+        emhash5::HashMap<std::bitset<8>, double> m5(v.begin(), v.end());
+
+        //Option 1 for a constructor with a custom Key type
+        // Define the KeyHash and KeyEqual structs and use them in the template
+        emhash5::HashMap<Key, std::string, KeyHash, KeyEqual> m6 = {
+            { {"John", "Doe"}, "example"},
+            { {"Mary", "Sue"}, "another"}
+        };
+
+        //Option 2 for a constructor with a custom Key type
+        // Define a const == operator for the class/struct and specialize std::hash
+        // structure in the std namespace
+        emhash5::HashMap<Foo, std::string> m7 = {
+            { Foo(1), "One"}, { 2, "Two"}, { 3, "Three"}
+        };
+
+#if CXX20
+        struct Goo {int val; };
+        auto hash = [](const Goo &g){ return std::hash<int>{}(g.val); };
+        auto comp = [](const Goo &l, const Goo &r){ return l.val == r.val; };
+        emhash5::HashMap<Goo, double, decltype(hash), decltype(comp)> m8;
+#endif
+
+        emhash5::HashMap<int,char> example = {{1,'a'},{2,'b'}};
+        for(int x: {2, 5}) {
+            if(example.contains(x)) {
+                std::cout << x << ": Found\n";
+            } else {
+                std::cout << x << ": Not found\n";
+            }
+        }
+
+```
 
 ### benchmark
 

@@ -27,6 +27,7 @@
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
+#include "../thirdparty/emilib/emilib2.hpp"
 
 #include <boost/mpl/list.hpp>
 #include <boost/test/unit_test.hpp>
@@ -47,6 +48,7 @@
 BOOST_AUTO_TEST_SUITE(test_robin_map)
 
 using test_types = boost::mpl::list<
+//    emilib2::HashMap<std::int64_t, std::int64_t>,
     emhash7::HashMap<std::int64_t, std::int64_t>,
     emhash6::HashMap<std::string, std::string>,
     // Test with hash having a lot of collisions
