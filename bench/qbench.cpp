@@ -16,9 +16,10 @@
 #include "hash_table6.hpp"
 #include "hash_table7.hpp"
 #include "hash_table8.hpp"
+
+#include "emilib/emilib2s.hpp"
 #include "emilib/emilib2.hpp"
 #include "emilib/emilib.hpp"
-#include "emilib/emilib2s.hpp"
 //#include "emilib/emiset2.hpp"
 
 #include "absl/container/flat_hash_map.h"
@@ -30,10 +31,9 @@
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
 
-
 #ifdef FIB_HASH
 #define QintHasher Int64Hasher<K>
-#elif HOOD_HASH
+#elif QC_HASH
 #define QintHasher robin_hood::hash<K>
 #else
 #define QintHasher typename qc::hash::RawMap<K, V>::hasher
@@ -80,27 +80,29 @@ static const std::vector<std::pair<size_t, size_t>> & detailedElementRoundCounts
 static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease.size(), detailedElementRoundCountsDebug.size())};
 
 static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
-#if 0
-    {         10u, 1'000'000u},
+#if 1
+//    {         10u, 1'000'000u},
     {        200u,  1'00'000u},
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
     {    500'000u,       100u},
-    {  7'200'000u,         5u},
+    {   7200'000u,        10u},
 #if 1
-    { 10'000'000u,         3u},
+    { 10'000'000u,         5u},
     { 50'000'000u,         3u},
 #endif
-//    {100'000'000u,         1u},
+//   {100'000'000u,         1u},
 #endif
 
-#if 1
+#if 0
+#if 0
     {4,   2000000},
     {10,  1200000},
     {32,   600000},
     {110,  200000},
     {240,  120000},
     {600,  70000},
+#endif
     {1024, 40000 },
     {1500, 30000 },
     {2048, 20000 },
@@ -123,7 +125,7 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {1200000, 12 },
     {2200000, 10 },
 #endif
-#if 1
+#if 0
     {3600000, 8 },
     {6000000, 5 },
     {10000000,4},
@@ -400,12 +402,12 @@ static void printTypicalChartable(const Stats & results, std::ostream & ofs)
 {
     for (const size_t elementCount : results.presentElementCounts()) {
         auto str = std::to_string(elementCount);
-        std::string padding = std::string(10 - str.size(), ' ');
-        ofs << elementCount << "," << padding << "      Insert,Fhit, Fmis, Erase,Iter, LoadFactor" << std::endl << std::setprecision(3);
+        std::string padding = std::string(11 - str.size(), ' ');
+        ofs << elementCount << padding << "      Insert,Fhit, Fmis, Erase,Iter, LoadFactor" << std::endl << std::setprecision(3);
         //ofs.fill('0');
         for (const size_t containerI : results.presentContainerIndices()) {
             ofs << results.containerName(containerI) << std::showpoint;
-            ofs << ", " << results.at(containerI, elementCount, Stat::insertReserved);
+            ofs << "  " << results.at(containerI, elementCount, Stat::insertReserved);
             ofs << ", " << results.at(containerI, elementCount, Stat::accessPresent);
             ofs << ", " << results.at(containerI, elementCount, Stat::accessEmpty);
             ofs << ", " << results.at(containerI, elementCount, Stat::erase);
@@ -689,12 +691,10 @@ static void timeTypical(const size_t containerI, Container& container, const std
     static_assert(std::is_same_v<K, typename Container::key_type>);
 
     static constexpr bool isSet{!IsMap<Container>};
-
-    const double invElementCount{1.0 / double(keys.size())};
     static size_t volatile v{0};
 
+    const double invElementCount{1.0 / double(keys.size())};
     const s64 t0{now()};
-
     // Insert
     for (const K key : keys) {
         if constexpr (isSet) {
@@ -715,12 +715,9 @@ static void timeTypical(const size_t containerI, Container& container, const std
         v = v + container.count(key);
     }
 
-//    if (keys.size() > 5234567)
-//        printf("size = %d, lf = %.2f\n", (int)container.size(), (float)container.load_factor());
-
     const s64 t2{now()};
     // AccessEmpty
-    for (const K key : keys) {
+    for (const K& key : keys) {
         v = v + container.count(key + v);
     }
 
@@ -1197,7 +1194,9 @@ int main(int argc, const char* argv[])
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
 //        compare<CompareMode::oneVsOne, K, EmiLib3MapInfo<K,int>, EmiLib2MapInfo<K, int>>();
 //        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
-//        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
+#if ABSL
+        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
+#endif
         compare<CompareMode::oneVsOne, K, RobinHoodMapInfo<K,int>, EmHash5MapInfo<K, int>>();
     }
     // Set comparison
@@ -1215,12 +1214,20 @@ int main(int argc, const char* argv[])
     }
     // Map comparison
     if constexpr (true) {
+#if TKey == 0
         using K = size_t;
+#elif TKey == 1
+        using K = uint64_t;
+#else
+        using K = uint32_t;
+#endif
+
         using V = size_t;
         compare<CompareMode::typical, K,
 #ifdef ABSL
             AbslMapInfo<K, V>,
 #endif
+
 #if X86
             EmiLib2MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
@@ -1240,7 +1247,7 @@ int main(int argc, const char* argv[])
 
 //            TslSparseMapInfo<K, V>,
 //            FphDyamicMapInfo<K,V>,
-#if 1
+#if EHMAP
             EmHash5MapInfo<K, V>,
             EmHash6MapInfo<K, V>,
 #if CXX201

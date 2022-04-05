@@ -872,7 +872,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#if ABSL == 0 && QC_HASH == 0 && CXX20 == 0
+#if QC_HASH == 0 && ABSL == 0
     auto tmp = ht_hash; auto id = 1;
     for (auto it = tmp.begin(); it != tmp.end(); ) {
 #if KEY_INT
@@ -1059,8 +1059,8 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         insert_find_erase<hash_type>(hash, hash_name, nList);
         erase_reinsert<hash_type>(hash, hash_name, oList);
 
-#ifdef UF
         hash_iter<hash_type>(hash, hash_name);
+#ifdef UF
         copy_clear <hash_type>(hash, hash_name);
         //hash_clear<hash_type>(hash, hash_name);
 #endif
@@ -1252,7 +1252,7 @@ static int benchHashMap(int n)
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
-        {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
+//        {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
 #endif
 
 #if QC_HASH && KEY_INT
@@ -1285,7 +1285,7 @@ static int benchHashMap(int n)
     }
 
     assert(n == vList.size());
-    auto pow2 = 2u << ilog(n, 2);
+    const auto pow2 = 2u << ilog(n, 2);
 
     constexpr uint64_t kv = sizeof(std::pair<keyType, valueType>);// sizeof(keyType) + sizeof(valueType) + (eq ? 0 : 4);
     auto memory1 = 8 * pow2 + kv * n; //emhash8 table

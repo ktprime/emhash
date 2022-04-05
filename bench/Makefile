@@ -77,8 +77,8 @@ ifneq ($(MAP),)
 CXXFLAGS += -DSMAP=1
 endif
 
-ifneq ($(QCH),)
-CXXFLAGS += -DQC_HASH=$(QCH) -std=c++20
+ifneq ($(QH),)
+CXXFLAGS += -DQC_HASH=$(QH) -std=c++20
 endif
 
 ifneq ($(std),)
@@ -90,8 +90,8 @@ CXXFLAGS += -DEMH_FIND_HIT=1
 endif
 
 all:
-ifneq ($(QCH),)
-	$(CXX) $(CXXFLAGS) -I. -DQC_HASH -std=c++20 qbench.cpp -o qbench
+ifneq ($(QB),)
+	$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
 endif
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench

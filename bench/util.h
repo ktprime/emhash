@@ -1,5 +1,5 @@
 #pragma once
-#define _HAS_STD_BYTE 0
+//#define _HAS_STD_BYTE 0
 
 #include <random>
 #include <cstdint>
@@ -634,7 +634,7 @@ static void printInfo(char* out)
 
     puts(cbuff);
     if (out)
-        strcpy(out, cbuff);
+        strncpy(out, cbuff, sizeof(cbuff));
     puts(sepator);
 }
 

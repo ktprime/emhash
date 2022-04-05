@@ -1,4 +1,3 @@
-// By Emil Ernerfeldt 2014-2017
 // LICENSE:
 //   This software is dual-licensed to the public domain and under the following
 //   license: you are granted a perpetual, irrevocable license to copy, modify,
@@ -34,10 +33,10 @@ namespace emilib2 {
 
     enum State : uint8_t
     {
-        EFILLED   = 0,
-        EDELETE   = 3,
-        EEMPTY    = 1,
-        PACK_STAT = EDELETE + EEMPTY,
+        EFILLED  = 0,
+        EDELETE  = 3,
+        EEMPTY   = 1,
+        SENTINEL = EDELETE + EEMPTY + EFILLED + 0xF8,
     };
 
     constexpr static uint64_t EMPTY_MASK   = 0x0101010101010101ull;
@@ -386,11 +385,11 @@ public:
         if (is_copy_trivially()) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
-            memcpy(_pairs,  other._pairs,  _num_buckets * sizeof(_pairs[0]));
+            memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
             clear();
             reserve(other._num_buckets / 2);
-            for (auto it = other.cbegin();  it.bucket() != _num_buckets; ++it)
+            for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
         }
         //assert(_num_buckets == other._num_buckets);
@@ -475,41 +474,41 @@ public:
 
     // ------------------------------------------------------------
 
-    template<typename KeyLike>
-    iterator find(const KeyLike& key)
+    template<typename K>
+    iterator find(const K& key)
     {
         return {this, find_filled_bucket(key), false};
     }
 
-    template<typename KeyLike>
-    const_iterator find(const KeyLike& key) const
+    template<typename K>
+    const_iterator find(const K& key) const
     {
         return {this, find_filled_bucket(key), false};
     }
 
-    template<typename KeyLike>
-    bool contains(const KeyLike& k) const
+    template<typename K>
+    bool contains(const K& k) const
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
-    template<typename KeyLike>
-    size_t count(const KeyLike& k) const
+    template<typename K>
+    size_t count(const K& k) const
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
-    template<typename KeyLike>
-    ValueT* try_get(const KeyLike& k)
+    template<typename K>
+    ValueT* try_get(const K& k)
     {
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
     }
 
     /// Const version of the above
-    template<typename KeyLike>
-    ValueT* try_get(const KeyLike& k) const
+    template<typename K>
+    ValueT* try_get(const K& k) const
     {
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
@@ -530,12 +529,13 @@ public:
         if (bnofind) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
-        return { iterator(this, bucket, false), bnofind };
+        return { {this, bucket, false}, bnofind };
     }
 
-    std::pair<iterator, bool> insert(const value_type& value)
+    template <class... Args>
+    inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(value.first, value.second);
+        return insert(std::forward<Args>(args)...);
     }
 
     std::pair<iterator, bool> insert(value_type&& value)
@@ -543,16 +543,15 @@ public:
         return insert(std::move(value.first), std::move(value.second));
     }
 
-    iterator insert(const_iterator hint, const value_type& value)
+    std::pair<iterator, bool> insert(const value_type& value)
     {
-        (void) hint;
-        return insert(value.first, value.second).first;
+        return insert(value.first, value.second);
     }
 
-    template <class... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args)
+    iterator insert(iterator hint, const value_type& value)
     {
-        return insert(std::forward<Args>(args)...);
+        (void)hint;
+        return insert(value.first, value.second).first;
     }
 
     void insert(const_iterator beginc, const_iterator endc)
@@ -572,7 +571,7 @@ public:
     }
 
     template<typename K, typename V>
-    size_t insert_unique(KeyT&& key, ValueT&& val)
+    size_t insert_unique(K&& key, V&& val)
     {
         check_expand_need();
 
@@ -622,7 +621,19 @@ public:
         const auto bucket = find_or_allocate(key, bnofind);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bnofind) {
-            new(_pairs + bucket) PairT(key, ValueT()); _num_filled++;
+            new(_pairs + bucket) PairT(key, std::move(ValueT())); _num_filled++;
+        }
+
+        return _pairs[bucket].second;
+    }
+
+    ValueT& operator[](KeyT&& key)
+    {
+        check_expand_need();
+        bool bnofind = true;
+        const auto bucket = find_or_allocate(key, bnofind);
+        if (bnofind) {
+            new(_pairs + bucket) PairT(std::move(key), std::move(ValueT())); _num_filled++;
         }
 
         return _pairs[bucket].second;
@@ -760,7 +771,7 @@ public:
         const auto state_size = (simd_bytes + num_buckets) * sizeof(State);
         //assert(state_size % 8 == 0);
 
-        const auto* new_data  = (char*)malloc(pairs_size + state_size);
+        const auto* new_data = (char*)malloc(pairs_size + state_size);
 #if 1
         auto* new_state = (decltype(_states))new_data;
         auto* new_pairs = (decltype(_pairs))(new_data + state_size);
@@ -787,15 +798,15 @@ public:
         //init empty tombstone
         std::fill_n(_states, num_buckets, State::EEMPTY);
         //set filled tombstone
-        std::fill_n(_states + num_buckets, simd_bytes, State::EFILLED + PACK_STAT);
+        std::fill_n(_states + num_buckets, simd_bytes, State::SENTINEL);
 //        if (num_buckets < simd_bytes)
 //            std::fill_n(_states, simd_bytes, State::EEMPTY);
 
 #if 0
         if (std::is_integral<KeyT>::value) {
-            auto keymask = hash_key2(_hasher(0)) + PACK_STAT;
+            auto keymask = hash_key2(_hasher((KeyT)State::EEMPTY)) + SENTINEL;
             if ((keymask & EEMPTY) == State::EEMPTY)
-                keymask = State::EFILLED + PACK_STAT;
+                keymask = SENTINEL;
             std::fill_n(_states + num_buckets, simd_bytes, keymask);
         }
 #endif
@@ -833,12 +844,22 @@ private:
         reserve(_num_filled);
     }
 
+    void prefetch_heap_block(char* ctrl) const
+    {
+        // Prefetch the heap-allocated memory region to resolve potential TLB
+        // misses.  This is intended to overlap with execution of calculating the hash for a key.
+#if defined(__GNUC__)
+        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+#endif  // __GNUC__
+    }
+
     // Find the bucket with this key, or return (size_t)-1
-    template<typename KeyLike>
-    size_t find_filled_bucket(const KeyLike& key) const
+    template<typename K>
+    size_t find_filled_bucket(const K& key) const
     {
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
+        prefetch_heap_block((char*)_states + next_bucket);
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         int i = _max_probe_length;
 
@@ -850,16 +871,14 @@ private:
                 const auto fbucket = next_bucket + CTZ(maskf);
                 if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break; //overflow
-                else if (_eq(_pairs[fbucket].first, key))
+                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                     return fbucket;
                 maskf &= maskf - 1;
             }
 
-//                if (_max_probe_length >= simd_bytes) {
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0)
                 break;
-//                }
 
             next_bucket += simd_bytes;
             if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
@@ -876,12 +895,14 @@ private:
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
-    template<typename KeyLike>
-    size_t find_or_allocate(const KeyLike& key, bool& bnew)
+    template<typename K>
+    size_t find_or_allocate(const K& key, bool& bnew)
     {
         const auto key_hash = _hasher(key);
         const auto key_h2 = hash_key2(key_hash, key);
         const auto bucket = (size_t)(key_hash & _mask);
+        //prefetch_heap_block((char*)_states + bucket);
+
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;
         auto next_bucket  = bucket, i = bucket;
@@ -896,7 +917,7 @@ private:
                 const auto fbucket = next_bucket + CTZ(maskf);
                 if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break;
-                else if (_eq(_pairs[fbucket].first, key)) {
+                if (_eq(_pairs[fbucket].first, key)) {
                     bnew = false;
                     return fbucket;
                 }
