@@ -112,7 +112,7 @@ namespace qc::memory
         Pool(const size_t capacity)
         {
             if (capacity < minCapacity || capacity > maxCapacity) {
-                throw std::exception{};
+                //throw std::exception{};
             }
 
             _chunkCapacity = (capacity + (sizeof(size_t) - 1u)) / sizeof(size_t);

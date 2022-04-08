@@ -142,7 +142,7 @@ public:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
     {
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 52) << 1;
     }
 #endif
 
@@ -207,7 +207,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -285,7 +285,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -511,7 +511,7 @@ public:
         if (bnofind) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
-        return { iterator{this, bucket, false}, bnofind };
+        return { {this, bucket, false}, bnofind };
     }
 
     template <class... Args>
@@ -610,7 +610,6 @@ public:
         check_expand_need();
         bool bnofind = true;
         const auto bucket = find_or_allocate(key, bnofind);
-        /* Check if inserting a new value rather than overwriting an old entry */
         if (bnofind) {
             new(_pairs + bucket) PairT(std::move(key), ValueT()); _num_filled++;
         }
@@ -656,18 +655,6 @@ public:
             return _states[gbucket + simd_bytes - 1] % 4;
         else
             return _states[_mask] % 4;
-    }
-
-    uint64_t empty_delete(size_t gbucket) const
-    {
-        const auto vec = LOAD_EMPTY2((decltype(&simd_empty))((char*)_states + gbucket));
-        return MOVEMASK_EPI8(vec);
-    }
-
-    uint64_t filled_mask(size_t gbucket) const
-    {
-        const auto vec = LOAD_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
-        return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
     }
 
     void _erase(size_t bucket)
@@ -795,7 +782,7 @@ public:
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 const auto key_hash = _hasher(src_pair.first);
-                const auto dst_bucket = find_empty_only(key_hash & _mask);
+                const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
                 //collision += _states[key_hash & _mask] % 2 == State::EFILLED;
 
                 _states[dst_bucket] = key_2hash(key_hash, src_pair.first);
@@ -874,7 +861,7 @@ private:
         const auto key_h2 = key_2hash(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
         const auto boffset = bucket % simd_bytes; bucket -= boffset;
-        prefetch_heap_block((char*)_states + bucket);
+        //prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;
@@ -938,34 +925,32 @@ private:
         return ebucket;
     }
 
-    size_t find_empty_slot(size_t next_bucket, int offset)
+    inline uint64_t empty_delete(size_t gbucket) const
     {
-        next_bucket -= next_bucket % simd_bytes;
-        while (true) {
-            const auto maske = empty_delete(next_bucket);
-            if (maske != 0) {
-                const auto probe = CTZ(maske);
-                offset += probe;
-                if (EMH_LIKELY(offset > _max_probe_length))
-                    _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
-                return next_bucket + probe;
-            }
-            offset      += simd_bytes;
-            next_bucket = (next_bucket + simd_bytes) & _mask;
-        }
-        return 0;
+        const auto vec = LOAD_EMPTY2((decltype(&simd_empty))((char*)_states + gbucket));
+        return MOVEMASK_EPI8(vec);
     }
 
-    size_t find_empty_only(size_t next_bucket)
+    uint64_t filled_mask(size_t gbucket) const
     {
-        int offset = 0;
+#if 0
+        const auto vec = LOAD_EMPTY2((decltype(&simd_empty))((char*)_states + gbucket));
+        return ~MOVEMASK_EPI8(vec) & ((1 << simd_bytes) - 1);
+#else
+        const auto vec = LOAD_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
+        return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
+#endif
+    }
+
+    size_t find_empty_slot(size_t next_bucket, int offset)
+    {
         next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = empty_delete(next_bucket);
             if (EMH_LIKELY(maske != 0)) {
                 const auto probe = CTZ(maske);
                 offset += probe;
-                if (EMH_UNLIKELY(offset > _max_probe_length))
+                if (EMH_LIKELY(offset > _max_probe_length))
                     _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
                 return next_bucket + probe;
             }
@@ -979,7 +964,7 @@ private:
     {
         next_bucket -= next_bucket % simd_bytes;
         while (true) {
-            auto maske = filled_mask(next_bucket);
+            const auto maske = filled_mask(next_bucket);
             if (EMH_LIKELY(maske != 0))
                 return next_bucket + CTZ(maske);
             next_bucket += simd_bytes;

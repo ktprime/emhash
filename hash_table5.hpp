@@ -24,25 +24,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-// From
-// NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
-// Quadratic collision resolution  1 - ln(1-L) - L/2     1/(1-L) - L - ln(1-L)
-// Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-// separator chain resolution      1 + L / 2             exp(-L) + L
-
-// -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
-// QUADRATIC COLLISION RES.
-//    probes/successful lookup    1.05  1.44  1.62  2.01  2.21  2.85  5.11
-//    probes/unsuccessful lookup  1.11  2.19  2.82  4.64  5.81  11.4  103.6
-// LINEAR COLLISION RES.
-//    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
-//    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
-// SEPARATE CHAN RES.
-//    probes/successful lookup    1.05  1.25  1.3   1.25  1.4   1.45  1.50
-//    probes/unsuccessful lookup  1.00  1.11  1.15  1.22  1.25  1.31  1.37
-//    clacul/unsuccessful lookup  1.01  1.25  1.36, 1.56, 1.64, 1.81, 1.97
-
-
 #pragma once
 
 #include <cstring>
@@ -61,11 +42,6 @@
     #if __has_include("wyhash.h")
     #include "wyhash.h"
     #endif
-    #if __has_include("ahash.h")
-    #include "ahash.h"
-    #endif
-#elif AHASH || AHASH_AHASH_H
-    #include "ahash.h"
 #elif EMH_WY_HASH
     #include "wyhash.h"
 #endif
@@ -237,10 +213,10 @@ public:
 
 #if EMH_BUCKET_INDEX == 0
     typedef value_type                        value_pair;
-    typedef std::pair<size_type, value_type>   PairT;
+    typedef std::pair<size_type, value_type>  PairT;
 #elif EMH_BUCKET_INDEX == 2
     typedef value_type                        value_pair;
-    typedef std::pair<value_type, size_type>   PairT;
+    typedef std::pair<value_type, size_type>  PairT;
 #else
     typedef entry<KeyT, ValueT>               value_pair;
     typedef entry<KeyT, ValueT>               PairT;
@@ -798,6 +774,7 @@ public:
     }
 #endif
 
+#ifdef EMH_EXT
     /// Return the old value or ValueT() if it didn't exist.
     ValueT set_get(const KeyT& key, const ValueT& val)
     {
@@ -867,6 +844,7 @@ public:
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? ValueT() : EMH_VAL(_pairs, bucket);
     }
+#endif
 
     // -----------------------------------------------------
 #if EMH_BUCKET_INDEX == 1
@@ -997,6 +975,14 @@ public:
             insert(*citbeg);
     }
 #endif
+
+    //assert(bucket < _num_buckets)
+    ValueT* find_hint(const KeyT& key, size_t bucket)
+    {
+        if (!EMH_EMPTY(_pairs, bucket) && EMH_KEY(_pairs, bucket) == key)
+            return &EMH_VAL(_pairs, bucket);
+        return nullptr;
+    }
 
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
@@ -1476,14 +1462,14 @@ private:
         EMH_BUCKET(_pairs, bucket) = INACTIVE; //the status is reset by destructor by some compiler
         _num_filled--;
 
-        if (_ehead && clear) {
 #if EMH_HIGH_LOAD
+        if (_ehead && clear) {
             if (10 * _num_filled < 8 * _num_buckets)
                 clear_empty();
             else if (bucket)
                 push_empty(bucket);
-#endif
         }
+#endif
     }
 
     template <typename K=KeyT>
@@ -1610,8 +1596,8 @@ private:
         if (next_bucket == bucket)
             EMH_BUCKET(_pairs, new_bucket) = new_bucket;
 
-        _num_filled ++;
         clear_bucket(bucket, false);
+        _num_filled ++;
         return bucket;
     }
 
@@ -1888,10 +1874,8 @@ one-way seach strategy.
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-#if defined(AHASH_AHASH_H)
-        return ahash64(key.data(), key.size(), KC);
-#elif WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size() + KC);
+#if WYHASH_LITTLE_ENDIAN
+        return wyhash(key.data(), key.size(), key.size());
 #else
         return (size_type)_hasher(key);
 #endif
@@ -1911,16 +1895,14 @@ private:
     PairT*    _pairs;
     HashT     _hasher;
     EqT       _eq;
+    uint32_t  _mlf;
     size_type _mask;
     size_type _num_buckets;
-
     size_type _num_filled;
     size_type _last;
     size_type _ehead;
-    uint32_t _mlf;
 };
 } // namespace emhash
-
 #if __cplusplus > 199711
 //template <class Key, class Val> using emhash5 = ehmap<Key, Val, std::hash<Key>>;
 #endif

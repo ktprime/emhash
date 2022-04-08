@@ -6,18 +6,18 @@ ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
 CXX?=clang++
 endif
 
-CXXFLAGS = -O3 -march=native -flto -mtune=native -I.. -I../thirdparty
+CXXFLAGS = -O3 -march=native -mtune=native -I.. -I../thirdparty
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)
 CXXFLAGS += -DFOLLY -lfolly
 endif
 
-ifneq ($(ABSL),)
+ifneq ($(SW),)
 CXXFLAGS += -DABSL=1
 endif
 
-ifneq ($(HH),)
+ifneq ($(MH),)
 CXXFLAGS += -DHOOD_HASH=1
 endif
 
@@ -27,6 +27,16 @@ endif
 
 ifneq ($(EH),)
 CXXFLAGS += -DEMH_FIBONACCI_HASH=$(EH)
+endif
+
+ifneq ($(EMH),)
+CXXFLAGS += -DEMH=$(EMH)
+else
+#CXXFLAGS += -DEMH=7
+endif
+
+ifneq ($(AH),)
+CXXFLAGS += -DABSL_HASH=1
 endif
 
 ifneq ($(RT),)
@@ -45,22 +55,6 @@ ifneq ($(ET),)
 CXXFLAGS += -DET=$(ET)
 endif
 
-ifneq ($(EA),)
-CXXFLAGS += -DEA=$(EA)
-endif
-
-ifneq ($(EMH),)
-CXXFLAGS += -DEMH=$(EMH)
-else
-CXXFLAGS += -DEMH=7
-endif
-
-ifneq ($(AH),)
-CXXFLAGS += -DABSL_HASH=1
-#CXXFLAGS += ../thirdparty/absl/hash/internal/low_level_hash.cc
-#CXXFLAGS += ../thirdparty/absl/hash/internal/city.cc
-endif
-
 ifneq ($(HL),)
 CXXFLAGS += -DEMH_HIGH_LOAD=$(HL)
 endif
@@ -77,15 +71,19 @@ ifneq ($(MAP),)
 CXXFLAGS += -DSMAP=1
 endif
 
-ifneq ($(QH),)
-CXXFLAGS += -DQC_HASH=$(QH) -std=c++20
+ifneq ($(QC),)
+CXXFLAGS += -DQC_HASH=$(QC) -std=c++20
 endif
 
 ifneq ($(std),)
 CXXFLAGS += -std=c++$(std)
 endif
 
-ifeq ($(fh),)
+ifeq ($(std),)
+#CXXFLAGS += -std=c++17
+endif
+
+ifneq ($(HT),)
 CXXFLAGS += -DEMH_FIND_HIT=1
 endif
 
@@ -98,17 +96,22 @@ endif
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
-	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
-	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
-	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
 	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
+ifneq ($(EMH),)
+	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
+	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
+	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
+endif
 
 eb:
 	./ebench
 mb:
 	./mbench
+qb:
+	./qbench
 
 clean:
 	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench
+

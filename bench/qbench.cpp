@@ -33,7 +33,7 @@
 
 #ifdef FIB_HASH
 #define QintHasher Int64Hasher<K>
-#elif QC_HASH
+#elif HOOD_HASH
 #define QintHasher robin_hood::hash<K>
 #else
 #define QintHasher typename qc::hash::RawMap<K, V>::hasher
@@ -86,10 +86,10 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
     {    500'000u,       100u},
-    {   7200'000u,        10u},
+    {   7200'000u,        7u},
 #if 1
-    { 10'000'000u,         5u},
-    { 50'000'000u,         3u},
+    { 10'000'000u,         4u},
+    { 50'000'000u,         2u},
 #endif
 //   {100'000'000u,         1u},
 #endif
@@ -273,7 +273,7 @@ public:
 
     void setContainerNames(const std::vector<std::string> & containerNames)
     {
-        if (containerNames.size() != _presentContainerIndices.size()) throw std::exception{};
+        if (containerNames.size() != _presentContainerIndices.size()) //throw std::exception{};
         _containerNames = containerNames;
     }
 
@@ -694,6 +694,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
     static size_t volatile v{0};
 
     const double invElementCount{1.0 / double(keys.size())};
+
     const s64 t0{now()};
     // Insert
     for (const K key : keys) {
@@ -717,7 +718,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
 
     const s64 t2{now()};
     // AccessEmpty
-    for (const K& key : keys) {
+    for (const K key : keys) {
         v = v + container.count(key + v);
     }
 
@@ -1195,9 +1196,11 @@ int main(int argc, const char* argv[])
 //        compare<CompareMode::oneVsOne, K, EmiLib3MapInfo<K,int>, EmiLib2MapInfo<K, int>>();
 //        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
 #if ABSL
-        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib2MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib3MapInfo<K, int>>();
+//        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K, int>, EmHash7MapInfo<K, int>>();
 #endif
-        compare<CompareMode::oneVsOne, K, RobinHoodMapInfo<K,int>, EmHash5MapInfo<K, int>>();
+//        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K,int>, EmHash5MapInfo<K, int>>();
+
     }
     // Set comparison
     else if constexpr (false) {
@@ -1214,17 +1217,21 @@ int main(int argc, const char* argv[])
     }
     // Map comparison
     if constexpr (true) {
-#if TKey == 0
+#if Key == 0
         using K = size_t;
-#elif TKey == 1
-        using K = uint64_t;
 #else
         using K = uint32_t;
 #endif
 
+#if Val == 0
         using V = size_t;
+#else
+        using V = uint32_t;
+#endif
+
         compare<CompareMode::typical, K,
 #ifdef ABSL
+            PhMapInfo<K, V>,
             AbslMapInfo<K, V>,
 #endif
 
@@ -1236,27 +1243,27 @@ int main(int argc, const char* argv[])
 #if ET
             EmiLib1MapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
-            EmHash8MapInfo<K, V>,
+            TslSparseMapInfo<K, V>,
 #endif
-            PhMapInfo<K, V>,
 
 #if ET > 1
             TslRobinMapInfo<K, V>,
             SkaMapInfo<K, V>,
 #endif
 
-//            TslSparseMapInfo<K, V>,
+#ifdef CXX20
 //            FphDyamicMapInfo<K,V>,
-#if EHMAP
-            EmHash5MapInfo<K, V>,
-            EmHash6MapInfo<K, V>,
-#if CXX201
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
             QcHashMapInfo<K, V>,
 #endif
-#endif
+
+            EmHash8MapInfo<K, V>,
+#ifdef EHMAP
             EmHash7MapInfo<K, V>
+            EmHash5MapInfo<K, V>,
+#endif
+            EmHash6MapInfo<K, V>
         >();
     }
     // Architecture comparison

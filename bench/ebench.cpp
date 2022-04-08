@@ -100,10 +100,10 @@ std::map<std::string, std::string> maps =
 //#define EMH_HIGH_LOAD         2345
 
 #ifdef EM3
-#include "old/hash_table2.hpp"
-#include "old/hash_table3.hpp"
-#include "old/hash_table4.hpp"
-#include "old/hash_table557.hpp"
+#include "emhash/hash_table2.hpp"
+#include "emhash/hash_table3.hpp"
+#include "emhash/hash_table4.hpp"
+#include "emhash/hash_table557.hpp"
 #endif
 
 #include "../hash_table5.hpp"

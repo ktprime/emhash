@@ -49,6 +49,7 @@ namespace emilib2 {
 
     #define SET1_EPI8      _mm_set1_epi8
     #define LOADU_EPI8     _mm_loadu_si128
+    #define GET_EMPTY(u)   _mm_slli_epi16(_mm_loadu_si128(u), 7)
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
 #elif 1
@@ -58,6 +59,7 @@ namespace emilib2 {
 
     #define SET1_EPI8      _mm256_set1_epi8
     #define LOADU_EPI8     _mm256_loadu_si256
+    #define GET_EMPTY(u)   _mm256_slli_epi32(_mm256_loadu_si256(u), 7)
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
 #elif AVX512_EHASH
@@ -69,6 +71,7 @@ namespace emilib2 {
     #define LOADU_EPI8     _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
     #define CMPEQ_EPI8     _mm512_test_epi8_mask
+    #define GET_EMPTY(u)   _mm512_slli_epi64(_mm512_loadu_si512(u), 7)
 #else
     //TODO arm neon
 #endif
@@ -139,7 +142,7 @@ public:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 52) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
     }
 #endif
 
@@ -159,11 +162,11 @@ public:
 
         void init()
         {
-            _from = (_bucket / stat_bytes) * stat_bytes;
-            if (_bucket < _map->bucket_count()) {
-                _bmask = *(uint64_t*)(_map->_states + _from) | EFILLED_FIND;
-                _bmask |= (1ull << (_bucket % stat_bytes * stat_bytes)) - 1;
-                _bmask = ~_bmask;
+            _from = (_bucket / simd_bytes) * simd_bytes;
+            const auto bucket_count = _map->bucket_count();
+            if (_bucket < bucket_count) {
+                _bmask = _map->filled_mask(_from);
+                _bmask &= ~((1ull << (_bucket % simd_bytes)) - 1);
             } else {
                 _bmask = 0;
             }
@@ -192,15 +195,8 @@ public:
             return old;
         }
 
-        reference operator*() const
-        {
-            return _map->_pairs[_bucket];
-        }
-
-        pointer operator->() const
-        {
-            return _map->_pairs + _bucket;
-        }
+        reference operator*() const { return _map->_pairs[_bucket]; }
+        pointer operator->() const { return _map->_pairs + _bucket; }
 
         bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
@@ -212,15 +208,15 @@ public:
         {
             _bmask &= _bmask - 1;
             if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask) / stat_bits;
+                _bucket = _from + CTZ(_bmask);
                 return;
             }
 
             do {
-                _bmask = ~(*(uint64_t*)(_map->_states + (_from += stat_bytes)) | EFILLED_FIND);
+                _bmask = _map->filled_mask(_from += simd_bytes);
             } while (_bmask == 0);
 
-            _bucket = _from + CTZ(_bmask) / stat_bits;
+            _bucket = _from + CTZ(_bmask);
         }
 
     public:
@@ -246,11 +242,11 @@ public:
 
         void init()
         {
-            _from = (_bucket / stat_bytes) * stat_bytes;
-            if (_bucket < _map->bucket_count()) {
-                _bmask = *(uint64_t*)(_map->_states + _from) | EFILLED_FIND;
-                _bmask |= (1ull << (_bucket % stat_bytes * stat_bytes)) - 1;
-                _bmask = ~_bmask;
+            _from = (_bucket / simd_bytes) * simd_bytes;
+            const auto bucket_count = _map->bucket_count();
+            if (_bucket < bucket_count) {
+                _bmask = _map->filled_mask(_from);
+                _bmask &= ~((1ull << (_bucket % simd_bytes)) - 1);
             } else {
                 _bmask = 0;
             }
@@ -279,41 +275,26 @@ public:
             return old;
         }
 
-        reference operator*() const
-        {
-            return _map->_pairs[_bucket];
-        }
+        reference operator*() const { return _map->_pairs[_bucket]; }
+        pointer operator->() const { return _map->_pairs + _bucket; }
 
-        pointer operator->() const
-        {
-            return _map->_pairs + _bucket;
-        }
-
-        bool operator==(const const_iterator& rhs) const
-        {
-            //DCHECK_EQ_F(_map, rhs._map);
-            return _bucket == rhs._bucket;
-        }
-
-        bool operator!=(const const_iterator& rhs) const
-        {
-            return _bucket != rhs._bucket;
-        }
+        bool operator==(const const_iterator& rhs) const { return _bucket == rhs._bucket; }
+        bool operator!=(const const_iterator& rhs) const { return _bucket != rhs._bucket; }
 
     private:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
             if (_bmask != 0) {
-                _bucket = _from + CTZ(_bmask) / stat_bits;
+                _bucket = _from + CTZ(_bmask);
                 return;
             }
 
             do {
-                _bmask = ~(*(uint64_t*)(_map->_states + (_from += stat_bytes)) | EFILLED_FIND);
+                _bmask = _map->filled_mask(_from += simd_bytes);
             } while (_bmask == 0);
 
-            _bucket = _from + CTZ(_bmask) / stat_bits;
+            _bucket = _from + CTZ(_bmask);
         }
 
     public:
@@ -937,7 +918,7 @@ private:
             }
 
             //3. find erased
-            if (hole == -1) {
+            else if (hole == -1) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);
@@ -964,20 +945,36 @@ private:
         return ebucket;
     }
 
+    inline uint64_t empty_delete(size_t gbucket) const
+    {
+        const auto vec = GET_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
+        return MOVEMASK_EPI8(vec);
+    }
+
+    uint64_t filled_mask(size_t gbucket) const
+    {
+#if 1
+        const auto vec = GET_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
+        return ~MOVEMASK_EPI8(vec) & ((1 << simd_bytes) - 1);
+#else
+        const auto vec = LOAD_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
+        return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
+#endif
+    }
+
     size_t find_empty_slot(size_t next_bucket, int offset)
     {
         while (true) {
-            const auto maske = *(uint64_t*)(_states + next_bucket) & EMPTY_MASK;
+            const auto maske = empty_delete(next_bucket); //*(uint64_t*)(_states + next_bucket) & EMPTY_MASK;
             if (EMH_LIKELY(maske != 0)) {
-                const auto probe = CTZ(maske) / stat_bits;
+                const auto probe = CTZ(maske);
                 offset += probe;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
-                const auto ebucket = next_bucket + probe;
-                return ebucket;
+                return next_bucket + probe;
             }
-            next_bucket += stat_bytes;
-            offset      += stat_bytes;
+            next_bucket += simd_bytes;
+            offset      += simd_bytes;
             if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
                 offset -= next_bucket - _num_buckets;
                 next_bucket = 0;
@@ -989,12 +986,12 @@ private:
     size_t find_filled_slot(size_t next_bucket) const
     {
         while (true) {
-            const auto maske = ~(*(uint64_t*)(_states + next_bucket) | EFILLED_FIND);
+            const auto maske = filled_mask(next_bucket);
             if (EMH_LIKELY(maske != 0))
-                return next_bucket + CTZ(maske) / stat_bits;
-            next_bucket += stat_bytes;
+                return next_bucket + CTZ(maske);
+            next_bucket += simd_bytes;
         }
-        return _num_buckets;
+        return 0;
     }
 
 private:

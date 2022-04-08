@@ -738,7 +738,7 @@ public:
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_key(key) & _mask;
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (EMH_EMPTY(_pairs, bucket))
             return 0;
@@ -746,7 +746,7 @@ public:
             return bucket + 1;
 
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
-        return (hash_bucket(bucket_key) & _mask) + 1;
+        return (hash_key(bucket_key) & _mask) + 1;
     }
 
     //Returns the number of elements in bucket n.
@@ -756,7 +756,7 @@ public:
             return 0;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        next_bucket = hash_bucket(EMH_KEY(_pairs, bucket)) & _mask;
+        next_bucket = hash_key(EMH_KEY(_pairs, bucket)) & _mask;
         size_type bucket_size = 1;
 
         //iterator each item in current main bucket
@@ -778,7 +778,7 @@ public:
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
-        const auto main_bucket = hash_bucket(bucket_key) & _mask;
+        const auto main_bucket = hash_key(bucket_key) & _mask;
         return main_bucket;
     }
 
@@ -800,7 +800,7 @@ public:
             return -1;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((hash_bucket(EMH_KEY(_pairs, bucket)) & _mask) != bucket)
+        if ((hash_key(EMH_KEY(_pairs, bucket)) & _mask) != bucket)
             return 0;
         else if (next_bucket == bucket)
             return 1;
@@ -1060,16 +1060,16 @@ public:
         return { {this, bucket}, isempty };
     }
 
-    std::pair<iterator, bool> insert(const value_type& p)
+    std::pair<iterator, bool> insert(const value_type& value)
     {
         check_expand_need();
-        return do_insert(p);
+        return do_insert(value);
     }
 
-    std::pair<iterator, bool> insert(value_type && p)
+    std::pair<iterator, bool> insert(value_type && value)
     {
         check_expand_need();
-        return do_insert(std::move(p));
+        return do_insert(std::move(value));
     }
 
     void insert(std::initializer_list<value_type> ilist)
@@ -1106,7 +1106,7 @@ public:
 
     size_type try_insert_mainbucket(const KeyT& key, const ValueT& val)
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_key(key) & _mask;
         if (!EMH_EMPTY(_pairs, bucket))
             return INACTIVE;
 
@@ -1261,7 +1261,7 @@ public:
     {
         auto iend = cend();
         auto next = first;
-        for (; next != last && next != iend; )
+        for (; next.bucket() < last.bucket() && next != iend; )
             next = erase(next);
 
         return {this, next.bucket()};
@@ -1416,7 +1416,7 @@ private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_key(key) & _mask;
         if (EMH_EMPTY(_pairs, bucket))
             return INACTIVE;
 
@@ -1433,7 +1433,7 @@ private:
 
             EMH_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
-        }/* else if (EMH_UNLIKELY(bucket != hash_bucket(EMH_KEY(_pairs, bucket)) & _mask))
+        }/* else if (EMH_UNLIKELY(bucket != hash_key(EMH_KEY(_pairs, bucket)) & _mask))
             return INACTIVE;
         */
 
@@ -1457,14 +1457,14 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
     size_type erase_key(const UType& key)
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_key(key) & _mask;
         if (EMH_EMPTY(_pairs, bucket))
             return INACTIVE;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (next_bucket == bucket)
             return _eq(key, EMH_KEY(_pairs, bucket)) ? bucket : INACTIVE;
-//        else if (bucket != hash_bucket(EMH_KEY(_pairs, bucket)))
+//        else if (bucket != hash_key(EMH_KEY(_pairs, bucket)))
 //            return INACTIVE;
 
         //find erase key and swap to last bucket
@@ -1498,7 +1498,7 @@ private:
     size_type erase_bucket(const size_type bucket)
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        const auto main_bucket = hash_bucket(EMH_KEY(_pairs, bucket)) & _mask;
+        const auto main_bucket = hash_key(EMH_KEY(_pairs, bucket)) & _mask;
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
@@ -1547,7 +1547,7 @@ private:
     template<typename K = KeyT>
     size_type find_filled_bucket(const K& key) const
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_key(key) & _mask;
         if (EMH_EMPTY(_pairs, bucket))
             return _num_buckets;
 
@@ -1571,7 +1571,7 @@ private:
             return _num_buckets;
         next_bucket = nbucket;
 #elif 0
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_key(key) & _mask;
         if (EMH_EMPTY(_pairs, bucket))
             return _num_buckets;
         else if (_eq(key, EMH_KEY(_pairs, bucket)))
@@ -1581,7 +1581,7 @@ private:
         if (next_bucket == bucket)
             return _num_buckets;
 #endif
-//        else if (bucket != hash_bucket(bucket_key) & _mask)
+//        else if (bucket != (hash_key(bucket_key) & _mask))
 //            return _num_buckets;
 
         while (true) {
@@ -1631,14 +1631,14 @@ private:
     template<typename Key=KeyT>
     size_type find_or_allocate(const Key& key)
     {
-        const auto bucket = hash_bucket(key) & _mask;
+        const auto bucket = hash_key(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
         if (EMH_EMPTY(_pairs, bucket) || _eq(key, bucket_key))
             return bucket;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(bucket_key) & _mask;
+        const auto main_bucket = hash_key(bucket_key) & _mask;
         if (main_bucket != bucket)
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket == bucket)
@@ -1760,13 +1760,13 @@ private:
 
     size_type find_unique_bucket(const KeyT& key)
     {
-        const size_type bucket = hash_bucket(key) & _mask;
+        const size_type bucket = hash_key(key) & _mask;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (EMH_EMPTY(_pairs, bucket))
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_bucket(EMH_KEY(_pairs, bucket)) & _mask;
+        const auto main_bucket = hash_key(EMH_KEY(_pairs, bucket)) & _mask;
         if (EMH_UNLIKELY(main_bucket != bucket))
             return kickout_bucket(main_bucket, bucket);
         else if (next_bucket != bucket)
@@ -1813,7 +1813,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    inline size_type hash_bucket(const UType key) const
+    inline size_type hash_key(const UType key) const
     {
 #ifdef EMH_FIBONACCI_HASH
         return hash64(key);
@@ -1827,7 +1827,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    inline size_type hash_bucket(const UType& key) const
+    inline size_type hash_key(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.data(), key.size(), key.size());
@@ -1837,7 +1837,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, size_type>::type = 0>
-    inline size_type hash_bucket(const UType& key) const
+    inline size_type hash_key(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
         return _hasher(key) * KC;

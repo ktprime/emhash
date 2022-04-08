@@ -24,20 +24,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-
-// From
-// NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
-// Quadratic collision resolution   1 - ln(1-L) - L/2    1/(1-L) - L - ln(1-L)
-// Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-//
-// -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
-// QUADRATIC COLLISION RES.
-//    probes/successful lookup    1.05  1.44  1.62  2.01  2.21  2.85  5.11
-//    probes/unsuccessful lookup  1.11  2.19  2.82  4.64  5.81  11.4  103.6
-// LINEAR COLLISION RES.
-//    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
-//    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
-
 #pragma once
 
 #include <cstring>
@@ -1676,7 +1662,7 @@ one-way seach strategy.
     inline uint64_t hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size());
+        return wyhash(key.data(), key.size(), key.size());
 #else
         return _hasher(key);
 #endif
@@ -1698,10 +1684,9 @@ private:
 
     HashT     _hasher;
     EqT       _eq;
-
-    size_type _num_buckets;
     size_type _mlf;
     size_type _mask;
+    size_type _num_buckets;
     size_type _num_filled;
     size_type _last;
     size_type _ehead;

@@ -161,7 +161,7 @@ public:
     typedef ValueT val_type;
     typedef KeyT   key_type;
 
-#ifndef EMH_H2
+#ifdef EMH_H2
     #define key2_hash(key_hash, key) ((uint8_t)(key_hash >> 24)) >> 1
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
@@ -585,11 +585,11 @@ public:
         const auto bucket = find_or_allocate(key, key_h2);
 
         if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
-            return { iterator(this, bucket, false), false };
+            return { {this, bucket, false}, false };
         } else {
             _states[bucket] = key_h2;
             new(_pairs + bucket) PairT(key, value); _num_filled++;
-            return { iterator(this, bucket, false), true };
+            return { {this, bucket, false}, true };
         }
     }
 
@@ -600,12 +600,12 @@ public:
         const auto bucket = find_or_allocate(key, key_h2);
 
         if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
-            return { iterator(this, bucket, false), false };
+            return { {this, bucket, false}, false };
         }
         else {
             _states[bucket] = key_h2;
             new(_pairs + bucket) PairT(key, std::move(value)); _num_filled++;
-            return { iterator(this, bucket, false), true };
+            return { {this, bucket, false}, true };
         }
     }
 
@@ -619,24 +619,24 @@ public:
         return insert(key, std::move(value));
     }
 
-    std::pair<iterator, bool> emplace(value_type&& v)
+    std::pair<iterator, bool> emplace(value_type&& value)
     {
-        return insert(std::move(v.first), std::move(v.second));
+        return insert(std::move(value.first), std::move(value.second));
     }
 
-    std::pair<iterator, bool> emplace(const value_type& v)
+    std::pair<iterator, bool> emplace(const value_type& value)
     {
-        return insert(v.first, v.second);
+        return insert(value.first, value.second);
     }
 
-    std::pair<iterator, bool> insert(const value_type& p)
+    std::pair<iterator, bool> insert(const value_type& value)
     {
-        return insert(p.first, p.second);
+        return insert(value.first, value.second);
     }
 
-    std::pair<iterator, bool> insert(iterator it, const value_type& p)
+    std::pair<iterator, bool> insert(iterator it, const value_type& value)
     {
-        return insert(p.first, p.second);
+        return insert(value.first, value.second);
     }
 
     void insert(const_iterator beginc, const_iterator endc)
@@ -656,7 +656,7 @@ public:
     }
 
     /// Same as above, but contains(key) MUST be false
-    void insert_unique(const KeyT& key, const ValueT& value)
+    void insert_unique(const KeyT& key, const ValueT& val)
     {
         check_expand_need();
 
@@ -664,10 +664,10 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = key2_hash(key_hash, key);
-        new(_pairs + bucket) PairT(key, value); _num_filled++;
+        new(_pairs + bucket) PairT(key, val); _num_filled++;
     }
 
-    void insert_unique(KeyT&& key, ValueT&& value)
+    void insert_unique(KeyT&& key, ValueT&& val)
     {
         check_expand_need();
 
@@ -675,20 +675,20 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = key2_hash(key_hash, key);
-        new(_pairs + bucket) PairT(std::move(key), std::move(value)); _num_filled++;
+        new(_pairs + bucket) PairT(std::move(key), std::move(val)); _num_filled++;
     }
 
-    void insert_unique(value_type&& p)
+    void insert_unique(value_type&& value)
     {
-        insert_unique(std::move(p.first), std::move(p.second));
+        insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    void insert_unique(const value_type & p)
+    void insert_unique(const value_type & value)
     {
-        insert_unique(p.first, p.second);
+        insert_unique(value.first, value.second);
     }
 
-    void insert_or_assign(const KeyT& key, ValueT&& value)
+    void insert_or_assign(const KeyT& key, ValueT&& val)
     {
         check_expand_need();
         uint8_t key_h2;
@@ -696,10 +696,10 @@ public:
 
         // Check if inserting a new value rather than overwriting an old entry
         if ((_states[bucket] & FILLED_MASK) == State::EFILLED) {
-            _pairs[bucket].second = value;
+            _pairs[bucket].second = val;
         } else {
             _states[bucket] = key_h2;
-            new(_pairs + bucket) PairT(key, value); _num_filled++;
+            new(_pairs + bucket) PairT(key, val); _num_filled++;
         }
     }
 

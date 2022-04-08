@@ -516,7 +516,7 @@ public:
 #ifdef JG_NO_EXCEPTION
             std::abort();
 #else
-            throw std::out_of_range("The specified key does not exists in this map.");
+            //throw std::out_of_range("The specified key does not exists in this map.");
 #endif
         }
 
@@ -532,7 +532,7 @@ public:
 #ifdef JG_NO_EXCEPTION
             std::abort();
 #else
-            throw std::out_of_range("The specified key does not exists in this map.");
+            //throw std::out_of_range("The specified key does not exists in this map.");
 #endif
         }
 

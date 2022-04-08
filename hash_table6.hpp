@@ -75,6 +75,7 @@
 #ifndef EMH_DEFAULT_LOAD_FACTOR
 #define EMH_DEFAULT_LOAD_FACTOR 0.88f
 #endif
+
 #if EMH_BUCKET_INDEX == 0
     #define EMH_KEY(p,n)     p[n].second.first
     #define EMH_VAL(p,n)     p[n].second.second
@@ -231,17 +232,6 @@ struct entry {
     Second second;//int
 #endif
 };// __attribute__ ((packed));
-
-template <typename A, typename B>
-inline constexpr bool operator==(std::pair<A, B> const& x, entry<A, B> const& y) {
-    return (x.first == y.first) && (x.second == y.second);
-}
-
-template <typename A, typename B>
-inline constexpr bool operator==(entry<A, B> const& x, entry<A, B> const& y) {
-    return (x.first == y.first) && (x.second == y.second);
-}
-
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -668,7 +658,7 @@ public:
         else if (bucket == next_bucket * 2)
             return bucket + 1;
 
-        return hash_bucket(bucket);
+        return hash_main(bucket);
     }
 
     //Returns the number of elements in bucket n.
@@ -699,7 +689,7 @@ public:
         if (EMH_EMPTY(_pairs, bucket))
             return -1u;
 
-        return hash_bucket(bucket);
+        return hash_main(bucket);
     }
 
     int get_cache_info(size_type bucket, size_type next_bucket) const
@@ -720,7 +710,7 @@ public:
         if ((int)next_bucket < 0)
             return -1;
 
-        const auto main_bucket = hash_bucket(bucket);
+        const auto main_bucket = hash_main(bucket);
         if (main_bucket != bucket)
             return 0;
         else if (next_bucket == bucket)
@@ -1205,9 +1195,18 @@ public:
 
     void clearkv()
     {
-        for (auto it = cbegin(); _num_filled; ++it) {
+        for (auto it = cbegin(); _num_filled; ++it)
             clear_bucket(it.bucket());
+    }
+
+    void reset_zero()
+    {
+#if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value) {
+            const auto bucket = hash_key(0) & _mask;
+            reset_bucket(bucket);
         }
+#endif
     }
 
     /// Remove all elements, keeping full capacity.
@@ -1215,10 +1214,18 @@ public:
     {
         if (is_triviall_destructable())
             clearkv();
-        else {
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * (_mask + 1));
+        else if (_num_filled) {
             memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
+            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * (_mask + 1));
+#if EMH_FIND_HIT
+            if constexpr (std::is_integral<KeyT>::value) {
+            for (size_type bucket = 0; bucket <= _mask; bucket++)
+                EMH_KEY(_pairs, bucket) = 0;
+            }
+            reset_zero();
+#endif
         }
+
         EMH_ADDR(_pairs, _mask + 1) = 0; //_last
         _num_filled = 0;
 #if EMH_SAFE_HASH
@@ -1297,12 +1304,7 @@ public:
 #endif
         }
 
-#if EMH_FIND_HIT
-        if constexpr (std::is_integral<KeyT>::value) {
-            const auto bucket = hash_key(0) & _mask;
-            reset_key(bucket);
-        }
-#endif
+        reset_zero();
 
         //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
@@ -1324,7 +1326,7 @@ public:
             const auto bucket = find_unique_bucket(key);
             EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
 #if EMH_REHASH_LOG
-            if (bucket / 2 != hash_bucket(bucket / 2))
+            if (bucket / 2 != hash_main(bucket / 2))
                 collision++;
 #endif
             if (is_triviall_destructable())
@@ -1367,7 +1369,7 @@ private:
         return reserve(_num_filled);
     }
 
-    void reset_key(size_type bucket)
+    void reset_bucket(size_type bucket)
     {
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value) {
@@ -1381,7 +1383,7 @@ private:
 
     void clear_bucket(size_type bucket)
     {
-        reset_key(bucket);
+        reset_bucket(bucket);
 
         EMH_ADDR(_pairs, bucket) = INACTIVE; //loop call in destructor
         if (is_triviall_destructable()) {
@@ -1505,7 +1507,7 @@ private:
             return next_bucket;
         }
 
-        const auto main_bucket = hash_bucket(bucket);
+        const auto main_bucket = hash_main(bucket);
         next_bucket /= 2;
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         const auto odd_bucket = (prev_bucket == main_bucket ? 0 : 1);
@@ -1536,7 +1538,7 @@ private:
                 return bucket;
             else if (next_bucket % 2 > 0 || next_bucket == bucket * 2)
                 return _num_buckets;
-//            else if (next_bucket == bucket * 2)
+//            else if (hash_main(bucket) != bucket)
 //                return _num_buckets;
         } else {
             if (next_bucket % 2 > 0)
@@ -1579,7 +1581,7 @@ private:
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
-        const auto main_bucket = hash_bucket(bucket);
+        const auto main_bucket = hash_main(bucket);
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); EMH_SET(new_bucket);
         if (next_bucket == bucket)
@@ -1766,7 +1768,7 @@ private:
 #endif
     }
 
-    inline uint64_t hash_bucket(const size_type bucket) const
+    inline uint64_t hash_main(const size_type bucket) const
     {
         return hash_key(EMH_KEY(_pairs, bucket)) & _mask;
     }
