@@ -1586,19 +1586,19 @@ private:
     //it will break the orgin link and relnik again.
     //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
     //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
-    size_type kickout_bucket(const size_type obmain, const size_type bucket)
+    size_type kickout_bucket(const size_type kmain, const size_type kbucket)
     {
-        const auto next_bucket = EMH_BUCKET(_pairs, bucket);
+        const auto next_bucket = EMH_BUCKET(_pairs, kbucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
-        const auto prev_bucket = find_prev_bucket(obmain, bucket);
+        const auto prev_bucket = find_prev_bucket(kmain, kbucket);
         EMH_BUCKET(_pairs, prev_bucket) = new_bucket;
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
-        if (next_bucket == bucket)
+        new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
+        if (next_bucket == kbucket)
             EMH_BUCKET(_pairs, new_bucket) = new_bucket;
 
-        clear_bucket(bucket, false);
+        clear_bucket(kbucket, false);
         _num_filled ++;
-        return bucket;
+        return kbucket;
     }
 
 /*
@@ -1623,9 +1623,9 @@ private:
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto obmain = key_to_bucket(bucket_key);
-        if (obmain != bucket)
-            return kickout_bucket(obmain, bucket);
+        const auto kmain = key_to_bucket(bucket_key);
+        if (kmain != bucket)
+            return kickout_bucket(kmain, bucket);
         else if (next_bucket == bucket)
             return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
 
@@ -1672,9 +1672,9 @@ private:
         }
 
         //check current bucket_key is in main bucket or not
-        const auto obmain = hash_main(bucket);
-        if (EMH_UNLIKELY(obmain != bucket))
-            return kickout_bucket(obmain, bucket);
+        const auto kmain = hash_main(bucket);
+        if (EMH_UNLIKELY(kmain != bucket))
+            return kickout_bucket(kmain, bucket);
         else if (EMH_UNLIKELY(next_bucket != bucket))
             next_bucket = find_last_bucket(next_bucket);
 

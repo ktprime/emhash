@@ -118,9 +118,6 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #ifndef EMH_BUCKET_INDEX
     #define EMH_BUCKET_INDEX 1
 #endif
-#if EMH_CACHE_LINE_SIZE < 32
-    #define EMH_CACHE_LINE_SIZE 64
-#endif
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
 #define EMH_DEFAULT_LOAD_FACTOR 0.88f
@@ -179,6 +176,7 @@ namespace emhash7 {
 static constexpr uint32_t MASK_BIT = sizeof(uint32_t) * 8;
 static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
 static constexpr uint32_t PACK_SIZE = 2; // > 1
+
 #ifndef EMH_SIZE_TYPE_16BIT
 static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
 #endif
@@ -634,7 +632,6 @@ public:
         _mlf      = rhs._mlf;
         _num_buckets = rhs._num_buckets;
 
-//        _bitmask     = decltype(_bitmask)((uint8_t*)_pairs + ((uint8_t*)rhs._bitmask - (uint8_t*)rhs._pairs));
         _bitmask     = decltype(_bitmask)(_pairs + PACK_SIZE + rhs._num_buckets);
 
         auto* opairs  = rhs._pairs;
@@ -784,13 +781,14 @@ public:
 
     size_type get_diss(size_type bucket, size_type next_bucket, const size_type slots) const
     {
+        const int cahe_line_size = 64;
         auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
         auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
-        if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
+        if (pbucket / cahe_line_size == pnext / cahe_line_size)
             return 0;
         size_type diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
-        if (diff / EMH_CACHE_LINE_SIZE + 1 < slots)
-            return (diff / EMH_CACHE_LINE_SIZE + 1);
+        if (diff / cahe_line_size + 1 < slots)
+            return (diff / cahe_line_size + 1);
         return slots - 1;
     }
 
@@ -812,7 +810,6 @@ public:
             if (nbucket == next_bucket)
                 break;
 
-            assert((int)nbucket >= 0);
             steps[get_diss(nbucket, next_bucket, slots)] ++;
             bucket_size ++;
             next_bucket = nbucket;
@@ -882,7 +879,7 @@ public:
         buff[bsize + 1] = 0;
 
 #ifdef EMH_LOG
-        EMH_LOG() << __FUNCTION__ << "|" << buff << endl;
+        EMH_LOG << __FUNCTION__ << "|" << buff << endl;
 #else
         puts(buff);
 #endif
@@ -1019,8 +1016,9 @@ public:
     std::pair<iterator, bool> do_assign(K&& key, V&& val)
     {
         reserve(_num_filled);
-        const auto bucket = find_or_allocate(key);
-        const auto isempty = EMH_EMPTY(_pairs, bucket);
+
+        bool isempty;
+        const auto bucket = find_or_allocate(key, isempty);
         if (isempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket);
         } else {
@@ -1031,8 +1029,8 @@ public:
 
     std::pair<iterator, bool> do_insert(const value_type& value)
     {
-        const auto bucket = find_or_allocate(value.first);
-        const auto isempty = EMH_EMPTY(_pairs, bucket);
+        bool isempty;
+        const auto bucket = find_or_allocate(value.first, isempty);
         if (isempty) {
             EMH_NEW(value.first, value.second, bucket);
         }
@@ -1041,8 +1039,8 @@ public:
 
     std::pair<iterator, bool> do_insert(value_type&& value)
     {
-        const auto bucket = find_or_allocate(value.first);
-        const auto isempty = EMH_EMPTY(_pairs, bucket);
+        bool isempty;
+        const auto bucket = find_or_allocate(value.first, isempty);
         if (isempty) {
             EMH_NEW(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second), bucket);
         }
@@ -1052,8 +1050,8 @@ public:
     template<typename K = KeyT, typename V = ValueT>
     std::pair<iterator, bool> do_insert(K&& key, V&& val)
     {
-        const auto bucket = find_or_allocate(key);
-        const auto isempty = EMH_EMPTY(_pairs, bucket);
+        bool isempty;
+        const auto bucket = find_or_allocate(key, isempty);
         if (isempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket);
         }
@@ -1195,8 +1193,10 @@ public:
     ValueT& operator[](const KeyT& key)
     {
         check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        if (EMH_EMPTY(_pairs, bucket)) {
+
+        bool isempty;
+        const auto bucket = find_or_allocate(key, isempty);
+        if (isempty) {
             EMH_NEW(key, std::move(ValueT()), bucket);
         }
 
@@ -1206,8 +1206,10 @@ public:
     ValueT& operator[](KeyT&& key)
     {
         check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        if (EMH_EMPTY(_pairs, bucket)) {
+
+        bool isempty;
+        const auto bucket = find_or_allocate(key, isempty);
+        if (isempty) {
             EMH_NEW(std::move(key), std::move(ValueT()), bucket);
         }
 
@@ -1359,12 +1361,12 @@ public:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
-        memset((char*)(new_pairs + _num_buckets), 0, sizeof(PairT) * PACK_SIZE);
+        const auto maks_byte = num_buckets / 8;
 
-        const auto num_byte = num_buckets / 8;
+        memset((char*)(new_pairs + _num_buckets), 0, sizeof(PairT) * PACK_SIZE);
         _bitmask     = decltype(_bitmask)(new_pairs + PACK_SIZE + num_buckets);
-        memset(_bitmask, 0xFFFFFFFF, num_byte);
-        memset(((char*)_bitmask) + num_byte, 0, sizeof(uint64_t));
+        memset(_bitmask, 0xFFFFFFFF, maks_byte);
+        memset(((char*)_bitmask) + maks_byte, 0, sizeof(uint64_t));
         assert(num_buckets % 8 == 0);
 
         _pairs       = new_pairs;
@@ -1601,24 +1603,25 @@ private:
     //it will break the orgin link and relnik again.
     //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
     //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
-    size_type kickout_bucket(const size_type main_bucket, const size_type bucket)
+    size_type kickout_bucket(const size_type kmain, const size_type kbucket)
     {
-        const auto next_bucket = EMH_BUCKET(_pairs, bucket);
+        const auto next_bucket = EMH_BUCKET(_pairs, kbucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
-        const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
-        new(_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
+        const auto prev_bucket = find_prev_bucket(kmain, kbucket);
+        new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
         if (is_triviall_destructable())
-            _pairs[bucket].~PairT();
+            _pairs[kbucket].~PairT();
 
-        if (next_bucket == bucket)
+        if (next_bucket == kbucket)
             EMH_BUCKET(_pairs, new_bucket) = new_bucket;
         EMH_BUCKET(_pairs, prev_bucket) = new_bucket;
 
-        //set bit
+        //set new bucket bit
         EMH_SET(new_bucket);
-        //clear bit
-        EMH_CLS(bucket);
-        return bucket;
+
+        //clear kickout bit
+        //EMH_CLS(kbucket);
+        return kbucket;
     }
 
 /*
@@ -1629,18 +1632,25 @@ private:
 ** position), new key goes to an empty position. ***/
 
     template<typename Key=KeyT>
-    size_type find_or_allocate(const Key& key)
+    size_type find_or_allocate(const Key& key, bool& isempty)
     {
         const auto bucket = hash_key(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
-        if (EMH_EMPTY(_pairs, bucket) || _eq(key, bucket_key))
+        if (EMH_EMPTY(_pairs, bucket)) {
+            isempty = true;
             return bucket;
+        }
+        else if (_eq(key, bucket_key)) {
+            isempty = false;
+            return bucket;
+        }
 
+        isempty = true;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_key(bucket_key) & _mask;
-        if (main_bucket != bucket)
-            return kickout_bucket(main_bucket, bucket);
+        const auto kmain_bucket = hash_key(bucket_key) & _mask;
+        if (kmain_bucket != bucket)
+            return kickout_bucket(kmain_bucket, bucket);
         else if (next_bucket == bucket)
             return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
 
@@ -1650,6 +1660,7 @@ private:
         //find next linked bucket and check key, if lru is set then swap current key with prev_bucket
         while (true) {
             if (EMH_UNLIKELY(_eq(key, EMH_KEY(_pairs, next_bucket)))) {
+                isempty = false;
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
                 return prev_bucket;
@@ -1689,7 +1700,6 @@ private:
             const auto offset = CTZ(bmask);
             //if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
             return bucket_from + offset;
-
             //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
             //return bucket_from - boset + 7 - CTZ(rerverse_bit);
             //return bucket_from - boset + CTZ(begin[0]);
@@ -1711,8 +1721,8 @@ private:
 #endif
         }
 
+        auto& _last = EMH_BUCKET(_pairs, _num_buckets);
         for (size_t s = 2; ; s += 1) { //2.4.7
-            auto& _last = EMH_BUCKET(_pairs, _num_buckets);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
@@ -1761,15 +1771,16 @@ private:
     size_type find_unique_bucket(const KeyT& key)
     {
         const size_type bucket = hash_key(key) & _mask;
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (EMH_EMPTY(_pairs, bucket))
             return bucket;
 
         //check current bucket_key is in main bucket or not
-        const auto main_bucket = hash_key(EMH_KEY(_pairs, bucket)) & _mask;
-        if (EMH_UNLIKELY(main_bucket != bucket))
-            return kickout_bucket(main_bucket, bucket);
-        else if (next_bucket != bucket)
+        const auto kmain_bucket = hash_key(EMH_KEY(_pairs, bucket)) & _mask;
+        if (EMH_UNLIKELY(kmain_bucket != bucket))
+            return kickout_bucket(kmain_bucket, bucket);
+
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
+        if (next_bucket != bucket)
             next_bucket = find_last_bucket(next_bucket);
 
         //find a new empty and link it to tail

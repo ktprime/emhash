@@ -1581,8 +1581,8 @@ private:
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
-        const auto main_bucket = hash_main(bucket);
-        const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
+        const auto kmain_bucket = hash_main(bucket);
+        const auto prev_bucket = find_prev_bucket(kmain_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); EMH_SET(new_bucket);
         if (next_bucket == bucket)
             EMH_ADDR(_pairs, new_bucket) = new_bucket * 2 + 1;

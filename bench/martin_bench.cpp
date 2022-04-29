@@ -11,7 +11,7 @@
 #endif
 
 
-#include "wyhash.h"
+//#include "wyhash.h"
 
 //#define EMH_STATIS 1
 //#define ET            1
@@ -117,12 +117,12 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 2  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1  //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
     #define MRNG sfc64
-#elif RT == 2
+#elif RT == 2 && WYHASH_LITTLE_ENDIAN
     #define MRNG WyRand
 #elif RT == 3
     #define MRNG RomuDuoJr
