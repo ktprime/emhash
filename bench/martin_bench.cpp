@@ -5,12 +5,6 @@
 #include <sys/resource.h>
 #endif
 
-#if A64 && X86_64
-#include "ahash/ahash.c"
-#include "ahash/random_state.c"
-#endif
-
-
 //#include "wyhash.h"
 
 //#define EMH_STATIS 1
@@ -218,7 +212,24 @@ class sfc64 {
 
 static inline float now2sec()
 {
-    return getus() / 1000000.0;
+#if _WIN32
+    FILETIME ptime[4];
+    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
+    return (ptime[3].dwLowDateTime + ptime[2].dwLowDateTime) / 10000000.0f;
+#elif __linux__
+    struct rusage rup;
+    getrusage(RUSAGE_SELF, &rup);
+    long sec  = rup.ru_utime.tv_sec  + rup.ru_stime.tv_sec;
+    long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
+    return sec + usec / 1000000.0;
+#elif __unix__
+    struct timeval start;
+    gettimeofday(&start, NULL);
+    return start.tv_sec + start.tv_usec / 1000000.0;
+#else
+    auto tp = std::chrono::steady_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count() / 1000000.0;
+#endif
 }
 
 template<class MAP> void bench_insert(MAP map)
@@ -365,7 +376,7 @@ template<class MAP> void bench_randomInsertErase(MAP map)
 
         uint64_t bitMask = 0;
         auto bitsIt = bits.begin();
-        size_t const expectedFinalSizes[] = {7, 127, 2084, 32722, 524149, 8367491};
+        //size_t const expectedFinalSizes[] = {7, 127, 2084, 32722, 524149, 8367491};
         size_t const max_n = 50000000;
 
         for (int i = 0; i < 6; ++i) {

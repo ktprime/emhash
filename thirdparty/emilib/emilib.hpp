@@ -173,7 +173,7 @@ public:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t key2_hash(uint64_t key_hash, const UType& key) const
     {
-        return (uint8_t)(key * 0x9FB21C651E98DF25ull >> 48) >> 1;
+        return (uint8_t)(key * 0x9FB21C651E98DF25ull >> 49) >> 1;
 #if _WIN32 && _MSC_VER
 //        return (uint8_t)(_byteswap_uint64(((uint64_t)key) * 0xA24BAED4963EE407)) >> 1;
 #else
@@ -525,49 +525,49 @@ public:
 
     // ------------------------------------------------------------
 
-    template<typename KeyLike>
-    iterator find(const KeyLike& key)
+    template<typename K>
+    iterator find(const K& key)
     {
-        return iterator(this, find_filled_bucket(key), false);
+        return {this, find_filled_bucket(key), false};
     }
 
-    template<typename KeyLike>
-    const_iterator find(const KeyLike& key) const
+    template<typename K>
+    const_iterator find(const K& key) const
     {
-        return const_iterator(this, find_filled_bucket(key), false);
+        return {this, find_filled_bucket(key), false};
     }
 
-    template<typename KeyLike>
-    bool contains(const KeyLike& k) const
+    template<typename K>
+    bool contains(const K& k) const
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
-    template<typename KeyLike>
-    size_t count(const KeyLike& k) const
+    template<typename K>
+    size_t count(const K& k) const
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
-    template<typename KeyLike>
-    ValueT* try_get(const KeyLike& k)
+    template<typename K>
+    ValueT* try_get(const K& k)
     {
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
     }
 
     /// Const version of the above
-    template<typename KeyLike>
-    ValueT* try_get(const KeyLike& k) const
+    template<typename K>
+    ValueT* try_get(const K& k) const
     {
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
     }
 
     /// Convenience function.
-    template<typename KeyLike>
-    ValueT get_or_return_default(const KeyLike& k) const
+    template<typename K>
+    ValueT get_or_return_default(const K& k) const
     {
         const ValueT* ret = try_get(k);
         return ret ? *ret : ValueT();
@@ -941,8 +941,8 @@ private:
     }
 
     // Find the bucket with this key, or return (size_t)-1
-    template<typename KeyLike>
-    size_t find_filled_bucket(const KeyLike& key) const
+    template<typename K>
+    size_t find_filled_bucket(const K& key) const
     {
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
@@ -1046,8 +1046,8 @@ private:
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
-    template<typename KeyLike>
-    size_t find_or_allocate(const KeyLike& key, uint8_t& key_h2)
+    template<typename K>
+    size_t find_or_allocate(const K& key, uint8_t& key_h2)
     {
         size_t hole = (size_t)-1;
         int offset = 0;

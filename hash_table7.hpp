@@ -548,8 +548,12 @@ public:
 
     HashMap(HashMap&& rhs)
     {
+#ifndef EMH_ZERO_MOVE
+        init(4);
+#else
         _num_buckets = _num_filled = 0;
         _pairs = nullptr;
+#endif
         swap(rhs);
     }
 
@@ -613,7 +617,7 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable()) {
+        if (is_triviall_destructable() && _num_filled) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _num_filled --;
                 it->~value_pair();
@@ -657,14 +661,16 @@ public:
         std::swap(_mask, rhs._mask);
         std::swap(_mlf, rhs._mlf);
         std::swap(_bitmask, rhs._bitmask);
-        std::swap(EMH_BUCKET(_pairs, _num_buckets), EMH_BUCKET(rhs._pairs, rhs._num_buckets));
+        //std::swap(EMH_BUCKET(_pairs, _num_buckets), EMH_BUCKET(rhs._pairs, rhs._num_buckets));
     }
 
     // -------------------------------------------------------------
     iterator begin()
     {
+#ifdef EMH_ZERO_MOVE
         if (0 == _num_filled)
             return {this, _num_buckets};
+#endif
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
@@ -676,11 +682,14 @@ public:
 
     const_iterator cbegin() const
     {
+#ifdef EMH_ZERO_MOVE
+        if (0 == _num_filled)
+            return {this, _num_buckets};
+#endif
+
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
             return {this, CTZ(bmask), true};
-        else if (0 == _num_filled)
-            return {this, _num_buckets};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -871,7 +880,7 @@ public:
         bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n",
                 _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
 
-        bsize += sprintf(buff + bsize, "  collision,poisson,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%%  %.2lf|%.2lf, %.2lf\n",
+        bsize += sprintf(buff + bsize, "  collision,poisson,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%% %.2lf|%.2lf, %.2lf\n",
                 (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled,
                 finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
 
@@ -1315,7 +1324,7 @@ public:
         else if (_num_filled > 0)
             memset(_bitmask, 0xFFFFFFFF, _num_buckets / 8);
 
-        EMH_BUCKET(_pairs, _num_buckets) = 0; //_last
+        //EMH_BUCKET(_pairs, _num_buckets) = 0; //_last
         _num_filled = 0;
     }
 
@@ -1389,7 +1398,7 @@ public:
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #ifdef EMH_LOG
             static size_t ihashs = 0;
-            EMH_LOG() << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
+            EMH_LOG << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1727,7 +1736,7 @@ private:
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
 #if 1
-            const auto next1 = (qmask / 2 + _last)  & qmask;
+            const auto next1 = (qmask / 2 + _last) & qmask;
 //            const auto next1 = qmask - _last;
             const auto bmask1 = *((size_t*)_bitmask + next1);
             if (bmask1 != 0) {

@@ -10,6 +10,7 @@
 #include "ska/bytell_hash_map.hpp"
 #include "martin/robin_hood.h"
 #include "hash_table7.hpp"
+#include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_set2.hpp"
 #include "hash_set4.hpp"
@@ -327,6 +328,7 @@ int main(__attribute__((unused)) int argc,
     benchmarkMap<robin_hood::unordered_map<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<std::unordered_map<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<emhash5::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<emhash6::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<emhash7::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<emilib::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
 

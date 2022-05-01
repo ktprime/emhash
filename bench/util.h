@@ -19,6 +19,7 @@
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
+
 #define NDEBUG                1
 #ifdef _WIN32
     #ifndef NOMINMAX
@@ -99,8 +100,8 @@ int64_t getus()
     auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
 #elif WIN32_RUS
-    FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
-    GetThreadTimes(GetCurrentThread(), NULL, NULL, &ptime[2], &ptime[3]);
+    FILETIME ptime[4] = {0};
+    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif WIN32_TICK
     return GetTickCount() * 1000;

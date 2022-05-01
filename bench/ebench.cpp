@@ -98,6 +98,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_LRU_SET         1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_HIGH_LOAD         2345
+//#define EMH_FIND_HIT        1
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
@@ -111,6 +112,7 @@ std::map<std::string, std::string> maps =
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
 
+//https://jishuin.proginn.com/p/763bfbd338d0
 //https://en.wikipedia.org/wiki/Hash_table
 //https://zhuanlan.zhihu.com/p/363213858
 //https://www.zhihu.com/question/46156495
@@ -144,7 +146,7 @@ std::map<std::string, std::string> maps =
 //https://gankra.github.io/blah/hashbrown-tldr/ swiss
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
 //https://jguegant.github.io/blogs/tech/dense-hash-map.html
-//https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
+
 //
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
@@ -1269,8 +1271,8 @@ static int benchHashMap(int n)
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
-        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
+        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }

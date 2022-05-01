@@ -23,10 +23,12 @@
 //#include "emilib/emilib33.hpp"
 #include "emilib/emilib.hpp"
 #include "emilib/emilib2.hpp"
+#include "emilib/emilib2s.hpp"
 
-#include "hash_table7.hpp"
-#include "hash_table5.hpp"
 #include "hash_table8.hpp"
+#include "hash_table7.hpp"
+#include "hash_table6.hpp"
+#include "hash_table5.hpp"
 
 static std::random_device rd;
 static std::mt19937_64 rnd(rd());
@@ -335,7 +337,7 @@ report(double ns_diff, const char * header, float lf, int sum) {
 
     fprintf(stderr, "\t%.2lf US", ns_diff / (ns_mult / (1000 * 1000)));
 //    fprintf(stderr, "\t%.2lf NS ", ns_diff);
-    fprintf(stderr, " -> load factor = %.2f, sum = %d, ns / op = %.3lf\n\n", lf, sum, ns_diff / total_ops);
+    fprintf(stderr, " -> load factor = %.2f, sum = %d, ns / op = %.1lf\n\n", lf, sum, ns_diff / total_ops);
 }
 
 
@@ -463,6 +465,7 @@ int main(int argc, char* argv[])
         run_udb2<ska::flat_hash_map<uint32_t, uint32_t, Hash32>>("ska_flat");
         run_udb2<ska::bytell_hash_map<uint32_t, uint32_t, Hash32>>("ska_byte");
         run_udb2<emhash7::HashMap<uint32_t, uint32_t, Hash32>>("emhash7");
+        run_udb2<emhash6::HashMap<uint32_t, uint32_t, Hash32>>("emhash6");
         run_udb2<robin_hood::unordered_flat_map<uint32_t, uint32_t, Hash32>>("martin_flat");
         run_udb2<phmap::flat_hash_map<uint32_t, uint32_t, Hash32>>("phmap_flat");
         run_udb2<tsl::robin_map<uint32_t, uint32_t, Hash32>>("tsl_robin");
@@ -470,6 +473,7 @@ int main(int argc, char* argv[])
         run_udb2<emhash5::HashMap<uint32_t, uint32_t, Hash32>>("emhash5");
         run_udb2<emilib::HashMap<uint32_t, uint32_t, Hash32>>("emilib");
         run_udb2<emilib2::HashMap<uint32_t, uint32_t, Hash32>>("emilib2");
+        run_udb2<emilib3::HashMap<uint32_t, uint32_t, Hash32>>("emilib3");
 #if ABSL
         run_udb2<absl::flat_hash_map<uint32_t, uint32_t, Hash32>>("absl");
 #endif
@@ -546,6 +550,8 @@ int main(int argc, char* argv[])
     run_table <emhash5::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <emilib::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
     run_table <emilib2::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <emilib3::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <emhash6::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <emhash7::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
 //    run_table <robin_hood::unordered_node_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);

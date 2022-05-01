@@ -448,7 +448,7 @@ public:
         _bitmask = nullptr;
         _num_filled = 0;
         max_load_factor(lf);
-        reserve(bucket + 1);
+        reserve(bucket);
     }
 
     HashMap(size_type bucket = 4, float lf = EMH_DEFAULT_LOAD_FACTOR)
@@ -469,8 +469,12 @@ public:
 
     HashMap(HashMap&& rhs)
     {
+#ifndef EMH_ZERO_MOVE
+        init(4);
+#else
         _mask = _num_filled = 0;
         _pairs = nullptr;
+#endif
         swap(rhs);
     }
 
@@ -583,14 +587,16 @@ public:
         std::swap(_mask, rhs._mask);
         std::swap(_mlf, rhs._mlf);
         std::swap(_bitmask, rhs._bitmask);
-        std::swap(EMH_ADDR(_pairs, _mask + 1), EMH_ADDR(rhs._pairs, rhs._mask + 1));
+        //std::swap(EMH_ADDR(_pairs, _mask + 1), EMH_ADDR(rhs._pairs, rhs._mask + 1));
     }
 
     // -------------------------------------------------------------
     iterator begin()
     {
+#ifdef EMH_ZERO_MOVE
         if (0 == _num_filled)
             return {this, _mask + 1};
+#endif
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
@@ -602,11 +608,14 @@ public:
 
     const_iterator cbegin() const
     {
+#ifdef EMH_ZERO_MOVE
+        if (0 == _num_filled)
+            return {this, _mask + 1};
+#endif
+
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
             return {this, CTZ(bmask), true};
-        else if (0 == _num_filled)
-            return {this, _mask + 1};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -1226,8 +1235,8 @@ public:
 #endif
         }
 
-        EMH_ADDR(_pairs, _mask + 1) = 0; //_last
         _num_filled = 0;
+
 #if EMH_SAFE_HASH
         _num_main = _hash_inter = 0;
 #endif
@@ -1241,14 +1250,14 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-        const auto required_buckets = (size_type)(num_elems * _mlf >> 27);
+        const auto required_buckets = (size_type)(num_elems * _mlf >> 27) + 1;
         if (EMH_LIKELY(required_buckets <= _mask))
             return false;
 
 #if EMH_STATIS
         if (_num_filled > EMH_STATIS) dump_statics(1);
 #endif
-        rehash(required_buckets + 2);
+        rehash(required_buckets + 1);
         return true;
     }
 

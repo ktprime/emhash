@@ -138,26 +138,6 @@ int64_t _abs(int64_t x) { return (x < 0) ? -x : x; }
     #include <sys/resource.h>
 #endif
 
-static int64_t getTime()
-{
-#if _WIN32 && 0
-    FILETIME ptime[4] = {0};
-    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[1], &ptime[2], &ptime[3]);
-    return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
-#elif __linux__ || __unix__
-    struct rusage rup;
-    getrusage(RUSAGE_SELF, &rup);
-    long sec  = rup.ru_utime.tv_sec  + rup.ru_stime.tv_sec;
-    long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
-    return sec * 1000000 + usec;
-#elif _WIN32
-    return clock() * 1000ll;
-#else
-    return clock();
-#endif
-}
-
-
 // --------------------------------------------------------------------------
 class Timer
 {
@@ -464,7 +444,7 @@ int main(int argc, char ** argv)
 #endif
 
     Timer timer(true);
-    auto ts = getTime();
+    auto ts = getus();
     long sums = 0;
 
         if(1)
@@ -473,7 +453,7 @@ int main(int argc, char ** argv)
             for(i = 0; i < num_keys; i++)
                 hash.emplace(i, value);
         sums += timer.elapsed().count();
-            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getus() - ts) / 1000.0);
         }
 #if 1
         if(1)
@@ -483,7 +463,7 @@ int main(int argc, char ** argv)
             timer = _fill_random(v, hash);
             //out("random", num_keys, timer);
         sums += timer.elapsed().count();
-            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getus() - ts) / 1000.0);
         }
 #else
         if(1)
@@ -513,7 +493,7 @@ int main(int argc, char ** argv)
             vector<int64_t> v(num_keys);
             timer = _delete(v,  hash);
         sums += timer.elapsed().count();
-            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getus() - ts) / 1000.0);
         }
         if(1)
         {
@@ -521,7 +501,7 @@ int main(int argc, char ** argv)
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
         sums += timer.elapsed().count();
-            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getus() - ts) / 1000.0);
         }
         if(1)
         {
@@ -529,7 +509,7 @@ int main(int argc, char ** argv)
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer((int)rand()), value);
         sums += timer.elapsed().count();
-            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getTime() - ts) / 1000.0);
+            printf("%.2lf %-10s %-10s %d %.2lf\n",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys,  (getus() - ts) / 1000.0);
         }
         if(1)
         {
@@ -537,12 +517,12 @@ int main(int argc, char ** argv)
             for(i = 0; i < num_keys; i++)
                 str_hash.emplace(new_string_from_integer(i), value);
             timer.reset();
-        auto ts1 = getTime();
+        auto ts1 = getus();
             for(i = 0; i < num_keys; i++)
                 str_hash.erase(new_string_from_integer(i));
         sums += timer.elapsed().count();
-        printf("%.2lf %-10s %-10s %d %.2lf ",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, (getTime() - ts1) / 1000.0);
-        printf("\nall %.2lf %.2lf ms\n", sums / 1000.0, (getTime() - ts) / 1000.0);
+        printf("%.2lf %-10s %-10s %d %.2lf ",((double)timer.elapsed().count() / 1000),program_slug, bench, num_keys, (getus() - ts1) / 1000.0);
+        printf("\nall %.2lf %.2lf ms\n", sums / 1000.0, (getus() - ts) / 1000.0);
     }
 
         //std::this_thread::sleep_for(std::chrono::seconds(1000));

@@ -25,11 +25,10 @@
 #ifndef _WIN32
 #define BOOST_TEST_MODULE hash_map_tests
 #include <boost/test/unit_test.hpp>
+#include "utils.h"
 #endif
 
-#include "wyhash.h"
 #include "eutil.h"
-#include "utils.h"
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
@@ -41,12 +40,20 @@
 #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 
 #if CXX20
+#include <string_view>
+#include "wyhash.h"
 struct string_hash
 {
     using is_transparent = void;
+#if WYHASH_LITTLE_ENDIAN
     std::size_t operator()(const char* key)             const { auto ksize = std::strlen(key); return wyhash(key, ksize, ksize); }
     std::size_t operator()(const std::string& key)      const { return wyhash(key.data(), key.size(), key.size()); }
     std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size()); }
+#else
+    std::size_t operator()(const char* key)             const { return std::hash<std::string_view>()(std::string_view(key, strlen(key))); }
+    std::size_t operator()(const std::string& key)      const { return std::hash<std::string>()(key); }
+    std::size_t operator()(const std::string_view& key) const { return std::hash<std::string_view>()(key); }
+#endif
 };
 
 struct string_equal
@@ -138,15 +145,22 @@ inline Os& operator<<(Os& os, Container const& cont)
     return os << "}" << std::endl;
 }
 
+
+#define ehmap  emhash7::HashMap
+#define ehmap5 emhash5::HashMap
+#define ehmap6 emhash6::HashMap
+#define ehmap7 emhash7::HashMap
+#define ehmap8 emhash8::HashMap
+
 static void TestApi()
 {
 	printf("============================== %s ============================\n", __FUNCTION__);
 
     {
         // default constructor: empty map
-        emhash5::HashMap<std::string, std::string> m1;
+        ehmap<std::string, std::string> m1;
         // list constructor
-        emhash5::HashMap<int, std::string> m2 =
+        ehmap<int, std::string> m2 =
         {
             {1, "foo"},
             {3, "bar"},
@@ -154,18 +168,27 @@ static void TestApi()
         };
 
         // copy constructor
-        emhash5::HashMap<int, std::string> m3 = m2;
+        ehmap<int, std::string> m3 = m2;
 
         // move constructor
-        emhash5::HashMap<int, std::string> m4 = std::move(m2);
+        auto m4 = std::move(m2);
+
+		//copy constructor
+        m2 = std::move(m4);
+
+        assert(m4.size() == 0);
+        assert(m4.count(1) == 0);
+        assert(m4.cbegin() == m4.end());
+
+        m4[1] = "cdd";
 
         // range constructor
         std::vector<std::pair<std::bitset<8>, int>> v = { {0x12, 1}, {0x01,-1} };
-        emhash5::HashMap<std::bitset<8>, double> m5(v.begin(), v.end());
+        ehmap<std::bitset<8>, double> m5(v.begin(), v.end());
 
         //Option 1 for a constructor with a custom Key type
         // Define the KeyHash and KeyEqual structs and use them in the template
-        emhash5::HashMap<Key, std::string, KeyHash, KeyEqual> m6 = {
+        ehmap<Key, std::string, KeyHash, KeyEqual> m6 = {
             { {"John", "Doe"}, "example"},
             { {"Mary", "Sue"}, "another"}
         };
@@ -173,7 +196,7 @@ static void TestApi()
         //Option 2 for a constructor with a custom Key type
         // Define a const == operator for the class/struct and specialize std::hash
         // structure in the std namespace
-        emhash5::HashMap<Foo, std::string> m7 = {
+        ehmap<Foo, std::string> m7 = {
             { Foo(1), "One"}, { 2, "Two"}, { 3, "Three"}
         };
 
@@ -181,10 +204,10 @@ static void TestApi()
         struct Goo {int val; };
         auto hash = [](const Goo &g){ return std::hash<int>{}(g.val); };
         auto comp = [](const Goo &l, const Goo &r){ return l.val == r.val; };
-        emhash5::HashMap<Goo, double, decltype(hash), decltype(comp)> m8;
+        ehmap<Goo, double, decltype(hash), decltype(comp)> m8;
 #endif
 
-        emhash5::HashMap<int,char> example = {{1,'a'},{2,'b'}};
+        ehmap<int,char> example = {{1,'a'},{2,'b'}};
         for(int x: {2, 5}) {
             if(example.contains(x)) {
                 std::cout << x << ": Found\n";
@@ -195,7 +218,7 @@ static void TestApi()
     }
 
     {
-        emhash5::HashMap<int, std::string> dict = {{1, "one"}, {2, "two"}};
+        ehmap<int, std::string> dict = {{1, "one"}, {2, "two"}};
         assert(dict.insert({3, "three"}).second);
 
         dict.insert({4, "four"});
@@ -211,14 +234,14 @@ static void TestApi()
             std::cout << " " << p.first << " => " << p.second << '\n';
 
         std::cout << "contents2:\n";
-        emhash5::HashMap<int, std::string> dict2;
+        ehmap<int, std::string> dict2;
         dict2.insert(dict.begin(), dict.end());
         for(auto& p: dict2)
             std::cout << " " << p.first << " => " << p.second << '\n';
     }
 
     {
-        emhash5::HashMap<std::string, std::string> m;
+        ehmap<std::string, std::string> m;
         // uses pair's move constructor
         m.emplace(std::make_pair(std::string("a"), std::string("a")));
         // uses pair's converting move constructor
@@ -249,7 +272,7 @@ static void TestApi()
             print_node(*pair.first);
         };
 
-        emhash5::HashMap<std::string, std::string> myMap;
+        ehmap<std::string, std::string> myMap;
         print_result( myMap.insert_or_assign("a", "apple"     ) );
         print_result( myMap.insert_or_assign("b", "banana"    ) );
         print_result( myMap.insert_or_assign("c", "cherry"    ) );
@@ -266,7 +289,7 @@ static void TestApi()
             std::cout << "}\n";
         };
 
-        emhash5::HashMap<char, int> letter_counts {{'a', 27}, {'b', 3}, {'c', 1}};
+        ehmap<char, int> letter_counts {{'a', 27}, {'b', 3}, {'c', 1}};
 
         print("letter_counts initially contains: ", letter_counts);
 
@@ -277,7 +300,7 @@ static void TestApi()
 
         // count the number of occurrences of each word
         // (the first call to operator[] initialized the counter with zero)
-        emhash5::HashMap<std::string, int>  word_map;
+        ehmap<std::string, int>  word_map;
         for (const auto &w : { "this", "sentence", "is", "not", "a", "sentence",
                 "this", "sentence", "is", "a", "hoax"}) {
             ++word_map[w];
@@ -289,7 +312,7 @@ static void TestApi()
     }
 
     {
-        emhash7::HashMap<int, std::string, std::hash<int>> c = {
+        ehmap<int, std::string, std::hash<int>> c = {
             {1, "one" }, {2, "two" }, {3, "three"},
             {4, "four"}, {5, "five"}, {6, "six"  }
         };
@@ -332,7 +355,7 @@ static void TestApi()
         Node nodes[3] = { {1, 0}, {2, 0}, {3, 0} };
 
         //mag is a map mapping the address of a Node to its magnitude in the plane
-        emhash5::HashMap<Node*, double> mag = {
+        ehmap<Node*, double> mag = {
             { nodes,     1 },
             { nodes + 1, 2 },
             { nodes + 2, 3 }
@@ -368,7 +391,7 @@ static void TestApi()
         Node nodes[3] = { {1, 0}, {2, 0}, {3, 0} };
 
         //mag is a map mapping the address of a Node to its magnitude in the plane
-        emhash5::HashMap<Node *, double> mag = {
+        ehmap<Node *, double> mag = {
             { nodes,     1 },
             { nodes + 1, 2 },
             { nodes + 2, 3 }
@@ -402,7 +425,7 @@ static void TestApi()
 
     //swap.ref
     {
-        emhash5::HashMap<int, int> numbers;
+        ehmap<int, int> numbers;
         std::cout << std::boolalpha;
         std::cout << "Initially, numbers.empty(): " << numbers.empty() << '\n';
 
@@ -411,7 +434,7 @@ static void TestApi()
         std::cout << "After adding elements, numbers.empty(): " << numbers.empty() << '\n';
 
 
-        emhash5::HashMap<std::string, std::string>
+        ehmap<std::string, std::string>
             m1 { {"γ", "gamma"}, {"β", "beta"}, {"α", "alpha"}, {"γ", "gamma"}, },
                m2 { {"ε", "epsilon"}, {"δ", "delta"}, {"ε", "epsilon"} };
 
@@ -431,7 +454,7 @@ static void TestApi()
 
     //merge
     {
-        emhash5::HashMap<std::string, int>
+        ehmap<std::string, int>
             p{ {"C", 3}, {"B", 2}, {"A", 1}, {"A", 0} },
             q{ {"E", 6}, {"E", 7}, {"D", 5}, {"A", 4} };
 
@@ -443,7 +466,7 @@ static void TestApi()
 #if 1
     //erase if
     {
-        emhash5::HashMap<int, char> data {{1, 'a'},{2, 'b'},{3, 'c'},{4, 'd'},
+        ehmap<int, char> data {{1, 'a'},{2, 'b'},{3, 'c'},{4, 'd'},
             {5, 'e'},{4, 'f'},{5, 'g'},{5, 'g'}};
         std::cout << "Original:\n" << data << '\n';
 
@@ -457,7 +480,7 @@ static void TestApi()
 
     //hint
     {
-       emhash5::HashMap<int, char> data {{1, 'a'},{2, 'b'},{3, 'c'},{4, 'd'}, {5, 'e'},{4, 'f'},{5, 'g'},{5, 'g'}};
+       ehmap5<int, char> data {{1, 'a'},{2, 'b'},{3, 'c'},{4, 'd'}, {5, 'e'},{4, 'f'},{5, 'g'},{5, 'g'}};
        std::cout << "Original:\n" << data << '\n';
 
        auto it = data.find(1);
@@ -476,59 +499,62 @@ static void TestApi()
 #define TO_KEY(i)  i
 static int RandTest(size_t n, int max_loops = 1234567)
 {
+    printf("n = %d, loop = %d\n", (int)n, (int)max_loops);
 	printf("============================== %s ============================\n", __FUNCTION__);
-    using keyType = long;
+    using keyType = uint64_t;
 
-#if X86
-#ifndef KEY_CLA
-
-    emhash5::HashMap <keyType, int> ehash5;
 #if X860
-    emilib2::HashMap <keyType, int> ehash2;
+    emilib2::HashMap <keyType, int> shash;
 #else
-    emhash7::HashMap <keyType, int> ehash2;
+    ehmap7<keyType, int> shash;
 #endif
 
-    emhash6::HashMap <keyType, int> unhash;
+	ehmap5<keyType, int> ehash5;
 
-    Sfc4 srng(n);
+#if 1
+    ehmap6<keyType, int> unhash;
+#else
+    ehmap8<keyType, int> unhash;
+#endif
+
+    Sfc4 srng(n + time(0));
     const auto step = n % 2 + 1;
     for (int i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
-        ehash5[ki] = unhash[ki] = ehash2[ki] = (int)srng();
+        ehash5[ki] = unhash[ki] = shash[ki] = (int)srng();
     }
 
     {
-        assert(ehash5 == ehash2);
+        assert(ehash5 == shash);
         assert(ehash5 == unhash);
     }
 
     int loops = max_loops;
     while (loops -- > 0) {
-        assert(ehash2.size() == unhash.size()); assert(ehash5.size() == unhash.size());
+        assert(shash.size() == unhash.size()); assert(ehash5.size() == unhash.size());
 
         const uint32_t type = srng() % 100;
         auto rid  = srng();// n ++;
         auto id   = TO_KEY(rid);
-        if (type <= 40 || ehash2.size() < 1000) {
-            ehash2[id] += type; ehash5[id] += type; unhash[id] += type;
+        if (type <= 40 || shash.size() < 1000) {
+            shash[id] += type; ehash5[id] += type; unhash[id] += type;
 
-            assert(ehash2[id] == unhash[id]); assert(ehash5[id] == unhash[id]);
+            assert(shash[id] == unhash[id]); assert(ehash5[id] == unhash[id]);
         }
         else if (type < 60) {
             if (srng() % 3 == 0)
                 id = unhash.begin()->first;
             else if (srng() % 2 == 0)
-                id = ehash2.begin()->first;
+                id = shash.begin()->first;
             else
                 id = ehash5.begin()->first;
 
             ehash5.erase(id);
             unhash.erase(unhash.find(id));
-            ehash2.erase(id);
+            shash.erase(id);
 
             assert(ehash5.count(id) == unhash.count(id));
-            assert(ehash2.count(id) == unhash.count(id));
+            assert(shash.count(id) == unhash.count(id));
         }
         else if (type < 80) {
             auto it = ehash5.begin();
@@ -536,9 +562,9 @@ static int RandTest(size_t n, int max_loops = 1234567)
                 it ++;
             id = it->first;
             unhash.erase(id);
-            ehash2.erase(ehash2.find(id));
+            shash.erase(shash.find(id));
             ehash5.erase(it);
-            assert(ehash2.count(id) == 0);
+            assert(shash.count(id) == 0);
             assert(ehash5.count(id) == unhash.count(id));
         }
         else if (type < 100) {
@@ -547,36 +573,33 @@ static int RandTest(size_t n, int max_loops = 1234567)
                 ehash5.emplace(id, vid);
                 assert(ehash5.count(id) == 1);
 
-                assert(ehash2.count(id) == 0);
+                assert(shash.count(id) == 0);
                 //if (id == 1043)
-                ehash2[id] = vid;
-                assert(ehash2.count(id) == 1);
+                shash[id] = vid;
+                assert(shash.count(id) == 1);
 
                 assert(unhash.count(id) == 0);
-                unhash[id] = ehash2[id];
-                assert(unhash[id] == ehash2[id]);
+                unhash[id] = shash[id];
+                assert(unhash[id] == shash[id]);
                 assert(unhash[id] == ehash5[id]);
             } else {
-                unhash[id] = ehash2[id] = 1;
+                unhash[id] = shash[id] = 1;
                 ehash5.insert_or_assign(id, 1);
                 unhash.erase(id);
-                ehash2.erase(id);
+                shash.erase(id);
                 ehash5.erase(id);
             }
         }
         if (loops % 100000 == 0) {
-            printf("%d %d\r", loops, (int)ehash2.size());
+            printf("%d %d\r", loops, (int)shash.size());
 #if 1
-            assert(ehash5 == ehash2);
+            assert(ehash5 == shash);
             assert(ehash5 == unhash);
 #endif
         }
     }
 
     printf("\n");
-#endif
-#endif
-
     return 0;
 }
 
@@ -723,6 +746,7 @@ int main(int argc, char* argv[])
     TestApi();
 
     benchIntRand(1e8+8);
+
     benchStringHash(1e6+6, 6, 16);
 
     size_t n = (int)1e6, loop = 12345678;
@@ -731,7 +755,6 @@ int main(int argc, char* argv[])
     if (argc > 2 && isdigit(argv[2][0]))
         loop = atoi(argv[2]);
 
-    printf("n = %d, loop = %d\n", (int)n, (int)loop);
     RandTest(n, loop);
 
     return 0;
