@@ -1667,7 +1667,7 @@ private:
             return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1) {
+        if (0) {
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
             if (bmask2 != 0)
@@ -1683,10 +1683,10 @@ private:
             const auto tail = (_last + qmask / 2) & qmask;
             const auto bmask1 = *((size_t*)_bitmask + tail);
             if (bmask1 != 0) {
-                _last = tail;
+                //_last = tail;
                 return tail * SIZE_BIT + CTZ(bmask1);
             }
-            _last = ++_last & qmask;
+            _last = (_last + 1) & qmask;
         }
         return 0;
     }

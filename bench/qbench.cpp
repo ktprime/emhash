@@ -85,8 +85,8 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {        200u,  1'00'000u},
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
-    {    500'000u,       100u},
-    {   7200'000u,        7u},
+    {    500'000u,       70u},
+    {   7200'000u,        5u},
 #if 1
     { 10'000'000u,         4u},
     { 50'000'000u,         2u},
@@ -1217,13 +1217,13 @@ int main(int argc, const char* argv[])
     }
     // Map comparison
     if constexpr (true) {
-#if Key == 0
+#if QKey == 0
         using K = size_t;
 #else
         using K = uint32_t;
 #endif
 
-#if Val == 0
+#if TVal == 0
         using V = size_t;
 #else
         using V = uint32_t;
@@ -1243,15 +1243,15 @@ int main(int argc, const char* argv[])
 #if ET
             EmiLib1MapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
-            TslSparseMapInfo<K, V>,
 #endif
 
 #if ET > 1
+            TslSparseMapInfo<K, V>,
             TslRobinMapInfo<K, V>,
             SkaMapInfo<K, V>,
 #endif
 
-#ifdef CXX20
+#ifdef CXX200
 //            FphDyamicMapInfo<K,V>,
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
@@ -1259,8 +1259,8 @@ int main(int argc, const char* argv[])
 #endif
 
             EmHash8MapInfo<K, V>,
+            EmHash7MapInfo<K, V>,
 #ifdef EHMAP
-            EmHash7MapInfo<K, V>
             EmHash5MapInfo<K, V>,
 #endif
             EmHash6MapInfo<K, V>

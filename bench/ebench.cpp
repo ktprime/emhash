@@ -1,4 +1,5 @@
 #include "util.h"
+#include <vector>
 #include <algorithm>
 
 #ifndef TKey
@@ -656,7 +657,7 @@ void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& v
         for (const auto v : vList) {
             const keyType v2 = v % hash_size;
             sum += hashm.emplace(v2, TO_VAL(0)).second;
-            sum += hashm.erase(v2 + 1);
+            sum += hashm.erase(v2 + v % 2);
             sum += hashm.count(v2 / 2);
         }
     }
@@ -1054,7 +1055,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 
         //shuffle(nList.begin(), nList.end());
         find_hit_50<hash_type>(hash, hash_name, nList);
+
         find_hit_50_erase<hash_type>(hash, hash_name, nList);
+#if 1
         erase_50<hash_type>(hash, hash_name, nList);
         find_erase_50<hash_type>(hash, hash_name, oList);
 
@@ -1065,6 +1068,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 #ifdef UF
         copy_clear <hash_type>(hash, hash_name);
         //hash_clear<hash_type>(hash, hash_name);
+#endif
 #endif
 #endif
 

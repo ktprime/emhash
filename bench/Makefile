@@ -83,7 +83,7 @@ ifeq ($(std),)
 #CXXFLAGS += -std=c++17
 endif
 
-ifneq ($(HT),)
+ifneq ($(HIT),)
 CXXFLAGS += -DEMH_FIND_HIT=1
 endif
 

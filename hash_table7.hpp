@@ -730,6 +730,7 @@ public:
     constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
+#if EMH_STATIS
     size_type bucket_main() const
     {
         auto main_size = 0;
@@ -739,7 +740,6 @@ public:
         }
         return main_size;
     }
-
 
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
@@ -896,6 +896,7 @@ public:
         assert(sums == bucket_coll || !show_cache);
         assert(bucket_coll == buckets[0]);
     }
+#endif
 
     // ------------------------------------------------------------
     template<typename Key = KeyT>
@@ -1715,11 +1716,11 @@ private:
         }
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1) {
-#if 1
+        if (0) {
+#if 0
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
             const auto bmask2 = *((size_t*)_bitmask + step);
-            if (EMH_LIKELY(bmask2 != 0))
+            if (bmask2 != 0)
                 return step * SIZE_BIT + CTZ(bmask2);
 #endif
 #if 0
@@ -1731,19 +1732,17 @@ private:
         }
 
         auto& _last = EMH_BUCKET(_pairs, _num_buckets);
-        for (size_t s = 2; ; s += 1) { //2.4.7
+        for (; ; ) { //2.4.7
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
-#if 1
+
             const auto next1 = (qmask / 2 + _last) & qmask;
-//            const auto next1 = qmask - _last;
             const auto bmask1 = *((size_t*)_bitmask + next1);
             if (bmask1 != 0) {
-                _last = next1;
+                //_last = next1;
                 return next1 * SIZE_BIT + CTZ(bmask1);
             }
-#endif
             _last = (_last + 1) & qmask;
         }
         return 0;
