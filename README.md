@@ -1,4 +1,4 @@
-# A quite fast and memory efficient *open address c++ flat hash map*
+# fast and memory efficient *open addressing c++ flat hash table/map*
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
