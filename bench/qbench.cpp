@@ -81,17 +81,16 @@ static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease
 
 static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
 #if 1
-//    {         10u, 1'000'000u},
-    {        200u,  1'00'000u},
+    {         10u,  1000'000u},
+    {        200u,   100'000u},
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
+
     {    500'000u,       70u},
-    {   7200'000u,        5u},
-#if 1
-    { 10'000'000u,         4u},
-    { 50'000'000u,         2u},
-#endif
-//   {100'000'000u,         1u},
+    {   7200'000u,        4u},
+    { 10'000'000u,        3u},
+    { 50'000'000u,        2u},
+
 #endif
 
 #if 0
@@ -402,20 +401,22 @@ static void printTypicalChartable(const Stats & results, std::ostream & ofs)
 {
     for (const size_t elementCount : results.presentElementCounts()) {
         auto str = std::to_string(elementCount);
-        std::string padding = std::string(11 - str.size(), ' ');
-        ofs << elementCount << padding << "      Insert,Fhit, Fmis, Erase,Iter, LoadFactor" << std::endl << std::setprecision(3);
+        std::string padding = std::string(9 - str.size(), ' ');
+        ofs << "|" <<elementCount << padding << "hashmap" << "|Insert|Fhit |Fmiss|Erase|Iter |LoadFactor|" << std::endl << std::setprecision(3);
+        ofs << "|----------------|------|-----|-----|-----|-----|----------|" << std::endl;
+
         //ofs.fill('0');
         for (const size_t containerI : results.presentContainerIndices()) {
-            ofs << results.containerName(containerI) << std::showpoint;
-            ofs << "  " << results.at(containerI, elementCount, Stat::insertReserved);
-            ofs << ", " << results.at(containerI, elementCount, Stat::accessPresent);
-            ofs << ", " << results.at(containerI, elementCount, Stat::accessEmpty);
-            ofs << ", " << results.at(containerI, elementCount, Stat::erase);
-            ofs << ", " << results.at(containerI, elementCount, Stat::iterateFull);
-            ofs << ", " << results.at(containerI, elementCount, Stat::iterateHalf);
-            ofs << std::endl;
+            ofs << "|" << results.containerName(containerI) << std::showpoint;
+            ofs << "|  " << results.at(containerI, elementCount, Stat::insertReserved);
+            ofs << "| " << results.at(containerI, elementCount, Stat::accessPresent);
+            ofs << "| " << results.at(containerI, elementCount, Stat::accessEmpty);
+            ofs << "| " << results.at(containerI, elementCount, Stat::erase);
+            ofs << "| " << std::to_string(results.at(containerI, elementCount, Stat::iterateFull)).substr(0,4);
+            ofs << "| " << results.at(containerI, elementCount, Stat::iterateHalf);
+            ofs << "     |"<< std::endl;
         }
-        ofs << std::endl;
+        ofs << std::endl << std::endl;
     }
 }
 
@@ -697,7 +698,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
 
     const s64 t0{now()};
     // Insert
-    for (const K key : keys) {
+    for (const K& key : keys) {
         if constexpr (isSet) {
             container.emplace(key);
         }
@@ -712,13 +713,13 @@ static void timeTypical(const size_t containerI, Container& container, const std
     //container.reserve(2);
     t1 = now();
     // Access
-    for (const K key : keys) {
+    for (const K& key : keys) {
         v = v + container.count(key);
     }
 
     const s64 t2{now()};
     // AccessEmpty
-    for (const K key : keys) {
+    for (const K& key : keys) {
         v = v + container.count(key + v);
     }
 
@@ -737,7 +738,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
     auto lf = container.load_factor();
     const s64 t4{now()};
     // Erase
-    for (const K key : keys) {
+    for (const K& key : keys) {
         container.erase(key);
     }
 
@@ -779,7 +780,7 @@ static void timeContainersTypical(const size_t containerI, const std::vector<Com
 
         const std::span<const K> keys_{reinterpret_cast<const K *>(keys.data()), keys.size()};
         Container container;
-        container.max_load_factor(0.88);
+        container.max_load_factor(0.87);
         container.reserve(keys_.size() / 2);
         timeTypical<Container>(containerI, container, keys_, results);
     }
@@ -979,7 +980,7 @@ struct StdMapInfo
     using Container = std::unordered_map<K, V, QintHasher>;
     using AllocatorContainer = std::unordered_map<K, V, typename std::unordered_map<K, V>::hasher, typename std::unordered_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
 
-    static inline const std::string name{"std::unordered_map"};
+    static inline const std::string name{"std::unorder_map"};
 };
 
 template <typename K>
@@ -1021,7 +1022,7 @@ struct RobinHoodSetInfo
     using Container = robin_hood::unordered_set<K>;
     using AllocatorContainer = void;
 
-    static inline const std::string name{"martin::unordered_set"};
+    static inline const std::string name{"martinus::fhset"};
 };
 
 template <typename K, typename V>
@@ -1030,7 +1031,7 @@ struct RobinHoodMapInfo
     using Container = robin_hood::unordered_flat_map<K, V, QintHasher>;
     using AllocatorContainer = void;
 
-    static inline const std::string name{"martin::flat_map"};
+    static inline const std::string name{"martinus::fhmap "};
 };
 
 template <typename K>
@@ -1195,9 +1196,9 @@ int main(int argc, const char* argv[])
 //        compare<CompareMode::oneVsOne, K, QcHashSetInfo<K>, EmiLib2SetInfo<K>>();
 //        compare<CompareMode::oneVsOne, K, EmiLib3MapInfo<K,int>, EmiLib2MapInfo<K, int>>();
 //        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
-#if ABSL
-        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib3MapInfo<K, int>>();
-//        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K, int>, EmHash7MapInfo<K, int>>();
+#if 1
+//        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib3MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K, int>, EmHash7MapInfo<K, int>>();
 #endif
 //        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K,int>, EmHash5MapInfo<K, int>>();
 
@@ -1223,35 +1224,39 @@ int main(int argc, const char* argv[])
         using K = uint32_t;
 #endif
 
-#if TVal == 0
+#if TVal == 1
         using V = size_t;
-#else
+#elif TVal == 0
         using V = uint32_t;
+#else
+        using V = std::string;
 #endif
 
         compare<CompareMode::typical, K,
 #ifdef ABSL
-            PhMapInfo<K, V>,
             AbslMapInfo<K, V>,
 #endif
 
 #if X86
+            EmiLib1MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
 #endif
-//            StdMapInfo<K, V>,
-#if ET
-            EmiLib1MapInfo<K, V>,
-            RobinHoodMapInfo<K, V>,
-#endif
 
+#if ET
+            PhMapInfo<K, V>,
+            RobinHoodMapInfo<K, V>,
+
+            SkaMapInfo<K, V>,
+            TslRobinMapInfo<K, V>,
 #if ET > 1
             TslSparseMapInfo<K, V>,
-            TslRobinMapInfo<K, V>,
-            SkaMapInfo<K, V>,
+#endif
 #endif
 
-#ifdef CXX200
+            StdMapInfo<K, V>,
+
+#ifdef CXX20
 //            FphDyamicMapInfo<K,V>,
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
@@ -1260,10 +1265,8 @@ int main(int argc, const char* argv[])
 
             EmHash8MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
-#ifdef EHMAP
-            EmHash5MapInfo<K, V>,
-#endif
-            EmHash6MapInfo<K, V>
+            EmHash6MapInfo<K, V>,
+            EmHash5MapInfo<K, V>
         >();
     }
     // Architecture comparison
@@ -1280,8 +1283,7 @@ int main(int argc, const char* argv[])
             QcHashMapInfo<size_t, Trivial<32>, true>,
             QcHashMapInfo<size_t, Trivial<64>, true>,
             QcHashMapInfo<size_t, Trivial<128>, true>,
-            QcHashMapInfo<size_t, Trivial<256>, true>
-        >();
+            QcHashMapInfo<size_t, Trivial<256>, true>>();
     }
     // Trivial vs complex
     else if constexpr (false) {
@@ -1292,8 +1294,7 @@ int main(int argc, const char* argv[])
             QcHashMapInfo<Trivial<sizeof(K)>, Trivial<sizeof(K)>, true, true>,
 //            QcHashMapInfo<Complex<sizeof(K)>, Trivial<sizeof(K)>, true, true>,
 //            QcHashMapInfo<Trivial<sizeof(K)>, Complex<sizeof(K)>, true, true>,
-            QcHashMapInfo<Complex<sizeof(K)>, Complex<sizeof(K)>, true, true>
-        >();
+            QcHashMapInfo<Complex<sizeof(K)>, Complex<sizeof(K)>, true, true> >();
     }
 
     return 0;

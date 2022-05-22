@@ -99,7 +99,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_LRU_SET         1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_HIGH_LOAD         2345
-//#define EMH_FIND_HIT        1
+#define EMH_FIND_HIT        1
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
