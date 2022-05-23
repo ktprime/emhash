@@ -54,7 +54,7 @@ other compile options
  ### g++ -I.. -I../thirdparty -O3 -march=native -DET=1 -DABSL=1 martin_bench.cpp -o mb
 
 # compile qc bench
- ### g++ -I.. -I../thirdparty -std=c++20 -O3 -march=native -DET=1 -DABSL=1 qbench.cpp -o qb
+ ### g++ -I.. -I../thirdparty -std=c++20 -O3 -march=native -DCXX20=1 -DET=1 -DABSL=1 qbench.cpp -o qb
  
 
 
