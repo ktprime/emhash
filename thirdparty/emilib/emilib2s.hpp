@@ -318,6 +318,7 @@ public:
 
     HashMap(HashMap&& other)
     {
+        rehash(1);
         if (this != &other) {
             swap(other);
         }
@@ -328,6 +329,14 @@ public:
         reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
+    }
+
+    template<class InputIt>
+    HashMap(InputIt first, InputIt last, size_t bucket_count=4)
+    {
+        reserve(std::distance(first, last) + bucket_count);
+        for (; first != last; ++first)
+            insert(*first);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -494,6 +503,24 @@ public:
     {
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
+    }
+
+    void merge(HashMap& rhs)
+    {
+        if (empty()) {
+            *this = std::move(rhs);
+            return;
+        }
+
+        for (auto rit = rhs.begin(); rit != rhs.end(); ) {
+            auto fit = find(rit->first);
+            if (fit.bucket() > _mask) {
+                insert_unique(rit->first, std::move(rit->second));
+                rit = rhs.erase(rit);
+            } else {
+                ++rit;
+            }
+        }
     }
 
     // -----------------------------------------------------

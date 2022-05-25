@@ -4,7 +4,9 @@
 #include <span>
 #include "util.h"
 
+#if QC_HASH
 #include "qchash/qc-hash.hpp"
+#endif
 #include "jg/dense_hash_map.hpp"
 #include "fph/dynamic_fph_table.h"
 #include "rigtorp/rigtorp.hpp"
@@ -33,7 +35,7 @@
 
 #ifdef FIB_HASH
 #define QintHasher Int64Hasher<K>
-#elif HOOD_HASH
+#elif HOOD_HASH || QC_HASH == 0
 #define QintHasher robin_hood::hash<K>
 #else
 #define QintHasher typename qc::hash::RawMap<K, V>::hasher
@@ -79,7 +81,7 @@ static const std::vector<std::pair<size_t, size_t>> & detailedElementRoundCounts
 
 static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease.size(), detailedElementRoundCountsDebug.size())};
 
-static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
+static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts {
 #if 1
     {         10u,  1000'000u},
     {        200u,   100'000u},
@@ -90,13 +92,11 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {   7200'000u,        4u},
     { 10'000'000u,        3u},
     { 50'000'000u,        2u},
+#else
 
-#endif
-
-#if 0
-#if 0
-    {4,   2000000},
-    {10,  1200000},
+#if 1
+    {4,   1000000},
+    {10,  1000000},
     {32,   600000},
     {110,  200000},
     {240,  120000},
@@ -123,12 +123,13 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts{
     {800000,  20 },
     {1200000, 12 },
     {2200000, 10 },
+#if 1
+    {3600000, 8},
+    {6000000, 5},
+    {10000000,3},
+    {50000000,2},
 #endif
-#if 0
-    {3600000, 8 },
-    {6000000, 5 },
-    {10000000,4},
-    {50000000,3},
+
 #endif
 };
 
@@ -224,6 +225,7 @@ static_assert(!std::is_trivial_v<Complex<1>>);
 static_assert(!std::is_trivial_v<Complex<8>>);
 static_assert(!std::is_trivial_v<Complex<64>>);
 
+#if QC_HASH
 template <size_t size> requires (size <= sizeof(size_t))
 struct qc::hash::IdentityHash<Trivial<size>>
 {
@@ -241,6 +243,7 @@ struct qc::hash::IdentityHash<Complex<size>>
         return k.val;
     }
 };
+#endif
 
 class Stats
 {
@@ -942,6 +945,7 @@ static void compare()
     }
 }
 
+#if QC_HASH
 template <typename K, bool sizeMode = false, bool doTrivialComplex = false>
 struct QcHashSetInfo
 {
@@ -962,8 +966,9 @@ struct QcHashMapInfo
     static constexpr bool isKeyTrivial{std::is_same_v<K, Trivial<sizeof(K)>>};
     static constexpr bool isValTrivial{std::is_same_v<V, Trivial<sizeof(V)>>};
 //    static inline const std::string name{sizeMode ? std::format("{}{} : {}{}", (doTrivialComplex ? isKeyTrivial ? "Trivial " : "Complex " : ""), sizeof(K), (doTrivialComplex ? isValTrivial ? "Trivial " : "Complex " : ""), sizeof(V)) : "qc::hash::RawMap"};
-    static inline const std::string name{"qc::hash::RawMap"};
+    static inline const std::string name{"qc__hash::RawMap"};
 };
+#endif
 
 template <typename K>
 struct StdSetInfo
@@ -1207,7 +1212,7 @@ int main(int argc, const char* argv[])
     else if constexpr (false) {
         using K = size_t;
         compare<CompareMode::typical, K,
-            QcHashSetInfo<K>,
+            //QcHashSetInfo<K>,
             StdSetInfo<K>,
             //AbslSetInfo<K>,
             RobinHoodSetInfo<K>,
@@ -1238,8 +1243,8 @@ int main(int argc, const char* argv[])
 #endif
 
 #if X86
-            EmiLib1MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
+            EmiLib1MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
 #endif
 
@@ -1249,18 +1254,20 @@ int main(int argc, const char* argv[])
 
             SkaMapInfo<K, V>,
             TslRobinMapInfo<K, V>,
+            StdMapInfo<K, V>,
 #if ET > 1
             TslSparseMapInfo<K, V>,
 #endif
 #endif
 
-            StdMapInfo<K, V>,
 
 #ifdef CXX20
 //            FphDyamicMapInfo<K,V>,
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
+#if QC_HASH
             QcHashMapInfo<K, V>,
+#endif
 #endif
 
             EmHash8MapInfo<K, V>,
@@ -1269,6 +1276,7 @@ int main(int argc, const char* argv[])
             EmHash5MapInfo<K, V>
         >();
     }
+#if QC_HASH
     // Architecture comparison
     else if constexpr (false) {
         using K = u32;
@@ -1296,6 +1304,7 @@ int main(int argc, const char* argv[])
 //            QcHashMapInfo<Trivial<sizeof(K)>, Complex<sizeof(K)>, true, true>,
             QcHashMapInfo<Complex<sizeof(K)>, Complex<sizeof(K)>, true, true> >();
     }
+#endif
 
     return 0;
 }

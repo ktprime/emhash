@@ -96,7 +96,7 @@ constexpr uint32_t SLOT_KMASK = ~((1 << SLOT_BITS) - 1);
 constexpr uint32_t SLOT_SMASK = ~SLOT_KMASK;
 
 constexpr uint32_t INACTIVE = 0xAAAAAAAA;
-constexpr uint32_t END      = 0-1;
+constexpr uint32_t END      = 0-0x1u;
 constexpr uint32_t EAD      = 2;
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
@@ -344,7 +344,7 @@ public:
         if (size() != rhs.size())
             return false;
 
-        for (auto it = begin(), last = end(); it != last; it++) {
+        for (auto it = begin(), last = end(); it != last; ++it) {
             auto oi = rhs.find(it->first);
             if (oi == rhs.end() || it->second != oi->second)
                 return false;
@@ -613,6 +613,24 @@ public:
             return { found, found };
         else
             return { found, std::next(found) };
+    }
+
+    void merge(HashMap& rhs)
+    {
+        if (empty()) {
+            *this = std::move(rhs);
+            return;
+        }
+
+        for (auto rit = rhs.begin(); rit != rhs.end(); ) {
+            auto fit = find(rit->first);
+            if (fit.bucket() > _mask) {
+                insert_unique(rit->first, std::move(rit->second));
+                rit = rhs.erase(rit);
+            } else {
+                ++rit;
+            }
+        }
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
@@ -1462,7 +1480,7 @@ private:
 
     size_type find_unique_bucket(uint64_t key_hash)
     {
-        const auto bucket = key_hash & _mask;
+        const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = EMH_BUCKET(_index, bucket);
         if ((int)next_bucket < 0) {
 #if EMH_HIGH_LOAD

@@ -401,7 +401,7 @@ public:
         if (size() != rhs.size())
             return false;
 
-        for (auto it = begin(), last = end(); it != last; it++) {
+        for (auto it = begin(), last = end(); it != last; ++it) {
             auto oi = rhs.find(it->first);
             if (oi == rhs.end() || it->second != oi->second)
                 return false;

@@ -68,9 +68,6 @@
 #ifndef EMH_BUCKET_INDEX
     #define EMH_BUCKET_INDEX 1
 #endif
-#if EMH_CACHE_LINE_SIZE < 32
-    #define EMH_CACHE_LINE_SIZE 64
-#endif
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
 #define EMH_DEFAULT_LOAD_FACTOR 0.88f
@@ -135,7 +132,7 @@ static_assert((int)INACTIVE < 0, "INACTIVE must be even and < 0(to int)");
 //https://gist.github.com/jtbr/1896790eb6ad50506d5f042991906c30
 inline static size_type CTZ(size_t n)
 {
-#if defined(__x86_64__) || defined(_M_X64) || defined(_M_IX86) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
 #elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
     n = __builtin_bswap64(n);
@@ -353,9 +350,9 @@ public:
 
     public:
         const htype* _map;
-        size_t    _bmask;
         size_type _bucket;
         size_type _from;
+        size_t    _bmask;
     };
 
     class const_iterator
@@ -419,7 +416,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -433,9 +430,9 @@ public:
 
     public:
         const htype* _map;
-        size_t    _bmask;
         size_type _bucket;
         size_type _from;
+        size_t    _bmask;
     };
 
     void init(size_type bucket, float lf = EMH_DEFAULT_LOAD_FACTOR)
@@ -525,7 +522,7 @@ public:
         if (size() != rhs.size())
             return false;
 
-        for (auto it = begin(), last = end(); it != last; it++) {
+        for (auto it = begin(), last = end(); it != last; ++it) {
             auto oi = rhs.find(it->first);
             if (oi == rhs.end() || it->second != oi->second)
                 return false;
@@ -656,7 +653,7 @@ public:
     constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
-#ifdef EMH_STATIS
+#if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
@@ -1212,8 +1209,8 @@ public:
     {
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value) {
-            const auto bucket = hash_key(0) & _mask;
-            reset_bucket(bucket);
+//        _zero_index = hash_key(INACTIVE) & _mask;
+        reset_bucket(hash_key(INACTIVE) & _mask);
         }
 #endif
     }
@@ -1226,13 +1223,7 @@ public:
         else if (_num_filled) {
             memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
             memset(_pairs, INACTIVE, sizeof(_pairs[0]) * (_mask + 1));
-#if EMH_FIND_HIT
-            if constexpr (std::is_integral<KeyT>::value) {
-            for (size_type bucket = 0; bucket <= _mask; bucket++)
-                EMH_KEY(_pairs, bucket) = 0;
-            }
             reset_zero();
-#endif
         }
 
         _num_filled = 0;
@@ -1305,13 +1296,7 @@ public:
         _num_main = 0;
 #endif
 
-        for (size_type bucket = 0; bucket < num_buckets; bucket++) {
-            EMH_ADDR(_pairs, bucket) = INACTIVE;
-#if EMH_FIND_HIT
-            if constexpr (std::is_integral<KeyT>::value)
-                EMH_KEY(_pairs, bucket) = 0;
-#endif
-        }
+        memset(_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
 
         reset_zero();
 
@@ -1382,26 +1367,23 @@ private:
     {
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value) {
-            auto& key = EMH_KEY(_pairs, bucket);
-            key = 0;
-            while ((hash_key(key) & _mask) == bucket)
-                key ++;
+            auto& key = EMH_KEY(_pairs, bucket); key = INACTIVE;
+//            if (bucket != _zero_index)
+//                return;
+            while ((hash_key(key) & _mask) == bucket) key ++;
         }
 #endif
     }
 
     void clear_bucket(size_type bucket)
     {
-        reset_bucket(bucket);
-
-        EMH_ADDR(_pairs, bucket) = INACTIVE; //loop call in destructor
-        if (is_triviall_destructable()) {
-            _pairs[bucket].~PairT();
-            EMH_ADDR(_pairs, bucket) = INACTIVE;
-        }
-
-        EMH_CLS(bucket);
         _num_filled--;
+        EMH_CLS(bucket);
+        if (is_triviall_destructable())
+            _pairs[bucket].~PairT();
+
+        EMH_ADDR(_pairs, bucket) = INACTIVE;
+        reset_bucket(bucket);
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
@@ -1590,7 +1572,7 @@ private:
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
-        const auto kmain_bucket = hash_main(bucket);
+        const auto kmain_bucket = (size_type)hash_main(bucket);
         const auto prev_bucket = find_prev_bucket(kmain_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); EMH_SET(new_bucket);
         if (next_bucket == bucket)
@@ -1721,7 +1703,7 @@ private:
 
     size_type find_unique_bucket(const KeyT& key)
     {
-        const auto bucket = hash_key(key) & _mask;
+        const auto bucket = size_type(hash_key(key) & _mask);
         const auto next_bucket = EMH_ADDR(_pairs, bucket);
         if ((int)next_bucket < 0) {
 #if EMH_SAFE_HASH
@@ -1783,7 +1765,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    inline uint64_t hash_key(const UType key) const
+    inline size_type hash_key(const UType key) const
     {
 #ifdef EMH_FIBONACCI_HASH
         return hash64(key);
@@ -1794,12 +1776,12 @@ private:
 #elif EMH_WYHASH64
         return wyhash64(key, KC);
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    inline uint64_t hash_key(const UType& key) const
+    inline size_type hash_key(const UType& key) const
     {
 #ifdef WYHASH_LITTLE_ENDIAN
         return wyhash(key.data(), key.size(), key.size());
@@ -1809,12 +1791,12 @@ private:
     }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, size_type>::type = 0>
-    inline uint64_t hash_key(const UType& key) const
+    inline size_type hash_key(const UType& key) const
     {
 #ifdef EMH_FIBONACCI_HASH
         return _hasher(key) * KC;
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
@@ -1827,6 +1809,10 @@ private:
     size_type _mask;
     size_type _num_filled;
     size_type _mlf;
+
+#if EMH_FIND_HIT
+//    size_type _zero_index;
+#endif
 
 #if EMH_SAFE_HASH
     size_type _num_main;

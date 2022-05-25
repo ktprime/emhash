@@ -84,7 +84,7 @@ static std::map<std::string, std::string> show_name =
 #if ET
     {"rigtorp", "rigtorp"},
     {"phmap", "phmap flat"},
-    {"robin_hood", "martin flat"},
+    {"robin_hood", "martinus flat"},
     //    {"hrd7", "hrd7map"},
 
 #if ET > 1
@@ -212,7 +212,7 @@ class sfc64 {
 
 static inline float now2sec()
 {
-#if _WIN32
+#if _WIN320
     FILETIME ptime[4];
     GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
     return (ptime[3].dwLowDateTime + ptime[2].dwLowDateTime) / 10000000.0f;
@@ -607,7 +607,7 @@ void bench_randomFindString(MAP map)
         randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
         now2 = now2sec();
     }
-    printf("13byte time = %.2f, total time %.2f\n\n", now1 - nows, now2 - nows);
+    printf("total time = %.2f + %.2f = %.2f\n\n", now1 - nows, now2 - now1, now2 - nows);
 }
 
 template<class MAP>

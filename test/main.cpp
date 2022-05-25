@@ -28,6 +28,8 @@
 #include "utils.h"
 #endif
 
+
+//#include "wyhash.h"
 #include "eutil.h"
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
@@ -145,8 +147,11 @@ inline Os& operator<<(Os& os, Container const& cont)
     return os << "}" << std::endl;
 }
 
-
-#define ehmap  emhash7::HashMap
+#if 1
+#define ehmap  emilib2::HashMap
+#else
+#define ehmap  emhash5::HashMap
+#endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
 #define ehmap7 emhash7::HashMap
@@ -154,11 +159,13 @@ inline Os& operator<<(Os& os, Container const& cont)
 
 static void TestApi()
 {
-	printf("============================== %s ============================\n", __FUNCTION__);
+    printf("============================== %s ============================\n", __FUNCTION__);
 
     {
         // default constructor: empty map
         ehmap<std::string, std::string> m1;
+        assert(m1.count("1") == 0);
+
         // list constructor
         ehmap<int, std::string> m2 =
         {
@@ -173,7 +180,7 @@ static void TestApi()
         // move constructor
         auto m4 = std::move(m2);
 
-		//copy constructor
+        //copy constructor
         m2 = std::move(m4);
 
         assert(m4.size() == 0);
@@ -332,8 +339,10 @@ static void TestApi()
     }
 
     {
-        emhash8::HashMap<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}};
-        auto print = [](std::pair<int, char>& n) {
+        ehmap<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}};
+//        using vtype = ehmap<int, char>::value_pair;
+        using vtype = ehmap<int, char>::value_type;
+        auto print = [](vtype& n) {
             std::cout << " " << n.first << '(' << n.second << ')';
         };
 
@@ -464,15 +473,14 @@ static void TestApi()
     }
 
 #if 1
-    //erase if
     {
         ehmap<int, char> data {{1, 'a'},{2, 'b'},{3, 'c'},{4, 'd'},
             {5, 'e'},{4, 'f'},{5, 'g'},{5, 'g'}};
         std::cout << "Original:\n" << data << '\n';
 
         const auto count = data.erase_if([](const auto& item) {
-            auto const [key, _, val] = item;
-            return (key & 1) == 1;
+//            auto const [key, val] = item; return (key & 1) == 1;
+            return (item.first & 1) == 1;
         });
         std::cout << "Erase items with odd keys:\n" << data << '\n'
             << count << " items removed.\n";
@@ -500,7 +508,7 @@ static void TestApi()
 static int RandTest(size_t n, int max_loops = 1234567)
 {
     printf("n = %d, loop = %d\n", (int)n, (int)max_loops);
-	printf("============================== %s ============================\n", __FUNCTION__);
+    printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint64_t;
 
 #if X860
@@ -509,7 +517,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     ehmap7<keyType, int> shash;
 #endif
 
-	ehmap5<keyType, int> ehash5;
+    ehmap5<keyType, int> ehash5;
 
 #if 1
     ehmap6<keyType, int> unhash;
@@ -605,7 +613,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 
 static void benchIntRand(int loops = 100000009)
 {
-	printf("============================== %s ============================\n", __FUNCTION__);
+    printf("============================== %s ============================\n", __FUNCTION__);
     printf("%s loops = %d\n",__FUNCTION__, loops);
     long sum = 0;
     auto ts = getus();
@@ -672,7 +680,7 @@ static void buildRandString(int size, std::vector<std::string>& rndstring, int s
 
 static void benchStringHash(int size, int str_min, int str_max)
 {
-	printf("============================== %s ============================\n", __FUNCTION__);
+    printf("============================== %s ============================\n", __FUNCTION__);
     printf("\n%s loops = %d\n", __FUNCTION__, size);
     std::vector<std::string> rndstring;
     rndstring.reserve(size * 4);

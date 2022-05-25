@@ -29,8 +29,6 @@ std::map<std::string, std::string> maps =
 //    {"fmap", "flat_map"},
 //    {"btree", "btree_map"},
 
-//    {"qchash", "qc-hash"},
-//    {"fph", "fph-table"},
 
 //    {"emhash2", "emhash2"},
 //    {"emhash3", "emhash3"},
@@ -39,8 +37,11 @@ std::map<std::string, std::string> maps =
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
+
 //    {"jg_dense", "jg_dense"},
 //    {"rigtorp", "rigtorp"},
+//    {"qchash", "qc-hash"},
+//    {"fph", "fph-table"},
 
     {"emhash8", "emhash8"},
 
@@ -76,7 +77,7 @@ std::map<std::string, std::string> maps =
 
 
 //rand data type
-#ifndef  RT
+#ifndef RT
     #define RT 1  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
@@ -99,7 +100,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_LRU_SET         1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_HIGH_LOAD         2345
-#define EMH_FIND_HIT        1
+//#define EMH_FIND_HIT        1
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
@@ -507,10 +508,10 @@ void hash_iter(const hash_type& ht_hash, const std::string& hash_name)
     for (const auto& v : ht_hash)
         sum += 1;
 
-    for (auto v : ht_hash)
-        sum += 1;
+    for (auto& v : ht_hash)
+        sum += 2;
 
-    for (auto it = ht_hash.begin(); it != ht_hash.end(); it++)
+    for (auto it = ht_hash.begin(); it != ht_hash.end(); ++it)
 #if KEY_INT
         sum += it->first;
 #elif KEY_CLA
@@ -726,7 +727,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     size_t pow2 = 2u << ilog(vList.size(), 2);
     hash_type tmp;
 
-    const auto max_loadf = 1 - 0.001;
+    const auto max_loadf = 1 - 0.001f;
 #ifndef SMAP
     tmp.max_load_factor(max_loadf);
     tmp.reserve(pow2 / 2);
@@ -779,7 +780,6 @@ static uint8_t l1_cache[64 * 1024];
 template<class hash_type>
 void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto n = ht_hash.size();
     size_t sum = 0;
 
 #if KEY_STR
@@ -885,7 +885,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
 #endif
             it = tmp.erase(it);
         else
-            it++;
+            ++it;
     }
 #if KEY_INT
     sum += tmp.size();
@@ -1256,15 +1256,15 @@ static int benchHashMap(int n)
 #endif
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
+
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
-//        {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
+        {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
 #endif
 
 #if QC_HASH && KEY_INT
         {  benOneHash<qc::hash::RawMap<keyType, valueType, ehash_func>>("qchash", vList); }
 #endif
-
 #if FPH_HASH
         {  benOneHash<fph::DynamicFphMap<keyType, valueType, fph::MixSeedHash<keyType>>>("fph", vList); }
 #endif
@@ -1275,8 +1275,8 @@ static int benchHashMap(int n)
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
-        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
+        {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
@@ -1345,7 +1345,7 @@ static void testHashInt(int loops = 500000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += robin_hood::hash_int(i + r);
-    printf("martin hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+    printf("martinus hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 #endif
 
     ts = getus(); sum = r;
@@ -1423,7 +1423,7 @@ int main(int argc, char* argv[])
     printInfo(nullptr);
 
     int run_type = 0;
-    int tn = 0, rnd = randomseed();
+    int rnd = randomseed();
     auto maxc = 500;
     int minn = (1000 * 100 * 8) / sizeof(keyType) + 10000;
     int maxn = 100*minn;
@@ -1431,8 +1431,8 @@ int main(int argc, char* argv[])
         minn *= 2;
 
     const int type_size = (sizeof(keyType) + sizeof(valueType) + 4);
-    if (maxn > 1024*1024*1024 / type_size)
-        maxn = 1024*1024*1024 / type_size;
+    if (maxn > (1 << 30) / type_size)
+        maxn = (1 << 30) / type_size;
 
     float load_factor = 0.0945f;
     printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a(0-3) b t(n %dkB - %dMB)\n",
@@ -1443,11 +1443,9 @@ int main(int argc, char* argv[])
         const auto value = atoi(&argv[i][0] + 1);
 
         if (isdigit(cmd))
-            maxn = atoll(argv[i]) + 1000;
+            maxn = atoi(argv[i]) + 1000;
         else if (cmd == 'f' && value > 0)
             load_factor = atof(&argv[i][0] + 1) / 100.0f;
-        else if (cmd == 't' && value > 0)
-            tn = value;
         else if (cmd == 'c' && value > 0)
             maxc = value;
         else if (cmd == 'a')
@@ -1483,13 +1481,13 @@ int main(int argc, char* argv[])
             else if (c == 'h')
                 maps.erase("hrdset");
             else if (c == 'j')
-                maps.erase("jg_dense");
+                maps.emplace("jg_dense", "jg_dense");
             else if (c == 'r')
-                maps.erase("rigtorp");
+                maps.emplace("rigtorp", "rigtorp");
             else if (c == 'q')
-                maps.erase("qchash");
+                maps.emplace("qchash",  "qc-hash");
             else if (c == 'f')
-                maps.erase("fph");
+                maps.emplace("fph", "fph-table");
 
             else if (c >= '1' && c <= '3') {
                 const std::string emistr = std::string("emilib") + c;
@@ -1520,7 +1518,11 @@ int main(int argc, char* argv[])
     while (true) {
         if (run_type == 2) {
             printf(">>");
-            if (scanf("%u", &n) == 0)
+#if _WIN32
+            if (scanf_s("%d", &n, sizeof(n)) == 0)
+#else
+            if (scanf("%d", &n) == 0)
+#endif
                 break;
             if (n <= 1)
                 run_type = 0;

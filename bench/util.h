@@ -15,6 +15,7 @@
 #include <fstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <cstdio>
 
 #if STR_SIZE < 5
 #define STR_SIZE 15
@@ -635,7 +636,12 @@ static void printInfo(char* out)
 
     puts(cbuff);
     if (out)
+#if _WIN32
+        strncpy_s(out, sizeof(cbuff), cbuff, sizeof(cbuff));
+#else
         strncpy(out, cbuff, sizeof(cbuff));
+#endif
+
     puts(sepator);
 }
 
@@ -694,12 +700,10 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #endif
 #endif
 
+#if __cplusplus > 201704L || CXX20
 #if QC_HASH
 #include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
-#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #endif
-
-#if __cplusplus > 201704L || CXX20
 #define CXX20 1
 #include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #include "rigtorp/rigtorp.hpp"   //https://github.com/rigtorp/HashMap/blob/master/include/rigtorp/HashMap.h

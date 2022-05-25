@@ -318,6 +318,7 @@ public:
 
     HashMap(HashMap&& other)
     {
+        rehash(1);
         if (this != &other) {
             swap(other);
         }
@@ -328,6 +329,14 @@ public:
         reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
+    }
+
+    template<class InputIt>
+    HashMap(InputIt first, InputIt last, size_t bucket_count=4)
+    {
+        reserve(std::distance(first, last) + bucket_count);
+        for (; first != last; ++first)
+            insert(*first);
     }
 
     HashMap& operator=(const HashMap& other)
@@ -495,13 +504,31 @@ public:
         return &_pairs[bucket].second;
     }
 
+    void merge(HashMap& rhs)
+    {
+        if (empty()) {
+            *this = std::move(rhs);
+            return;
+        }
+
+        for (auto rit = rhs.begin(); rit != rhs.end(); ) {
+            auto fit = find(rit->first);
+            if (fit.bucket() > _mask) {
+                insert_unique(rit->first, std::move(rit->second));
+                rit = rhs.erase(rit);
+            } else {
+                ++rit;
+            }
+        }
+    }
+
     // -----------------------------------------------------
 
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
     template<typename K, typename V>
-    std::pair<iterator, bool> insert(K&& key, V&& val)
+    std::pair<iterator, bool> do_insert(K&& key, V&& val)
     {
         check_expand_need();
         bool bnofind = true;
@@ -513,34 +540,66 @@ public:
         return { {this, bucket, false}, bnofind };
     }
 
+    std::pair<iterator, bool> do_insert(const value_type& value)
+    {
+        check_expand_need();
+        bool bnofind = true;
+        const auto bucket = find_or_allocate(value.first, bnofind);
+
+        if (bnofind) {
+            new(_pairs + bucket) PairT(value.first, value.second); _num_filled++;
+        }
+        return { {this, bucket, false}, bnofind };
+    }
+
+    std::pair<iterator, bool> do_insert(value_type&& value)
+    {
+        check_expand_need();
+        bool bnofind = true;
+        const auto bucket = find_or_allocate(value.first, bnofind);
+
+        if (bnofind) {
+            new(_pairs + bucket) PairT(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second)); _num_filled++;
+        }
+        return { {this, bucket, false}, bnofind };
+    }
+
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args)
     {
-        return insert(std::forward<Args>(args)...);
+        return do_insert(std::forward<Args>(args)...);
     }
 
     std::pair<iterator, bool> insert(value_type&& value)
     {
-        return insert(std::move(value.first), std::move(value.second));
+        return do_insert(std::move(value));
     }
 
     std::pair<iterator, bool> insert(const value_type& value)
     {
-        return insert(value.first, value.second);
+        return do_insert(value);
     }
 
     iterator insert(iterator hint, const value_type& value)
     {
         (void)hint;
-        return insert(value.first, value.second).first;
+        return do_insert(value).first;
     }
 
-    void insert(const_iterator beginc, const_iterator endc)
+    template <typename Iter>
+    void insert(Iter beginc, Iter endc)
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc) {
-            insert(beginc->first, beginc->second);
+            do_insert(beginc->first, beginc->second);
         }
+    }
+
+    void insert(std::initializer_list<value_type> ilist)
+    {
+        reserve(ilist.size() + _num_filled);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            insert(*it);
     }
 
     void insert_unique(const_iterator beginc, const_iterator endc)
@@ -592,6 +651,8 @@ public:
         } else {
             _pairs[bucket].second = std::forward<V>(val);
         }
+
+        return { {this, bucket, false}, bnofind };
     }
 
     /// Like std::map<KeyT,ValueT>::operator[].

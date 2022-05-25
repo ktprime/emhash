@@ -162,6 +162,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #endif
 
 namespace emhash7 {
+
 #ifdef EMH_SIZE_TYPE_16BIT
     typedef uint16_t size_type;
     static constexpr size_type INACTIVE = 0xFFFE;
@@ -436,9 +437,9 @@ public:
 
     public:
         const htype* _map;
-        size_t    _bmask;
         size_type _bucket;
         size_type _from;
+        size_t    _bmask;
     };
 
     class const_iterator
@@ -516,9 +517,9 @@ public:
 
     public:
         const htype* _map;
-        size_t    _bmask;
         size_type _bucket;
         size_type _from;
+        size_t    _bmask;
     };
 
     void init(size_type bucket, float mlf = EMH_DEFAULT_LOAD_FACTOR)
@@ -604,7 +605,7 @@ public:
         if (size() != rhs.size())
             return false;
 
-        for (auto it = begin(), last = end(); it != last; it++) {
+        for (auto it = begin(), last = end(); it != last; ++it) {
             auto oi = rhs.find(it->first);
             if (oi == rhs.end() || it->second != oi->second)
                 return false;
@@ -1312,9 +1313,8 @@ public:
 
     void clearkv()
     {
-        for (auto it = cbegin(); _num_filled; ++it) {
+        for (auto it = cbegin(); _num_filled; ++it)
             clear_bucket(it.bucket());
-        }
     }
 
     /// Remove all elements, keeping full capacity.
