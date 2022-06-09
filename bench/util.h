@@ -107,7 +107,7 @@ int64_t getus()
 #elif WIN32_TICK
     return GetTickCount() * 1000;
 #elif WIN32_HTIME || _WIN32
-    LARGE_INTEGER freq = {0, 0};
+    LARGE_INTEGER freq = {0};
     QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;

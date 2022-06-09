@@ -33,12 +33,14 @@
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
 
-#ifdef FIB_HASH
-#define QintHasher Int64Hasher<K>
-#elif HOOD_HASH || QC_HASH == 0
-#define QintHasher robin_hood::hash<K>
+#if FIB_HASH
+    #define QintHasher Int64Hasher<K>
+#elif HOOD_HASH
+    #define QintHasher robin_hood::hash<K>
+#elif QC_HASH == 0
+    #define QintHasher std::hash<K>
 #else
-#define QintHasher typename qc::hash::RawMap<K, V>::hasher
+    #define QintHasher typename qc::hash::RawMap<K, V>::hasher
 #endif
 
 using namespace qc::types;
@@ -898,7 +900,7 @@ static void compareTypical(Stats & results)
 {
     qc::Random random{size_t(std::chrono::steady_clock::now().time_since_epoch().count())};
 
-    for (const auto [elementCount, roundCount] : typicalElementRoundCounts) {
+    for (const auto&[elementCount, roundCount] : typicalElementRoundCounts) {
         if (elementCount > std::numeric_limits<qc::utype<CommonKey>>::max()) {
             break;
         }
@@ -921,7 +923,7 @@ static void compare()
         Stats results{};
         compareTypical<CommonKey, ContainerInfos...>(results);
         std::cout << std::endl;
-        for (const auto[elementCount, roundCount] : typicalElementRoundCounts) {
+        for (const auto& [elementCount, roundCount] : typicalElementRoundCounts) {
             reportComparison(results, 1, 0, elementCount);
             std::cout << std::endl;
         }
@@ -998,7 +1000,6 @@ struct AbslSetInfo
     static inline const std::string name{"absl::flat_hash_set"};
 };
 
-#if ABSL
 template <typename K, typename V>
 struct AbslMapInfo
 {
@@ -1008,7 +1009,6 @@ struct AbslMapInfo
 
     static inline const std::string name{"absl::f_hash_map"};
 };
-#endif
 
 template <typename K, typename V>
 struct PhMapInfo
@@ -1192,8 +1192,9 @@ struct FphDyamicMapInfo
     static inline const std::string name{"fph::DynamicFph "};
 };
 
-int main(int argc, const char* argv[])
+int main(const int argc, const char* argv[])
 {
+    assert(argv);
     // 1v1
     if (argc == 2) {
         using K = size_t;
@@ -1238,15 +1239,13 @@ int main(int argc, const char* argv[])
 #endif
 
         compare<CompareMode::typical, K,
-#ifdef ABSL
-            AbslMapInfo<K, V>,
-#endif
-
 #if X86
             EmiLib2MapInfo<K, V>,
             EmiLib1MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
 #endif
+
+            AbslMapInfo<K, V>,
 
 #if ET
             PhMapInfo<K, V>,

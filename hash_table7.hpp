@@ -552,7 +552,7 @@ public:
 #ifndef EMH_ZERO_MOVE
         init(4);
 #else
-        _num_buckets = _num_filled = 0;
+        _num_buckets = _num_filled = _mask = 0;
         _pairs = nullptr;
 #endif
         swap(rhs);
@@ -1364,6 +1364,7 @@ public:
         auto* new_pairs = (PairT*)malloc(AllocSize(num_buckets));
         //TODO: throwOverflowError
         auto old_num_filled = _num_filled;
+        auto old_mask  = _num_buckets - 1;
         auto old_pairs = _pairs;
         auto* obmask   = _bitmask;
 
@@ -1380,7 +1381,8 @@ public:
         assert(num_buckets % 8 == 0);
 
         _pairs       = new_pairs;
-        for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        //for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket --) {
             if (obmask[src_bucket / MASK_BIT] & (EMH_MASK(src_bucket)))
                 continue;
 

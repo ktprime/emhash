@@ -858,10 +858,14 @@ public:
 #endif
 
         auto old_num_filled  = _num_filled;
+#ifdef EMH_NRB
         auto old_num_buckets = _num_buckets;
+#endif
         auto old_states      = _states;
         auto old_pairs       = _pairs;
+#if EMH_DUMP
         auto max_probe_length = _max_probe_length;
+#endif
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
@@ -877,7 +881,7 @@ public:
         //memset(_states, 0-1u, num_buckets);
 
         //set delete tombstone for some use.
-        for (auto index = 0; index < _num_buckets; index += simd_bytes)
+        for (size_t index = 0; index < _num_buckets; index += simd_bytes)
             _states[index] = _states[index + simd_bytes / 2] = State::EDELETE;
 
         //set sentinel to deal with iterator
@@ -893,7 +897,9 @@ public:
 #endif
 
         _max_probe_length = -1;
+#if EMH_DUMP || EMH_NRB
         auto collisions = 0;
+#endif
 
         for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
             if ((old_states[src_bucket] & FILLED_MASK) == State::EFILLED) {
@@ -912,7 +918,9 @@ public:
 #else
                 const auto key_hash = _hasher(src_pair.first);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
+#if EMH_DUMP
                 collisions += (_states[key_hash & _mask] & FILLED_MASK) == State::EFILLED;
+#endif
 #endif
                 _states[dst_bucket] = key2_hash(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
@@ -938,7 +946,7 @@ public:
                 auto dst_bucket = find_empty_slot2(bucket, offset);
                 if (offset > _max_probe_length && offset >= maxf_bytes) {
                     auto mbucket = robin_shift(bucket, dst_bucket, offset);
-                    if (mbucket != -1)
+                    if (mbucket != (size_t)-1)
                         dst_bucket = mbucket;
                 } else
                     check_offset(offset);
@@ -1114,14 +1122,14 @@ private:
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
+                const auto ebucket = hole == (size_t)-1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 check_offset(offset);
                 return ebucket;
             }
 
             //3. find erased
-            if (hole == -1) {
+            if (hole == (size_t)-1) {
                 const auto zero = MOVEMASK_EPI8(vec);
                 if (zero != 0)
                     hole = next_bucket + CTZ(zero);

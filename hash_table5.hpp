@@ -1298,10 +1298,10 @@ public:
         size_type num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
-        auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         auto old_num_filled  = _num_filled;
         auto old_pairs   = _pairs;
         auto old_buckets = _num_buckets;
+        auto old_mask    = _num_buckets - 1;
 
 #if EMH_REHASH_LOG
         auto last = _last;
@@ -1313,6 +1313,7 @@ public:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
+        auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         for (size_type bucket = 0; bucket < num_buckets; bucket++)
             EMH_BUCKET(new_pairs, bucket) = INACTIVE;
 
@@ -1341,7 +1342,8 @@ public:
                 EMH_BUCKET(_pairs, bucket) = bucket;
             }
         } else {
-            for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+            //for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+            for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket--) {
                 if ((int)EMH_BUCKET(old_pairs, src_bucket) < 0)
                     continue;
 

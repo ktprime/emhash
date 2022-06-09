@@ -823,10 +823,8 @@ public:
 #endif
 
         auto old_num_filled  = _num_filled;
-        auto old_num_buckets = _num_buckets;
         auto old_states      = _states;
         auto old_pairs       = _pairs;
-        auto max_probe_length = _max_probe_length;
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
@@ -854,14 +852,12 @@ public:
 #endif
 
         _max_probe_length = -1;
-        auto collision = 0;
 
         for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 const auto key_hash = _hasher(src_pair.first);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
-                //collision += _states[key_hash & _mask] % 2 == State::EFILLED;
 
                 _states[dst_bucket] = hash_key2(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
@@ -869,12 +865,6 @@ public:
                 src_pair.~PairT();
             }
         }
-
-#if EMH_DUMP
-        if (_num_filled > 1000000)
-            printf("\t\t\tmax_probe_length/_max_probe_length = %d/%d, collsions = %d, collision = %.2f%%\n",
-                max_probe_length, _max_probe_length, collision, collision * 100.0f / _num_buckets);
-#endif
 
         free(old_states);
     }
@@ -969,7 +959,7 @@ private:
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
+                const auto ebucket = hole == (size_t)-1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
@@ -979,7 +969,7 @@ private:
             }
 
             //3. find erased
-            else if (hole == -1) {
+            else if (hole == (size_t)-1) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);

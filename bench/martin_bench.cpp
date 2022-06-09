@@ -929,7 +929,7 @@ void runTest(int sflags, int eflags)
 
         static constexpr size_t numInserts[] = { /*200,*/ 2000, 500000 };
         static constexpr size_t numFindsPerInsert[] = { /*5000000,*/ 500000, 1000 };
-        for (int i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
+        for (size_t i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
         {
 #if ET
             { tsl::robin_map <size_t, size_t, hash_func> rmap; bench_randomFind(rmap, numInserts[i], numFindsPerInsert[i]); }

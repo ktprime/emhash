@@ -334,7 +334,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
 {
     if (func_result.find(func) == func_result.end()) {
         func_result[func] = sum;
-    } else if (sum != func_result[func]) {
+    } else if ((int64_t)sum != func_result[func]) {
         printf("%s %s %zd != %zd (o)\n", hash_name.data(), func.data(), (size_t)sum, (size_t)func_result[func]);
     }
 
@@ -367,7 +367,7 @@ static void inline hash_convert(const std::map<std::string, int64_t>& hash_score
         score_hash.emplace(v.second, v.first);
 }
 
-static void add_hash_func_time(std::map<std::string, std::map<std::string, int64_t>>& func_hash_score, std::multimap <int64_t, std::string>& once_score_hash, int vsize)
+static void add_hash_func_time(std::map<std::string, std::map<std::string, int64_t>>& func_hash_score, std::multimap <int64_t, std::string>& once_score_hash)
 {
     std::map<std::string, int64_t> once_hash_score;
     for (auto& v : once_func_hash_time) {
@@ -1106,7 +1106,7 @@ void reset_top3(std::map<std::string, int64_t>& top3, const std::multimap <int64
     }
 }
 
-static void printResult(int n)
+static void printResult()
 {
     //total func hash time
     static std::map<std::string, std::map<std::string, int64_t>> func_hash_score;
@@ -1114,7 +1114,7 @@ static void printResult(int n)
     static std::map<std::string, int64_t> top3;
 
     std::multimap<int64_t, std::string> once_score_hash;
-    add_hash_func_time(func_hash_score, once_score_hash, n);
+    add_hash_func_time(func_hash_score, once_score_hash);
     if (once_score_hash.size() >= 3) {
         reset_top3(top3, once_score_hash);
     }
@@ -1303,7 +1303,7 @@ static int benchHashMap(int n)
             test_case + 1, n, 1.0 * n / pow2, 1.0 * memory1 / (1 << 20) , 1.0 * memory2 / (1 << 20),
             1.0 * memoryr / (1 << 20), 1.0 * memoryu / (1 << 20), flag);
 
-    printResult(n);
+    printResult();
     return test_case;
 }
 
@@ -1393,6 +1393,7 @@ static void testHashInt(int loops = 500000009)
 #endif
 }
 
+#if 0
 static int test_lru(int n)
 {
 #if ET
@@ -1406,6 +1407,7 @@ static int test_lru(int n)
 #endif
     return 0;
 }
+#endif
 
 int main(int argc, char* argv[])
 {
