@@ -34,7 +34,7 @@
 //#include "old/ktprime_hash.hpp"
 
 #if __cplusplus >= 201103L || _MSC_VER > 1600
-#include "martin/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 
 #if ET
 #include "phmap/phmap.h"           //https://github.com/tessil/robin-map
@@ -80,12 +80,12 @@ static std::map<std::string, std::string> show_name =
 #if ABSL
     {"absl", "absl flat"},
 #endif
-//    {"folly", "f14_vector"},
 #if ET
     {"rigtorp", "rigtorp"},
     {"phmap", "phmap flat"},
     {"robin_hood", "martinus flat"},
-    //    {"hrd7", "hrd7map"},
+//    {"hrd7", "hrd7map"},
+//    {"folly", "f14_vector"},
 
 #if ET > 1
     {"robin_map", "tessil robin"},
@@ -697,7 +697,7 @@ void bench_IterateIntegers(MAP map)
         return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    MRNG rng(RND + 1);
+    MRNG rng(123);
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
@@ -710,7 +710,9 @@ void bench_IterateIntegers(MAP map)
             result += keyVal.second;
         }
     }
+    assert(result == 20833333325000ull);
 
+    result = 0;
     auto ts1 = now2sec();
     for (size_t n = 0; n < num_iters; ++n) {
         map.erase(rng());
@@ -718,7 +720,8 @@ void bench_IterateIntegers(MAP map)
             result += keyVal.second;
         }
     }
-    printf("    total iterate/removing time = %.2f, %.2f|%u\n\n", (ts1 - ts), now2sec() - ts, (uint32_t)result);
+    assert(result == 62498750000000ull);
+    printf("    total iterate/removing time = %.2f, %.2f|%llu\n\n", (ts1 - ts), now2sec() - ts, result);
 }
 
 template<class MAP>

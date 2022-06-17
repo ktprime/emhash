@@ -98,16 +98,16 @@ uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_
 int64_t getus()
 {
 #if STD_HRC
-    auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
+	auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
+	return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
 #elif WIN32_RUS
-    FILETIME ptime[4] = {0};
-    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
-    return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
+	FILETIME ptime[4];
+	GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
+	return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif WIN32_TICK
-    return GetTickCount() * 1000;
+	return GetTickCount() * 1000;
 #elif WIN32_HTIME || _WIN32
-    LARGE_INTEGER freq = {0};
+    LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;
@@ -132,7 +132,7 @@ int64_t getus()
 //#elif LINUX_TICK || __APPLE__
 //    return clock();
 #elif __linux__
-    struct timespec ts = {0};
+    struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000ull + ts.tv_nsec / 1000;
 #elif __unix__

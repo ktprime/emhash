@@ -22,10 +22,11 @@
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2.hpp"
 #include "emilib/emilib.hpp"
+#include "emilib/emilib12.hpp"
 //#include "emilib/emiset2.hpp"
 
 #include "absl/container/flat_hash_map.h"
-#include "martin/robin_hood.h"
+#include "martinus/robin_hood.h"
 #include "ska/flat_hash_map.hpp"
 #include "phmap/phmap.h"
 #include "tsl/robin_map.h"
@@ -1148,13 +1149,20 @@ struct EmiLib3MapInfo
     static inline const std::string name{"emilib3::HashMap"};
 };
 
-
 template <typename K, typename V>
 struct EmiLib1MapInfo
 {
     using Container = emilib::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"emilib1::HashMap"};
+};
+
+template <typename K, typename V>
+struct EmLibMapInfo
+{
+    using Container = emlib2::HashMap<K, V, QintHasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"emilib::HashMap "};
 };
 
 template <typename K, typename V>
@@ -1240,12 +1248,15 @@ int main(const int argc, const char* argv[])
 
         compare<CompareMode::typical, K,
 #if X86
+//            EmiLib1MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
-            EmiLib1MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
+//            EmLibMapInfo<K, V>,
 #endif
 
+#if ABSL
             AbslMapInfo<K, V>,
+#endif
 
 #if ET
             PhMapInfo<K, V>,

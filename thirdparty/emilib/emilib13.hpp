@@ -11,7 +11,7 @@
 #include <utility>
 #include <cstring>
 
-namespace emilib3 {
+namespace emlib3 {
 
 /// like std::equal_to but no need to #include <functional>
 template<typename T>

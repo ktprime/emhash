@@ -1649,25 +1649,18 @@ private:
             return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
-        if (0) {
-            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
-            const auto bmask2 = *((size_t*)_bitmask + step);
-            if (bmask2 != 0)
-                return step * SIZE_BIT + CTZ(bmask2);
-        }
 
-        auto& _last = EMH_ADDR(_pairs, _mask + 1);
-        for (; ;) {
+        for (uint32_t s = bucket_from / SIZE_BIT + 2, n = 1;  ; s += ++n) {
+            auto& _last = EMH_ADDR(_pairs, _mask + 1);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
 
-            const auto tail = (_last + qmask / 2) & qmask;
-            const auto bmask1 = *((size_t*)_bitmask + tail);
-            if (bmask1 != 0) {
-                //_last = tail;
-                return tail * SIZE_BIT + CTZ(bmask1);
-            }
+            const auto quarc = s & qmask;
+            const auto bmask1 = *((size_t*)_bitmask + quarc);
+            if (bmask1 != 0)
+                return quarc * SIZE_BIT + CTZ(bmask1);
+
             _last = (_last + 1) & qmask;
         }
         return 0;

@@ -164,7 +164,7 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if HOOD_HASH
-    #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "martinus/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 #if PHMAP_HASH
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
@@ -204,7 +204,7 @@ std::map<std::string, std::string> maps =
     #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
-    #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "martinus/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
 
@@ -1535,7 +1535,7 @@ int main(int argc, char* argv[])
         } else if (run_type == 1) {
             n = (srng() % (maxn - minn)) + minn;
         } else {
-            n += n * 2 / 11;
+            n += n * 1 / 11;
             if (n > maxn)
                 n = (srng() % (maxn - minn)) + minn;
         }
