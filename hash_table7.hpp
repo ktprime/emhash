@@ -120,7 +120,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #endif
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
-#define EMH_DEFAULT_LOAD_FACTOR 0.88f
+#define EMH_DEFAULT_LOAD_FACTOR 0.80f
 #endif
 
 #if EMH_BUCKET_INDEX == 0
@@ -386,7 +386,6 @@ public:
         iterator& next()
         {
             goto_next_element();
-            _bmask &= _bmask - 1;
             return *this;
         }
 

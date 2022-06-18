@@ -299,7 +299,6 @@ public:
         iterator& next()
         {
             goto_next_element();
-            _bmask &= _bmask - 1;
             return *this;
         }
 

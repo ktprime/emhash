@@ -1535,7 +1535,7 @@ int main(int argc, char* argv[])
         } else if (run_type == 1) {
             n = (srng() % (maxn - minn)) + minn;
         } else {
-            n += n * 1 / 11;
+            n += n / 15;
             if (n > maxn)
                 n = (srng() % (maxn - minn)) + minn;
         }
