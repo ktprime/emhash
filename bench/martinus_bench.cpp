@@ -712,7 +712,6 @@ void bench_IterateIntegers(MAP map)
     }
     assert(result == 20833333325000ull);
 
-    result = 0;
     auto ts1 = now2sec();
     for (size_t n = 0; n < num_iters; ++n) {
         map.erase(rng());
@@ -720,8 +719,8 @@ void bench_IterateIntegers(MAP map)
             result += keyVal.second;
         }
     }
-    assert(result == 62498750000000ull);
-    printf("    total iterate/removing time = %.2f, %.2f|%llu\n\n", (ts1 - ts), now2sec() - ts, result);
+    assert(result == 62498750000000ull + 20833333325000ull);
+    printf("    total iterate/removing time = %.2f, %.2f|%lu\n\n", (ts1 - ts), now2sec() - ts, result);
 }
 
 template<class MAP>
