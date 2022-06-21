@@ -168,3 +168,10 @@ my result is benched on 3 linux server(amd, intel, arm64), win10 pc/Laptop and a
     }
 ```
 
+```
+     emhash7:HashMap<int,int> myhash = {{1,2},{5,2},};
+     auto it = myhash.find(1);
+    
+     it = map.erase( it );
+      map.erase( it++ );// it's error. use upper line
+```
