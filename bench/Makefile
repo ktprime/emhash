@@ -89,9 +89,11 @@ endif
 
 all:
 ifneq ($(QB),)
-	$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
+	$(CXX) $(CXXFLAGS) -std=c++20 qbench.cpp -o qbench
 endif
 	$(CXX) $(CXXFLAGS) martinus_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) btest.cpp -o btest
+	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) app.cpp -o app
@@ -100,7 +102,7 @@ endif
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
 ifneq ($(EMH),)
-	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o tbench
+	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o template
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
 endif

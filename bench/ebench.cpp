@@ -38,7 +38,7 @@ std::map<std::string, std::string> maps =
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
 
-//    {"jg_dense", "jg_dense"},
+    {"jg_dense", "jg_dense"},
 //    {"rigtorp", "rigtorp"},
 //    {"qchash", "qc-hash"},
 //    {"fph", "fph-table"},
@@ -875,7 +875,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#if QC_HASH == 0 && ABSL == 0
+#if QC_HASH == 0
     auto tmp = ht_hash; auto id = 1;
     for (auto it = tmp.begin(); it != tmp.end(); ) {
 #if KEY_INT

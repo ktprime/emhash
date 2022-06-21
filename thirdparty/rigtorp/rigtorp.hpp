@@ -221,8 +221,9 @@ public:
   }
 
   //void erase(iterator it) { erase_impl(it); }
-  void erase(iterator it) {
+  iterator erase(iterator it) {
       erase_impl(it);
+      return ++it;
   }
 
   size_type erase(const key_type &key) { return erase_impl(key); }

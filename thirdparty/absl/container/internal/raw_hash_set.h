@@ -1324,14 +1324,15 @@ class raw_hash_set {
   //     m.erase(copy_it);
   //   }
   // }
-  void erase(const_iterator cit) { erase(cit.inner_); }
+  iterator erase(const_iterator cit) { return erase(cit.inner_); }
 
   // This overload is necessary because otherwise erase<K>(const K&) would be
   // a better match if non-const iterator is passed as an argument.
-  void erase(iterator it) {
+  iterator erase(iterator it) {
     AssertIsFull(it.ctrl_);
     PolicyTraits::destroy(&alloc_ref(), it.slot_);
     erase_meta_only(it);
+    return ++it;
   }
 
   iterator erase(const_iterator first, const_iterator last) {

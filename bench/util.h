@@ -707,8 +707,6 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #define CXX20 1
 #include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #include "rigtorp/rigtorp.hpp"   //https://github.com/rigtorp/HashMap/blob/master/include/rigtorp/HashMap.h
-#endif
 
-#if FPH_HASH
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #endif
