@@ -37,13 +37,13 @@ std::map<std::string, std::string> maps =
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
+    {"emhash8", "emhash8"},
 
-    {"jg_dense", "jg_dense"},
+//    {"jg_dense", "jg_dense"},
 //    {"rigtorp", "rigtorp"},
 //    {"qchash", "qc-hash"},
 //    {"fph", "fph-table"},
 
-    {"emhash8", "emhash8"},
 
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
@@ -58,6 +58,7 @@ std::map<std::string, std::string> maps =
     {"abslf", "absl_flat"},
 //    {"f14_value", "f14_value"},
 
+    {"martind", "martin_dense"},
 #if ET
     {"f14_vector", "f14_vector"},
     {"fht", "fht"},
@@ -100,7 +101,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_LRU_SET         1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_HIGH_LOAD         2345
-//#define EMH_FIND_HIT        1
+#define EMH_FIND_HIT        1
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
@@ -120,7 +121,7 @@ std::map<std::string, std::string> maps =
 //https://www.zhihu.com/question/46156495
 //http://www.brendangregg.com/index.html
 
-//https://eourcs.github.io/LockFreeCuckooHash/
+//https://eourcs.github.io/LockFreeCuckooHash2
 //https://lemire.me/blog/2018/08/15/fast-strongly-universal-64-bit-hashing-everywhere/
 ////some others
 //https://sites.google.com/view/patchmap/overview
@@ -161,6 +162,10 @@ std::map<std::string, std::string> maps =
 
 #if CUCKOO_HASHMAP
 #include "libcuckoo/cuckoohash_map.hh"
+#endif
+
+#if CXX20
+#include "martinus/unordered_dense_map.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
 #if HOOD_HASH
@@ -1254,12 +1259,11 @@ static int benchHashMap(int n)
 #if CUCKOO_HASHMAP
         {  benOneHash<libcuckoo::cuckoohash_map <keyType, valueType, ehash_func>>("cuckoo", vList); }
 #endif
-        {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
-        {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
 
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
         {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
+        {  benOneHash<ankerl::unordered_dense_map <keyType, valueType, ehash_func>>("martind", vList); }
 #endif
 
 #if QC_HASH && KEY_INT
@@ -1277,6 +1281,8 @@ static int benchHashMap(int n)
 #endif
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
+        {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
+        {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }

@@ -38,7 +38,7 @@
 #include "emilib/emilib2.hpp"
 
 
-#include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 
 #if CXX20
@@ -147,10 +147,10 @@ inline Os& operator<<(Os& os, Container const& cont)
     return os << "}" << std::endl;
 }
 
-#if 1
+#if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash5::HashMap
+#define ehmap  emhash8::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap

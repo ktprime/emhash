@@ -36,6 +36,10 @@
 #if __cplusplus >= 201103L || _MSC_VER > 1600
 #include "martinus/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 
+#if CXX20
+#include "martinus/unordered_dense_map.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#endif
+
 #if ET
 #include "phmap/phmap.h"           //https://github.com/tessil/robin-map
 #include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
@@ -68,6 +72,10 @@ static std::map<std::string, std::string> show_name =
 //    {"emilib", "emilib"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
+#endif
+
+#if CXX20
+    {"ankerl", "martinus dense"},
 #endif
 
 #if QC_HASH
@@ -783,6 +791,7 @@ void runTest(int sflags, int eflags)
         { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #if CXX20
+        { ankerl::unordered_dense_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
         { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
@@ -790,6 +799,7 @@ void runTest(int sflags, int eflags)
         //        { hrd7::hash_map <uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
+
 #if X86_64
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_IterateIntegers(fmap); }
 #endif
@@ -844,12 +854,14 @@ void runTest(int sflags, int eflags)
         //        { hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
         { tsl::robin_map  <std::string, size_t, hash_func> bench;     bench_randomFindString(bench); }
         { robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+
 #if X86_64
         { ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench); }
 #endif
         { phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if CXX20
+        { ankerl::unordered_dense_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         { rigtorp::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
@@ -892,6 +904,7 @@ void runTest(int sflags, int eflags)
         { emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 
 #if CXX20
+        { ankerl::unordered_dense_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { rigtorp::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
@@ -904,6 +917,7 @@ void runTest(int sflags, int eflags)
         //        { hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
         { tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+
 #if X86_64
         { ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
@@ -936,6 +950,7 @@ void runTest(int sflags, int eflags)
 #if ET
             { tsl::robin_map <size_t, size_t, hash_func> rmap; bench_randomFind(rmap, numInserts[i], numFindsPerInsert[i]); }
             { robin_hood::unordered_map <size_t, size_t, hash_func> martin; bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]); }
+
 #if X86_64
             { ska::flat_hash_map <size_t, size_t, hash_func> fmap; bench_randomFind(fmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
@@ -947,6 +962,7 @@ void runTest(int sflags, int eflags)
             { qc::hash::RawMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if CXX20
+            { ankerl::unordered_dense_map<size_t, size_t, hash_func> martin; bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]); }
             { jg::dense_hash_map<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { rigtorp::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
@@ -997,6 +1013,7 @@ void runTest(int sflags, int eflags)
 #if CXX20
         { jg::dense_hash_map<int, int, hash_func> qmap; bench_insert(qmap); }
         { rigtorp::HashMap<int, int, hash_func> emap; bench_insert(emap); }
+        { ankerl::unordered_dense_map<int, int, hash_func> martin; bench_insert(martin); }
 #endif
 
 #if QC_HASH
@@ -1020,6 +1037,9 @@ void runTest(int sflags, int eflags)
         //        { hrd7::hash_map <int, int, hash_func> hmap;  bench_insert(hmap); }
         { tsl::robin_map  <int, int, hash_func> rmap; bench_insert(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_insert(martin); }
+
+
+
 #if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_insert(fmap); }
 #endif
@@ -1068,6 +1088,7 @@ void runTest(int sflags, int eflags)
         //        { hrd7::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
+
 #if X86_64
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
 #endif
@@ -1077,6 +1098,7 @@ void runTest(int sflags, int eflags)
         { folly::F14VectorMap <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
 #endif
 #if CXX20
+        { ankerl::unordered_dense_map<uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
         { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         //{ rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hange
 #endif
@@ -1103,6 +1125,7 @@ void runTest(int sflags, int eflags)
 #if CXX20
         { jg::dense_hash_map<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { rigtorp::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
+        { ankerl::unordered_dense_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
 #endif
 
         { emhash6::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
@@ -1125,6 +1148,7 @@ void runTest(int sflags, int eflags)
         //        { hrd7::hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
         { tsl::robin_map     <int, int, hash_func> rmap; bench_randomDistinct2(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
+
 #if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_randomDistinct2(fmap); }
 #endif
@@ -1167,8 +1191,10 @@ int main(int argc, char* argv[])
                 std::string map_name("emhash");
                 map_name += c;
                 checkSet(map_name);
-            } else if (c == 'm')
+            } else if (c == 'm') {
                 checkSet("robin_hood");
+                checkSet("ankerl");
+            }
             else if (c == 'p')
                 checkSet("phmap");
             else if (c == 'a')

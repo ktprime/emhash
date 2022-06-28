@@ -1526,8 +1526,12 @@ private:
         if constexpr (std::is_integral<K>::value) {
             if (_eq(key, EMH_KEY(_pairs, bucket)))
                 return bucket;
-            else if (next_bucket % 2 > 0 || next_bucket == bucket * 2)
+            else if (next_bucket % 2 > 0)
                 return _num_buckets;
+//            else if (next_bucket == bucket * 2)
+//                return _num_buckets;
+//            else if (next_bucket != bucket * 2 + 1)
+//                return _num_buckets;
 //            else if (hash_main(bucket) != bucket)
 //                return _num_buckets;
         } else {

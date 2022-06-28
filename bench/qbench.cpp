@@ -29,10 +29,15 @@
 #include "martinus/robin_hood.h"
 #include "ska/flat_hash_map.hpp"
 #include "phmap/phmap.h"
+
 #include "tsl/robin_map.h"
 #include "tsl/robin_set.h"
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
+
+#if CXX20
+#include "martinus/unordered_dense_map.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#endif
 
 #if FIB_HASH
     #define QintHasher Int64Hasher<K>
@@ -1040,6 +1045,17 @@ struct RobinHoodMapInfo
     static inline const std::string name{"martinus::fhmap "};
 };
 
+#if CXX20
+template <typename K, typename V>
+struct RobinDenseMapInfo
+{
+    using Container = ankerl::unordered_dense_map<K, V, QintHasher>;
+    using AllocatorContainer = void;
+
+    static inline const std::string name{"martinus::dense "};
+};
+#endif
+
 template <typename K>
 struct SkaSetInfo
 {
@@ -1264,14 +1280,15 @@ int main(const int argc, const char* argv[])
 
             SkaMapInfo<K, V>,
             TslRobinMapInfo<K, V>,
-            StdMapInfo<K, V>,
 #if ET > 1
+            StdMapInfo<K, V>,
             TslSparseMapInfo<K, V>,
 #endif
 #endif
 
-
+            EmHash8MapInfo<K, V>,
 #ifdef CXX20
+            RobinDenseMapInfo<K, V>,
 //            FphDyamicMapInfo<K,V>,
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
@@ -1280,7 +1297,6 @@ int main(const int argc, const char* argv[])
 #endif
 #endif
 
-            EmHash8MapInfo<K, V>,
             EmHash7MapInfo<K, V>,
             EmHash6MapInfo<K, V>,
             EmHash5MapInfo<K, V>

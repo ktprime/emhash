@@ -20,6 +20,10 @@
 #include <iomanip>
 #include <chrono>
 
+#if CXX20
+#include "martinus/unordered_dense_map.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#endif
+
 using namespace std::chrono_literals;
 #if TKey == 0
 using KeyType = uint64_t;
@@ -316,6 +320,7 @@ template<class K, class V> using emilib3_map = emilib3::HashMap<K, V, BintHasher
 
 #ifdef CXX20
 template<class K, class V> using jg_densemap = jg::dense_hash_map<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using martinus_dense = ankerl::unordered_dense_map<K, V, BintHasher, std::equal_to<K>>;
 #endif
 template<class K, class V> using phmap_flat  = phmap::flat_hash_map<K, V, BintHasher, std::equal_to<K>>;
 template<class K, class V> using tsl_robin_map= tsl::robin_map<K, V, BintHasher, std::equal_to<K>>;
@@ -349,6 +354,7 @@ int main(int argc, const char* argv[])
     test<emhash_map6> ("emhash_map6" );
     test<emhash_map7> ("emhash_map7" );
     test<emhash_map8> ("emhash_map8" );
+    test<martinus_dense>("martinus_dense" );
     test<martinus_flat> ("martinus_flat" );
     test<emilib2_map> ("emilib2_map" );
     test<emilib3_map> ("emilib3_map" );

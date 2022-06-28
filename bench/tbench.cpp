@@ -203,36 +203,36 @@ int main(int argc, const char* argv[])
     using QintHasher = std::hash<ktype>;
 #endif
 
-    hash_table_test<rigtorp::HashMap<ktype,vtype, QintHasher>>("rigtorp");
+    hash_table_test<rigtorp::HashMap<ktype, vtype, QintHasher>>("rigtorp");
 #ifdef CXX20
-    hash_table_test<jg::dense_hash_map<ktype,vtype, QintHasher>>("jg_dense");
+    hash_table_test<jg::dense_hash_map<ktype, vtype, QintHasher>>("jg_dense");
     if ((max_n >> 20) == 0)
-        hash_table_test<fph::DynamicFphMap<ktype,vtype, fph::MixSeedHash<vtype>>>("fph_table");
+        hash_table_test<fph::DynamicFphMap<ktype, vtype, fph::MixSeedHash<vtype>>>("fph_table");
 #endif
 
-    hash_table_test<robin_hood::unordered_map<ktype,vtype, QintHasher>>("martinus");
-    hash_table_test<tsl::robin_map<ktype,vtype, QintHasher>>("tsl_robin_map");
+    hash_table_test<robin_hood::unordered_map<ktype, vtype, QintHasher>>("martinus");
+    hash_table_test<phmap::flat_hash_map<ktype, vtype, QintHasher>>("phmap_flat");
+    hash_table_test<tsl::robin_map<ktype, vtype, QintHasher>>("tsl_robin_map");
 
-    hash_table_test<emhash5::HashMap<ktype,vtype, QintHasher>>("emhash5");
-    hash_table_test<emhash6::HashMap<ktype,vtype, QintHasher>>("emhash6");
-    hash_table_test<emhash7::HashMap<ktype,vtype, QintHasher>>("emhash7");
-    hash_table_test<emhash8::HashMap<ktype,vtype, QintHasher>>("emhash8");
+    hash_table_test<emhash5::HashMap<ktype, vtype, QintHasher>>("emhash5");
+    hash_table_test<emhash6::HashMap<ktype, vtype, QintHasher>>("emhash6");
+    hash_table_test<emhash7::HashMap<ktype, vtype, QintHasher>>("emhash7");
+    hash_table_test<emhash8::HashMap<ktype, vtype, QintHasher>>("emhash8");
 
-    hash_table_test<phmap::flat_hash_map<ktype,vtype, QintHasher>>("phmap_flat");
 
 #if ET > 1 
-    hash_table_test<ska::flat_hash_map<ktype,vtype>>("ska_flat");
-    hash_table_test<emilib::HashMap<ktype,vtype, QintHasher>>("emilib1");
+    hash_table_test<ska::flat_hash_map<ktype, vtype>>("ska_flat");
+    hash_table_test<emilib::HashMap<ktype, vtype, QintHasher>>("emilib1");
 #endif
 
-    hash_table_test<emilib2::HashMap<ktype,vtype, QintHasher>>("emilib2");
-    hash_table_test<emilib3::HashMap<ktype,vtype, QintHasher>>("emilib3");
+    hash_table_test<emilib2::HashMap<ktype, vtype, QintHasher>>("emilib2");
+    hash_table_test<emilib3::HashMap<ktype, vtype, QintHasher>>("emilib3");
 
 #if ABSL
-    hash_table_test<absl::flat_hash_map<ktype,vtype, QintHasher>>("absl_flat");
+    hash_table_test<absl::flat_hash_map<ktype, vtype, QintHasher>>("absl_flat");
 #endif
 
-    hash_table_test<std::unordered_map<ktype,vtype, QintHasher>>("unordered_map");
-
+    hash_table_test<std::unordered_map<ktype, vtype, QintHasher>>("unordered_map");
     return 0;
 }
+
