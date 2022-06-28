@@ -166,6 +166,17 @@ my result is benched on 3 linux server(amd, intel, arm64), win10 pc/Laptop and a
        ...
        do_some_more();
     }
+    
+    //change upper code as follow
+    for (auto it = myhash.begin(); it != myhash.end(); it++)
+    {
+        if (some_key == it.first) {
+            it = myhash.erase(it);
+       }
+       ...
+       do_some_more();
+    }
+    
 ```
 
 ```
@@ -173,5 +184,5 @@ my result is benched on 3 linux server(amd, intel, arm64), win10 pc/Laptop and a
      auto it = myhash.find(1);
     
      it = map.erase( it );
-      map.erase( it++ );// it's error. use upper line
+     map.erase( it++ );// it's error code. use upper line
 ```
