@@ -1645,9 +1645,15 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from)
     {
+#if EMH_X86
         const auto boset = bucket_from % 8;
-        const auto begin = (uint8_t*)_bitmask + bucket_from / 8;
-        const auto bmask = *(size_t*)begin >> boset;
+        auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
+#else
+        const auto boset = bucket_from % SIZE_BIT;
+        auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
+#endif
+        const auto bmask = *(size_t*)(start) >> boset;
+
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 

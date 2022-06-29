@@ -83,6 +83,14 @@ ifeq ($(std),)
 #CXXFLAGS += -std=c++17
 endif
 
+ifneq ($(check),)
+CXXFLAGS += -fsanitize=undefined
+endif
+
+ifneq ($(addr),)
+CXXFLAGS += -fsanitize=address
+endif
+
 ifneq ($(HIT),)
 CXXFLAGS += -DEMH_FIND_HIT=1
 endif

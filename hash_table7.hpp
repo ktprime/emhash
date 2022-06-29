@@ -1698,7 +1698,7 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from)
     {
-#if __x86_64__ || _M_X64
+#if EMH_X86
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
 #else
@@ -1717,19 +1717,11 @@ private:
         }
 
         const auto qmask = _mask / SIZE_BIT;
-        if (0) {
-#if 0
+        if (1) {
             const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
-            const auto bmask2 = *((size_t*)_bitmask + step);
-            if (bmask2 != 0)
-                return step * SIZE_BIT + CTZ(bmask2);
-#endif
-#if 0
-            const auto begino = bucket_from - bucket_from % 32;
-            const auto beginw = *(size_t*)((uint8_t*)_bitmask + begino / 8);
-            if (beginw != 0)
-                return begino + CTZ(beginw);//reverse beginw
-#endif
+            const auto bmask3 = *((size_t*)_bitmask + step);
+            if (bmask3 != 0)
+                return step * SIZE_BIT + CTZ(bmask3);
         }
 
         auto& _last = EMH_BUCKET(_pairs, _num_buckets);

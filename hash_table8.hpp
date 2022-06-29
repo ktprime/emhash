@@ -309,8 +309,7 @@ public:
         if (this == &rhs)
             return *this;
 
-        if (is_triviall_destructable())
-            clearkv();
+        clearkv();
 
         if (_num_buckets < rhs._num_buckets || _num_buckets > 2 * rhs._num_buckets) {
             free(_pairs); _pairs = alloc_bucket(rhs._num_buckets);
@@ -349,8 +348,7 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable())
-            clearkv();
+        clearkv();
         free(_pairs);
         free(_index);
     }
@@ -969,8 +967,10 @@ public:
 
     void clearkv()
     {
-        while (_num_filled --)
-            _pairs[_num_filled].~PairT();
+        if (is_triviall_destructable()) {
+            while (_num_filled --)
+                _pairs[_num_filled].~PairT();
+        }
     }
 
     /// Remove all elements, keeping full capacity.
@@ -979,8 +979,7 @@ public:
         if (_num_filled > 0 || _ehead > 0)
             memset(_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
 
-        if (is_triviall_destructable())
-            clearkv();
+        clearkv();
 
         _last = _num_filled = 0;
         _ehead = 0;
@@ -1135,12 +1134,27 @@ public:
         return true;
     }
 
+    void rebuild(size_type num_buckets)
+    {
+        auto new_pairs = (PairT*)alloc_bucket(num_buckets * max_load_factor() + 4);
+        if (is_copy_trivially())
+            memcpy(new_pairs, _pairs, _num_filled * sizeof(PairT));
+        else {
+            for (size_type slot = 0; slot < _num_filled; slot++) {
+                new(new_pairs + slot) PairT(std::move(_pairs[slot]));
+                if (is_triviall_destructable())
+                    _pairs[slot].~PairT();
+            }
+        }
+        free(_pairs); _pairs = new_pairs;
+    }
+
     void rehash(size_type required_buckets)
     {
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
+        size_type num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
 #if EMH_REHASH_LOG
@@ -1153,19 +1167,10 @@ public:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
-        auto new_pairs = (PairT*)alloc_bucket((uint64_t)num_buckets * max_load_factor() + 4);
-        if (is_copy_trivially())
-            memcpy(new_pairs, _pairs, _num_filled * sizeof(PairT));
-        else {
-            for (size_type slot = 0; slot < _num_filled; slot++) {
-                new(new_pairs + slot) PairT(std::move(_pairs[slot]));
-                if (is_triviall_destructable())
-                    _pairs[slot].~PairT();
-            }
-        }
+        free(_index);
+        rebuild(_num_buckets);
 
-        free(_pairs); _pairs = new_pairs;
-        free(_index); _index = (Index*)alloc_index (num_buckets);
+        _index = (Index*)alloc_index (num_buckets);
 
         memset(_index, INACTIVE, sizeof(_index[0]) * num_buckets);
         memset(_index + num_buckets, 0, sizeof(_index[0]) * EAD);

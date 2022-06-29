@@ -345,6 +345,7 @@ int main(int argc, const char* argv[])
     test<std_unordered_map> ("std::unordered_map" );
 #ifdef CXX20
     test<jg_densemap> ("jg_densemap" );
+    test<martinus_dense>("martinus_dense" );
 #endif
 
     test<tsl_robin_map> ("tsl_robin_map" );
@@ -354,7 +355,6 @@ int main(int argc, const char* argv[])
     test<emhash_map6> ("emhash_map6" );
     test<emhash_map7> ("emhash_map7" );
     test<emhash_map8> ("emhash_map8" );
-    test<martinus_dense>("martinus_dense" );
     test<martinus_flat> ("martinus_flat" );
     test<emilib2_map> ("emilib2_map" );
     test<emilib3_map> ("emilib3_map" );
