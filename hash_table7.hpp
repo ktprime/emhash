@@ -1,5 +1,5 @@
 // emhash7::HashMap for C++11/14/17
-// version 2.1.0
+// version 2.1.2
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1691,34 +1691,28 @@ private:
         }
 
         //find a new empty and link it to tail, TODO link after main bucket?
-        const auto new_bucket = find_empty_bucket(next_bucket);// : find_empty_bucket(next_bucketx);
+        const auto new_bucket = find_empty_bucket(bucket + 2);// : find_empty_bucket(next_bucketx);
         return EMH_BUCKET(_pairs, next_bucket) = new_bucket;
     }
 
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from)
     {
-#if EMH_X86
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
+
+#if EMH_X86
+        const auto bmask = *(size_t*)(start) >> boset;
 #else
-        const auto boset = bucket_from % SIZE_BIT;
-        auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
+        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
 #endif
 
-        const auto bmask = *(size_t*)(start) >> boset;
-        if (EMH_LIKELY(bmask != 0)) {
-            const auto offset = CTZ(bmask);
-            //if (EMH_LIKELY(offset < 8 + 256 / sizeof(PairT)) || begin[0] == 0)
-            return bucket_from + offset;
-            //const auto rerverse_bit = ((begin[0] * 0x80200802ULL) & 0x0884422110ULL) * 0x0101010101ULL >> 32;
-            //return bucket_from - boset + 7 - CTZ(rerverse_bit);
-            //return bucket_from - boset + CTZ(begin[0]);
-        }
+        if (EMH_LIKELY(bmask != 0))
+            return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
         if (1) {
-            const auto step = (bucket_from + 2 * SIZE_BIT) & qmask;
+            const auto step = (bucket_from - SIZE_BIT / 2) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
                 return step * SIZE_BIT + CTZ(bmask3);

@@ -1,5 +1,5 @@
 // emhash6::HashMap for C++11/14/17
-// version 1.6.8
+// version 1.6.9
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1638,7 +1638,7 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(next_bucket);
+        const auto new_bucket = find_empty_bucket(bucket + 1);
         return EMH_ADDR(_pairs, next_bucket) = new_bucket * 2 + 1;
     }
 
@@ -1648,16 +1648,27 @@ private:
 #if EMH_X86
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
+        const auto bmask = *(size_t*)(start) >> boset;
+#elif 1
+        const auto boset = bucket_from % 8;
+        auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
+        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
 #else
         const auto boset = bucket_from % SIZE_BIT;
         auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
-#endif
         const auto bmask = *(size_t*)(start) >> boset;
+#endif
 
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
+        if (1) {
+            const auto step = (bucket_from - SIZE_BIT / 2) & qmask;
+            const auto bmask3 = *((size_t*)_bitmask + step);
+            if (bmask3 != 0)
+                return step * SIZE_BIT + CTZ(bmask3);
+        }
 
         for (uint32_t s = bucket_from / SIZE_BIT + 2, n = 1;  ; s += ++n) {
             auto& _last = EMH_ADDR(_pairs, _mask + 1);

@@ -519,7 +519,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 
     ehmap5<keyType, int> ehash5;
 
-#if 1
+#if EMH6
     ehmap6<keyType, int> unhash;
 #else
     ehmap8<keyType, int> unhash;

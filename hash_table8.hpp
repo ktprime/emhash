@@ -1,5 +1,5 @@
-// emhash5::HashMap for C++11
-// version 1.5.8
+// emhash5::HashMap for C++11/14/17
+// version 1.6.1
 // https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.

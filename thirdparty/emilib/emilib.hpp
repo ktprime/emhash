@@ -1193,7 +1193,12 @@ private:
     size_t find_empty_slot(size_t next_bucket, int offset)
     {
         while (true) {
+#if 0
             const auto maske = *(uint64_t*)(_states + next_bucket) & EEMPTY_FIND;
+#else
+            uint64_t maske; memcpy(&maske, _states + next_bucket, sizeof(maske));
+            maske &= EEMPTY_FIND;
+#endif
             if (EMH_LIKELY(maske != 0)) {
                 const auto probe = CTZ(maske) / stat_bits;
                 offset      += probe;

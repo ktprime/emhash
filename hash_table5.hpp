@@ -1,5 +1,5 @@
-// emhash5::HashMap for C++11
-// version 2.0.0
+// emhash5::HashMap for C++11/14/17
+// version 2.0.1
 // https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -103,7 +103,7 @@
 namespace emhash5 {
 
 typedef uint32_t     size_type;
-const constexpr size_type INACTIVE = 0xFAAAAAAA;
+const constexpr size_type INACTIVE = 0xFFFFFFFF;
 
 template <typename First, typename Second>
 struct entry {
@@ -1232,6 +1232,28 @@ public:
         }
     }
 
+    void reset_empty()
+    {
+#if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value) {
+//        _zero_index = hash_key(INACTIVE) & _mask;
+        reset_bucket(hash_key(INACTIVE) & _mask);
+        }
+#endif
+    }
+
+    void reset_bucket(size_type bucket)
+    {
+#if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value) {
+            auto& key = EMH_KEY(_pairs, bucket); key = INACTIVE;
+//            if (bucket != _zero_index)
+//                return;
+            while ((hash_key(key) & _mask) == bucket) key ++;
+        }
+#endif
+    }
+
     /// Remove all elements, keeping full capacity.
     void clear()
     {
@@ -1245,6 +1267,7 @@ public:
         else
             memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 #endif
+        reset_empty();
 
         _last = _num_filled = 0;
     }
@@ -1313,12 +1336,10 @@ public:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
-        auto new_pairs = (PairT*)alloc_bucket(num_buckets);
-        for (size_type bucket = 0; bucket < num_buckets; bucket++)
-            EMH_BUCKET(new_pairs, bucket) = INACTIVE;
-
-        memset((char*)(new_pairs + num_buckets), 0, sizeof(PairT) * 2);
-        _pairs       = new_pairs;
+        _pairs = (PairT*)alloc_bucket(num_buckets);
+        memset(_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
+        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
+        reset_empty();
 
         (void)old_buckets;
         if (0 && is_copy_trivially() && old_num_filled && _num_buckets >= 2 * old_buckets) {
@@ -1472,6 +1493,7 @@ private:
                 push_empty(bucket);
         }
 #endif
+        reset_bucket(bucket);
     }
 
     template <typename K=KeyT>
@@ -1562,11 +1584,27 @@ private:
         const auto bucket = key_hash & _mask;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
 
+#ifndef EMH_FIND_HIT
         if ((int)next_bucket < 0)
             return _num_buckets;
         else if (_eq(EMH_KEY(_pairs, bucket), key))
             return bucket;
-        else if (next_bucket == bucket)
+#else
+
+        if constexpr (std::is_integral<K>::value) {
+            if (_eq(EMH_KEY(_pairs, bucket), key))
+                return bucket;
+            else if ((int)next_bucket < 0)
+                return _num_buckets;
+        } else {
+            if ((int)next_bucket < 0)
+                return _num_buckets;
+            else if (_eq(EMH_KEY(_pairs, bucket), key))
+                return bucket;
+        }
+#endif
+
+        if (next_bucket == bucket)
             return _num_buckets;
 //        else if (key_to_bucket(EMH_KEY(_pairs, bucket)) != bucket)
 //            return _num_buckets;

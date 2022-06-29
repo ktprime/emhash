@@ -113,7 +113,7 @@ std::map<std::string, std::string> maps =
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
-#include "../hash_table8.hpp"
+#include "../hash_table7o.hpp"
 
 //https://jishuin.proginn.com/p/763bfbd338d0
 //https://en.wikipedia.org/wiki/Hash_table
@@ -1189,7 +1189,7 @@ static int benchHashMap(int n)
         int64_t ts = getus(), sum = 0ul;
         for (auto& v : vList)
 #if KEY_INT
-            sum += v;
+            sum += (int)v;
 #elif KEY_CLA
         sum += v.lScore;
 #else
@@ -1279,10 +1279,10 @@ static int benchHashMap(int n)
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
+        {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
-        {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
 #if ET
         {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
@@ -1344,7 +1344,7 @@ static void testHashInt(int loops = 500000009)
 
     ts = getus(); sum = r;
     for (int i = 1; i < loops; i++)
-        sum += sum + i;
+        sum += (int)sum + i;
     printf("sum  add   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
 #ifdef ROBIN_HOOD_H_INCLUDED
@@ -1474,9 +1474,10 @@ int main(int argc, char* argv[])
                 else
                     maps[hash_name] = hash_name;
             }
-            else if (c == 'm')
+            else if (c == 'm') {
                 maps.erase("martinf");
-            else if (c == 'p')
+                maps.erase("martind");
+            } else if (c == 'p')
                 maps.erase("phmap");
             else if (c == 't')
                 maps.erase("tslr");
