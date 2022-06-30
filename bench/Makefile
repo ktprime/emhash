@@ -99,10 +99,10 @@ all:
 ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
 endif
+	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) martinus_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) btest.cpp -o btest
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
-	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench

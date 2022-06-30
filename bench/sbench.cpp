@@ -1070,7 +1070,7 @@ static int benchHashSet(int n)
         int64_t ts = getus(), sum = 0ul;
         for (auto& v : vList)
 #if KEY_INT
-            sum += v;
+            sum += (int)v;
 #elif KEY_CLA
         sum += v.lScore;
 #else

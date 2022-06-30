@@ -113,7 +113,7 @@ std::map<std::string, std::string> maps =
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
-#include "../hash_table7o.hpp"
+#include "../hash_table8.hpp"
 
 //https://jishuin.proginn.com/p/763bfbd338d0
 //https://en.wikipedia.org/wiki/Hash_table

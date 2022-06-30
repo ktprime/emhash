@@ -368,7 +368,8 @@ public:
         memcpy(_index, rhs._index, (_num_buckets + EAD) * sizeof(Index));
 
         if (is_copy_trivially()) {
-            memcpy(_pairs, opairs, _num_filled * sizeof(PairT));
+            if (opairs)
+                memcpy(_pairs, opairs, _num_filled * sizeof(PairT));
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++)
                 new(_pairs + slot) PairT(opairs[slot]);
@@ -1137,9 +1138,10 @@ public:
     void rebuild(size_type num_buckets)
     {
         auto new_pairs = (PairT*)alloc_bucket(num_buckets * max_load_factor() + 4);
-        if (is_copy_trivially())
-            memcpy(new_pairs, _pairs, _num_filled * sizeof(PairT));
-        else {
+        if (is_copy_trivially()) {
+            if (_pairs)
+                memcpy(new_pairs, _pairs, _num_filled * sizeof(PairT));
+        } else {
             for (size_type slot = 0; slot < _num_filled; slot++) {
                 new(new_pairs + slot) PairT(std::move(_pairs[slot]));
                 if (is_triviall_destructable())

@@ -1,5 +1,5 @@
 #pragma once
-// version 1.4.2
+// version 1.4.3
 // https://github.com/ktprime/ktprime/blob/master/hash_set4.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -23,21 +23,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
-
-
-// From
-// NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
-// Quadratic collision resolution   1 - ln(1-L) - L/2    1/(1-L) - L - ln(1-L)
-// Linear collision resolution     [1+1/(1-L)]/2         [1+1/(1-L)2]/2
-//
-// -- enlarge_factor --           0.10  0.50  0.60  0.75  0.80  0.90  0.99
-// QUADRATIC COLLISION RES.
-//    probes/successful lookup    1.05  1.44  1.62  2.01  2.21  2.85  5.11
-//    probes/unsuccessful lookup  1.11  2.19  2.82  4.64  5.81  11.4  103.6
-// LINEAR COLLISION RES.
-//    probes/successful lookup    1.06  1.5   1.75  2.5   3.0   5.5   50.5
-//    probes/unsuccessful lookup  1.12  2.5   3.6   8.5   13.0  50.0
-
 
 #include <cstring>
 #include <string>
@@ -1218,31 +1203,32 @@ private:
     // key is not in this map. Find a place to put it.
     uint32_t find_empty_bucket(const uint32_t bucket_from)
     {
-#if __x86_64__ || _M_X64
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
+
+#if EMH_X86 
+        const auto bmask = *(size_t*)(start) >> boset;
 #else
-        const auto boset = bucket_from % SIZE_BIT;
-        auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
+        //const auto boset = bucket_from % SIZE_BIT;
+        //auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
+        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
 #endif
 
-        const auto bmask = *(size_t*)(start) >> boset;
         if (EMH_LIKELY(bmask != 0)) {
             const auto offset = CTZ(bmask);
             return bucket_from + offset;
         }
 
         const auto qmask = _mask / SIZE_BIT;
-
         for (size_t i = 2; ; i++) {
+            const auto bmask2 = *((size_t*)_bitmask + _last);
+            if (bmask2 != 0)
+                return _last * SIZE_BIT + CTZ(bmask2);
+
             const auto step = (bucket_from + i * SIZE_BIT) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
                 return step * SIZE_BIT + CTZ(bmask3);
-
-            const auto bmask2 = *((size_t*)_bitmask + _last);
-            if (bmask2 != 0)
-                return _last * SIZE_BIT + CTZ(bmask2);
 #if 0
             const auto next1 = (qmask / 2 + _last)  & qmask;
 //            const auto next1 = qmask - _last;

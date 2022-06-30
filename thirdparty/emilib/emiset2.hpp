@@ -815,7 +815,13 @@ private:
         constexpr uint64_t EMPTY_MASK = 0x0101010101010101ull;
 
         while (true) {
-            const auto maske = *(uint64_t*)(_states + next_bucket) & EMPTY_MASK;
+#if EMH_X86
+            auto maske = *(uint64_t*)(_states + next_bucket);
+#else
+            uint64_t maske; memcpy(&maske, _states + next_bucket, sizeof(maske));
+#endif
+            maske &= EMPTY_MASK;
+
             if (EMH_LIKELY(maske != 0)) {
                 const auto probe = CTZ(maske) / stat_bits;
                 offset += probe;
@@ -838,7 +844,11 @@ private:
     {
         constexpr uint64_t EFILLED_FIND = 0xfefefefefefefefeull;
         while (true) {
+#if EMH_X86
             const auto maske = ~(*(uint64_t*)(_states + next_bucket) | EFILLED_FIND);
+#else
+            uint64_t maske; memcpy(&maske, _states + next_bucket, sizeof(maske)); maske = ~(maske | EFILLED_FIND);
+#endif
             if (EMH_LIKELY(maske != 0))
                 return next_bucket + CTZ(maske) / stat_bits;
             next_bucket += stat_bytes;
