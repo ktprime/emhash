@@ -7,8 +7,9 @@
 #include <cstdint>
 #include <cstddef>
 #include <cmath>
-#include <algorithm>
 #include <iterator>
+#include <limits>
+#include <algorithm>
 #include <utility>
 #include <type_traits>
 #include "flat_hash_map.hpp"
@@ -49,7 +50,7 @@ struct sherwood_v8_constants
     // 3. add 44 more triangular numbers at a much steeper growth rate
     // to get a sequence that allows large jumps so that a table
     // with 10000 sequential numbers doesn't endlessly re-allocate
-    static constexpr size_t jump_distances[num_jump_distances]
+    static constexpr size_t jump_distances[num_jump_distances + 2]
     {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 
@@ -68,7 +69,7 @@ struct sherwood_v8_constants
         3525196427195653, 7931691866727775, 17846306747368716,
         40154190394120111, 90346928493040500, 203280588949935750,
         457381324898247375, 1029107980662394500, 2315492957028380766,
-        5209859150892887590,
+        5209859150892887590, 0, 0
     };
 };
 template<typename T>
@@ -88,7 +89,7 @@ constexpr int8_t sherwood_v8_constants<T>::bits_for_distance;
 template<typename T>
 constexpr int sherwood_v8_constants<T>::num_jump_distances;
 template<typename T>
-constexpr size_t sherwood_v8_constants<T>::jump_distances[num_jump_distances];
+constexpr size_t sherwood_v8_constants<T>::jump_distances[num_jump_distances + 2];
 
 template<typename T, uint8_t BlockSize>
 struct sherwood_v8_block
@@ -424,10 +425,12 @@ public:
             if (compares_equal(key, block->data[index_in_block]))
                 return { block, index };
             int8_t to_next_index = metadata & Constants::bits_for_distance;
-            if (to_next_index == 0)
+            if (to_next_index == 0 || to_next_index >= Constants::num_jump_distances)
                 return end();
             index += Constants::jump_distances[to_next_index];
             index = hash_policy.keep_in_range(index, num_slots_minus_one);
+            if ((index % BlockSize) == (size_t)index_in_block && (index / BlockSize) == block_index)
+                return end();
         }
     }
     inline const_iterator find(const FindKey & key) const
@@ -479,10 +482,12 @@ public:
             if (compares_equal(key, block->data[index_in_block]))
                 return { { block, index }, false };
             int8_t to_next_index = metadata & Constants::bits_for_distance;
-            if (to_next_index == 0)
+            if (to_next_index == 0 || to_next_index >= Constants::num_jump_distances)
                 return emplace_new_key({ index, block }, std::forward<Key>(key), std::forward<Args>(args)...);
             index += Constants::jump_distances[to_next_index];
             index = hash_policy.keep_in_range(index, num_slots_minus_one);
+            if ((index % BlockSize) == (size_t)index_in_block && (index / BlockSize) == block_index)
+                return emplace_new_key({ index, block }, std::forward<Key>(key), std::forward<Args>(args)...);
         }
     }
 
@@ -633,7 +638,7 @@ public:
                 for (;;)
                 {
                     LinkedListIt next = root.next(*this);
-                    if (next == list_it)
+                    if (next == list_it || next == root)
                         break;
                     ++distance;
                     root = next;
@@ -724,7 +729,7 @@ public:
     }
     float load_factor() const
     {
-        return static_cast<double>(num_elements) / (num_slots_minus_one + 1);
+        return static_cast<float>(num_elements) / (num_slots_minus_one + 1);
     }
     void max_load_factor(float value)
     {
@@ -744,7 +749,7 @@ private:
     BlockPointer entries = BlockType::empty_block();
     size_t num_slots_minus_one = 0;
     typename HashPolicySelector<ArgumentHash>::type hash_policy;
-    float _max_load_factor = 0.9999f;
+    float _max_load_factor = 0.9375f;
     size_t num_elements = 0;
 
     size_t num_buckets_for_reserve(size_t num_elements) const
@@ -883,6 +888,7 @@ private:
                 return emplace(std::forward<Args>(args)...);
             }
             value_type new_value(std::forward<Args>(args)...);
+            size_t cnt = 0;
             for (LinkedListIt it = block;;)
             {
                 AllocatorTraits::construct(*this, std::addressof(*free_block.second), std::move(*it));
@@ -905,6 +911,9 @@ private:
                     grow();
                     return emplace(std::move(new_value));
                 }
+                cnt++;
+                if (cnt > num_slots_minus_one)
+                    break;
             }
             AllocatorTraits::construct(*this, std::addressof(*block), std::move(new_value));
             block.set_metadata(Constants::magic_for_direct_hit);
@@ -946,7 +955,7 @@ private:
         for (;;)
         {
             LinkedListIt next = parent_block.next(*this);
-            if (next == child)
+            if (next == child || next == parent_block)
                 return parent_block;
             parent_block = next;
         }
@@ -1098,6 +1107,10 @@ public:
     {
     }
 
+    static const char * name() {
+        return "ska::bytell_hash_map<K, V>";
+    }
+
     inline V & operator[](const K & key)
     {
         return emplace(key, convertible_to_value()).first->second;
@@ -1216,6 +1229,10 @@ public:
     using Table::Table;
     bytell_hash_set()
     {
+    }
+
+    static const char * name() {
+        return "ska::bytell_hash_set<K, V>";
     }
 
     template<typename... Args>

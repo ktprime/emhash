@@ -1,5 +1,4 @@
 #include "util.h"
-#include <vector>
 #include <algorithm>
 
 #ifndef TKey
@@ -101,7 +100,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_LRU_SET         1
 //#define EMH_ERASE_SMALL     1
 //#define EMH_HIGH_LOAD         2345
-#define EMH_FIND_HIT        1
+//#define EMH_FIND_HIT        1
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
@@ -165,7 +164,7 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if CXX20
-#include "martinus/unordered_dense_map.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/unordered_dense.h"
 #endif
 
 #if HOOD_HASH
@@ -1263,7 +1262,7 @@ static int benchHashMap(int n)
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
         {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
-        {  benOneHash<ankerl::unordered_dense_map <keyType, valueType, ehash_func>>("martind", vList); }
+        {  benOneHash<ankerl::unordered_dense::map <keyType, valueType, ehash_func>>("martind", vList); }
 #endif
 
 #if QC_HASH && KEY_INT
@@ -1279,8 +1278,8 @@ static int benchHashMap(int n)
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
-        {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
+        {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
 #if ET

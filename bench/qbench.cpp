@@ -36,7 +36,7 @@
 #include "tsl/sparse_set.h"
 
 #if CXX20
-#include "martinus/unordered_dense_map.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/unordered_dense.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 
 #if FIB_HASH
@@ -1049,7 +1049,7 @@ struct RobinHoodMapInfo
 template <typename K, typename V>
 struct RobinDenseMapInfo
 {
-    using Container = ankerl::unordered_dense_map<K, V, QintHasher>;
+    using Container = ankerl::unordered_dense::map<K, V, QintHasher>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"martinus::dense "};

@@ -298,11 +298,10 @@ class sparse_array {
 
  private:
   static const size_type CAPACITY_GROWTH_STEP =
-      (Sparsity == tsl::sh::sparsity::high)
-          ? 2
-          : (Sparsity == tsl::sh::sparsity::medium)
-                ? 4
-                : 8;  // (Sparsity == tsl::sh::sparsity::low)
+      (Sparsity == tsl::sh::sparsity::high) ? 2
+      : (Sparsity == tsl::sh::sparsity::medium)
+          ? 4
+          : 8;  // (Sparsity == tsl::sh::sparsity::low)
 
   /**
    * Bitmap size configuration.
@@ -529,7 +528,7 @@ class sparse_array {
    * Return iterator to set value.
    */
   template <typename... Args>
-  iterator set(allocator_type &alloc, size_type index, Args &&... value_args) {
+  iterator set(allocator_type &alloc, size_type index, Args &&...value_args) {
     tsl_sh_assert(!has_value(index));
 
     const size_type offset = index_to_offset(index);
@@ -674,7 +673,7 @@ class sparse_array {
  private:
   template <typename... Args>
   static void construct_value(allocator_type &alloc, value_type *value,
-                              Args &&... value_args) {
+                              Args &&...value_args) {
     std::allocator_traits<allocator_type>::construct(
         alloc, value, std::forward<Args>(value_args)...);
   }
@@ -757,7 +756,7 @@ class sparse_array {
             typename std::enable_if<
                 std::is_nothrow_move_constructible<U>::value>::type * = nullptr>
   void insert_at_offset(allocator_type &alloc, size_type offset,
-                        Args &&... value_args) {
+                        Args &&...value_args) {
     if (m_nb_elements < m_capacity) {
       insert_at_offset_no_realloc(alloc, offset,
                                   std::forward<Args>(value_args)...);
@@ -771,7 +770,7 @@ class sparse_array {
             typename std::enable_if<!std::is_nothrow_move_constructible<
                 U>::value>::type * = nullptr>
   void insert_at_offset(allocator_type &alloc, size_type offset,
-                        Args &&... value_args) {
+                        Args &&...value_args) {
     insert_at_offset_realloc(alloc, offset, m_nb_elements + 1,
                              std::forward<Args>(value_args)...);
   }
@@ -780,7 +779,7 @@ class sparse_array {
             typename std::enable_if<
                 std::is_nothrow_move_constructible<U>::value>::type * = nullptr>
   void insert_at_offset_no_realloc(allocator_type &alloc, size_type offset,
-                                   Args &&... value_args) {
+                                   Args &&...value_args) {
     tsl_sh_assert(offset <= m_nb_elements);
     tsl_sh_assert(m_nb_elements < m_capacity);
 
@@ -805,7 +804,7 @@ class sparse_array {
             typename std::enable_if<
                 std::is_nothrow_move_constructible<U>::value>::type * = nullptr>
   void insert_at_offset_realloc(allocator_type &alloc, size_type offset,
-                                size_type new_capacity, Args &&... value_args) {
+                                size_type new_capacity, Args &&...value_args) {
     tsl_sh_assert(new_capacity > m_nb_elements);
 
     value_type *new_values = alloc.allocate(new_capacity);
@@ -839,7 +838,7 @@ class sparse_array {
             typename std::enable_if<!std::is_nothrow_move_constructible<
                 U>::value>::type * = nullptr>
   void insert_at_offset_realloc(allocator_type &alloc, size_type offset,
-                                size_type new_capacity, Args &&... value_args) {
+                                size_type new_capacity, Args &&...value_args) {
     tsl_sh_assert(new_capacity > m_nb_elements);
 
     value_type *new_values = alloc.allocate(new_capacity);
@@ -1457,24 +1456,24 @@ class sparse_hash : private Allocator,
   }
 
   template <class... Args>
-  std::pair<iterator, bool> emplace(Args &&... args) {
+  std::pair<iterator, bool> emplace(Args &&...args) {
     return insert(value_type(std::forward<Args>(args)...));
   }
 
   template <class... Args>
-  iterator emplace_hint(const_iterator hint, Args &&... args) {
+  iterator emplace_hint(const_iterator hint, Args &&...args) {
     return insert_hint(hint, value_type(std::forward<Args>(args)...));
   }
 
   template <class K, class... Args>
-  std::pair<iterator, bool> try_emplace(K &&key, Args &&... args) {
+  std::pair<iterator, bool> try_emplace(K &&key, Args &&...args) {
     return insert_impl(key, std::piecewise_construct,
                        std::forward_as_tuple(std::forward<K>(key)),
                        std::forward_as_tuple(std::forward<Args>(args)...));
   }
 
   template <class K, class... Args>
-  iterator try_emplace_hint(const_iterator hint, K &&key, Args &&... args) {
+  iterator try_emplace_hint(const_iterator hint, K &&key, Args &&...args) {
     if (hint != cend() && compare_keys(KeySelect()(*hint), key)) {
       return mutable_iterator(hint);
     }
@@ -1833,7 +1832,7 @@ class sparse_hash : private Allocator,
 
   template <class K, class... Args>
   std::pair<iterator, bool> insert_impl(const K &key,
-                                        Args &&... value_type_args) {
+                                        Args &&...value_type_args) {
     if (size() >= m_load_threshold_rehash) {
       rehash_impl(GrowthPolicy::next_bucket_count());
     } else if (size() + m_nb_deleted_buckets >=
@@ -1901,7 +1900,7 @@ class sparse_hash : private Allocator,
   std::pair<iterator, bool> insert_in_bucket(
       std::size_t sparse_ibucket,
       typename sparse_array::size_type index_in_sparse_bucket,
-      Args &&... value_type_args) {
+      Args &&...value_type_args) {
     auto value_it = m_sparse_buckets[sparse_ibucket].set(
         *this, index_in_sparse_bucket, std::forward<Args>(value_type_args)...);
     m_nb_elements++;

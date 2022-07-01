@@ -95,8 +95,8 @@ class sparse_map {
    public:
     using key_type = Key;
 
-    const key_type &operator()(const std::pair<Key, T> &key_value) const
-        noexcept {
+    const key_type &operator()(
+        const std::pair<Key, T> &key_value) const noexcept {
       return key_value.first;
     }
 
@@ -109,8 +109,8 @@ class sparse_map {
    public:
     using value_type = T;
 
-    const value_type &operator()(const std::pair<Key, T> &key_value) const
-        noexcept {
+    const value_type &operator()(
+        const std::pair<Key, T> &key_value) const noexcept {
       return key_value.second;
     }
 
@@ -294,7 +294,7 @@ class sparse_map {
    * Mainly here for compatibility with the `std::unordered_map` interface.
    */
   template <class... Args>
-  std::pair<iterator, bool> emplace(Args &&... args) {
+  std::pair<iterator, bool> emplace(Args &&...args) {
     return m_ht.emplace(std::forward<Args>(args)...);
   }
 
@@ -306,28 +306,27 @@ class sparse_map {
    * Mainly here for compatibility with the `std::unordered_map` interface.
    */
   template <class... Args>
-  iterator emplace_hint(const_iterator hint, Args &&... args) {
+  iterator emplace_hint(const_iterator hint, Args &&...args) {
     return m_ht.emplace_hint(hint, std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  std::pair<iterator, bool> try_emplace(const key_type &k, Args &&... args) {
+  std::pair<iterator, bool> try_emplace(const key_type &k, Args &&...args) {
     return m_ht.try_emplace(k, std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  std::pair<iterator, bool> try_emplace(key_type &&k, Args &&... args) {
+  std::pair<iterator, bool> try_emplace(key_type &&k, Args &&...args) {
     return m_ht.try_emplace(std::move(k), std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  iterator try_emplace(const_iterator hint, const key_type &k,
-                       Args &&... args) {
+  iterator try_emplace(const_iterator hint, const key_type &k, Args &&...args) {
     return m_ht.try_emplace_hint(hint, k, std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  iterator try_emplace(const_iterator hint, key_type &&k, Args &&... args) {
+  iterator try_emplace(const_iterator hint, key_type &&k, Args &&...args) {
     return m_ht.try_emplace_hint(hint, std::move(k),
                                  std::forward<Args>(args)...);
   }

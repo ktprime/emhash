@@ -224,7 +224,7 @@ class prime_growth_policy {
     auto it_prime = std::lower_bound(primes().begin(), primes().end(),
                                      min_bucket_count_in_out);
     if (it_prime == primes().end()) {
-      //throw std::length_error("The hash table exceeds its maximum size.");
+      throw std::length_error("The hash table exceeds its maximum size.");
     }
 
     m_iprime =
@@ -242,7 +242,7 @@ class prime_growth_policy {
 
   std::size_t next_bucket_count() const {
     if (m_iprime + 1 >= primes().size()) {
-      //throw std::length_error("The hash table exceeds its maximum size.");
+      throw std::length_error("The hash table exceeds its maximum size.");
     }
 
     return primes()[m_iprime + 1];

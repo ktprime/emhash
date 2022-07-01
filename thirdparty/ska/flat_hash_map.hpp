@@ -25,6 +25,15 @@ struct prime_number_hash_policy;
 struct power_of_two_hash_policy;
 struct fibonacci_hash_policy;
 
+template <typename T>
+struct remove_cvref : public std::remove_cv<typename std::remove_reference<T>::type> {
+};
+
+template <typename T1, typename T2>
+struct is_same_ex : public std::is_same<typename remove_cvref<T1>::type,
+                                        typename remove_cvref<T2>::type> {
+};
+
 namespace detailv3
 {
 template<typename Result, typename Functor>
@@ -71,33 +80,129 @@ struct functor_storage<Result, Result (*)(Args...)>
 template<typename key_type, typename value_type, typename hasher>
 struct KeyOrValueHasher : functor_storage<size_t, hasher>
 {
-    typedef functor_storage<size_t, hasher> hasher_storage;
+    typedef functor_storage<size_t, hasher>         hasher_storage;
+    typedef typename value_type::first_type         first_type;
+    typedef typename value_type::second_type        second_type;
+    typedef std::pair<first_type *, second_type>    value_type_2nd;
+
+    hasher hasher_;
+
     KeyOrValueHasher() = default;
     KeyOrValueHasher(const hasher & hash)
-        : hasher_storage(hash)
+        : hasher_storage(hash), hasher_(hash)
     {
     }
-    size_t operator()(const key_type & key)
+
+#if 0
+    template <typename Arg, typename std::enable_if<!ska::is_same_ex<Arg, key_type>::value &&
+                            std::is_constructible<key_type, typename ska::remove_cvref<Arg>::type
+                            >::value>::type * = nullptr>
+    size_t operator()(const Arg & arg)
+    {
+        key_type key(arg);
+        return hasher_(key);
+    }
+
+    template <typename Arg, typename std::enable_if<!ska::is_same_ex<Arg, key_type>::value &&
+                            std::is_constructible<key_type, typename ska::remove_cvref<Arg>::type
+                            >::value>::type * = nullptr>
+    size_t operator()(const Arg & arg) const
+    {
+        key_type key(arg);
+        return hasher_(key);
+    }
+#endif
+
+    template <typename KeyType, typename std::enable_if<
+                                    ska::is_same_ex<key_type, KeyType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const KeyType & key)
     {
         return static_cast<hasher_storage &>(*this)(key);
     }
-    size_t operator()(const key_type & key) const
+
+    template <typename KeyType, typename std::enable_if<
+                                    ska::is_same_ex<key_type, KeyType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const KeyType & key) const
     {
         return static_cast<const hasher_storage &>(*this)(key);
     }
+
+    template <typename KeyType, typename std::enable_if<
+                                    ska::is_same_ex<key_type, KeyType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const KeyType * key)
+    {
+        return static_cast<hasher_storage &>(*this)(key);
+    }
+
+    template <typename KeyType, typename std::enable_if<
+                                    ska::is_same_ex<key_type, KeyType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const KeyType * key) const
+    {
+        return static_cast<const hasher_storage &>(*this)(key);
+    }
+
+    template <typename FirstType, typename std::enable_if<
+                                    !ska::is_same_ex<key_type, FirstType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const FirstType & key)
+    {
+        return static_cast<hasher_storage &>(*this)(key);
+    }
+
+    template <typename FirstType, typename std::enable_if<
+                                    !ska::is_same_ex<key_type, FirstType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const FirstType & key) const
+    {
+        return static_cast<const hasher_storage &>(*this)(key);
+    }
+
+    template <typename FirstType, typename std::enable_if<
+                                    !ska::is_same_ex<key_type, FirstType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const FirstType * key)
+    {
+        return static_cast<hasher_storage &>(*this)(key);
+    }
+
+    template <typename FirstType, typename std::enable_if<
+                                    !ska::is_same_ex<key_type, FirstType>::value
+                                  >::type * = nullptr>
+    size_t operator()(const FirstType * key) const
+    {
+        return static_cast<const hasher_storage &>(*this)(key);
+    }
+
     size_t operator()(const value_type & value)
     {
         return static_cast<hasher_storage &>(*this)(value.first);
     }
+
     size_t operator()(const value_type & value) const
     {
         return static_cast<const hasher_storage &>(*this)(value.first);
     }
+
+    size_t operator()(const value_type_2nd & value)
+    {
+        return static_cast<hasher_storage &>(*this)(value.first);
+    }
+
+    size_t operator()(const value_type_2nd & value) const
+    {
+        return static_cast<const hasher_storage &>(*this)(value.first);
+    }
+
     template<typename F, typename S>
     size_t operator()(const std::pair<F, S> & value)
     {
         return static_cast<hasher_storage &>(*this)(value.first);
     }
+
     template<typename F, typename S>
     size_t operator()(const std::pair<F, S> & value) const
     {
@@ -107,48 +212,72 @@ struct KeyOrValueHasher : functor_storage<size_t, hasher>
 template<typename key_type, typename value_type, typename key_equal>
 struct KeyOrValueEquality : functor_storage<bool, key_equal>
 {
-    typedef functor_storage<bool, key_equal> equality_storage;
+    typedef functor_storage<bool, key_equal>        equality_storage;
+    typedef typename value_type::first_type         first_type;
+    typedef typename value_type::second_type        second_type;
+    typedef std::pair<first_type *, second_type>    value_type_2nd;
+
     KeyOrValueEquality() = default;
     KeyOrValueEquality(const key_equal & equality)
         : equality_storage(equality)
     {
     }
-    bool operator()(const key_type & lhs, const key_type & rhs)
+
+    template <typename KeyType, typename std::enable_if<
+                                    ska::is_same_ex<key_type, KeyType>::value
+                                  >::type * = nullptr>
+    bool operator()(const KeyType & lhs, const KeyType & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs, rhs);
     }
+
+    template <typename FirstType, typename std::enable_if<
+                                    !ska::is_same_ex<key_type, FirstType>::value
+                                  >::type * = nullptr>
+    bool operator()(const FirstType & lhs, const FirstType & rhs)
+    {
+        return static_cast<equality_storage &>(*this)(lhs, rhs);
+    }
+
     bool operator()(const key_type & lhs, const value_type & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs, rhs.first);
     }
+
     bool operator()(const value_type & lhs, const key_type & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs.first, rhs);
     }
+
     bool operator()(const value_type & lhs, const value_type & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs.first, rhs.first);
     }
+
     template<typename F, typename S>
     bool operator()(const key_type & lhs, const std::pair<F, S> & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs, rhs.first);
     }
+
     template<typename F, typename S>
     bool operator()(const std::pair<F, S> & lhs, const key_type & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs.first, rhs);
     }
+
     template<typename F, typename S>
     bool operator()(const value_type & lhs, const std::pair<F, S> & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs.first, rhs.first);
     }
+
     template<typename F, typename S>
     bool operator()(const std::pair<F, S> & lhs, const value_type & rhs)
     {
         return static_cast<equality_storage &>(*this)(lhs.first, rhs.first);
     }
+
     template<typename FL, typename SL, typename FR, typename SR>
     bool operator()(const std::pair<FL, SL> & lhs, const std::pair<FR, SR> & rhs)
     {
@@ -268,8 +397,7 @@ template<typename...> using void_t = void;
 template<typename T, typename = void>
 struct HashPolicySelector
 {
-    //typedef fibonacci_hash_policy type;
-	typedef power_of_two_hash_policy type;
+    typedef fibonacci_hash_policy type;
 };
 template<typename T>
 struct HashPolicySelector<T, void_t<typename T::hash_policy>>
@@ -537,6 +665,50 @@ public:
         return end();
     }
 
+#if 1
+    template <typename Arg, typename std::enable_if<!std::is_same<
+                            typename std::remove_cv<typename std::remove_reference<Arg>::type>::type, FindKey>::value &&
+                            std::is_constructible<FindKey, typename std::remove_cv<typename std::remove_reference<Arg>::type>::type
+                            >::value>::type * = nullptr>
+    iterator find(const Arg & arg)
+    {
+        FindKey key(arg);
+        return find(std::move(key));
+    }
+
+    template <typename Arg, typename std::enable_if<!std::is_same<
+                            typename std::remove_cv<typename std::remove_reference<Arg>::type>::type, FindKey>::value &&
+                            std::is_constructible<FindKey, typename std::remove_cv<typename std::remove_reference<Arg>::type>::type
+                            >::value>::type * = nullptr>
+    const_iterator find(const Arg & arg) const
+    {
+        FindKey key(arg);
+        return find(std::move(key));
+    }
+
+    template <typename InKey, typename std::enable_if<std::is_same<
+                              typename std::remove_cv<typename std::remove_reference<InKey>::type>::type, FindKey
+                              >::value>::type * = nullptr>
+    iterator find(const InKey & key)
+    {
+        size_t index = hash_policy.index_for_hash(hash_object(key), num_slots_minus_one);
+        EntryPointer it = entries + ptrdiff_t(index);
+        for (int8_t distance = 0; it->distance_from_desired >= distance; ++distance, ++it)
+        {
+            if (compares_equal(key, it->value))
+                return { it };
+        }
+        return end();
+    }
+
+    template <typename InKey, typename std::enable_if<std::is_same<
+                              typename std::remove_cv<typename std::remove_reference<InKey>::type>::type, FindKey
+                              >::value>::type * = nullptr>
+    const_iterator find(const InKey & key) const
+    {
+        return const_cast<sherwood_v3_table *>(this)->find(key);
+    }
+#else
     iterator find(const FindKey & key)
     {
         size_t index = hash_policy.index_for_hash(hash_object(key), num_slots_minus_one);
@@ -548,10 +720,13 @@ public:
         }
         return end();
     }
+
     const_iterator find(const FindKey & key) const
     {
         return const_cast<sherwood_v3_table *>(this)->find(key);
     }
+#endif
+
     size_t count(const FindKey & key) const
     {
         return find(key) == end() ? 0 : 1;
@@ -792,7 +967,7 @@ private:
     size_t num_slots_minus_one = 0;
     typename HashPolicySelector<ArgumentHash>::type hash_policy;
     int8_t max_lookups = detailv3::min_lookups - 1;
-    float _max_load_factor = 0.9f;
+    float _max_load_factor = 0.5f;
     size_t num_elements = 0;
 
     static int8_t compute_max_lookups(size_t num_buckets)
@@ -803,7 +978,7 @@ private:
 
     size_t num_buckets_for_reserve(size_t num_elements) const
     {
-        return static_cast<size_t>(std::ceil(num_elements / std::min(0.9, static_cast<double>(_max_load_factor))));
+        return static_cast<size_t>(std::ceil(num_elements / std::min(0.5, static_cast<double>(_max_load_factor))));
     }
     void rehash_for_other_container(const sherwood_v3_table & other)
     {
@@ -889,16 +1064,19 @@ private:
         max_lookups = detailv3::min_lookups - 1;
     }
 
-    template<typename U>
+    template <typename U>
     size_t hash_object(const U & key)
     {
         return static_cast<Hasher &>(*this)(key);
+        //return hasher()(key);
     }
-    template<typename U>
+    template <typename U>
     size_t hash_object(const U & key) const
     {
         return static_cast<const Hasher &>(*this)(key);
+        //return hasher()(key);
     }
+
     template<typename L, typename R>
     bool compares_equal(const L & lhs, const R & rhs)
     {
@@ -1330,6 +1508,10 @@ public:
     {
     }
 
+    static const char * name() {
+        return "ska::flat_hash_map<K, V>";
+    }
+
     inline V & operator[](const K & key)
     {
         return emplace(key, convertible_to_value()).first->second;
@@ -1446,6 +1628,10 @@ public:
     using Table::Table;
     flat_hash_set()
     {
+    }
+
+    static const char * name() {
+        return "ska::flat_hash_set<K, V>";
     }
 
     template<typename... Args>

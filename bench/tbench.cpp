@@ -220,7 +220,7 @@ int main(int argc, const char* argv[])
     hash_table_test<emhash8::HashMap<ktype, vtype, QintHasher>>("emhash8");
 
 
-#if ET > 1 
+#if ET > 1
     hash_table_test<ska::flat_hash_map<ktype, vtype>>("ska_flat");
     hash_table_test<emilib::HashMap<ktype, vtype, QintHasher>>("emilib1");
 #endif

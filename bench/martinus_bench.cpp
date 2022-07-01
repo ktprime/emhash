@@ -37,7 +37,7 @@
 #include "martinus/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 
 #if CXX20
-#include "martinus/unordered_dense_map.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/unordered_dense.h"
 #endif
 
 #if ET
@@ -791,7 +791,7 @@ void runTest(int sflags, int eflags)
         { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #if CXX20
-        { ankerl::unordered_dense_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
+        { ankerl::unordered_dense::map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
         { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
@@ -861,7 +861,7 @@ void runTest(int sflags, int eflags)
         { phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if CXX20
-        { ankerl::unordered_dense_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
+        { ankerl::unordered_dense::map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         { rigtorp::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
@@ -904,7 +904,7 @@ void runTest(int sflags, int eflags)
         { emhash5::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 
 #if CXX20
-        { ankerl::unordered_dense_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { ankerl::unordered_dense::map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { rigtorp::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
@@ -962,7 +962,7 @@ void runTest(int sflags, int eflags)
             { qc::hash::RawMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if CXX20
-            { ankerl::unordered_dense_map<size_t, size_t, hash_func> martin; bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]); }
+            { ankerl::unordered_dense::map<size_t, size_t, hash_func> martin; bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]); }
             { jg::dense_hash_map<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { rigtorp::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
@@ -1013,7 +1013,7 @@ void runTest(int sflags, int eflags)
 #if CXX20
         { jg::dense_hash_map<int, int, hash_func> qmap; bench_insert(qmap); }
         { rigtorp::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-        { ankerl::unordered_dense_map<int, int, hash_func> martin; bench_insert(martin); }
+        { ankerl::unordered_dense::map<int, int, hash_func> martin; bench_insert(martin); }
 #endif
 
 #if QC_HASH
@@ -1098,7 +1098,7 @@ void runTest(int sflags, int eflags)
         { folly::F14VectorMap <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
 #endif
 #if CXX20
-        { ankerl::unordered_dense_map<uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
+        { ankerl::unordered_dense::map<uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
         { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         //{ rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hange
 #endif
@@ -1125,7 +1125,7 @@ void runTest(int sflags, int eflags)
 #if CXX20
         { jg::dense_hash_map<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { rigtorp::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-        { ankerl::unordered_dense_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
+        { ankerl::unordered_dense::map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
 #endif
 
         { emhash6::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }

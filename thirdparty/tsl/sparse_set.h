@@ -242,7 +242,7 @@ class sparse_set {
    * Mainly here for compatibility with the `std::unordered_map` interface.
    */
   template <class... Args>
-  std::pair<iterator, bool> emplace(Args &&... args) {
+  std::pair<iterator, bool> emplace(Args &&...args) {
     return m_ht.emplace(std::forward<Args>(args)...);
   }
 
@@ -254,7 +254,7 @@ class sparse_set {
    * Mainly here for compatibility with the `std::unordered_map` interface.
    */
   template <class... Args>
-  iterator emplace_hint(const_iterator hint, Args &&... args) {
+  iterator emplace_hint(const_iterator hint, Args &&...args) {
     return m_ht.emplace_hint(hint, std::forward<Args>(args)...);
   }
 
