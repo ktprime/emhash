@@ -1,6 +1,5 @@
-// emhash5::HashMap for C++11/14/17
-// version 1.6.1
-// https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
+// emhash8::HashMap for C++11/14/17
+// version 1.6.2
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -1506,7 +1505,7 @@ private:
 
 /***
   Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
-Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing¡ªthe most cache-friendly alternative¡ªis typically used.
+Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probingÂ¡Âªthe most cache-friendly alternativeÂ¡Âªis typically used.
 
     It's the core algorithm of this hash map with highly optimization/benchmark.
 normaly linear probing is inefficient with high load factor, it use a new 3-way linear
