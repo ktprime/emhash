@@ -471,6 +471,48 @@ template<class MAP> void bench_randomDistinct2(MAP map)
     printf("total time = %.2f s\n\n", now2sec() - nows);
 }
 
+template<class MAP> void bench_copy(MAP map)
+{
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+    printf("%s map = %s\n", __FUNCTION__, map_name);
+
+    size_t result = 0;
+    sfc64 rng(987);
+
+    MAP mapSource;
+    uint64_t rememberKey = 0;
+    for (size_t i = 0; i < 1'000'000; ++i) {
+        auto key = rng();
+        if (i == 500'000) {
+            rememberKey = key;
+        }
+        mapSource[key] = i;
+    }
+
+    auto nows = now2sec();
+    MAP mapForCopy = mapSource;
+    for (size_t n = 0; n < 200; ++n) {
+        MAP m = mapForCopy;
+        result += m.size() + m[rememberKey];
+        mapForCopy[rng()] = rng();
+    }
+    assert(result == 300019900);
+    auto copyt = now2sec();
+    printf("copy time = %.2f s,", copyt - nows);
+    mapForCopy = mapSource;
+
+    MAP m;
+    for (size_t n = 0; n < 200; ++n) {
+        m = mapForCopy;
+        result += m.size() + m[rememberKey];
+        mapForCopy[rng()] = rng();
+    }
+    assert(result == 600039800);
+    printf(" assign time = %.2f s\n\n", now2sec() - copyt);
+}
+
 template<class MAP>
 size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 {
@@ -1165,6 +1207,59 @@ void runTest(int sflags, int eflags)
         putchar('\n');
     }
 
+    if (sflags <= 8 && eflags >= 8)
+    {
+#if STD_HASH
+        typedef std::hash<uint64_t> hash_func;
+#else
+        typedef robin_hood::hash<uint64_t> hash_func;
+#endif
+
+        { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+
+#if QC_HASH
+        { qc::hash::RawMap<int, int, hash_func> emap; bench_copy(emap); }
+#endif
+
+#if CXX20
+        { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { ankerl::unordered_dense::map <uint64_t, uint64_t, hash_func> martin; bench_copy(martin); }
+#endif
+
+#if EM3
+        { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+#endif
+
+#if X86
+        { emilib::HashMap<uint64_t, uint64_t, hash_func> emap;  bench_copy(emap); }
+        { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+        { emilib3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_copy(emap); }
+#endif
+#if ET
+        { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_copy(rmap); }
+        { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_copy(martin); }
+
+#if X86_64
+        { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_copy(fmap); }
+#endif
+        { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_copy(pmap); }
+#endif
+#if ABSL
+        { absl::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_copy(pmap); }
+#endif
+
+#if FOLLY
+        { folly::F14VectorMap <uint64_t, uint64_t, hash_func> pmap; bench_copy(pmap); }
+#endif
+
+    }
+
     printf("total time = %.3f s", now2sec() - start);
 }
 
@@ -1183,7 +1278,7 @@ int main(int argc, char* argv[])
     for (auto& m : show_name)
         printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
 
-    int sflags = 1, eflags = 7;
+    int sflags = 1, eflags = 8;
     if (argc > 1) {
         printf("cmd agrs = %s\n", argv[1]);
         for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {

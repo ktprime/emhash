@@ -25,7 +25,7 @@
 #endif
 
 using namespace std::chrono_literals;
-#if TKey == 0
+#if TKey == 1
 using KeyType = uint64_t;
 #else
 using KeyType = uint32_t;
@@ -156,7 +156,7 @@ template<class Map>  void test_iteration( Map& map, std::chrono::steady_clock::t
     {
         if( it->second & 1 )
         {
-//            map.erase( it++ );//can not use
+//            map.erase( it++ );//can not use in some hash map
             it = map.erase( it );
         }
         else

@@ -121,12 +121,11 @@ namespace emhash6 {
     static constexpr size_type INACTIVE = 0 - 0x1ull;
 #endif
 
-
 constexpr size_type MASK_BIT = sizeof(size_type) * 8;
-constexpr size_type BIT_PACK = sizeof(uint64_t) * 2 + sizeof(uint8_t);
+constexpr size_type BIT_PACK = sizeof(size_t) * 2;
 constexpr size_type SIZE_BIT = sizeof(size_t) * 8;
-constexpr size_type PACK_SIZE = 1; // > 1
-static_assert(INACTIVE % 2 == 1, "INACTIVE must be even and < 0(to int)");
+constexpr size_type PACK_SIZE = 2; // > 1
+
 static_assert((int)INACTIVE < 0, "INACTIVE must be even and < 0(to int)");
 
 //https://gist.github.com/jtbr/1896790eb6ad50506d5f042991906c30
@@ -454,12 +453,12 @@ public:
 
     size_type AllocSize(size_type num_buckets) const
     {
-        return num_buckets * sizeof(PairT) + PACK_SIZE * sizeof(PairT) + num_buckets / 8 + sizeof(uint64_t);
+        return (num_buckets + PACK_SIZE) * sizeof(PairT) + num_buckets / 8 + BIT_PACK;
     }
 
     HashMap(const HashMap& rhs)
     {
-        _pairs = (PairT*)malloc((3 + rhs._mask) * sizeof(PairT) + (rhs._mask + 1) / 8 + BIT_PACK);
+        _pairs = (PairT*)malloc(AllocSize(rhs._mask + 1));
         clone(rhs);
     }
 
@@ -499,7 +498,7 @@ public:
 
         if (_mask != rhs._mask) {
             free(_pairs);
-            _pairs = (PairT*)malloc((3 + rhs._mask) * sizeof(PairT) + (rhs._mask + 1) / 8 + BIT_PACK);
+            _pairs = (PairT*)malloc(AllocSize(1 + rhs._mask));
         }
 
         clone(rhs);
@@ -567,7 +566,7 @@ public:
                     new(_pairs + bucket) PairT(opairs[bucket]);
             }
         }
-        memcpy(_pairs + _num_buckets, opairs + _num_buckets, 2 * sizeof(PairT) + _num_buckets / 8 + BIT_PACK);
+        memcpy(_pairs + _num_buckets, opairs + _num_buckets, PACK_SIZE * sizeof(PairT) + _num_buckets / 8 + BIT_PACK);
     }
 
     void swap(HashMap& rhs)
@@ -1258,17 +1257,17 @@ public:
             return;
 #if 0 //(__GNUC__ >= 4 || __clang__)
         size_type num_buckets = 1ul << (sizeof(required_buckets) * 8 - __builtin_clz(required_buckets));
-        if (num_buckets < sizeof(uint64_t))
-            num_buckets = sizeof(uint64_t);
+        if (num_buckets < sizeof(size_t))
+            num_buckets = sizeof(size_t);
 #else
-        size_type num_buckets = _num_filled > (1u << 16) ? (1u << 16) : sizeof(uint64_t);
+        size_type num_buckets = _num_filled > (1u << 16) ? (1u << 16) : sizeof(size_t);
         while (num_buckets < required_buckets) { num_buckets *= 2; }
         //assert(num_buckets == (2 << CTZ(required_buckets)));
 #endif
 
         //assert(num_buckets > _num_filled);
         auto old_num_filled  = _num_filled;
-        auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_buckets / 8 + BIT_PACK);
+        auto* new_pairs = (PairT*)malloc(AllocSize(num_buckets));
 #if EMH_EXCEPT
         if (EMH_UNLIKELY(!new_pairs))
             throw std::bad_alloc();
@@ -1278,11 +1277,11 @@ public:
 
         auto old_pairs = _pairs;
 
-        _bitmask = (size_type*)(new_pairs + 2 + num_buckets);
-        const auto bitmask_pack = ((size_t)_bitmask) % sizeof(uint64_t);
+        _bitmask = (size_type*)(new_pairs + PACK_SIZE + num_buckets);
+        const auto bitmask_pack = ((size_t)_bitmask) % sizeof(size_t);
         if (bitmask_pack != 0) {
-            _bitmask = (size_type*)((char*)_bitmask + sizeof(uint64_t) - bitmask_pack);
-            assert(0 == ((size_t)_bitmask) % sizeof(uint64_t));
+            _bitmask = (size_type*)((char*)_bitmask + sizeof(size_t) - bitmask_pack);
+            assert(0 == ((size_t)_bitmask) % sizeof(size_t));
         }
 
         _num_filled  = 0;
@@ -1300,11 +1299,11 @@ public:
         reset_zero();
 
         //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
-        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
+        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * PACK_SIZE);
 
         /***************** init bitmask ---------------------- ***********/
         memset(_bitmask, 0xFFFFFFFF, num_buckets / 8);
-        memset((char*)_bitmask + num_buckets / 8, 0, sizeof(uint64_t) + sizeof(uint8_t));
+        memset((char*)_bitmask + num_buckets / 8, 0, BIT_PACK);
         //pack last position to bit 0
         /**************** -------------------------------- *************/
 
@@ -1638,7 +1637,7 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(bucket + 1);
+        const auto new_bucket = find_empty_bucket(bucket);
         return EMH_ADDR(_pairs, next_bucket) = new_bucket * 2 + 1;
     }
 
@@ -1652,7 +1651,8 @@ private:
 #elif 1
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
-        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
+        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask));
+        bmask >>= boset;// bmask |= ((size_t)start[8] << (SIZE_BIT - boset));
 #else
         const auto boset = bucket_from % SIZE_BIT;
         auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;

@@ -98,20 +98,18 @@ template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, type
 class HashMap
 {
 public:
-    typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
-    typedef std::pair<KeyT, ValueT>           value_type;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
+    using value_type = std::pair<KeyT, ValueT>;
 
 public:
-    typedef KeyT              key_type;
-    typedef ValueT            mapped_type;
+    using key_type = KeyT;
+    using mapped_type = ValueT;
 
-    typedef uint32_t          size_type;
-    typedef value_type&       reference;
-    typedef const value_type& const_reference;
-
-    typedef value_type*       pointer;
-    typedef const value_type* const_pointer;
-    typedef std::ptrdiff_t    difference_type;
+#ifndef EMH_SIZE_TYPE
+    using size_type = uint32_t;
+#else
+    using size_type = size_t;
+#endif
 
     using hasher = HashT;
     using key_equal = EqT;
@@ -126,7 +124,13 @@ public:
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
+        using iterator_category = std::bidirectional_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type      = typename htype::value_type;
+        using pointer         = value_type*;
+        using const_pointer   = const value_type* ;
+        using reference       = value_type&;
+        using const_reference = const value_type&;
 
         iterator() : kv_(nullptr) {}
         iterator(const_iterator& cit)  {
@@ -183,7 +187,13 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
+        using iterator_category = std::bidirectional_iterator_tag;
+        using value_type        = typename htype::value_type;
+        using difference_type   = std::ptrdiff_t;
+        using pointer           = value_type*;
+        using const_pointer     = const value_type*;
+        using reference         = value_type&;
+        using const_reference   = const value_type&;
 
         const_iterator(const iterator& it) {
             kv_    = it.kv_;
@@ -219,12 +229,12 @@ public:
             return *this;
         }
 
-        reference operator*() const
+        const_reference operator*() const
         {
             return *kv_;
         }
 
-        pointer operator->() const
+        const_pointer operator->() const
         {
             return kv_;
         }
@@ -240,7 +250,7 @@ public:
         }
     public:
 //        const value_type* start_;
-        value_type* kv_;
+        const value_type* kv_;
     };
 
     void init(size_type bucket, float mlf = EMH_DEFAULT_LOAD_FACTOR)
@@ -261,7 +271,7 @@ public:
 
     HashMap(const HashMap& rhs)
     {
-        _pairs = alloc_bucket(rhs._num_buckets);
+        _pairs = alloc_bucket(rhs._num_buckets * rhs.max_load_factor() + 4);
         _index = alloc_index(rhs._num_buckets);
         clone(rhs);
     }
@@ -295,7 +305,7 @@ public:
         clearkv();
 
         if (_num_buckets < rhs._num_buckets || _num_buckets > 2 * rhs._num_buckets) {
-            free(_pairs); _pairs = alloc_bucket(rhs._num_buckets);
+            free(_pairs); _pairs = alloc_bucket(rhs._num_buckets * rhs.max_load_factor() + 4);
             free(_index); _index = alloc_index(rhs._num_buckets);
         }
 
@@ -386,7 +396,7 @@ public:
 
     iterator begin() { return last(); }
     const_iterator cbegin() const { return last(); }
-    const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const { return last(); }
 
     inline iterator end() { return {this, END}; }
     inline const_iterator cend() const { return {this, END}; }

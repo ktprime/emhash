@@ -84,7 +84,7 @@ ifeq ($(std),)
 endif
 
 ifneq ($(check),)
-CXXFLAGS += -fsanitize=undefined
+CXXFLAGS += -fsanitize=undefined -g
 endif
 
 ifneq ($(addr),)

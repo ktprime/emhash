@@ -1,31 +1,7 @@
-/**
- * MIT License
- *
- * Copyright (c) 2017 Thibaut Goetghebuer-Planchon <tessil@gmx.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 #ifndef _WIN32
-#define BOOST_TEST_MODULE hash_map_tests
-#include <boost/test/unit_test.hpp>
-#include "utils.h"
+//#define BOOST_TEST_MODULE hash_map_tests
+//#include <boost/test/unit_test.hpp>
+//#include "utils.h"
 #endif
 
 
@@ -188,6 +164,17 @@ static void TestApi()
         assert(m4.cbegin() == m4.end());
 
         m4[1] = "cdd";
+        m4.clear();  m4.clear();
+        assert(m4.size() == 0);
+
+        m4[2] = "2";  m4.emplace(2, "22"); m4[3] = "3";
+        assert(m4.size() == 2 && m4[2] == "2");
+
+        m4.erase(2); assert(0 == m4.erase(2));
+        assert(m4.size() == 1);
+
+        m4.erase(m4.find(3));
+        assert(m4.size()== 0);
 
         // range constructor
         std::vector<std::pair<std::bitset<8>, int>> v = { {0x12, 1}, {0x01,-1} };
@@ -326,7 +313,7 @@ static void TestApi()
 
         // erase all odd numbers from c
         for(auto it = c.begin(); it != c.end(); ) {
-            printf("%d:%d:%s\n", it->first, (int)it.bucket(), it->second.data());
+            printf("%d:%s\n", it->first,  it->second.data());
             if(it->first % 2 != 0)
                 it = c.erase(it);
             else
@@ -339,7 +326,7 @@ static void TestApi()
     }
 
     {
-        ehmap<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}};
+        ehmap8<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}};
 //        using vtype = ehmap<int, char>::value_pair;
         using vtype = ehmap<int, char>::value_type;
         auto print = [](vtype& n) {
@@ -443,9 +430,9 @@ static void TestApi()
         std::cout << "After adding elements, numbers.empty(): " << numbers.empty() << '\n';
 
 
-        ehmap<std::string, std::string>
-            m1 { {"γ", "gamma"}, {"β", "beta"}, {"α", "alpha"}, {"γ", "gamma"}, },
-               m2 { {"ε", "epsilon"}, {"δ", "delta"}, {"ε", "epsilon"} };
+        ehmap5<std::string, std::string>
+        m1 { {"γ", "gamma"}, {"β", "beta"}, {"α", "alpha"}, {"γ", "gamma"}, },
+        m2 { {"ε", "epsilon"}, {"δ", "delta"}, {"ε", "epsilon"} };
 
         const auto& ref = *(m1.begin());
         const auto iter = std::next(m1.cbegin());

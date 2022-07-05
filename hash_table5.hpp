@@ -73,7 +73,7 @@
 #endif
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
-#define EMH_DEFAULT_LOAD_FACTOR 0.88f
+#define EMH_DEFAULT_LOAD_FACTOR 0.80f
 #endif
 
 #if EMH_BUCKET_INDEX == 0
@@ -374,8 +374,7 @@ public:
         if (this == &rhs)
             return *this;
 
-        if (is_triviall_destructable())
-            clearkv();
+        clearkv();
 
         if (_num_buckets < rhs._num_buckets || _num_buckets > 2 * rhs._num_buckets) {
             free(_pairs);
@@ -414,8 +413,7 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable())
-            clearkv();
+        clearkv();
         free(_pairs);
     }
 
@@ -1226,9 +1224,11 @@ public:
 
     void clearkv()
     {
-        for (size_type bucket = 0; _num_filled > 0; ++bucket) {
-            if (!EMH_EMPTY(_pairs, bucket))
-                clear_bucket(bucket, false);
+        if (is_triviall_destructable()) {
+            for (size_type bucket = 0; _num_filled > 0; ++bucket) {
+                if (!EMH_EMPTY(_pairs, bucket))
+                    clear_bucket(bucket, false);
+            }
         }
     }
 
@@ -1262,9 +1262,9 @@ public:
             clear_empty();
         clearkv();
 #else
-        if (is_triviall_destructable() || sizeof(PairT) > EMH_CACHE_LINE_SIZE / 2 || _num_filled < _num_buckets / 8)
+        if (is_triviall_destructable() || _num_filled < _num_buckets / 8)
             clearkv();
-        else
+        else if (_num_filled)
             memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 #endif
         reset_empty();
@@ -1476,7 +1476,7 @@ private:
         return reserve(_num_filled);
     }
 
-    void clear_bucket(size_type bucket, bool clear = true)
+    void clear_bucket(size_type bucket, bool bclear = true)
     {
         if (is_triviall_destructable()) {
             //EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
@@ -1486,7 +1486,7 @@ private:
         _num_filled--;
 
 #if EMH_HIGH_LOAD
-        if (_ehead && clear) {
+        if (_ehead && bclear) {
             if (10 * _num_filled < 8 * _num_buckets)
                 clear_empty();
             else if (bucket)
