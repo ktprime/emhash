@@ -68,7 +68,7 @@
 #endif
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
-#define EMH_DEFAULT_LOAD_FACTOR 0.88f
+#define EMH_DEFAULT_LOAD_FACTOR 0.80f
 #endif
 
 #define EMH_KEY(p,n)     p[n].first
