@@ -63,14 +63,6 @@
 #    define EMH_UNLIKELY(condition) condition
 #endif
 
-#if EMH_CACHE_LINE_SIZE < 32
-    #define EMH_CACHE_LINE_SIZE 64
-#endif
-
-#ifndef EMH_DEFAULT_LOAD_FACTOR
-#define EMH_DEFAULT_LOAD_FACTOR 0.88f
-#endif
-
 #define EMH_KEY(p,n)     p[n].first
 #define EMH_VAL(p,n)     p[n].second
 #define EMH_KV(p,n)      p[n]
@@ -93,7 +85,13 @@ constexpr uint32_t INACTIVE = 0xAAAAAAAA;
 constexpr uint32_t END      = 0-0x1u;
 constexpr uint32_t EAD      = 2;
 
-/// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+#endif
+#if EMH_CACHE_LINE_SIZE < 32
+    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
+#endif
+
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
 {
@@ -268,7 +266,7 @@ public:
     }
 
     constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
+    constexpr size_type max_size() const { return (1ul << (sizeof(size_type) * 8 - 1)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
 #ifdef EMH_STATIS

@@ -68,13 +68,6 @@
 #ifndef EMH_BUCKET_INDEX
     #define EMH_BUCKET_INDEX 1
 #endif
-#if EMH_CACHE_LINE_SIZE < 32
-    #define EMH_CACHE_LINE_SIZE 64
-#endif
-
-#ifndef EMH_DEFAULT_LOAD_FACTOR
-#define EMH_DEFAULT_LOAD_FACTOR 0.80f
-#endif
 
 #if EMH_BUCKET_INDEX == 0
     #define EMH_KEY(p,n)     p[n].second.first
@@ -207,6 +200,13 @@ struct entry {
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
 {
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+#endif
+#if EMH_CACHE_LINE_SIZE < 32
+    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
+#endif
+
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
     typedef std::pair<KeyT,ValueT>            value_type;
@@ -334,7 +334,7 @@ public:
         _num_filled = 0;
         _ehead = 0;
         max_load_factor(mlf);
-        reserve(bucket);
+        rehash(bucket);
     }
 
     HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR)

@@ -126,7 +126,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash8::HashMap
+#define ehmap  emhash7::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -354,13 +354,14 @@ static void TestApi()
         ehmap<Node*, double> mag = {
             { nodes,     1 },
             { nodes + 1, 2 },
-            { nodes + 2, 3 }
+            { nodes + 2, 3 },
         };
 
+        mag.reserve(6);
         //Change each y-coordinate from 0 to the magnitude
         for(auto iter = mag.begin(); iter != mag.end(); ++iter){
             auto cur = iter->first; // pointer to Node
-            cur->y = mag[cur]; // could also have used  cur->y = iter->second;
+            cur->y = iter->second; // could also have used  cur->y = iter->second;
         }
 
         //Update and print the magnitude of each node
@@ -393,6 +394,7 @@ static void TestApi()
             { nodes + 2, 3 }
         };
 
+        mag.reserve(8);
         //Change each y-coordinate from 0 to the magnitude
         for(auto iter = mag.begin(); iter != mag.end(); ++iter){
             auto cur = iter->first; // pointer to Node
@@ -739,9 +741,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 int main(int argc, char* argv[])
 {
     TestApi();
-
     benchIntRand(1e8+8);
-
     benchStringHash(1e6+6, 6, 16);
 
     size_t n = (int)1e6, loop = 12345678;
