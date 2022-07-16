@@ -87,7 +87,7 @@ template<class Map>  void test_insert( Map& map, std::chrono::steady_clock::time
 
     for( unsigned i = 1; i <= N; ++i )
     {
-        map.insert( { indices2[ i ], i } );
+        map.emplace(  indices2[ i ], i  );
     }
 
     print_time( t1, "Random insert",  0, map.size() );
@@ -112,8 +112,9 @@ template<class Map>  void test_lookup( Map& map, std::chrono::steady_clock::time
     {
         for( unsigned i = 1; i <= N * 2; ++i )
         {
-            auto it = map.find( indices1[ i ] );
-            if( it != map.end() ) s += it->second;
+//            auto it = map.find( indices1[ i ] );
+//            if( it != map.end() ) s += it->second;
+            s += map.count(indices1[ i ]);
         }
     }
 
@@ -125,8 +126,9 @@ template<class Map>  void test_lookup( Map& map, std::chrono::steady_clock::time
     {
         for( unsigned i = 1; i <= N * 2; ++i )
         {
-            auto it = map.find( indices2[ i ] );
-            if( it != map.end() ) s += it->second;
+//            auto it = map.find( indices2[ i ] );
+//            if( it != map.end() ) s += it->second;
+            s += map.count(indices2[ i ]);
         }
     }
 
@@ -297,10 +299,10 @@ template<class K, class V> struct pair
 
 #if FIB_HASH
     #define BintHasher Int64Hasher<K>
-#elif HOOD_HASH
-    #define BintHasher robin_hood::hash<K>
-#else
+#elif STD_HASH
     #define BintHasher std::hash<K>
+#else
+    #define BintHasher robin_hood::hash<K>
 #endif
 
 
@@ -347,6 +349,7 @@ int main(int argc, const char* argv[])
     test<jg_densemap> ("jg_densemap" );
     test<martinus_dense>("martinus_dense" );
 #endif
+    test<emhash_map8> ("emhash_map8" );
 
     test<tsl_robin_map> ("tsl_robin_map" );
     test<phmap_flat> ("phmap_flat" );
@@ -354,7 +357,6 @@ int main(int argc, const char* argv[])
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6> ("emhash_map6" );
     test<emhash_map7> ("emhash_map7" );
-    test<emhash_map8> ("emhash_map8" );
     test<martinus_flat> ("martinus_flat" );
     test<emilib2_map> ("emilib2_map" );
     test<emilib3_map> ("emilib3_map" );

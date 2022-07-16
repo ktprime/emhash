@@ -1181,16 +1181,6 @@ public:
         clear_bucket(bucket);
     }
 
-    iterator erase(const_iterator first, const_iterator last)
-    {
-        auto iend = cend();
-        auto next = first;
-        for (; next != last && next != iend; )
-            next = erase(next);
-
-        return {this, next.bucket()};
-    }
-
     template<typename Pred>
     size_type erase_if(Pred pred)
     {

@@ -159,7 +159,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 namespace emhash7 {
 
-    constexpr static float EMH_DEFAULT_LOAD_FACTOR =  0.80f;
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #ifdef EMH_SIZE_TYPE_16BIT
     typedef uint16_t size_type;
     static constexpr size_type INACTIVE = 0xFFFE;
@@ -1259,16 +1259,6 @@ public:
     {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
-    }
-
-    iterator erase(const_iterator first, const_iterator last)
-    {
-        auto iend = cend();
-        auto next = first;
-        for (; next.bucket() < last.bucket() && next != iend; )
-            next = erase(next);
-
-        return {this, next.bucket()};
     }
 
     template<typename Pred>

@@ -80,19 +80,19 @@ namespace ankerl::unordered_dense {
 // hardcodes seed and the secret, reformattes the code, and clang-tidy fixes.
 namespace detail::wyhash {
 
-static inline void mum(uint64_t* a, uint64_t* b) {
+static inline void mum(uint64_t& a, uint64_t& b) {
 #if defined(__SIZEOF_INT128__)
-    __uint128_t r = *a;
-    r *= *b;
-    *a = static_cast<uint64_t>(r);
-    *b = static_cast<uint64_t>(r >> 64U);
+    __uint128_t r = a;
+    r *= b;
+    a = static_cast<uint64_t>(r);
+    b = static_cast<uint64_t>(r >> 64U);
 #elif defined(_MSC_VER) && defined(_M_X64)
-    *a = _umul128(*a, *b, b);
+    a = _umul128(a, b, &b);
 #else
-    uint64_t ha = *a >> 32U;
-    uint64_t hb = *b >> 32U;
-    uint64_t la = static_cast<uint32_t>(*a);
-    uint64_t lb = static_cast<uint32_t>(*b);
+    uint64_t ha = a >> 32U;
+    uint64_t hb = b >> 32U;
+    uint64_t la = static_cast<uint32_t>(a);
+    uint64_t lb = static_cast<uint32_t>(b);
     uint64_t hi{};
     uint64_t lo{};
     uint64_t rh = ha * hb;
@@ -104,14 +104,14 @@ static inline void mum(uint64_t* a, uint64_t* b) {
     lo = t + (rm1 << 32U);
     c += static_cast<uint64_t>(lo < t);
     hi = rh + (rm0 >> 32U) + (rm1 >> 32U) + c;
-    *a = lo;
-    *b = hi;
+    a = lo;
+    b = hi;
 #endif
 }
 
 // multiply and xor mix function, aka MUM
 [[nodiscard]] static inline auto mix(uint64_t a, uint64_t b) -> uint64_t {
-    mum(&a, &b);
+    mum(a, b);
     return a ^ b;
 }
 
@@ -471,7 +471,9 @@ private:
     }
 
     void clear_buckets() {
-        std::memset(m_buckets_start, 0, sizeof(Bucket) * bucket_count());
+        if (m_buckets_start != nullptr) {
+            std::memset(m_buckets_start, 0, sizeof(Bucket) * bucket_count());
+        }
     }
 
     void clear_and_fill_buckets_from_values() {
@@ -524,6 +526,10 @@ private:
 
     template <typename K>
     auto do_erase_key(K&& key) -> size_t {
+        if (empty()) {
+            return 0;
+        }
+
         auto [dist_and_fingerprint, bucket] = next_while_less(key);
 
         while (dist_and_fingerprint == bucket->dist_and_fingerprint && !m_equal(key, get_key(m_values[bucket->value_idx]))) {
@@ -1138,7 +1144,7 @@ using map = detail::table<Key, T, Hash, KeyEqual, Allocator>;
 template <class Key, class Hash = hash<Key>, class KeyEqual = std::equal_to<Key>, class Allocator = std::allocator<Key>>
 using set = detail::table<Key, void, Hash, KeyEqual, Allocator>;
 
-#if ANKERL_UNORDERED_DENSE_PMR
+#    if ANKERL_UNORDERED_DENSE_PMR
 
 namespace pmr {
 
@@ -1150,7 +1156,7 @@ using set = detail::table<Key, void, Hash, KeyEqual, std::pmr::polymorphic_alloc
 
 } // namespace pmr
 
-#endif
+#    endif
 
 // deduction guides ///////////////////////////////////////////////////////////
 

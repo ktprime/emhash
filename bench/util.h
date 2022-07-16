@@ -700,7 +700,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #endif
 #endif
 
-#if __cplusplus > 201704L || CXX20
+#if __cplusplus > 201704L || CXX20 || _MSC_VER > 1930
 #if QC_HASH
 #include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 #endif
@@ -709,4 +709,5 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #include "rigtorp/rigtorp.hpp"   //https://github.com/rigtorp/HashMap/blob/master/include/rigtorp/HashMap.h
 
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
+#include "fph/meta_fph_table.h" //https://github.com/renzibei/fph-table
 #endif

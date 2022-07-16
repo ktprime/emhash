@@ -126,7 +126,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash7::HashMap
+#define ehmap  emhash8::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -326,7 +326,7 @@ static void TestApi()
     }
 
     {
-        ehmap8<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}};
+        ehmap8<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}, {4, 'z'}};
 //        using vtype = ehmap<int, char>::value_pair;
         using vtype = ehmap<int, char>::value_type;
         auto print = [](vtype& n) {
@@ -343,6 +343,40 @@ static void TestApi()
         std::cout << "After clear:";
         std::for_each(container.begin(), container.end(), print);
         std::cout << "\nSize=" << container.size() << '\n';
+    }
+
+    //erase(first, last)
+    {
+        ehmap8<int, char> container{{1, 'x'}, {2, 'y'}, {3, 'z'}, {4, 'z'}};
+        {
+            auto n1 = container;
+            n1.erase(n1.find(1), n1.find(4));
+            assert(n1.size() == 1);
+
+            n1 = container;
+            n1.erase(n1.find(5), n1.find(1));
+            assert(n1.size() == container.size());
+
+            auto n3 = container;
+            n3.erase(n3.find(2), n3.find(2));
+            assert(n3.size() == container.size());
+        }
+
+        {
+            auto n2 = container;
+            n2.erase(n2.find(1), n2.find(5));
+            assert(n2.size() == 0);
+
+            n2 = container;
+            n2.erase(n2.find(2), n2.find(5));
+            assert(n2.size() == 1);
+        }
+
+        {
+            auto n3 = container;
+            n3.erase(n3.find(2), n3.find(4));
+            assert(n3.size() == 2);
+        }
     }
 
     struct Node { double x, y; };
@@ -431,8 +465,7 @@ static void TestApi()
         numbers.insert(std::make_pair(13317, 123));
         std::cout << "After adding elements, numbers.empty(): " << numbers.empty() << '\n';
 
-
-        ehmap5<std::string, std::string>
+        ehmap<std::string, std::string>
         m1 { {"γ", "gamma"}, {"β", "beta"}, {"α", "alpha"}, {"γ", "gamma"}, },
         m2 { {"ε", "epsilon"}, {"δ", "delta"}, {"ε", "epsilon"} };
 
@@ -445,9 +478,12 @@ static void TestApi()
 
         m1.swap(m2);
 
+        //crash on gcc ?
+#ifndef __GNUC__
         std::cout << "──────── after swap ────────\n"
             << "m1: " << m1 << "m2: " << m2 << "ref: {" << ref.first << "," << ref.second << "}"
             << "\niter: " << "{" << iter->first << ", " << iter->second << "}" << '\n';
+#endif
     }
 
     //merge

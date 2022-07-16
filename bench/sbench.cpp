@@ -9,6 +9,10 @@
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 
+#if CXX20
+#include "martinus/unordered_dense.h"
+#endif
+
 #ifndef ET
 #define ET                 1
 #endif
@@ -23,6 +27,8 @@ std::map<std::string, std::string> maps =
 //    {"emhash7", "emhash7"},
 //    {"emhash2", "emhash2"},
     {"emhash9", "emhash9"},
+    {"emhash8", "emhash8"},
+    {"martind", "martin_dense"},
 
     {"gp_hash", "gp_hash"},
 
@@ -72,6 +78,7 @@ std::map<std::string, std::string> maps =
 #include "hash_set2.hpp"
 #include "hash_set3.hpp"
 #include "hash_set4.hpp"
+#include "hash_set8.hpp"
 
 
 //https://www.zhihu.com/question/46156495
@@ -1113,6 +1120,10 @@ static int benchHashSet(int n)
 #endif
 #endif
 
+#if CXX20
+        {  benOneHash<ankerl::unordered_dense::set <keyType, ehash_func>>("martind", vList); }
+#endif
+
 #if ET
         {  benOneHash<phmap::flat_hash_set <keyType,  ehash_func>>("phmap", vList); }
         {  benOneHash<robin_hood::unordered_flat_set <keyType,  ehash_func>>("martin", vList); }
@@ -1122,11 +1133,13 @@ static int benchHashSet(int n)
         {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
 #endif
 
+        {  benOneHash<emhash8::HashSet <keyType,  ehash_func>>("emhash8", vList); }
         {  benOneHash<emilib::HashSet  <keyType,  ehash_func>>("emiset", vList); }
         {  benOneHash<emilib2::HashSet <keyType,  ehash_func>>("emiset2", vList); }
         {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
+
 
 #if QC_HASH && KEY_INT
         {  benOneHash<qc::hash::RawSet<keyType,  ehash_func>>("qchash", vList); }
