@@ -166,20 +166,13 @@ public:
             return cur;
         }
 
-        reference operator*() const
-        {
-            return *kv_;
-        }
+        reference operator*() const { return *kv_; }
+        pointer operator->() const { return kv_; }
 
-        pointer operator->() const
-        {
-            return kv_;
-        }
-
-        bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
-        bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
-        bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
-        bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
+        bool operator == (const iterator& rhs) const { return kv_ == rhs.kv_; }
+        bool operator != (const iterator& rhs) const { return kv_ != rhs.kv_; }
+        bool operator == (const const_iterator& rhs) const { return kv_ == rhs.kv_; }
+        bool operator != (const const_iterator& rhs) const { return kv_ != rhs.kv_; }
 
     public:
         value_type*  kv_;
@@ -228,25 +221,13 @@ public:
             return cur;
         }
 
-        const_reference operator*() const
-        {
-            return *kv_;
-        }
+        const_reference operator*() const { return *kv_; }
+        const_pointer operator->() const { return kv_; }
 
-        const_pointer operator->() const
-        {
-            return kv_;
-        }
-
-        bool operator==(const const_iterator& rhs) const
-        {
-            return kv_ == rhs.kv_;
-        }
-
-        bool operator!=(const const_iterator& rhs) const
-        {
-            return kv_ != rhs.kv_;
-        }
+        bool operator == (const iterator& rhs) const { return kv_ == rhs.kv_; }
+        bool operator != (const iterator& rhs) const { return kv_ != rhs.kv_; }
+        bool operator == (const const_iterator& rhs) const { return kv_ == rhs.kv_; }
+        bool operator != (const const_iterator& rhs) const { return kv_ != rhs.kv_; }
     public:
         const value_type* kv_;
     };
@@ -1557,26 +1538,18 @@ one-way seach strategy.
 #else
         //for (auto slot = bucket + offset; ;slot += offset++) {
         for (auto slot = bucket + offset; ; slot++) {
-            _last &= _mask;
-            if (EMH_EMPTY(_index, ++_last))// || EMH_EMPTY(_index, ++_last))
-                return _last ++;
+//            if (EMH_EMPTY(_index, ++_last))// || EMH_EMPTY(_index, ++_last))
+//                return _last ++;
 
             auto bucket1 = slot++ & _mask;
-            if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket1)))// || EMH_UNLIKELY(EMH_EMPTY(_index, ++bucket1)))
+            if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket1)))// || EMH_UNLIKELY(EMH_EMPTY(_index, ++bucket1))))
                 return bucket1;
 
-#if 0
-            auto tail = _mask - _last;
-            if (EMH_EMPTY(_index, tail) /*|| EMH_EMPTY(_index, ++tail) **/)
-                return tail;
-#endif
-
-#if 0
-            //auto medium = (_num_filled - _last) & _mask;
-            auto medium = (_mask / 2 + _last) & _mask;
-            if (EMH_EMPTY(_index, medium))// || EMH_EMPTY(_index, ++medium))
+            auto medium = (_num_filled + _last++) & _mask;
+            if (EMH_EMPTY(_index, medium) || EMH_EMPTY(_index, ++medium))
                 return medium;
-#endif
+
+            ++_last &= _mask;
         }
 #endif
         return 0;
@@ -1704,7 +1677,4 @@ private:
     size_type _ehead;
 };
 } // namespace emhash
-#if __cplusplus > 199711
-//template <class Key, class Val> using emhash5 = ehmap<Key, Val, std::hash<Key>>;
-#endif
 

@@ -1,7 +1,7 @@
 ///////////////////////// ankerl::unordered_dense::{map, set} /////////////////////////
 
 // A fast & densely stored hashmap and hashset based on robin-hood backward shift deletion.
-// Version 1.0.0
+// Version 1.0.3
 // https://github.com/martinus/unordered_dense
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -32,44 +32,54 @@
 // see https://semver.org/spec/v2.0.0.html
 #define ANKERL_UNORDERED_DENSE_VERSION_MAJOR 1 // incompatible API changes
 #define ANKERL_UNORDERED_DENSE_VERSION_MINOR 0 // add functionality in a backwards compatible manner
-#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 0 // backwards compatible bug fixes
+#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 3 // backwards compatible bug fixes
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-#include <initializer_list>
-#include <limits>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <string_view>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#define ANKERL_UNORDERED_DENSE_PMR 0
-#if defined(__has_include)
-#    if __has_include(<memory_resource>)
-#        undef ANKERL_UNORDERED_DENSE_PMR
-#        define ANKERL_UNORDERED_DENSE_PMR 1
-#        include <memory_resource>
-#    endif
-#endif
-
-#if defined(_MSC_VER) && defined(_M_X64)
-#    include <intrin.h>
-#    pragma intrinsic(_umul128)
-#endif
-
-#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
-#    define ANKERL_UNORDERED_DENSE_LIKELY(x) __builtin_expect(x, 1)
-#    define ANKERL_UNORDERED_DENSE_UNLIKELY(x) __builtin_expect(x, 0)
+#if defined(_MSVC_LANG)
+#    define ANKERL_UNORDERED_DENSE_CPP_VERSION _MSVC_LANG
 #else
-#    define ANKERL_UNORDERED_DENSE_LIKELY(x) (x)
-#    define ANKERL_UNORDERED_DENSE_UNLIKELY(x) (x)
+#    define ANKERL_UNORDERED_DENSE_CPP_VERSION __cplusplus
 #endif
+
+#if ANKERL_UNORDERED_DENSE_CPP_VERSION < 201703L
+#    error ankerl::unordered_dense requires C++17 or higher
+#else
+#    include <array>            // for array
+#    include <cstdint>          // for uint64_t, uint32_t, uint8_t, UINT64_C
+#    include <cstring>          // for size_t, memcpy, memset
+#    include <functional>       // for equal_to, hash
+#    include <initializer_list> // for initializer_list
+#    include <iterator>         // for pair, distance
+#    include <limits>           // for numeric_limits
+#    include <memory>           // for allocator, allocator_traits, shared_ptr
+#    include <stdexcept>        // for out_of_range
+#    include <string>           // for basic_string
+#    include <string_view>      // for basic_string_view, hash
+#    include <tuple>            // for forward_as_tuple
+#    include <type_traits>      // for enable_if_t, declval, conditional_t, ena...
+#    include <utility>          // for forward, exchange, pair, as_const, piece...
+#    include <vector>           // for vector
+
+#    define ANKERL_UNORDERED_DENSE_PMR 0
+#    if defined(__has_include)
+#        if __has_include(<memory_resource>)
+#            undef ANKERL_UNORDERED_DENSE_PMR
+#            define ANKERL_UNORDERED_DENSE_PMR 1
+#            include <memory_resource> // for polymorphic_allocator
+#        endif
+#    endif
+
+#    if defined(_MSC_VER) && defined(_M_X64)
+#        include <intrin.h>
+#        pragma intrinsic(_umul128)
+#    endif
+
+#    if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
+#        define ANKERL_UNORDERED_DENSE_LIKELY(x) __builtin_expect(x, 1)
+#        define ANKERL_UNORDERED_DENSE_UNLIKELY(x) __builtin_expect(x, 0)
+#    else
+#        define ANKERL_UNORDERED_DENSE_LIKELY(x) (x)
+#        define ANKERL_UNORDERED_DENSE_UNLIKELY(x) (x)
+#    endif
 
 namespace ankerl::unordered_dense {
 
@@ -80,19 +90,19 @@ namespace ankerl::unordered_dense {
 // hardcodes seed and the secret, reformattes the code, and clang-tidy fixes.
 namespace detail::wyhash {
 
-static inline void mum(uint64_t& a, uint64_t& b) {
-#if defined(__SIZEOF_INT128__)
-    __uint128_t r = a;
-    r *= b;
-    a = static_cast<uint64_t>(r);
-    b = static_cast<uint64_t>(r >> 64U);
-#elif defined(_MSC_VER) && defined(_M_X64)
-    a = _umul128(a, b, &b);
-#else
-    uint64_t ha = a >> 32U;
-    uint64_t hb = b >> 32U;
-    uint64_t la = static_cast<uint32_t>(a);
-    uint64_t lb = static_cast<uint32_t>(b);
+static inline void mum(uint64_t* a, uint64_t* b) {
+#    if defined(__SIZEOF_INT128__)
+    __uint128_t r = *a;
+    r *= *b;
+    *a = static_cast<uint64_t>(r);
+    *b = static_cast<uint64_t>(r >> 64U);
+#    elif defined(_MSC_VER) && defined(_M_X64)
+    *a = _umul128(*a, *b, b);
+#    else
+    uint64_t ha = *a >> 32U;
+    uint64_t hb = *b >> 32U;
+    uint64_t la = static_cast<uint32_t>(*a);
+    uint64_t lb = static_cast<uint32_t>(*b);
     uint64_t hi{};
     uint64_t lo{};
     uint64_t rh = ha * hb;
@@ -104,14 +114,14 @@ static inline void mum(uint64_t& a, uint64_t& b) {
     lo = t + (rm1 << 32U);
     c += static_cast<uint64_t>(lo < t);
     hi = rh + (rm0 >> 32U) + (rm1 >> 32U) + c;
-    a = lo;
-    b = hi;
-#endif
+    *a = lo;
+    *b = hi;
+#    endif
 }
 
 // multiply and xor mix function, aka MUM
 [[nodiscard]] static inline auto mix(uint64_t a, uint64_t b) -> uint64_t {
-    mum(a, b);
+    mum(&a, &b);
     return a ^ b;
 }
 
@@ -214,7 +224,7 @@ struct hash<std::basic_string_view<CharT>> {
 template <class T>
 struct hash<T*> {
     using is_avalanching = void;
-    size_t operator()(T* ptr) const noexcept {
+    auto operator()(T* ptr) const noexcept -> size_t {
         return static_cast<size_t>(detail::wyhash::hash(reinterpret_cast<uintptr_t>(ptr)));
     }
 };
@@ -222,7 +232,7 @@ struct hash<T*> {
 template <class T>
 struct hash<std::unique_ptr<T>> {
     using is_avalanching = void;
-    size_t operator()(std::unique_ptr<T> const& ptr) const noexcept {
+    auto operator()(std::unique_ptr<T> const& ptr) const noexcept -> size_t {
         return static_cast<size_t>(detail::wyhash::hash(reinterpret_cast<uintptr_t>(ptr.get())));
     }
 };
@@ -230,7 +240,7 @@ struct hash<std::unique_ptr<T>> {
 template <class T>
 struct hash<std::shared_ptr<T>> {
     using is_avalanching = void;
-    size_t operator()(std::shared_ptr<T> const& ptr) const noexcept {
+    auto operator()(std::shared_ptr<T> const& ptr) const noexcept -> size_t {
         return static_cast<size_t>(detail::wyhash::hash(reinterpret_cast<uintptr_t>(ptr.get())));
     }
 };
@@ -238,45 +248,48 @@ struct hash<std::shared_ptr<T>> {
 template <typename Enum>
 struct hash<Enum, typename std::enable_if<std::is_enum<Enum>::value>::type> {
     using is_avalanching = void;
-    size_t operator()(Enum e) const noexcept {
+    auto operator()(Enum e) const noexcept -> size_t {
         using Underlying = typename std::underlying_type_t<Enum>;
         return static_cast<size_t>(detail::wyhash::hash(static_cast<Underlying>(e)));
     }
 };
 
-#define ANKERL_UNORDERED_DENSE_HASH_NUMERIC(T)                                            \
-    template <>                                                                           \
-    struct hash<T> {                                                                      \
-        using is_avalanching = void;                                                      \
-        size_t operator()(T const& obj) const noexcept {                                  \
-            return static_cast<size_t>(detail::wyhash::hash(static_cast<uint64_t>(obj))); \
-        }                                                                                 \
-    }
+#    define ANKERL_UNORDERED_DENSE_HASH_STATICCAST(T)                                         \
+        template <>                                                                           \
+        struct hash<T> {                                                                      \
+            using is_avalanching = void;                                                      \
+            auto operator()(T const& obj) const noexcept -> size_t {                          \
+                return static_cast<size_t>(detail::wyhash::hash(static_cast<uint64_t>(obj))); \
+            }                                                                                 \
+        }
 
-#if defined(__GNUC__) && !defined(__clang__)
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wuseless-cast"
-#endif
+#    if defined(__GNUC__) && !defined(__clang__)
+#        pragma GCC diagnostic push
+#        pragma GCC diagnostic ignored "-Wuseless-cast"
+#    endif
 // see https://en.cppreference.com/w/cpp/utility/hash
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(bool);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(char);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(signed char);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(unsigned char);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(char16_t);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(char32_t);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(wchar_t);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(short);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(unsigned short);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(int);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(unsigned int);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(long);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(long long);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(unsigned long);
-ANKERL_UNORDERED_DENSE_HASH_NUMERIC(unsigned long long);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(bool);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(char);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(signed char);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(unsigned char);
+#    if ANKERL_UNORDERED_DENSE_CPP_VERSION >= 202002L
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(char8_t);
+#    endif
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(char16_t);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(char32_t);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(wchar_t);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(short);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(unsigned short);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(int);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(unsigned int);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(long);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(long long);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(unsigned long);
+ANKERL_UNORDERED_DENSE_HASH_STATICCAST(unsigned long long);
 
-#if defined(__GNUC__) && !defined(__clang__)
-#    pragma GCC diagnostic pop
-#endif
+#    if defined(__GNUC__) && !defined(__clang__)
+#        pragma GCC diagnostic pop
+#    endif
 
 namespace detail {
 
@@ -554,22 +567,8 @@ private:
     }
 
     template <typename K, typename... Args>
-    auto do_try_emplace(K&& key, Args&&... args) -> std::pair<iterator, bool> {
-        if (is_full()) {
-            increase_size();
-        }
-
-        auto hash = mixed_hash(key);
-        auto dist_and_fingerprint = dist_and_fingerprint_from_hash(hash);
-        auto* bucket = bucket_from_hash(hash);
-
-        while (dist_and_fingerprint <= bucket->dist_and_fingerprint) {
-            if (dist_and_fingerprint == bucket->dist_and_fingerprint && m_equal(key, m_values[bucket->value_idx].first)) {
-                return {begin() + bucket->value_idx, false};
-            }
-            dist_and_fingerprint += BUCKET_DIST_INC;
-            bucket = next(bucket);
-        }
+    auto do_place_element(uint32_t dist_and_fingerprint, Bucket* bucket, K&& key, Args&&... args)
+        -> std::pair<iterator, bool> {
 
         // emplace the new value. If that throws an exception, no harm done; index is still in a valid state
         m_values.emplace_back(std::piecewise_construct,
@@ -582,9 +581,32 @@ private:
         return {begin() + value_idx, true};
     }
 
+    template <typename K, typename... Args>
+    auto do_try_emplace(K&& key, Args&&... args) -> std::pair<iterator, bool> {
+        if (ANKERL_UNORDERED_DENSE_UNLIKELY(is_full())) {
+            increase_size();
+        }
+
+        auto hash = mixed_hash(key);
+        auto dist_and_fingerprint = dist_and_fingerprint_from_hash(hash);
+        auto* bucket = bucket_from_hash(hash);
+
+        while (true) {
+            if (dist_and_fingerprint == bucket->dist_and_fingerprint) {
+                if (m_equal(key, m_values[bucket->value_idx].first)) {
+                    return {begin() + bucket->value_idx, false};
+                }
+            } else if (dist_and_fingerprint > bucket->dist_and_fingerprint) {
+                return do_place_element(dist_and_fingerprint, bucket, std::forward<K>(key), std::forward<Args>(args)...);
+            }
+            dist_and_fingerprint += BUCKET_DIST_INC;
+            bucket = next(bucket);
+        }
+    }
+
     template <typename K>
     auto do_find(K const& key) -> iterator {
-        if (empty()) {
+        if (ANKERL_UNORDERED_DENSE_UNLIKELY(empty())) {
             return end();
         }
 
@@ -605,14 +627,17 @@ private:
         dist_and_fingerprint += BUCKET_DIST_INC;
         bucket = next(bucket);
 
-        do {
-            if (dist_and_fingerprint == bucket->dist_and_fingerprint && m_equal(key, get_key(m_values[bucket->value_idx]))) {
-                return begin() + bucket->value_idx;
+        while (true) {
+            if (dist_and_fingerprint == bucket->dist_and_fingerprint) {
+                if (m_equal(key, get_key(m_values[bucket->value_idx]))) {
+                    return begin() + bucket->value_idx;
+                }
+            } else if (dist_and_fingerprint > bucket->dist_and_fingerprint) {
+                return end();
             }
             dist_and_fingerprint += BUCKET_DIST_INC;
             bucket = next(bucket);
-        } while (dist_and_fingerprint <= bucket->dist_and_fingerprint);
-        return end();
+        }
     }
 
     template <typename K>
@@ -1160,7 +1185,8 @@ using set = detail::table<Key, void, Hash, KeyEqual, std::pmr::polymorphic_alloc
 
 // deduction guides ///////////////////////////////////////////////////////////
 
-// TODO not yet implemented
+// deduction guides for alias templates are only possible since C++20
+// see https://en.cppreference.com/w/cpp/language/class_template_argument_deduction
 
 } // namespace ankerl::unordered_dense
 
@@ -1186,4 +1212,5 @@ auto erase_if(ankerl::unordered_dense::detail::table<Key, T, Hash, KeyEqual, All
 
 } // namespace std
 
+#endif
 #endif

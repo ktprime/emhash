@@ -48,8 +48,8 @@ std::map<std::string, std::string> maps =
 //    {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
-    {"emilib1", "emilib1"},
-    {"emilib3", "emilib3"},
+//    {"emilib1", "emilib1"},
+//    {"emilib3", "emilib3"},
 //    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
@@ -78,7 +78,7 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT 1  //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP       1
@@ -163,7 +163,7 @@ std::map<std::string, std::string> maps =
 #include "libcuckoo/cuckoohash_map.hh"
 #endif
 
-#if CXX20
+#if CXX17
 #include "martinus/unordered_dense.h"
 #endif
 
@@ -194,7 +194,7 @@ std::map<std::string, std::string> maps =
     #include "hrd/hash_set7.h"        //https://github.com/hordi/hash/blob/master/include/hash_set7.h
 #endif
     #include "emilib/emilib33.hpp"
-    #include "ska/flat_hash_map.hpp"  //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
+    #include "ska/flat_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
 //    #include "simd_hash_map/simd_hash_map.hpp"
 #endif
 
@@ -494,7 +494,7 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
     pys += std::string("\n\n# ") + os_info;
 
     //puts(pys.data());
-    std::ofstream  outfile;
+    std::ofstream outfile;
     auto full_file = file + ".py";
     outfile.open("./" + full_file, std::fstream::out | std::fstream::trunc | std::fstream::binary);
     if (outfile.is_open())
@@ -759,7 +759,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     }
 
     auto ts1 = getus();
-    for (; i  < maxn; i++) {
+    for (; i < maxn; i++) {
         auto& v = vList[i - minn];
 #if KEY_INT
         auto v2 = v + i;
@@ -844,13 +844,7 @@ void find_hit_100(const hash_type& ht_hash, const std::string& hash_name, const 
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
-#if KEY_INT
         sum += ht_hash.count(v);
-#elif KEY_CLA
-        sum += ht_hash.count(v);
-#else
-        sum += ht_hash.count(v);
-#endif
 #if FL1
         if (sum % (1024 * 64) == 0)
             memset(l1_cache, 0, sizeof(l1_cache));
@@ -1262,6 +1256,8 @@ static int benchHashMap(int n)
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
         {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
+#endif
+#if CXX17
         {  benOneHash<ankerl::unordered_dense::map <keyType, valueType, ehash_func>>("martind", vList); }
 #endif
 

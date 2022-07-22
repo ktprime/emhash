@@ -9,7 +9,7 @@
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 
-#if CXX20
+#if CXX17
 #include "martinus/unordered_dense.h"
 #endif
 
@@ -1120,7 +1120,7 @@ static int benchHashSet(int n)
 #endif
 #endif
 
-#if CXX20
+#if CXX17
         {  benOneHash<ankerl::unordered_dense::set <keyType, ehash_func>>("martind", vList); }
 #endif
 

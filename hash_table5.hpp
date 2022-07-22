@@ -1777,7 +1777,7 @@ one-way seach strategy.
             if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                 return tail;
 #else
-            auto medium = (_mask / 2 + _last) & _mask;
+            auto medium = (_num_filled + _last) & _mask;
             if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
                 return medium;
 #endif
@@ -1791,21 +1791,12 @@ one-way seach strategy.
                 return bucket1;
 
             if (step > linear_probe_length) {
-                if (EMH_EMPTY(_pairs, _last))// || EMH_EMPTY(_pairs, ++_last))
-                    return _last++;
-                ++_last &= _mask;
-#if 1
-                auto tail = _mask - _last;
-                if (EMH_EMPTY(_pairs, tail))// || EMH_EMPTY(_pairs, ++tail))
-                    return tail;
-#endif
-#if 0
+//                if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
+//                    return _last++;
                 auto medium = (_num_filled + _last) & _mask;
-                //auto medium = (_num_buckets / 2 + _last) & _mask;
-                //if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium)) return _last = medium;
-                if (EMH_EMPTY(_pairs, medium))
+                if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
                     return medium;
-#endif
+                ++_last &= _mask;
             }
         }
 #endif

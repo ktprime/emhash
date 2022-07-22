@@ -8,7 +8,6 @@
 #include "qchash/qc-hash.hpp"
 #endif
 #include "jg/dense_hash_map.hpp"
-#include "fph/dynamic_fph_table.h"
 #include "rigtorp/rigtorp.hpp"
 
 #include "qc-core/memory.hpp"
@@ -35,8 +34,9 @@
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
 
-#if CXX20
 #include "martinus/unordered_dense.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#if CXX20
+#include "fph/dynamic_fph_table.h"
 #endif
 
 #if FIB_HASH
@@ -1045,7 +1045,6 @@ struct RobinHoodMapInfo
     static inline const std::string name{"martinus::fhmap "};
 };
 
-#if CXX20
 template <typename K, typename V>
 struct RobinDenseMapInfo
 {
@@ -1053,6 +1052,15 @@ struct RobinDenseMapInfo
     using AllocatorContainer = void;
 
     static inline const std::string name{"martinus::dense "};
+};
+
+#if CXX20
+template <typename K, typename V>
+struct FphDyamicMapInfo
+{
+    using Container = fph::DynamicFphMap<K, V, fph::MixSeedHash<K>>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"fph::DynamicFph "};
 };
 #endif
 
@@ -1208,13 +1216,6 @@ struct EmiLib2SetInfo
 };
 #endif
 
-template <typename K, typename V>
-struct FphDyamicMapInfo
-{
-    using Container = fph::DynamicFphMap<K, V, fph::MixSeedHash<K>>;
-    using AllocatorContainer = void;
-    static inline const std::string name{"fph::DynamicFph "};
-};
 
 int main(const int argc, const char* argv[])
 {
@@ -1228,7 +1229,7 @@ int main(const int argc, const char* argv[])
 //        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
 #if 1
 //        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib3MapInfo<K, int>>();
-        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K, int>, EmHash7MapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, EmHash8MapInfo<K, int>, RobinDenseMapInfo<K, int>>();
 #endif
 //        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K,int>, EmHash5MapInfo<K, int>>();
 
@@ -1287,9 +1288,10 @@ int main(const int argc, const char* argv[])
 #endif
 
             EmHash8MapInfo<K, V>,
-#ifdef CXX20
             RobinDenseMapInfo<K, V>,
-//            FphDyamicMapInfo<K,V>,
+
+#ifdef CXX20
+            //FphDyamicMapInfo<K,V>,
             JgDenseMapInfo<K, V>,
             RigtorpMapInfo<K, V>,
 #if QC_HASH
