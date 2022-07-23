@@ -667,11 +667,13 @@ void bench_randomEraseString(MAP map)
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     auto nows = now2sec();
-    { runRandomString<MAP>(6000000, 1000, 0x1ffff); }
+    { runRandomString<MAP>(6000000, 200, 0x1ffff); }
     { runRandomString<MAP>(20000000, 7, 0xfffff); }
     { runRandomString<MAP>(20000000, 8, 0xfffff); }
     { runRandomString<MAP>(20000000, 13, 0xfffff); }
+    { runRandomString<MAP>(10000000, 24, 0xfffff); }
     { runRandomString<MAP>(12000000, 100, 0x7ffff); }
+    { runRandomString<MAP>(2000000, 1000, 0x7ffff); }
 
     printf("total time = %.2f s\n\n", now2sec() - nows);
 }

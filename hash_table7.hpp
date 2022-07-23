@@ -722,7 +722,6 @@ public:
     constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
-#if EMH_STATIS
     size_type bucket_main() const
     {
         auto main_size = 0;
@@ -733,6 +732,7 @@ public:
         return main_size;
     }
 
+#if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
@@ -1381,8 +1381,9 @@ public:
         if (_num_filled > EMH_REHASH_LOG) {
             auto mbucket = bucket_main();
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
-                    _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
+            sprintf(buff, "    _num_filled/collision/main/K.V/pack/ = %u/%.2lf%%(%.2lf%%)/%s.%s/%zd",
+                    _num_filled, 200.0f * (_num_filled - mbucket) / _mask,  100.0f * mbucket / _mask,
+					typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #ifdef EMH_LOG
             static size_t ihashs = 0;
             EMH_LOG << "rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;

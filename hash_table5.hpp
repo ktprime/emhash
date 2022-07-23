@@ -508,7 +508,7 @@ public:
     HashT hash_function() const { return static_cast<const HashT&>(_hasher); }
     EqT key_eq() const { return static_cast<const EqT&>(_eq); }
 
-    float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
+    float load_factor() const { return static_cast<float>(_num_filled) / _num_buckets; }
     float max_load_factor() const { return (1 << 27) / (float)_mlf; }
     void max_load_factor(float ml)
     {
@@ -1314,17 +1314,20 @@ public:
         auto old_num_filled  = _num_filled;
         auto old_pairs   = _pairs;
         auto old_buckets = _num_buckets;
-        auto old_mask    = _num_buckets - 1;
 
 #if EMH_REHASH_LOG
+        auto omask = _mask;
         auto last = _last;
         size_type collision = 0;
 #endif
 
         _ehead = 0;
         _last = _num_filled  = 0;
-        _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
+#if EMH_PACK_TAIL > 1
+        num_buckets += num_buckets / EMH_PACK_TAIL; //add more 5-10%
+#endif
+        _num_buckets = num_buckets;
 
         _pairs = (PairT*)alloc_bucket(num_buckets);
         memset(_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
@@ -1332,7 +1335,7 @@ public:
         reset_empty();
 
         (void)old_buckets;
-        if (0 && is_copy_trivially() && old_num_filled && _num_buckets >= 2 * old_buckets) {
+        if (0 && is_copy_trivially() && old_num_filled && num_buckets >= 2 * old_buckets) {
             memcpy(_pairs, old_pairs, old_buckets * sizeof(PairT));
             //free(old_pairs);
             for (size_type src_bucket = 0; src_bucket < old_buckets; src_bucket++) {
@@ -1354,19 +1357,18 @@ public:
             }
         } else {
             //for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
-            for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket--) {
+            for (size_type src_bucket = old_buckets - 1; _num_filled < old_num_filled; src_bucket--) {
                 if ((int)EMH_BUCKET(old_pairs, src_bucket) < 0)
                     continue;
+#if EMH_REHASH_LOG
+                else if (src_bucket != EMH_BUCKET(old_pairs, src_bucket))
+                    collision ++;
+#endif
 
                 auto& key = EMH_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
                 new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
                 EMH_BUCKET(_pairs, bucket) = bucket;
-
-#if EMH_REHASH_LOG
-                if (bucket != hash_main(bucket))
-                    collision ++;
-#endif
                 if (is_triviall_destructable())
                     old_pairs[src_bucket].~PairT();
             }
@@ -1377,7 +1379,8 @@ public:
             auto mbucket = _num_filled - collision;
             char buff[255] = {0};
             sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
-                    _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
+                    _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(),
+                    sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / omask);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0; EMH_LOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
@@ -1784,7 +1787,7 @@ one-way seach strategy.
         }
 
 #else
-        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 2 : 4;
+        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 2 : 3;
         for (size_type step = 2, slot = bucket + 1; ; slot += 2, step ++) {
             auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
@@ -1793,10 +1796,21 @@ one-way seach strategy.
             if (step > linear_probe_length) {
 //                if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
 //                    return _last++;
-                auto medium = (_num_filled + _last) & _mask;
-                if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
+
+#if EMH_PACK_TAIL
+                const auto last = ++_last & _mask;
+                const auto tail = _num_buckets - last;
+                if (EMH_EMPTY(_pairs, tail))
+                    return tail;
+                else if (EMH_EMPTY(_pairs, last))
+                    return last;
+                _last &= _mask;
+#else
+                auto medium = (_num_filled + _last++) & _mask;
+                if (EMH_EMPTY(_pairs, medium))
                     return medium;
-                ++_last &= _mask;
+                _last &= _mask;
+#endif
             }
         }
 #endif

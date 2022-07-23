@@ -36,14 +36,6 @@
 #include <iterator>
 #include <algorithm>
 
-#ifdef __has_include
-    #if __has_include("wyhash.h")
-    #include "wyhash.h"
-    #endif
-#elif EMH_WY_HASH
-    #include "wyhash.h"
-#endif
-
 #ifdef EMH_KEY
     #undef  EMH_KEY
     #undef  EMH_VAL
@@ -55,12 +47,12 @@
 #endif
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
+#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
 #    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
-#    define EMH_LIKELY(condition)   condition
-#    define EMH_UNLIKELY(condition) condition
+#    define EMH_LIKELY(condition)   (condition)
+#    define EMH_UNLIKELY(condition) (condition)
 #endif
 
 #define EMH_KEY(p,n)     p[n].first
@@ -99,8 +91,6 @@ class HashMap
 public:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
     using value_type = std::pair<KeyT, ValueT>;
-
-public:
     using key_type = KeyT;
     using mapped_type = ValueT;
 
@@ -1594,6 +1584,7 @@ one-way seach strategy.
         return (size_type)hash_key(EMH_KEY(_pairs, slot)) & _mask;
     }
 
+#ifdef EMH_FIBONACCI_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static uint64_t hash64(uint64_t key)
     {
@@ -1628,6 +1619,88 @@ one-way seach strategy.
         return x;
 #endif
     }
+#endif
+
+#if WYHASH_HASH
+    //#define WYHASH_CONDOM 1
+    static inline uint64_t wymix(uint64_t A, uint64_t B)
+    {
+#if defined(__SIZEOF_INT128__)
+        __uint128_t r = A; r *= B;
+#if WYHASH_CONDOM
+        A ^= (uint64_t)r; B ^= (uint64_t)(r >> 64);
+#else
+        A = (uint64_t)r; B = (uint64_t)(r >> 64);
+#endif
+
+#elif defined(_MSC_VER) && defined(_M_X64)
+#if WYHASH_CONDOM
+        uint64_t a, b;
+        a = _umul128(A, B, &b);
+        A ^= a; B ^= b;
+#else
+        A = _umul128(A, B, &B);
+#endif
+#else
+        uint64_t ha = A >> 32, hb = B >> 32, la = (uint32_t)A, lb = (uint32_t)B, hi, lo;
+        uint64_t rh = ha * hb, rm0 = ha * lb, rm1 = hb * la, rl = la * lb, t = rl + (rm0 << 32), c = t < rl;
+        lo = t + (rm1 << 32); c += lo < t; hi = rh + (rm0 >> 32) + (rm1 >> 32) + c;
+#if WYHASH_CONDOM
+        A ^= lo; B ^= hi;
+#else
+        A = lo; B = hi;
+#endif
+#endif
+        return A ^ B;
+    }
+
+    //multiply and xor mix function, aka MUM
+    static inline uint64_t wyr8(const uint8_t *p) { uint64_t v; memcpy(&v, p, 8); return v; }
+    static inline uint64_t wyr4(const uint8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
+    static inline uint64_t wyr3(const uint8_t *p, size_t k) {
+        return (((uint64_t)p[0]) << 16) | (((uint64_t)p[k >> 1]) << 8) | p[k - 1];
+    }
+
+    static constexpr uint64_t secret[4] = {
+        0xa0761d6478bd642full, 0xe7037ed1a0b428dbull,
+        0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
+
+    //wyhash main function https://github.com/wangyi-fudan/wyhash
+    static uint64_t wyhashstr(const void *key, const size_t len)
+    {
+        uint64_t a = 0, b = 0, seed = secret[0];
+        const uint8_t *p = (const uint8_t*)key;
+        if (EMH_LIKELY(len <= 16)) {
+            if (EMH_LIKELY(len >= 4)) {
+                const auto half = (len >> 3) << 2;
+                a = (wyr4(p) << 32U) | wyr4(p + half); p += len - 4;
+                b = (wyr4(p) << 32U) | wyr4(p - half);
+            } else if (len) {
+                a = wyr3(p, len);
+            }
+        } else {
+            size_t i = len;
+            if (EMH_UNLIKELY(i > 48)) {
+                uint64_t see1 = seed, see2 = seed;
+                do {
+                    seed = wymix(wyr8(p +  0) ^ secret[1], wyr8(p +  8) ^ seed);
+                    see1 = wymix(wyr8(p + 16) ^ secret[2], wyr8(p + 24) ^ see1);
+                    see2 = wymix(wyr8(p + 32) ^ secret[3], wyr8(p + 40) ^ see2);
+                    p += 48; i -= 48;
+                } while (EMH_LIKELY(i > 48));
+                seed ^= see1 ^ see2;
+            }
+            while (i > 16) {
+                seed = wymix(wyr8(p) ^ secret[1], wyr8(p + 8) ^ seed);
+                i -= 16; p += 16;
+            }
+            a = wyr8(p + i - 16);
+            b = wyr8(p + i - 8);
+        }
+
+        return wymix(secret[1] ^ len, wymix(a ^ secret[1], b ^ seed));
+    }
+#endif
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType key) const
@@ -1646,8 +1719,10 @@ one-way seach strategy.
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType& key) const
     {
-#if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size());
+#if WYHASH_HASH
+        return wyhashstr(key.data(), key.size());
+#elif WYHASH_LITTLE_ENDIAN
+        return wyhash(key.data(), key.size(), 0);
 #else
         return _hasher(key);
 #endif
