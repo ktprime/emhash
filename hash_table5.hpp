@@ -1330,13 +1330,13 @@ public:
         _num_buckets = num_buckets;
 
         _pairs = (PairT*)alloc_bucket(num_buckets);
-        memset(_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
+        memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
         reset_empty();
 
         (void)old_buckets;
         if (0 && is_copy_trivially() && old_num_filled && num_buckets >= 2 * old_buckets) {
-            memcpy(_pairs, old_pairs, old_buckets * sizeof(PairT));
+            memcpy((char*)_pairs, old_pairs, old_buckets * sizeof(PairT));
             //free(old_pairs);
             for (size_type src_bucket = 0; src_bucket < old_buckets; src_bucket++) {
                 if ((int)EMH_BUCKET(_pairs, src_bucket) < 0)
@@ -1902,7 +1902,7 @@ one-way seach strategy.
 #elif EMH_WYHASH64
         return wyhash64(key, KC);
 #else
-        return (size_type)_hasher(key);
+        return _hasher(key);
 #endif
     }
 
@@ -1910,9 +1910,9 @@ one-way seach strategy.
     inline size_type hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size());
+        return wyhash(key.data(), key.size(), 0);
 #else
-        return (size_type)_hasher(key);
+        return _hasher(key);
 #endif
     }
 
@@ -1922,7 +1922,7 @@ one-way seach strategy.
 #ifdef EMH_FIBONACCI_HASH
         return _hasher(key) * KC;
 #else
-        return (size_type)_hasher(key);
+        return _hasher(key);
 #endif
     }
 

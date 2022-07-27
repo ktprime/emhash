@@ -150,6 +150,13 @@ static void TestApi()
             {2, "baz"},
         };
 
+        m2[2] = "frist";
+        m2.find(2)->second = "second";
+        m2.insert({3, "null"}).first->second = "third";
+        m2.emplace(4, "null").first->second = "four";
+        for (auto& it : m2)
+            printf("%d -> %s\n", it.first, it.second.data());
+
         // copy constructor
         ehmap<int, std::string> m3 = m2;
 

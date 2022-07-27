@@ -13,7 +13,8 @@
 //#define HOOD_HASH     1
 //#define ABSL 1
 //#define ABSL_HASH 1
-
+//
+//#define EMH_PACK_TAIL 16
 //#define EMH_HIGH_LOAD 123456
 #if EM3
 #include "old/hash_table2.hpp"
@@ -238,7 +239,7 @@ static inline float now2sec()
 #endif
 }
 
-template<class MAP> void bench_insert(MAP map)
+template<class MAP> void bench_insert(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -332,7 +333,7 @@ void iotas(ForwardIt first, ForwardIt last, T value)
         ++value;
     }
 }
-template<class MAP> void bench_randomInsertErase(MAP map)
+template<class MAP> void bench_randomInsertErase(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -403,7 +404,7 @@ template<class MAP> void bench_randomInsertErase(MAP map)
     printf("total time = %.2f s\n\n", now2sec() - nows);
 }
 
-template<class MAP> void bench_randomDistinct2(MAP map)
+template<class MAP> void bench_randomDistinct2(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -469,7 +470,7 @@ template<class MAP> void bench_randomDistinct2(MAP map)
     printf("total time = %.2f s\n\n", now2sec() - nows);
 }
 
-template<class MAP> void bench_copy(MAP map)
+template<class MAP> void bench_copy(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -512,7 +513,7 @@ template<class MAP> void bench_copy(MAP map)
 }
 
 template<class MAP>
-size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
+size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask )
 {
     //printf("%s map = %s\n", __FUNCTION__, typeid(MAP).name());
     MRNG rng(RND + 4);
@@ -548,7 +549,7 @@ size_t runRandomString(size_t max_n, size_t string_length, uint32_t bitMask )
 #endif
     }
 
-    printf("    %016x time = %.2f, loadf = %.2f %d\n", bitMask, now2sec() - ts, map.load_factor(), (int)map.size());
+    printf("%4zd bytes time = %.2f, loadf = %.2f %d\n", string_length, now2sec() - ts, map.load_factor(), (int)map.size());
     return verifier;
 }
 
@@ -622,7 +623,7 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
 }
 
 template<class MAP>
-void bench_randomFindString(MAP map)
+void bench_randomFindString(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -659,7 +660,7 @@ void bench_randomFindString(MAP map)
 }
 
 template<class MAP>
-void bench_randomEraseString(MAP map)
+void bench_randomEraseString(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -667,13 +668,13 @@ void bench_randomEraseString(MAP map)
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
     auto nows = now2sec();
-    { runRandomString<MAP>(6000000, 200, 0x1ffff); }
-    { runRandomString<MAP>(20000000, 7, 0xfffff); }
-    { runRandomString<MAP>(20000000, 8, 0xfffff); }
-    { runRandomString<MAP>(20000000, 13, 0xfffff); }
-    { runRandomString<MAP>(10000000, 24, 0xfffff); }
-    { runRandomString<MAP>(12000000, 100, 0x7ffff); }
-    { runRandomString<MAP>(2000000, 1000, 0x7ffff); }
+    { runInsertEraseString<MAP>(20000000, 7, 0xfffff); }
+    { runInsertEraseString<MAP>(20000000, 8, 0xfffff); }
+    { runInsertEraseString<MAP>(20000000, 13, 0xfffff); }
+    { runInsertEraseString<MAP>(10000000, 24, 0xfffff); }
+    { runInsertEraseString<MAP>(12000000, 100, 0x4ffff); }
+    { runInsertEraseString<MAP>(8000000,  200, 0x3ffff); }
+    { runInsertEraseString<MAP>(6000000,  1000,0x7ffff); }
 
     printf("total time = %.2f s\n\n", now2sec() - nows);
 }
@@ -740,7 +741,7 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
 }
 
 template<class MAP>
-void bench_IterateIntegers(MAP map)
+void bench_IterateIntegers(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -869,12 +870,15 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<std::string> hash_func;
 #elif ABSL_HASH
         typedef absl::Hash<std::string> hash_func;
-#elif AHASH_AHASH_H
-        typedef Ahash64er hash_func;
+//#elif AHASH_AHASH_H
+//        typedef Ahash64er hash_func;
 #elif STD_HASH
         typedef std::hash<std::string> hash_func;
 #else
         typedef WysHasher hash_func;
+#endif
+#if CXX17
+        { ankerl::unordered_dense::map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 
         { emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
@@ -904,9 +908,6 @@ void runTest(int sflags, int eflags)
 #endif
         { phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
-#if CXX17
-        { ankerl::unordered_dense::map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-#endif
 #if CXX20
         { jg::dense_hash_map<std::string, int, hash_func> bench; bench_randomFindString(bench); }
         { rigtorp::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
@@ -926,8 +927,8 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<std::string> hash_func;
 #elif ABSL_HASH
         typedef absl::Hash<std::string> hash_func;
-#elif AHASH_AHASH_H
-        typedef Ahash64er hash_func;
+//#elif AHASH_AHASH_H
+//        typedef Ahash64er hash_func;
 #elif STD_HASH
         typedef std::hash<std::string> hash_func;
 #else

@@ -36,14 +36,6 @@
 #include <iterator>
 #include <algorithm>
 
-#ifdef __has_include
-    #if __has_include("wyhash.h")
-    #include "wyhash.h"
-    #endif
-#elif EMH_WY_HASH
-    #include "wyhash.h"
-#endif
-
 #ifdef EMH_KEY
     #undef  EMH_KEY
     #undef  EMH_VAL
@@ -55,12 +47,12 @@
 #endif
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
+#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
 #    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
-#    define EMH_LIKELY(condition)   condition
-#    define EMH_UNLIKELY(condition) condition
+#    define EMH_LIKELY(condition)   (condition)
+#    define EMH_UNLIKELY(condition) (condition)
 #endif
 
 #define EMH_KEY(p,n)     p[n].first
@@ -73,7 +65,7 @@
 #define EMH_SLOT(i,n)    (i[n].slot & _mask)
 #define EMH_PREVET(i,n)  i[n].slot
 
-#define EMH_KEYMASK(key, mask)  ((size_type)(key >> 0) & ~mask)
+#define EMH_KEYMASK(key, mask)  ((size_type)(key) & ~mask)
 #define EMH_EQHASH(n, key_hash) (EMH_KEYMASK(key_hash, _mask) == (_index[n].slot & ~_mask))
 #define EMH_NEW(key, val, bucket, key_hash) _pairs.emplace_back(key, val); _index[bucket] = {bucket, _num_filled++ | EMH_KEYMASK(key_hash, _mask)}
 
@@ -780,7 +772,7 @@ public:
     size_type erase_if(Pred pred)
     {
         auto old_size = size();
-        for (auto it = begin(), last = end(); it != last; ) {
+        for (auto it = begin(); it != end();) {
             if (pred(*it))
                 it = erase(it);
             else
@@ -816,7 +808,7 @@ public:
     void clear()
     {
         if (_num_filled > 0 || _ehead > 0)
-            memset(_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
+            memset((char*)_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
 
         clearkv();
 
@@ -947,7 +939,7 @@ public:
 #endif
         });
 
-        memset(_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
+        memset((char*)_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
         for (size_type slot = 0; slot < _num_filled; slot++) {
             const auto& key = EMH_KEY(_pairs, slot);
             const auto key_hash = hash_key(key);
@@ -985,8 +977,8 @@ public:
 
         _index = (Index*)alloc_index (num_buckets);
 
-        memset(_index, INACTIVE, sizeof(_index[0]) * num_buckets);
-        memset(_index + num_buckets, 0, sizeof(_index[0]) * EAD);
+        memset((char*)_index, INACTIVE, sizeof(_index[0]) * num_buckets);
+        memset((char*)(_index + num_buckets), 0, sizeof(_index[0]) * EAD);
 
 #ifdef EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {
@@ -1150,8 +1142,7 @@ private:
                 return end();
             next_bucket = nbucket;
         }
-
-        return _pairs.end();
+        return end();
     }
 
     size_type find_hash_bucket(const KeyT& key) const
@@ -1335,70 +1326,55 @@ one-way seach strategy.
         if (_ehead)
             return pop_empty(_ehead);
 #endif
+
         auto bucket = bucket_from;
         if (EMH_EMPTY(_index, ++bucket) || EMH_EMPTY(_index, ++bucket))
             return bucket;
 
+        constexpr auto linear_probe_length = 6u;//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
-#ifndef EMH_QUADRATIC
-        constexpr auto linear_probe_length = 2 + EMH_CACHE_LINE_SIZE / 16;//2 4 6 8
+#if 0
         for (; offset < linear_probe_length; offset += 2) {
-            auto bucket1 = (bucket + offset) & _mask;
-            if (EMH_EMPTY(_index, bucket1) || EMH_EMPTY(_index, ++bucket1))
-                return bucket1;
+            bucket = (bucket + offset) & _mask;
+            if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
+                return bucket;
         }
 #else
-        constexpr auto linear_probe_length = 10;//2 4 7 11
-        for (auto step = offset; offset < linear_probe_length; offset += ++step) {
-            auto bucket1 = (bucket + offset) & _mask;
+        for (auto next = offset; offset < linear_probe_length; next += ++offset) {
+            bucket = (bucket + next) & _mask;
+            if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
+                return bucket;
+        }
+#endif
+
+        bucket += linear_probe_length;
+        constexpr auto quadratic_probe_length = 4;
+        for (size_type step = 2, slot = bucket; ; slot += step ++) {
+            auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_index, bucket1) || EMH_EMPTY(_index, ++bucket1))
                 return bucket1;
-        }
-#endif
 
-#if 0
-        while (true) {
-            _last &= _mask;
-            if (EMH_EMPTY(_index, _last++) || EMH_EMPTY(_index, _last++))
-                return _last++ - 1;
+            else if (step > quadratic_probe_length) {
+                if (EMH_EMPTY(_index, _last) || EMH_EMPTY(_index, ++_last))
+                    return _last++;
 
-#if 1
-            auto tail = _mask - (_last & _mask);
-            if (EMH_EMPTY(_index, tail) || EMH_EMPTY(_index, ++tail))
-                return tail;
-#endif
-#if 0
-            auto medium = (_num_filled + _last) & _mask;
-            if (EMH_EMPTY(_index, medium) || EMH_EMPTY(_index, ++medium))
-                return medium;
-#endif
-        }
+                ++_last &= _mask;
+#if EMH_PACK_TAIL
+                const auto last = _last;
+                const auto tail = _num_buckets - last;
+                if (EMH_EMPTY(_index, tail))
+                    return tail;
+                else if (EMH_EMPTY(_index, last))
+                    return last;
 #else
-        //for (auto slot = bucket + offset; ;slot += offset++) {
-        for (auto slot = bucket + offset; ; slot++) {
-            _last &= _mask;
-            if (EMH_EMPTY(_index, ++_last))// || EMH_EMPTY(_index, ++_last))
-                return _last ++;
-
-            auto bucket1 = slot++ & _mask;
-            if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket1)))// || EMH_UNLIKELY(EMH_EMPTY(_index, ++bucket1)))
-                return bucket1;
-
-#if 0
-            auto tail = _mask - _last;
-            if (EMH_EMPTY(_index, tail) /*|| EMH_EMPTY(_index, ++tail) **/)
-                return tail;
+                auto medium = (_num_filled + _last) & _mask;
+                if (EMH_EMPTY(_index, medium))
+                    return medium;
 #endif
-
-#if 0
-            //auto medium = (_num_filled - _last) & _mask;
-            auto medium = (_mask / 2 + _last) & _mask;
-            if (EMH_EMPTY(_index, medium))// || EMH_EMPTY(_index, ++medium))
-                return medium;
-#endif
+            }
         }
-#endif
+
         return 0;
     }
 
@@ -1441,6 +1417,7 @@ one-way seach strategy.
         return (size_type)hash_key(EMH_KEY(_pairs, slot)) & _mask;
     }
 
+#ifdef EMH_FIBONACCI_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static uint64_t hash64(uint64_t key)
     {
@@ -1475,6 +1452,88 @@ one-way seach strategy.
         return x;
 #endif
     }
+#endif
+
+#if WYHASH_HASH
+    //#define WYHASH_CONDOM 1
+    static inline uint64_t wymix(uint64_t A, uint64_t B)
+    {
+#if defined(__SIZEOF_INT128__)
+        __uint128_t r = A; r *= B;
+#if WYHASH_CONDOM
+        A ^= (uint64_t)r; B ^= (uint64_t)(r >> 64);
+#else
+        A = (uint64_t)r; B = (uint64_t)(r >> 64);
+#endif
+
+#elif defined(_MSC_VER) && defined(_M_X64)
+#if WYHASH_CONDOM
+        uint64_t a, b;
+        a = _umul128(A, B, &b);
+        A ^= a; B ^= b;
+#else
+        A = _umul128(A, B, &B);
+#endif
+#else
+        uint64_t ha = A >> 32, hb = B >> 32, la = (uint32_t)A, lb = (uint32_t)B, hi, lo;
+        uint64_t rh = ha * hb, rm0 = ha * lb, rm1 = hb * la, rl = la * lb, t = rl + (rm0 << 32), c = t < rl;
+        lo = t + (rm1 << 32); c += lo < t; hi = rh + (rm0 >> 32) + (rm1 >> 32) + c;
+#if WYHASH_CONDOM
+        A ^= lo; B ^= hi;
+#else
+        A = lo; B = hi;
+#endif
+#endif
+        return A ^ B;
+    }
+
+    //multiply and xor mix function, aka MUM
+    static inline uint64_t wyr8(const uint8_t *p) { uint64_t v; memcpy(&v, p, 8); return v; }
+    static inline uint64_t wyr4(const uint8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
+    static inline uint64_t wyr3(const uint8_t *p, size_t k) {
+        return (((uint64_t)p[0]) << 16) | (((uint64_t)p[k >> 1]) << 8) | p[k - 1];
+    }
+
+    static constexpr uint64_t secret[4] = {
+        0xa0761d6478bd642full, 0xe7037ed1a0b428dbull,
+        0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
+
+    //wyhash main function https://github.com/wangyi-fudan/wyhash
+    static uint64_t wyhashstr(const void *key, const size_t len)
+    {
+        uint64_t a = 0, b = 0, seed = secret[0];
+        const uint8_t *p = (const uint8_t*)key;
+        if (EMH_LIKELY(len <= 16)) {
+            if (EMH_LIKELY(len >= 4)) {
+                const auto half = (len >> 3) << 2;
+                a = (wyr4(p) << 32U) | wyr4(p + half); p += len - 4;
+                b = (wyr4(p) << 32U) | wyr4(p - half);
+            } else if (len) {
+                a = wyr3(p, len);
+            }
+        } else {
+            size_t i = len;
+            if (EMH_UNLIKELY(i > 48)) {
+                uint64_t see1 = seed, see2 = seed;
+                do {
+                    seed = wymix(wyr8(p +  0) ^ secret[1], wyr8(p +  8) ^ seed);
+                    see1 = wymix(wyr8(p + 16) ^ secret[2], wyr8(p + 24) ^ see1);
+                    see2 = wymix(wyr8(p + 32) ^ secret[3], wyr8(p + 40) ^ see2);
+                    p += 48; i -= 48;
+                } while (EMH_LIKELY(i > 48));
+                seed ^= see1 ^ see2;
+            }
+            while (i > 16) {
+                seed = wymix(wyr8(p) ^ secret[1], wyr8(p + 8) ^ seed);
+                i -= 16; p += 16;
+            }
+            a = wyr8(p + i - 16);
+            b = wyr8(p + i - 8);
+        }
+
+        return wymix(secret[1] ^ len, wymix(a ^ secret[1], b ^ seed));
+    }
+#endif
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType key) const
@@ -1493,8 +1552,10 @@ one-way seach strategy.
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType& key) const
     {
-#if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size());
+#if WYHASH_HASH
+        return wyhashstr(key.data(), key.size());
+#elif WYHASH_LITTLE_ENDIAN
+        return wyhash(key.data(), key.size(), 0);
 #else
         return _hasher(key);
 #endif

@@ -491,7 +491,7 @@ struct WysHasher
 {
     std::size_t operator()(const std::string& str) const
     {
-        return wyhash(str.data(), str.size(), str.size());
+        return wyhash(str.data(), str.size(), 0);
     }
 };
 

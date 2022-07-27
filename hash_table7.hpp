@@ -1690,7 +1690,7 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from, const size_t main_bucket)
     {
-#if 1 || __arm64__ || __aarch64__
+#if 0
         const auto boset  = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
         const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
@@ -1704,7 +1704,7 @@ private:
 
         const auto qmask = _mask / SIZE_BIT;
         if (1) {
-            const auto step = (bucket_from - SIZE_BIT / 2) & qmask;
+            const auto step = (main_bucket - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
                 return step * SIZE_BIT + CTZ(bmask3);
@@ -1859,7 +1859,7 @@ private:
     static constexpr uint32_t BIT_PACK = sizeof(_bitmask[0]) * 2;
     static constexpr uint32_t MASK_BIT = sizeof(_bitmask[0]) * 8;
     static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-    static constexpr uint32_t EPACK_SIZE = sizeof(PairT) >= sizeof(size_t) == 0 ? 1 : 2; // > 1
+    static constexpr uint32_t EPACK_SIZE = (sizeof(PairT) >= sizeof(size_t) == 0 ? 1 : 2); // > 1
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
