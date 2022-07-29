@@ -1,5 +1,5 @@
 // emhash6::HashMap for C++11/14/17
-// version 1.6.9
+// version 1.7.0
 // https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1739,13 +1739,14 @@ private:
         return EMH_ADDR(_pairs, last_bucket) = find_empty_bucket(last_bucket) * 2 + 1;
     }
 
+#if EMH_INT_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__ && EMH_FIBONACCI_HASH == 1
+#if __SIZEOF_INT128__ && EMH_INT_HASH == 1
         __uint128_t r = key; r *= KC;
         return (uint64_t)(r >> 64) + (uint64_t)r;
-#elif EMH_FIBONACCI_HASH == 2
+#elif EMH_INT_HASH == 2
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1754,18 +1755,20 @@ private:
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif _WIN64 && EMH_FIBONACCI_HASH == 1
+#elif _WIN64 && EMH_INT_HASH == 1
         uint64_t high;
         return _umul128(key, KC, &high) + high;
-#elif EMH_FIBONACCI_HASH == 3
+#elif EMH_INT_HASH == 3
         auto ror  = (key >> 32) | (key << 32);
         auto low  = key * 0xA24BAED4963EE407ull;
         auto high = ror * 0x9FB21C651E98DF25ull;
         auto mix  = low + high;
         return mix;
-#elif EMH_FIBONACCI_HASH == 1
+#elif EMH_INT_HASH == 1
         uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
+#elif EMH_WYHASH64
+        return wyhash64(key, KC);
 #else
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
@@ -1774,6 +1777,7 @@ private:
         return x;
 #endif
     }
+#endif
 
     inline uint64_t hash_main(const size_type bucket) const
     {
@@ -1783,14 +1787,12 @@ private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     inline size_type hash_key(const UType key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#if EMH_INT_HASH
         return hash64(key);
 #elif EMH_SAFE_HASH
         return _hash_inter == 0 ? _hasher(key) : hash64(key);
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
-#elif EMH_WYHASH64
-        return wyhash64(key, KC);
 #else
         return (size_type)_hasher(key);
 #endif
@@ -1799,7 +1801,7 @@ private:
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-#ifdef WYHASH_LITTLE_ENDIAN
+#if WYHASH_LITTLE_ENDIAN
         return wyhash(key.data(), key.size(), key.size());
 #else
         return (size_type)_hasher(key);
@@ -1809,11 +1811,7 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-#ifdef EMH_FIBONACCI_HASH
-        return _hasher(key) * KC;
-#else
         return (size_type)_hasher(key);
-#endif
     }
 
 private:

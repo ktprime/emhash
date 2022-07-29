@@ -1318,7 +1318,7 @@ private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#ifdef EMH_INT_HASH
         return hash64(key) & _mask;
 #elif EMH_IDENTITY_HASH
         return (key + (key >> (sizeof(UType) * 4))) & _mask;
@@ -1342,7 +1342,7 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#ifdef EMH_INT_HASH
         return (_hasher(key) * KC) & _mask;
 #else
         return _hasher(key) & _mask;

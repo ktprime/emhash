@@ -1,5 +1,5 @@
 // emhash5::HashMap for C++11/14/17
-// version 2.0.1
+// version 2.1.1
 // https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -519,7 +519,7 @@ public:
     constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
-#ifdef EMH_STATIS
+#if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
     size_type bucket_slot(const KeyT& key) const
     {
@@ -1295,7 +1295,7 @@ public:
 #endif
 
 #if EMH_STATIS
-        if (_num_filled > 1'000'000) dump_statics();
+        if (_num_filled > EMH_STATIS) dump_statics();
 #endif
 
         //assert(required_buckets < max_size());
@@ -1325,7 +1325,8 @@ public:
         _last = _num_filled  = 0;
         _mask        = num_buckets - 1;
 #if EMH_PACK_TAIL > 1
-        num_buckets += num_buckets / EMH_PACK_TAIL; //add more 5-10%
+        _last = num_buckets;
+        num_buckets += num_buckets * EMH_PACK_TAIL / 100; //add more 5-10%
 #endif
         _num_buckets = num_buckets;
 
@@ -1748,72 +1749,52 @@ one-way seach strategy.
         if (_ehead)
             return pop_empty(_ehead);
 #endif
+
         auto bucket = bucket_from;
         if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
-#ifdef EMH_LPL
-        constexpr auto linear_probe_length = std::max((size_type)(128 / sizeof(PairT)) + 2, 4u);//cpu cache line 64 byte,2-3 cache line miss
+        constexpr auto linear_probe_length = std::max((uint32_t)(128 / sizeof(PairT)), 4u);//cpu cache line 64 byte,2-3 cache line miss
         auto offset = 2u;
 
-#ifndef EMH_QUADRATIC
+#if 0
         for (; offset < linear_probe_length; offset += 2) {
-            auto bucket1 = (bucket + offset) & _mask;
-            if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
-                return bucket1;
+            bucket = (bucket + offset) & _mask;
+            if (EMH_EMPTY(_pairs, bucket) || EMH_EMPTY(_pairs, ++bucket))
+                return bucket;
         }
 #else
         for (auto next = offset; offset < linear_probe_length; next += ++offset) {
-            auto bucket1 = (bucket + next) & _mask;
-            if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
-                return bucket1;
+            bucket = (bucket + next) & _mask;
+            if (EMH_EMPTY(_pairs, bucket) || EMH_EMPTY(_pairs, ++bucket))
+                return bucket;
         }
 #endif
 
-        while (true) {
-            if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
-                return _last++;
-            ++_last &= _mask;
-
-#ifndef EMH_LINEAR3
-            auto tail = _mask - _last;
-            if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
-                return tail;
-#else
-            auto medium = (_num_filled + _last) & _mask;
-            if (EMH_EMPTY(_pairs, medium) || EMH_EMPTY(_pairs, ++medium))
-                return medium;
-#endif
-        }
-
-#else
-        constexpr auto linear_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 2 : 3;
-        for (size_type step = 2, slot = bucket + 1; ; slot += 2, step ++) {
+        bucket += linear_probe_length;
+        constexpr auto quadratic_probe_length = sizeof(value_type) > EMH_CACHE_LINE_SIZE ? 3 : 4;
+        for (size_type step = 2, slot = bucket; ; slot += step ++) {
             auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                 return bucket1;
 
-            if (step > linear_probe_length) {
-//                if (EMH_EMPTY(_pairs, _last) || EMH_EMPTY(_pairs, ++_last))
-//                    return _last++;
+            else if (step > quadratic_probe_length) {
+                if (EMH_EMPTY(_pairs, ++_last) || EMH_EMPTY(_pairs, ++_last))
+                    return _last++;
 
+                _last &= _mask;
 #if EMH_PACK_TAIL
-                const auto last = ++_last & _mask;
-                const auto tail = _num_buckets - last;
+                const auto tail = _num_buckets - _last;
                 if (EMH_EMPTY(_pairs, tail))
                     return tail;
-                else if (EMH_EMPTY(_pairs, last))
-                    return last;
-                _last &= _mask;
 #else
-                auto medium = (_num_filled + _last++) & _mask;
+                auto medium = (_num_filled + _last) & _mask;
                 if (EMH_EMPTY(_pairs, medium))
                     return medium;
-                _last &= _mask;
 #endif
             }
         }
-#endif
+
         return 0;
     }
 
@@ -1856,13 +1837,14 @@ one-way seach strategy.
         return (size_type)hash_key(EMH_KEY(_pairs, bucket)) & _mask;
     }
 
+#if EMH_INT_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    static uint64_t hash64(uint64_t key)
+    static inline uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__ && EMH_FIBONACCI_HASH == 1
+#if __SIZEOF_INT128__ && EMH_INT_HASH == 1
         __uint128_t r = key; r *= KC;
         return (uint64_t)(r >> 64) + (uint64_t)r;
-#elif EMH_FIBONACCI_HASH == 2
+#elif EMH_INT_HASH == 2
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1871,18 +1853,20 @@ one-way seach strategy.
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif _WIN64 && EMH_FIBONACCI_HASH == 1
+#elif _WIN64 && EMH_INT_HASH == 1
         uint64_t high;
         return _umul128(key, KC, &high) + high;
-#elif EMH_FIBONACCI_HASH == 3
+#elif EMH_INT_HASH == 3
         auto ror  = (key >> 32) | (key << 32);
         auto low  = key * 0xA24BAED4963EE407ull;
         auto high = ror * 0x9FB21C651E98DF25ull;
         auto mix  = low + high;
         return mix;
-#elif EMH_FIBONACCI_HASH == 1
+#elif EMH_INT_HASH == 1
         uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
+#elif EMH_WYHASH64
+        return wyhash64(key, KC);
 #else
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
@@ -1891,16 +1875,15 @@ one-way seach strategy.
         return x;
 #endif
     }
+#endif
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     inline size_type hash_key(const UType key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#if EMH_INT_HASH
         return hash64(key);
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
-#elif EMH_WYHASH64
-        return wyhash64(key, KC);
 #else
         return _hasher(key);
 #endif
@@ -1919,11 +1902,7 @@ one-way seach strategy.
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-#ifdef EMH_FIBONACCI_HASH
-        return _hasher(key) * KC;
-#else
         return _hasher(key);
-#endif
     }
 
 private:

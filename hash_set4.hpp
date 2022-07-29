@@ -1322,7 +1322,7 @@ private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#ifdef EMH_INT_HASH
         return hash64(key);
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
@@ -1346,7 +1346,7 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const
     {
-#ifdef EMH_FIBONACCI_HASH
+#ifdef EMH_INT_HASH
         return (_hasher(key) * 11400714819323198485ull);
 #else
         return _hasher(key);
