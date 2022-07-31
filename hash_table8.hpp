@@ -1508,17 +1508,17 @@ one-way seach strategy.
             return bucket;
 
 #ifndef EMH_QUADRATIC
-        constexpr auto linear_probe_length = 4 + EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3
-        for (auto offset = 5; offset < linear_probe_length; ) {
+        constexpr auto linear_probe_length = 8 + EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3
+        for (size_type offset = 4, step = _num_filled % 2 + 3; offset < linear_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
                 return bucket;
-            offset += offset / 8 + 2;
+            offset += step;
         }
         bucket += linear_probe_length;
 #else
-        constexpr auto quadratic_probe_length = EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3 8
-        for (auto offset = 4; auto step = 2; step < quadratic_probe_length; ) {
+        constexpr auto quadratic_probe_length = 6;//skip 3 8
+        for (auto offset = 4, step = 2; step < quadratic_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
                 return bucket;
@@ -1536,19 +1536,19 @@ one-way seach strategy.
             if (EMH_UNLIKELY(_last >= _num_buckets))
                 _last = 0;
 
-//            auto tail = (_num_filled + _last++) & _mask;
-//            if (EMH_EMPTY(_index, tail))
-//                return tail;
+            auto tail = (_num_filled + _last++) & _mask;
+            if (EMH_EMPTY(_index, tail))
+                return tail;
 #else
             _last &= _mask;
-            if (EMH_EMPTY(_index, ++_last) || EMH_EMPTY(_index, ++_last))
+            if (EMH_EMPTY(_index, ++_last))// || EMH_EMPTY(_index, ++_last))
                 return _last++;
 
 //            bucket = (bucket + 1) & _mask;
 //            if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket)))
 //                return bucket;
-#if 0
-            auto medium = _mask / 2 + _last;
+#if 1
+            auto medium = (_mask / 2 + _last++) & _mask;
             if (EMH_UNLIKELY(EMH_EMPTY(_index, medium)))// || EMH_EMPTY(_index, ++medium))
                 return medium;
 #endif

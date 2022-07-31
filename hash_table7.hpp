@@ -1697,13 +1697,13 @@ private:
 #else
         const auto boset  = bucket_from % 8;
         auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
-        const auto bmask  = *(size_t*)(align) >> boset;
+        const auto bmask  = (*(size_t*)(align) >> boset) & 0xF0F0F0F0FF0FF0FFull;//
 #endif
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1) {
+        if (0) {
             const auto step = (main_bucket - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
@@ -1711,7 +1711,7 @@ private:
         }
 
         auto& _last = EMH_BUCKET(_pairs, _num_buckets);
-        for (; ; ) { //2.4.7
+        for (; ;) {
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
@@ -1724,6 +1724,27 @@ private:
             }
             _last = (_last + 1) & qmask;
         }
+        return 0;
+    }
+
+    // key is not in this map. Find a place to put it.
+    size_type find_unique_empty(const size_type bucket_from, const size_t main_bucket)
+    {
+        const auto boset  = bucket_from % MASK_BIT;
+        auto* const align = _bitmask + bucket_from / MASK_BIT;
+        const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
+
+        if (EMH_LIKELY(bmask != 0))
+            return bucket_from + CTZ(bmask);
+
+        const auto qmask = _mask / SIZE_BIT;
+        for (auto last = (bucket_from + _mask) & qmask; ;) {
+            const auto bmask2 = *((size_t*)_bitmask + last) & 0xF0F0F0F0FF0FF0FFull;
+            if(EMH_LIKELY(bmask2 != 0))
+                return last * SIZE_BIT + CTZ(bmask2);
+            last = (last + 1) & qmask;
+        }
+
         return 0;
     }
 
@@ -1771,7 +1792,7 @@ private:
             next_bucket = find_last_bucket(next_bucket);
 
         //find a new empty and link it to tail
-        return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket, bucket);
+        return EMH_BUCKET(_pairs, next_bucket) = find_unique_empty(next_bucket, bucket);
     }
 
 #if EMH_INT_HASH
