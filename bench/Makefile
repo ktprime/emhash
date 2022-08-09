@@ -1,9 +1,10 @@
 ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
-CXX?=g++ -fwhole-program
+CXX?=g++ -fwhole-program -flto
 endif
 
 ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
-CXX?=clang++
+CXX?=clang++ -stdlib=libc++
+#sudo apt install libc++abi-12-dev libstdc++-dev-12
 endif
 
 CXXFLAGS = -O3 -march=native -mtune=native -I.. -I../thirdparty
@@ -26,7 +27,7 @@ CXXFLAGS += -DFIB_HASH=$(FH)
 endif
 
 ifneq ($(EH),)
-CXXFLAGS += -DEMH_FIBONACCI_HASH=$(EH)
+CXXFLAGS += -DEMH_INT_HASH=$(EH)
 endif
 
 ifneq ($(EMH),)

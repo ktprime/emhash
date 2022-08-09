@@ -10,7 +10,7 @@
 //#include <ext/pb_ds/assoc_container.hpp>
 #endif
 
-//#define EMH_FIBONACCI_HASH 1
+//#define EMH_INT_HASH 1
 
 #include "martinus/robin_hood.h"
 #include "phmap/phmap.h"

@@ -76,10 +76,6 @@
 
 namespace emhash8 {
 
-constexpr uint32_t INACTIVE = 0xAAAAAAAA;
-constexpr uint32_t END      = 0-0x1u;
-constexpr uint32_t EAD      = 2;
-
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif
@@ -106,6 +102,10 @@ public:
 
     using hasher = HashT;
     using key_equal = EqT;
+
+    constexpr static size_type INACTIVE = -1u;
+    //constexpr uint32_t END      = 0-0x1u;
+    constexpr static size_type EAD      = 2;
 
     struct Index
     {
@@ -388,7 +388,7 @@ public:
     }
 
     constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
+    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
@@ -477,7 +477,7 @@ public:
 
     void dump_statics() const
     {
-        const uint32_t slots = 128;
+        const size_type slots = 128;
         size_type buckets[slots + 1] = {0};
         size_type steps[slots + 1]   = {0};
         for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
@@ -845,7 +845,7 @@ public:
     {
         const auto key_hash = hash_key(key);
         const auto sbucket = find_filled_bucket(key, key_hash);
-        if (sbucket == END)
+        if (sbucket == INACTIVE)
             return 0;
 
         const auto main_bucket = key_hash & _mask;
@@ -925,16 +925,17 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
+        clearkv();
+
         if (_num_filled > 0)
             memset((char*)_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
 
-        clearkv();
-
         _last = _num_filled = 0;
+        _etail = INACTIVE;
+
 #if EMH_HIGH_LOAD
         _ehead = 0;
 #endif
-        _etail = INACTIVE;
     }
 
     void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4)
@@ -1007,12 +1008,12 @@ public:
     bool reserve(uint64_t num_elems, bool force)
     {
 #if EMH_HIGH_LOAD == 0
-        const auto required_buckets = (uint32_t)(num_elems * _mlf >> 27);
+        const auto required_buckets = num_elems * _mlf >> 27;
         if (EMH_LIKELY(required_buckets < _mask)) // && !force
             return false;
 
 #elif EMH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)(num_elems + num_elems * 1 / 9);
+        const auto required_buckets = num_elems + num_elems * 1 / 9;
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
 
@@ -1039,11 +1040,7 @@ public:
 
     static value_type* alloc_bucket(size_type num_buckets)
     {
-#if 0
-        auto new_pairs = (char*)malloc(num_buckets * sizeof(value_type) + (EAD + num_buckets) * sizeof(Index));
-#else
         auto new_pairs = (char*)malloc(num_buckets * sizeof(value_type));
-#endif
         return (value_type *)(new_pairs);
     }
 
@@ -1063,16 +1060,15 @@ public:
         _ehead = 0;
 #endif
 
+#if EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {
             const auto hashl = (size_type)hash_key(l.first) & _mask, hashr = (size_type)hash_key(r.first) & _mask;
             if (hashl != hashr)
                 return hashl < hashr;
-#if 0
             return hashl < hashr;
-#else
-            return l.first < r.first;
-#endif
+            //return l.first < r.first;
         });
+#endif
 
         memset((char*)_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
         for (size_type slot = 0; slot < _num_filled; slot++) {
@@ -1111,9 +1107,9 @@ public:
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
+        assert(required_buckets < max_size());
+        auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
-        assert(num_buckets < max_size());
 
 #if EMH_REHASH_LOG
         auto last = _last;
@@ -1210,7 +1206,7 @@ private:
             _pairs[last_slot].~value_type();
 
         _etail = INACTIVE;
-        EMH_INDEX(_index, ebucket) = {INACTIVE, END};
+        EMH_INDEX(_index, ebucket) = {INACTIVE, 0};
 #if EMH_HIGH_LOAD
         if (_ehead) {
             if (10 * _num_filled < 8 * _num_buckets)
@@ -1255,7 +1251,7 @@ private:
             next_bucket = EMH_BUCKET(_index, next_bucket);
         }
 
-        return 0;
+        return INACTIVE;
     }
 
     // Find the slot with this key, or return bucket size
@@ -1264,7 +1260,7 @@ private:
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket  = EMH_BUCKET(_index, bucket);
         if (EMH_UNLIKELY((int)next_bucket < 0))
-            return END;
+            return INACTIVE;
 
         if (EMH_EQHASH(bucket, key_hash)) {
             const auto slot = EMH_SLOT(_index, bucket);
@@ -1272,21 +1268,22 @@ private:
                 return bucket;
         }
         if (next_bucket == bucket)
-            return END;
+            return INACTIVE;
 
         while (true) {
             if (EMH_EQHASH(next_bucket, key_hash)) {
                 const auto slot = EMH_SLOT(_index, next_bucket);
                 if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
-                return next_bucket;
+                    return next_bucket;
             }
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
-            if (EMH_UNLIKELY(nbucket == next_bucket))
-                return END;
+            if (nbucket == next_bucket)
+                return INACTIVE;
             next_bucket = nbucket;
         }
-        return 0;
+
+        return INACTIVE;
     }
 
     // Find the slot with this key, or return bucket size
@@ -1310,18 +1307,19 @@ private:
             if (EMH_EQHASH(next_bucket, key_hash)) {
                 const auto slot = EMH_SLOT(_index, next_bucket);
                 if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
-                return slot;
+                    return slot;
             }
 
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
-            if (EMH_UNLIKELY(nbucket == next_bucket))
+            if (nbucket == next_bucket)
                 return _num_filled;
             next_bucket = nbucket;
         }
 
-        return 0;
+        return _num_filled;
     }
 
+#if EMH_SORT
     size_type find_hash_bucket(const KeyT& key) const
     {
         const auto key_hash = hash_key(key);
@@ -1353,6 +1351,7 @@ private:
         return END;
     }
 
+    //only for find/can not insert
     size_type find_sorted_bucket(const KeyT& key) const
     {
         const auto key_hash = hash_key(key);
@@ -1372,7 +1371,7 @@ private:
         else if (slots == 1 || key < EMH_KEY(_pairs, slot))
             return END;
 
-#if 0
+#if EMH_SORT
         if (key < EMH_KEY(_pairs, slot) || key > EMH_KEY(_pairs, slots + slot - 1))
             return END;
 #endif
@@ -1387,6 +1386,7 @@ private:
 
         return END;
     }
+#endif
 
     //kick out bucket and find empty to occpuy
     //it will break the orgin link and relnik again.
@@ -1508,7 +1508,7 @@ one-way seach strategy.
             return bucket;
 
 #ifndef EMH_QUADRATIC
-        constexpr auto linear_probe_length = 8 + EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3
+        constexpr size_type linear_probe_length = 8 + EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3
         for (size_type offset = 4, step = _num_filled % 2 + 3; offset < linear_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
@@ -1517,8 +1517,8 @@ one-way seach strategy.
         }
         bucket += linear_probe_length;
 #else
-        constexpr auto quadratic_probe_length = 6;//skip 3 8
-        for (auto offset = 4, step = 2; step < quadratic_probe_length; ) {
+        constexpr size_type quadratic_probe_length = 6u;//skip 3 8
+        for (size_type offset = 4u, step = 2u; step < quadratic_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
                 return bucket;
@@ -1530,13 +1530,13 @@ one-way seach strategy.
         for (;;) {
 #if EMH_PACK_TAIL
             //find empty bucket and skip next
-            if (EMH_EMPTY(_index, ++_last) || EMH_EMPTY(_index, ++_last))
-                return _last++;
+            if (EMH_EMPTY(_index, _last++))// || EMH_EMPTY(_index, _last++))
+                return _last++ - 1;
 
             if (EMH_UNLIKELY(_last >= _num_buckets))
                 _last = 0;
 
-            auto tail = (_num_filled + _last++) & _mask;
+            auto tail = (_mask / 2 + _last++) & _mask;
             if (EMH_EMPTY(_index, tail))
                 return tail;
 #else
@@ -1544,14 +1544,13 @@ one-way seach strategy.
             if (EMH_EMPTY(_index, ++_last))// || EMH_EMPTY(_index, ++_last))
                 return _last++;
 
-//            bucket = (bucket + 1) & _mask;
-//            if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket)))
-//                return bucket;
-#if 1
+            // bucket = (bucket + 1) & _mask;
+            // if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket)))
+            // return bucket;
+
             auto medium = (_mask / 2 + _last++) & _mask;
             if (EMH_UNLIKELY(EMH_EMPTY(_index, medium)))// || EMH_EMPTY(_index, ++medium))
                 return medium;
-#endif
 #endif
         }
 
@@ -1749,8 +1748,8 @@ one-way seach strategy.
     }
 
 private:
-    value_type*_pairs;
     Index*    _index;
+    value_type*_pairs;
 
     HashT     _hasher;
     EqT       _eq;

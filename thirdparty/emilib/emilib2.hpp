@@ -833,7 +833,7 @@ public:
         _pairs       = new_pairs;
 
         //fill last packet zero
-        memset(_pairs + num_buckets, 0, sizeof(_pairs[0]));
+        memset((char*)(_pairs + num_buckets), 0, sizeof(_pairs[0]));
 
         //init empty tombstone
         std::fill_n(_states, num_buckets, State::EEMPTY);

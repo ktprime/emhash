@@ -5,7 +5,7 @@
 #include <iostream>
 
 //#define EMH_HIGH_LOAD 201000
-//#define EMH_FIBONACCI_HASH 1
+//#define EMH_INT_HASH 1
 //#define EMH_SAFE_HASH 1
 
 #include "sfc64.h"

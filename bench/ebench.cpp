@@ -7,6 +7,7 @@
 #ifndef TVal
     #define TVal              1
 #endif
+
 #if __GNUC__ > 4 && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
@@ -43,11 +44,10 @@ std::map<std::string, std::string> maps =
 //    {"qchash", "qc-hash"},
 //    {"fph", "fph-table"},
 
-
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
 
-    {"emilib2", "emilib2"},
+//    {"emilib2", "emilib2"},
 //    {"emilib1", "emilib1"},
 //    {"emilib3", "emilib3"},
 //    {"simd_hash", "simd_hash"},
@@ -57,7 +57,7 @@ std::map<std::string, std::string> maps =
     {"abslf", "absl_flat"},
 //    {"f14_value", "f14_value"},
 
-    {"martind", "martin_dense"},
+//    {"martind", "martin_dense"},
 #if ET
     {"f14_vector", "f14_vector"},
     {"fht", "fht"},
@@ -89,7 +89,7 @@ std::map<std::string, std::string> maps =
 //#define FL1                 1
 
 //feature of emhash
-//#define EMH_FIBONACCI_HASH  1
+//#define EMH_INT_HASH        1
 //#define EMH_BUCKET_INDEX    2
 //#define EMH_REHASH_LOG      1234567
 
@@ -101,6 +101,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_ERASE_SMALL     1
 //#define EMH_HIGH_LOAD         2345
 //#define EMH_FIND_HIT        1
+//#define EMH_PACK_TAIL         5
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
@@ -1158,20 +1159,23 @@ static int benchHashMap(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if ABSL_HASH && ABSL
+    //more than 10 hash
+#if KEY_CLA
+    using ehash_func = StuHasher;
+#elif ABSL_HASH && ABSL
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
-#elif AHASH_AHASH_H && KEY_STR
+#elif A_HASH && KEY_STR
     using ehash_func = Ahash64er;
 #elif KEY_INT && FIB_HASH > 0
-    using ehash_func = Int64Hasher<keyType>;
-#elif KEY_CLA
-    using ehash_func = StuHasher;
+    using ehash_func = Int64Hasher<keyType>; //9 difference hashers
 #elif PHMAP_HASH
     using ehash_func = phmap::Hash<keyType>;
 #elif HOOD_HASH
     using ehash_func = robin_hood::hash<keyType>;
+#elif DENSE_HASH
+    using ehash_func = ankerl::unordered_dense::hash<keyType>;
 #elif QCH && KEY_INT
     using ehash_func = qc::hash::RawMap<keyType, valueType>::hasher;
 #else
@@ -1428,7 +1432,7 @@ int main(int argc, char* argv[])
     int run_type = 0;
     int rnd = randomseed();
     auto maxc = 500;
-    int minn = (1000 * 100 * 8) / sizeof(keyType) + 10000;
+    int minn = (1000 * 100 * 8) / sizeof(keyType) + 12345;
     int maxn = 100*minn;
     if (TKey < 3)
         minn *= 2;
@@ -1548,7 +1552,7 @@ int main(int argc, char* argv[])
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
             hlf = 1.0 * n / pow2;
         }
-        if (n < 1000 || n > 1234567890)
+        if (n < 1e5 || n > 1e9)
             n = minn + srng() % minn;
 
         int tc = benchHashMap(n);

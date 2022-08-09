@@ -1047,10 +1047,10 @@ void runTest(int sflags, int eflags)
         typedef absl::Hash<int> hash_func;
 #elif FIB_HASH
         typedef Int64Hasher<int> hash_func;
-#elif STD_HASH
-        typedef std::hash<int> hash_func;
-#else
+#elif HOOD_HASH
         typedef robin_hood::hash<int> hash_func;
+#else
+        typedef std::hash<int> hash_func;
 #endif
 
 #if ABSL //failed on other hash
@@ -1333,7 +1333,7 @@ int main(int argc, char* argv[])
                 checkSet("fph");
             else if (c == 'b')
                 sflags = atoi(&argv[1][++i]);
-            else if (c == 'd')
+            else if (c == 'e')
                 eflags = atoi(&argv[1][++i]);
         }
     }

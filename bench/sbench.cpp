@@ -60,7 +60,7 @@ std::map<std::string, std::string> maps =
 //#define WY_HASH             1
 #endif
 //#define FL1                 1
-//#define EMH_FIBONACCI_HASH  1
+//#define EMH_INT_HASH  1
 //#define EMH_REHASH_LOG      1234567
 
 //#define EMH_STATIS          1
