@@ -159,10 +159,9 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 namespace emhash7 {
 
-    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #ifdef EMH_SIZE_TYPE_16BIT
     typedef uint16_t size_type;
-    static constexpr size_type INACTIVE = 0xFFFE;
+    static constexpr size_type INACTIVE = 0xFFFF;
 #elif EMH_SIZE_TYPE_64BIT
     typedef uint64_t size_type;
     static constexpr size_type INACTIVE = 0 - 0x1ull;
@@ -298,7 +297,7 @@ struct entry {
         std::swap(first, o.first);
     }
 
-#ifndef EMH_ORDER_KV
+#if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
     Second second;//int
     size_type bucket;
     First first; //long
@@ -313,6 +312,9 @@ struct entry {
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
 {
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+#endif
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
     typedef std::pair<KeyT,ValueT>            value_type;
@@ -527,7 +529,7 @@ public:
         init(bucket, mlf);
     }
 
-    size_type AllocSize(size_type num_buckets) const
+    uint64_t AllocSize(uint64_t num_buckets) const
     {
         return num_buckets * sizeof(PairT) + EPACK_SIZE * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
     }
@@ -653,7 +655,6 @@ public:
         std::swap(_mask, rhs._mask);
         std::swap(_mlf, rhs._mlf);
         std::swap(_bitmask, rhs._bitmask);
-        //std::swap(EMH_BUCKET(_pairs, _num_buckets), EMH_BUCKET(rhs._pairs, rhs._num_buckets));
     }
 
     // -------------------------------------------------------------
@@ -719,7 +720,7 @@ public:
     }
 
     constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
+    constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
     size_type bucket_main() const
@@ -1087,34 +1088,6 @@ public:
             do_insert(it->first, it->second);
     }
 
-#if 0
-    template <typename Iter>
-    void insert2(Iter begin, Iter end)
-    {
-        Iter citbeg = begin;
-        Iter citend = begin;
-        reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin) {
-            if (try_insert_mainbucket(begin->first, begin->second) == INACTIVE) {
-                std::swap(*begin, *citend++);
-            }
-        }
-
-        for (; citbeg != citend; ++citbeg)
-            insert(*citbeg);
-    }
-
-    size_type try_insert_mainbucket(const KeyT& key, const ValueT& val)
-    {
-        const auto bucket = hash_key(key) & _mask;
-        if (!EMH_EMPTY(_pairs, bucket))
-            return INACTIVE;
-
-        EMH_NEW(key, val, bucket);
-        return bucket;
-    }
-#endif
-
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
@@ -1123,15 +1096,10 @@ public:
             do_insert_unqiue(*begin);
     }
 
-    /// Same as above, but contains(key) MUST be false
-    size_type insert_unique(KeyT&& key, ValueT&& val)
+    template<typename K, typename V>
+    size_type insert_unique(K&& key, V&& val)
     {
-        return do_insert_unqiue(std::move(key), std::forward<ValueT>(val));
-    }
-
-    size_type insert_unique(const KeyT& key, ValueT&& val)
-    {
-        return do_insert_unqiue(key, std::forward<ValueT>(val));
+        return do_insert_unqiue(std::forward<K>(key), std::forward<V>(val));
     }
 
     size_type insert_unique(value_type&& value)
@@ -1341,10 +1309,12 @@ public:
         if (required_buckets < _num_filled)
             return;
 
-        auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 2u;
-        while (num_buckets < required_buckets) { num_buckets *= 2; }
-
+        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2u;
+        while (buckets < required_buckets) { buckets *= 2; }
+        assert(buckets < max_size() && buckets > _num_filled);
         //TODO: throwOverflowError
+
+        auto num_buckets = (size_type)buckets;
         auto old_num_filled = _num_filled;
         auto old_mask  = _num_buckets - 1;
         auto old_pairs = _pairs;
@@ -1529,12 +1499,7 @@ private:
         if (EMH_EMPTY(_pairs, bucket))
             return _num_buckets;
 
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (_eq(key, EMH_KEY(_pairs, bucket)))
-            return bucket;
-        else if (next_bucket == bucket)
-            return _num_buckets;
-
+        auto next_bucket = bucket;
         while (true) {
             if (_eq(key, EMH_KEY(_pairs, next_bucket)))
                 return next_bucket;
@@ -1556,36 +1521,7 @@ private:
         if (EMH_EMPTY(_pairs, bucket))
             return _num_buckets;
 
-#if 1
-        if (_eq(key, EMH_KEY(_pairs, bucket)))
-            return bucket;
-
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (next_bucket == bucket)
-            return _num_buckets;
-#elif 0
-        else if (_eq(key, EMH_KEY(_pairs, bucket)))
-            return bucket;
-        else if (next_bucket == bucket)
-            return _num_buckets;
-
-        else if (_eq(key, EMH_KEY(_pairs, next_bucket)))
-            return next_bucket;
-        const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-        if (nbucket == next_bucket)
-            return _num_buckets;
-        next_bucket = nbucket;
-#elif 0
-        const auto bucket = hash_key(key) & _mask;
-        if (EMH_EMPTY(_pairs, bucket))
-            return _num_buckets;
-        else if (_eq(key, EMH_KEY(_pairs, bucket)))
-            return bucket;
-
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (next_bucket == bucket)
-            return _num_buckets;
-#endif
+        auto next_bucket = bucket;
 //        else if (bucket != (hash_key(bucket_key) & _mask))
 //            return _num_buckets;
 
@@ -1619,11 +1555,7 @@ private:
             EMH_BUCKET(_pairs, new_bucket) = new_bucket;
         EMH_BUCKET(_pairs, prev_bucket) = new_bucket;
 
-        //set new bucket bit
         EMH_SET(new_bucket);
-
-        //clear kickout bit
-        //EMH_CLS(kbucket);
         return kbucket;
     }
 
@@ -1694,13 +1626,15 @@ private:
         const auto boset  = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
         const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
-#else
-        const auto boset  = bucket_from % 8;
-        auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
-        const auto bmask  = (*(size_t*)(align) >> boset) & 0xF0F0F0F0FF0FF0FFull;//
-#endif
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
+#else
+        const auto boset  = main_bucket % 8;
+        auto* const align = (uint8_t*)_bitmask + main_bucket / 8;
+        const auto bmask  = (*(size_t*)(align) >> boset) & 0xF0F0F0F0FF0FF0FFull;//
+        if (EMH_LIKELY(bmask != 0))
+            return main_bucket + CTZ(bmask);
+#endif
 
         const auto qmask = _mask / SIZE_BIT;
         if (0) {
@@ -1878,17 +1812,17 @@ private:
     static constexpr uint32_t BIT_PACK = sizeof(_bitmask[0]) * 2;
     static constexpr uint32_t MASK_BIT = sizeof(_bitmask[0]) * 8;
     static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-    static constexpr uint32_t EPACK_SIZE = (sizeof(PairT) >= sizeof(size_t) == 0 ? 1 : 2); // > 1
+    static constexpr uint32_t EPACK_SIZE = sizeof(PairT) >= sizeof(size_t) == 0 ? 1 : 2; // > 1
 };
-} // namespace emhash
+}
+// namespace emhash7
 #if __cplusplus >= 201103L
-//template <class Key, class Val> using emhash7 = emhash7::HashMap<Key, Val, std::hash<Key>, std::equal_to<Key>>;
+//template <class Key, class Val> using ehmap7 = emhash7::HashMap<Key, Val, std::hash<Key>, std::equal_to<Key>>;
 #endif
 
 //TODO
 //2. improve rehash and find miss performance(reduce peak memory)
 //3. dump or Serialization interface
 //4. node hash map support
-//5. support load_factor > 1.0
-//6. add grow ration
-//8. ... https://godbolt.org/
+//5. load_factor > 1.0 && add grow ration
+//... https://godbolt.org/

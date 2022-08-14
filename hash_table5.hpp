@@ -95,8 +95,13 @@
 
 namespace emhash5 {
 
-typedef uint32_t     size_type;
-const constexpr size_type INACTIVE = 0xFFFFFFFF;
+#if EMH_SIZE_TYPE_64BIT
+    typedef uint64_t size_type;
+    static constexpr size_type INACTIVE = 0 - 0x1ull;
+#else
+    typedef uint32_t size_type;
+    const constexpr size_type INACTIVE = 0xFFFFFFFF;
+#endif
 
 template <typename First, typename Second>
 struct entry {
@@ -191,9 +196,15 @@ struct entry {
         std::swap(first, o.first);
     }
 
-    Second second;//int
+#if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
     size_type bucket;
+    First first;
+    Second second;
+#else
     First first; //long
+    size_type bucket;
+    Second second;//int
+#endif
 };// __attribute__ ((packed));
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
@@ -520,7 +531,7 @@ public:
             _mlf = (uint32_t)((1 << 27) / ml);
     }
 
-    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
+    constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
@@ -1226,7 +1237,7 @@ public:
             clear_empty();
         clearkv();
 #else
-        if (is_triviall_destructable() || _num_filled < _num_buckets / 8)
+        if (is_triviall_destructable())
             clearkv();
         else if (_num_filled)
             memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
