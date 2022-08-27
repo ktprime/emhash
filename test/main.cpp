@@ -5,6 +5,8 @@
 #endif
 
 
+#define EMH_IDENTITY_HASH 1
+
 //#include "wyhash.h"
 #include "eutil.h"
 #include "../hash_table5.hpp"
@@ -126,7 +128,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash8::HashMap
+#define ehmap  emhash7::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -160,6 +162,19 @@ static void TestApi()
         // copy constructor
         ehmap<int, std::string> m3 = m2;
 
+        ehmap<int, int> m21 =
+        {
+            {2, 2}, {4, 3},
+        };
+
+        m21.clear();
+        m21.emplace(1,1);
+        m21.emplace(3,1);
+        for (int i = 0; i < 16; i++)
+            m21[i] = 0;
+        assert(m21.size() == 16);
+
+
         // move constructor
         auto m4 = std::move(m2);
 
@@ -182,6 +197,8 @@ static void TestApi()
 
         m4.erase(m4.find(3));
         assert(m4.size()== 0);
+
+        m4.clear();
 
         // range constructor
         std::vector<std::pair<std::bitset<8>, int>> v = { {0x12, 1}, {0x01,-1} };

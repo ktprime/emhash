@@ -103,7 +103,7 @@ public:
     using hasher = HashT;
     using key_equal = EqT;
 
-    constexpr static size_type INACTIVE = -1u;
+    constexpr static size_type INACTIVE = 0-1u;
     //constexpr uint32_t END      = 0-0x1u;
     constexpr static size_type EAD      = 2;
 
@@ -1040,13 +1040,13 @@ public:
 
     static value_type* alloc_bucket(size_type num_buckets)
     {
-        auto new_pairs = (char*)malloc(num_buckets * sizeof(value_type));
+        auto new_pairs = (char*)malloc((uint64_t)num_buckets * sizeof(value_type));
         return (value_type *)(new_pairs);
     }
 
     static Index* alloc_index(size_type num_buckets)
     {
-        auto new_index = (char*)malloc((EAD + num_buckets) * sizeof(Index));
+        auto new_index = (char*)malloc((uint64_t)(EAD + num_buckets) * sizeof(Index));
         return (Index *)(new_index);
     }
 
@@ -1525,6 +1525,10 @@ one-way seach strategy.
             offset += step++;
         }
         bucket += 4;
+#endif
+
+#ifndef _MSC_VER
+        __builtin_prefetch(static_cast<const void*>(_index + _last + 1), 0, 1);
 #endif
 
         for (;;) {

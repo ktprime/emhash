@@ -434,7 +434,7 @@ public:
 //        _eq          = rhs._eq;
         _num_buckets = rhs._num_buckets;
         _num_filled  = rhs._num_filled;
-        _mlf      = rhs._mlf;
+        _mlf         = rhs._mlf;
         _last        = rhs._last;
         _mask        = rhs._mask;
 #if EMH_HIGH_LOAD
@@ -1390,6 +1390,7 @@ private:
 
     static PairT* alloc_bucket(size_type num_buckets)
     {
+        //TODO: call realloc
         auto* new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
         return (PairT *)(new_pairs);
     }
@@ -1597,7 +1598,6 @@ private:
         else if (_eq(EMH_KEY(_pairs, bucket), key))
             return bucket;
 #else
-
         if constexpr (std::is_integral<K>::value) {
             if (_eq(EMH_KEY(_pairs, bucket), key))
                 return bucket;
@@ -1767,6 +1767,9 @@ one-way seach strategy.
         if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
+#ifndef _MSC_VER
+        //__builtin_prefetch(static_cast<const void*>(_pairs + bucket + 1), 0, 1);
+#endif
         constexpr auto linear_probe_length = 3;//2-3 cache line miss
         for (size_type step = 2, slot = bucket + 1; ; slot += 3) {
             if (step < 8) {
@@ -1800,7 +1803,7 @@ one-way seach strategy.
         if (EMH_UNLIKELY(EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket)))
             return bucket;
 
-        for (size_type step = 2, slot = bucket + 2; ; slot += 3) {
+        for (size_type slot = bucket + 2; ; slot += 3) {
             auto bucket1 = slot & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                 return bucket1;

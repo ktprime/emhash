@@ -1271,8 +1271,10 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (!is_triviall_destructable() && _num_filled)
+        if (!is_triviall_destructable() && _num_filled) {
             memset(_bitmask, 0xFFFFFFFF, (_num_buckets + 7) / 8);
+            if (_num_buckets < 8) _bitmask[0] = (1 << _num_buckets) - 1;
+        }
         else if (_num_filled)
             clearkv();
 
@@ -1782,6 +1784,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
+
     inline size_type hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
