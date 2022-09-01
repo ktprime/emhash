@@ -982,7 +982,7 @@ public:
         }
     }
 
-    /// Returns false if key isn't found.
+#ifdef EMH_EXT
     bool try_get(const KeyT& key, ValueT& val) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
@@ -1013,6 +1013,7 @@ public:
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? ValueT() : EMH_VAL(_pairs, bucket);
     }
+#endif
 
     // -----------------------------------------------------
     template<typename K = KeyT, typename V = ValueT>
@@ -1067,7 +1068,7 @@ public:
         return do_insert(value);
     }
 
-    std::pair<iterator, bool> insert(value_type && value)
+    std::pair<iterator, bool> insert(value_type&& value)
     {
         check_expand_need();
         return do_insert(std::move(value));
@@ -1568,8 +1569,8 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position. ***/
 
-    template<typename Key=KeyT>
-    size_type find_or_allocate(const Key& key, bool& isempty)
+//    template<typename Key=KeyT>
+    size_type find_or_allocate(const KeyT& key, bool& isempty)
     {
         const auto bucket = hash_key(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
@@ -1784,7 +1785,6 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-
     inline size_type hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN

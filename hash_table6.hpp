@@ -1590,9 +1590,7 @@ private:
 ** position or not: if it is not, move colliding bucket to an empty place and
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position. ***/
-
-    template<typename Key>
-    size_type find_or_allocate(const Key& key)
+    size_type find_or_allocate(const KeyT& key)
     {
         const auto bucket = hash_key(key) & _mask;
         auto next_bucket = EMH_ADDR(_pairs, bucket);
