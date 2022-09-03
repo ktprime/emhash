@@ -524,7 +524,7 @@ public:
         rehash(bucket);
     }
 
-    HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR)
+    HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) noexcept
     {
         init(bucket, mlf);
     }
@@ -534,13 +534,13 @@ public:
         return num_buckets * sizeof(PairT) + EPACK_SIZE * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
     }
 
-    HashMap(const HashMap& rhs)
+    HashMap(const HashMap& rhs) noexcept
     {
         _pairs = (PairT*)malloc(AllocSize(rhs._num_buckets));
         clone(rhs);
     }
 
-    HashMap(HashMap&& rhs)
+    HashMap(HashMap&& rhs) noexcept
     {
 #ifndef EMH_ZERO_MOVE
         init(4);
@@ -566,7 +566,7 @@ public:
             emplace(*first);
     }
 
-    HashMap& operator=(const HashMap& rhs)
+    HashMap& operator= (const HashMap& rhs) noexcept
     {
         if (this == &rhs)
             return *this;
@@ -583,7 +583,7 @@ public:
         return *this;
     }
 
-    HashMap& operator=(HashMap&& rhs)
+    HashMap& operator= (HashMap&& rhs) noexcept
     {
         if (this != &rhs) {
             swap(rhs);
@@ -1126,7 +1126,7 @@ public:
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) { return do_assign(std::move(key), std::forward<ValueT>(val)); }
 
     template <typename... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args)
+    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -1155,13 +1155,13 @@ public:
     }
 
     template <class... Args>
-    inline size_type emplace_unique(Args&&... args)
+    inline size_type emplace_unique(Args&&... args) noexcept
     {
         return insert_unique(std::forward<Args>(args)...);
     }
 
     /* Check if inserting a new value rather than overwriting an old entry */
-    ValueT& operator[](const KeyT& key)
+    ValueT& operator[](const KeyT& key) noexcept
     {
         check_expand_need();
 
@@ -1174,7 +1174,7 @@ public:
         return EMH_VAL(_pairs, bucket);
     }
 
-    ValueT& operator[](KeyT&& key)
+    ValueT& operator[](KeyT&& key) noexcept
     {
         check_expand_need();
 

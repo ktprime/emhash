@@ -131,7 +131,8 @@ public:
 
 #ifdef EMH_H2
     #define key_2hash(key_hash, key) ((uint8_t)(key_hash >> 24)) << 1
-    //#define key_2hash(key_hash, key) (((uint8_t)(key_hash >> 57)) << 1)
+#elif EMH_H3
+    #define key_2hash(key_hash, key) (uint8_t)(key_hash & 0xFE)
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
@@ -306,17 +307,17 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap(size_t n = 4)
+    HashMap(size_t n = 4) noexcept
     {
         rehash(n);
     }
 
-    HashMap(const HashMap& other)
+    HashMap(const HashMap& other) noexcept
     {
         clone(other);
     }
 
-    HashMap(HashMap&& other)
+    HashMap(HashMap&& other) noexcept
     {
         rehash(1);
         if (this != &other) {
@@ -324,7 +325,7 @@ public:
         }
     }
 
-    HashMap(std::initializer_list<value_type> il)
+    HashMap(std::initializer_list<value_type> il) noexcept
     {
         reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
@@ -332,21 +333,21 @@ public:
     }
 
     template<class InputIt>
-    HashMap(InputIt first, InputIt last, size_t bucket_count=4)
+    HashMap(InputIt first, InputIt last, size_t bucket_count = 4) noexcept
     {
         reserve(std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
 
-    HashMap& operator=(const HashMap& other)
+    HashMap& operator=(const HashMap& other) noexcept
     {
         if (this != &other)
             clone(other);
         return *this;
     }
 
-    HashMap& operator=(HashMap&& other)
+    HashMap& operator=(HashMap&& other) noexcept
     {
         if (this != &other) {
             swap(other);
@@ -355,7 +356,7 @@ public:
         return *this;
     }
 
-    ~HashMap()
+    ~HashMap() noexcept
     {
         if (is_triviall_destructable())
             clear();
@@ -365,7 +366,7 @@ public:
         free(_pairs);
     }
 
-    void clone(const HashMap& other)
+    void clone(const HashMap& other) noexcept
     {
         if (other.size() == 0) {
             clear();
@@ -389,7 +390,7 @@ public:
         memcpy(_states, other._states, (_num_buckets + simd_bytes) * sizeof(_states[0]));
     }
 
-    void swap(HashMap& other)
+    void swap(HashMap& other) noexcept
     {
         std::swap(_hasher,           other._hasher);
         std::swap(_eq,               other._eq);
@@ -403,36 +404,36 @@ public:
 
     // -------------------------------------------------------------
 
-    iterator begin()
+    iterator begin() noexcept
     {
         if (_num_filled == 0)
             return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
-    const_iterator cbegin() const
+    const_iterator cbegin() const noexcept
     {
         if (_num_filled == 0)
             return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
-    const_iterator begin() const
+    const_iterator begin() const noexcept
     {
         return cbegin();
     }
 
-    iterator end()
+    iterator end() noexcept
     {
         return {this, _num_buckets, false};
     }
 
-    const_iterator cend() const
+    const_iterator cend() const noexcept
     {
         return {this, _num_buckets, false};
     }
 
-    const_iterator end() const
+    const_iterator end() const noexcept
     {
         return cend();
     }
@@ -459,6 +460,7 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
+	//defualt load_factor = 7/8
     void max_load_factor(float lf = 8.0f/9)
     {
     }
@@ -466,25 +468,25 @@ public:
     // ------------------------------------------------------------
 
     template<typename K>
-    iterator find(const K& key)
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    const_iterator find(const K& key) const
+    const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    bool contains(const K& k) const
+    bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    size_t count(const K& k) const
+    size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
@@ -529,7 +531,7 @@ public:
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
     template<typename K, typename V>
-    std::pair<iterator, bool> insert(K&& key, V&& val)
+    std::pair<iterator, bool> insert(K&& key, V&& val) noexcept
     {
         check_expand_need();
         bool bnofind = true;
@@ -542,28 +544,28 @@ public:
     }
 
     template <class... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args)
+    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         return insert(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> insert(value_type&& value)
+    std::pair<iterator, bool> insert(value_type&& value) noexcept
     {
         return insert(std::move(value.first), std::move(value.second));
     }
 
-    std::pair<iterator, bool> insert(const value_type& value)
+    std::pair<iterator, bool> insert(const value_type& value) noexcept
     {
         return insert(value.first, value.second);
     }
 
-    iterator insert(iterator hint, const value_type& value)
+    iterator insert(iterator hint, const value_type& value) noexcept
     {
         (void)hint;
         return insert(value.first, value.second).first;
     }
 
-    void insert(const_iterator beginc, const_iterator endc)
+    void insert(const_iterator beginc, const_iterator endc) noexcept
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc) {
@@ -571,7 +573,7 @@ public:
         }
     }
 
-    void insert_unique(const_iterator beginc, const_iterator endc)
+    void insert_unique(const_iterator beginc, const_iterator endc) noexcept
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc) {
@@ -580,11 +582,11 @@ public:
     }
 
     template<typename K, typename V>
-    size_t insert_unique(K&& key, V&& val)
+    size_t insert_unique(K&& key, V&& val) noexcept
     {
         check_expand_need();
 
-        const auto key_hash = _hasher(key);
+        const auto key_hash = H1(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = key_2hash(key_hash, key);
@@ -592,18 +594,18 @@ public:
         return bucket;
     }
 
-    size_t insert_unique(value_type&& value)
+    size_t insert_unique(value_type&& value) noexcept
     {
         return insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    size_t insert_unique(const value_type& value)
+    size_t insert_unique(const value_type& value) noexcept
     {
         return insert_unique(value.first, value.second);
     }
 
     template<typename K, typename V>
-    void insert_or_assign(K&& key, V&& val)
+    void insert_or_assign(K&& key, V&& val) noexcept
     {
         check_expand_need();
 
@@ -619,7 +621,7 @@ public:
     }
 
     /// Like std::map<KeyT,ValueT>::operator[].
-    ValueT& operator[](const KeyT& key)
+    ValueT& operator[](const KeyT& key) noexcept
     {
         check_expand_need();
         bool bnofind = true;
@@ -632,7 +634,7 @@ public:
         return _pairs[bucket].second;
     }
 
-    ValueT& operator[](KeyT&& key)
+    ValueT& operator[](KeyT&& key) noexcept
     {
         check_expand_need();
         bool bnofind = true;
@@ -648,7 +650,7 @@ public:
 
     /// Erase an element from the hash table.
     /// return false if element was not found
-    size_t erase(const KeyT& key)
+    size_t erase(const KeyT& key) noexcept
     {
         auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
@@ -658,33 +660,34 @@ public:
         return 1;
     }
 
-    iterator erase(const const_iterator& cit)
+    iterator erase(const const_iterator& cit) noexcept
     {
         _erase(cit._bucket);
         iterator it(cit);
         return ++it;
     }
 
-    iterator erase(iterator it)
+    iterator erase(iterator it) noexcept
     {
         _erase(it._bucket);
         return ++it;
     }
 
-    void _erase(iterator& it)
+    void _erase(iterator& it) noexcept
     {
         _erase(it._bucket);
     }
 
-    uint8_t group_mask(size_t gbucket) const
+    uint8_t group_mask(size_t gbucket) const noexcept
     {
-        if (stat_bytes >= simd_bytes || _num_buckets >= simd_bytes)
+        assert(stat_bytes >= simd_bytes);
+//        if (stat_bytes >= simd_bytes || _num_buckets >= simd_bytes)
             return _states[gbucket + simd_bytes - 1] % 4;
-        else
-            return _states[_mask] % 4;
+//        else
+//            return _states[_mask] % 4;
     }
 
-    void _erase(size_t bucket)
+    void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
         if (is_triviall_destructable())
@@ -713,7 +716,7 @@ public:
     }
 
     /// Remove all elements, keeping full capacity.
-    void clear()
+    void clear() noexcept
     {
         if (is_triviall_destructable()) {
             for (auto it = begin(); it.bucket() != _num_buckets; ++it) {
@@ -733,7 +736,7 @@ public:
         rehash(_num_filled);
     }
 
-    bool reserve(size_t num_elems)
+    bool reserve(size_t num_elems) noexcept
     {
         size_t required_buckets = num_elems + num_elems / 8;
         if (EMH_LIKELY(required_buckets < _num_buckets))
@@ -744,7 +747,7 @@ public:
     }
 
     /// Make room for this many elements
-    void rehash(size_t num_elems)
+    void rehash(size_t num_elems) noexcept
     {
         const size_t required_buckets = num_elems;
         if (EMH_UNLIKELY(required_buckets < _num_filled))
@@ -796,7 +799,7 @@ public:
 
 #if 0
         if (std::is_integral<KeyT>::value) {
-            auto keymask = key_2hash(_hasher(0)) + SENTINEL;
+            auto keymask = key_2hash(H1(0)) + SENTINEL;
             if ((keymask & EEMPTY) == State::EEMPTY)
                 keymask = SENTINEL;
             std::fill_n(_states + num_buckets, simd_bytes, keymask);
@@ -811,7 +814,7 @@ public:
         for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
-                const auto key_hash = _hasher(src_pair.first);
+                const auto key_hash = H1(src_pair.first);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
 #if EMH_DUMP
                 collision += _states[key_hash & _mask] % 2 == State::EFILLED;
@@ -852,12 +855,12 @@ private:
 
     // Find the bucket with this key, or return (size_t)-1
     template<typename K>
-    size_t find_filled_bucket(const K& key) const
+    size_t find_filled_bucket(const K& key) const noexcept
     {
-        const auto key_hash = _hasher(key);
+        const auto key_hash = H1(key);
         auto next_bucket = (size_t)(key_hash & _mask);
         next_bucket -= next_bucket % simd_bytes;
-        prefetch_heap_block((char*)_states + next_bucket);
+        //prefetch_heap_block((char*)_states + next_bucket);
 
         const auto filled = SET1_EPI8(key_2hash(key_hash, key));
         int i = _max_probe_length;
@@ -868,9 +871,7 @@ private:
 
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (EMH_UNLIKELY(fbucket >= _num_buckets))
-                    break; //overflow
-                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
+                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key))) 
                     return fbucket;
                 maskf &= maskf - 1;
             }
@@ -887,9 +888,9 @@ private:
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
     template<typename K>
-    size_t find_or_allocate(const K& key, bool& bnew)
+    size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        const auto key_hash = _hasher(key);
+        const auto key_hash = H1(key);
         const auto key_h2 = key_2hash(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
         const auto boffset = bucket % simd_bytes; bucket -= boffset;
@@ -907,8 +908,6 @@ private:
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (EMH_UNLIKELY(fbucket >= _num_buckets))
-                    break;
                 if (_eq(_pairs[fbucket].first, key)) {
                     bnew = false;
                     return fbucket;
@@ -957,13 +956,13 @@ private:
         return ebucket;
     }
 
-    inline uint64_t empty_delete(size_t gbucket) const
+    inline uint64_t empty_delete(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_EMPTY2((decltype(&simd_empty))((char*)_states + gbucket));
         return MOVEMASK_EPI8(vec);
     }
 
-    uint64_t filled_mask(size_t gbucket) const
+    uint64_t filled_mask(size_t gbucket) const noexcept
     {
 #if 0
         const auto vec = LOAD_EMPTY2((decltype(&simd_empty))((char*)_states + gbucket));
@@ -974,7 +973,7 @@ private:
 #endif
     }
 
-    size_t find_empty_slot(size_t next_bucket, int offset)
+    size_t find_empty_slot(size_t next_bucket, int offset) noexcept
     {
         next_bucket -= next_bucket % simd_bytes;
         while (true) {
@@ -992,7 +991,7 @@ private:
         return 0;
     }
 
-    size_t find_filled_slot(size_t next_bucket) const
+    size_t find_filled_slot(size_t next_bucket) const noexcept
     {
         next_bucket -= next_bucket % simd_bytes;
         while (true) {
@@ -1002,6 +1001,16 @@ private:
             next_bucket += simd_bytes;
         }
         return 0;
+    }
+
+    inline size_t H1(const KeyT& key) const noexcept
+    {
+#ifdef EMH_H3
+        const auto key_hash = _hasher(key);
+        return (key_hash >> 7) ^ (reinterpret_cast<uintptr_t>(_states) >> 12);
+#else
+        return _hasher(key);
+#endif
     }
 
 private:

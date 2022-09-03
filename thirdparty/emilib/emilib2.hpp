@@ -465,13 +465,13 @@ public:
     // ------------------------------------------------------------
 
     template<typename K>
-    iterator find(const K& key)
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    const_iterator find(const K& key) const
+    const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
@@ -685,35 +685,35 @@ public:
 
     /// Erase an element from the hash table.
     /// return false if element was not found
-    size_t erase(const KeyT& key)
+    size_t erase(const KeyT& key) noexcept
     {
         auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
             return 0;
 
-        _erase(bucket);
+        do_erase(bucket);
         return 1;
     }
 
-    iterator erase(const const_iterator& cit)
+    iterator erase(const const_iterator& cit) noexcept
     {
-        _erase(cit._bucket);
+        do_erase(cit._bucket);
         iterator it(cit);
         return ++it;
     }
 
-    iterator erase(iterator it)
+    iterator erase(iterator it) noexcept
     {
-        _erase(it._bucket);
+        do_erase(it._bucket);
         return ++it;
     }
 
-    void _erase(iterator& it)
+    void _erase(iterator& it) noexcept
     {
-        _erase(it._bucket);
+        do_erase(it._bucket);
     }
 
-    void _erase(size_t bucket)
+    void do_erase(size_t bucket)
     {
         _num_filled -= 1;
         if (is_triviall_destructable())
@@ -887,11 +887,11 @@ private:
 
     // Find the bucket with this key, or return (size_t)-1
     template<typename K>
-    size_t find_filled_bucket(const K& key) const
+    size_t find_filled_bucket(const K& key) const noexcept
     {
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
-        prefetch_heap_block((char*)_states + next_bucket);
+        //prefetch_heap_block((char*)_states + next_bucket);
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         int i = _max_probe_length;
 
@@ -901,10 +901,19 @@ private:
 
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (EMH_UNLIKELY(fbucket >= _num_buckets))
-                    break; //overflow
-                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
-                    return fbucket;
+                if (std::is_integral<K>::value) {
+                    if (EMH_LIKELY(_eq(_pairs[fbucket].first, key))) {
+                        if (EMH_UNLIKELY(fbucket >= _num_buckets))
+                            break; //overflow
+                        return fbucket;
+                    }
+                } else {
+                    if (EMH_UNLIKELY(fbucket >= _num_buckets))
+                        break; //overflow
+                    if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
+                        return fbucket;
+                }
+
                 maskf &= maskf - 1;
             }
 
@@ -928,7 +937,7 @@ private:
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
     template<typename K>
-    size_t find_or_allocate(const K& key, bool& bnew)
+    size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
         const auto key_hash = _hasher(key);
         const auto key_h2 = hash_key2(key_hash, key);
@@ -996,13 +1005,13 @@ private:
         return ebucket;
     }
 
-    inline uint64_t empty_delete(size_t gbucket) const
+    inline uint64_t empty_delete(size_t gbucket) const noexcept
     {
         const auto vec = GET_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
         return MOVEMASK_EPI8(vec);
     }
 
-    uint64_t filled_mask(size_t gbucket) const
+    uint64_t filled_mask(size_t gbucket) const noexcept
     {
 #if 1
         const auto vec = GET_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
@@ -1013,7 +1022,7 @@ private:
 #endif
     }
 
-    size_t find_empty_slot(size_t next_bucket, int offset)
+    size_t find_empty_slot(size_t next_bucket, int offset) noexcept
     {
         while (true) {
             const auto maske = empty_delete(next_bucket); //*(uint64_t*)(_states + next_bucket) & EMPTY_MASK;
@@ -1034,7 +1043,7 @@ private:
         return 0;
     }
 
-    size_t find_filled_slot(size_t next_bucket) const
+    size_t find_filled_slot(size_t next_bucket) const noexcept
     {
         while (true) {
             const auto maske = filled_mask(next_bucket);

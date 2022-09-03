@@ -38,6 +38,7 @@ std::map<std::string, std::string> maps =
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
     {"emhash8", "emhash8"},
+    {"ck_map", "ck_map"},
 
 //    {"jg_dense", "jg_dense"},
 //    {"rigtorp", "rigtorp"},
@@ -57,7 +58,8 @@ std::map<std::string, std::string> maps =
     {"abslf", "absl_flat"},
 //    {"f14_value", "f14_value"},
 
-//    {"martind", "martin_dense"},
+    {"martind", "martin_dense"},
+
 #if ET
     {"f14_vector", "f14_vector"},
     {"fht", "fht"},
@@ -793,8 +795,15 @@ void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const st
 #endif
 #endif
 
+#if KEY_INT
+    auto vl = vList;
+    shuffle(vl.begin(), vl.end());
+#else
+    const auto& vl = vList;
+#endif
+
     auto ts1 = getus();
-    for (const auto& v : vList) {
+    for (const auto& v : vl) {
 #if KEY_STR
 #if TKey != 4
         skey[v.size() % STR_SIZE + 1] ++;
@@ -814,8 +823,11 @@ void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const st
 template<class hash_type>
 void find_hit_50(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
+    auto vl = vList;
+    shuffle(vl.begin(), vl.end());
+
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto& v : vList) {
+    for (const auto& v : vl) {
 #if FL1
         if (sum % (1024 * 256) == 0)
             memset(l1_cache, 0, sizeof(l1_cache));
@@ -843,8 +855,15 @@ void find_hit_50_erase(const hash_type& ht_hash, const std::string& hash_name, c
 template<class hash_type>
 void find_hit_100(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
+#if KEY_INT
+    auto vl = vList;
+    shuffle(vl.begin(), vl.end());
+#else
+    const auto& vl = vList;
+#endif
+
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto& v : vList) {
+    for (const auto& v : vl) {
         sum += ht_hash.count(v);
 #if FL1
         if (sum % (1024 * 64) == 0)
@@ -1007,72 +1026,69 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 template<class hash_type>
 void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 {
-    if (maps.find(hash_name) == maps.end())
-        return;
+	if (maps.find(hash_name) == maps.end())
+		return;
 
-    if (test_case == 0)
-        printf("%s:size %zd\n", hash_name.data(), sizeof(hash_type));
+	if (test_case == 0)
+		printf("%s:size %zd\n", hash_name.data(), sizeof(hash_type));
 
-    {
-        hash_type hash;
-        const uint32_t l1_size = (32 * 1024)   / (sizeof(keyType) + sizeof(valueType));
-        //const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
-        const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
+	hash_type hash;
+	const uint32_t l1_size = (32 * 1024)   / (sizeof(keyType) + sizeof(valueType));
+	//const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
+	const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
-        func_index = 0;
+	func_index = 0;
 #if 1
-        multi_small_ife <hash_type>(hash_name, oList);
+	multi_small_ife <hash_type>(hash_name, oList);
 
 #if QC_HASH == 0 || QC_HASH == 2
-        insert_erase     <hash_type>(hash_name, oList);
+	insert_erase     <hash_type>(hash_name, oList);
 #endif
-        insert_high_load <hash_type>(hash_name, oList);
 
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
-//        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", l2_size, l2_size + 1000);
-        insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l3_size, l3_size + 1000);
+	//        insert_high_load <hash_type>(hash_name, oList);
 
-        insert_no_reserve <hash_type>(hash_name, oList);
+	insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
+	//        insert_cache_size <hash_type>(hash_name, oList, "insert_l2_cache", l2_size, l2_size + 1000);
+	insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l3_size, l3_size + 1000);
 
-        insert_hit<hash_type>(hash,hash_name, oList);
-        find_hit_100<hash_type>(hash,hash_name, oList);
-        find_hit_0  <hash_type>(hash,hash_name, oList);
+	insert_no_reserve <hash_type>(hash_name, oList);
 
-        auto nList = oList;
-        for (size_t v = 0; v < nList.size() / 2; v ++) {
-            auto& next = nList[v];
+	insert_hit<hash_type>(hash,hash_name, oList);
+	find_hit_100<hash_type>(hash,hash_name, oList);
+	find_hit_0  <hash_type>(hash,hash_name, oList);
+
+	auto nList = oList;
+	for (size_t v = 0; v < nList.size() / 2; v ++) {
+		auto& next = nList[v];
 #if KEY_INT
-            next += nList.size() / 2 - v;
+		next += nList.size() / 2 - v;
 #elif KEY_CLA
-            next.lScore += nList.size() / 2 - v;
+		next.lScore += nList.size() / 2 - v;
 #elif TKey != 4
-            next[v % next.size()] += 1;
+		next[v % next.size()] += 1;
 #else
-            next = next.substr(0, next.size() - 1);
+		next = next.substr(0, next.size() - 1);
 #endif
-        }
+	}
 
-        //shuffle(nList.begin(), nList.end());
-        find_hit_50<hash_type>(hash, hash_name, nList);
+	//shuffle(nList.begin(), nList.end());
+	find_hit_50<hash_type>(hash, hash_name, nList);
+	find_hit_50_erase<hash_type>(hash, hash_name, nList);
 
-        find_hit_50_erase<hash_type>(hash, hash_name, nList);
-#if 1
-        erase_50<hash_type>(hash, hash_name, nList);
-        find_erase_50<hash_type>(hash, hash_name, oList);
+	erase_50<hash_type>(hash, hash_name, nList);
+	find_erase_50<hash_type>(hash, hash_name, oList);
 
-        insert_find_erase<hash_type>(hash, hash_name, nList);
-        erase_reinsert<hash_type>(hash, hash_name, oList);
+	insert_find_erase<hash_type>(hash, hash_name, nList);
+	erase_reinsert<hash_type>(hash, hash_name, oList);
 
-        hash_iter<hash_type>(hash, hash_name);
+	hash_iter<hash_type>(hash, hash_name);
 #ifdef UF
-        copy_clear <hash_type>(hash, hash_name);
-        //hash_clear<hash_type>(hash, hash_name);
-#endif
+	copy_clear <hash_type>(hash, hash_name);
+	//hash_clear<hash_type>(hash, hash_name);
 #endif
 #endif
 
-        func_size = func_index;
-    }
+	func_size = func_index;
 }
 
 constexpr static auto base1 = 300000000;
@@ -1260,6 +1276,7 @@ static int benchHashMap(int n)
 #if CXX20
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
         {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
+//        {  benOneHash<HashMap <keyType, valueType, ehash_func>>("ck_map", vList); }
 #endif
 #if CXX17
         {  benOneHash<ankerl::unordered_dense::map <keyType, valueType, ehash_func>>("martind", vList); }
