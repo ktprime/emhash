@@ -1,5 +1,5 @@
 // emhash7::HashMap for C++11/14/17
-// version 2.2.2
+// version 2.2.3
 // https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -298,15 +298,15 @@ struct entry {
     }
 
 #if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
-    Second second;//int
+    Second second;
     size_type bucket;
-    First first; //long
+    First first;
 #else
-    First first; //long
+    First first;
     size_type bucket;
-    Second second;//int
+    Second second;
 #endif
-};// __attribute__ ((packed));
+};
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -315,6 +315,7 @@ class HashMap
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif
+
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
     typedef std::pair<KeyT,ValueT>            value_type;
@@ -529,9 +530,9 @@ public:
         init(bucket, mlf);
     }
 
-    uint64_t AllocSize(uint64_t num_buckets) const
+    size_t AllocSize(uint64_t num_buckets) const
     {
-        return num_buckets * sizeof(PairT) + EPACK_SIZE * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
+        return (num_buckets + EPACK_SIZE) * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
     }
 
     HashMap(const HashMap& rhs) noexcept
@@ -623,7 +624,7 @@ public:
     void clone(const HashMap& rhs)
     {
         _hasher      = rhs._hasher;
-//        _eq          = rhs._eq;
+        //_eq          = rhs._eq;
 
         _num_filled  = rhs._num_filled;
         _mask        = rhs._mask;
@@ -648,7 +649,7 @@ public:
     void swap(HashMap& rhs)
     {
         std::swap(_hasher, rhs._hasher);
-        //      std::swap(_eq, rhs._eq);
+        //std::swap(_eq, rhs._eq);
         std::swap(_pairs, rhs._pairs);
         std::swap(_num_buckets, rhs._num_buckets);
         std::swap(_num_filled, rhs._num_filled);
@@ -658,7 +659,7 @@ public:
     }
 
     // -------------------------------------------------------------
-    iterator begin()
+    iterator begin() noexcept
     {
 #ifdef EMH_ZERO_MOVE
         if (0 == _num_filled)
@@ -673,7 +674,7 @@ public:
         return it.next();
     }
 
-    const_iterator cbegin() const
+    const_iterator cbegin() const noexcept
     {
 #ifdef EMH_ZERO_MOVE
         if (0 == _num_filled)
@@ -698,9 +699,9 @@ public:
         return {this, bucket, true};
     }
 
-    const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const noexcept { return cbegin(); }
 
-    iterator end() { return {this, _num_buckets}; }
+    iterator end() noexcept { return {this, _num_buckets}; }
     const_iterator cend() const { return {this, _num_buckets}; }
     const_iterator end() const { return cend(); }
 
@@ -1628,13 +1629,13 @@ private:
 #ifdef EMH_ALIGN
         const auto boset  = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
-        const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
+        const auto size_t  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 #else
         const auto boset  = main_bucket % 8;
         auto* const align = (uint8_t*)_bitmask + main_bucket / 8;
-        const auto bmask  = (*(size_t*)(align) >> boset) & 0xF0F0F0F0FF0FF0FFull;//
+        const size_t bmask  = (*(size_t*)(align) >> boset);// & 0xF0F0F0F0FF0FF0FFull;//
         if (EMH_LIKELY(bmask != 0))
             return main_bucket + CTZ(bmask);
 #endif
@@ -1661,23 +1662,29 @@ private:
             }
             _last = (_last + 1) & qmask;
         }
+
         return 0;
     }
 
     // key is not in this map. Find a place to put it.
     size_type find_unique_empty(const size_type bucket_from, const size_t main_bucket)
     {
+#ifdef EMH_ALIGN
         const auto boset  = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
         const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
-
+#else
+        const auto boset  = bucket_from % 8;
+        auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
+        const auto bmask  = (*(size_t*)(align) >> boset);
+#endif
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
         for (auto last = (bucket_from + _mask) & qmask; ;) {
-            const auto bmask2 = *((size_t*)_bitmask + last) & 0xF0F0F0F0FF0FF0FFull;
-            if(EMH_LIKELY(bmask2 != 0))
+            const auto bmask2 = *((size_t*)_bitmask + last);// & 0xF0F0F0F0FF0FF0FFull;
+            if (EMH_LIKELY(bmask2 != 0))
                 return last * SIZE_BIT + CTZ(bmask2);
             last = (last + 1) & qmask;
         }

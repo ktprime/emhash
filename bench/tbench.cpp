@@ -13,6 +13,10 @@
 
 #include "rigtorp/rigtorp.hpp"
 
+#if CXX17
+#include "martinus/unordered_dense.h"
+#endif
+
 #include <algorithm>
 #include <numeric>
 
@@ -185,6 +189,9 @@ int main(int argc, const char* argv[])
     else
         max_n += time(0) % 10024;
 
+    if (argc > 2)
+        max_trials = atoi(argv[2]);
+
     using ktype = int64_t;
 
 #if TKey == 0
@@ -210,6 +217,7 @@ int main(int argc, const char* argv[])
         hash_table_test<fph::DynamicFphMap<ktype, vtype, fph::MixSeedHash<vtype>>>("fph_table");
 #endif
 
+
     hash_table_test<robin_hood::unordered_map<ktype, vtype, QintHasher>>("martinus");
     hash_table_test<phmap::flat_hash_map<ktype, vtype, QintHasher>>("phmap_flat");
     hash_table_test<tsl::robin_map<ktype, vtype, QintHasher>>("tsl_robin_map");
@@ -218,7 +226,9 @@ int main(int argc, const char* argv[])
     hash_table_test<emhash6::HashMap<ktype, vtype, QintHasher>>("emhash6");
     hash_table_test<emhash7::HashMap<ktype, vtype, QintHasher>>("emhash7");
     hash_table_test<emhash8::HashMap<ktype, vtype, QintHasher>>("emhash8");
-
+#if CXX17
+    hash_table_test<ankerl::unordered_dense::map<ktype, vtype, QintHasher>>("ankerl::dense");
+#endif
 
 #if ET > 1
     hash_table_test<ska::flat_hash_map<ktype, vtype>>("ska_flat");

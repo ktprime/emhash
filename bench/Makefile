@@ -3,11 +3,11 @@ CXX?=g++ -fwhole-program -flto
 endif
 
 ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
-CXX?=clang++ -stdlib=libc++
+CXX?=clang++ -stdlib=libc++ -flto
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 endif
 
-CXXFLAGS = -O3 -march=native -mtune=native -I.. -I../thirdparty
+CXXFLAGS = -O3 -march=native -mtune=native -I.. -I../thirdparty -DNDEBUG=1
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)

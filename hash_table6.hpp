@@ -120,9 +120,6 @@ namespace emhash6 {
     static constexpr size_type INACTIVE = 0 - 0x1u;
 #endif
 
-//constexpr size_type MASK_BIT = sizeof(size_type) * 8;
-//constexpr size_type SIZE_BIT = sizeof(size_t) * 8;
-
 static_assert((int)INACTIVE < 0, "INACTIVE must be even and < 0(to int)");
 
 //https://gist.github.com/jtbr/1896790eb6ad50506d5f042991906c30
@@ -215,16 +212,16 @@ struct entry {
         std::swap(first, o.first);
     }
 
-#ifndef EMH_ORDER_KV
-    Second second;//int
+#if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
+    Second second;
     size_type bucket;
-    First first; //long
+    First first;
 #else
-    First first; //long
+    First first;
     size_type bucket;
-    Second second;//int
+    Second second;
 #endif
-};// __attribute__ ((packed));
+};
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -452,9 +449,9 @@ public:
         init(bucket, lf);
     }
 
-    uint64_t AllocSize(uint64_t num_buckets) const
+    size_t AllocSize(uint64_t num_buckets) const
     {
-        return (num_buckets + PACK_SIZE) * sizeof(PairT) + num_buckets / 8 + BIT_PACK;
+        return (num_buckets + PACK_SIZE) * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
     }
 
     HashMap(const HashMap& rhs)
@@ -489,7 +486,7 @@ public:
             emplace(*first);
     }
 
-    HashMap& operator=(const HashMap& rhs)
+    HashMap& operator= (const HashMap& rhs) noexcept
     {
         if (this == &rhs)
             return *this;
@@ -506,7 +503,7 @@ public:
         return *this;
     }
 
-    HashMap& operator=(HashMap&& rhs)
+    HashMap& operator= (HashMap&& rhs) noexcept
     {
         if (this != &rhs) {
             swap(rhs);
@@ -587,7 +584,7 @@ public:
     }
 
     // -------------------------------------------------------------
-    iterator begin()
+    iterator begin() noexcept
     {
 #ifdef EMH_ZERO_MOVE
         if (0 == _num_filled)
@@ -602,7 +599,7 @@ public:
         return it.next();
     }
 
-    const_iterator cbegin() const
+    const_iterator cbegin() const noexcept
     {
 #ifdef EMH_ZERO_MOVE
         if (0 == _num_filled)
@@ -627,9 +624,9 @@ public:
         return {this, bucket, true};
     }
 
-    const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const noexcept { return cbegin(); }
 
-    iterator end() { return {this, _mask + 1}; }
+    iterator end() noexcept { return {this, _mask + 1}; }
     const_iterator cend() const { return {this, _mask + 1}; }
     const_iterator end() const { return {this, _mask + 1}; }
 
@@ -972,43 +969,11 @@ public:
     }
 
     template <typename Iter>
-    void insert(Iter begin, Iter end)
+    void insert(Iter first, Iter last)
     {
-        reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin)
-            do_insert(begin->first, begin->second);
-    }
-
-#if 0
-    size_type try_insert_mainbucket(const KeyT& key, const ValueT& val)
-    {
-        const auto bucket = hash_key(key) & _mask;
-        if (EMH_EMPTY(_pairs, bucket))
-        {
-#if EMH_SAFE_HASH
-            _num_main ++;
-#endif
-            EMH_NEW(key, val, bucket, bucket * 2);
-            return bucket;
-        }
-
-        return -1u;
-    }
-
-    template <typename Iter>
-    void insert2(Iter begin, Iter end)
-    {
-        Iter citbeg = begin;
-        Iter citend = begin;
-        reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin) {
-            if ((int)try_insert_mainbucket(begin->first, begin->second) < 0) {
-                std::swap(*begin, *citend++);
-            }
-        }
-
-        for (; citbeg != citend; ++citbeg)
-            insert(*citbeg);
+        reserve(std::distance(first, last) + _num_filled);
+        for (auto it = first; it != last; ++it)
+            do_insert(it->first, it->second);
     }
 
     template <typename Iter>
@@ -1018,17 +983,11 @@ public:
         for (; begin != end; ++begin)
             do_insert_unqiue(*begin);
     }
-#endif
 
-    /// Same as above, but contains(key) MUST be false
-    size_type insert_unique(KeyT&& key, ValueT&& val)
+    template<typename K, typename V>
+    size_type insert_unique(K&& key, V&& val)
     {
-        return do_insert_unqiue(std::move(key), std::forward<ValueT>(val));
-    }
-
-    size_type insert_unique(const KeyT& key, ValueT&& val)
-    {
-        return do_insert_unqiue(key, std::forward<ValueT>(val));
+        return do_insert_unqiue(std::forward<K>(key), std::forward<V>(val));
     }
 
     size_type insert_unique(value_type&& value)
@@ -1054,7 +1013,7 @@ public:
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) { return do_assign(std::move(key), std::forward<ValueT>(val)); }
 
     template <typename... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args)
+    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -1083,7 +1042,7 @@ public:
     }
 
     template <class... Args>
-    inline size_type emplace_unique(Args&&... args)
+    inline size_type emplace_unique(Args&&... args) noexcept
     {
         return insert_unique(std::forward<Args>(args)...);
     }
@@ -1157,16 +1116,6 @@ public:
         clear_bucket(bucket);
     }
 
-    iterator erase(const_iterator first, const_iterator last)
-    {
-        auto iend = cend();
-        auto next = first;
-        for (; next != last && next != iend; )
-            next = erase(next);
-
-        return {this, next.bucket()};
-    }
-
     template<typename Pred>
     size_type erase_if(Pred pred)
     {
@@ -1221,8 +1170,7 @@ public:
             clearkv();
         else if (_num_filled) {
             memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
-            memset(_pairs, -1, sizeof(_pairs[0]) * (_mask + 1));
-            reset_zero();
+            memset(_pairs, -1, sizeof(_pairs[0]) * (_mask + 1)); reset_zero();
         }
 
         _num_filled = 0;
@@ -1270,6 +1218,7 @@ public:
         auto num_buckets = (size_type)buckets;
         //assert(num_buckets > _num_filled);
         auto old_num_filled  = _num_filled;
+        auto old_mask        = _mask;
         auto* new_pairs = (PairT*)malloc(AllocSize(num_buckets));
 #if EMH_EXCEPTION
         if (EMH_UNLIKELY(!new_pairs))
@@ -1297,22 +1246,25 @@ public:
         _num_main = 0;
 #endif
 
-        memset(_pairs, -1, sizeof(_pairs[0]) * num_buckets);
+        memset(_pairs, -1, sizeof(_pairs[0]) * num_buckets); reset_zero();
 
-        reset_zero();
         //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * PACK_SIZE);
 
         /***************** init bitmask ---------------------- ***********/
-        memset(_bitmask, 0xFFFFFFFF, num_buckets / 8);
-        memset((char*)_bitmask + num_buckets / 8, 0, BIT_PACK);
+        const auto mask_byte = (num_buckets + 7) / 8;
+        memset(_bitmask, 0xFFFFFFFF, mask_byte);
+        memset((char*)_bitmask + mask_byte, 0, BIT_PACK);
+        if (num_buckets < 8)
+            _bitmask[0] = (1 << num_buckets) - 1;
         //pack last position to bit 0
         /**************** -------------------------------- *************/
 
 #if EMH_REHASH_LOG
         auto collision = 0;
 #endif
-        for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        //for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket --) {
             if (EMH_EMPTY(old_pairs, src_bucket))
                 continue;
 
@@ -1824,10 +1776,10 @@ private:
     size_type _hash_inter;
 #endif
 
+    static constexpr uint32_t BIT_PACK = sizeof(_bitmask[0]) * 2;
     static constexpr uint32_t MASK_BIT = sizeof(_bitmask[0]) * 8;
     static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-    static constexpr size_type PACK_SIZE = 2; // > 1
-    static constexpr size_type BIT_PACK = sizeof(size_t) * 2;
+    static constexpr uint32_t PACK_SIZE = 2; // > 1
 };
 }
 // namespace emhash6
