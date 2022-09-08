@@ -82,10 +82,8 @@ endif
 
 ifneq ($(std),)
 CXXFLAGS += -std=c++$(std)
-endif
-
-ifeq ($(std),)
-#CXXFLAGS += -std=c++17
+else (1)
+CXXFLAGS += -std=c++17
 endif
 
 ifneq ($(check),)
@@ -100,10 +98,19 @@ ifneq ($(HIT),)
 CXXFLAGS += -DEMH_FIND_HIT=1
 endif
 
+ifneq ($(MAR),)
+CXXFLAGS += -D$(MAR)
+endif
+
+ifneq ($(MF),)
+CXXFLAGS += $(MF)
+endif
+
 all:
 ifneq ($(QB),)
-	$(CXX) $(CXXFLAGS) -I. -std=c++20 qbench.cpp -o qbench
+	$(CXX) $(CXXFLAGS) -I. qbench.cpp -o qbench
 endif
+
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) martinus_bench.cpp -o mbench

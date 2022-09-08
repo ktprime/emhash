@@ -353,7 +353,11 @@ public:
         iterator() : _map(nullptr) { }
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+#ifdef EMH_ITER_SAFE
+        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+#else
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+#endif
 
         void init()
         {
@@ -448,7 +452,11 @@ public:
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+#ifdef EMH_ITER_SAFE
+        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+#else
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+#endif
 
         void init()
         {
@@ -1626,10 +1634,16 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from, const size_t main_bucket)
     {
-#ifdef EMH_ALIGN
+#ifdef EMH_ALIGN64 // only works 64bit
         const auto boset  = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
-        const auto size_t  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
+        const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
+        if (EMH_LIKELY(bmask != 0))
+            return bucket_from + CTZ(bmask);
+#elif EMH_ITER_SAFE
+        const auto boset = bucket_from % 8;
+        auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
+        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;// bmask |= ((size_t)start[8] << (SIZE_BIT - boset));
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 #else
@@ -1641,7 +1655,7 @@ private:
 #endif
 
         const auto qmask = _mask / SIZE_BIT;
-        if (0) {
+        if (1) {
             const auto step = (main_bucket - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
@@ -1669,14 +1683,19 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_unique_empty(const size_type bucket_from, const size_t main_bucket)
     {
-#ifdef EMH_ALIGN
+#ifdef EMH_ALIGN64
         const auto boset  = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
         const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
+        static_assert(sizeof(size_t) > 4);
+#elif EMH_ITER_SAFE
+        const auto boset = bucket_from % 8;
+        auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
+        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
 #else
         const auto boset  = bucket_from % 8;
         auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
-        const auto bmask  = (*(size_t*)(align) >> boset);
+        const auto bmask  = (*(size_t*)(align) >> boset); //maybe not aligned and warning
 #endif
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);

@@ -1166,6 +1166,12 @@ public:
         clear_bucket(bucket);
     }
 
+    void _erase(iterator it) noexcept
+    {
+        const auto bucket = erase_bucket(it._bucket);
+        clear_bucket(bucket);
+    }
+
     template<typename Pred>
     size_type erase_if(Pred pred)
     {
@@ -1933,6 +1939,8 @@ private:
 #endif
 };
 } // namespace emhash
+
+//#define ehmap emhash5::HashMap
 #if __cplusplus > 199711
 //template <class Key, class Val> using emhash5 = ehmap<Key, Val, std::hash<Key>>;
 #endif

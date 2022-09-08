@@ -268,7 +268,11 @@ public:
         iterator() : _map(nullptr) { }
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+#ifdef EMH_ITER_SAFE
+        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+#else
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+#endif
 
         void init()
         {
@@ -363,7 +367,11 @@ public:
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+#ifdef EMH_ITER_SAFE
+        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+#else
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+#endif
 
         void init()
         {
@@ -1562,7 +1570,7 @@ private:
         else if (next_bucket % 2 > 0)
             return kickout_bucket(bucket);
 
-        int collisions = 2;
+        //int collisions = 2;
         next_bucket /= 2;
         //find next linked bucket and check key
         while (true) {
@@ -1579,7 +1587,7 @@ private:
             if (nbucket == next_bucket)
                 break;
             next_bucket = nbucket;
-            collisions++;
+            //collisions++;
         }
 
         //find a new empty and link it to tail
@@ -1590,26 +1598,25 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from)
     {
-#if EMH_X86
+#ifdef EMH_ALIGN64
+        const auto boset  = bucket_from % MASK_BIT;
+        auto* const align = _bitmask + bucket_from / MASK_BIT;
+        const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
+        static_assert(sizeof(size_t) > 4);
+#elif EMH_ITER_SAFE
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
-        const auto bmask = *(size_t*)(start) >> boset;
-#elif 0
-        const auto boset = bucket_from % 8;
-        auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
-        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask));
-        bmask >>= boset;// bmask |= ((size_t)start[8] << (SIZE_BIT - boset));
-#else
-        const auto boset = bucket_from % SIZE_BIT;
-        auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
-        const auto bmask = *(size_t*)(start) >> boset;
+        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
+#else //maybe not aligned
+        const auto boset  = bucket_from % 8;
+        auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
+        const auto bmask  = (*(size_t*)(align) >> boset); //maybe not aligned and warning
 #endif
-
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1) {
+        if (0) {
             const auto step = (bucket_from - SIZE_BIT / 2) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
@@ -1622,10 +1629,11 @@ private:
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
 
-            const auto quarc = s & qmask;
-            const auto bmask1 = *((size_t*)_bitmask + quarc);
-            if (bmask1 != 0)
-                return quarc * SIZE_BIT + CTZ(bmask1);
+            const auto next1 = (qmask / 2 + _last) & qmask;
+            const auto bmask1 = *((size_t*)_bitmask + next1);
+            if (bmask1 != 0) {
+                return next1 * SIZE_BIT + CTZ(bmask1);
+            }
 
             _last = (_last + 1) & qmask;
         }
