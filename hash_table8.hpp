@@ -518,7 +518,7 @@ public:
 
     // ------------------------------------------------------------
     template<typename K=KeyT>
-    iterator find(const KeyT& key) noexcept
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_slot(key)};
     }
