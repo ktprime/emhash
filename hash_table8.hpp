@@ -646,26 +646,26 @@ public:
     {
         const auto key_hash = hash_key(value.first);
         const auto bucket = find_or_allocate(value.first, key_hash);
-        const auto empty  = EMH_EMPTY(_index, bucket);
-        if (empty) {
+        const auto bempty  = EMH_EMPTY(_index, bucket);
+        if (bempty) {
             EMH_NEW(value.first, value.second, bucket, key_hash);
         }
 
         const auto slot = EMH_SLOT(_index, bucket);
-        return { {this, slot}, empty };
+        return { {this, slot}, bempty };
     }
 
     std::pair<iterator, bool> do_insert(value_type&& value) noexcept
     {
         const auto key_hash = hash_key(value.first);
         const auto bucket = find_or_allocate(value.first, key_hash);
-        const auto empty  = EMH_EMPTY(_index, bucket);
-        if (empty) {
+        const auto bempty  = EMH_EMPTY(_index, bucket);
+        if (bempty) {
             EMH_NEW(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second), bucket, key_hash);
         }
 
         const auto slot = EMH_SLOT(_index, bucket);
-        return { {this, slot}, empty };
+        return { {this, slot}, bempty };
     }
 
     template<typename K, typename V>
@@ -673,13 +673,13 @@ public:
     {
         const auto key_hash = hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
-        const auto empty = EMH_EMPTY(_index, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_index, bucket);
+        if (bempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket, key_hash);
         }
 
         const auto slot = EMH_SLOT(_index, bucket);
-        return { {this, slot}, empty };
+        return { {this, slot}, bempty };
     }
 
     template<typename K, typename V>
@@ -688,15 +688,15 @@ public:
         check_expand_need();
         const auto key_hash = hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
-        const auto empty = EMH_EMPTY(_index, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_index, bucket);
+        if (bempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket, key_hash);
         } else {
             EMH_VAL(_pairs, EMH_SLOT(_index, bucket)) = std::move(val);
         }
 
         const auto slot = EMH_SLOT(_index, bucket);
-        return { {this, slot}, empty };
+        return { {this, slot}, bempty };
     }
 
     std::pair<iterator, bool> insert(const value_type& p)
@@ -1063,8 +1063,6 @@ public:
 #if EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {
             const auto hashl = (size_type)hash_key(l.first) & _mask, hashr = (size_type)hash_key(r.first) & _mask;
-            if (hashl != hashr)
-                return hashl < hashr;
             return hashl < hashr;
             //return l.first < r.first;
         });

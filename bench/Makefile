@@ -82,7 +82,7 @@ endif
 
 ifneq ($(std),)
 CXXFLAGS += -std=c++$(std)
-else (1)
+else
 CXXFLAGS += -std=c++17
 endif
 

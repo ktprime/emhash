@@ -9,6 +9,8 @@
 
 //#include "wyhash.h"
 #include "eutil.h"
+
+#define EMH_ITER_SAFE 1
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
@@ -548,6 +550,19 @@ static void TestApi()
        assert(it->second == 'c');
 
       data.emplace_hint(data.end(), 1, 'd');
+    }
+
+    {
+        emhash7::HashMap<uint64_t, uint32_t> emi;
+        emi.reserve(10);
+        int key = rand();
+        emi.insert({key, 0}); emi.insert({key, 1});
+        auto iter = emi.find(key);
+        assert(iter != emi.end() && iter->second == 0);
+#ifdef EMH_ITER_SAFE
+        auto iter_next = iter; iter_next++;
+        assert(iter_next == emi.end());
+#endif
     }
 
 #endif

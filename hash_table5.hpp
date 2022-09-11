@@ -852,43 +852,43 @@ public:
     std::pair<iterator, bool> do_insert(const value_pair& value)
     {
         const auto bucket = find_or_allocate(value.first);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
             EMH_NEW(value.first, value.second, bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 #endif
 
     std::pair<iterator, bool> do_insert(const value_type& value) noexcept
     {
         const auto bucket = find_or_allocate(value.first);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
             EMH_NEW(value.first, value.second, bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 
     std::pair<iterator, bool> do_insert(value_type&& value) noexcept
     {
         const auto bucket = find_or_allocate(value.first);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
             EMH_NEW(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second), bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 
     template<typename K, typename V>
     std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept
     {
         const auto bucket = find_or_allocate(key);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 
     template<typename K, typename V>
@@ -896,13 +896,13 @@ public:
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
             EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket);
         } else {
             EMH_VAL(_pairs, bucket) = std::forward<V>(val);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 
     std::pair<iterator, bool> insert(const value_type& value) noexcept
@@ -1027,11 +1027,11 @@ public:
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
 //            EMH_NEW(key, std::forward_as_tuple(std::forward<Args>(args)...), bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 
     template<class... Args>
@@ -1039,11 +1039,11 @@ public:
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
 //            EMH_NEW(std::move(key), std::forward_as_tuple(std::forward<Args>(args)...), bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 
     template<class... Args>

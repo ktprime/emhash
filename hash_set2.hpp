@@ -495,6 +495,7 @@ public:
         return key - 1;
     }
 
+#if 0
     size_type get_bucket_value(const size_type main_bucket, const int64_t key, std::vector<KeyT>& vec)
     {
         auto node = _pairs[main_bucket].first;
@@ -521,6 +522,7 @@ public:
         }
         return vec.size();
     }
+#endif
 
     size_type get_main_bucket(const int64_t key) const
     {

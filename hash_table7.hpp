@@ -353,7 +353,7 @@ public:
         iterator() : _map(nullptr) { }
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
-#ifdef EMH_ITER_SAFE
+#if EMH_ITER_SAFE
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 #else
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
@@ -452,7 +452,7 @@ public:
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
-#ifdef EMH_ITER_SAFE
+#if EMH_ITER_SAFE
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 #else
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
