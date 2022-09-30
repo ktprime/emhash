@@ -220,6 +220,11 @@ public:
     return emplace_impl(std::forward<Args>(args)...);
   }
 
+  template <typename... Args>
+  std::pair<iterator, bool> insert_or_assign(Args &&... args) {
+    return emplace_impl(std::forward<Args>(args)...);
+  }
+
   //void erase(iterator it) { erase_impl(it); }
   iterator erase(iterator it) {
       erase_impl(it);

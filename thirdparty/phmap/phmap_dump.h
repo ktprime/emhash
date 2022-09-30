@@ -123,7 +123,7 @@ bool parallel_hash_set<N, RefSet, Mtx_, Policy, Hash, Eq, Alloc>::phmap_load(Inp
         return false;
     }
 
-    for (size_t i = 0; i < submap_count; ++i) {            
+    for (size_t i = 0; i < submap_count; ++i) {
         auto& inner = sets_[i];
         typename Lockable::UniqueLock m(const_cast<Inner&>(inner));
         if (!inner.set_.phmap_load(ar)) {
@@ -158,6 +158,19 @@ public:
         return true;
     }
 
+    template<typename V>
+    typename std::enable_if<type_traits_internal::IsTriviallyCopyable<V>::value, bool>::type
+    saveBinary(const V& v) {
+        ofs_.write(reinterpret_cast<const char *>(&v), sizeof(V));
+        return true;
+    }
+
+    template<typename Map>
+    auto saveBinary(const Map& v) -> decltype(v.phmap_dump(*this), bool())
+    {
+        return v.phmap_dump(*this);
+    }
+
 private:
     std::ofstream ofs_;
 };
@@ -174,6 +187,19 @@ public:
         return true;
     }
 
+    template<typename V>
+    typename std::enable_if<type_traits_internal::IsTriviallyCopyable<V>::value, bool>::type
+    loadBinary(V* v) {
+        ifs_.read(reinterpret_cast<char *>(v), sizeof(V));
+        return true;
+    }
+
+    template<typename Map>
+    auto loadBinary(Map* v) -> decltype(v->phmap_load(*this), bool())
+    {
+        return v->phmap_load(*this);
+    }
+
 private:
     std::ifstream ifs_;
 };
@@ -185,7 +211,7 @@ private:
 
 template <class T>
 using PhmapTrivCopyable = typename phmap::type_traits_internal::IsTriviallyCopyable<T>;
-    
+
 namespace cereal
 {
     // Overload Cereal serialization code for phmap::flat_hash_map
@@ -198,7 +224,7 @@ namespace cereal
     }
 
     template <class K, class V, class Hash, class Eq, class A>
-    void load(typename std::enable_if<PhmapTrivCopyable<K>::value && PhmapTrivCopyable<V>::value, typename cereal::BinaryInputArchive>::type &ar, 
+    void load(typename std::enable_if<PhmapTrivCopyable<K>::value && PhmapTrivCopyable<V>::value, typename cereal::BinaryInputArchive>::type &ar,
               phmap::flat_hash_map<K, V, Hash, Eq, A>  &hmap)
     {
         hmap.phmap_load(ar);
@@ -215,7 +241,7 @@ namespace cereal
     }
 
     template <class K, class V, class Hash, class Eq, class A, size_t N, class Mtx_>
-    void load(typename std::enable_if<PhmapTrivCopyable<K>::value && PhmapTrivCopyable<V>::value, typename cereal::BinaryInputArchive>::type &ar, 
+    void load(typename std::enable_if<PhmapTrivCopyable<K>::value && PhmapTrivCopyable<V>::value, typename cereal::BinaryInputArchive>::type &ar,
               phmap::parallel_flat_hash_map<K, V, Hash, Eq, A, N, Mtx_>  &hmap)
     {
         hmap.phmap_load(ar);
@@ -231,7 +257,7 @@ namespace cereal
     }
 
     template <class K, class Hash, class Eq, class A>
-    void load(typename std::enable_if<PhmapTrivCopyable<K>::value, typename cereal::BinaryInputArchive>::type &ar, 
+    void load(typename std::enable_if<PhmapTrivCopyable<K>::value, typename cereal::BinaryInputArchive>::type &ar,
               phmap::flat_hash_set<K, Hash, Eq, A>  &hset)
     {
         hset.phmap_load(ar);
@@ -247,7 +273,7 @@ namespace cereal
     }
 
     template <class K, class Hash, class Eq, class A, size_t N, class Mtx_>
-    void load(typename std::enable_if<PhmapTrivCopyable<K>::value, typename cereal::BinaryInputArchive>::type &ar, 
+    void load(typename std::enable_if<PhmapTrivCopyable<K>::value, typename cereal::BinaryInputArchive>::type &ar,
               phmap::parallel_flat_hash_set<K, Hash, Eq, A, N, Mtx_>  &hset)
     {
         hset.phmap_load(ar);

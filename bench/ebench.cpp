@@ -12,9 +12,7 @@
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 
-#ifndef ET
 //#define ET                 1
-#endif
 
 #if SMAP
 #include "flat_map.hpp"
@@ -153,6 +151,8 @@ std::map<std::string, std::string> maps =
 //https://gankra.github.io/blah/hashbrown-tldr/ swiss
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
 //https://jguegant.github.io/blogs/tech/dense-hash-map.html
+
+//https://martin.ankerl.com/2022/08/27/hashmap-bench-01/
 
 //
 #if FHT_HMAP && __linux__
@@ -329,7 +329,7 @@ struct StuHasher
     #define sValueType  "Struct"
 #endif
 
-static int test_case = 0;
+static int test_case = 0, test_extra = 0;
 static int loop_vector_time = 0;
 static int func_index = 0, func_size = 10;
 static int func_first = 0, func_last = 0;
@@ -398,7 +398,7 @@ static void add_hash_func_time(std::map<std::string, std::map<std::string, int64
     const auto first = double(once_score_hash.begin()->first);
     //print once score
     for (auto& v : once_score_hash) {
-        printf("%5d   %13s   (%4.2lf %6.1lf%%)\n", int(v.first / (func_index - 1)), v.second.data(), last * 1.0 / v.first, first * 100.0 / v.first);
+        printf("%5d   %13s   (%6.1lf %%)\n", int(v.first / (func_index - 1)), v.second.data(), 100 * v.first / first);
     }
 }
 
@@ -415,7 +415,7 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
 
         //hash_func_score[v.second][func] = (int)((mins * 100) / (v.first + 1));
         hash_func_score[v.second][func] = v.first / test_case;
-        printf("%4d        %-20s   %-2.1f%%\n", (int)(v.first / test_case), v.second.data(), ((mins * 100.0f) / v.first));
+        printf("%4d        %-20s   %-2.1f %%\n", (int)(v.first / test_case), v.second.data(), ((v.first* 100.0f) / mins));
     }
     putchar('\n');
 }
@@ -1076,8 +1076,11 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 
     insert_find_erase <hash_type>(hash, hash_name, nList);
     iter_all          <hash_type>(hash, hash_name);
-    insert_high_load  <hash_type>(hash_name, oList);
-    copy_clear        <hash_type>(hash, hash_name);
+
+    if (test_extra) {
+        insert_high_load  <hash_type>(hash_name, oList);
+        copy_clear        <hash_type>(hash, hash_name);
+    }
 
 #endif
 
@@ -1147,8 +1150,11 @@ static void printResult()
     auto maxs = score_hash.rbegin()->first;
     //print hash rank
     puts("======== hash    score  weigh ==========================");
-    for (auto& v : score_hash)
-        printf("%13s  %4d     %3.1lf%%\n", v.second.data(), (int)(v.first / func_hash_score.size()), (v.first * 100.0 / maxs));
+    for (auto it = score_hash.rbegin(); it != score_hash.rend(); it++) {
+        const auto& v = *it;
+        printf("%13s  %4d     %3.1lf %%\n",
+                v.second.data(), (int)(v.first / func_hash_score.size()), (maxs * 100.0 / v.first));
+    }
 
 #if _WIN32
     Sleep(100*1);
@@ -1473,6 +1479,8 @@ int main(int argc, char* argv[])
             minn = value;
         else if (cmd == 'm')
             maxn = value;
+        else if (cmd == 't')
+            test_extra = 1 - test_extra;
         else if (cmd == 'd') {
         for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
             if (c >= '5' && c <= '9') {
