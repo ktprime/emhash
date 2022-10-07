@@ -165,15 +165,6 @@ struct Hash
     }
 };
 
-template <class T>
-struct Hash<T *>
-{
-    inline size_t operator()(const T *val) const noexcept
-    {
-        return static_cast<size_t>(reinterpret_cast<const uintptr_t>(val));
-    }
-};
-
 template<class ArgumentType, class ResultType>
 struct phmap_unary_function
 {
