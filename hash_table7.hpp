@@ -1153,14 +1153,14 @@ public:
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
     {
         check_expand_need();
-        return do_insert(key, std::forward<Args>(args)...).first;
+        return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
     {
         check_expand_need();
-        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...).first;
+        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
     template <class... Args>
@@ -1655,7 +1655,7 @@ private:
 #endif
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1) {
+        if (0) {
             const auto step = (main_bucket - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)

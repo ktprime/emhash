@@ -5,7 +5,7 @@
 #endif
 
 
-#define EMH_IDENTITY_HASH 1
+//#define EMH_IDENTITY_HASH 1
 
 //#include "wyhash.h"
 #include "eutil.h"
@@ -556,9 +556,14 @@ static void TestApi()
         emhash7::HashMap<uint64_t, uint32_t> emi;
         emi.reserve(10);
         int key = rand();
-        emi.insert({key, 0}); emi.insert({key, 1});
+        emi.insert({key, 0}); emi.emplace(key, 1);
+        auto it = emi.try_emplace(key, 0); assert(!it.second);
+        it = emi.try_emplace(key + 1, 1); assert(it.second);
+
+        emi.shrink_to_fit();
         auto iter = emi.find(key);
-        assert(iter != emi.end() && iter->second == 0);
+        assert(iter != emi.end());
+        assert(iter->second == 0);
 #ifdef EMH_ITER_SAFE
         auto iter_next = iter; iter_next++;
         assert(iter_next == emi.end());

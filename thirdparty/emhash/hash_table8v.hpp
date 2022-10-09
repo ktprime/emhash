@@ -347,7 +347,7 @@ public:
 
     void dump_statics() const
     {
-        const uint32_t slots = 128;
+        const size_type slots = 128;
         size_type buckets[slots + 1] = {0};
         size_type steps[slots + 1]   = {0};
         for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
@@ -388,7 +388,7 @@ public:
 
     // ------------------------------------------------------------
     template<typename K=KeyT>
-    iterator find(const KeyT& key) noexcept
+    iterator find(const K& key) noexcept
     {
         return find_filled_slot(key);
     }
@@ -627,7 +627,7 @@ public:
     }
 
     template <class... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args)
+    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -682,7 +682,7 @@ public:
     }
 
     /// Like std::map<KeyT,ValueT>::operator[].
-    ValueT& operator[](const KeyT& key)
+    ValueT& operator[](const KeyT& key) noexcept
     {
         check_expand_need();
         const auto key_hash = hash_key(key);
@@ -696,7 +696,7 @@ public:
         return EMH_VAL(_pairs, slot);
     }
 
-    ValueT& operator[](KeyT&& key)
+    ValueT& operator[](KeyT&& key) noexcept
     {
         check_expand_need();
         const auto key_hash = hash_key(key);
@@ -711,7 +711,7 @@ public:
 
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    size_type erase(const KeyT& key)
+    size_type erase(const KeyT& key) noexcept
     {
         const auto key_hash = hash_key(key);
         const auto sbucket = find_hash_bucket(key, key_hash);
@@ -724,7 +724,7 @@ public:
     }
 
     //iterator erase(const_iterator begin_it, const_iterator end_it)
-    iterator erase(const const_iterator& cit)
+    iterator erase(const const_iterator& cit) noexcept
     {
         const auto slot = cit - cbegin();
         size_type main_bucket;
@@ -734,7 +734,7 @@ public:
     }
 
     //only last >= first
-    iterator erase(const_iterator first, const_iterator last)
+    iterator erase(const_iterator first, const_iterator last) noexcept
     {
         auto esize = long(last - first);
         auto tsize = long(end() - first); //last to tail size
@@ -790,7 +790,7 @@ public:
     }
 
     /// Remove all elements, keeping full capacity.
-    void clear()
+    void clear() noexcept
     {
         if (_num_filled > 0 || _ehead > 0)
             memset((char*)_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
@@ -804,7 +804,7 @@ public:
     void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4)
     {
         if (load_factor() < min_factor && bucket_count() > 10) //safe guard
-            rehash(_num_filled);
+            rehash(_num_filled + 1);
     }
 
 #if EMH_HIGH_LOAD
@@ -871,12 +871,12 @@ public:
     bool reserve(uint64_t num_elems, bool force)
     {
 #if EMH_HIGH_LOAD == 0
-        const auto required_buckets = (uint32_t)(num_elems * _mlf >> 27);
+        const auto required_buckets = num_elems * _mlf >> 27;
         if (EMH_LIKELY(required_buckets < _mask)) // && !force
             return false;
 
 #elif EMH_HIGH_LOAD
-        const auto required_buckets = (uint32_t)(num_elems + num_elems * 1 / 9);
+        const auto required_buckets = num_elems + num_elems * 1 / 9;
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
 
@@ -1013,14 +1013,14 @@ private:
         return reserve(_num_filled, false);
     }
 
-    size_type slot_to_bucket(const size_type slot) const
+    size_type slot_to_bucket(const size_type slot) const noexcept
     {
         size_type main_bucket;
         return find_slot_bucket(slot, main_bucket); //TODO
     }
 
     //very slow
-    void erase_slot(const size_type sbucket, const size_type main_bucket)
+    void erase_slot(const size_type sbucket, const size_type main_bucket) noexcept
     {
         const auto slot = EMH_SLOT(_index, sbucket);
         const auto ebucket = erase_bucket(sbucket, main_bucket);
@@ -1044,7 +1044,7 @@ private:
 #endif
     }
 
-    size_type erase_bucket(const size_type bucket, const size_type main_bucket)
+    size_type erase_bucket(const size_type bucket, const size_type main_bucket) noexcept
     {
         const auto next_bucket = EMH_BUCKET(_index, bucket);
         if (bucket == main_bucket) {
@@ -1063,6 +1063,7 @@ private:
         return bucket;
     }
 
+    // Find the slot with this key, or return bucket size
     size_type find_slot_bucket(const size_type slot, size_type& main_bucket) const
     {
         const auto key_hash = hash_key(EMH_KEY(_pairs, slot));
@@ -1174,7 +1175,8 @@ private:
         return END;
     }
 
-    size_type find_sorted_bucket(const KeyT& key) const
+    //only for find/can not insert
+    size_type find_sorted_bucket(const KeyT& key) const noexcept
     {
         const auto key_hash = hash_key(key);
         const auto bucket = size_type(key_hash & _mask);
@@ -1193,7 +1195,7 @@ private:
         else if (slots == 1 || key < EMH_KEY(_pairs, slot))
             return END;
 
-#if 0
+#if EMH_SORT
         if (key < EMH_KEY(_pairs, slot) || key > EMH_KEY(_pairs, slots + slot - 1))
             return END;
 #endif
@@ -1208,12 +1210,13 @@ private:
 
         return END;
     }
+#endif
 
     //kick out bucket and find empty to occpuy
     //it will break the orgin link and relnik again.
     //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
     //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
-    size_type kickout_bucket(const size_type kmain, const size_type bucket)
+    size_type kickout_bucket(const size_type kmain, const size_type bucket) noexcept
     {
         const auto next_bucket = EMH_BUCKET(_index, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
@@ -1238,7 +1241,7 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    size_type find_or_allocate(const KeyT& key, uint64_t key_hash)
+    size_type find_or_allocate(const KeyT& key, uint64_t key_hash) noexcept
     {
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = EMH_BUCKET(_index, bucket);
@@ -1281,7 +1284,7 @@ private:
         return EMH_BUCKET(_index, next_bucket) = new_bucket;
     }
 
-    size_type find_unique_bucket(uint64_t key_hash)
+    size_type find_unique_bucket(uint64_t key_hash) noexcept
     {
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = EMH_BUCKET(_index, bucket);
@@ -1317,7 +1320,7 @@ one-way seach strategy.
 3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
 */
     // key is not in this mavalue. Find a place to put it.
-    size_type find_empty_bucket(const size_type bucket_from)
+    size_type find_empty_bucket(const size_type bucket_from) noexcept
     {
 #if EMH_HIGH_LOAD
         if (_ehead)
@@ -1400,12 +1403,12 @@ one-way seach strategy.
         }
     }
 
-    inline size_type hash_bucket(const KeyT& key) const
+    inline size_type hash_bucket(const KeyT& key) const noexcept
     {
         return (size_type)hash_key(key) & _mask;
     }
 
-    inline size_type hash_main(const size_type bucket) const
+    inline size_type hash_main(const size_type bucket) const noexcept
     {
         const auto slot = EMH_SLOT(_index, bucket);
         return (size_type)hash_key(EMH_KEY(_pairs, slot)) & _mask;
