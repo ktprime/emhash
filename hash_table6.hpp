@@ -213,13 +213,13 @@ struct entry {
     }
 
 #if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
-    Second second;
-    size_type bucket;
     First first;
+    size_type bucket;
+    Second second;;
 #else
-    First first;
-    size_type bucket;
     Second second;
+    size_type bucket;
+    First first;
 #endif
 };
 
@@ -265,7 +265,7 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        iterator() : _map(nullptr) { }
+        iterator() = default;
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 #if EMH_ITER_SAFE
@@ -286,7 +286,7 @@ public:
             }
         }
 
-        size_t bucket() const
+        size_type bucket() const
         {
             return _bucket;
         }
@@ -385,7 +385,7 @@ public:
             }
         }
 
-        size_t bucket() const
+        size_type bucket() const
         {
             return _bucket;
         }
@@ -1467,7 +1467,7 @@ private:
     template<typename K>
     size_type find_filled_hash(const K& key, const size_t key_hash) const
     {
-        const auto bucket = key_hash & _mask;
+        const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = EMH_ADDR(_pairs, bucket);
         const auto _num_buckets = _mask + 1;
 #ifndef EMH_FIND_HIT
@@ -1530,7 +1530,7 @@ private:
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
-        const auto kmain_bucket = (size_type)hash_main(bucket);
+        const auto kmain_bucket = hash_main(bucket);
         const auto prev_bucket = find_prev_bucket(kmain_bucket, bucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[bucket])); EMH_SET(new_bucket);
         if (next_bucket == bucket)
@@ -1623,7 +1623,7 @@ private:
                 return step * SIZE_BIT + CTZ(bmask3);
         }
 
-        for (size_type s = bucket_from / SIZE_BIT + 2, n = 1;  ; s += ++n) {
+        while ( true ) {
             auto& _last = EMH_ADDR(_pairs, _mask + 1);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
@@ -1730,7 +1730,7 @@ private:
     }
 #endif
 
-    inline uint64_t hash_main(const size_type bucket) const
+    inline size_type hash_main(const size_type bucket) const
     {
         return hash_key(EMH_KEY(_pairs, bucket)) & _mask;
     }

@@ -110,7 +110,7 @@ public:
       pow2 <<= 1;
     }
     buckets_.resize(pow2, std::make_pair(empty_key_, T()));
-    mask_ = buckets_.size() - 1;
+    mask_ = uint32_t(buckets_.size() - 1);
   }
 
   HashMap(size_type bucket_count, key_type empty_key,
@@ -121,7 +121,7 @@ public:
       pow2 <<= 1;
     }
     buckets_.resize(pow2, std::make_pair(empty_key_, T()));
-    mask_ = buckets_.size() - 1;
+    mask_ = uint32_t(buckets_.size() - 1);
   }
 
   HashMap(const HashMap &other, size_type bucket_count)
@@ -195,7 +195,7 @@ public:
   size_type max_size() const noexcept { return buckets_.max_size() / 2; }
 
   float load_factor() const noexcept { return (float)size_ / buckets_.size(); }
-  float max_load_factor(float lf) const noexcept { return size_ / buckets_.size(); }
+  float max_load_factor(float lf) const noexcept { return 0.5f; }
 
   // Modifiers
   void clear() noexcept {

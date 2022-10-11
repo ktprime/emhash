@@ -654,6 +654,7 @@ static const std::array<char, 62> ALPHANUMERIC_CHARS = {
 
 static std::uniform_int_distribution<std::size_t> rd_uniform(0, ALPHANUMERIC_CHARS.size() - 1);
 
+#if TKey > 1
 static std::mt19937_64 generator(time(0));
 static std::string get_random_alphanum_string(std::size_t size) {
     std::string str(size, '\0');
@@ -669,6 +670,7 @@ static std::string get_random_alphanum_string(std::size_t size) {
 
     return str;
 }
+#endif
 
 #if STR_VIEW
 static char string_view_buf[1024 * 32] = {0};
@@ -684,7 +686,6 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 }
 #endif
 
-#if ABSL
 #if X86
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE2 1
@@ -697,7 +698,6 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #include "absl/hash/internal/low_level_hash.cc"
 #include "absl/hash/internal/hash.cc"
 #include "absl/hash/internal/city.cc"
-#endif
 #endif
 
 #if __cplusplus > 201402L || CXX17 || _MSC_VER > 1730

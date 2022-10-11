@@ -175,7 +175,7 @@ static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
 #endif
 
 //count the leading zero bit
-inline static size_type CTZ(size_t n)
+inline static int CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -209,7 +209,7 @@ inline static size_type CTZ(size_t n)
     #endif
 #endif
 
-    return (size_type)index;
+    return (int)index;
 }
 
 template <typename First, typename Second>
@@ -298,13 +298,13 @@ struct entry {
     }
 
 #if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
-    Second second;
-    size_type bucket;
     First first;
+    size_type bucket;
+    Second second;
 #else
-    First first;
-    size_type bucket;
     Second second;
+    size_type bucket;
+    First first;
 #endif
 };
 
@@ -350,7 +350,7 @@ public:
         typedef value_pair*               pointer;
         typedef value_pair&               reference;
 
-        iterator() : _map(nullptr) { }
+        iterator() = default;
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 #if EMH_ITER_SAFE
@@ -371,7 +371,7 @@ public:
             }
         }
 
-        size_t bucket() const
+        size_type bucket() const
         {
             return _bucket;
         }
@@ -470,7 +470,7 @@ public:
             }
         }
 
-        size_t bucket() const
+        size_type bucket() const
         {
             return _bucket;
         }
@@ -676,7 +676,7 @@ public:
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this, CTZ(bmask), true};
+            return {this, (size_type)CTZ(bmask), true};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -691,7 +691,7 @@ public:
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this, CTZ(bmask), true};
+            return {this, (size_type)CTZ(bmask), true};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
         return it.next();
@@ -1632,7 +1632,7 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    size_type find_empty_bucket(const size_type bucket_from, const size_t main_bucket)
+    size_type find_empty_bucket(const size_type bucket_from, const size_type main_bucket)
     {
 #ifdef EMH_ALIGN64 // only works 64bit
         const auto boset  = bucket_from % MASK_BIT;
@@ -1648,7 +1648,7 @@ private:
             return bucket_from + CTZ(bmask);
 #else
         const auto boset  = main_bucket % 8;
-        auto* const align = (uint8_t*)_bitmask + main_bucket / 8;
+        auto* const align = (uint8_t*)_bitmask + main_bucket / 8; (void)bucket_from;
         const size_t bmask  = (*(size_t*)(align) >> boset);// & 0xF0F0F0F0FF0FF0FFull;//
         if (EMH_LIKELY(bmask != 0))
             return main_bucket + CTZ(bmask);
@@ -1656,7 +1656,7 @@ private:
 
         const auto qmask = _mask / SIZE_BIT;
         if (0) {
-            const auto step = (main_bucket - SIZE_BIT / 4) & qmask;
+            const size_type step = (main_bucket - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
                 return step * SIZE_BIT + CTZ(bmask3);
@@ -1693,7 +1693,7 @@ private:
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
         size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
 #else
-        const auto boset  = bucket_from % 8;
+        const auto boset  = bucket_from % 8; (void)main_bucket;
         auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
         const auto bmask  = (*(size_t*)(align) >> boset); //maybe not aligned and warning
 #endif

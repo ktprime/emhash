@@ -470,7 +470,7 @@ hash_write(ahasher_t hasher, const char* input, size_t size)
 
 uint64_t finish(ahasher_t hasher)
 {
-    size_t rot = hasher.buffer & 63;
+    uint8_t rot = hasher.buffer & 63;
     return rotate_left(folded_multiply(hasher.buffer, hasher.pad), rot);
 }
 #endif

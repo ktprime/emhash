@@ -36,8 +36,12 @@ else
 #CXXFLAGS += -DEMH=7
 endif
 
-ifneq ($(AH),)
+ifneq ($(SH),)
 CXXFLAGS += -DABSL_HASH=1
+endif
+
+ifneq ($(AH),)
+CXXFLAGS += -DANKERL_HASH=1
 endif
 
 ifneq ($(RT),)

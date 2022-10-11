@@ -24,7 +24,7 @@ typedef struct ahasher_s
 ahasher_t
 hasher_from_random_state(uint64_t k0, uint64_t k1, uint64_t k2, uint64_t k3);
 
-#define WRITE_API(TYPE) ahasher_t write_##TYPE(ahasher_t hasher, TYPE value);
+#define WRITE_API(TYPE) ahasher_t write_##TYPE(ahasher_t hasher, TYPE value)
 
 WRITE_API(uint64_t);
 WRITE_API(int64_t);

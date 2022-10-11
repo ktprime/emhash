@@ -20,6 +20,8 @@
 #  include <x86intrin.h>
 #endif
 
+#undef EMH_LIKELY
+#undef EMH_UNLIKELY
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
@@ -942,7 +944,7 @@ public:
 #if 0
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
 #else
-                auto bucket = key_hash & _mask; int offset = 0;
+                auto bucket = size_t(key_hash & _mask); int offset = 0;
                 auto dst_bucket = find_empty_slot2(bucket, offset);
                 if (offset > _max_probe_length && offset >= maxf_bytes) {
                     auto mbucket = robin_shift(bucket, dst_bucket, offset);

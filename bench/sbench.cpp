@@ -29,6 +29,7 @@ std::map<std::string, std::string> maps =
     {"emhash9", "emhash9"},
     {"emhash8", "emhash8"},
     {"martind", "martin_dense"},
+    {"ck_hash", "sk_hset"},
 
     {"gp_hash", "gp_hash"},
 
@@ -470,7 +471,7 @@ void erase_reinsert(hash_type& ht_hash, const std::string& hash_name, const std:
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
-        ht_hash.emplace(v);
+        ht_hash.insert(v);
         sum ++;
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -483,7 +484,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
     auto ts1 = getus(); size_t sum = 0;
     const auto vsmall = 1024 + vList.size() % 1024;
     for (size_t i = 0; i < vList.size(); i++) {
-        sum += ht_hash.emplace(vList[i]).second;
+        sum += ht_hash.insert(vList[i]).second;
         if (i > vsmall)
             ht_hash.erase(vList[i - vsmall]);
     }
@@ -492,7 +493,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
         ht_hash.clear();
     const auto vmedium = vList.size() / 100;
     for (size_t i = 0; i < vList.size(); i++) {
-        auto it = ht_hash.emplace(vList[i]);
+        auto it = ht_hash.insert(vList[i]);
         if (i > vmedium)
             ht_hash.erase(it.first);
     }
@@ -501,7 +502,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
         ht_hash.clear();
     const auto vsize = vList.size() / 8;
     for (size_t i = 0; i < vList.size(); i++) {
-        sum += ht_hash.emplace(vList[i]).second;
+        sum += ht_hash.insert(vList[i]).second;
         if (i > vsize)
             sum += ht_hash.erase(vList[i - vsize]);
     }
@@ -515,7 +516,7 @@ void insert_no_reserve(const std::string& hash_name, const std::vector<keyType>&
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
-        sum += ht_hash.emplace(v).second;
+        sum += ht_hash.insert(v).second;
 
     hlf = ht_hash.load_factor();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -530,7 +531,7 @@ void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std:
 #endif
 
     for (const auto& v : vList)
-        sum += ht_hash.emplace(v).second;
+        sum += ht_hash.insert(v).second;
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -539,7 +540,7 @@ void insert_hit(hash_type& ht_hash, const std::string& hash_name, const std::vec
 {
     auto ts1 = getus(); size_t sum = 0;
     for (auto& v : vList) {
-        ht_hash.emplace(v);
+        ht_hash.insert(v);
         sum ++;
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -556,7 +557,7 @@ void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& v
     auto mh = new hash_type[hash_size];
     for (const auto& v : vList) {
         auto hash_id = ((uint64_t)v) % hash_size;
-        sum += mh[hash_id].emplace(v).second;
+        sum += mh[hash_id].insert(v).second;
     }
 
     for (const auto& v : vList) {
@@ -591,7 +592,7 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 #else
         const keyType v2(v.data(), v.size() - 1);
 #endif
-        auto it = tmp.emplace(v2);
+        auto it = tmp.insert(v2);
 #if QC_HASH == 0
         sum += tmp.count(v2);
 #endif
@@ -616,7 +617,7 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
     tmp = empty;
     for (const auto& v : vList)
     {
-        sum += tmp.emplace(v).second;
+        sum += tmp.insert(v).second;
         //sum += tmp.count(v);
         if (tmp.size() > lsize) {
             if (lsize % 2 == 0)
@@ -646,7 +647,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     //fill data to min factor
     for (; i < minn; i++) {
         if (i < (int)vList.size())
-            tmp.emplace(vList[i]);
+            tmp.insert(vList[i]);
         else {
             auto& v = vList[i - vList.size()];
 #if KEY_INT
@@ -658,7 +659,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 #else
             const keyType v2(v.data(), v.size() - 1);
 #endif
-            tmp.emplace(v2);
+            tmp.insert(v2);
         }
     }
 
@@ -674,7 +675,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 #else
         const keyType v2(v.data(), v.size() - 1);
 #endif
-        tmp.emplace(v2);
+        tmp.insert(v2);
         sum += tmp.count(v2);
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -961,7 +962,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         hash_iter<hash_type>(hash, hash_name);
 
 #ifndef UF
-        copy_clear <hash_type>(hash, hash_name);
+        //copy_clear <hash_type>(hash, hash_name);
         //hash_clear<hash_type>(hash, hash_name);
 #endif
 
@@ -1140,6 +1141,7 @@ static int benchHashSet(int n)
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
 
+//        {  benOneHash<CK::HashSet <keyType,  ehash_func>>("ck_hash", vList); }
 
 #if QC_HASH && KEY_INT
         {  benOneHash<qc::hash::RawSet<keyType,  ehash_func>>("qchash", vList); }

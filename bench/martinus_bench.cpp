@@ -23,8 +23,10 @@
 #endif
 
 #include "../hash_table5.hpp"
-#include "../hash_table6.hpp"
-#include "../hash_table7.hpp"
+//#include "../hash_table6.hpp"
+//#include "../hash_table7.hpp"
+#include "../thirdparty/emhash/hash_table8v.hpp"
+#include "../thirdparty/emhash/hash_table8v2.hpp"
 #include "../hash_table8.hpp"
 
 #if X86
@@ -118,12 +120,12 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 1  //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2  //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
     #define MRNG sfc64
-#elif RT == 2 && WYHASH_LITTLE_ENDIAN
+#elif RT == 2
     #define MRNG WyRand
 #elif RT == 3
     #define MRNG RomuDuoJr
@@ -235,7 +237,7 @@ static inline float now2sec()
     return start.tv_sec + start.tv_usec / 1000000.0;
 #else
     auto tp = std::chrono::steady_clock::now().time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count() / 1000000.0;
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count() / 1000000.0f;
 #endif
 }
 
@@ -595,9 +597,9 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
             for (bool isRandomToInsert : insertRandom) {
                 auto val = anotherUnrelatedRng();
                 if (isRandomToInsert) {
-                    *strData32 = rng();
+                    *strData32 = (uint32_t)rng();
                 } else {
-                    *strData32 = val;
+                    *strData32 = uint32_t(val);
                 }
                 map[str] = 1;
                 ++i;
@@ -609,7 +611,7 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
                     findCount = 0;
                     findRng.state(anotherUnrelatedRngInitialState);
                 }
-                *strData32 = findRng();
+                *strData32 = (uint32_t)findRng();
                 auto it = map.find(str);
                 if (it != map.end()) {
                     num_found += it->second;
@@ -1298,7 +1300,7 @@ int main(int argc, char* argv[])
     int sflags = 1, eflags = 8;
     if (argc > 1) {
         printf("cmd agrs = %s\n", argv[1]);
-        for (char c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
+        for (int c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
             if (c > '3' && c < '9') {
                 std::string map_name("emhash");
                 map_name += c;

@@ -78,7 +78,7 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT 1 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP       1
@@ -116,6 +116,9 @@ std::map<std::string, std::string> maps =
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
+
+//#include "../thirdparty/emhash/hash_table8v.hpp"
+//#include "../thirdparty/emhash/hash_table8v2.hpp"
 
 //https://jishuin.proginn.com/p/763bfbd338d0
 //https://en.wikipedia.org/wiki/Hash_table
@@ -351,7 +354,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     once_func_hash_time[func][showname] += (getus() - ts1) / weigh;
     func_index ++;
 
-    long ts = (getus() - ts1) / 1000;
+    auto ts = (getus() - ts1) / 1000;
 
     if (func_first < func_last)  {
         if (func_index == func_first)
@@ -394,7 +397,7 @@ static void add_hash_func_time(std::map<std::string, std::map<std::string, int64
     }
     hash_convert(once_hash_score, once_score_hash);
 
-    const auto last  = double(once_score_hash.rbegin()->first);
+//    const auto last  = double(once_score_hash.rbegin()->first);
     const auto first = double(once_score_hash.begin()->first);
     //print once score
     for (auto& v : once_score_hash) {
@@ -564,7 +567,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 {
 #if TVal < 2
     hash_type ht_hash;
-    auto ts1 = getus(); size_t sum = 0;
+    auto ts1 = getus(); size_t sum(0);
     const auto vsmall = 128 + vList.size() % 1024;
     for (size_t i = 0; i < vList.size(); i++) {
         sum += ht_hash.emplace(vList[i], TO_VAL(0)).second;
@@ -586,7 +589,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
     if (test_case % 2 == 0)
         ht_hash.clear();
 
-    ht_hash.max_load_factor(0.80);
+    ht_hash.max_load_factor(0.80f);
     //load_factor = 0.8
     const auto vsize = (1u << ilog(vList.size() / 8, 2)) * 75 / 100;
     ht_hash.reserve(vsize / 2);
@@ -741,7 +744,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
     tmp.max_load_factor(max_loadf);
     tmp.reserve(pow2 / 2);
 #endif
-    int minn = (max_loadf - 0.2f) * pow2, maxn = int(max_loadf * pow2);
+    int minn = int((max_loadf - 0.2f) * pow2), maxn = int(max_loadf * pow2);
     int i = 0;
 
     //fill data to min factor
@@ -1189,7 +1192,7 @@ static int benchHashMap(int n)
     using ehash_func = phmap::Hash<keyType>;
 #elif HOOD_HASH
     using ehash_func = robin_hood::hash<keyType>;
-#elif DENSE_HASH
+#elif ANKERL_HASH
     using ehash_func = ankerl::unordered_dense::hash<keyType>;
 #elif QCH && KEY_INT
     using ehash_func = qc::hash::RawMap<keyType, valueType>::hasher;
@@ -1207,7 +1210,7 @@ static int benchHashMap(int n)
 #else
         sum += v.size();
 #endif
-        loop_vector_time = getus() - ts;
+        loop_vector_time = int(getus() - ts);
         printf("n = %d, keyType = %s, valueType = %s(%zd), loop_sum = %d us, sum = %d\n",
                 n, sKeyType, sValueType, sizeof(valueType), (int)(loop_vector_time), (int)sum);
     }
@@ -1332,7 +1335,7 @@ static void testHashInt(int loops = 500000009)
 {
     printf("%s loops = %d\n", __FUNCTION__, loops);
     auto ts = getus();
-    long sum = ts;
+    auto sum = ts;
     auto r  =  ts;
 
 #ifdef PHMAP_VERSION_MAJOR
@@ -1437,7 +1440,7 @@ int main(int argc, char* argv[])
 #endif
     auto start = getus();
 //    test_lru(100'000'000);
-    testHashInt(2e7+8);
+    testHashInt(int(2e7+8));
 
 #ifdef AHASH_AHASH_H
     printf("ahash_version = %s\n", ahash_version());
@@ -1446,7 +1449,7 @@ int main(int argc, char* argv[])
     printInfo(nullptr);
 
     int run_type = 0;
-    int rnd = randomseed();
+    auto rnd = randomseed();
     auto maxc = 500;
     int minn = (1000 * 100 * 8) / sizeof(keyType) + 12345;
     int maxn = 100*minn;
@@ -1468,7 +1471,7 @@ int main(int argc, char* argv[])
         if (isdigit(cmd))
             maxn = atoi(argv[i]) + 1000;
         else if (cmd == 'f' && value > 0)
-            load_factor = atof(&argv[i][0] + 1) / 100.0f;
+            load_factor = float(atof(&argv[i][0] + 1) / 100.0);
         else if (cmd == 'c' && value > 0)
             maxc = value;
         else if (cmd == 'a')
@@ -1482,7 +1485,7 @@ int main(int argc, char* argv[])
         else if (cmd == 't')
             test_extra = 1 - test_extra;
         else if (cmd == 'd') {
-        for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
+        for (int c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
             if (c >= '5' && c <= '9') {
                 std::string hash_name("emhash");
                 hash_name += c;
@@ -1516,7 +1519,7 @@ int main(int argc, char* argv[])
                 maps.emplace("fph", "fph-table");
 
             else if (c >= '1' && c <= '3') {
-                const std::string emistr = std::string("emilib") + c;
+                const std::string emistr = std::string("emilib") + char(c);
                 if (maps.find(emistr) != maps.end()) maps.erase(emistr);
                 else maps.emplace(emistr, emistr);
             }
@@ -1545,7 +1548,7 @@ int main(int argc, char* argv[])
         if (run_type == 2) {
             printf(">>");
 #if _WIN32
-            if (scanf_s("%d", &n, sizeof(n)) == 0)
+            if (scanf_s("%d", &n) == 0)
 #else
             if (scanf("%d", &n) == 0)
 #endif
@@ -1565,10 +1568,10 @@ int main(int argc, char* argv[])
         }
 
         auto pow2 = 2 << ilog(n, 2);
-        hlf = 1.0 * n / pow2;
+        hlf = 1.0f * n / pow2;
         if (load_factor > 0.2 && load_factor < 1) {
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
-            hlf = 1.0 * n / pow2;
+            hlf = 1.0f * n / pow2;
         }
         if (n < 1e5 || n > 1e9)
             n = minn + srng() % minn;

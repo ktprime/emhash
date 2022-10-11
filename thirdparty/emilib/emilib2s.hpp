@@ -20,6 +20,9 @@
 #  include <x86intrin.h>
 #endif
 
+#undef EMH_LIKELY
+#undef EMH_UNLIKELY
+
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
@@ -137,12 +140,14 @@ public:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
     {
+        (void)key;
         return (uint8_t)(key_hash >> 28) << 1;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
     {
+        (void)key_hash;
         return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 52) << 1;
     }
 #endif
@@ -460,7 +465,7 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-	//defualt load_factor = 7/8
+    //defualt load_factor = 7/8
     void max_load_factor(float lf = 8.0f/9)
     {
     }
@@ -871,7 +876,7 @@ private:
 
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key))) 
+                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                     return fbucket;
                 maskf &= maskf - 1;
             }
@@ -1009,7 +1014,7 @@ private:
         const auto key_hash = _hasher(key);
         return (key_hash >> 7) ^ (reinterpret_cast<uintptr_t>(_states) >> 12);
 #else
-        return _hasher(key);
+        return (size_t)_hasher(key);
 #endif
     }
 

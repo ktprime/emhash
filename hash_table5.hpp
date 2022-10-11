@@ -197,13 +197,13 @@ struct entry {
     }
 
 #if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
-    size_type bucket;
-    First first;
-    Second second;
-#else
     First first; //long
     size_type bucket;
     Second second;//int
+#else
+    Second second;
+    size_type bucket;
+    First first;
 #endif
 };// __attribute__ ((packed));
 
@@ -1364,7 +1364,7 @@ public:
                     collision ++;
 #endif
 
-                auto& key = EMH_KEY(old_pairs, src_bucket);
+                const auto& key = EMH_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
                 new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
                 EMH_BUCKET(_pairs, bucket) = bucket;
@@ -1397,8 +1397,8 @@ private:
     static PairT* alloc_bucket(size_type num_buckets)
     {
         //TODO: call realloc
-        auto* new_pairs = (char*)malloc((2 + num_buckets) * sizeof(PairT));
-        return (PairT *)(new_pairs);
+        auto* new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
+        return new_pairs;
     }
 
 #if EMH_HIGH_LOAD
@@ -1905,7 +1905,7 @@ one-way seach strategy.
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
@@ -1913,16 +1913,16 @@ one-way seach strategy.
     inline size_type hash_key(const UType& key) const
     {
 #if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), 0);
+        return (size_type)wyhash(key.data(), key.size(), 0);
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-        return _hasher(key);
+        return (size_type)_hasher(key);
     }
 
 private:
