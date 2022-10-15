@@ -116,6 +116,7 @@ std::map<std::string, std::string> maps =
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
+//#include "../hash_table8v.hpp"
 
 //#include "../thirdparty/emhash/hash_table8v.hpp"
 //#include "../thirdparty/emhash/hash_table8v2.hpp"
@@ -589,8 +590,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
     if (test_case % 2 == 0)
         ht_hash.clear();
 
-    ht_hash.max_load_factor(0.80f);
-    //load_factor = 0.8
+    ht_hash.max_load_factor(0.80f); //load_factor = 0.8
     const auto vsize = (1u << ilog(vList.size() / 8, 2)) * 75 / 100;
     ht_hash.reserve(vsize / 2);
     for (size_t i = 0; i < vList.size(); i++) {
@@ -620,7 +620,7 @@ void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std:
 {
     auto ts1 = getus(); size_t sum = 0;
 #ifndef SMAP
-    ht_hash.max_load_factor(0.9f);
+    ht_hash.max_load_factor(0.80f);
     ht_hash.reserve(vList.size());
 #endif
 
@@ -644,7 +644,7 @@ void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& v
 {
 #if KEY_INT
     size_t sum = 0;
-    const auto hash_size = vList.size() / 1003 + 10;
+    const auto hash_size = vList.size() / 10003 + 4;
     const auto ts1 = getus();
 
     if (test_case % 2) {
@@ -654,12 +654,14 @@ void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& v
             sum += mh[hash_id].emplace(v, TO_VAL(0)).second;
         }
 
-        for (const auto& v : vList) {
+        auto v1 = vList;
+        shuffle(v1.begin(), v1.end());
+        for (const auto& v : v1) {
             auto hash_id = ((uint32_t)v) % hash_size;
             sum += mh[hash_id].count(v);
         }
 
-        for (const auto& v : vList) {
+        for (const auto& v : v1) {
             auto hash_id = ((uint32_t)v) % hash_size;
             sum += mh[hash_id].erase(v + v % 2);
         }
@@ -667,11 +669,12 @@ void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& v
         delete []mh;
     } else {
         hash_type hashm;
+        uint32_t small_size = 10 + vList.size() % 2000;
         for (const auto v : vList) {
-            const keyType v2 = v % hash_size;
+            const keyType v2 = v % small_size;
             sum += hashm.emplace(v2, TO_VAL(0)).second;
-            sum += hashm.erase(v2 + v % 2);
-            sum += hashm.count(v2 / 2);
+            sum += hashm.erase(v2 - 1);
+            sum += hashm.count(v2 + 1);
         }
     }
 
@@ -1297,8 +1300,8 @@ static int benchHashMap(int n)
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
-        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
+        {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
 #if ET

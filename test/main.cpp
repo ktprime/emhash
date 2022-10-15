@@ -9,8 +9,8 @@
 
 //#include "wyhash.h"
 #include "eutil.h"
-
-#define EMH_ITER_SAFE 1
+#define EMH_WYHASH_HASH 1
+//#define EMH_ITER_SAFE 1
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
@@ -18,7 +18,8 @@
 #include "emilib/emilib2.hpp"
 
 
-#include "martinus/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/robin_hood.h"      //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/unordered_dense.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 
 #if CXX20
@@ -554,7 +555,7 @@ static void TestApi()
 
     {
         emhash7::HashMap<uint64_t, uint32_t> emi;
-        emi.reserve(10);
+		emi.reserve(1e8);
         int key = rand();
         emi.insert({key, 0}); emi.emplace(key, 1);
         auto it = emi.try_emplace(key, 0); assert(!it.second);
@@ -797,6 +798,19 @@ static void benchStringHash(int size, int str_min, int str_max)
             sum += robin_hood::hash_bytes(v.data(), v.size());
         t_find = (getus() - start) / 1000;
         printf("martius hash= %4d ms\n", t_find);
+
+        start = getus(); sum = 0;
+        for (auto& v : rndstring)
+            sum += emhash8::HashMap<int,int>::wyhashstr (v.data(), v.size());
+        t_find = (getus() - start) / 1000;
+        printf("emhash8 hash= %4d ms\n", t_find);
+
+
+        start = getus(); sum = 0;
+        for (auto& v : rndstring)
+          sum += ankerl::unordered_dense::detail::wyhash::hash(v.data(), v.size());
+        t_find = (getus() - start) / 1000;
+        printf("ankerl hash = %4d ms\n", t_find);
 
 #if ABSL_HASH && ABSL
         start = getus();

@@ -23,10 +23,10 @@
 #endif
 
 #include "../hash_table5.hpp"
-//#include "../hash_table6.hpp"
-//#include "../hash_table7.hpp"
-#include "../thirdparty/emhash/hash_table8v.hpp"
-#include "../thirdparty/emhash/hash_table8v2.hpp"
+#include "../hash_table6.hpp"
+#include "../hash_table7.hpp"
+//#include "../thirdparty/emhash/hash_table8v.hpp"
+//#include "../thirdparty/emhash/hash_table8v2.hpp"
 #include "../hash_table8.hpp"
 
 #if X86

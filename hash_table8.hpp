@@ -1400,7 +1400,7 @@ private:
     size_type kickout_bucket(const size_type kmain, const size_type bucket) noexcept
     {
         const auto next_bucket = EMH_BUCKET(_index, bucket);
-        const auto new_bucket  = find_empty_bucket(next_bucket);
+        const auto new_bucket  = find_empty_bucket(next_bucket, 2);
         const auto prev_bucket = find_prev_bucket(kmain, bucket);
 
         const auto oslot = EMH_HSLOT(_index, bucket);
@@ -1444,8 +1444,9 @@ private:
         if (kmain != bucket)
             return kickout_bucket(kmain, bucket);
         else if (next_bucket == bucket)
-            return EMH_BUCKET(_index, next_bucket) = find_empty_bucket(next_bucket);
+            return EMH_BUCKET(_index, next_bucket) = find_empty_bucket(next_bucket, 1);
 
+        uint32_t csize = 1;
         //find next linked bucket and check key
         while (true) {
             const auto eslot = EMH_SLOT(_index, next_bucket);
@@ -1454,6 +1455,7 @@ private:
                 return next_bucket;
             }
 
+            csize += 1;
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
             if (nbucket == next_bucket)
                 break;
@@ -1461,7 +1463,7 @@ private:
         }
 
         //find a empty and link it to tail
-        const auto new_bucket = find_empty_bucket(next_bucket);
+        const auto new_bucket = find_empty_bucket(next_bucket, csize);
         return EMH_BUCKET(_index, next_bucket) = new_bucket;
     }
 
@@ -1484,7 +1486,7 @@ private:
         else if (EMH_UNLIKELY(next_bucket != bucket))
             next_bucket = find_last_bucket(next_bucket);
 
-        return EMH_BUCKET(_index, next_bucket) = find_empty_bucket(next_bucket);
+        return EMH_BUCKET(_index, next_bucket) = find_empty_bucket(next_bucket, 2);
     }
 
 /***
@@ -1494,14 +1496,14 @@ Since Robin Hood hashing is relatively resilient to clustering (both primary and
     It's the core algorithm of this hash map with highly optimization/benchmark.
 normaly linear probing is inefficient with high load factor, it use a new 3-way linear
 probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than
-one-way seach strategy.
+one-way search strategy.
 
 1. linear or quadratic probing a few cache line for less cache miss from input slot "bucket_from".
-2. the first  seach  slot from member variant "_last", init with 0
+2. the first  search  slot from member variant "_last", init with 0
 3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
 */
     // key is not in this mavalue. Find a place to put it.
-    size_type find_empty_bucket(const size_type bucket_from) noexcept
+    size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept
     {
 #if EMH_HIGH_LOAD
         if (_ehead)
@@ -1513,12 +1515,12 @@ one-way seach strategy.
             return bucket;
 
 #ifndef EMH_QUADRATIC
-        constexpr size_type linear_probe_length = 8 + EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3
-        for (size_type offset = 4, step = _num_filled % 2 + 3; offset < linear_probe_length; ) {
+        constexpr size_type linear_probe_length = 4 + EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3
+        for (size_type offset = csize + 2, step = 3; offset < linear_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
                 return bucket;
-            offset += step;
+            offset += step; //4.7.10.13.16
         }
         bucket += linear_probe_length;
 #else
@@ -1557,7 +1559,7 @@ one-way seach strategy.
             // if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket)))
             // return bucket;
 
-            auto medium = (_mask / 2 + _last++) & _mask;
+            auto medium = (_mask / 2 + _last) & _mask;
             if (EMH_UNLIKELY(EMH_EMPTY(_index, medium)))// || EMH_EMPTY(_index, ++medium))
                 return medium;
 #endif
@@ -1651,14 +1653,14 @@ one-way seach strategy.
     {
 #if defined(__SIZEOF_INT128__)
         __uint128_t r = A; r *= B;
-#if WYHASH_CONDOM
+#if WYHASH_CONDOM2
         A ^= (uint64_t)r; B ^= (uint64_t)(r >> 64);
 #else
         A = (uint64_t)r; B = (uint64_t)(r >> 64);
 #endif
 
 #elif defined(_MSC_VER) && defined(_M_X64)
-#if WYHASH_CONDOM
+#if WYHASH_CONDOM2
         uint64_t a, b;
         a = _umul128(A, B, &b);
         A ^= a; B ^= b;
@@ -1669,7 +1671,7 @@ one-way seach strategy.
         uint64_t ha = A >> 32, hb = B >> 32, la = (uint32_t)A, lb = (uint32_t)B, hi, lo;
         uint64_t rh = ha * hb, rm0 = ha * lb, rm1 = hb * la, rl = la * lb, t = rl + (rm0 << 32), c = t < rl;
         lo = t + (rm1 << 32); c += lo < t; hi = rh + (rm0 >> 32) + (rm1 >> 32) + c;
-#if WYHASH_CONDOM
+#if WYHASH_CONDOM2
         A ^= lo; B ^= hi;
 #else
         A = lo; B = hi;
@@ -1689,8 +1691,9 @@ one-way seach strategy.
         0xa0761d6478bd642full, 0xe7037ed1a0b428dbull,
         0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
 
+public:
     //wyhash main function https://github.com/wangyi-fudan/wyhash
-    static uint64_t wyhashstr(const void *key, const size_t len)
+    static uint64_t wyhashstr(const char *key, const size_t len)
     {
         uint64_t a = 0, b = 0, seed = secret[0];
         const uint8_t *p = (const uint8_t*)key;
@@ -1726,6 +1729,7 @@ one-way seach strategy.
     }
 #endif
 
+private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType key) const
     {

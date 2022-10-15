@@ -1655,7 +1655,7 @@ private:
 #endif
 
         const auto qmask = _mask / SIZE_BIT;
-        if (0) {
+        if (1) {
             const size_type step = (main_bucket - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)

@@ -1642,7 +1642,7 @@ private:
     size_type kickout_bucket(const size_type kmain, const size_type kbucket) noexcept
     {
         const auto next_bucket = EMH_BUCKET(_pairs, kbucket);
-        const auto new_bucket  = find_empty_bucket(next_bucket);
+        const auto new_bucket  = find_empty_bucket(next_bucket, 2);
         const auto prev_bucket = find_prev_bucket(kmain, kbucket);
         EMH_BUCKET(_pairs, prev_bucket) = new_bucket;
         new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
@@ -1680,8 +1680,9 @@ private:
         if (kmain != bucket)
             return kickout_bucket(kmain, bucket);
         else if (next_bucket == bucket)
-            return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
+            return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket, 1);
 
+        int csize = 1;
 #if EMH_LRU_SET
         auto prev_bucket = bucket;
 #endif
@@ -1700,6 +1701,7 @@ private:
             prev_bucket = next_bucket;
 #endif
 
+            csize += 1;
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
                 break;
@@ -1707,7 +1709,7 @@ private:
         }
 
         //find a new empty and link it to tail
-        const auto new_bucket = find_empty_bucket(next_bucket);
+        const auto new_bucket = find_empty_bucket(next_bucket, csize);
         return EMH_BUCKET(_pairs, next_bucket) = new_bucket;
     }
 
@@ -1755,14 +1757,14 @@ Since Robin Hood hashing is relatively resilient to clustering (both primary and
     It's the core algorithm of this hash map with highly optimization/benchmark.
 normaly linear probing is inefficient with high load factor, it use a new 3-way linear
 probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than
-one-way seach strategy.
+one-way search strategy.
 
 1. linear or quadratic probing a few cache line for less cache miss from input slot "bucket_from".
-2. the first  seach  slot from member variant "_last", init with 0
+2. the first  search  slot from member variant "_last", init with 0
 3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
 */
     // key is not in this map. Find a place to put it.
-    size_type find_empty_bucket(const size_type bucket_from) noexcept
+    size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept
     {
 #if EMH_HIGH_LOAD
         if (_ehead)
@@ -1776,24 +1778,24 @@ one-way seach strategy.
 #ifndef _MSC_VER
         //__builtin_prefetch(static_cast<const void*>(_pairs + bucket + 1), 0, 1);
 #endif
-        constexpr auto linear_probe_length = 3;//2-3 cache line miss
-        for (size_type step = 2, slot = bucket + 1; ; slot += 3) {
-            if (step < 8) {
+        constexpr auto linear_probe_length = 5;//2-3 cache line miss
+        for (size_type step = 0, slot = bucket + 1 + csize / 2; ; slot += 2) {
+            if (step < linear_probe_length) {
                 auto bucket1 = slot & _mask;
-                if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
+                if (EMH_EMPTY(_pairs, bucket1))// || EMH_EMPTY(_pairs, ++bucket1))
                     return bucket1;
             }
-            if (step++ > linear_probe_length) {
-                if (EMH_EMPTY(_pairs, _last++))// || EMH_EMPTY(_pairs, ++_last))
-                    return ++_last - 2;
+            if (step++ > 2) {
+                if (EMH_EMPTY(_pairs, _last++))// || EMH_EMPTY(_pairs, _last++))
+                    return _last - 1;
 
-                ++_last &= _mask;
+                _last &= _mask;
 #if EMH_PACK_TAIL
                 auto tail = _num_buckets - _last;
                 if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                     return tail;
 #else
-                auto medium = (_mask / 2 + _last++) & _mask;
+                auto medium = (_mask / 2 + _last) & _mask;
                 if (EMH_EMPTY(_pairs, medium) && EMH_EMPTY(_pairs, ++medium))
                     return medium;
 #endif

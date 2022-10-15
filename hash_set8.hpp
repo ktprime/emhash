@@ -1246,10 +1246,10 @@ Since Robin Hood hashing is relatively resilient to clustering (both primary and
     It's the core algorithm of this hash map with highly optimization/benchmark.
 normaly linear probing is inefficient with high load factor, it use a new 3-way linear
 probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than
-one-way seach strategy.
+one-way search strategy.
 
 1. linear or quadratic probing a few cache line for less cache miss from input slot "bucket_from".
-2. the first  seach  slot from member variant "_last", init with 0
+2. the first  search  slot from member variant "_last", init with 0
 3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
 */
     // key is not in this mavalue. Find a place to put it.
