@@ -38,11 +38,7 @@
 #include <iterator>
 #include <algorithm>
 
-#ifdef __has_include
-    #if __has_include("wyhash.h")
-    #include "wyhash.h"
-    #endif
-#elif EMH_WY_HASH
+#if EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -108,7 +104,7 @@ struct entry {
     using first_type =  First;
     using second_type = Second;
     entry(const First& key, const Second& val, size_type ibucket)
-        :second(val),first(key)
+        :second(val), first(key)
     {
         bucket = ibucket;
     }
@@ -134,8 +130,8 @@ struct entry {
         bucket = ibucket;
     }
 
-    entry(const std::pair<First,Second>& pair)
-        :second(pair.second),first(pair.first)
+    entry(const std::pair<First, Second>& pair)
+        :second(pair.second), first(pair.first)
     {
         bucket = INACTIVE;
     }
@@ -153,22 +149,22 @@ struct entry {
     }
 
     entry(const entry& rhs)
-        :second(rhs.second),first(rhs.first)
+        :second(rhs.second), first(rhs.first)
     {
         bucket = rhs.bucket;
     }
 
     entry(entry&& rhs) noexcept
-        :second(std::move(rhs.second)),first(std::move(rhs.first))
+        :second(std::move(rhs.second)), first(std::move(rhs.first))
     {
         bucket = rhs.bucket;
     }
 
-    entry& operator = (entry&& rhs)
+    entry& operator = (entry&& rhs) noexcept
     {
         second = std::move(rhs.second);
         bucket = rhs.bucket;
-        first = std::move(rhs.first);
+        first  = std::move(rhs.first);
         return *this;
     }
 
@@ -220,7 +216,7 @@ class HashMap
 
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
-    typedef std::pair<KeyT,ValueT>            value_type;
+    typedef std::pair<KeyT, ValueT>           value_type;
 
 #if EMH_BUCKET_INDEX == 0
     typedef value_type                        value_pair;
@@ -875,7 +871,7 @@ public:
         const auto bucket = find_or_allocate(value.first);
         const auto bempty = EMH_EMPTY(_pairs, bucket);
         if (bempty) {
-            EMH_NEW(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second), bucket);
+            EMH_NEW(std::move(value.first), std::move(value.second), bucket);
         }
         return { {this, bucket}, bempty };
     }
@@ -1087,7 +1083,7 @@ public:
         return do_assign(std::move(key), std::forward<M>(val)).first;
     }
 
-    /// Like std::map<KeyT,ValueT>::operator[].
+    /// Like std::map<KeyT, ValueT>::operator[].
     ValueT& operator[](const KeyT& key) noexcept
     {
         check_expand_need();
@@ -1497,7 +1493,7 @@ private:
         if ((int)next_bucket < 0)
             return INACTIVE;
 
-        const auto equalk = _eq(EMH_KEY(_pairs, bucket), key);
+        const auto equalk = _eq(key, EMH_KEY(_pairs, bucket));
 #if 1
         if (next_bucket == bucket)
             return equalk ? bucket : INACTIVE;
@@ -1524,7 +1520,7 @@ private:
         auto prev_bucket = bucket;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(EMH_KEY(_pairs, next_bucket), key)) {
+            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
 #if 1
                 EMH_BUCKET(_pairs, prev_bucket) = (nbucket == next_bucket) ? prev_bucket : nbucket;
                 return next_bucket;
@@ -1601,18 +1597,18 @@ private:
 #ifndef EMH_FIND_HIT
         if ((int)next_bucket < 0)
             return _num_buckets;
-        else if (_eq(EMH_KEY(_pairs, bucket), key))
+        else if (_eq(key, EMH_KEY(_pairs, bucket)))
             return bucket;
 #else
         if constexpr (std::is_integral<K>::value) {
-            if (_eq(EMH_KEY(_pairs, bucket), key))
+            if (_eq(key, EMH_KEY(_pairs, bucket)))
                 return bucket;
             else if ((int)next_bucket < 0)
                 return _num_buckets;
         } else {
             if ((int)next_bucket < 0)
                 return _num_buckets;
-            else if (_eq(EMH_KEY(_pairs, bucket), key))
+            else if (_eq(key, EMH_KEY(_pairs, bucket)))
                 return bucket;
         }
 #endif
@@ -1623,7 +1619,7 @@ private:
 //            return _num_buckets;
 
         while (true) {
-            if (_eq(EMH_KEY(_pairs, next_bucket), key))
+            if (_eq(key, EMH_KEY(_pairs, next_bucket)))
                 return next_bucket;
 
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
@@ -1661,7 +1657,8 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    size_type find_or_allocate(const KeyT& key) noexcept
+    template<typename K=KeyT>
+    size_type find_or_allocate(const K& key) noexcept
     {
         const auto bucket = key_to_bucket(key);
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
@@ -1672,7 +1669,7 @@ private:
                 pop_empty(bucket);
 #endif
             return bucket;
-        } else if (_eq(bucket_key, key))
+        } else if (_eq(key, bucket_key))
             return bucket;
 
         //check current bucket_key is in main bucket or not
@@ -1688,7 +1685,7 @@ private:
 #endif
         //find next linked bucket and check key
         while (true) {
-            if (EMH_UNLIKELY(_eq(EMH_KEY(_pairs, next_bucket), key))) {
+            if (EMH_UNLIKELY(_eq(key, EMH_KEY(_pairs, next_bucket)))) {
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
                 return prev_bucket;
@@ -1905,7 +1902,7 @@ one-way search strategy.
 #if EMH_INT_HASH
         return hash64(key);
 #elif EMH_IDENTITY_HASH
-        return key + (key >> (sizeof(UType) * 4));
+        return key + (key >> 24);
 #else
         return (size_type)_hasher(key);
 #endif
@@ -1914,7 +1911,7 @@ one-way search strategy.
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-#if WYHASH_LITTLE_ENDIAN
+#if EMH_WY_HASH
         return (size_type)wyhash(key.data(), key.size(), 0);
 #else
         return (size_type)_hasher(key);

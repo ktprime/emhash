@@ -6,10 +6,8 @@
 
 
 //#define EMH_IDENTITY_HASH 1
-
-//#include "wyhash.h"
 #include "eutil.h"
-#define EMH_WYHASH_HASH 1
+//#define EMH_WYHASH_HASH 1
 //#define EMH_ITER_SAFE 1
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
@@ -24,17 +22,16 @@
 
 #if CXX20
 #include <string_view>
-#include "wyhash.h"
 struct string_hash
 {
     using is_transparent = void;
 #if WYHASH_LITTLE_ENDIAN
-    std::size_t operator()(const char* key)             const { auto ksize = std::strlen(key); return wyhash(key, ksize, ksize); }
-    std::size_t operator()(const std::string& key)      const { return wyhash(key.data(), key.size(), key.size()); }
-    std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), key.size()); }
+    std::size_t operator()(const char* key)             const { return wyhash(key, strlen(key), 0); }
+    std::size_t operator()(const std::string& key)      const { return wyhash(key.data(), key.size(), 0); }
+    std::size_t operator()(const std::string_view& key) const { return wyhash(key.data(), key.size(), 0); }
 #else
     std::size_t operator()(const char* key)             const { return std::hash<std::string_view>()(std::string_view(key, strlen(key))); }
-    std::size_t operator()(const std::string& key)      const { return std::hash<std::string>()(key); }
+    std::size_t operator()(const std::string& key)      const { return std::hash<std::string_view>()(key); }
     std::size_t operator()(const std::string_view& key) const { return std::hash<std::string_view>()(key); }
 #endif
 };
@@ -43,37 +40,35 @@ struct string_equal
 {
     using is_transparent = int;
 
-#if 1
+
     bool operator()(const std::string_view& lhs, const std::string& rhs) const {
-        return lhs.size() == rhs.size() && lhs == rhs;
+        return lhs == rhs;
     }
-#endif
+
+    bool operator()(const std::string& lhs, const std::string& rhs) const {
+        return lhs == rhs;
+    }
 
     bool operator()(const char* lhs, const std::string& rhs) const {
-        return std::strcmp(lhs, rhs.data()) == 0;
-    }
-
-    bool operator()(const char* lhs, const std::string_view& rhs) const {
-        return std::strcmp(lhs, rhs.data()) == 0;
-    }
-
-    bool operator()(const std::string_view& rhs, const char* lhs) const {
         return std::strcmp(lhs, rhs.data()) == 0;
     }
 };
 
 static int find_strview_test()
 {
-    emhash6::HashMap<const std::string, char, string_hash, string_equal> map;
-    std::string_view key = "key";
-    std::string     skey = "key";
-    map.emplace(key, 0);
-    const auto it = map.find(key); // fail
-    assert(it == map.find("key"));
-    assert(it == map.find(skey));
+    {
+        emhash7::HashMap<std::string, int, string_hash, string_equal> map;
+        std::string_view vkey = "key";
+        std::string      skey = "key";
+        assert(vkey == skey);
 
-    assert(key == "key");
-    assert(key == skey);
+        map.emplace(vkey, 0);
+        map.emplace(skey, 1);
+        const auto it = map.find(vkey); // fail
+        assert(it == map.find("vkey"));
+        assert(it == map.find(skey));
+    }
+
     return 0;
 }
 #endif
@@ -138,6 +133,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #define ehmap7 emhash7::HashMap
 #define ehmap8 emhash8::HashMap
 
+//TODO template
 static void TestApi()
 {
     printf("============================== %s ============================\n", __FUNCTION__);
@@ -159,6 +155,7 @@ static void TestApi()
         m2.find(2)->second = "second";
         m2.insert({3, "null"}).first->second = "third";
         m2.emplace(4, "null").first->second = "four";
+        m2.insert(std::pair<int, std::string>(5, "insert"));
         for (auto& it : m2)
             printf("%d -> %s\n", it.first, it.second.data());
 
@@ -554,8 +551,8 @@ static void TestApi()
     }
 
     {
-        emhash7::HashMap<uint64_t, uint32_t> emi;
-		emi.reserve(1e8);
+        ehmap<uint64_t, uint32_t> emi;
+        emi.reserve(1e8);
         int key = rand();
         emi.insert({key, 0}); emi.emplace(key, 1);
         auto it = emi.try_emplace(key, 0); assert(!it.second);
@@ -570,6 +567,21 @@ static void TestApi()
         assert(iter_next == emi.end());
 #endif
     }
+
+#if CXX20
+    {
+        ehmap<std::string, int, string_hash, string_equal> map;
+        std::string_view vkey = "key";
+        std::string      skey = "key";
+
+        auto its = map.emplace(skey, 1);
+        auto itv = map.emplace(vkey, 0);
+        assert(!itv.second);
+        const auto it = map.find(vkey); // fail
+        assert(it == map.find(skey));
+        assert(it == map.find("key"));
+    }
+#endif
 
 #endif
 }
@@ -799,12 +811,13 @@ static void benchStringHash(int size, int str_min, int str_max)
         t_find = (getus() - start) / 1000;
         printf("martius hash= %4d ms\n", t_find);
 
+#if 0
         start = getus(); sum = 0;
         for (auto& v : rndstring)
             sum += emhash8::HashMap<int,int>::wyhashstr (v.data(), v.size());
         t_find = (getus() - start) / 1000;
         printf("emhash8 hash= %4d ms\n", t_find);
-
+#endif
 
         start = getus(); sum = 0;
         for (auto& v : rndstring)

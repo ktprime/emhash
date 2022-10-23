@@ -88,11 +88,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #include <iterator>
 #include <algorithm>
 
-#ifdef __has_include
-    #if __has_include("wyhash.h")
-    #include "wyhash.h"
-    #endif
-#elif EMH_WY_HASH
+#if EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -217,7 +213,7 @@ struct entry {
     using first_type =  First;
     using second_type = Second;
     entry(const First& key, const Second& val, size_type ibucket)
-        :second(val),first(key)
+        :second(val), first(key)
     {
         bucket = ibucket;
     }
@@ -235,8 +231,8 @@ struct entry {
         bucket = ibucket;
     }
 
-    entry(const std::pair<First,Second>& pair)
-        :second(pair.second),first(pair.first)
+    entry(const std::pair<First, Second>& pair)
+        :second(pair.second), first(pair.first)
     {
         bucket = INACTIVE;
     }
@@ -254,18 +250,18 @@ struct entry {
     }
 
     entry(const entry& rhs)
-        :second(rhs.second),first(rhs.first)
+        :second(rhs.second), first(rhs.first)
     {
         bucket = rhs.bucket;
     }
 
     entry(entry&& rhs) noexcept
-        :second(std::move(rhs.second)),first(std::move(rhs.first))
+        :second(std::move(rhs.second)), first(std::move(rhs.first))
     {
         bucket = rhs.bucket;
     }
 
-    entry& operator = (entry&& rhs)
+    entry& operator = (entry&& rhs) noexcept
     {
         second = std::move(rhs.second);
         bucket = rhs.bucket;
@@ -318,7 +314,7 @@ class HashMap
 
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
-    typedef std::pair<KeyT,ValueT>            value_type;
+    typedef std::pair<KeyT ,ValueT>           value_type;
 
 #if EMH_BUCKET_INDEX == 0
     typedef value_type                        value_pair;
@@ -882,7 +878,7 @@ public:
         bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n",
                 _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
 
-        bsize += sprintf(buff + bsize, "  collision,poisson,cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%% %.2lf|%.2lf, %.2lf\n",
+        bsize += sprintf(buff + bsize, "  collision, poisson, cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%% %.2lf|%.2lf, %.2lf\n",
                 (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled,
                 finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
 
@@ -1055,7 +1051,7 @@ public:
         bool isempty;
         const auto bucket = find_or_allocate(value.first, isempty);
         if (isempty) {
-            EMH_NEW(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second), bucket);
+            EMH_NEW(std::move(value.first), std::move(value.second), bucket);
         }
         return { {this, bucket}, isempty };
     }
@@ -1389,9 +1385,9 @@ private:
     void clear_bucket(size_type bucket)
     {
         EMH_CLS(bucket);
+        _num_filled--;
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
-        _num_filled--;
     }
 
 #if 1
@@ -1578,8 +1574,8 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position. ***/
 
-//    template<typename Key=KeyT>
-    size_type find_or_allocate(const KeyT& key, bool& isempty)
+    template<typename K=KeyT>
+    size_type find_or_allocate(const K& key, bool& isempty)
     {
         const auto bucket = hash_key(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
@@ -1662,8 +1658,8 @@ private:
                 return step * SIZE_BIT + CTZ(bmask3);
         }
 
-        auto& _last = EMH_BUCKET(_pairs, _num_buckets);
         for (; ;) {
+           auto& _last = EMH_BUCKET(_pairs, _num_buckets);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
@@ -1804,7 +1800,7 @@ private:
 #if EMH_INT_HASH
         return hash64(key);
 #elif EMH_IDENTITY_HASH
-        return key + (key >> (sizeof(UType) * 4));
+        return key + (key >> 24);
 #else
         return (size_type)_hasher(key);
 #endif
@@ -1813,8 +1809,8 @@ private:
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-#if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size());
+#if EMH_WY_HASH
+        return wyhash(key.data(), key.size(), 0);
 #else
         return (size_type)_hasher(key);
 #endif

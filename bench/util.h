@@ -690,6 +690,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE2 1
 #endif
+#define ABSL 1
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/internal/raw_hash_set.cc"
@@ -704,7 +705,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #define CXX17 1
 #endif
 
-#if __cplusplus > 201704L || CXX20 || _MSC_VER > 1930
+#if __cplusplus > 201704L || CXX20 || _MSC_VER >= 1929
 #if QC_HASH
 #include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 #endif

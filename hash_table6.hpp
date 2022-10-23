@@ -38,11 +38,7 @@
 #include <iterator>
 #include <algorithm>
 
-#ifdef __has_include
-    #if __has_include("wyhash.h")
-    #include "wyhash.h"
-    #endif
-#elif EMH_WY_HASH
+#if EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -164,14 +160,14 @@ template <typename First, typename Second>
 struct entry {
     using first_type =  First;
     using second_type = Second;
-    entry(const First& key, const Second& val, size_type ibucket) :second(val),first(key) { bucket = ibucket; }
+    entry(const First& key, const Second& val, size_type ibucket) :second(val), first(key) { bucket = ibucket; }
     entry(First&& key, Second&& val, size_type ibucket) :second(std::move(val)), first(std::move(key)) { bucket = ibucket; }
 
-    entry(const std::pair<First,Second>& pair) :second(pair.second),first(pair.first) { bucket = INACTIVE; }
-    entry(std::pair<First, Second>&& pair) :second(std::move(pair.second)),first(std::move(pair.first)) { bucket = INACTIVE; }
+    entry(const std::pair<First, Second>& pair) :second(pair.second), first(pair.first) { bucket = INACTIVE; }
+    entry(std::pair<First, Second>&& pair) :second(std::move(pair.second)), first(std::move(pair.first)) { bucket = INACTIVE; }
 
-    entry(const entry& pairT) :second(pairT.second),first(pairT.first) { bucket = pairT.bucket; }
-    entry(entry&& pairT) noexcept :second(std::move(pairT.second)),first(std::move(pairT.first)) { bucket = pairT.bucket; }
+    entry(const entry& pairT) :second(pairT.second), first(pairT.first) { bucket = pairT.bucket; }
+    entry(entry&& pairT) noexcept :second(std::move(pairT.second)), first(std::move(pairT.first)) { bucket = pairT.bucket; }
 
     template<typename K, typename V>
     entry(K&& key, V&& val, size_type ibucket)
@@ -180,7 +176,7 @@ struct entry {
         bucket = ibucket;
     }
 
-    entry& operator = (entry&& pairT)
+    entry& operator = (entry&& pairT) noexcept
     {
         second = std::move(pairT.second);
         bucket = pairT.bucket;
@@ -233,7 +229,7 @@ class HashMap
 
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
-    typedef std::pair<KeyT,ValueT>            value_type;
+    typedef std::pair<KeyT, ValueT>           value_type;
 
 #if EMH_BUCKET_INDEX == 0
     typedef value_type                        value_pair;
@@ -872,7 +868,7 @@ public:
         }
     }
 
-    /// Returns false if key isn't found.
+#ifdef EMH_EXT
     bool try_get(const KeyT& key, ValueT& val) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
@@ -903,6 +899,7 @@ public:
         const auto bucket = find_filled_bucket(key);
         return bucket <= _mask ? EMH_VAL(_pairs, bucket) : ValueT();
     }
+#endif
 
     // -----------------------------------------------------
     /// Returns a pair consisting of an iterator to the inserted element
@@ -925,7 +922,7 @@ public:
         const auto next   = bucket / 2;
         const auto found  = EMH_EMPTY(_pairs, next);
         if (found) {
-            EMH_NEW(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second), next, bucket);
+            EMH_NEW(std::move(value.first), std::move(value.second), next, bucket);
         }
         return { {this, next}, found };
     }
@@ -960,13 +957,13 @@ public:
     std::pair<iterator, bool> insert(const value_type& value)
     {
         check_expand_need();
-        return do_insert(value.first, value.second);
+        return do_insert(value);
     }
 
-    std::pair<iterator, bool> insert(value_type && value)
+    std::pair<iterator, bool> insert(value_type&& value)
     {
         check_expand_need();
-        return do_insert(std::move(value.first), std::move(value.second));
+        return do_insert(std::move(value));
     }
 
     void insert(std::initializer_list<value_type> ilist)
@@ -1039,14 +1036,14 @@ public:
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
     {
         check_expand_need();
-        return do_insert(key, std::forward<Args>(args)...).first;
+        return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
     {
         check_expand_need();
-        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...).first;
+        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
     template <class... Args>
@@ -1055,7 +1052,7 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    ValueT& operator[](const KeyT& key)
+    ValueT& operator[](const KeyT& key) noexcept
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1069,7 +1066,7 @@ public:
         return EMH_VAL(_pairs, next);
     }
 
-    ValueT& operator[](KeyT&& key)
+    ValueT& operator[](KeyT&& key) noexcept
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1337,8 +1334,8 @@ private:
 
     void clear_bucket(size_type bucket)
     {
-        _num_filled--;
         EMH_CLS(bucket);
+        _num_filled--;
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
 
@@ -1550,7 +1547,8 @@ private:
 ** position or not: if it is not, move colliding bucket to an empty place and
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position. ***/
-    size_type find_or_allocate(const KeyT& key)
+    template<typename K=KeyT>
+    size_type find_or_allocate(const K& key)
     {
         const auto bucket = hash_key(key) & _mask;
         auto next_bucket = EMH_ADDR(_pairs, bucket);
@@ -1617,7 +1615,7 @@ private:
 
         const auto qmask = _mask / SIZE_BIT;
         if (0) {
-            const auto step = (bucket_from - SIZE_BIT / 2) & qmask;
+            const auto step = (bucket_from - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
                 return step * SIZE_BIT + CTZ(bmask3);
@@ -1743,7 +1741,7 @@ private:
 #elif EMH_SAFE_HASH
         return _hash_inter == 0 ? _hasher(key) : hash64(key);
 #elif EMH_IDENTITY_HASH
-        return key + (key >> (sizeof(UType) * 4));
+        return key + (key >> 24);
 #else
         return (size_type)_hasher(key);
 #endif
@@ -1752,8 +1750,8 @@ private:
     template<typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_key(const UType& key) const
     {
-#if WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size());
+#if EMH_WY_HASH
+        return wyhash(key.data(), key.size(), 0);
 #else
         return (size_type)_hasher(key);
 #endif

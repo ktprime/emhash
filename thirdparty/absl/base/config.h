@@ -784,7 +784,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #ifdef ABSL_HAVE_ADDRESS_SANITIZER
 #error "ABSL_HAVE_ADDRESS_SANITIZER cannot be directly set."
 #elif defined(__SANITIZE_ADDRESS__)
-#define ABSL_HAVE_ADDRESS_SANITIZER 1
+//#define ABSL_HAVE_ADDRESS_SANITIZER 1
 #elif ABSL_HAVE_FEATURE(address_sanitizer)
 #define ABSL_HAVE_ADDRESS_SANITIZER 1
 #endif

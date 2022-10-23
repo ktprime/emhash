@@ -26,6 +26,10 @@ ifneq ($(FH),)
 CXXFLAGS += -DFIB_HASH=$(FH)
 endif
 
+ifneq ($(WH),)
+CXXFLAGS += -DWY_HASH=1
+endif
+
 ifneq ($(EH),)
 CXXFLAGS += -DEMH_INT_HASH=$(EH)
 endif

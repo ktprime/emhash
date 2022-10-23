@@ -57,15 +57,15 @@
 #    define EMH_UNLIKELY(condition) (condition)
 #endif
 
-#define EMH_KEY(p,n)     p[n].first
-#define EMH_VAL(p,n)     p[n].second
-#define EMH_KV(p,n)      p[n]
+#define EMH_KEY(p, n)     p[n].first
+#define EMH_VAL(p, n)     p[n].second
+#define EMH_KV(p, n)      p[n]
 
-#define EMH_INDEX(i,n)   i[n]
-#define EMH_BUCKET(i,n)  i[n].bucket
-#define EMH_HSLOT(i,n)   i[n].slot
-#define EMH_SLOT(i,n)    (i[n].slot & _mask)
-#define EMH_PREVET(i,n)  i[n].slot
+#define EMH_INDEX(i, n)   i[n]
+#define EMH_BUCKET(i, n)  i[n].bucket
+#define EMH_HSLOT(i, n)   i[n].slot
+#define EMH_SLOT(i, n)    (i[n].slot & _mask)
+#define EMH_PREVET(i, n)  i[n].slot
 
 #define EMH_KEYMASK(key, mask)  ((size_type)(key) & ~mask)
 #define EMH_EQHASH(n, key_hash) (EMH_KEYMASK(key_hash, _mask) == (_index[n].slot & ~_mask))
@@ -666,7 +666,7 @@ public:
         const auto bucket = find_or_allocate(value.first, key_hash);
         const auto bempty  = EMH_EMPTY(_index, bucket);
         if (bempty) {
-            EMH_NEW(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second), bucket, key_hash);
+            EMH_NEW(std::move(value.first), std::move(value.second), bucket, key_hash);
         }
 
         const auto slot = EMH_SLOT(_index, bucket);
@@ -817,7 +817,7 @@ public:
         }
     }
 
-    /// Like std::map<KeyT,ValueT>::operator[].
+    /// Like std::map<KeyT, ValueT>::operator[].
     ValueT& operator[](const KeyT& key) noexcept
     {
         check_expand_need();
@@ -1292,7 +1292,8 @@ private:
     }
 
     // Find the slot with this key, or return bucket size
-    size_type find_filled_slot(const KeyT& key) const noexcept
+    template<typename K=KeyT>
+    size_type find_filled_slot(const K& key) const noexcept
     {
         const auto key_hash = hash_key(key);
         const auto bucket = size_type(key_hash & _mask);
@@ -1422,7 +1423,8 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    size_type find_or_allocate(const KeyT& key, uint64_t key_hash) noexcept
+    template<typename K=KeyT>
+    size_type find_or_allocate(const K& key, uint64_t key_hash) noexcept
     {
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = EMH_BUCKET(_index, bucket);
@@ -1736,7 +1738,7 @@ private:
 #if EMH_INT_HASH
         return hash64(key);
 #elif EMH_IDENTITY_HASH
-        return key + (key >> (sizeof(UType) * 4));
+        return key + (key >> 24);
 #else
         return _hasher(key);
 #endif
@@ -1747,8 +1749,6 @@ private:
     {
 #if EMH_WYHASH_HASH
         return wyhashstr(key.data(), key.size());
-#elif WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), 0);
 #else
         return _hasher(key);
 #endif
