@@ -80,6 +80,7 @@ namespace emhash8 {
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
 #endif
 #if EMH_CACHE_LINE_SIZE < 32
     constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
@@ -243,9 +244,15 @@ public:
 
     HashMap(const HashMap& rhs)
     {
-        _pairs = alloc_bucket((size_type)(rhs._num_buckets * rhs.max_load_factor()) + 4);
-        _index = alloc_index(rhs._num_buckets);
-        clone(rhs);
+        if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
+            _pairs = alloc_bucket((size_type)(rhs._num_buckets * rhs.max_load_factor()) + 4);
+            _index = alloc_index(rhs._num_buckets);
+            clone(rhs);
+        } else {
+            init(rhs._num_filled + 2, EMH_DEFAULT_LOAD_FACTOR);
+            for (auto it = rhs.begin(); it != rhs.end(); ++it)
+                insert_unique(it->first, it->second);
+        }
     }
 
     HashMap(HashMap&& rhs) noexcept
@@ -274,11 +281,20 @@ public:
         if (this == &rhs)
             return *this;
 
+        if (rhs.load_factor() < EMH_MIN_LOAD_FACTOR) {
+            clear(); free(_pairs); _pairs = nullptr;
+            rehash(rhs._num_filled + 2);
+            for (auto it = rhs.begin(); it != rhs.end(); ++it)
+                insert_unique(it->first, it->second);
+            return *this;
+        }
+
         clearkv();
 
-        if (_num_buckets < rhs._num_buckets || _num_buckets > 2 * rhs._num_buckets) {
-            free(_pairs); _pairs = alloc_bucket((size_type)(rhs._num_buckets * rhs.max_load_factor()) + 4);
-            free(_index); _index = alloc_index(rhs._num_buckets);
+        if (_num_buckets != rhs._num_buckets) {
+            free(_pairs); free(_index); 
+            _index = alloc_index(rhs._num_buckets);
+            _pairs = alloc_bucket((size_type)(rhs._num_buckets * rhs.max_load_factor()) + 4);
         }
 
         clone(rhs);
@@ -388,7 +404,7 @@ public:
 
     void max_load_factor(float mlf)
     {
-        if (mlf < 1.0-1e-4 && mlf > 0.2f)
+        if (mlf < 0.999 && mlf > EMH_MIN_LOAD_FACTOR)
             _mlf = (uint32_t)((1 << 27) / mlf);
     }
 
@@ -731,7 +747,7 @@ public:
             do_insert(first->first, first->second);
     }
 
-
+#if 0
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
@@ -740,6 +756,7 @@ public:
             insert_unique(*begin);
         }
     }
+#endif
 
     template<typename K, typename V>
     size_type insert_unique(K&& key, V&& val)
@@ -1093,10 +1110,10 @@ public:
 
     void rebuild(size_type num_buckets) noexcept
     {
+        free(_index);
         auto new_pairs = (value_type*)alloc_bucket((size_type)(num_buckets * max_load_factor()) + 4);
         if (is_copy_trivially()) {
-            if (_pairs)
-                memcpy((char*)new_pairs, (char*)_pairs, _num_filled * sizeof(value_type));
+            memcpy((char*)new_pairs, (char*)_pairs, _num_filled * sizeof(value_type));
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++) {
                 new(new_pairs + slot) value_type(std::move(_pairs[slot]));
@@ -1104,7 +1121,12 @@ public:
                     _pairs[slot].~value_type();
             }
         }
-        free(_pairs); _pairs = new_pairs;
+        free(_pairs);
+        _pairs = new_pairs;
+        _index = (Index*)alloc_index (num_buckets);
+
+        memset((char*)_index, INACTIVE, sizeof(_index[0]) * num_buckets);
+        memset((char*)(_index + num_buckets), 0, sizeof(_index[0]) * EAD);
     }
 
     void rehash(uint64_t required_buckets)
@@ -1133,13 +1155,7 @@ public:
 #endif
         _num_buckets = num_buckets;
 
-        free(_index);
         rebuild(num_buckets);
-
-        _index = (Index*)alloc_index (num_buckets);
-
-        memset((char*)_index, INACTIVE, sizeof(_index[0]) * num_buckets);
-        memset((char*)(_index + num_buckets), 0, sizeof(_index[0]) * EAD);
 
 #ifdef EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {

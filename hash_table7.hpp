@@ -265,7 +265,7 @@ struct entry {
     {
         second = std::move(rhs.second);
         bucket = rhs.bucket;
-        first = std::move(rhs.first);
+        first  = std::move(rhs.first);
         return *this;
     }
 
@@ -310,11 +310,12 @@ class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
 #endif
 
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
-    typedef std::pair<KeyT ,ValueT>           value_type;
+    typedef std::pair<KeyT, ValueT>           value_type;
 
 #if EMH_BUCKET_INDEX == 0
     typedef value_type                        value_pair;
@@ -541,8 +542,14 @@ public:
 
     HashMap(const HashMap& rhs) noexcept
     {
-        _pairs = (PairT*)malloc(AllocSize(rhs._num_buckets));
-        clone(rhs);
+        if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
+            _pairs = (PairT*)malloc(AllocSize(rhs._num_buckets));
+            clone(rhs);
+        } else {
+            init(rhs._num_filled + 2, EMH_DEFAULT_LOAD_FACTOR);
+            for (auto it = rhs.begin(); it != rhs.end(); ++it)
+                insert_unique(it->first, it->second);
+        }
     }
 
     HashMap(HashMap&& rhs) noexcept
@@ -575,6 +582,14 @@ public:
     {
         if (this == &rhs)
             return *this;
+
+        if (rhs.load_factor() < EMH_MIN_LOAD_FACTOR) {
+            clear(); free(_pairs); _pairs = nullptr;
+            rehash(rhs._num_filled + 2);
+            for (auto it = rhs.begin(); it != rhs.end(); ++it)
+                insert_unique(it->first, it->second);
+            return *this;
+        }
 
         if (_num_filled)
             clearkv();
@@ -614,7 +629,7 @@ public:
     template<typename Con>
     bool operator != (const Con& rhs) const { return !(*this == rhs); }
 
-    ~HashMap()
+    ~HashMap() noexcept
     {
         if (is_triviall_destructable() && _num_filled) {
             for (auto it = cbegin(); _num_filled; ++it) {
@@ -625,7 +640,7 @@ public:
         free(_pairs);
     }
 
-    void clone(const HashMap& rhs)
+    void clone(const HashMap& rhs) noexcept
     {
         _hasher      = rhs._hasher;
         //_eq          = rhs._eq;
@@ -720,7 +735,7 @@ public:
 
     void max_load_factor(float mlf)
     {
-        if (mlf < 0.9999f && mlf > 0.2f)
+        if (mlf < 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
             _mlf = (uint32_t)((1 << 27) / mlf);
     }
 
@@ -1094,6 +1109,7 @@ public:
             do_insert(it->first, it->second);
     }
 
+#if 0
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
@@ -1101,6 +1117,7 @@ public:
         for (; begin != end; ++begin)
             do_insert_unqiue(*begin);
     }
+#endif
 
     template<typename K, typename V>
     size_type insert_unique(K&& key, V&& val)
@@ -1319,6 +1336,12 @@ public:
 
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2u;
         while (buckets < required_buckets) { buckets *= 2; }
+
+        // no need alloc large bucket for small key sizeof(KeyT) < sizeof(int).
+        // set small a max_load_factor, insert/reserve() will fail and introduce rehash issiue TODO: dothing ?
+        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (sizeof(KeyT) * 8)))
+            buckets = 2ul << (sizeof(KeyT) * 8);
+
         assert(buckets < max_size() && buckets > _num_filled);
         //TODO: throwOverflowError
 

@@ -465,7 +465,6 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    //defualt load_factor = 7/8
     void max_load_factor(float lf = 8.0f/9)
     {
     }
@@ -536,54 +535,73 @@ public:
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
     template<typename K, typename V>
-    std::pair<iterator, bool> insert(K&& key, V&& val) noexcept
+    std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
 
-        if (bnofind) {
+        if (bempty) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
-        return { {this, bucket, false}, bnofind };
+        return { {this, bucket, false}, bempty };
     }
+
+    std::pair<iterator, bool> do_insert(const value_type& value) noexcept
+    {
+        bool bempty = true;
+        const auto bucket = find_or_allocate(value.first, bempty);
+        if (bempty) {
+            new(_pairs + bucket) PairT(value); _num_filled++;
+        }
+        return { {this, bucket, false}, bempty };
+    }
+
+    std::pair<iterator, bool> do_insert(value_type&& value) noexcept
+    {
+        bool bempty = true;
+        const auto bucket = find_or_allocate(value.first, bempty);
+        if (bempty) {
+            new(_pairs + bucket) PairT(std::move(value)); _num_filled++;
+        }
+        return { {this, bucket, false}, bempty };
+    }
+
 
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
-        return insert(std::forward<Args>(args)...);
+        return do_insert(std::forward<Args>(args)...);
     }
 
     std::pair<iterator, bool> insert(value_type&& value) noexcept
     {
-        return insert(std::move(value.first), std::move(value.second));
+        return do_insert(std::move(value));
     }
 
     std::pair<iterator, bool> insert(const value_type& value) noexcept
     {
-        return insert(value.first, value.second);
+        return do_insert(value);
     }
 
     iterator insert(iterator hint, const value_type& value) noexcept
     {
         (void)hint;
-        return insert(value.first, value.second).first;
+        return do_insert(value).first;
     }
 
-    void insert(const_iterator beginc, const_iterator endc) noexcept
+    template <typename Iter>
+    void insert(Iter beginc, Iter endc)
     {
         reserve(endc - beginc + _num_filled);
-        for (; beginc != endc; ++beginc) {
-            insert(beginc->first, beginc->second);
-        }
+        for (; beginc != endc; ++beginc)
+            do_insert(beginc->first, beginc->second);
     }
 
-    void insert_unique(const_iterator beginc, const_iterator endc) noexcept
+    void insert(std::initializer_list<value_type> ilist) noexcept
     {
-        reserve(endc - beginc + _num_filled);
-        for (; beginc != endc; ++beginc) {
-            insert_unique(beginc->first, beginc->second);
-        }
+        reserve(ilist.size() + _num_filled);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(*it);
     }
 
     template<typename K, typename V>
@@ -599,41 +617,27 @@ public:
         return bucket;
     }
 
-    size_t insert_unique(value_type&& value) noexcept
-    {
-        return insert_unique(std::move(value.first), std::move(value.second));
-    }
-
-    size_t insert_unique(const value_type& value) noexcept
-    {
-        return insert_unique(value.first, value.second);
-    }
-
     template<typename K, typename V>
     void insert_or_assign(K&& key, V&& val) noexcept
     {
-        check_expand_need();
-
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
 
         // Check if inserting a new value rather than overwriting an old entry
-        if (bnofind) {
+        if (bempty) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         } else {
             _pairs[bucket].second = std::forward<V>(val);
         }
     }
 
-    /// Like std::map<KeyT,ValueT>::operator[].
     ValueT& operator[](const KeyT& key) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */
-        if (bnofind) {
-            new(_pairs + bucket) PairT(key, ValueT()); _num_filled++;
+        if (bempty) {
+            new(_pairs + bucket) PairT(key, std::move(ValueT())); _num_filled++;
         }
 
         return _pairs[bucket].second;
@@ -641,11 +645,10 @@ public:
 
     ValueT& operator[](KeyT&& key) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
-        if (bnofind) {
-            new(_pairs + bucket) PairT(std::move(key), ValueT()); _num_filled++;
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
+        if (bempty) {
+            new(_pairs + bucket) PairT(std::move(key), std::move(ValueT())); _num_filled++;
         }
 
         return _pairs[bucket].second;
@@ -738,7 +741,7 @@ public:
 
     void shrink_to_fit()
     {
-        rehash(_num_filled);
+        rehash(_num_filled + 1);
     }
 
     bool reserve(size_t num_elems) noexcept
@@ -791,7 +794,7 @@ public:
         _pairs       = new_pairs;
 
         //fill last packet zero
-        memset(_pairs + num_buckets, 0, sizeof(_pairs[0]));
+        memset((char*)(_pairs + num_buckets), 0, sizeof(_pairs[0]));
 
         //init empty tombstone
         std::fill_n(_states, num_buckets, State::EEMPTY);
@@ -853,9 +856,9 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__)
+#if defined(__GNUC__) || EMH_PREFETCH
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
-#endif  // __GNUC__
+#endif
     }
 
     // Find the bucket with this key, or return (size_t)-1
@@ -865,12 +868,12 @@ private:
         const auto key_hash = H1(key);
         auto next_bucket = (size_t)(key_hash & _mask);
         next_bucket -= next_bucket % simd_bytes;
-        //prefetch_heap_block((char*)_states + next_bucket);
+        prefetch_heap_block((char*)_states + next_bucket);
 
         const auto filled = SET1_EPI8(key_2hash(key_hash, key));
         int i = _max_probe_length;
 
-        for ( ; ; ) {
+        while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))((char*)_states + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
@@ -895,18 +898,20 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
+        check_expand_need();
+
         const auto key_hash = H1(key);
         const auto key_h2 = key_2hash(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
         const auto boffset = bucket % simd_bytes; bucket -= boffset;
-        //prefetch_heap_block((char*)_states + bucket);
+        prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;
         auto next_bucket  = bucket, i = bucket;
         size_t hole = (size_t)-1;
 
-        for ( ; ; ) {
+        while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))((char*)_states + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 

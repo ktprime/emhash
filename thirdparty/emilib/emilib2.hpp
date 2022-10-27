@@ -20,6 +20,9 @@
 #  include <x86intrin.h>
 #endif
 
+#undef EMH_LIKELY
+#undef EMH_UNLIKELY
+
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__)
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
@@ -120,6 +123,7 @@ private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
     using PairT = std::pair<KeyT, ValueT>;
+
 public:
     using size_t          = uint32_t;
     using value_type      = PairT;
@@ -209,7 +213,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -287,7 +291,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (EMH_LIKELY(_bmask != 0)) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -308,17 +312,17 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap(size_t n = 4)
+    HashMap(size_t n = 4) noexcept
     {
         rehash(n);
     }
 
-    HashMap(const HashMap& other)
+    HashMap(const HashMap& other) noexcept
     {
         clone(other);
     }
 
-    HashMap(HashMap&& other)
+    HashMap(HashMap&& other) noexcept
     {
         rehash(1);
         if (this != &other) {
@@ -326,7 +330,7 @@ public:
         }
     }
 
-    HashMap(std::initializer_list<value_type> il)
+    HashMap(std::initializer_list<value_type> il) noexcept
     {
         reserve(il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
@@ -334,21 +338,21 @@ public:
     }
 
     template<class InputIt>
-    HashMap(InputIt first, InputIt last, size_t bucket_count=4)
+    HashMap(InputIt first, InputIt last, size_t bucket_count = 4) noexcept
     {
         reserve(std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
 
-    HashMap& operator=(const HashMap& other)
+    HashMap& operator=(const HashMap& other) noexcept
     {
         if (this != &other)
             clone(other);
         return *this;
     }
 
-    HashMap& operator=(HashMap&& other)
+    HashMap& operator=(HashMap&& other) noexcept
     {
         if (this != &other) {
             swap(other);
@@ -357,7 +361,7 @@ public:
         return *this;
     }
 
-    ~HashMap()
+    ~HashMap() noexcept
     {
         if (is_triviall_destructable())
             clear();
@@ -366,7 +370,7 @@ public:
         free(_states);
     }
 
-    void clone(const HashMap& other)
+    void clone(const HashMap& other) noexcept
     {
         if (other.size() == 0) {
             clear();
@@ -390,7 +394,7 @@ public:
         memcpy(_states, other._states, (_num_buckets + simd_bytes) * sizeof(_states[0]));
     }
 
-    void swap(HashMap& other)
+    void swap(HashMap& other) noexcept
     {
         std::swap(_hasher,           other._hasher);
         std::swap(_eq,               other._eq);
@@ -404,36 +408,36 @@ public:
 
     // -------------------------------------------------------------
 
-    iterator begin()
+    iterator begin() noexcept
     {
         if (_num_filled == 0)
             return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
-    const_iterator cbegin() const
+    const_iterator cbegin() const noexcept
     {
         if (_num_filled == 0)
             return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
-    const_iterator begin() const
+    const_iterator begin() const noexcept
     {
         return cbegin();
     }
 
-    iterator end()
+    iterator end() noexcept
     {
         return {this, _num_buckets, false};
     }
 
-    const_iterator cend() const
+    const_iterator cend() const noexcept
     {
         return {this, _num_buckets, false};
     }
 
-    const_iterator end() const
+    const_iterator end() const noexcept
     {
         return cend();
     }
@@ -479,13 +483,13 @@ public:
     }
 
     template<typename K>
-    bool contains(const K& k) const
+    bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    size_t count(const K& k) const
+    size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
@@ -530,90 +534,78 @@ public:
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
     template<typename K, typename V>
-    std::pair<iterator, bool> do_insert(K&& key, V&& val)
+    std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
 
-        if (bnofind) {
+        if (bempty) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
-        return { {this, bucket, false}, bnofind };
+        return { {this, bucket, false}, bempty };
     }
 
-    std::pair<iterator, bool> do_insert(const value_type& value)
+    std::pair<iterator, bool> do_insert(const value_type& value) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(value.first, bnofind);
-
-        if (bnofind) {
-            new(_pairs + bucket) PairT(value.first, value.second); _num_filled++;
+        bool bempty = true;
+        const auto bucket = find_or_allocate(value.first, bempty);
+        if (bempty) {
+            new(_pairs + bucket) PairT(value); _num_filled++;
         }
-        return { {this, bucket, false}, bnofind };
+        return { {this, bucket, false}, bempty };
     }
 
-    std::pair<iterator, bool> do_insert(value_type&& value)
+    std::pair<iterator, bool> do_insert(value_type&& value) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(value.first, bnofind);
-
-        if (bnofind) {
-            new(_pairs + bucket) PairT(std::forward<KeyT>(value.first), std::forward<ValueT>(value.second)); _num_filled++;
+        bool bempty = true;
+        const auto bucket = find_or_allocate(value.first, bempty);
+        if (bempty) {
+            new(_pairs + bucket) PairT(std::move(value)); _num_filled++;
         }
-        return { {this, bucket, false}, bnofind };
+        return { {this, bucket, false}, bempty };
     }
 
     template <class... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args)
+    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         return do_insert(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> insert(value_type&& value)
+    std::pair<iterator, bool> insert(value_type&& value) noexcept
     {
         return do_insert(std::move(value));
     }
 
-    std::pair<iterator, bool> insert(const value_type& value)
+    std::pair<iterator, bool> insert(const value_type& value) noexcept
     {
         return do_insert(value);
     }
 
-    iterator insert(iterator hint, const value_type& value)
+    iterator insert(iterator hint, const value_type& value) noexcept
     {
         (void)hint;
         return do_insert(value).first;
     }
 
+#if 0
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
         reserve(endc - beginc + _num_filled);
-        for (; beginc != endc; ++beginc) {
-            do_insert(beginc->first, beginc->second);
-        }
+        for (; beginc != endc; ++beginc)
+            insert(beginc->first, beginc->second);
     }
+#endif
 
-    void insert(std::initializer_list<value_type> ilist)
+    void insert(std::initializer_list<value_type> ilist) noexcept
     {
         reserve(ilist.size() + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            insert(*it);
-    }
-
-    void insert_unique(const_iterator beginc, const_iterator endc)
-    {
-        reserve(endc - beginc + _num_filled);
-        for (; beginc != endc; ++beginc) {
-            insert_unique(beginc->first, beginc->second);
-        }
+            do_insert(*it);
     }
 
     template<typename K, typename V>
-    size_t insert_unique(K&& key, V&& val)
+    size_t insert_unique(K&& key, V&& val) noexcept
     {
         check_expand_need();
 
@@ -625,16 +617,6 @@ public:
         return bucket;
     }
 
-    size_t insert_unique(value_type&& value)
-    {
-        return insert_unique(std::move(value.first), std::move(value.second));
-    }
-
-    size_t insert_unique(const value_type& value)
-    {
-        return insert_unique(value.first, value.second);
-    }
-
     template <class M>
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) { return do_assign(key, std::forward<M>(val)); }
     template <class M>
@@ -643,40 +625,36 @@ public:
     template<typename K, typename V>
     std::pair<iterator, bool> do_assign(K&& key, V&& val)
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
 
         // Check if inserting a new val rather than overwriting an old entry
-        if (bnofind) {
+        if (bempty) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         } else {
             _pairs[bucket].second = std::forward<V>(val);
         }
 
-        return { {this, bucket, false}, bnofind };
+        return { {this, bucket, false}, bempty };
     }
 
-    /// Like std::map<KeyT,ValueT>::operator[].
-    ValueT& operator[](const KeyT& key)
+    ValueT& operator[](const KeyT& key) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */
-        if (bnofind) {
+        if (bempty) {
             new(_pairs + bucket) PairT(key, std::move(ValueT())); _num_filled++;
         }
 
         return _pairs[bucket].second;
     }
 
-    ValueT& operator[](KeyT&& key)
+    ValueT& operator[](KeyT&& key) noexcept
     {
-        check_expand_need();
-        bool bnofind = true;
-        const auto bucket = find_or_allocate(key, bnofind);
-        if (bnofind) {
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
+        if (bempty) {
             new(_pairs + bucket) PairT(std::move(key), std::move(ValueT())); _num_filled++;
         }
 
@@ -788,10 +766,10 @@ public:
 
     void shrink_to_fit()
     {
-        rehash(_num_filled);
+        rehash(_num_filled + 1);
     }
 
-    bool reserve(size_t num_elems)
+    bool reserve(size_t num_elems) noexcept
     {
         size_t required_buckets = num_elems + num_elems / 8;
         if (EMH_LIKELY(required_buckets < _num_buckets))
@@ -802,7 +780,7 @@ public:
     }
 
     /// Make room for this many elements
-    void rehash(size_t num_elems)
+    void rehash(size_t num_elems) noexcept
     {
         const size_t required_buckets = num_elems;
         if (EMH_UNLIKELY(required_buckets < _num_filled))
@@ -882,9 +860,9 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__)
+#if defined(__GNUC__) || EMH_PREFETCH
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
-#endif  // __GNUC__
+#endif
     }
 
     // Find the bucket with this key, or return (size_t)-1
@@ -893,11 +871,13 @@ private:
     {
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
-        //prefetch_heap_block((char*)_states + next_bucket);
+        
+        prefetch_heap_block((char*)_states + next_bucket);
+
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         int i = _max_probe_length;
 
-        for ( ; ; ) {
+        while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
@@ -920,7 +900,7 @@ private:
             }
 
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (maske != 0)
+            if (EMH_LIKELY(maske != 0))
                 break;
 
             next_bucket += simd_bytes;
@@ -941,17 +921,19 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
+        check_expand_need();
+
         const auto key_hash = _hasher(key);
         const auto key_h2 = hash_key2(key_hash, key);
         const auto bucket = (size_t)(key_hash & _mask);
-        //prefetch_heap_block((char*)_states + bucket);
+        prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;
         auto next_bucket  = bucket, i = bucket;
         size_t hole = (size_t)-1;
 
-        for ( ; ; ) {
+        while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
             auto maskf  = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 

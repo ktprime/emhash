@@ -211,7 +211,7 @@ struct entry {
 #if EMH_ORDER_KV || EMH_SIZE_TYPE_64BIT
     First first;
     size_type bucket;
-    Second second;;
+    Second second;
 #else
     Second second;
     size_type bucket;
@@ -225,6 +225,7 @@ class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
 #endif
 
 public:
@@ -460,11 +461,17 @@ public:
 
     HashMap(const HashMap& rhs)
     {
-        _pairs = (PairT*)malloc(AllocSize(rhs._mask + 1));
-        clone(rhs);
+        if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
+            _pairs = (PairT*)malloc(AllocSize(rhs._mask + 1));
+            clone(rhs);
+        } else {
+            init(rhs._num_filled + 2, EMH_DEFAULT_LOAD_FACTOR);
+            for (auto it = rhs.begin(); it != rhs.end(); ++it)
+                insert_unique(it->first, it->second);
+        }
     }
 
-    HashMap(HashMap&& rhs)
+    HashMap(HashMap&& rhs) noexcept
     {
 #ifndef EMH_ZERO_MOVE
         init(4);
@@ -494,6 +501,14 @@ public:
     {
         if (this == &rhs)
             return *this;
+
+        if (rhs.load_factor() < EMH_MIN_LOAD_FACTOR) {
+            clear(); free(_pairs); _pairs = nullptr;
+            rehash(rhs._num_filled + 2);
+            for (auto it = rhs.begin(); it != rhs.end(); ++it)
+                insert_unique(it->first, it->second);
+            return *this;
+        }
 
         if (is_triviall_destructable())
             clearkv();
@@ -533,7 +548,7 @@ public:
     template<typename Con>
     bool operator != (const Con& rhs) const { return !(*this == rhs); }
 
-    ~HashMap()
+    ~HashMap() noexcept
     {
         if (is_triviall_destructable()) {
             for (auto it = cbegin(); _num_filled; ++it) {
@@ -645,7 +660,7 @@ public:
 
     void max_load_factor(float mlf)
     {
-        if (mlf < 0.9999f && mlf > 0.2f)
+        if (mlf < 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
             _mlf = decltype(_mlf)((1 << 27) / mlf);
     }
 
@@ -981,6 +996,7 @@ public:
             do_insert(it->first, it->second);
     }
 
+#if 0
     template <typename Iter>
     void insert_unique(Iter begin, Iter end)
     {
@@ -988,6 +1004,7 @@ public:
         for (; begin != end; ++begin)
             do_insert_unqiue(*begin);
     }
+#endif
 
     template<typename K, typename V>
     size_type insert_unique(K&& key, V&& val)
@@ -1158,16 +1175,6 @@ public:
             clear_bucket(it.bucket());
     }
 
-    void reset_zero()
-    {
-#if EMH_FIND_HIT
-        if constexpr (std::is_integral<KeyT>::value) {
-//        _zero_index = hash_key(INACTIVE) & _mask;
-        reset_bucket(hash_key(INACTIVE) & _mask);
-        }
-#endif
-    }
-
     /// Remove all elements, keeping full capacity.
     void clear()
     {
@@ -1175,7 +1182,10 @@ public:
             clearkv();
         else if (_num_filled) {
             memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
-            memset(_pairs, -1, sizeof(_pairs[0]) * (_mask + 1)); reset_zero();
+            memset(_pairs, -1, sizeof(_pairs[0]) * (_mask + 1));
+#if EMH_FIND_HIT
+            reset_bucket(hash_main(0));
+#endif
         }
 
         _num_filled = 0;
@@ -1216,6 +1226,12 @@ public:
 #else
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : sizeof(size_t);
         while (buckets < required_buckets) { buckets *= 2; }
+
+        // no need alloc too many bucket for small key.
+        // if maybe fail set small load_factor and then call reserve() TODO:
+        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (sizeof(KeyT) * 8)))
+            buckets = 2ul << (sizeof(KeyT) * 8);
+
         assert(buckets < max_size() && buckets > _num_filled);
         //assert(num_buckets == (2 << CTZ(required_buckets)));
 #endif
@@ -1251,7 +1267,11 @@ public:
         _num_main = 0;
 #endif
 
-        memset(_pairs, -1, sizeof(_pairs[0]) * num_buckets); reset_zero();
+        memset(_pairs, -1, sizeof(_pairs[0]) * num_buckets);
+
+#if EMH_FIND_HIT
+        reset_bucket(hash_main(0));
+#endif
 
         //pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * PACK_SIZE);
@@ -1320,17 +1340,16 @@ private:
         return reserve(_num_filled);
     }
 
+#if EMH_FIND_HIT
     void reset_bucket(size_type bucket)
     {
-#if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value) {
-            auto& key = EMH_KEY(_pairs, bucket); key = INACTIVE;
-//            if (bucket != _zero_index)
-//                return;
-            while ((hash_key(key) & _mask) == bucket) key ++;
+            auto& key = EMH_KEY(_pairs, bucket); key ++;
+//            if (bucket != _zero_index) return;
+            while ((hash_key(key) & _mask) == bucket) key += 1610612741;
         }
-#endif
     }
+#endif
 
     void clear_bucket(size_type bucket)
     {
@@ -1340,7 +1359,9 @@ private:
             _pairs[bucket].~PairT();
 
         EMH_ADDR(_pairs, bucket) = INACTIVE;
+#if EMH_FIND_HIT
         reset_bucket(bucket);
+#endif
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>

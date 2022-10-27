@@ -1,5 +1,5 @@
 /**
- * komihash.h version 4.3
+ * komihash.h version 4.3.1
  *
  * The inclusion file for the "komihash" hash function.
  *
@@ -7,7 +7,7 @@
  *
  * License
  *
- * Copyright (c) 2021 Aleksey Vaneev
+ * Copyright (c) 2021-2022 Aleksey Vaneev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -36,8 +36,7 @@
 
 // Macros that apply byte-swapping.
 
-#if defined( __GNUC__ ) || defined( __clang__ ) || \
-	( defined( __GNUC__ ) && defined( __INTEL_COMPILER ))
+#if defined( __GNUC__ ) || defined( __clang__ )
 
 	#define KOMIHASH_BYTESW32( v ) __builtin_bswap32( v )
 	#define KOMIHASH_BYTESW64( v ) __builtin_bswap64( v )
@@ -107,8 +106,7 @@
 
 // Likelihood macros that are used for manually-guided micro-optimization.
 
-#if defined( __GNUC__ ) || defined( __clang__ ) || \
-	( defined( __GNUC__ ) && defined( __INTEL_COMPILER ))
+#if defined( __GNUC__ ) || defined( __clang__ )
 
 	#define KOMIHASH_LIKELY( x )  __builtin_expect( x, 1 )
 	#define KOMIHASH_UNLIKELY( x )  __builtin_expect( x, 0 )
@@ -123,8 +121,7 @@
 // In-memory data prefetch macro (temporal locality=1, in case a collision
 // resolution would be necessary).
 
-#if defined( __GNUC__ ) || defined( __clang__ ) || \
-	( defined( __GNUC__ ) && defined( __INTEL_COMPILER ))
+#if defined( __GNUC__ ) || defined( __clang__ )
 
 	#define KOMIHASH_PREFETCH( addr ) __builtin_prefetch( addr, 0, 1 )
 
@@ -299,31 +296,29 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 
 #else // defined( _MSC_VER )
 
-	// _umul128() code for 32-bit systems, from
-	// https://github.com/simdjson/simdjson
-	// (from file: /include/simdjson/generic/jsoncharutils.h).
-	// Licensed under Apache-2.0 license.
+	// _umul128() code for 32-bit systems, adapted from mullu(),
+	// from https://go.dev/src/runtime/softfloat64.go
+	// Licensed under BSD-style license.
 
 	static inline uint64_t kh__emulu( const uint32_t x, const uint32_t y )
 	{
 		return( x * (uint64_t) y );
 	}
 
-	static inline void kh_m128( const uint64_t ab, const uint64_t cd,
+	static inline void kh_m128( const uint64_t u, const uint64_t v,
 		uint64_t* const rl, uint64_t* const rh )
 	{
-		uint64_t ad = kh__emulu( (uint32_t) ( ab >> 32 ), (uint32_t) cd );
-		uint64_t bd = kh__emulu( (uint32_t) ab, (uint32_t) cd );
-		uint64_t adbc = ad + kh__emulu( (uint32_t) ab,
-			(uint32_t) ( cd >> 32 ));
+		*rl = u * v;
 
-		uint64_t adbc_carry = !!( adbc < ad );
-		uint64_t lo = bd + ( adbc << 32 );
+		const uint32_t u0 = (uint32_t) u;
+		const uint32_t v0 = (uint32_t) v;
+		const uint64_t w0 = kh__emulu( u0, v0 );
+		const uint32_t u1 = (uint32_t) ( u >> 32 );
+		const uint32_t v1 = (uint32_t) ( v >> 32 );
+		const uint64_t t = kh__emulu( u1, v0 ) + ( w0 >> 32 );
+		const uint64_t w1 = (uint32_t) t + kh__emulu( u0, v1 );
 
-		*rh = kh__emulu( (uint32_t) ( ab >> 32 ), (uint32_t) ( cd >> 32 )) +
-			( adbc >> 32 ) + ( adbc_carry << 32 ) + !!( lo < bd );
-
-		*rl = lo;
+		*rh = kh__emulu( u1, v1 ) + ( w1 >> 32 ) + ( t >> 32 );
 	}
 
 #endif // defined( _MSC_VER )
