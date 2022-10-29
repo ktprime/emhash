@@ -1229,7 +1229,7 @@ public:
 
         // no need alloc too many bucket for small key.
         // if maybe fail set small load_factor and then call reserve() TODO:
-        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (sizeof(KeyT) * 8)))
+        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
             buckets = 2ul << (sizeof(KeyT) * 8);
 
         assert(buckets < max_size() && buckets > _num_filled);

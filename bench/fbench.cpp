@@ -474,7 +474,7 @@ int main(int argc, char* argv[])
         run_udb2<emilib::HashMap<uint32_t, uint32_t, Hash32>>("emilib");
         run_udb2<emilib2::HashMap<uint32_t, uint32_t, Hash32>>("emilib2");
         run_udb2<emilib3::HashMap<uint32_t, uint32_t, Hash32>>("emilib3");
-#if ABSL
+#if ABSL_HMAP
         run_udb2<absl::flat_hash_map<uint32_t, uint32_t, Hash32>>("absl");
 #endif
 #if QC_HASH
@@ -539,7 +539,7 @@ int main(int argc, char* argv[])
 #endif
 
 
-#if ABSL
+#if ABSL_HMAP
     run_table <absl::flat_hash_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 

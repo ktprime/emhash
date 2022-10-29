@@ -782,7 +782,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
-#if ABSL == 0 && QC_HASH == 0
+#if QC_HASH == 0
     int flag = 0;
     for (auto it = tmp.begin(); it != tmp.end(); ) {
        if (++flag & 1)
@@ -1054,7 +1054,7 @@ static int benchHashSet(int n)
     std::vector<keyType> vList;
     auto flag = buildTestData(n, vList);
 
-#if ABSL_HASH && ABSL
+#if ABSL_HASH
     using ehash_func = absl::Hash<keyType>;
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
@@ -1130,7 +1130,7 @@ static int benchHashSet(int n)
         {  benOneHash<robin_hood::unordered_flat_set <keyType,  ehash_func>>("martin", vList); }
 #endif
 
-#if ABSL
+#if ABSL_HMAP
         {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
 #endif
 

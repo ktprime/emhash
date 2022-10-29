@@ -67,7 +67,7 @@ static void init_indices()
 
     indices3.push_back( 0 );
 
-    for( unsigned i = 1; i <= N*2; ++i )
+    for( uint64_t i = 1; i <= N*2; ++i )
     {
         if (sizeof (KeyType) == sizeof (uint64_t))
             indices3.push_back( (KeyType)i << 40 );
@@ -327,7 +327,7 @@ template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K
 template<class K, class V> using phmap_flat  = phmap::flat_hash_map<K, V, BintHasher, std::equal_to<K>>;
 template<class K, class V> using tsl_robin_map= tsl::robin_map<K, V, BintHasher, std::equal_to<K>>;
 
-#if ABSL
+#if ABSL_HMAP
 template<class K, class V> using absl_flat_hash_map = absl::flat_hash_map<K, V, BintHasher>;
 #endif
 
@@ -340,7 +340,7 @@ int main(int argc, const char* argv[])
         K = atoi(argv[2]);
 
     init_indices();
-#if ABSL
+#if ABSL_HMAP
     test<absl_flat_hash_map>("absl::flat_hash_map" );
 #endif
 

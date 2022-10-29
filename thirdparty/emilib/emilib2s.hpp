@@ -868,7 +868,7 @@ private:
         const auto key_hash = H1(key);
         auto next_bucket = (size_t)(key_hash & _mask);
         next_bucket -= next_bucket % simd_bytes;
-        prefetch_heap_block((char*)_states + next_bucket);
+        //prefetch_heap_block((char*)_states + next_bucket);
 
         const auto filled = SET1_EPI8(key_2hash(key_hash, key));
         int i = _max_probe_length;
@@ -904,7 +904,7 @@ private:
         const auto key_h2 = key_2hash(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
         const auto boffset = bucket % simd_bytes; bucket -= boffset;
-        prefetch_heap_block((char*)_states + bucket);
+        //prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;

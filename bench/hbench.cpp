@@ -360,7 +360,7 @@ int main()
 #endif
 
     uint64_t ret = 0;
-#if ABSL
+#if ABSL_HMAP
     { absl::flat_hash_map<uint64_t, Value, hash_t> m6; ret -= test(m6, "\nabsl::flat_hash_map"); }
 #endif
 #if QC_HASH

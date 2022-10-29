@@ -15,7 +15,7 @@ CXXFLAGS += -DFOLLY -lfolly
 endif
 
 ifneq ($(SW),)
-CXXFLAGS += -DABSL=1
+CXXFLAGS += -DABSL_HMAP=1
 endif
 
 ifneq ($(MH),)
@@ -40,12 +40,16 @@ else
 #CXXFLAGS += -DEMH=7
 endif
 
-ifneq ($(SH),)
+ifneq ($(SWH),)
 CXXFLAGS += -DABSL_HASH=1
 endif
 
 ifneq ($(AH),)
 CXXFLAGS += -DANKERL_HASH=1
+endif
+
+ifneq ($(SH),)
+CXXFLAGS += -DSTD_HASH=1
 endif
 
 ifneq ($(RT),)
@@ -76,7 +80,7 @@ ifneq ($(H2),)
 CXXFLAGS += -DEMH_H2=1
 endif
 
-ifneq ($(MAP),)
+ifneq ($(SMAP),)
 CXXFLAGS += -DSMAP=1
 endif
 
@@ -119,12 +123,12 @@ ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -I. qbench.cpp -o qbench
 endif
 
-	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) martinus_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) btest.cpp -o btest
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app
+	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench

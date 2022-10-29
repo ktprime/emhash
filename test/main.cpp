@@ -235,6 +235,31 @@ static void TestApi()
         }
     }
 
+    //copy
+    {
+        ehmap<short, int> dict = {{1, 1}, {2, 2}, {3, 3}};
+        dict.reserve(1 << 20);// overview
+        assert(dict.bucket_count() <= (2 << 16));
+        dict.shrink_to_fit();
+        assert(dict.bucket_count() <= 8);
+
+        dict.reserve(1024);
+        for (int i = 0; i < 1024; i++) {
+            dict[i] = 0;
+            decltype(dict) dict2 = dict;
+            assert(dict2 == dict);
+        }
+		assert(dict.size() == 1024);
+
+        for (int i = 0; i < 1024; i++) {
+            dict.erase(i);
+            decltype(dict) dict3 = {{1, 1}, {2, 2}, {3, 3}};
+            dict3 = dict;
+            assert(dict3 == dict);
+        }
+		assert(dict.size() == 0);
+    }
+
     {
         ehmap<int, std::string> dict = {{1, "one"}, {2, "two"}};
         assert(dict.insert({3, "three"}).second);
@@ -825,7 +850,7 @@ static void benchStringHash(int size, int str_min, int str_max)
         t_find = (getus() - start) / 1000;
         printf("ankerl hash = %4d ms\n", t_find);
 
-#if ABSL_HASH && ABSL
+#if ABSL_HMAP && ABSL
         start = getus();
         for (auto& v : rndstring)
             sum += absl::Hash<std::string>()(v);
@@ -857,7 +882,9 @@ int main(int argc, char* argv[])
     if (argc > 2 && isdigit(argv[2][0]))
         loop = atoi(argv[2]);
 
+#ifndef GCOV
     RandTest(n, loop);
+#endif
 
     return 0;
 }

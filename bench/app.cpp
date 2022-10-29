@@ -23,11 +23,6 @@
 #include "phmap/phmap.h"
 #include "phmap/btree.h"
 
-#if ABSL
-#include "absl/container/btree_map.h"
-#endif
-
-
 #include "has_member.hpp"
 define_has_member(reserve);
 
@@ -310,7 +305,7 @@ int main(__attribute__((unused)) int argc,
 
     cout << "\n# Unordered Maps:" << endl;
     benchmarkMap<phmap::flat_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount);
-#if ABSL
+#if ABSL_HMAP
     benchmarkMap<absl::flat_hash_map<Sample, Sample, hash_t>>(ulongArray, runCount);
 #endif
 
@@ -335,9 +330,6 @@ int main(__attribute__((unused)) int argc,
     cout << "\n# Ordered Maps:" << endl;
     benchmarkMap<std::map<Sample, Sample>>(ulongArray, runCount);
     benchmarkMap<phmap::btree_map<Sample, Sample>>(ulongArray, runCount);
-#if ABSL
-    benchmarkMap<absl::btree_map<Sample, Sample>>(ulongArray, runCount);
-#endif
 
     return 0;
 }

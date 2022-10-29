@@ -1271,7 +1271,7 @@ int main(const int argc, const char* argv[])
 //            EmLibMapInfo<K, V>,
 #endif
 
-#if ABSL
+#if ABSL_HMAP
             AbslMapInfo<K, V>,
 #endif
 

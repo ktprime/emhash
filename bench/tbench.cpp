@@ -238,7 +238,7 @@ int main(int argc, const char* argv[])
     hash_table_test<emilib2::HashMap<ktype, vtype, QintHasher>>("emilib2");
     hash_table_test<emilib3::HashMap<ktype, vtype, QintHasher>>("emilib3");
 
-#if ABSL
+#if ABSL_HMAP
     hash_table_test<absl::flat_hash_map<ktype, vtype, QintHasher>>("absl_flat");
 #endif
 

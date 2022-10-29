@@ -872,7 +872,7 @@ private:
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
         
-        prefetch_heap_block((char*)_states + next_bucket);
+        //prefetch_heap_block((char*)_states + next_bucket);
 
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         int i = _max_probe_length;
@@ -892,7 +892,7 @@ private:
                 } else {
                     if (EMH_UNLIKELY(fbucket >= _num_buckets))
                         break; //overflow
-                    if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
+					else if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
                 }
 
@@ -926,7 +926,7 @@ private:
         const auto key_hash = _hasher(key);
         const auto key_h2 = hash_key2(key_hash, key);
         const auto bucket = (size_t)(key_hash & _mask);
-        prefetch_heap_block((char*)_states + bucket);
+        //prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;

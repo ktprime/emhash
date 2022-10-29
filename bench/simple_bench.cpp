@@ -37,13 +37,10 @@
 #include "fph/dynamic_fph_table.h"
 #endif
 
-#if ABSL
-//#define _HAS_DEPRECATED_RESULT_OF 1
+#if ABSL_HMAP
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/internal/raw_hash_set.cc"
-//#endif
 
-//#if ABSL_HASH
 #include "absl/hash/internal/low_level_hash.cc"
 #include "absl/hash/internal/hash.cc"
 #include "absl/hash/internal/city.cc"
@@ -122,7 +119,7 @@ int main(int argc, char* argv[])
     bench<fph::DynamicFphMap<int, k_value, fph::MixSeedHash<int>>>("fph::mixmap");
     //bench<qc::hash::RawMap<int, k_value>>("qc::hashmap");
 #endif
-#if ABSL
+#if ABSL_HMAP
     bench<absl::flat_hash_map<int, k_value>>("absl::flat_hash_map");
 #endif
 

@@ -404,7 +404,7 @@ public:
 
     void max_load_factor(float mlf)
     {
-        if (mlf < 0.999 && mlf > EMH_MIN_LOAD_FACTOR)
+        if (mlf < 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
             _mlf = (uint32_t)((1 << 27) / mlf);
     }
 
@@ -1138,6 +1138,9 @@ public:
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
+        if (sizeof(KeyT) < sizeof(size_type) && num_buckets >= (1ul << (2 * 8)))
+            num_buckets = 2ul << (sizeof(KeyT) * 8);
+
 #if EMH_REHASH_LOG
         auto last = _last;
         size_type collision = 0;
@@ -1532,28 +1535,28 @@ one-way search strategy.
         if (EMH_EMPTY(_index, ++bucket) || EMH_EMPTY(_index, ++bucket))
             return bucket;
 
-#ifndef EMH_QUADRATIC
-        constexpr size_type linear_probe_length = 4 + EMH_CACHE_LINE_SIZE / sizeof(Index);//skip 3
-        for (size_type offset = csize + 2, step = 3; offset < linear_probe_length; ) {
+#if EMH_PREFETCH
+        __builtin_prefetch(static_cast<const void*>(_index + bucket + csize), 0, EMH_PREFETCH);
+#endif
+
+#ifdef EMH_QUADRATIC
+        constexpr size_type linear_probe_length = 4 + EMH_CACHE_LINE_SIZE / sizeof(Index);//4 + 8
+        for (size_type offset = csize + 2; offset < linear_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
-            if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
+            if (EMH_EMPTY(_index, bucket))// && EMH_EMPTY(_index, ++bucket))
                 return bucket;
-            offset += step; //4.7.10.13.16
+            offset += 2; //4.7.10.13.16
         }
-        bucket += linear_probe_length;
+//        bucket += linear_probe_length;
 #else
         constexpr size_type quadratic_probe_length = 6u;//skip 3 8
-        for (size_type offset = 4u, step = 2u; step < quadratic_probe_length; ) {
+        for (size_type offset = 4u, step = 3u; step < quadratic_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(_index, bucket) || EMH_EMPTY(_index, ++bucket))
                 return bucket;
             offset += step++;
         }
-        bucket += 4;
-#endif
-
-#if EMH_PREFETCH
-        __builtin_prefetch(static_cast<const void*>(_index + _last + 1), 0, EMH_PREFETCH);
+//        bucket += 4;
 #endif
 
         for (;;) {
@@ -1577,7 +1580,7 @@ one-way search strategy.
             // if (EMH_UNLIKELY(EMH_EMPTY(_index, bucket)))
             // return bucket;
 
-            auto medium = (_mask / 2 + _last) & _mask;
+            auto medium = (_mask / 4 + _last) & _mask;
             if (EMH_UNLIKELY(EMH_EMPTY(_index, medium)))// || EMH_EMPTY(_index, ++medium))
                 return medium;
 #endif

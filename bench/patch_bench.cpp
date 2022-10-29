@@ -61,7 +61,7 @@ using value_type = uint64_t;
 #if ABSL
   #include "absl/container/flat_hash_map.h"
   #include "absl/container/internal/raw_hash_set.cc"
-#if ABSL_HASH
+#if ABSL_HMAP
   #include "absl/hash/internal/city.cc"
   #include "absl/hash/internal/hash.cc"
 #endif
