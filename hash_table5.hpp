@@ -1330,8 +1330,9 @@ public:
         _ehead = 0;
 #endif
 
-        _last        = _num_filled = 0;
+        _num_filled  = 0;
         _mask        = num_buckets - 1;
+        _last        = num_buckets / 4;
 
 #if EMH_PACK_TAIL > 1 && EMH_PACK_TAIL <= 100
         _last = num_buckets;
@@ -1352,7 +1353,7 @@ public:
             memcpy((char*)_pairs, old_pairs, old_buckets * sizeof(PairT));
             //free(old_pairs);
             for (size_type src_bucket = 0; src_bucket < old_buckets; src_bucket++) {
-                if ((int)EMH_BUCKET(_pairs, src_bucket) < 0)
+                if (EMH_EMPTY(_pairs, src_bucket))
                     continue;
 
                 _num_filled ++;
@@ -1371,7 +1372,7 @@ public:
         } else {
             //for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             for (size_type src_bucket = old_buckets - 1; _num_filled < old_num_filled; src_bucket--) {
-                if ((int)EMH_BUCKET(old_pairs, src_bucket) < 0)
+                if (EMH_EMPTY(old_pairs, src_bucket))
                     continue;
 #if EMH_REHASH_LOG
                 else if (src_bucket != EMH_BUCKET(old_pairs, src_bucket))
@@ -1795,16 +1796,15 @@ one-way search strategy.
 #ifndef _MSC_VER
         //__builtin_prefetch(static_cast<const void*>(_pairs + bucket + 1), 0, 1);
 #endif
-        constexpr auto linear_probe_length = 5;//2-3 cache line miss
-        for (size_type step = 0, slot = bucket + 1 + csize / 2; ; slot += 2) {
+        constexpr auto linear_probe_length = 6;//2-3 cache line miss
+        for (size_type step = 2, slot = bucket + 1 + csize / 2; ; slot += step++) {
             if (step < linear_probe_length) {
                 auto bucket1 = slot & _mask;
                 if (EMH_EMPTY(_pairs, bucket1))// || EMH_EMPTY(_pairs, ++bucket1))
                     return bucket1;
-            }
-            if (step++ > 2) {
-                if (EMH_EMPTY(_pairs, _last++))// || EMH_EMPTY(_pairs, _last++))
-                    return _last - 1;
+            } else { //if (step++ > 5) {
+                if (EMH_EMPTY(_pairs, ++_last))// || EMH_EMPTY(_pairs, _last++))
+                    return _last++;
 
                 _last &= _mask;
 #if EMH_PACK_TAIL
