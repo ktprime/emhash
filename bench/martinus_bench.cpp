@@ -254,40 +254,38 @@ template<class MAP> void bench_insert(MAP& map)
 
     for (int  i = 0; i < 2; i++) {
         auto nows = now2sec();
-        MRNG rng(RND + 5 + i);
         {
             {
                 auto ts = now2sec();
-                for (size_t n = 0; n < maxn; ++n) {
+                MRNG rng(RND + 15 + i);
+                for (size_t n = 0; n < maxn; ++n)
                     map[static_cast<int>(rng())];
-                }
-                printf("insert %.2f", now2sec() - ts);
+                printf("(lf=%.2f) insert %.2f",  map.load_factor(), now2sec() - ts);
+                fflush(stdout);
             }
-
+            {
+                auto ts = now2sec();
+                MRNG rng(RND + 15 + i);
+                for (size_t n = 0; n < maxn; ++n)
+                    map.erase(static_cast<int>(rng()));
+                printf(", remove %.2f", now2sec() - ts);
+                fflush(stdout);
+                assert(map.size() == 0);
+            }
+            {
+                auto ts = now2sec();
+                MRNG rng(RND + 16 + i);
+                for (size_t n = 0; n < maxn; ++n)
+                    map.emplace(static_cast<int>(rng()), 0);
+                printf(", reinsert %.2f", now2sec() - ts);
+            }
             {
                 auto ts = now2sec();
                 map.clear();
-                printf(", clear %.3f", now2sec() - ts); fflush(stdout);
-            }
-
-            {
-                auto ts = now2sec();
-                for (size_t n = 0; n < maxn; ++n) {
-                    map.emplace(static_cast<int>(rng()), 0);
-                }
-                printf(", reinsert %.2f", now2sec() - ts); fflush(stdout);
-            }
-
-            {
-                auto ts = now2sec();
-                for (size_t n = 0; n < maxn; ++n) {
-                    map.erase(static_cast<int>(rng()));
-                }
-                printf(", remove %.2f", now2sec() - ts); fflush(stdout);
+                printf(", clear %.3f", now2sec() - ts);
             }
         }
-        printf(", loadf = %.2f size = %d, total %dM int time = %.2f s\n",
-                map.load_factor(), (int)map.size(), int(maxn / 1000000), now2sec() - nows);
+        printf(", total %dM int time = %.2f s\n", int(maxn / 1000000), now2sec() - nows);
         maxn *= 10;
     }
     printf("\n");
@@ -417,7 +415,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
     constexpr size_t const n = 50000000 / 2;
 #endif
     auto nows = now2sec();
-    MRNG rng(RND + 7);
+    MRNG rng(RND + 100);
 
     //    map.max_load_factor(7.0 / 8);
     int checksum;
@@ -618,7 +616,9 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
         } while (i < numInserts);
     }
 
-//    printf("    %s success time = %.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
+    assert(map.size() > 12);
+
+    printf("    %s success time = %.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
     return num_found;
 }
 
@@ -750,30 +750,32 @@ void bench_IterateIntegers(MAP& map)
         return;
     printf("%s map = %s\n", __FUNCTION__, map_name);
 
-    MRNG rng(123);
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
-    //Map<uint64_t, int> map;
-
     auto ts = now2sec();
-    for (size_t n = 0; n < num_iters; ++n) {
-        map[rng()] = n;
-        for (auto & keyVal : map) {
-            result += keyVal.second;
+
+    {
+        MRNG rng(123);
+        for (size_t n = 0; n < num_iters; ++n) {
+            map[rng()] = n;
+            for (auto & keyVal : map)
+                result += keyVal.second;
         }
+        assert(result == 20833333325000ull);
     }
-    assert(result == 20833333325000ull);
 
     auto ts1 = now2sec();
-    for (size_t n = 0; n < num_iters; ++n) {
-        map.erase(rng());
-        for (auto const& keyVal : map) {
-            result += keyVal.second;
+    {
+        MRNG rng(123);
+        for (size_t n = 0; n < num_iters; ++n) {
+            map.erase(rng());
+            for (auto const& keyVal : map)
+                result += keyVal.second;
         }
     }
     assert(result == 62498750000000ull + 20833333325000ull);
-    printf("    total iterate/removing time = %.2f, %.2f|%lu\n\n", (ts1 - ts), now2sec() - ts, result);
+    printf("    total iterate/removing time = %.2f, %.2f|%lu\n\n", (ts1 - ts), now2sec() - ts1, result);
 }
 
 template<class MAP>
@@ -997,8 +999,8 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<size_t> hash_func;
 #endif
 
-        static constexpr size_t numInserts[]        = {100,     5000, 1000000, 10000000};
-        static constexpr size_t numFindsPerInsert[] = {1000000, 10000,100, 10};
+        static constexpr size_t numInserts[]        = {100,     5000,  1000000, 10000000};
+        static constexpr size_t numFindsPerInsert[] = {1000000, 10000, 50, 10};
         for (size_t i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
         {
 #if ET

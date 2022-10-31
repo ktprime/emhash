@@ -892,7 +892,7 @@ private:
                 } else {
                     if (EMH_UNLIKELY(fbucket >= _num_buckets))
                         break; //overflow
-					else if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
+                    if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
                 }
 
