@@ -36,9 +36,9 @@ namespace emilib3 {
 
     enum State : uint8_t
     {
-        EFILLED   = 0,
-        EDELETE   = 3,
-        EEMPTY    = 1,
+        EFILLED  = 0,
+        EDELETE  = 3,
+        EEMPTY   = 1,
         SENTINEL = EFILLED + EDELETE + EEMPTY + 0xE0,
     };
 
@@ -123,6 +123,7 @@ private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
     using PairT = std::pair<KeyT, ValueT>;
+
 public:
     using size_t          = uint32_t;
     using value_type      = PairT;
@@ -389,6 +390,7 @@ public:
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
         }
+
         //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
         _max_probe_length = other._max_probe_length;
@@ -450,7 +452,7 @@ public:
 
     bool empty() const
     {
-        return _num_filled==0;
+        return _num_filled == 0;
     }
 
     // Returns the number of buckets.
@@ -566,7 +568,6 @@ public:
         return { {this, bucket, false}, bempty };
     }
 
-
     template <class... Args>
     inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
@@ -589,6 +590,7 @@ public:
         return do_insert(value).first;
     }
 
+#if 0
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
@@ -596,6 +598,7 @@ public:
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
     }
+#endif
 
     void insert(std::initializer_list<value_type> ilist) noexcept
     {
@@ -686,13 +689,10 @@ public:
         _erase(it._bucket);
     }
 
-    uint8_t group_mask(size_t gbucket) const noexcept
+    inline uint8_t group_mask(size_t gbucket) const noexcept
     {
         assert(stat_bytes >= simd_bytes);
-//        if (stat_bytes >= simd_bytes || _num_buckets >= simd_bytes)
-            return _states[gbucket + simd_bytes - 1] % 4;
-//        else
-//            return _states[_mask] % 4;
+        return _states[gbucket + simd_bytes - 1] % 4;
     }
 
     void _erase(size_t bucket) noexcept
@@ -701,8 +701,9 @@ public:
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
 
-        const auto gbucket = bucket - bucket % simd_bytes;
+        const auto gbucket = bucket / simd_bytes * simd_bytes;
         _states[bucket] = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
+        //if next is empty()
     }
 
     static constexpr bool is_triviall_destructable()
@@ -746,7 +747,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 8;
+        size_t required_buckets = num_elems + num_elems / 5;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -803,23 +804,13 @@ public:
             std::fill_n(_states + num_buckets, 1, State::SENTINEL);
         else
             std::fill_n(_states + num_buckets, simd_bytes - num_buckets + 1, State::SENTINEL);
-//        if (num_buckets < simd_bytes) std::fill_n(_states, simd_bytes, State::EEMPTY);
-
-#if 0
-        if (std::is_integral<KeyT>::value) {
-            auto keymask = key_2hash(H1(0)) + SENTINEL;
-            if ((keymask & EEMPTY) == State::EEMPTY)
-                keymask = SENTINEL;
-            std::fill_n(_states + num_buckets, simd_bytes, keymask);
-        }
-#endif
 
         _max_probe_length = -1;
 #if EMH_DUMP
         auto collision = 0;
 #endif
 
-        for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
+        for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 const auto key_hash = H1(src_pair.first);
@@ -871,10 +862,10 @@ private:
         //prefetch_heap_block((char*)_states + next_bucket);
 
         const auto filled = SET1_EPI8(key_2hash(key_hash, key));
-        int i = _max_probe_length;
+        int offset = _max_probe_length;
 
         while (true) {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
@@ -886,7 +877,7 @@ private:
 
             if (group_mask(next_bucket) == State::EEMPTY)
                 break;
-            else if (EMH_UNLIKELY((i -= simd_bytes) < 0))
+            else if (EMH_UNLIKELY((offset -= simd_bytes) < 0))
                 break;
             next_bucket = (next_bucket + simd_bytes) & _mask;
         }
@@ -908,11 +899,11 @@ private:
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;
-        auto next_bucket  = bucket, i = bucket;
+        auto next_bucket  = bucket, offset = bucket;
         size_t hole = (size_t)-1;
 
         while (true) {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             //1. find filled
@@ -934,9 +925,9 @@ private:
 #else
                 const auto ebucket = hole == (size_t)-1 ? next_bucket + CTZ(maske) : hole;
 #endif
-                const int offset = (ebucket - bucket + _num_buckets) & _mask;
-                if (EMH_UNLIKELY(offset > _max_probe_length))
-                    _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
+                const int doffset = (ebucket - bucket + _num_buckets) & _mask;
+                if (EMH_UNLIKELY(doffset > _max_probe_length))
+                    _max_probe_length = doffset / simd_bytes * simd_bytes + simd_bytes - 1;
 
                 _states[ebucket] = key_h2;
                 return ebucket;
@@ -949,36 +940,35 @@ private:
                     hole = next_bucket + CTZ(maskd);
             }
 
-            if (EMH_UNLIKELY((i += simd_bytes) > round))
-                break;
-
             //4. next round
             next_bucket = (next_bucket + simd_bytes) & _mask;
+            if (EMH_UNLIKELY((offset += simd_bytes) > round)) {
+                if (EMH_LIKELY(hole != (size_t)-1)) {
+                    _states[hole] = key_h2;
+                    return hole;
+                }
+                break;
+            }
         }
 
-        if (EMH_LIKELY(hole != (size_t)-1)) {
-            _states[hole] = key_h2;
-            return hole;
-        }
-
-        const auto ebucket = find_empty_slot(next_bucket, i - bucket);
+        const auto ebucket = find_empty_slot(next_bucket, offset - bucket);
         _states[ebucket] = key_h2;
         return ebucket;
     }
 
     inline uint64_t empty_delete(size_t gbucket) const noexcept
     {
-        const auto vec = LOAD_EMPTY2((decltype(&simd_empty))((char*)_states + gbucket));
+        const auto vec = LOAD_EMPTY2((decltype(&simd_empty))(&_states[gbucket]));
         return MOVEMASK_EPI8(vec);
     }
 
     uint64_t filled_mask(size_t gbucket) const noexcept
     {
 #if 0
-        const auto vec = LOAD_EMPTY2((decltype(&simd_empty))((char*)_states + gbucket));
+        const auto vec = LOAD_EMPTY2((decltype(&simd_empty))(&_states[gbucket]));
         return ~MOVEMASK_EPI8(vec) & ((1 << simd_bytes) - 1);
 #else
-        const auto vec = LOAD_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
+        const auto vec = LOAD_EMPTY((decltype(&simd_empty))(&_states[gbucket]));
         return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
 #endif
     }

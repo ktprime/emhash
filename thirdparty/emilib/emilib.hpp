@@ -515,7 +515,7 @@ public:
 
     bool empty() const
     {
-        return _num_filled==0;
+        return _num_filled == 0;
     }
 
     // Returns the number of buckets.
@@ -903,7 +903,7 @@ public:
         auto collisions = 0;
 #endif
 
-        for (size_t src_bucket=0; _num_filled < old_num_filled; src_bucket++) {
+        for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if ((old_states[src_bucket] & FILLED_MASK) == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
 #ifdef EMH_NRB
