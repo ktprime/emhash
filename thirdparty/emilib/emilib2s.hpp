@@ -467,8 +467,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    void max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 8.0f/9)
     {
+        return 7/8.0f;
     }
 
     // ------------------------------------------------------------
@@ -747,7 +748,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 5;
+        size_t required_buckets = num_elems + num_elems / 8;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 

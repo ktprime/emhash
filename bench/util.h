@@ -158,11 +158,11 @@ static inline uint32_t ilog(uint32_t x, uint32_t n = 2)
 
 static inline uint64_t randomseed() {
     std::random_device rd;
-    std::mt19937 g(rd());
+    std::mt19937_64 g(rd());
     return g();
 }
 
-#if __SIZEOF_INT128__
+#ifndef _MSC_VER
 class Lehmer64 {
     __uint128_t g_lehmer64_state;
 
@@ -216,7 +216,6 @@ class Lehmer64 {
         return high;
 #endif
     }
-
 };
 #endif
 

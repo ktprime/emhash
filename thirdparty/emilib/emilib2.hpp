@@ -768,7 +768,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 5;
+        size_t required_buckets = num_elems + num_elems / 8;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 

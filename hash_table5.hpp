@@ -70,7 +70,7 @@
     #define EMH_VAL(p,n)     p[n].second.second
     #define EMH_BUCKET(p,n)  p[n].first
     #define EMH_PKV(p,n)     p[n].second
-    #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(bucket, std::move(value_type(key, val))); _num_filled ++
+    #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, val)); _num_filled ++
 #elif EMH_BUCKET_INDEX == 2
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
@@ -1542,7 +1542,7 @@ private:
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
-#if 1
+#ifndef EMH_RNEXT
                 EMH_BUCKET(_pairs, prev_bucket) = (nbucket == next_bucket) ? prev_bucket : nbucket;
                 return next_bucket;
 #else
@@ -1622,10 +1622,10 @@ private:
             return bucket;
 #else
         if constexpr (std::is_integral<KeyT>::value) {
-          if (_eq(key, EMH_KEY(_pairs, bucket)))
-              return bucket;
-          else if ((int)next_bucket < 0)
-              return _num_buckets;
+            if (_eq(key, EMH_KEY(_pairs, bucket)))
+                return bucket;
+            else if ((int)next_bucket < 0)
+                return _num_buckets;
         } else {
             if ((int)next_bucket < 0)
                 return _num_buckets;
@@ -1700,7 +1700,7 @@ private:
         else if (next_bucket == bucket)
             return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket, 1);
 
-        int csize = 1;
+        int csize = 0;
 #if EMH_LRU_SET
         auto prev_bucket = bucket;
 #endif
@@ -1796,15 +1796,15 @@ one-way search strategy.
 #ifndef _MSC_VER
         //__builtin_prefetch(static_cast<const void*>(_pairs + bucket + 1), 0, 1);
 #endif
-        constexpr auto linear_probe_length = 6;//2-3 cache line miss
+        constexpr auto linear_probe_length = 5;//2-3 cache line miss
         for (size_type step = 2, slot = bucket + 1 + csize / 2; ; slot += step++) {
             if (step < linear_probe_length) {
                 auto bucket1 = slot & _mask;
-                if (EMH_EMPTY(_pairs, bucket1))// || EMH_EMPTY(_pairs, ++bucket1))
+                if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                     return bucket1;
             } else { //if (step++ > 5) {
                 if (EMH_EMPTY(_pairs, ++_last))// || EMH_EMPTY(_pairs, _last++))
-                    return _last++;
+                    return _last;
 
                 _last &= _mask;
 #if EMH_PACK_TAIL
@@ -1812,9 +1812,9 @@ one-way search strategy.
                 if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
                     return tail;
 #else
-                auto medium = (_mask / 2 + _last) & _mask;
-                if (EMH_EMPTY(_pairs, medium) && EMH_EMPTY(_pairs, ++medium))
-                    return medium;
+                auto medium = (_num_buckets / 2 + _last) & _mask;
+                if (EMH_EMPTY(_pairs, medium))// && EMH_EMPTY(_pairs, ++medium))
+                    return _last = medium;
 #endif
             }
         }
@@ -1828,10 +1828,10 @@ one-way search strategy.
         if (EMH_UNLIKELY(EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket)))
             return bucket;
 
-        for (size_type slot = bucket + 2; ; slot += 3) {
-            auto bucket1 = slot & _mask;
-            if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
-                return bucket1;
+        for (size_type slot = bucket + 2, step = 2; ; slot += ++step) {
+            auto nbucket = slot & _mask;
+            if (EMH_EMPTY(_pairs, nbucket) || EMH_EMPTY(_pairs, ++nbucket))
+                return nbucket;
         }
 
         return 0;

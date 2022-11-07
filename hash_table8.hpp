@@ -404,8 +404,10 @@ public:
 
     void max_load_factor(float mlf)
     {
-        if (mlf < 0.999 && mlf > EMH_MIN_LOAD_FACTOR)
+        if (mlf < 0.991 && mlf > EMH_MIN_LOAD_FACTOR) {
             _mlf = (uint32_t)((1 << 27) / mlf);
+            if (_num_buckets > 0) rehash(_num_buckets);
+        }
     }
 
     constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
@@ -1420,11 +1422,8 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket, 2);
         const auto prev_bucket = find_prev_bucket(kmain, bucket);
 
-        const auto oslot = EMH_HSLOT(_index, bucket);
-        if (next_bucket == bucket)
-            EMH_INDEX(_index, new_bucket) = {new_bucket, oslot};
-        else
-            EMH_INDEX(_index, new_bucket) = {next_bucket, oslot};
+        const auto last = next_bucket == bucket ? new_bucket : next_bucket;
+        EMH_INDEX(_index, new_bucket) = {last, EMH_HSLOT(_index, bucket)};
 
         EMH_BUCKET(_index, prev_bucket) = new_bucket;
         EMH_BUCKET(_index, bucket) = INACTIVE;
@@ -1567,13 +1566,13 @@ one-way search strategy.
             if (EMH_EMPTY(_index, medium))
                 return medium;
 #else
-            _last &= _mask;
             if (EMH_EMPTY(_index, ++_last))// || EMH_EMPTY(_index, ++_last))
                 return _last++;
 
-            auto medium = (_mask / 4 + _last) & _mask;
+            _last &= _mask;
+            auto medium = (_num_buckets / 2 + _last) & _mask;
             if (EMH_EMPTY(_index, medium))// || EMH_EMPTY(_index, ++medium))
-                return medium;
+                return _last = medium;
 #endif
         }
 

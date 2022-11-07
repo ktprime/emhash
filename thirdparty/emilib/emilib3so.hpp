@@ -465,8 +465,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    void max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 8.0f/9)
     {
+        return 7/8.0f;
     }
 
     // ------------------------------------------------------------
@@ -971,6 +972,29 @@ private:
         return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
     }
 
+    size_t update_probe(size_t gbucket, size_t next_bucket, size_t new_bucket, int offset) noexcept
+    {
+        const auto kprobe = group_probe(gbucket) + 2;
+        const auto kgroup = (gbucket + kprobe * simd_bytes) & _mask;
+        for (auto i = simd_bytes - 1; i > 1; i--) {
+            const auto kbucket  = kgroup + i;
+            const auto kmain_bucket = H1(_pairs[kbucket].first) & _mask;
+            if (kmain_bucket / simd_bytes != kbucket / simd_bytes)
+                continue;
+
+            //move current bucket
+            set_states(new_bucket, _states[kbucket]);
+            new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
+            _pairs[kbucket].~PairT();
+
+            set_probe(kgroup, offset - kprobe);
+            set_probe(gbucket, kprobe);
+            return kbucket;
+        }
+
+        return 0;
+    }
+
     //gbucket--->kbucket--->next_bucket|  kick_bucket--->next_bucket--->gbucket
     size_t find_empty_slot(size_t gbucket, size_t next_bucket, int offset) noexcept
     {
@@ -983,27 +1007,12 @@ private:
             }
 
             const auto new_bucket = next_bucket + CTZ(maske);
-#if 1
-            if (offset > 32 && offset > 2 * group_probe(gbucket)) {
-                const auto kprobe = group_probe(gbucket);
-                const auto kgroup = (gbucket + kprobe * simd_bytes) & _mask;
-                for (auto i = simd_bytes - 1; i > 1; i--) {
-                    const auto kbucket  = kgroup + i;
-                    const auto kmain_bucket = H1(_pairs[kbucket].first) & _mask;
-                    if (kmain_bucket / simd_bytes != kbucket / simd_bytes)
-                        continue;
-
-                    //move current bucket
-                    set_states(new_bucket, _states[kbucket]);
-                    new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
-                    _pairs[kbucket].~PairT();
-
-                    set_probe(kgroup, offset - kprobe);
-                    set_probe(gbucket, kprobe);
+            if (EMH_UNLIKELY(offset > 16) && offset > group_probe(gbucket) + 4) {
+                const auto kbucket = update_probe(gbucket, next_bucket, new_bucket, offset);
+                if (kbucket)
                     return kbucket;
-                }
             }
-#endif
+
             set_probe(gbucket, offset);
             return new_bucket;
         }

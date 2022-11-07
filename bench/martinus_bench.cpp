@@ -28,9 +28,10 @@
 #include "../hash_table8.hpp"
 
 #if X86
-#include "emilib/emilib.hpp"
-#include "emilib/emilib2.hpp"
+//#include "emilib/emilib.hpp"
+#include "emilib/emilib3so.hpp"
 #include "emilib/emilib2s.hpp"
+#include "emilib/emilib2o.hpp"
 #endif
 //#include "old/ktprime_hash.hpp"
 
@@ -70,7 +71,7 @@ static std::map<std::string, std::string> show_name =
    {"emhash8", "emhash8"},
    {"emhash5", "emhash5"},
 #if X86
-//    {"emilib", "emilib"},
+    {"emilib", "emilibo"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
 #endif
@@ -128,7 +129,7 @@ static const char* find_hash(const std::string& map_name)
 #elif RT == 3
     #define MRNG RomuDuoJr
 #else
-    #define MRNG std::mt19937_64
+    #define MRNG Lehmer64
 #endif
 
 // this is probably the fastest high quality 64bit random number generator that exists.
@@ -1330,7 +1331,7 @@ int main(int argc, char* argv[])
                 checkSet("ska");
             else if (c == 'h')
                 checkSet("hrd7");
-            else if (c == 'e' || c == '1')
+            else if (c == '1')
                 checkSet("emilib");
             else if (c == '2')
                 checkSet("emilib2");

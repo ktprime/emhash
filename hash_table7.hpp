@@ -1674,7 +1674,7 @@ private:
 #endif
 
         const auto qmask = _mask / SIZE_BIT;
-        if (1) {
+        if (0) {
             const size_type step = (main_bucket - SIZE_BIT / 4) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
@@ -1682,7 +1682,7 @@ private:
         }
 
         for (; ;) {
-           auto& _last = EMH_BUCKET(_pairs, _num_buckets);
+            auto& _last = EMH_BUCKET(_pairs, _num_buckets);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
