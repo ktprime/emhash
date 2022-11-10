@@ -1467,7 +1467,7 @@ private:
         //find next linked bucket and check key
         while (true) {
             const auto eslot = EMH_SLOT(_index, next_bucket);
-            if (EMH_UNLIKELY(EMH_EQHASH(next_bucket, key_hash))) {
+            if (EMH_EQHASH(next_bucket, key_hash)) {
                 if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, eslot))))
                 return next_bucket;
             }

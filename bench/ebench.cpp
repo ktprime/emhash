@@ -233,10 +233,9 @@ struct StructValue
         return lScore;
     }
 
-    bool operator < (const StructValue& r) const
-    {
-        return lScore < r.lScore;
-    }
+    bool operator < (const StructValue& r) const { return lScore < r.lScore; }
+
+    StructValue& operator *= (const int r) { lScore *= r; return *this; }
 
     int64_t operator + (int64_t r) const { return lScore + r; }
 
@@ -291,6 +290,7 @@ struct StuHasher
     #define sKeyType    "Struct"
 #elif TKey == 4
     #define KEY_STR     1
+    #define STR_VIEW    1
     typedef std::string_view keyType;
     #define TO_KEY(i)   std::to_string(i)
     #define sKeyType    "string_view"
@@ -1559,10 +1559,11 @@ int main(int argc, char* argv[])
                 else
                     maps[hash_name] = hash_name;
             }
-            else if (c == 'm') {
+            else if (c == 'm')
                 maps.erase("martinf");
+            else if (c == 'd')
                 maps.erase("martind");
-            } else if (c == 'p')
+             else if (c == 'p')
                 maps.erase("phmap");
             else if (c == 't')
                 maps.erase("tslr");

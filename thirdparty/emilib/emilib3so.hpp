@@ -214,7 +214,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -292,7 +292,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -949,6 +949,7 @@ private:
             if (offset > group_probe(bucket)) {
                 if (EMH_LIKELY(hole != (size_t)-1)) {
                     set_states(hole, key_h2);
+                    set_probe(bucket, offset - 1);
                     return hole;
                 }
                 break;
@@ -972,7 +973,7 @@ private:
         return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
     }
 
-    size_t update_probe(size_t gbucket, size_t next_bucket, size_t new_bucket, int offset) noexcept
+    size_t update_probe(size_t gbucket, size_t new_bucket, int offset) noexcept
     {
         const auto kprobe = group_probe(gbucket) + 2;
         const auto kgroup = (gbucket + kprobe * simd_bytes) & _mask;
@@ -1008,7 +1009,7 @@ private:
 
             const auto new_bucket = next_bucket + CTZ(maske);
             if (EMH_UNLIKELY(offset > 16) && offset > group_probe(gbucket) + 4) {
-                const auto kbucket = update_probe(gbucket, next_bucket, new_bucket, offset);
+                const auto kbucket = update_probe(gbucket, new_bucket, offset);
                 if (kbucket)
                     return kbucket;
             }

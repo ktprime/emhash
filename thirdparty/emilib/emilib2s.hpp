@@ -982,7 +982,7 @@ private:
             if (EMH_LIKELY(maske != 0)) {
                 const auto probe = CTZ(maske);
                 offset += probe;
-                if (EMH_LIKELY(offset > _max_probe_length))
+                if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
                 return next_bucket + probe;
             }

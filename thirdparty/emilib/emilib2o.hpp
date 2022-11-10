@@ -209,7 +209,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -287,7 +287,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -783,12 +783,30 @@ public:
         return true;
     }
 
+    void dump_statics() const
+    {
+        int off[256] = {0};
+        for (int i = 0; i < _num_buckets; i++)
+            off[_offset[i]]++;
+
+        for (int i = 0; i < 256; i++) {
+            if (off[i])
+                printf("\n%3d %3d %.3lf", i, off[i], 100.0 * off[i] / _num_buckets);
+        }
+    }
+
+//#define EMH_STATIS 1000'000
     /// Make room for this many elements
     void rehash(size_t num_elems) noexcept
     {
         const size_t required_buckets = num_elems;
         if (EMH_UNLIKELY(required_buckets < _num_filled))
             return;
+
+#if EMH_STATIS
+        if (_num_filled > EMH_STATIS)
+            dump_statics();
+#endif
 
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : simd_bytes;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
@@ -897,7 +915,7 @@ private:
 //                break;
 
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (EMH_LIKELY(maske != 0))
+            if (maske != 0)
                 break;
 
             if (++offset > _offset[bucket])
@@ -957,19 +975,18 @@ private:
             }
 
             //4. next round
-            offset += 1;
             next_bucket += simd_bytes;
-            if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
+            if (EMH_UNLIKELY(next_bucket >= _num_buckets))
                 next_bucket = 0;
-            }
 
-            if (offset > _offset[bucket]) {
-                if (EMH_LIKELY(hole != (size_t)-1)) {
-                    set_states(hole, key_h2);
-                    return hole;
-                }
+            if (++offset > _offset[bucket])
                 break;
-            }
+        }
+
+        if (EMH_LIKELY(hole != (size_t)-1)) {
+            _offset[bucket] = offset - 1;
+            set_states(hole, key_h2);
+            return hole;
         }
 
         const auto ebucket = find_empty_slot(bucket, next_bucket, offset);
@@ -994,26 +1011,62 @@ private:
 #endif
     }
 
+    size_t update_probe(size_t gbucket, size_t new_bucket, int offset) noexcept
+    {
+        const auto kdiff  = offset / 2;
+        const auto kprobe = offset - kdiff;
+        const auto kgroup = (new_bucket - kdiff * simd_bytes) & _mask;
+
+        for (int i = 0; i < simd_bytes; i++) {
+            const auto kbucket = (kgroup + i) & _mask;
+            const auto kmain_bucket = _hasher(_pairs[kbucket].first) & _mask;
+            if (kmain_bucket != kbucket)
+                continue;
+
+            //move current bucket
+            set_states(new_bucket, _states[kbucket]);
+            new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
+            _pairs[kbucket].~PairT();
+
+            _offset[kbucket] = offset - kprobe + 1;
+            if (kprobe >= _offset[gbucket])
+                _offset[gbucket] = kprobe + 1;
+            return kbucket;
+        }
+
+        return 0;
+    }
+
     size_t find_empty_slot(size_t bucket, size_t next_bucket, size_t offset) noexcept
     {
         while (true) {
-            const auto maske = empty_delete(next_bucket); //*(uint64_t*)(_states + next_bucket) & EMPTY_MASK;
-            if (EMH_LIKELY(maske != 0)) {
-                if (EMH_UNLIKELY(offset > _offset[bucket]))
-                    _offset[bucket] = offset;
+            size_t ebucket;
+            const auto maske = empty_delete(next_bucket);
+            if (EMH_UNLIKELY(maske == 0))
+                goto GNEXT;
 
-                assert(offset < 256);
-                const auto ebucket = next_bucket + CTZ(maske);
-                if (EMH_LIKELY(ebucket < _num_buckets))
-                    return ebucket;
+            ebucket = next_bucket + CTZ(maske);
+            if (EMH_UNLIKELY(ebucket >= _num_buckets))
+                goto GNEXT;
+
+            else if (offset <= _offset[bucket])
+                return ebucket;
+
+            else if (EMH_UNLIKELY(offset > 32)) {
+                const auto kbucket = update_probe(bucket, ebucket, offset);
+                if (kbucket)
+                    return kbucket;
             }
+            _offset[bucket] = offset;
+            return ebucket;
 
+GNEXT:
             offset      += 1;
             next_bucket += simd_bytes;
-            if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
+            if (EMH_UNLIKELY(next_bucket >= _num_buckets))
                 next_bucket = 0;
-            }
         }
+
         return 0;
     }
 

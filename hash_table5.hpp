@@ -1511,7 +1511,7 @@ private:
     {
         const auto bucket = key_to_bucket(key);
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if (EMH_UNLIKELY((int)next_bucket < 0))
             return INACTIVE;
 
         const auto equalk = _eq(key, EMH_KEY(_pairs, bucket));
@@ -1706,7 +1706,7 @@ private:
 #endif
         //find next linked bucket and check key
         while (true) {
-            if (EMH_UNLIKELY(_eq(key, EMH_KEY(_pairs, next_bucket)))) {
+            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
                 return prev_bucket;
@@ -1825,7 +1825,7 @@ one-way search strategy.
     size_type find_unique_empty(const size_type bucket_from) noexcept
     {
         auto bucket = bucket_from;
-        if (EMH_UNLIKELY(EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket)))
+        if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
         for (size_type slot = bucket + 2, step = 2; ; slot += ++step) {

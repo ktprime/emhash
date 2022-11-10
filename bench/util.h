@@ -653,8 +653,9 @@ static const std::array<char, 62> ALPHANUMERIC_CHARS = {
 
 static std::uniform_int_distribution<std::size_t> rd_uniform(0, ALPHANUMERIC_CHARS.size() - 1);
 
-#if TKey > 1
 static std::mt19937_64 generator(time(0));
+
+#if TKey > 1
 static std::string get_random_alphanum_string(std::size_t size) {
     std::string str(size, '\0');
 
