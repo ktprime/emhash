@@ -1642,8 +1642,8 @@ private:
                 return step * SIZE_BIT + CTZ(bmask3);
         }
 
+        auto& _last = EMH_ADDR(_pairs, _mask + 1);
         while ( true ) {
-            auto& _last = EMH_ADDR(_pairs, _mask + 1);
             const auto bmask2 = *((size_t*)_bitmask + _last);
             if (bmask2 != 0)
                 return _last * SIZE_BIT + CTZ(bmask2);
