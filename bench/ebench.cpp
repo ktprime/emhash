@@ -28,6 +28,9 @@ std::map<std::string, std::string> maps =
 //    {"emhash2", "emhash2"},
 //    {"emhash3", "emhash3"},
 //    {"emhash4", "emhash4"},
+#if HAVE_BOOST
+    {"boostf",  "boost_flat"},
+#endif
 
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
@@ -54,7 +57,7 @@ std::map<std::string, std::string> maps =
 //    {"f14_value", "f14_value"},
 
     {"martind", "martin_dense"},
-    {"martinf", "martin_flat"},
+//    {"martinf", "martin_flat"},
 
 #if ET
     {"f14_vector", "f14_vector"},
@@ -107,6 +110,10 @@ std::map<std::string, std::string> maps =
 #include "emhash/hash_table557.hpp"
 #endif
 
+#ifdef HAVE_BOOST
+#include <boost/unordered/unordered_flat_map.hpp>
+#endif
+
 //#define EMH_ITER_SAFE    1
 //#define EMH_ALIGN64      1
 #include "../hash_table5.hpp"
@@ -154,6 +161,7 @@ std::map<std::string, std::string> maps =
 //https://jguegant.github.io/blogs/tech/dense-hash-map.html
 
 //https://martin.ankerl.com/2022/08/27/hashmap-bench-01/
+//https://bannalia.blogspot.com/2022/11/inside-boostunorderedflatmap.html
 
 //
 #if FHT_HMAP && __linux__
@@ -178,9 +186,6 @@ std::map<std::string, std::string> maps =
 #if PHMAP_HASH
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 #endif
-
-//#include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
-//#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 
 #if X86
 #include "emilib/emilib2s.hpp"
@@ -571,6 +576,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
     if (vList.size() % 3 == 0)
         ht_hash.clear();
 
+#if CXX17
     //load_factor = 0.5
     const auto vmedium = (1u << ilog(vList.size() / 100, 2)) * 5 / 10;
     for (size_t i = 0; i < vList.size(); i++) {
@@ -581,6 +587,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 
     if (test_case % 2 == 0)
         ht_hash.clear();
+#endif
 
     //load_factor = 0.75
     ht_hash.max_load_factor(0.80f);
@@ -925,7 +932,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
-
+#ifndef HAVE_BOOST
 #if QC_HASH == 0
     for (auto it = tmp.begin(); it != tmp.end(); ) {
 #if KEY_INT
@@ -937,6 +944,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
         else
             ++it;
     }
+#endif
 
 #if KEY_INT
     sum += tmp.size();
@@ -1363,6 +1371,10 @@ static int benchHashMap(int n)
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
+#if HAVE_BOOST
+        {  benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
+#endif
+
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
@@ -1498,8 +1510,44 @@ static int test_lru(int n)
 }
 #endif
 
+#include "tsl/robin_map.h"
+template <typename T>
+struct BadHash {
+  size_t operator()(T const& val) const {
+    return static_cast<size_t>(val);
+}
+};
+
+void testrb() {
+  emilib2 ::HashMap<int, int, BadHash<int>> map;
+  map.reserve(16); // resizes with mask 31
+
+  map.emplace(31, 1);        // gets into last bucket
+  map.emplace(1024 + 31, 2); // would also get into last bucket, but wraps around
+
+  // first entry in the map
+  auto it = map.begin();
+  std::cout << it->first << "->" << it->second << std::endl;
+
+  // second entry in the map, erase it
+  ++it;
+  std::cout << it->first << "->" << it->second << std::endl;
+  it = map.erase(it);
+
+  // now all two elements are iterated, we should be at the map's end, but due to backward shift
+  // deletion we are not
+  if (it != map.end()) {
+    std::cout << it->first << "->" << it->second << std::endl;
+    it = map.erase(it);
+  }
+  else {
+    std::cout << "are we now at the end? " << (it == map.end()) << std::endl;
+  }
+}
+
 int main(int argc, char* argv[])
 {
+  testrb();
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
     //find_test();
 #endif

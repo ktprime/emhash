@@ -703,6 +703,8 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 
 #if __cplusplus > 201402L || CXX17 || _MSC_VER > 1730
 #define CXX17 1
+#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
+#include "fph/meta_fph_table.h" //https://github.com/renzibei/fph-table
 #endif
 
 #if __cplusplus > 201704L || CXX20 || _MSC_VER >= 1929
@@ -713,8 +715,6 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #include "rigtorp/rigtorp.hpp"   //https://github.com/rigtorp/HashMap/blob/master/include/rigtorp/HashMap.h
 
-#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
-#include "fph/meta_fph_table.h" //https://github.com/renzibei/fph-table
 //#include "ck/Common/HashTable/HashMap.h"
 //#include "ck/Common/HashTable/HashSet.h"
 #endif

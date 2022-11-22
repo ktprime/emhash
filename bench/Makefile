@@ -11,11 +11,15 @@ CXXFLAGS = -O3 -march=native -mtune=native -I.. -I../thirdparty -DNDEBUG=1
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)
-CXXFLAGS += -DFOLLY -lfolly
+CXXFLAGS += -DFOLLY_F14 -lfolly
 endif
 
 ifneq ($(SW),)
 CXXFLAGS += -DABSL_HMAP=1
+endif
+
+ifneq ($(BF),)
+CXXFLAGS += -DHAVE_BOOST=1
 endif
 
 ifneq ($(MH),)
