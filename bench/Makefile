@@ -129,7 +129,8 @@ endif
 
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) martinus_bench.cpp -o mbench
-	$(CXX) $(CXXFLAGS) btest.cpp -o btest
+	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
+	$(CXX) $(CXXFLAGS) bstring.cpp -o bs
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb

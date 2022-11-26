@@ -1,15 +1,20 @@
 //#define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 
+#define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #include "tsl/robin_map.h"
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/endian/conversion.hpp>
+#include <boost/core/detail/splitmix64.hpp>
+#include <boost/config.hpp>
 #include "martinus/robin_hood.h"
+#include "martinus/unordered_dense.h"
 #include "phmap/phmap.h"
 #include "hash_table7.hpp"
 #include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_table8.hpp"
-#include "emilib/emilib.hpp"
-#include "emilib/emilib2.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emilib3so.hpp"
+#include "emilib/emilib2o.hpp"
 
 #include "util.h"
 #include <unordered_map>
@@ -20,18 +25,14 @@
 #include <iomanip>
 #include <chrono>
 
-#if CXX20
-#include "martinus/unordered_dense.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
-#endif
-
 using namespace std::chrono_literals;
 #if TKey == 1
-using KeyType = uint64_t;
+using ValType = uint64_t;
 #else
-using KeyType = uint32_t;
+using ValType = uint32_t;
 #endif
 
-static void print_time( std::chrono::steady_clock::time_point & t1, char const* label, KeyType s, std::size_t size )
+static void print_time( std::chrono::steady_clock::time_point & t1, char const* label, uint64_t s, std::size_t size )
 {
     auto t2 = std::chrono::steady_clock::now();
 
@@ -43,7 +44,7 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
 static unsigned N = 2'000'000;
 static int K = 10;
 
-static std::vector< KeyType > indices1, indices2, indices3;
+static std::vector< uint64_t > indices1, indices2, indices3;
 
 static void init_indices()
 {
@@ -69,10 +70,11 @@ static void init_indices()
 
     for( uint64_t i = 1; i <= N*2; ++i )
     {
-        if (sizeof (KeyType) == sizeof (uint64_t))
-            indices3.push_back( (KeyType)i << 40 );
-        else
-            indices3.push_back( (KeyType)i << 11 );
+        indices3.push_back( boost::endian::endian_reverse( static_cast<std::uint64_t>( i ) ) );
+//        if (sizeof (KeyType) == sizeof (uint64_t))
+//            indices3.push_back( (KeyType)i << 40 );
+//        else
+//            indices3.push_back( (KeyType)i << 11 );
     }
 }
 
@@ -104,7 +106,7 @@ template<class Map>  void test_insert( Map& map, std::chrono::steady_clock::time
 
 template<class Map>  void test_lookup( Map& map, std::chrono::steady_clock::time_point & t1 )
 {
-    KeyType s;
+    uint64_t s;
 
     s = 0;
 
@@ -158,8 +160,14 @@ template<class Map>  void test_iteration( Map& map, std::chrono::steady_clock::t
     {
         if( it->second & 1 )
         {
-//            map.erase( it++ );//can not use in some hash map
-            it = map.erase( it );
+            if constexpr( std::is_void_v< decltype( map.erase( it ) ) > )
+            {
+                map.erase( it++ );
+            }
+            else
+            {
+                it = map.erase( it );
+            }
         }
         else
         {
@@ -182,7 +190,7 @@ template<class Map>  void test_erase( Map& map, std::chrono::steady_clock::time_
     print_time( t1, "Consecutive erase",  0, map.size() );
 
     {
-        Sfc4 rng(123);
+//        Sfc4 rng(123);
 
         for( unsigned i = 1; i <= N; ++i )
         {
@@ -263,7 +271,7 @@ template<template<class...> class Map>  void test( char const* label )
     s_alloc_bytes = 0;
     s_alloc_count = 0;
 
-    Map<KeyType, std::uint32_t> map;
+    Map<std::uint64_t, ValType> map;
 
     auto t0 = std::chrono::steady_clock::now();
     auto t1 = t0;
@@ -301,12 +309,17 @@ template<class K, class V> struct pair
     #define BintHasher Int64Hasher<K>
 #elif STD_HASH
     #define BintHasher std::hash<K>
-#else
+#elif ROBIN_HASH
     #define BintHasher robin_hood::hash<K>
+#elif CXX17
+    #define BintHasher ankerl::unordered_dense::hash<K>
 #endif
 
 
 template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;
+
+template<class K, class V> using boost_unordered_flat_map =
+    boost::unordered_flat_map<K, V, BintHasher, std::equal_to<K>, allocator_for<K, V>>;
 
 template<class K, class V> using std_unordered_map =
     std::unordered_map<K, V, BintHasher, std::equal_to<K>, allocator_for<K, V>>;
@@ -317,13 +330,13 @@ template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BintHasher
 template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BintHasher, std::equal_to<K>>;
 
 template<class K, class V> using martinus_flat = robin_hood::unordered_map<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emilib3_map = emilib3::HashMap<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using emilib_map2 = emilib2::HashMap<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using emilib_map3 = emilib::HashMap<K, V, BintHasher, std::equal_to<K>>;
 
 #ifdef CXX20
 template<class K, class V> using jg_densemap = jg::dense_hash_map<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K, V, BintHasher, std::equal_to<K>>;
 #endif
+template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K, V, BintHasher, std::equal_to<K>>;
 template<class K, class V> using phmap_flat  = phmap::flat_hash_map<K, V, BintHasher, std::equal_to<K>>;
 template<class K, class V> using tsl_robin_map= tsl::robin_map<K, V, BintHasher, std::equal_to<K>>;
 
@@ -340,16 +353,20 @@ int main(int argc, const char* argv[])
         K = atoi(argv[2]);
 
     init_indices();
+
+
 #if ABSL_HMAP
     test<absl_flat_hash_map>("absl::flat_hash_map" );
 #endif
 
-    test<std_unordered_map> ("std::unordered_map" );
+//    test<std_unordered_map> ("std::unordered_map" );
+
 #ifdef CXX20
     test<jg_densemap> ("jg_densemap" );
-    test<martinus_dense>("martinus_dense" );
 #endif
     test<emhash_map8> ("emhash_map8" );
+    test<martinus_dense>("martinus_dense" );
+    test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
     test<tsl_robin_map> ("tsl_robin_map" );
     test<phmap_flat> ("phmap_flat" );
@@ -358,14 +375,14 @@ int main(int argc, const char* argv[])
     test<emhash_map6> ("emhash_map6" );
     test<emhash_map7> ("emhash_map7" );
     test<martinus_flat> ("martinus_flat" );
-    test<emilib2_map> ("emilib2_map" );
-    test<emilib3_map> ("emilib3_map" );
+    test<emilib_map2> ("emilib_map2" );
+    test<emilib_map3> ("emilib_map3" );
 
     std::cout << "---\n\n";
 
     for( auto const& x: times )
     {
-        std::cout << std::setw( 25 ) << ( x.label_ + ": " ) << std::setw( 5 ) << x.time_ << " ms, " << std::setw( 9 ) << x.bytes_ << " bytes in " << x.count_ << " allocations\n";
+        std::cout << std::setw( 30 ) << ( x.label_ + ": " ) << std::setw( 5 ) << x.time_ << " ms, " << std::setw( 9 ) << x.bytes_ << " bytes in " << x.count_ << " allocations\n";
     }
 
     return 0;
