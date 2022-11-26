@@ -208,7 +208,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -286,7 +286,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -460,32 +460,33 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    void max_load_factor(float lf = 8.0f/9)
+    inline float max_load_factor(float lf = 8.0f/9)
     {
+        return 7/8.0f;
     }
 
     // ------------------------------------------------------------
 
     template<typename K>
-    iterator find(const K& key) noexcept
+    inline iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    const_iterator find(const K& key) const noexcept
+    inline const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    bool contains(const K& k) const noexcept
+    inline bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    size_t count(const K& k) const noexcept
+    inline size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }

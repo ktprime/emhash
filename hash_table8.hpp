@@ -381,26 +381,26 @@ public:
     inline iterator first() const { return {this, 0}; }
     inline iterator last() const { return {this, _num_filled - 1}; }
 
-    iterator begin() { return first(); }
-    const_iterator cbegin() const { return first(); }
-    const_iterator begin() const { return first(); }
+    inline iterator begin() { return first(); }
+    inline const_iterator cbegin() const { return first(); }
+    inline const_iterator begin() const { return first(); }
 
     inline iterator end() { return {this, _num_filled}; }
     inline const_iterator cend() const { return {this, _num_filled}; }
-    const_iterator end() const { return cend(); }
+    inline const_iterator end() const { return cend(); }
 
-    const value_type* values() const { return _pairs; }
-    const Index* index() const { return _index; }
+    inline const value_type* values() const { return _pairs; }
+    inline const Index* index() const { return _index; }
 
-    size_type size() const { return _num_filled; }
-    bool empty() const { return _num_filled == 0; }
-    size_type bucket_count() const { return _num_buckets; }
+    inline size_type size() const { return _num_filled; }
+    inline bool empty() const { return _num_filled == 0; }
+    inline size_type bucket_count() const { return _num_buckets; }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
+    inline float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
 
-    HashT& hash_function() const { return _hasher; }
-    EqT& key_eq() const { return _eq; }
+    inline HashT& hash_function() const { return _hasher; }
+    inline EqT& key_eq() const { return _eq; }
 
     void max_load_factor(float mlf)
     {
@@ -410,9 +410,9 @@ public:
         }
     }
 
-    constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    inline constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
+    inline constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
+    inline constexpr size_type max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -541,13 +541,13 @@ public:
 
     // ------------------------------------------------------------
     template<typename K=KeyT>
-    iterator find(const K& key) noexcept
+    inline iterator find(const K& key) noexcept
     {
         return {this, find_filled_slot(key)};
     }
 
     template<typename K=KeyT>
-    const_iterator find(const K& key) const noexcept
+    inline const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_slot(key)};
     }
@@ -569,13 +569,13 @@ public:
     }
 
     template<typename K=KeyT>
-    bool contains(const K& key) const noexcept
+    inline bool contains(const K& key) const noexcept
     {
         return find_filled_slot(key) != _num_filled;
     }
 
     template<typename K=KeyT>
-    size_type count(const K& key) const noexcept
+    inline size_type count(const K& key) const noexcept
     {
         return find_filled_slot(key) == _num_filled ? 0 : 1;
         //return find_sorted_bucket(key) == END ? 0 : 1;

@@ -468,25 +468,25 @@ public:
     // ------------------------------------------------------------
 
     template<typename K>
-    iterator find(const K& key) noexcept
+    inline iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    const_iterator find(const K& key) const noexcept
+    inline const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    bool contains(const K& k) const noexcept
+    inline bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    size_t count(const K& k) const noexcept
+    inline size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }

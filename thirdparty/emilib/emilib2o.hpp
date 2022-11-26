@@ -419,49 +419,49 @@ public:
         return {this, find_filled_slot(0)};
     }
 
-    const_iterator begin() const noexcept
+    inline const_iterator begin() const noexcept
     {
         return cbegin();
     }
 
-    iterator end() noexcept
+    inline iterator end() noexcept
     {
         return {this, _num_buckets, false};
     }
 
-    const_iterator cend() const noexcept
+    inline const_iterator cend() const noexcept
     {
         return {this, _num_buckets, false};
     }
 
-    const_iterator end() const noexcept
+    inline const_iterator end() const noexcept
     {
         return cend();
     }
 
-    size_t size() const
+    inline size_t size() const
     {
         return _num_filled;
     }
 
-    bool empty() const
+    inline bool empty() const
     {
         return _num_filled == 0;
     }
 
     // Returns the number of buckets.
-    size_t bucket_count() const
+    inline size_t bucket_count() const
     {
         return _num_buckets;
     }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const
+    inline float load_factor() const
     {
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    float max_load_factor(float lf = 8.0f/9)
+    inline float max_load_factor(float lf = 8.0f/9)
     {
         return 7/8.0f;
     }
@@ -469,25 +469,25 @@ public:
     // ------------------------------------------------------------
 
     template<typename K>
-    iterator find(const K& key) noexcept
+    inline iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    const_iterator find(const K& key) const noexcept
+    inline const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    bool contains(const K& k) const noexcept
+    inline bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    size_t count(const K& k) const noexcept
+    inline size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }

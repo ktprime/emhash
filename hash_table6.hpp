@@ -794,31 +794,31 @@ public:
 
     // ------------------------------------------------------------
     template<typename Key = KeyT>
-    iterator find(const Key& key, size_t key_hash) noexcept
+    inline iterator find(const Key& key, size_t key_hash) noexcept
     {
         return {this, find_filled_hash(key, key_hash)};
     }
 
     template<typename Key = KeyT>
-    const_iterator find(const Key& key, size_t key_hash) const noexcept
+    inline const_iterator find(const Key& key, size_t key_hash) const noexcept
     {
         return {this, find_filled_hash(key, key_hash)};
     }
 
     template<typename Key=KeyT>
-    iterator find(const Key& key) noexcept
+    inline iterator find(const Key& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
     template<typename Key = KeyT>
-    const_iterator find(const Key& key) const noexcept
+    inline const_iterator find(const Key& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
     template<typename Key = KeyT>
-    ValueT& at(const KeyT& key)
+    inline ValueT& at(const KeyT& key)
     {
         const auto bucket = find_filled_bucket(key);
         //throw
@@ -826,7 +826,7 @@ public:
     }
 
     template<typename Key = KeyT>
-    const ValueT& at(const KeyT& key) const
+    inline const ValueT& at(const KeyT& key) const
     {
         const auto bucket = find_filled_bucket(key);
         //throw
@@ -834,13 +834,13 @@ public:
     }
 
     template<typename Key = KeyT>
-    bool contains(const Key& key) const noexcept
+    inline bool contains(const Key& key) const noexcept
     {
         return find_filled_bucket(key) <= _mask;
     }
 
     template<typename Key = KeyT>
-    size_type count(const Key& key) const noexcept
+    inline size_type count(const Key& key) const noexcept
     {
         return find_filled_bucket(key) <= _mask ? 1 : 0;
     }
@@ -1007,17 +1007,17 @@ public:
 #endif
 
     template<typename K, typename V>
-    size_type insert_unique(K&& key, V&& val)
+    inline size_type insert_unique(K&& key, V&& val)
     {
         return do_insert_unqiue(std::forward<K>(key), std::forward<V>(val));
     }
 
-    size_type insert_unique(value_type&& value)
+    inline size_type insert_unique(value_type&& value)
     {
         return do_insert_unqiue(std::move(value.first), std::move(value.second));
     }
 
-    size_type insert_unique(const value_type& value)
+    inline size_type insert_unique(const value_type& value)
     {
         return do_insert_unqiue(value.first, value.second);
     }

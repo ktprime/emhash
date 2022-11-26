@@ -171,7 +171,7 @@ static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
 #endif
 
 //count the leading zero bit
-inline static int CTZ(size_t n)
+static int CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -718,30 +718,30 @@ public:
         return {this, bucket, true};
     }
 
-    const_iterator begin() const noexcept { return cbegin(); }
+    inline const_iterator begin() const noexcept { return cbegin(); }
 
-    iterator end() noexcept { return {this, _num_buckets}; }
-    const_iterator cend() const { return {this, _num_buckets}; }
-    const_iterator end() const { return cend(); }
+    inline iterator end() noexcept { return {this, _num_buckets}; }
+    inline const_iterator cend() const { return {this, _num_buckets}; }
+    inline const_iterator end() const { return cend(); }
 
-    size_type size() const { return _num_filled; }
-    bool empty() const { return _num_filled == 0; }
+    inline size_type size() const { return _num_filled; }
+    inline bool empty() const { return _num_filled == 0; }
 
-    size_type bucket_count() const { return _num_buckets; }
-    float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
+    inline size_type bucket_count() const { return _num_buckets; }
+    inline float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
 
-    HashT& hash_function() const { return _hasher; }
-    EqT& key_eq() const { return _eq; }
+    inline HashT& hash_function() const { return _hasher; }
+    inline EqT& key_eq() const { return _eq; }
 
-    void max_load_factor(float mlf)
+    inline void max_load_factor(float mlf)
     {
         if (mlf < 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
             _mlf = (uint32_t)((1 << 27) / mlf);
     }
 
-    constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    inline constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
+    inline constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
+    inline constexpr size_type max_bucket_count() const { return max_size(); }
 
     size_type bucket_main() const
     {
@@ -913,25 +913,25 @@ public:
 
     // ------------------------------------------------------------
     template<typename Key = KeyT>
-    iterator find(const Key& key, size_t key_hash) noexcept
+    inline iterator find(const Key& key, size_t key_hash) noexcept
     {
         return {this, find_filled_hash(key, key_hash)};
     }
 
     template<typename Key = KeyT>
-    const_iterator find(const Key& key, size_t key_hash) const noexcept
+    inline const_iterator find(const Key& key, size_t key_hash) const noexcept
     {
         return {this, find_filled_hash(key, key_hash)};
     }
 
     template<typename Key=KeyT>
-    iterator find(const Key& key) noexcept
+    inline iterator find(const Key& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
     template<typename Key = KeyT>
-    const_iterator find(const Key& key) const noexcept
+    inline const_iterator find(const Key& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
@@ -953,13 +953,13 @@ public:
     }
 
     template<typename Key = KeyT>
-    bool contains(const Key& key) const noexcept
+    inline bool contains(const Key& key) const noexcept
     {
         return find_filled_bucket(key) != _num_buckets;
     }
 
     template<typename Key = KeyT>
-    size_type count(const Key& key) const noexcept
+    inline size_type count(const Key& key) const noexcept
     {
         return find_filled_bucket(key) != _num_buckets ? 1 : 0;
     }
@@ -1120,23 +1120,23 @@ public:
 #endif
 
     template<typename K, typename V>
-    size_type insert_unique(K&& key, V&& val)
+    inline size_type insert_unique(K&& key, V&& val)
     {
         return do_insert_unqiue(std::forward<K>(key), std::forward<V>(val));
     }
 
-    size_type insert_unique(value_type&& value)
+    inline size_type insert_unique(value_type&& value)
     {
         return do_insert_unqiue(std::move(value.first), std::move(value.second));
     }
 
-    size_type insert_unique(const value_type& value)
+    inline size_type insert_unique(const value_type& value)
     {
         return do_insert_unqiue(value.first, value.second);
     }
 
     template<typename K, typename V>
-    inline size_type do_insert_unqiue(K&& key, V&& val)
+    size_type do_insert_unqiue(K&& key, V&& val)
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
@@ -1148,7 +1148,7 @@ public:
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) { return do_assign(std::move(key), std::forward<ValueT>(val)); }
 
     template <typename... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -1177,7 +1177,7 @@ public:
     }
 
     template <class... Args>
-    inline size_type emplace_unique(Args&&... args) noexcept
+    size_type emplace_unique(Args&&... args) noexcept
     {
         return insert_unique(std::forward<Args>(args)...);
     }

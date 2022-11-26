@@ -340,6 +340,7 @@ void iotas(ForwardIt first, ForwardIt last, T value)
         ++value;
     }
 }
+
 template<class MAP> void bench_randomInsertErase(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
@@ -1314,6 +1315,8 @@ void runTest(int sflags, int eflags)
 #endif
 #if ABSL_HMAP
         { absl::flat_hash_map <uint64_t, int, hash_func> pmap; bench_copy(pmap); }
+#endif
+#if HAVE_BOOST
         { boost::unordered_flat_map <uint64_t, int, hash_func> pmap; bench_copy(pmap); }
 #endif
 

@@ -520,29 +520,29 @@ public:
         }
         return {this, bucket};
     }
-    const_iterator begin() const noexcept { return cbegin(); }
+    inline const_iterator begin() const noexcept { return cbegin(); }
 
-    iterator end() noexcept { return {this, _num_buckets}; }
-    const_iterator end()  const noexcept { return cend(); }
-    const_iterator cend() const noexcept { return {this, _num_buckets}; }
+    inline iterator end() noexcept { return {this, _num_buckets}; }
+    inline const_iterator end()  const noexcept { return cend(); }
+    inline const_iterator cend() const noexcept { return {this, _num_buckets}; }
 
-    size_type size() const noexcept { return _num_filled; }
-    bool empty() const noexcept { return _num_filled == 0; }
-    size_type bucket_count() const noexcept { return _num_buckets; }
+    inline size_type size() const noexcept { return _num_filled; }
+    inline bool empty() const noexcept { return _num_filled == 0; }
+    inline size_type bucket_count() const noexcept { return _num_buckets; }
 
-    HashT hash_function() const noexcept { return static_cast<const HashT&>(_hasher); }
-    EqT key_eq() const noexcept { return static_cast<const EqT&>(_eq); }
+    inline HashT hash_function() const noexcept { return static_cast<const HashT&>(_hasher); }
+    inline EqT key_eq() const noexcept { return static_cast<const EqT&>(_eq); }
 
-    float load_factor() const noexcept { return static_cast<float>(_num_filled) / _num_buckets; }
-    float max_load_factor() const noexcept { return (1 << 27) / (float)_mlf; }
+    inline float load_factor() const noexcept { return static_cast<float>(_num_filled) / _num_buckets; }
+    inline float max_load_factor() const noexcept { return (1 << 27) / (float)_mlf; }
     void max_load_factor(float ml) noexcept
     {
         if (ml < 0.991f && ml > EMH_MIN_LOAD_FACTOR)
             _mlf = (uint32_t)((1 << 27) / ml);
     }
 
-    constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    inline constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
+    inline constexpr size_type max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -671,25 +671,25 @@ public:
 
     // ------------------------------------------------------------
     template<typename K=KeyT>
-    iterator find(const K& key) noexcept
+    inline iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
     template<typename K=KeyT>
-    const_iterator find(const K& key) const noexcept
+    inline const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
     template<typename K=KeyT>
-    iterator find(const K& key, size_type key_hash) noexcept
+    inline iterator find(const K& key, size_type key_hash) noexcept
     {
         return {this, find_hash_bucket(key, key_hash)};
     }
 
     template<typename K=KeyT>
-    const_iterator find(const K& key, size_type key_hash) const noexcept
+    inline const_iterator find(const K& key, size_type key_hash) const noexcept
     {
         return {this, find_hash_bucket(key, key_hash)};
     }
@@ -724,25 +724,25 @@ public:
     }
 
     template<typename K=KeyT>
-    bool contains(const K& key) const noexcept
+    inline bool contains(const K& key) const noexcept
     {
         return find_filled_bucket(key) != _num_buckets;
     }
 
     template<typename K=KeyT>
-    bool contains(const K& key, size_type key_hash) const noexcept
+    inline bool contains(const K& key, size_type key_hash) const noexcept
     {
         return find_hash_bucket(key, key_hash) != _num_buckets;
     }
 
     template<typename K=KeyT>
-    size_type count(const K& key) const noexcept
+    inline size_type count(const K& key) const noexcept
     {
         return find_filled_bucket(key) == _num_buckets ? 0 : 1;
     }
 
     template<typename K=KeyT>
-    size_type count(const K& key, size_type key_hash) const noexcept
+    inline size_type count(const K& key, size_type key_hash) const noexcept
     {
         return find_hash_bucket(key, key_hash) == _num_buckets ? 0 : 1;
     }
@@ -1014,7 +1014,7 @@ public:
     }
 
     template <class... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
