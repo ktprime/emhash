@@ -18,13 +18,14 @@
 # include "tsl/robin_map.h"
 #endif
 
+#include "./util.h"
 #include "martinus/robin_hood.h"
 #include "martinus/unordered_dense.h"
+
 #include "../hash_table8.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table5.hpp"
 
-#include "./util.h"
 #include "emilib/emilib3so.hpp"
 #include "emilib/emilib2o.hpp"
 
@@ -244,6 +245,13 @@ struct record
 
 static std::vector<record> times;
 
+#if STD_VIEW && CXX17
+#include <string_view>
+using keyType = std::string_view;
+#else
+using keyType = std::string;
+#endif
+
 template<template<class...> class Map> BOOST_NOINLINE void test( char const* label )
 {
     std::cout << label << ":\n\n";
@@ -251,11 +259,7 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     s_alloc_bytes = 0;
     s_alloc_count = 0;
 
-#ifdef STD_VIEW
-    Map<std::string_view, std::uint32_t> map;
-#else
-    Map<std::string, std::uint32_t> map;
-#endif
+    Map<keyType, std::uint32_t> map;
 
     auto t0 = std::chrono::steady_clock::now();
     auto t1 = t0;
@@ -342,7 +346,7 @@ template<int Bits> struct fnv1a_hash_impl;
 
 template<> struct fnv1a_hash_impl<32>
 {
-    std::size_t operator()( std::string const& s ) const
+    std::size_t operator()( keyType const& s ) const
     {
         std::size_t h = 0x811C9DC5u;
 
@@ -361,7 +365,7 @@ template<> struct fnv1a_hash_impl<32>
 
 template<> struct fnv1a_hash_impl<64>
 {
-    std::size_t operator()( std::string const& s ) const
+    std::size_t operator()( keyType const& s ) const
     {
         std::size_t h = 0xCBF29CE484222325ull;
 

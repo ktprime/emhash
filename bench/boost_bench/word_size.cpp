@@ -7,7 +7,7 @@
 //#include <boost/unordered_map.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/regex.hpp>
-#ifdef HAVE_ABSEIL
+#ifdef ABSL_HMAP
 # include "absl/container/node_hash_map.h"
 # include "absl/container/flat_hash_map.h"
 #endif
@@ -204,13 +204,13 @@ template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K
 template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emilib3_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 
-#ifdef HAVE_ABSEIL
+#ifdef ABSL_HMAP
 
 template<class K, class V> using absl_node_hash_map =
-    absl::node_hash_map<K, V, absl::container_internal::hash_default_hash<K>, absl::container_internal::hash_default_eq<K>, allocator_for<K, V>>;
+    absl::node_hash_map<K, V, BstrHasher, absl::container_internal::hash_default_eq<K>, allocator_for<K, V>>;
 
 template<class K, class V> using absl_flat_hash_map =
-    absl::flat_hash_map<K, V, absl::container_internal::hash_default_hash<K>, absl::container_internal::hash_default_eq<K>, allocator_for<K, V>>;
+    absl::flat_hash_map<K, V, BstrHasher, absl::container_internal::hash_default_eq<K>, allocator_for<K, V>>;
 
 #endif
 
@@ -232,7 +232,7 @@ int main()
     test<emilib2_map> ("emilib2_map" );
     test<emilib3_map> ("emilib3_map" );
 
-#ifdef HAVE_ABSEIL
+#ifdef ABSL_HMAP
 
     test<absl_node_hash_map>( "absl::node_hash_map" );
     test<absl_flat_hash_map>( "absl::flat_hash_map" );
@@ -247,9 +247,3 @@ int main()
     }
 }
 
-#ifdef HAVE_ABSEIL
-# include "absl/container/internal/raw_hash_set.cc"
-# include "absl/hash/internal/hash.cc"
-# include "absl/hash/internal/low_level_hash.cc"
-# include "absl/hash/internal/city.cc"
-#endif

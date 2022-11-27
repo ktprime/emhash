@@ -9,7 +9,7 @@
 #include <boost/endian/conversion.hpp>
 #include <boost/core/detail/splitmix64.hpp>
 #include <boost/config.hpp>
-#ifdef HAVE_ABSEIL
+#ifdef ABSL_HMAP
 # include "absl/container/node_hash_map.h"
 # include "absl/container/flat_hash_map.h"
 #endif
@@ -294,7 +294,7 @@ template<class K, class V> using boost_unordered_map =
 template<class K, class V> using boost_unordered_flat_map =
     boost::unordered_flat_map<K, V, boost::hash<K>, std::equal_to<K>, allocator_for<K, V>>;
 
-#ifdef HAVE_ABSEIL
+#ifdef ABSL_HMAP
 
 template<class K, class V> using absl_node_hash_map =
     absl::node_hash_map<K, V, absl::container_internal::hash_default_hash<K>, absl::container_internal::hash_default_eq<K>, allocator_for<K, V>>;
@@ -332,7 +332,7 @@ int main()
     test<boost_unordered_map>( "boost::unordered_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
-#ifdef HAVE_ABSEIL
+#ifdef ABSL_HMAP
 
     test<absl_node_hash_map>( "absl::node_hash_map" );
     test<absl_flat_hash_map>( "absl::flat_hash_map" );
@@ -361,7 +361,7 @@ int main()
     }
 }
 
-#ifdef HAVE_ABSEIL
+#ifdef ABSL_HMAP
 # include "absl/container/internal/raw_hash_set.cc"
 # include "absl/hash/internal/hash.cc"
 # include "absl/hash/internal/low_level_hash.cc"
