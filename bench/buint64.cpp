@@ -13,7 +13,7 @@
 #include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_table8.hpp"
-#include "emilib/emilib3so.hpp"
+#include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
 
 #include "util.h"
@@ -27,8 +27,10 @@
 
 using namespace std::chrono_literals;
 #if TKey == 1
+using KeyType = uint64_t;
 using ValType = uint64_t;
 #else
+using KeyType = uint32_t;
 using ValType = uint32_t;
 #endif
 
@@ -58,7 +60,7 @@ static void init_indices()
     indices2.push_back( 0 );
 
     {
-        Sfc4 rng(123);
+        boost::detail::splitmix64 rng;
 
         for( unsigned i = 1; i <= N*2; ++i )
         {
@@ -68,7 +70,7 @@ static void init_indices()
 
     indices3.push_back( 0 );
 
-    for( uint64_t i = 1; i <= N*2; ++i )
+    for( unsigned i = 1; i <= N*2; ++i )
     {
         indices3.push_back( boost::endian::endian_reverse( static_cast<std::uint64_t>( i ) ) );
 //        if (sizeof (KeyType) == sizeof (uint64_t))
@@ -106,7 +108,7 @@ template<class Map>  void test_insert( Map& map, std::chrono::steady_clock::time
 
 template<class Map>  void test_lookup( Map& map, std::chrono::steady_clock::time_point & t1 )
 {
-    uint64_t s;
+    std::uint64_t s;
 
     s = 0;
 
@@ -186,25 +188,18 @@ template<class Map>  void test_erase( Map& map, std::chrono::steady_clock::time_
     {
         map.erase( indices1[ i ] );
     }
-
     print_time( t1, "Consecutive erase",  0, map.size() );
 
+    for( unsigned i = 1; i <= N; ++i )
     {
-//        Sfc4 rng(123);
-
-        for( unsigned i = 1; i <= N; ++i )
-        {
-            map.erase( indices2[ i ] );
-        }
+        map.erase( indices2[ i ] );
     }
-
     print_time( t1, "Random erase",  0, map.size() );
 
     for( unsigned i = 1; i <= N; ++i )
     {
         map.erase( indices3[ i ] );
     }
-
     print_time( t1, "Consecutive shifted erase",  0, map.size() );
 
     std::cout << std::endl;
@@ -271,7 +266,7 @@ template<template<class...> class Map>  void test( char const* label )
     s_alloc_bytes = 0;
     s_alloc_count = 0;
 
-    Map<std::uint64_t, ValType> map;
+    Map<KeyType, ValType> map;
 
     auto t0 = std::chrono::steady_clock::now();
     auto t1 = t0;
@@ -294,27 +289,20 @@ template<template<class...> class Map>  void test( char const* label )
     times.push_back( rec );
 }
 
-// multi_index emulation of unordered_map
-
-template<class K, class V> struct pair
-{
-    K first;
-    mutable V second;
-};
-
-
 // aliases using the counting allocator
-
-#if FIB_HASH
+#if ABSL_HASH
+    #define BintHasher absl::Hash<K>
+#elif BOOST_HASH
+    #define BintHasher boost::hash<K>
+#elif FIB_HASH
     #define BintHasher Int64Hasher<K>
-#elif STD_HASH
-    #define BintHasher std::hash<K>
 #elif ROBIN_HASH
     #define BintHasher robin_hood::hash<K>
 #elif CXX17
     #define BintHasher ankerl::unordered_dense::hash<K>
+#else
+    #define BintHasher std::hash<K>
 #endif
-
 
 template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;
 
@@ -331,7 +319,7 @@ template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BintHasher
 
 template<class K, class V> using martinus_flat = robin_hood::unordered_map<K, V, BintHasher, std::equal_to<K>>;
 template<class K, class V> using emilib_map2 = emilib2::HashMap<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emilib_map3 = emilib::HashMap<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using emilib_map3 = emilib3::HashMap<K, V, BintHasher, std::equal_to<K>>;
 
 #ifdef CXX20
 template<class K, class V> using jg_densemap = jg::dense_hash_map<K, V, BintHasher, std::equal_to<K>>;
@@ -382,7 +370,7 @@ int main(int argc, const char* argv[])
 
     for( auto const& x: times )
     {
-        std::cout << std::setw( 30 ) << ( x.label_ + ": " ) << std::setw( 5 ) << x.time_ << " ms, " << std::setw( 9 ) << x.bytes_ << " bytes in " << x.count_ << " allocations\n";
+        std::cout << std::setw( 27 ) << ( x.label_ + ": " ) << std::setw( 5 ) << x.time_ << " ms, " << std::setw( 9 ) << x.bytes_ << " bytes in " << x.count_ << " allocations\n";
     }
 
     return 0;

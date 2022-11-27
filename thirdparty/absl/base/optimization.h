@@ -91,6 +91,7 @@
 #define ABSL_CACHELINE_SIZE 64
 #endif
 #endif
+#endif
 
 #ifndef ABSL_CACHELINE_SIZE
 // A reasonable default guess.  Note that overestimates tend to waste more
@@ -141,12 +142,11 @@
 //    the generated machine code.
 // 3) Prefer applying this attribute to individual variables. Avoid
 //    applying it to types. This tends to localize the effect.
+#if defined(__clang__) || defined(__GNUC__)
 #define ABSL_CACHELINE_ALIGNED __attribute__((aligned(ABSL_CACHELINE_SIZE)))
 #elif defined(_MSC_VER)
-#define ABSL_CACHELINE_SIZE 64
 #define ABSL_CACHELINE_ALIGNED __declspec(align(ABSL_CACHELINE_SIZE))
 #else
-#define ABSL_CACHELINE_SIZE 64
 #define ABSL_CACHELINE_ALIGNED
 #endif
 
@@ -247,30 +247,6 @@
   asm(ABSL_INTERNAL_UNIQUE_SMALL_NAME1(.absl.__COUNTER__))
 #else
 #define ABSL_INTERNAL_UNIQUE_SMALL_NAME()
-#endif
-
-// ABSL_IS_TRIVIALLY_RELOCATABLE(type)
-// Detects whether a type is "trivially relocatable" -- meaning it can be
-// relocated without invoking the constructor/destructor, using a form of move
-// elision.
-//
-// Example:
-//
-// if constexpr (ABSL_IS_TRIVIALLY_RELOCATABLE(T)) {
-//   memcpy(new_location, old_location, sizeof(T));
-// } else {
-//   new(new_location) T(std::move(*old_location));
-//   old_location->~T();
-// }
-//
-// Upstream documentation:
-//
-// https://clang.llvm.org/docs/LanguageExtensions.html#:~:text=__is_trivially_relocatable
-//
-#if ABSL_HAVE_BUILTIN(__is_trivially_relocatable)
-#define ABSL_IS_TRIVIALLY_RELOCATABLE(type) __is_trivially_relocatable(type)
-#else
-#define ABSL_IS_TRIVIALLY_RELOCATABLE(type) false
 #endif
 
 #endif  // ABSL_BASE_OPTIMIZATION_H_

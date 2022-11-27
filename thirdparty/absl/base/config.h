@@ -243,6 +243,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #ifdef ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE
 #error ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE cannot be directly set
 #elif defined(_LIBCPP_VERSION) || defined(_MSC_VER) || \
+    (defined(__clang__) && __clang_major__ >= 15) ||   \
     (!defined(__clang__) && defined(__GLIBCXX__) &&    \
      ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(4, 8))
 #define ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE 1
@@ -264,6 +265,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #elif defined(ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE)
 #error ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE cannot directly set
 #elif (defined(__clang__) && defined(_LIBCPP_VERSION)) ||                    \
+    (defined(__clang__) && __clang_major__ >= 15) ||                         \
     (!defined(__clang__) &&                                                  \
      ((ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(7, 4) && defined(__GLIBCXX__)) || \
       (ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(8, 2) &&                          \
@@ -784,7 +786,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #ifdef ABSL_HAVE_ADDRESS_SANITIZER
 #error "ABSL_HAVE_ADDRESS_SANITIZER cannot be directly set."
 #elif defined(__SANITIZE_ADDRESS__)
-//#define ABSL_HAVE_ADDRESS_SANITIZER 1
+#define ABSL_HAVE_ADDRESS_SANITIZER 1
 #elif ABSL_HAVE_FEATURE(address_sanitizer)
 #define ABSL_HAVE_ADDRESS_SANITIZER 1
 #endif
@@ -915,9 +917,14 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 
 // ABSL_INTERNAL_HAVE_ARM_NEON is used for compile-time detection of NEON (ARM
 // SIMD).
+//
+// If __CUDA_ARCH__ is defined, then we are compiling CUDA code in device mode.
+// In device mode, NEON intrinsics are not available, regardless of host
+// platform.
+// https://llvm.org/docs/CompileCudaWithLLVM.html#detecting-clang-vs-nvcc-from-code
 #ifdef ABSL_INTERNAL_HAVE_ARM_NEON
 #error ABSL_INTERNAL_HAVE_ARM_NEON cannot be directly set
-#elif defined(__ARM_NEON)
+#elif defined(__ARM_NEON) && !defined(__CUDA_ARCH__)
 #define ABSL_INTERNAL_HAVE_ARM_NEON 1
 #endif
 

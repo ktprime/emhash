@@ -515,7 +515,7 @@ void iter_all(const hash_type& ht_hash, const std::string& hash_name)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : ht_hash)
-        sum += 1;
+        sum += sum;
 
     for (auto& v : ht_hash)
         sum += 2;
@@ -932,24 +932,16 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
-#ifndef HAVE_BOOST
-#if QC_HASH == 0
+
     for (auto it = tmp.begin(); it != tmp.end(); ) {
-#if KEY_INT
-        if (it->first % 2 == 0)
-#else
-        if (id++ % 2 == 0)
+#if CXX17
+        if constexpr( std::is_void_v< decltype( tmp.erase( it ) ) > )
+            ++it;
+        else
 #endif
             it = tmp.erase(it);
-        else
-            ++it;
     }
-#endif
-
-#if KEY_INT
     sum += tmp.size();
-#endif
-#endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -1140,9 +1132,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
     erase_50_reinsert<hash_type>(hash, hash_name, oList);
 
     insert_find_erase <hash_type>(hash, hash_name, nList);
+    iter_all          <hash_type>(hash, hash_name);
 
     if (test_extra) {
-        iter_all          <hash_type>(hash, hash_name);
         insert_high_load  <hash_type>(hash_name, oList);
         insert_erase_high <hash_type>(hash_name, oList.size());
         copy_clear        <hash_type>(hash, hash_name);

@@ -612,9 +612,9 @@ struct GroupAArch64Impl {
 
   NonIterableBitMask<uint64_t, kWidth, 3> MaskEmpty() const {
     uint64_t mask =
-        vget_lane_u64(vreinterpret_u64_u8(
-                          vceq_s8(vdup_n_s8(static_cast<h2_t>(ctrl_t::kEmpty)),
-                                  vreinterpret_s8_u8(ctrl))),
+        vget_lane_u64(vreinterpret_u64_u8(vceq_s8(
+                          vdup_n_s8(static_cast<int8_t>(ctrl_t::kEmpty)),
+                          vreinterpret_s8_u8(ctrl))),
                       0);
     return NonIterableBitMask<uint64_t, kWidth, 3>(mask);
   }
@@ -797,15 +797,54 @@ size_t SelectBucketCountForIterRange(InputIter first, InputIter last,
   return 0;
 }
 
-#define ABSL_INTERNAL_ASSERT_IS_FULL(ctrl, msg) \
-  ABSL_HARDENING_ASSERT((ctrl != nullptr && IsFull(*ctrl)) && msg)
+#define ABSL_INTERNAL_ASSERT_IS_FULL(ctrl, operation)                         \
+  do {                                                                        \
+    ABSL_HARDENING_ASSERT(                                                    \
+        (ctrl != nullptr) && operation                                        \
+        " called on invalid iterator. The iterator might be an end() "        \
+        "iterator or may have been default constructed.");                    \
+    ABSL_HARDENING_ASSERT(                                                    \
+        (IsFull(*ctrl)) && operation                                          \
+        " called on invalid iterator. The element might have been erased or " \
+        "the table might have rehashed.");                                    \
+  } while (0)
 
-inline void AssertIsValid(ctrl_t* ctrl) {
+// Note that for comparisons, null/end iterators are valid.
+inline void AssertIsValidForComparison(const ctrl_t* ctrl) {
+  ABSL_HARDENING_ASSERT((ctrl == nullptr || IsFull(*ctrl)) &&
+                        "Invalid iterator comparison. The element might have "
+                        "been erased or the table might have rehashed.");
+}
+
+// If the two iterators come from the same container, then their pointers will
+// interleave such that ctrl_a <= ctrl_b < slot_a <= slot_b or vice/versa.
+// Note: we take slots by reference so that it's not UB if they're uninitialized
+// as long as we don't read them (when ctrl is null).
+inline bool AreItersFromSameContainer(const ctrl_t* ctrl_a,
+                                      const ctrl_t* ctrl_b,
+                                      const void* const& slot_a,
+                                      const void* const& slot_b) {
+  // If either control byte is null, then we can't tell.
+  if (ctrl_a == nullptr || ctrl_b == nullptr) return true;
+  const void* low_slot = slot_a;
+  const void* hi_slot = slot_b;
+  if (ctrl_a > ctrl_b) {
+    std::swap(ctrl_a, ctrl_b);
+    std::swap(low_slot, hi_slot);
+  }
+  return ctrl_b < low_slot && low_slot <= hi_slot;
+}
+
+// Asserts that two iterators come from the same container.
+// Note: we take slots by reference so that it's not UB if they're uninitialized
+// as long as we don't read them (when ctrl is null).
+inline void AssertSameContainer(const ctrl_t* ctrl_a, const ctrl_t* ctrl_b,
+                                const void* const& slot_a,
+                                const void* const& slot_b) {
   ABSL_HARDENING_ASSERT(
-      (ctrl == nullptr || IsFull(*ctrl)) &&
-      "Invalid operation on iterator. The element might have "
-      "been erased, the table might have rehashed, or this may "
-      "be an end() iterator.");
+      AreItersFromSameContainer(ctrl_a, ctrl_b, slot_a, slot_b) &&
+      "Invalid iterator comparison. The iterators may be from different "
+      "containers or the container might have rehashed.");
 }
 
 struct FindInfo {
@@ -1034,22 +1073,19 @@ class raw_hash_set {
 
     // PRECONDITION: not an end() iterator.
     reference operator*() const {
-      ABSL_INTERNAL_ASSERT_IS_FULL(ctrl_,
-                                   "operator*() called on invalid iterator.");
+      ABSL_INTERNAL_ASSERT_IS_FULL(ctrl_, "operator*()");
       return PolicyTraits::element(slot_);
     }
 
     // PRECONDITION: not an end() iterator.
     pointer operator->() const {
-      ABSL_INTERNAL_ASSERT_IS_FULL(ctrl_,
-                                   "operator-> called on invalid iterator.");
+      ABSL_INTERNAL_ASSERT_IS_FULL(ctrl_, "operator->");
       return &operator*();
     }
 
     // PRECONDITION: not an end() iterator.
     iterator& operator++() {
-      ABSL_INTERNAL_ASSERT_IS_FULL(ctrl_,
-                                   "operator++ called on invalid iterator.");
+      ABSL_INTERNAL_ASSERT_IS_FULL(ctrl_, "operator++");
       ++ctrl_;
       ++slot_;
       skip_empty_or_deleted();
@@ -1063,8 +1099,9 @@ class raw_hash_set {
     }
 
     friend bool operator==(const iterator& a, const iterator& b) {
-      AssertIsValid(a.ctrl_);
-      AssertIsValid(b.ctrl_);
+      AssertSameContainer(a.ctrl_, b.ctrl_, a.slot_, b.slot_);
+      AssertIsValidForComparison(a.ctrl_);
+      AssertIsValidForComparison(b.ctrl_);
       return a.ctrl_ == b.ctrl_;
     }
     friend bool operator!=(const iterator& a, const iterator& b) {
@@ -1081,7 +1118,7 @@ class raw_hash_set {
     // Fixes up `ctrl_` to point to a full by advancing it and `slot_` until
     // they reach one.
     //
-    // If a sentinel is reached, we null both of them out instead.
+    // If a sentinel is reached, we null `ctrl_` out instead.
     void skip_empty_or_deleted() {
       while (IsEmptyOrDeleted(*ctrl_)) {
         uint32_t shift = Group{ctrl_}.CountLeadingEmptyOrDeleted();
@@ -1144,11 +1181,12 @@ class raw_hash_set {
           std::is_nothrow_default_constructible<key_equal>::value&&
               std::is_nothrow_default_constructible<allocator_type>::value) {}
 
-  explicit raw_hash_set(size_t bucket_count, const hasher& hash = hasher(),
+  explicit raw_hash_set(size_t bucket_count,
+                        const hasher& hash = hasher(),
                         const key_equal& eq = key_equal(),
                         const allocator_type& alloc = allocator_type())
       : ctrl_(EmptyGroup()),
-        settings_(0, HashtablezInfoHandle(), hash, eq, alloc) {
+        settings_(0u, HashtablezInfoHandle(), hash, eq, alloc) {
     if (bucket_count) {
       capacity_ = NormalizeCapacity(bucket_count);
       initialize_slots();
@@ -1273,14 +1311,16 @@ class raw_hash_set {
               std::is_nothrow_copy_constructible<allocator_type>::value)
       : ctrl_(absl::exchange(that.ctrl_, EmptyGroup())),
         slots_(absl::exchange(that.slots_, nullptr)),
-        size_(absl::exchange(that.size_, 0)),
-        capacity_(absl::exchange(that.capacity_, 0)),
+        size_(absl::exchange(that.size_, size_t{0})),
+        capacity_(absl::exchange(that.capacity_, size_t{0})),
         // Hash, equality and allocator are copied instead of moved because
         // `that` must be left valid. If Hash is std::function<Key>, moving it
         // would create a nullptr functor that cannot be called.
-        settings_(absl::exchange(that.growth_left(), 0),
+        settings_(absl::exchange(that.growth_left(), size_t{0}),
                   absl::exchange(that.infoz(), HashtablezInfoHandle()),
-                  that.hash_ref(), that.eq_ref(), that.alloc_ref()) {}
+                  that.hash_ref(),
+                  that.eq_ref(),
+                  that.alloc_ref()) {}
 
   raw_hash_set(raw_hash_set&& that, const allocator_type& a)
       : ctrl_(EmptyGroup()),
@@ -1324,7 +1364,7 @@ class raw_hash_set {
         typename AllocTraits::propagate_on_container_move_assignment());
   }
 
-  ~raw_hash_set() { destroy_slots(); }
+  ~raw_hash_set() { destroy_slots(/*reset=*/false); }
 
   iterator begin() {
     auto it = iterator_at(0);
@@ -1354,7 +1394,7 @@ class raw_hash_set {
     // largest bucket_count() threshold for which iteration is still fast and
     // past that we simply deallocate the array.
     if (capacity_ > 127) {
-      destroy_slots();
+      destroy_slots(/*reset=*/true);
 
       infoz().RecordClearedReservation();
     } else if (capacity_) {
@@ -1593,17 +1633,15 @@ class raw_hash_set {
   //     m.erase(copy_it);
   //   }
   // }
-  iterator erase(const_iterator cit) { return erase(cit.inner_); }
+  iterator erase(const_iterator cit) { erase(cit.inner_); return ++cit; }
 
   // This overload is necessary because otherwise erase<K>(const K&) would be
   // a better match if non-const iterator is passed as an argument.
   iterator erase(iterator it) {
-    auto next = it;
-    ABSL_INTERNAL_ASSERT_IS_FULL(it.ctrl_,
-                                 "erase() called on invalid iterator.");
+    ABSL_INTERNAL_ASSERT_IS_FULL(it.ctrl_, "erase()");
     PolicyTraits::destroy(&alloc_ref(), it.slot_);
     erase_meta_only(it);
-    return ++next;
+	return ++it;
   }
 
   iterator erase(const_iterator first, const_iterator last) {
@@ -1635,8 +1673,7 @@ class raw_hash_set {
   }
 
   node_type extract(const_iterator position) {
-    ABSL_INTERNAL_ASSERT_IS_FULL(position.inner_.ctrl_,
-                                 "extract() called on invalid iterator.");
+    ABSL_INTERNAL_ASSERT_IS_FULL(position.inner_.ctrl_, "extract()");
     auto node =
         CommonAccess::Transfer<node_type>(alloc_ref(), position.inner_.slot_);
     erase_meta_only(position);
@@ -1671,7 +1708,7 @@ class raw_hash_set {
   void rehash(size_t n) {
     if (n == 0 && capacity_ == 0) return;
     if (n == 0 && size_ == 0) {
-      destroy_slots();
+      destroy_slots(/*reset=*/true);
       infoz().RecordStorageChanged(0, 0);
       infoz().RecordClearedReservation();
       return;
@@ -1949,11 +1986,11 @@ class raw_hash_set {
     infoz().RecordStorageChanged(size_, capacity_);
   }
 
-  // Destroys all slots in the backing array, frees the backing array, and
-  // clears all top-level book-keeping data.
+  // Destroys all slots in the backing array, frees the backing array,
+  // If reset is true, also clears all top-level book-keeping data.
   //
   // This essentially implements `map = raw_hash_set();`.
-  void destroy_slots() {
+  void destroy_slots(bool reset) {
     if (!capacity_) return;
     for (size_t i = 0; i != capacity_; ++i) {
       if (IsFull(ctrl_[i])) {
@@ -1966,11 +2003,13 @@ class raw_hash_set {
     Deallocate<alignof(slot_type)>(
         &alloc_ref(), ctrl_,
         AllocSize(capacity_, sizeof(slot_type), alignof(slot_type)));
-    ctrl_ = EmptyGroup();
-    slots_ = nullptr;
-    size_ = 0;
-    capacity_ = 0;
-    growth_left() = 0;
+    if (reset) {
+      ctrl_ = EmptyGroup();
+      slots_ = nullptr;
+      size_ = 0;
+      capacity_ = 0;
+      growth_left() = 0;
+    }
   }
 
   void resize(size_t new_capacity) {

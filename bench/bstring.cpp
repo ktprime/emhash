@@ -251,7 +251,11 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     s_alloc_bytes = 0;
     s_alloc_count = 0;
 
+#ifdef STD_VIEW
+    Map<std::string_view, std::uint32_t> map;
+#else
     Map<std::string, std::uint32_t> map;
+#endif
 
     auto t0 = std::chrono::steady_clock::now();
     auto t1 = t0;
@@ -274,49 +278,61 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     times.push_back( rec );
 }
 
+#if ABSL_HASH
+    #define BstrHasher absl::Hash<K>
+#elif BOOST_HASH
+    #define BstrHasher boost::hash<K>
+#elif ROBIN_HASH
+    #define BstrHasher robin_hood::hash<K>
+#elif CXX17
+    #define BstrHasher ankerl::unordered_dense::hash<K>
+#else
+    #define BstrHasher std::hash<K>
+#endif
+
 // aliases using the counting allocator
 
 template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;
 
 template<class K, class V> using std_unordered_map =
-    std::unordered_map<K, V, std::hash<K>, std::equal_to<K>, allocator_for<K, V>>;
+    std::unordered_map<K, V, BstrHasher, std::equal_to<K>, allocator_for<K, V>>;
 
 template<class K, class V> using boost_unordered_flat_map =
-    boost::unordered_flat_map<K, V, boost::hash<K>, std::equal_to<K>, allocator_for<K, V>>;
+    boost::unordered_flat_map<K, V, BstrHasher, std::equal_to<K>, allocator_for<K, V>>;
 
-template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, boost::hash<K>, std::equal_to<K>>;
-template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, boost::hash<K>, std::equal_to<K>>;
-template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, boost::hash<K>, std::equal_to<K>>;
+template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 
-template<class K, class V> using martinus_flat = robin_hood::unordered_map<K, V, boost::hash<K>, std::equal_to<K>>;
-template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K, V, boost::hash<K>, std::equal_to<K>>;
-template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, boost::hash<K>, std::equal_to<K>>;
-template<class K, class V> using emilib3_map = emilib::HashMap<K, V, boost::hash<K>, std::equal_to<K>>;
+template<class K, class V> using martinus_flat = robin_hood::unordered_map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using emilib3_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 
 #ifdef ABSL_HMAP
 
-template<class K, class V> using absl_node_hash_map = absl::node_hash_map<K, V, boost::hash<K>, std::equal_to<K>>;
-template<class K, class V> using absl_flat_hash_map = absl::flat_hash_map<K, V, boost::hash<K>, std::equal_to<K>>;
+template<class K, class V> using absl_node_hash_map = absl::node_hash_map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using absl_flat_hash_map = absl::flat_hash_map<K, V, BstrHasher, std::equal_to<K>>;
 
 #endif
 
 #ifdef HAVE_TSL_HOPSCOTCH
 
 template<class K, class V> using tsl_hopscotch_map =
-    tsl::hopscotch_map<K, V, std::hash<K>, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
+    tsl::hopscotch_map<K, V, BstrHasher, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
 
 template<class K, class V> using tsl_hopscotch_pg_map =
-    tsl::hopscotch_pg_map<K, V, std::hash<K>, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
+    tsl::hopscotch_pg_map<K, V, BstrHasher, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
 
 #endif
 
 #ifdef HAVE_TSL_ROBIN
 
 template<class K, class V> using tsl_robin_map =
-    tsl::robin_map<K, V, std::hash<K>, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
+    tsl::robin_map<K, V, BstrHasher, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
 
 template<class K, class V> using tsl_robin_pg_map =
-    tsl::robin_pg_map<K, V, std::hash<K>, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
+    tsl::robin_pg_map<K, V, BstrHasher, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
 
 #endif
 
@@ -411,6 +427,7 @@ int main()
 
 //    test<std_unordered_map>( "std::unordered_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+
     test<emhash_map8>( "emhash8::hash_map" );
     test<emhash_map7>( "emhash7::hash_map" );
     test<emhash_map5>( "emhash5::hash_map" );

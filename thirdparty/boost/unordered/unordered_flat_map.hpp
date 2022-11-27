@@ -352,10 +352,10 @@ namespace boost {
           .first;
       }
 
-      BOOST_FORCEINLINE void erase(iterator pos) { table_.erase(pos); }
-      BOOST_FORCEINLINE void erase(const_iterator pos)
+      BOOST_FORCEINLINE iterator erase(iterator pos) { table_.erase(pos); return ++pos; }
+      BOOST_FORCEINLINE iterator erase(const_iterator pos)
       {
-        return table_.erase(pos);
+        table_.erase(pos); return ++pos;
       }
       iterator erase(const_iterator first, const_iterator last)
       {
