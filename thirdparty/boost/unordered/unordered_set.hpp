@@ -673,6 +673,20 @@ namespace boost {
     unordered_set(std::initializer_list<T>, std::size_t, Hash, Allocator)
       -> unordered_set<T, Hash, std::equal_to<T>, Allocator>;
 
+    template <class InputIterator, class Allocator,
+      class = boost::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
+      class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
+    unordered_set(InputIterator, InputIterator, Allocator)
+      -> unordered_set<typename std::iterator_traits<InputIterator>::value_type,
+        boost::hash<typename std::iterator_traits<InputIterator>::value_type>,
+        std::equal_to<typename std::iterator_traits<InputIterator>::value_type>,
+        Allocator>;
+
+    template <class T, class Allocator,
+      class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
+    unordered_set(std::initializer_list<T>, Allocator)
+      -> unordered_set<T, boost::hash<T>, std::equal_to<T>, Allocator>;
+
 #endif
 
     template <class T, class H, class P, class A> class unordered_multiset
@@ -1302,6 +1316,21 @@ namespace boost {
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
     unordered_multiset(std::initializer_list<T>, std::size_t, Hash, Allocator)
       -> unordered_multiset<T, Hash, std::equal_to<T>, Allocator>;
+
+    template <class InputIterator, class Allocator,
+      class = boost::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
+      class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
+    unordered_multiset(InputIterator, InputIterator, Allocator)
+      -> unordered_multiset<
+        typename std::iterator_traits<InputIterator>::value_type,
+        boost::hash<typename std::iterator_traits<InputIterator>::value_type>,
+        std::equal_to<typename std::iterator_traits<InputIterator>::value_type>,
+        Allocator>;
+
+    template <class T, class Allocator,
+      class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
+    unordered_multiset(std::initializer_list<T>, Allocator)
+      -> unordered_multiset<T, boost::hash<T>, std::equal_to<T>, Allocator>;
 
 #endif
 

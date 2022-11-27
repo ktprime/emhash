@@ -427,24 +427,24 @@ namespace boost {
           std::out_of_range("key was not found in unordered_flat_map"));
       }
 
-      mapped_type& operator[](key_type const& key)
+      BOOST_FORCEINLINE mapped_type& operator[](key_type const& key)
       {
         return table_.try_emplace(key).first->second;
       }
 
-      mapped_type& operator[](key_type&& key)
+      BOOST_FORCEINLINE mapped_type& operator[](key_type&& key)
       {
         return table_.try_emplace(std::move(key)).first->second;
       }
 
-      size_type count(key_type const& key) const
+      BOOST_FORCEINLINE size_type count(key_type const& key) const
       {
         auto pos = table_.find(key);
         return pos != table_.end() ? 1 : 0;
       }
 
       template <class K>
-      typename std::enable_if<
+      BOOST_FORCEINLINE typename std::enable_if<
         detail::are_transparent<K, hasher, key_equal>::value, size_type>::type
       count(K const& key) const
       {
@@ -480,13 +480,13 @@ namespace boost {
         return table_.find(key);
       }
 
-      bool contains(key_type const& key) const
+      BOOST_FORCEINLINE bool contains(key_type const& key) const
       {
         return this->find(key) != this->end();
       }
 
       template <class K>
-      typename std::enable_if<
+      BOOST_FORCEINLINE typename std::enable_if<
         boost::unordered::detail::are_transparent<K, hasher, key_equal>::value,
         bool>::type
       contains(K const& key) const
