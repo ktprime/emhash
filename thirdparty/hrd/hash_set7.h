@@ -1,21 +1,14 @@
-//#ifndef hrd_hash_set_h_
-//#define hrd_hash_set_h_
-
-#include <functional>
-#include <stdexcept>
-#include <cstdint>
-#include <string.h> //memcpy
 #pragma once
 
 //LOAD_FACTOR implementation
 
 // Fast hashtable (hash_set, hash_map) based on open addressing hashing for C++11 and up
-// version 1.2.18
+// version 1.3.1
 // https://github.com/hordi/hash
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2019 Yurii Hordiienko
+// Copyright (c) 2018-2022 Yurii Hordiienko
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -79,7 +72,7 @@ public:
 #if defined(_MSC_VER) && _MSC_VER >= 1915
         __declspec (empty_bases)
 #endif
-    hash_eql: public Hasher, public KeyEql
+    hash_eql: private Hasher, private KeyEql
     {
     public:
         hash_eql() {}
@@ -115,13 +108,13 @@ protected:
     enum { DELETED_MARK = 0x1 };
 
     constexpr static const uint32_t OFFSET_BASIS = 2166136261;
-    constexpr static const float DEFAULT_LOAD_FACTOR = 0.8f;
+    constexpr static const float DEFAULT_LOAD_FACTOR = 0.5f;
 
     HRD_ALWAYS_INLINE static size_t roundup(size_t sz) noexcept
     {
 #ifdef _MSC_VER
         unsigned long idx;
-#  if defined(_WIN64)
+#  if defined(_WIN64) || defined(__LP64__)
         _BitScanReverse64(&idx, sz - 1);
 #  else
         _BitScanReverse(&idx, sz - 1);
@@ -129,8 +122,7 @@ protected:
 #else
         size_t idx;
 #  ifdef __LP64__
-        idx = __builtin_ctzll(sz - 1);
-        //__asm__("bsrq %0, %0" : "=r" (idx) : "0" (sz - 1));
+        __asm__("bsrq %0, %0" : "=r" (idx) : "0" (sz - 1));
 #  else
         __asm__("bsr %0, %0" : "=r" (idx) : "0" (sz - 1));
 #  endif
@@ -168,7 +160,7 @@ protected:
         return fnv_1a((const char*)ptr, SIZE);
     }
 
-    static HRD_ALWAYS_INLINE uint32_t fnv_1a(const char* key, const size_t len, uint32_t hash32 = OFFSET_BASIS) noexcept
+    constexpr static HRD_ALWAYS_INLINE uint32_t fnv_1a(const char* key, size_t len, uint32_t hash32 = OFFSET_BASIS) noexcept
     {
         constexpr const uint32_t PRIME = 1607;
 
@@ -186,7 +178,8 @@ protected:
     }
 
     HRD_ALWAYS_INLINE static uint32_t make_mark(size_t h) noexcept {
-        return static_cast<uint32_t>(h > DELETED_MARK ? h : (DELETED_MARK + 1));
+        auto n = static_cast<uint32_t>(h);
+        return n > DELETED_MARK ? n : (DELETED_MARK + 1);
     }
 
 #ifdef _MSC_VER
@@ -274,7 +267,7 @@ HRD_ALWAYS_INLINE uint32_t hash_utils::hash_1<16>(const void* ptr) noexcept
 template<>
 struct hash_utils::hash_<std::string> {
     HRD_ALWAYS_INLINE size_t operator()(const std::string& val) const noexcept {
-        return fnv_1a(val.data(), val.size());
+        return fnv_1a(val.c_str(), val.size());
     }
 };
 
@@ -420,12 +413,12 @@ protected:
         // |1 to prevent 0-usage (produces _capacity = 0 finally)
         ctor_pow2(roundup((hint_size | 1) * 2));
     }
-    
+
     template<typename Iter>
     hash_base(Iter first, Iter last, const hasher& hf = hasher(), const key_equal& eql = key_equal()) :
         hash_pred(hf, eql)
     {
-        ctor_iters(first, last, Iter::iterator_category());
+        ctor_iters(first, last, typename std::iterator_traits<Iter>::iterator_category());
     }
 
 #if (__cplusplus >= 201402L || _MSC_VER > 1600 || __clang__)
@@ -435,7 +428,7 @@ protected:
         ctor_init_list(lst);
     }
 #endif
-    
+
     ~hash_base() noexcept {
         dtor(IS_TRIVIALLY_DESTRUCTIBLE());
     }
@@ -465,7 +458,7 @@ public:
         }
     }
 
-    HRD_ALWAYS_INLINE void reserve(size_type hint) {
+    void reserve(size_type hint) {
         hint *= 2;
         if (HRD_LIKELY(hint > _capacity))
             resize_pow2(roundup(hint));
@@ -501,14 +494,14 @@ public:
 
     template<class P>
     HRD_ALWAYS_INLINE std::pair<iterator, bool> insert(P&& val) {
-        return insert_(std::forward<P>(val));
+        return insert_(std::forward<P>(val), std::false_type());
     }
 
 #if (__cplusplus >= 201402L || _MSC_VER > 1600 || __clang__)
     void insert(std::initializer_list<value_type> lst)
     {
         for (auto i = lst.begin(), e = lst.end(); i != e; ++i)
-            insert_(*i);
+            insert_(*i, std::false_type());
     }
 #endif
 
@@ -516,11 +509,26 @@ public:
     * \params it - Iterator pointing to a single element to be removed
     * \return return an iterator pointing to the position immediately following of the element erased
     */
-    HRD_ALWAYS_INLINE iterator erase(const_iterator it) noexcept {
+    HRD_ALWAYS_INLINE iterator erase(const_iterator it) noexcept
+    {
         iterator& ret = (iterator&)it;
+
+        auto ee = reinterpret_cast<storage_type*>(_elements);
+        auto e_next = ee + ((it._ptr + 1 - ee) & _capacity);
+
         if (HRD_LIKELY(!!it._ptr)) //valid
         {
-            deleteElement(it._ptr);
+            it._ptr->data.~value_type();
+            _size--;
+
+            //set DELETED_MARK only if next element not 0
+            auto next_mark = e_next->mark;
+            if (HRD_LIKELY(!next_mark))
+                it._ptr->mark = 0;
+            else {
+                it._ptr->mark = DELETED_MARK;
+                _erased++;
+            }
 
             if (HRD_UNLIKELY(ret._cnt)) {
                 for (--ret._cnt;;) {
@@ -537,13 +545,39 @@ public:
     * \params k - Key of the element to be erased
     * \return 1 - if element erased and zero otherwise
     */
-    HRD_ALWAYS_INLINE size_type erase(const key_type& k) noexcept {
-        storage_type* ptr = find_(k);
-        if (HRD_LIKELY(!!ptr)) {
-            deleteElement(ptr);
-            return 1;
+    HRD_ALWAYS_INLINE size_type erase(const key_type& k) noexcept
+    {
+        auto ee = (storage_type*)_elements;
+        const uint32_t mark = make_mark(hash_pred::operator()(k));
+
+        for (size_t i = mark;;)
+        {
+            i &= _capacity;
+            storage_type& r = ee[i++];
+            auto h = r.mark;
+            if (HRD_LIKELY(h == mark))
+            {
+                if (HRD_LIKELY(hash_pred::operator()(get_key(r.data), k))) //identical found
+                {
+                    r.data.~value_type();
+                    _size--;
+
+                    h = ee[i & _capacity].mark;
+
+                    //set DELETED_MARK only if next element not 0
+                    if (HRD_LIKELY(!h))
+                        r.mark = 0;
+                    else {
+                        r.mark = DELETED_MARK;
+                        _erased++;
+                    }
+
+                    return 1;
+                }
+            }
+            else if (!h)
+                return 0;
         }
-        return 0;
     }
 
     HRD_ALWAYS_INLINE iterator begin() noexcept {
@@ -627,23 +661,7 @@ protected:
         if (HRD_UNLIKELY(!_elements))
             throw_bad_alloc();
     }
-
-    HRD_ALWAYS_INLINE void deleteElement(storage_type* ptr) noexcept
-    {
-        ptr->data.~value_type();
-        _size--;
-
-        //set DELETED_MARK only if next element not 0
-        storage_type* ee = (storage_type*)_elements;
-        const uint32_t next_mark = (HRD_LIKELY(ptr != (ee + _capacity)) ? ptr + 1 : ee)->mark;
-        if (HRD_LIKELY(!next_mark))
-            ptr->mark = 0;
-        else {
-            ptr->mark = DELETED_MARK;
-            _erased++;
-        }
-    }
-
+    
     HRD_ALWAYS_INLINE void dtor(std::true_type) noexcept
     {
         if (HRD_LIKELY(_capacity))
@@ -893,12 +911,10 @@ protected:
         tmp.reset();
     }
 
+    //all needed space should be allocated before
     template<typename V>
-    HRD_ALWAYS_INLINE std::pair<iterator, bool> insert_(V&& val)
+    std::pair<iterator, bool> insert_(V&& val, std::true_type)
     {
-        if (HRD_UNLIKELY(_erased + _size >= _gap))
-            resize_pow2(2 * (_capacity + 1));
-
         storage_type* empty_spot = nullptr;
         uint32_t deleted_mark = DELETED_MARK;
         const uint32_t mark = make_mark(hash_pred::operator()(get_key(val)));
@@ -932,6 +948,16 @@ protected:
         }
     }
 
+    //probe available size
+    template<typename V>
+    HRD_ALWAYS_INLINE std::pair<iterator, bool> insert_(V&& val, std::false_type)
+    {
+        if (HRD_UNLIKELY(_erased + _size >= _gap))
+            resize_pow2(2 * (_capacity + 1));
+
+        return insert_(std::forward<V>(val), std::true_type());
+    }
+
     HRD_ALWAYS_INLINE storage_type* find_(const key_type& k) const noexcept
     {
         const uint32_t mark = make_mark(hash_pred::operator()(k));
@@ -948,6 +974,27 @@ protected:
             else if (!h)
                 return nullptr;
         }
+    }
+
+    template <typename Iter, typename SIZE_PREPARED>
+    void insert_iters_(Iter first, Iter last, SIZE_PREPARED) {
+        for (; first != last; ++first)
+            insert_(*first, SIZE_PREPARED());
+    }
+
+    template<typename Iter, class this_type>
+    HRD_ALWAYS_INLINE void insert_iters(Iter first, Iter last, std::random_access_iterator_tag)
+    {
+        size_t actual = std::distance(first, last) + _size;
+        if ((_erased + actual) >= _gap)
+            resize_pow2(roundup((actual | 1) * 2));
+
+        insert_iters_(first, last, std::true_type());
+    }
+
+    template<typename Iter, typename XXX>
+    HRD_ALWAYS_INLINE void insert_iters(Iter first, Iter last, XXX) {
+        insert_iters_(first, last, std::false_type());
     }
 
 #if (__cplusplus >= 201402L || _MSC_VER > 1600 || __clang__)
@@ -1058,12 +1105,17 @@ public:
     }
 
     HRD_ALWAYS_INLINE std::pair<iterator, bool> insert(const key_type& val) {
-        return super_type::insert_(val);
+        return super_type::insert_(val, std::false_type());
+    }
+
+    template<typename Iter>
+    HRD_ALWAYS_INLINE void insert(Iter first, Iter last) {
+        super_type::insert_iters(first, last, typename std::iterator_traits<Iter>::iterator_category());
     }
 
     template<class K>
     HRD_ALWAYS_INLINE std::pair<iterator, bool> emplace(K&& val) {
-        return super_type::insert_(std::forward<K>(val));
+        return super_type::insert_(std::forward<K>(val), std::false_type());
     }
 
     HRD_ALWAYS_INLINE hash_set& operator=(const hash_set& r) {
@@ -1130,11 +1182,13 @@ public:
     }
 
     HRD_ALWAYS_INLINE std::pair<iterator, bool> insert(const value_type& val) {
-        return super_type::insert_(val);
+        return super_type::insert_(val, std::false_type());
     }
-    HRD_ALWAYS_INLINE std::pair<iterator, bool> insert_or_assign(const Key& key, const T v) {
-        return super_type::emplace_(key, v);
-	}
+
+    template<typename Iter>
+    HRD_ALWAYS_INLINE void insert(Iter first, Iter last) {
+        super_type::insert_iters(first, last, typename std::iterator_traits<Iter>::iterator_category());
+    }
 
 #if (__cplusplus >= 201402L || _MSC_VER > 1600 || __clang__)
     template<class... Args>

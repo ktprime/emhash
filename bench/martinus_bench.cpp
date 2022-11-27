@@ -15,51 +15,46 @@
 //#define EMH_PACK_TAIL 16
 //#define EMH_HIGH_LOAD 123456
 #if EM3
-#include "old/hash_table2.hpp"
-#include "old/hash_table3.hpp"
-#include "old/hash_table4.hpp"
+#include "emhash/hash_table2.hpp"
+#include "emhash/hash_table3.hpp"
+#include "emhash/hash_table4.hpp"
 #endif
 
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
+#include "../hash_table8.hpp"
+
 //#include "../thirdparty/emhash/hash_table8v.hpp"
 //#include "../thirdparty/emhash/hash_table8v2.hpp"
-#include "../hash_table8.hpp"
 
 #ifdef HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
 #if X86
-//#include "emilib/emilib.hpp"
-#include "emilib/emilib3so.hpp"
-#include "emilib/emilib2s.hpp"
-#include "emilib/emilib2o.hpp"
+    #include "emilib/emilib3so.hpp"
+    #include "emilib/emilib2s.hpp"
+    #include "emilib/emilib2o.hpp"
 #endif
-//#include "old/ktprime_hash.hpp"
 
-#if __cplusplus >= 201103L || _MSC_VER > 1600
-#include "martinus/robin_hood.h"     //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/robin_hood.h"
 
 #if CXX17
 #include "martinus/unordered_dense.h"
 #endif
 
 #if ET
-#include "phmap/phmap.h"           //https://github.com/tessil/robin-map
-#include "tsl/robin_map.h"         //https://github.com/tessil/robin-map
-//#include "tsl/hopscotch_map.h"     //https://github.com/tessil/hopscotch-map
+    #include "phmap/phmap.h"
+    #include "tsl/robin_map.h"
 #if X86_64
-#include "ska/flat_hash_map.hpp"   //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
-//#include "hrd/hash_set7.h"         //https://github.com/tessil/robin-map
+    #include "ska/flat_hash_map.hpp"
+    #include "hrd/hash_set_m.h"
 #endif
-//#include "ska/bytell_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
 #endif
 
 #if FOLLY_F14
 #include "folly/container/F14Map.h"
-#endif
 #endif
 
 static const auto RND = getus() + time(0);
@@ -78,6 +73,7 @@ static std::map<std::string, std::string> show_name =
     {"emilib", "emilibo"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
+    {"hrd_m", "hrdm"},
 #endif
 
 #if HAVE_BOOST
@@ -100,7 +96,6 @@ static std::map<std::string, std::string> show_name =
     {"rigtorp", "rigtorp"},
     {"phmap", "phmap flat"},
     {"robin_hood", "martinus flat"},
-//    {"hrd7", "hrd7map"},
 //    {"folly", "f14_vector"},
 
 #if ET > 1
@@ -742,9 +737,9 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
 
     if (map.size() == 0) {
 #if _WIN32
-    printf("    %3u%% %016llx success time = %.2f s, %8d loadf = %.2f\n",
+    printf("    %3u%% %016llx time = %.2f s, %8d loadf = %.2f\n",
 #else
-    printf("    %3u%% %016lx success time = %.2f s, %8d loadf = %.2f\n",
+    printf("    %3u%% %016lx time = %.2f s, %8d loadf = %.2f\n",
 #endif
             uint32_t(numSequential * 100 / NumTotal), bitMask, now2sec() - ts, (int)num_found, map.load_factor());
     }
@@ -852,7 +847,7 @@ void runTest(int sflags, int eflags)
         { rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
 #if ET
-        //        { hrd7::hash_map <uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
+        { hrd_m::hash_map <uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
 
@@ -919,7 +914,7 @@ void runTest(int sflags, int eflags)
 #endif
 
 #if ET
-        //        { hrd7::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
+        { hrd_m::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
         { tsl::robin_map  <std::string, size_t, hash_func> bench;     bench_randomFindString(bench); }
         { robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 
@@ -985,7 +980,7 @@ void runTest(int sflags, int eflags)
 #endif
 
 #if ET
-        //        { hrd7::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
+        { hrd_m::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
         { tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 
@@ -1033,7 +1028,7 @@ void runTest(int sflags, int eflags)
 #endif
 
             { phmap::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
-            //        { hrd7::hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
+            { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if QC_HASH
             { fph::DynamicFphMap<size_t, size_t, fph::MixSeedHash<size_t>> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -1124,7 +1119,7 @@ void runTest(int sflags, int eflags)
         { emilib3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 #endif
 #if ET
-        //        { hrd7::hash_map <int, int, hash_func> hmap;  bench_insert(hmap); }
+        { hrd_m::hash_map <int, int, hash_func> hmap; bench_insert(hmap); }
         { tsl::robin_map  <int, int, hash_func> rmap; bench_insert(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_insert(martin); }
 
@@ -1179,7 +1174,7 @@ void runTest(int sflags, int eflags)
         { emilib::HashMap<uint64_t, uint64_t, hash_func>  emap; bench_randomInsertErase(emap); }
 #endif
 #if ET
-        //        { hrd7::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
+        { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
         { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
 
@@ -1243,8 +1238,8 @@ void runTest(int sflags, int eflags)
         { emilib3::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #endif
 #if ET
-        //        { hrd7::hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
-        { tsl::robin_map     <int, int, hash_func> rmap; bench_randomDistinct2(rmap); }
+        { hrd_m::hash_map  <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
+        { tsl::robin_map   <int, int, hash_func> rmap; bench_randomDistinct2(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
 
 #if X86_64
@@ -1365,7 +1360,7 @@ int main(int argc, char* argv[])
             else if (c == 's')
                 checkSet("ska");
             else if (c == 'h')
-                checkSet("hrd7");
+                checkSet("hrd_m");
             else if (c == '1')
                 checkSet("emilib");
             else if (c == '2')

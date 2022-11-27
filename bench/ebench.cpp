@@ -14,6 +14,7 @@
 
 #if SMAP
 #include "flat_map.hpp"
+#include "phmap/btree.h"
 #endif
 
 static void printInfo(char* out);
@@ -36,7 +37,6 @@ std::map<std::string, std::string> maps =
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
     {"emhash8", "emhash8"},
-    {"ck_map", "ck_map"},
 
 //    {"jg_dense", "jg_dense"},
 //    {"rigtorp", "rigtorp"},
@@ -53,19 +53,21 @@ std::map<std::string, std::string> maps =
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
 //    {"ktprime", "ktprime"},
+#ifdef ABSL_HASH
     {"abslf", "absl_flat"},
+#endif
+    {"martind", "martin_dense"},
 //    {"f14_value", "f14_value"},
 
-    {"martind", "martin_dense"},
-//    {"martinf", "martin_flat"},
-
 #if ET
+    {"martinf", "martin_flat"},
+    {"ck_map", "ck_map"},
+    {"hrd_m", "hrd_m"},
     {"f14_vector", "f14_vector"},
     {"fht", "fht"},
     {"cuckoo", "cuckoo hash"},
     {"zhashmap", "zhashmap"},
     {"phmap", "phmap_flat"},
-//    {"hrdset", "hrdset"},
 
     {"tslr", "tsl_robin"},
     {"skaf", "ska_flat"},
@@ -81,12 +83,12 @@ std::map<std::string, std::string> maps =
     #define RT 1 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
-//#define CUCKOO_HASHMAP       1
-//#define EM3               1
-//#define PHMAP_HASH        1
-//#define WY_HASH           1
+//#define CUCKOO_HASHMAP     1
+//#define EM3                1
+//#define PHMAP_HASH         1
+//#define WY_HASH            1
 
-//#define FL1                 1
+//#define FL1                1
 
 //feature of emhash
 //#define EMH_INT_HASH        1
@@ -99,29 +101,28 @@ std::map<std::string, std::string> maps =
 
 //#define EMH_LRU_SET         1
 //#define EMH_ERASE_SMALL     1
-//#define EMH_HIGH_LOAD         2345
+//#define EMH_HIGH_LOAD       2345
 //#define EMH_FIND_HIT        1
-//#define EMH_PACK_TAIL         5
+//#define EMH_PACK_TAIL       5
+//#define EMH_ITER_SAFE       1
+//#define EMH_ALIGN64         1
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
 #include "emhash/hash_table3.hpp"
 #include "emhash/hash_table4.hpp"
-#include "emhash/hash_table557.hpp"
 #endif
 
 #ifdef HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
-//#define EMH_ITER_SAFE    1
-//#define EMH_ALIGN64      1
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
-//#include "../hash_table8v.hpp"
 
+//#include "../hash_table8v.hpp"
 //#include "../thirdparty/emhash/hash_table8v.hpp"
 //#include "../thirdparty/emhash/hash_table8v2.hpp"
 
@@ -166,7 +167,7 @@ std::map<std::string, std::string> maps =
 //
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
-#include "fht/fht_ht.hpp" // https://github.com/goldsteinn/hashtable_test/blob/master/my_table/fht_ht.hpp
+#include "fht/fht_ht.hpp"
 #endif
 
 #if FOLLY
@@ -181,38 +182,29 @@ std::map<std::string, std::string> maps =
 #include "martinus/unordered_dense.h"
 #endif
 
-#include "martinus/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martinus/robin_hood.h"
 
 #if PHMAP_HASH
-    #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
+    #include "phmap/phmap.h"
 #endif
 
 #if X86
-#include "emilib/emilib2s.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib3so.hpp"
+    #include "emilib/emilib2s.hpp"
+    #include "emilib/emilib2o.hpp"
+    #include "emilib/emilib3so.hpp"
 #endif
+
 #if ET
-
-#if X86_64
-
-#if __cplusplus > 201402L || _MSVC_LANG >= 201402L
-    #include "hrd/hash_set7.h"       //https://github.com/hordi/hash/blob/master/include/hash_set7.h
-#endif
-    #include "emilib/emilib33.hpp"
-    #include "ska/flat_hash_map.hpp" //https://github.com/skarupke/flat_hash_map/blob/master/flat_hash_map.hpp
-#endif
-
-    #include "tsl/robin_map.h"       //https://github.com/tessil/robin-map
-
+    #include "hrd/hash_set_m.h"
+    #include "tsl/robin_map.h"
+    #include "tsl/hopscotch_map.h"
+#if ET > 1
     #include "lru_size.h"
     #include "lru_time.h"
-    #include "phmap/btree.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
-#if ET > 1
-    #include "tsl/hopscotch_map.h"    //https://github.com/tessil/hopscotch-map
-    #include "ska/bytell_hash_map.hpp"//https://github.com/skarupke/flat_hash_map/blob/master/bytell_hash_map.hpp
+    #include "ska/flat_hash_map.hpp"
+    #include "ska/bytell_hash_map.hpp"
 #endif
-    #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
+    #include "phmap/phmap.h"
 #endif
 
 
@@ -255,7 +247,7 @@ struct StructValue
 
 #if VCOMP
     std::string sdata = {"test data input"};
-    std::vector<int> vint = {1,2,3,4,5,6,7,8};
+    std::vector<int> vint = {1, 2,3, 4, 5, 6, 7, 8};
     std::map<std::string, int> msi = {{"111", 1}, {"1222", 2}};
 #endif
 };
@@ -576,7 +568,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
     if (vList.size() % 3 == 0)
         ht_hash.clear();
 
-#if CXX17
+#if CXX17 && !SMAP
     //load_factor = 0.5
     const auto vmedium = (1u << ilog(vList.size() / 100, 2)) * 5 / 10;
     for (size_t i = 0; i < vList.size(); i++) {
@@ -600,7 +592,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
     }
 
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
-//    printf(" = %.2f\n", ht_hash.load_factor());
+    //    printf(" = %.2f\n", ht_hash.load_factor());
 }
 
 template<class hash_type>
@@ -739,6 +731,7 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
             if (lsize % 2 == 0)
                 tmp.clear();
             else
+//                tmp = empty;
                 tmp = std::move(empty);
         }
     }
@@ -1217,7 +1210,7 @@ static void printResult()
 #if _WIN32
     Sleep(100*1);
 #else
-    usleep(1000*2000);
+    usleep(1000*1000);
 #endif
     printf("--------------------------------------------------------------------\n\n");
 }
@@ -1287,39 +1280,34 @@ static int benchHashMap(int n)
         //shuffle(vList.begin(), vList.end());
 
 #if ET > 2
-        {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
-#if X86_64 && __cplusplus >= 201402L
-        {  benOneHash<ska::bytell_hash_map <keyType, valueType, ehash_func>>("sbyte", vList); }
-#endif
+    #if FHT_HMAP
+        {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
+    #endif
         {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
         {  benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
 #endif
 
-        {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
+
 #if ET > 1
+    #if X86_64 && CXX17
+        {  benOneHash<ska::bytell_hash_map <keyType, valueType, ehash_func>>("sbyte", vList); }
+    #endif
+        {  benOneHash<std::unordered_map<keyType, valueType, ehash_func>>   ("stl_hash", vList); }
         {  benOneHash<tsl::robin_map        <keyType, valueType, ehash_func>>("tslr", vList); }
+        {  benOneHash<tsl::hopscotch_map   <keyType, valueType, ehash_func>>("hopsco", vList); }
+        //{  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
+        //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
         //{  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
         //{  benOneHash<emilib4::HashMap      <keyType, valueType, ehash_func>>("emilib4", vList); }
 
-#if X86_64
+    #if X86_64
         {  benOneHash<ska::flat_hash_map <keyType, valueType, ehash_func>>("skaf", vList); }
-#if __cplusplus > 201402L || _MSVC_LANG >= 201402L
-        {  benOneHash<hrd7::hash_map     <keyType, valueType, ehash_func>>("hrdset", vList); }
-#endif
-#endif
+    #endif
 #endif
 
 #ifdef SMAP
-        {  benOneHash<std::map<keyType, valueType>>          ("stl_map", vList); }
-//        {  benOneHash<std::flat_map<keyType, valueType>>     ("fmap", vList); }
-
-#if __GNUC__ && __linux__
-//        {  benOneHash<__gnu_pbds::gp_hash_table<keyType, valueType>>("gp_hash", vList) };
-#endif
-
-#if ET
+        {  benOneHash<std::map<keyType, valueTye>>          ("stl_map", vList); }
         {  benOneHash<phmap::btree_map<keyType, valueType> >("btree", vList); }
-#endif
 #endif
 
 #ifdef EM3
@@ -1327,9 +1315,7 @@ static int benchHashMap(int n)
         {  benOneHash<emhash4::HashMap <keyType, valueType, ehash_func>>("emhash4", vList); }
         {  benOneHash<emhash3::HashMap <keyType, valueType, ehash_func>>("emhash3", vList); }
 #endif
-#if ABSL_HMAP
-        {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("abslf", vList); }
-#endif
+
 
 #if FOLLY
         {  benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
@@ -1340,46 +1326,49 @@ static int benchHashMap(int n)
         {  benOneHash<libcuckoo::cuckoohash_map <keyType, valueType, ehash_func>>("cuckoo", vList); }
 #endif
 
-#if CXX20
+#if CXX20 && JG_MAP
         {  benOneHash<jg::dense_hash_map <keyType, valueType, ehash_func>>("jg_dense", vList); }
-//        {  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
-//        {  benOneHash<HashMap <keyType, valueType, ehash_func>>("ck_map", vList); }
+        //{  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
+        //{  benOneHash<HashMap <keyType, valueType, ehash_func>>("ck_map", vList); }
 #endif
-#if CXX17
-        {  benOneHash<ankerl::unordered_dense::map <keyType, valueType, ehash_func>>("martind", vList); }
-        {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
-#endif
+
 
 #if QC_HASH && KEY_INT
         {  benOneHash<qc::hash::RawMap<keyType, valueType, ehash_func>>("qchash", vList); }
 #endif
+
 #if FPH_HASH
         {  benOneHash<fph::DynamicFphMap<keyType, valueType, fph::MixSeedHash<keyType>>>("fph", vList); }
 #endif
 
 #if X86
-        //            {  benOneHash<emilib1::HashMap      <keyType, valueType, ehash_func>>("emilib1", vList); }
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
-        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
 #endif
+
 #if HAVE_BOOST
         {  benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
+#endif
+#if ABSL_HMAP
+        {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("abslf", vList); }
 #endif
 
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
-#if ET
-        {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
-        //{  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
 
-        //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
-
-#if FHT_HMAP
-        {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
+#if CXX17
+        {  benOneHash<ankerl::unordered_dense::map <keyType, valueType, ehash_func>>("martind", vList); }
 #endif
+
+#if ET
+#if X86_64 && CXX17
+        {  benOneHash<hrd_m::hash_map   <keyType, valueType, ehash_func>>("hrd_m", vList); }
+#endif
+        {  benOneHash<phmap::flat_hash_map <keyType, valueType, ehash_func>>("phmap", vList); }
+        {  benOneHash<robin_hood::unordered_map <keyType, valueType, ehash_func>>("martinf", vList); }
 #endif
     }
 
@@ -1466,80 +1455,42 @@ static void testHashInt(int loops = 500000009)
         sum += rrxmrrxmsx_0(i + r);
     printf("rrxmrrxmsx_0= %3d ms [%ld]\n\n", (int)(getus() - ts) / 1000, sum);
 
-#if 0
-    const int buff_size = 1024*1024 * 16;
-    const int pack_size = 64;
+#if 1
+    constexpr int buff_size = 1024*1024;
+    constexpr int pack_size = 64;
     auto buffer = new char[buff_size * pack_size];
     memset(buffer, 0, buff_size * pack_size);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
         ts = getus();
         memset(buffer, 0, buff_size * pack_size);
-        printf("memset   = %4d ms\n", (int)(getus() - ts) / 1000);
+        printf("memset[%d MB] = %4d ms, ", (pack_size * buff_size) >> 20, (int)(getus() - ts) / 1000);
 
         ts = getus();
         for (uint32_t bi = 0; bi < buff_size; bi++)
-           *(int*)(buffer + (bi * pack_size)) = 0;
-        printf("loops   = %4d ms\n\n", (int)(getus() - ts) / 1000);
+           *(int64_t*)(buffer + (bi * pack_size)) = 0;
+        printf("loops   = %4d ms\n", (int)(getus() - ts) / 1000);
     }
     delete [] buffer;
 #endif
 }
 
-#if 0
 static int test_lru(int n)
 {
-#if ET
+#if ET > 2
     emlru_size::lru_cache<uint64_t, int> elru(1 << 10, 1<<20);
     Sfc4 srng(n);
     auto ts = getus();
-    for (int i = 0; i < n ; i++) {
-        elru.emplace(i, i);
-    }
+    for (int i = 0; i < n ; i++)
+        elru.emplace(i, 0);
     printf("n = %d, hsize = %zd, time use = %d ms\n", n, elru.size(), (int)(getus() - ts) / 1000);
 #endif
+
     return 0;
-}
-#endif
-
-#include "tsl/robin_map.h"
-template <typename T>
-struct BadHash {
-  size_t operator()(T const& val) const {
-    return static_cast<size_t>(val);
-}
-};
-
-void testrb() {
-  emilib2 ::HashMap<int, int, BadHash<int>> map;
-  map.reserve(16); // resizes with mask 31
-
-  map.emplace(31, 1);        // gets into last bucket
-  map.emplace(1024 + 31, 2); // would also get into last bucket, but wraps around
-
-  // first entry in the map
-  auto it = map.begin();
-  std::cout << it->first << "->" << it->second << std::endl;
-
-  // second entry in the map, erase it
-  ++it;
-  std::cout << it->first << "->" << it->second << std::endl;
-  it = map.erase(it);
-
-  // now all two elements are iterated, we should be at the map's end, but due to backward shift
-  // deletion we are not
-  if (it != map.end()) {
-    std::cout << it->first << "->" << it->second << std::endl;
-    it = map.erase(it);
-  }
-  else {
-    std::cout << "are we now at the end? " << (it == map.end()) << std::endl;
-  }
 }
 
 int main(int argc, char* argv[])
 {
-  testrb();
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
     //find_test();
 #endif
@@ -1614,7 +1565,7 @@ int main(int argc, char* argv[])
             else if (c == 'v')
                 maps.erase("f14_vector");
             else if (c == 'h')
-                maps.erase("hrdset");
+                maps.erase("hrd_m");
             else if (c == 'j')
                 maps.emplace("jg_dense", "jg_dense");
             else if (c == 'r')
