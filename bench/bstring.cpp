@@ -430,11 +430,11 @@ int main()
     init_indices();
 
 //    test<std_unordered_map>( "std::unordered_map" );
+    test<emhash_map5>( "emhash5::hash_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
-    test<emhash_map8>( "emhash8::hash_map" );
     test<emhash_map7>( "emhash7::hash_map" );
-    test<emhash_map5>( "emhash5::hash_map" );
+    test<emhash_map8>( "emhash8::hash_map" );
     test<martinus_dense>("martinus::dense_hash_map" );
     test<martinus_flat>("martinus::flat_hash_map" );
 

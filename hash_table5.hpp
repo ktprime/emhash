@@ -389,7 +389,12 @@ public:
             return *this;
 
         if (rhs.load_factor() < EMH_MIN_LOAD_FACTOR) {
-            clear(); free(_pairs); _pairs = nullptr;
+            clear();
+#if EMH_SMALL_SIZE
+            if (_pairs != (PairT*)_small)
+#endif
+            free(_pairs); _pairs = nullptr;
+
             rehash(rhs._num_filled + 2);
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(it->first, it->second);
@@ -398,6 +403,9 @@ public:
 
         clearkv();
         if (_num_buckets < rhs._num_buckets || _num_buckets > 2 * rhs._num_buckets) {
+#if EMH_SMALL_SIZE
+            if (_pairs != (PairT*)_small)
+#endif
             free(_pairs);
             _pairs = alloc_bucket(rhs._num_buckets);
         }
@@ -408,10 +416,25 @@ public:
 
     HashMap& operator=(HashMap&& rhs) noexcept
     {
-        if (this != &rhs) {
-            swap(rhs);
+        if (this == &rhs)
+            return *this;
+
+#if EMH_SMALL_SIZE
+        if (_pairs == (PairT*)_small || rhs._pairs == (PairT*)rhs._small) {
+            clear();
+            if (rhs.empty())
+                return *this;
+            if (_pairs != (PairT*)_small)
+                free(_pairs);
+            if (rhs._num_buckets > EMH_SMALL_SIZE)
+                _pairs = alloc_bucket(rhs._num_buckets);
+            clone(rhs);
             rhs.clear();
+            return *this;
         }
+#endif
+        swap(rhs);
+        rhs.clear();
         return *this;
     }
 
@@ -435,6 +458,9 @@ public:
     ~HashMap() noexcept
     {
         clearkv();
+#if EMH_SMALL_SIZE
+        if (_pairs != (PairT*)_small)
+#endif
         free(_pairs);
     }
 
@@ -471,6 +497,14 @@ public:
 
     void swap(HashMap& rhs) noexcept
     {
+#if EMH_SMALL_SIZE
+        if (_pairs == (PairT*)_small || rhs._pairs == (PairT*)rhs._small) {
+            HashMap tmp(*this);
+            *this = rhs;
+            rhs = tmp;
+            return;
+        }
+#endif
         //      std::swap(_eq, rhs._eq);
         std::swap(_hasher, rhs._hasher);
         std::swap(_pairs, rhs._pairs);
@@ -695,7 +729,7 @@ public:
     }
 
     template<typename K=KeyT>
-    ValueT& at(const K& key)
+    inline ValueT& at(const K& key)
     {
         const auto bucket = find_filled_bucket(key);
         //throw
@@ -703,7 +737,7 @@ public:
     }
 
     template<typename K=KeyT>
-    const ValueT& at(const K& key) const
+    inline const ValueT& at(const K& key) const
     {
         const auto bucket = find_filled_bucket(key);
         return EMH_VAL(_pairs, bucket);
@@ -814,14 +848,14 @@ public:
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
-    ValueT* try_get(const KeyT& key)
+    inline ValueT* try_get(const KeyT& key)
     {
         const auto bucket = find_filled_bucket(key);
         return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
 
     /// Const version of the above
-    ValueT* try_get(const KeyT& key) const
+    inline ValueT* try_get(const KeyT& key) const
     {
         const auto bucket = find_filled_bucket(key);
         return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
@@ -1250,6 +1284,7 @@ public:
             memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 #endif
 #if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value)
         reset_bucket(hash_main(0));
 #endif
 
@@ -1306,7 +1341,13 @@ public:
         if (required_buckets < _num_filled)
             return;
 
-        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
+#if EMH_SMALL_SIZE
+        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : EMH_SMALL_SIZE;
+        static_assert(EMH_SMALL_SIZE >= 2 && EMH_SMALL_SIZE < 1024);
+        static_assert((EMH_SMALL_SIZE & (EMH_SMALL_SIZE - 1)) == 0);
+#else
+        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2;
+#endif
         while (buckets < required_buckets) { buckets *= 2; }
 
         // no need alloc too many bucket for small key.
@@ -1318,7 +1359,7 @@ public:
 
         auto num_buckets = (size_type)buckets;
         auto old_num_filled  = _num_filled;
-        auto old_pairs   = _pairs;
+        auto* old_pairs   = _pairs;
         auto old_buckets = _num_buckets;
 
 #if EMH_REHASH_LOG
@@ -1340,18 +1381,23 @@ public:
 #endif
         _num_buckets = num_buckets;
 
+#if EMH_SMALL_SIZE
+        if (num_buckets <= EMH_SMALL_SIZE && old_pairs != (PairT*)_small)
+            _pairs = (PairT*)_small;
+        else
+#endif
         _pairs = (PairT*)alloc_bucket(num_buckets);
         memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
 
 #if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value)
         reset_bucket(hash_main(0));
 #endif
 
         (void)old_buckets;
         if (0 && is_copy_trivially() && old_num_filled && num_buckets >= 2 * old_buckets) {
             memcpy((char*)_pairs, old_pairs, old_buckets * sizeof(PairT));
-            //free(old_pairs);
             for (size_type src_bucket = 0; src_bucket < old_buckets; src_bucket++) {
                 if (EMH_EMPTY(_pairs, src_bucket))
                     continue;
@@ -1402,7 +1448,9 @@ public:
 #endif
         }
 #endif
-
+#if EMH_SMALL_SIZE
+        if (old_pairs != (PairT*)_small)
+#endif
         free(old_pairs);
         assert(old_num_filled == _num_filled);
     }
@@ -1878,7 +1926,7 @@ one-way search strategy.
 
 #if EMH_INT_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    static inline uint64_t hash64(uint64_t key)
+    inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__ && EMH_INT_HASH == 1
         __uint128_t r = key; r *= KC;
@@ -1946,6 +1994,10 @@ one-way search strategy.
 
 private:
     PairT*    _pairs;
+#if EMH_SMALL_SIZE
+    char      _small[(EMH_SMALL_SIZE + 2) * sizeof(PairT)];
+#endif
+
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _mlf;

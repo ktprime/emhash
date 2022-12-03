@@ -65,7 +65,7 @@ constexpr uint32_t MASK_BIT = sizeof(uint8_t) * 8;
 constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
 constexpr uint32_t INACTIVE = 0xFFFFFFFF;
 
-inline static uint32_t CTZ(size_t n)
+static uint32_t CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -1290,7 +1290,7 @@ private:
     }
 
     const static uint64_t KC = UINT64_C(11400714819323198485);
-    static inline uint64_t hash64(uint64_t key)
+    inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__
         __uint128_t r = key; r *= KC;

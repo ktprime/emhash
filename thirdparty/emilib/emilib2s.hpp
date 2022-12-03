@@ -848,7 +848,7 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__) || EMH_PREFETCH
+#if EMH_PREFETCH
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #endif
     }

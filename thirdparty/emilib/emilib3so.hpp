@@ -857,7 +857,7 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__) || EMH_PREFETCH
+#if EMH_PREFETCH
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #endif
     }
@@ -870,7 +870,7 @@ private:
         auto next_bucket = (size_t)(key_hash & _mask);
         next_bucket -= next_bucket % simd_bytes;
         const auto gbucket = next_bucket;
-        //prefetch_heap_block((char*)_states + next_bucket);
+        prefetch_heap_block((char*)_states + next_bucket);
 
         const auto filled = SET1_EPI8(key_2hash(key_hash, key));
         size_t offset = 0;
@@ -908,7 +908,7 @@ private:
         const auto key_h2 = key_2hash(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
         bucket -= bucket % simd_bytes;
-        //prefetch_heap_block((char*)_states + bucket);
+        prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket  = bucket, offset = 0u;

@@ -119,7 +119,7 @@ namespace emhash6 {
 static_assert((int)INACTIVE < 0, "INACTIVE must be even and < 0(to int)");
 
 //https://gist.github.com/jtbr/1896790eb6ad50506d5f042991906c30
-inline static size_type CTZ(size_t n)
+static size_type CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -1184,6 +1184,7 @@ public:
             memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
             memset(_pairs, -1, sizeof(_pairs[0]) * (_mask + 1));
 #if EMH_FIND_HIT
+            if constexpr (std::is_integral<KeyT>::value)
             reset_bucket(hash_main(0));
 #endif
         }
@@ -1270,6 +1271,7 @@ public:
         memset(_pairs, -1, sizeof(_pairs[0]) * num_buckets);
 
 #if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value)
         reset_bucket(hash_main(0));
 #endif
 
@@ -1711,7 +1713,7 @@ private:
 
 #if EMH_INT_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    static inline uint64_t hash64(uint64_t key)
+    inline uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__ && EMH_INT_HASH == 1
         __uint128_t r = key; r *= KC;

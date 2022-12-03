@@ -53,7 +53,7 @@ std::map<std::string, std::string> maps =
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
 //    {"ktprime", "ktprime"},
-#ifdef ABSL_HASH
+#ifdef ABSL_HMAP
     {"abslf", "absl_flat"},
 #endif
     {"martind", "martin_dense"},
@@ -106,6 +106,8 @@ std::map<std::string, std::string> maps =
 //#define EMH_PACK_TAIL       5
 //#define EMH_ITER_SAFE       1
 //#define EMH_ALIGN64         1
+#define EMH_FIND_HIT      1
+#define EMH_SMALL_SIZE    4
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
