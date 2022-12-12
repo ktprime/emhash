@@ -154,6 +154,7 @@ public:
     using Self = HashMapTable;
     using Base = HashTable<Key, Cell, Hash, Grower, Allocator>;
     using LookupResult = typename Base::LookupResult;
+    using iterator =     typename Base::iterator;
 
     using Base::Base;
 
@@ -213,7 +214,7 @@ public:
     {
         LookupResult it;
         bool inserted;
-        this->emplace(x, it, inserted);
+        Base::emplace(x, it, inserted);
 
         /** It may seem that initialization is not necessary for POD-types (or __has_trivial_constructor),
           *  since the hash table memory is initially initialized with zeros.
@@ -235,29 +236,17 @@ public:
         return it->getMapped();
     }
 
-    std::pair<iterator, bool> emplace(Key && x, typename Cell::Mapped && value) {
+    template<typename K, typename V>
+    std::pair<iterator, bool> emplace(K && x, V && value) {
         LookupResult it;
         bool inserted;
-        this->emplace(std::forward<Key>(x), it, inserted);
+        Base::emplace(std::forward<K>(x), it, inserted);
         if (inserted) {
-            new (&it->getMapped())(value);
-            return {{this, 0}, inserted};
+            new (&it->getMapped())V(std::forward<V>(value));
         }
 
-        return {{this, 0}, inserted};
+        return {this->begin(), inserted};
     }
-};
-
-namespace std
-{
-
-    template <typename Key, typename TMapped, typename Hash, typename TState>
-    struct tuple_size<HashMapCellWithSavedHash<Key, TMapped, Hash, TState>> : std::integral_constant<size_t, 2> { };
-
-    template <typename Key, typename TMapped, typename Hash, typename TState>
-    struct tuple_element<0, HashMapCellWithSavedHash<Key, TMapped, Hash, TState>> { using type = Key; };
-    }
-
 };
 
 namespace std
@@ -273,6 +262,7 @@ namespace std
     struct tuple_element<1, HashMapCellWithSavedHash<Key, TMapped, Hash, TState>> { using type = TMapped; };
 }
 
+namespace ck {
 
 template <
     typename Key,
@@ -301,3 +291,4 @@ using HashMapWithStackMemory = HashMapTable<
     HashTableAllocatorWithStackMemory<
         (1ULL << initial_size_degree)
         * sizeof(HashMapCellWithSavedHash<Key, Mapped, Hash>)>>;
+};

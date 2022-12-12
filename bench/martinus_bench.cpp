@@ -20,6 +20,10 @@
 #include "emhash/hash_table4.hpp"
 #endif
 
+#if CK_HMAP
+#include "ck/Common/HashTable/HashMap.h"
+#endif
+
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
@@ -70,7 +74,7 @@ static std::map<std::string, std::string> show_name =
    {"emhash8", "emhash8"},
    {"emhash5", "emhash5"},
 #if X86
-    {"emilib", "emilibo"},
+//    {"emilib", "emilibo"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
     {"hrd_m", "hrdm"},
@@ -78,6 +82,9 @@ static std::map<std::string, std::string> show_name =
 
 #if HAVE_BOOST
     {"boost",  "boost_flat"},
+#endif
+#if CK_HMAP
+    {"HashMapCell",  "ck_hashmap"},
 #endif
 
     {"ankerl", "martinus dense"},
@@ -111,6 +118,8 @@ static const char* find_hash(const std::string& map_name)
         return show_name.count("emilib2") ? show_name["emilib2"].data() : nullptr;
     if (map_name.find("emilib3") < 10)
         return show_name.count("emilib3") ? show_name["emilib3"].data() : nullptr;
+    if (map_name.find("HashMapCell") < 30)
+        return show_name.count("HashMapCell") ? show_name["HashMapCell"].data() : nullptr;
 
     for (const auto& kv : show_name)
     {
@@ -615,7 +624,11 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
                 *strData32 = (uint32_t)findRng();
                 auto it = map.find(str);
                 if (it != map.end()) {
+#ifndef CK_HMAP
                     num_found += it->second;
+#else
+                    num_found += 1;
+#endif
                 }
             }
         } while (i < numInserts);
@@ -751,10 +764,10 @@ template<class MAP>
 void bench_IterateIntegers(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
-    if (!map_name)
+    if (!map_name) {
         return;
+    }
     printf("%s map = %s\n", __FUNCTION__, map_name);
-
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
@@ -765,7 +778,12 @@ void bench_IterateIntegers(MAP& map)
         for (size_t n = 0; n < num_iters; ++n) {
             map[rng()] = n;
             for (auto & keyVal : map)
+#ifndef CK_HMAP
                 result += keyVal.second;
+#else
+                result += 1;
+#endif
+
         }
         assert(result == 20833333325000ull);
     }
@@ -776,7 +794,11 @@ void bench_IterateIntegers(MAP& map)
         for (size_t n = 0; n < num_iters; ++n) {
             map.erase(rng());
             for (auto const& keyVal : map)
+#ifndef CK_HMAP
                 result += keyVal.second;
+#else
+                result += 1;
+#endif
         }
     }
     assert(result == 62498750000000ull + 20833333325000ull);
@@ -854,7 +876,7 @@ void runTest(int sflags, int eflags)
 #if X86_64
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_IterateIntegers(fmap); }
 #endif
-        { phmap::flat_hash_map<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
+        { phmap::flat_hash_map<uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
 #endif
 #if X86
         { emilib::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
@@ -862,13 +884,17 @@ void runTest(int sflags, int eflags)
         { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
 #if HAVE_BOOST
-        { boost::unordered_flat_map<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
+        { boost::unordered_flat_map<uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
 #endif
+#if CK_HMAP
+        { ck::HashMap<uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
+#endif
+
 #if ABSL_HMAP
-        { absl::flat_hash_map<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
+        { absl::flat_hash_map<uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
 #endif
 #if FOLLY_F14
-        { folly::F14VectorMap<uint64_t, uint64_t, hash_func> pmap; bench_IterateIntegers(pmap); }
+        { folly::F14VectorMap<uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
 #endif
         putchar('\n');
     }
@@ -911,6 +937,9 @@ void runTest(int sflags, int eflags)
 #endif
 #if HAVE_BOOST
         { boost::unordered_flat_map<std::string,  size_t, hash_func> bench; bench_randomFindString(bench); }
+#endif
+#if CK_HMAP
+        { ck::HashMap<std::string,  size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 
 #if ET
@@ -998,6 +1027,9 @@ void runTest(int sflags, int eflags)
 #if HAVE_BOOST
         { boost::unordered_flat_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
+#if CK_HMAP
+        { ck::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+#endif
 
     }
 
@@ -1027,7 +1059,7 @@ void runTest(int sflags, int eflags)
             { ska::flat_hash_map <size_t, size_t, hash_func> fmap; bench_randomFind(fmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 
-            { phmap::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
+            { phmap::flat_hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
             { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if QC_HASH
@@ -1044,11 +1076,15 @@ void runTest(int sflags, int eflags)
             { emilib::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if ABSL_HMAP
-            { absl::flat_hash_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
+            { absl::flat_hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if HAVE_BOOST
-            { boost::unordered_flat_map <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
+            { boost::unordered_flat_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
+#if CK_HMAP
+            { ck::HashMap <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
+#endif
+
 #if CXX17
             { ankerl::unordered_dense::map<size_t, size_t, hash_func> martin; bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]); }
 #endif
@@ -1057,7 +1093,7 @@ void runTest(int sflags, int eflags)
             { emhash6::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emhash7::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #if FOLLY_F14
-            { folly::F14VectorMap <size_t, size_t, hash_func> pmap; bench_randomFind(pmap, numInserts[i], numFindsPerInsert[i]); }
+            { folly::F14VectorMap <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if EM3
             { emhash4::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
@@ -1082,14 +1118,17 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<int> hash_func;
 #endif
 
-#if ABSL_HMAP //failed on other hash
+#if ABSL_HMAP
         { absl::flat_hash_map <int, int, hash_func> amap; bench_insert(amap); }
 #endif
 #if HAVE_BOOST
         { boost::unordered_flat_map <int, int, hash_func> amap; bench_insert(amap); }
 #endif
+#if CK_HMAP
+        { ck::HashMap <int, int, hash_func> amap; bench_insert(amap); }
+#endif
 #if FOLLY_F14
-        { folly::F14VectorMap <int, int, hash_func> pmap; bench_insert(pmap); }
+        { folly::F14VectorMap <int, int, hash_func> hmap; bench_insert(hmap); }
 #endif
         { emhash7::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 
@@ -1123,12 +1162,10 @@ void runTest(int sflags, int eflags)
         { tsl::robin_map  <int, int, hash_func> rmap; bench_insert(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_insert(martin); }
 
-
-
 #if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_insert(fmap); }
 #endif
-        { phmap::flat_hash_map <int, int, hash_func> pmap; bench_insert(pmap); }
+        { phmap::flat_hash_map <int, int, hash_func> hmap; bench_insert(hmap); }
 #endif
         putchar('\n');
     }
@@ -1147,10 +1184,14 @@ void runTest(int sflags, int eflags)
         typedef robin_hood::hash<uint64_t> hash_func;
 #endif
 #if HAVE_BOOST
-        { boost::unordered_flat_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+        { boost::unordered_flat_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
+#if CK_HMAP
+        { ck::HashMap <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
+#endif
+
 #if ABSL_HMAP
-        { absl::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+        { absl::flat_hash_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
         { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         { emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
@@ -1181,13 +1222,16 @@ void runTest(int sflags, int eflags)
 #if X86_64
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
 #endif
-        { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+        { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
 #if FOLLY_F14
-        { folly::F14VectorMap <uint64_t, uint64_t, hash_func> pmap; bench_randomInsertErase(pmap); }
+        { folly::F14VectorMap <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
 #if CXX17
         { ankerl::unordered_dense::map<uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
+#endif
+#if CK_HMAP
+        { ck::HashMap<uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
 #endif
 #if CXX20
         { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
@@ -1217,6 +1261,7 @@ void runTest(int sflags, int eflags)
         { jg::dense_hash_map<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { rigtorp::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #endif
+
 #if CXX17
         { ankerl::unordered_dense::map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
 #endif
@@ -1245,17 +1290,20 @@ void runTest(int sflags, int eflags)
 #if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_randomDistinct2(fmap); }
 #endif
-        { phmap::flat_hash_map <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
+        { phmap::flat_hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
 #endif
 #if HAVE_BOOST
-        { boost::unordered_flat_map <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
+        { boost::unordered_flat_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
+#endif
+#if CK_HMAP
+        { ck::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 #endif
 #if ABSL_HMAP
-        { absl::flat_hash_map <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
+        { absl::flat_hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
 #endif
 
 #if FOLLY_F14
-        { folly::F14VectorMap <int, int, hash_func> pmap; bench_randomDistinct2(pmap); }
+        { folly::F14VectorMap <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
 #endif
 
         putchar('\n');
@@ -1306,17 +1354,20 @@ void runTest(int sflags, int eflags)
 #if X86_64
         { ska::flat_hash_map <uint64_t, int, hash_func> fmap; bench_copy(fmap); }
 #endif
-        { phmap::flat_hash_map <uint64_t, int, hash_func> pmap; bench_copy(pmap); }
+        { phmap::flat_hash_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
 #endif
 #if ABSL_HMAP
-        { absl::flat_hash_map <uint64_t, int, hash_func> pmap; bench_copy(pmap); }
+        { absl::flat_hash_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
 #endif
 #if HAVE_BOOST
-        { boost::unordered_flat_map <uint64_t, int, hash_func> pmap; bench_copy(pmap); }
+        { boost::unordered_flat_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
+#endif
+#if CK_HMAP
+//        { ck::HashMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
 #endif
 
 #if FOLLY_F14
-        { folly::F14VectorMap <uint64_t, int, hash_func> pmap; bench_copy(pmap); }
+        { folly::F14VectorMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
 #endif
 
     }

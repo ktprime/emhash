@@ -20,8 +20,7 @@
 
 #include "./util.h"
 #include "emilib/emilib3so.hpp"
-#include "emilib/emilib2o.hpp"
-
+#include "emilib/emilib2.hpp"
 
 #include <unordered_map>
 #include <vector>
@@ -49,7 +48,15 @@ static std::vector<std::string> words;
 
 static void init_words()
 {
+#if SIZE_MAX > UINT32_MAX
+
     char const* fn = "enwik9"; // http://mattmahoney.net/dc/textdata
+
+#else
+
+    char const* fn = "enwik8"; // ditto
+
+#endif
 
     auto t1 = std::chrono::steady_clock::now();
 
@@ -90,7 +97,7 @@ template<class Map> BOOST_NOINLINE void test_contains( Map& map, std::chrono::st
         std::string_view w2( word );
         w2.remove_prefix( 1 );
 #if CXX20
-        s += map.contains( w2 );
+        s += map.count( w2 );
 #else
         s += map.count( w2 );
 #endif
@@ -336,9 +343,8 @@ int main()
 {
     init_words();
 
-    test<std_unordered_map>( "std::unordered_map" );
+//    test<std_unordered_map>( "std::unordered_map" );
 //    test<boost_unordered_map>( "boost::unordered_map" );
-    test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
     test<emhash_map8>( "emhash8::hash_map" );
     test<emhash_map7>( "emhash7::hash_map" );
@@ -348,6 +354,7 @@ int main()
 
     test<emilib2_map> ("emilib2_map" );
     test<emilib3_map> ("emilib3_map" );
+    test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
 #ifdef ABSL_HMAP
 

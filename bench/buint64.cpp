@@ -1,6 +1,7 @@
-//#define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
+
 
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
+#define _SILENCE_CXX20_CISO646_REMOVED_WARNING
 #include "tsl/robin_map.h"
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/endian/conversion.hpp>
@@ -188,12 +189,14 @@ template<class Map>  void test_erase( Map& map, std::chrono::steady_clock::time_
     {
         map.erase( indices1[ i ] );
     }
+
     print_time( t1, "Consecutive erase",  0, map.size() );
 
     for( unsigned i = 1; i <= N; ++i )
     {
         map.erase( indices2[ i ] );
     }
+
     print_time( t1, "Random erase",  0, map.size() );
 
     for( unsigned i = 1; i <= N; ++i )

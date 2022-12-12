@@ -3,7 +3,7 @@
 // https://www.boost.org/LICENSE_1_0.txt
 
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
-
+#define _SILENCE_CXX20_CISO646_REMOVED_WARNING
 //#include <boost/unordered_map.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/regex.hpp>
@@ -46,7 +46,15 @@ static std::vector<std::string> words;
 
 static void init_words()
 {
+#if SIZE_MAX > UINT32_MAX
+
     char const* fn = "enwik9"; // http://mattmahoney.net/dc/textdata
+
+#else
+
+    char const* fn = "enwik8"; // ditto
+
+#endif
 
     auto t1 = std::chrono::steady_clock::now();
 

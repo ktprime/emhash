@@ -976,13 +976,13 @@ public:
         return const_cast<std::decay_t<decltype(*this)> *>(this)->find(x, hash_value);
     }
 
-    std::enable_if_t<Grower::performs_linear_probing_with_single_step, bool>
+    std::enable_if_t<Grower::performs_linear_probing_with_single_step, size_t>
     ALWAYS_INLINE erase(const Key & x)
     {
-        return erase(x, hash(x));
+        return erase(x, hash(x)) ? 1 : 0;
     }
 
-    std::enable_if_t<Grower::performs_linear_probing_with_single_step, bool>
+    std::enable_if_t<Grower::performs_linear_probing_with_single_step, size_t>
     ALWAYS_INLINE erase(const Key & x, size_t hash_value)
     {
         /** Deletion from open addressing hash table without tombstones
@@ -1103,6 +1103,11 @@ public:
     }
 
     size_t ALWAYS_INLINE count(const Key & x) const
+    {
+        return has(x) ? 1 : 0;
+    }
+
+    bool ALWAYS_INLINE contains(const Key & x) const
     {
         return has(x);
     }

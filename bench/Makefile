@@ -92,10 +92,6 @@ ifneq ($(QC),)
 CXXFLAGS += -DQC_HASH=$(QC) -std=c++20
 endif
 
-ifneq ($(CK),)
-CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base
-endif
-
 ifneq ($(std),)
 CXXFLAGS += -std=c++$(std)
 else
@@ -121,6 +117,11 @@ endif
 ifneq ($(MF),)
 CXXFLAGS += $(MF)
 endif
+
+ifneq ($(CK),)
+CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
+endif
+
 
 all:
 ifneq ($(QB),)

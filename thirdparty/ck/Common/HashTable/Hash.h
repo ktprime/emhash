@@ -66,7 +66,7 @@ inline DB::UInt64 intHashCRC32(DB::UInt64 x, DB::UInt64 updated_value)
 #ifdef __SSE4_2__
     return _mm_crc32_u64(updated_value, x);
 #elif defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-    return  __crc32cd(updated_value, x);
+    return __crc32cd(static_cast<UInt32>(updated_value), x);
 #else
     /// On other platforms we do not have CRC32. NOTE This can be confusing.
     return intHash64(x) ^ updated_value;
@@ -124,14 +124,14 @@ inline UInt32 updateWeakHash32(const DB::UInt8 * pos, size_t size, DB::UInt32 up
         }
 
         reinterpret_cast<unsigned char *>(&value)[7] = size;
-        return intHashCRC32(value, updated_value);
+        return static_cast<UInt32>(intHashCRC32(value, updated_value));
     }
 
     const auto * end = pos + size;
     while (pos + 8 <= end)
     {
         auto word = unalignedLoad<UInt64>(pos);
-        updated_value = intHashCRC32(word, updated_value);
+        updated_value = static_cast<UInt32>(intHashCRC32(word, updated_value));
 
         pos += 8;
     }
@@ -149,7 +149,7 @@ inline UInt32 updateWeakHash32(const DB::UInt8 * pos, size_t size, DB::UInt32 up
         /// Use least byte to store tail length.
         word |= tail_size;
         /// Now word is '\3\0\0\0\0XYZ'
-        updated_value = intHashCRC32(word, updated_value);
+        updated_value = static_cast<UInt32>(intHashCRC32(word, updated_value));
     }
 
     return updated_value;
@@ -300,8 +300,8 @@ struct UInt128HashCRC32
     size_t operator()(UInt128 x) const
     {
         UInt64 crc = -1ULL;
-        crc = __crc32cd(crc, x.items[0]);
-        crc = __crc32cd(crc, x.items[1]);
+        crc = __crc32cd(static_cast<UInt32>(crc), x.items[0]);
+        crc = __crc32cd(static_cast<UInt32>(crc), x.items[1]);
         return crc;
     }
 };
@@ -356,10 +356,10 @@ struct UInt256HashCRC32
     size_t operator()(UInt256 x) const
     {
         UInt64 crc = -1ULL;
-        crc = __crc32cd(crc, x.items[0]);
-        crc = __crc32cd(crc, x.items[1]);
-        crc = __crc32cd(crc, x.items[2]);
-        crc = __crc32cd(crc, x.items[3]);
+        crc = __crc32cd(static_cast<UInt32>(crc), x.items[0]);
+        crc = __crc32cd(static_cast<UInt32>(crc), x.items[1]);
+        crc = __crc32cd(static_cast<UInt32>(crc), x.items[2]);
+        crc = __crc32cd(static_cast<UInt32>(crc), x.items[3]);
         return crc;
     }
 };
@@ -421,7 +421,7 @@ inline DB::UInt32 intHash32(DB::UInt64 key)
     key = key + (key << 6);
     key = key ^ ((key >> 22) | (key << 42));
 
-    return key;
+    return static_cast<UInt32>(key);
 }
 
 

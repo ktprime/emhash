@@ -7,6 +7,11 @@
 #if QC_HASH
 #include "qchash/qc-hash.hpp"
 #endif
+
+#if CK_HMAP
+#include "ck/Common/HashTable/HashMap.h"
+#endif
+
 #include "jg/dense_hash_map.hpp"
 #include "rigtorp/rigtorp.hpp"
 
@@ -95,11 +100,12 @@ static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts {
     {        200u,   100'000u},
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
-
+#if 1
     {    500'000u,       70u},
     {   7200'000u,        4u},
     { 10'000'000u,        3u},
     { 50'000'000u,        2u},
+#endif
 #else
 
 #if 1
@@ -742,7 +748,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
             v = v + reinterpret_cast<const size_t &>(element);
         }
         else {
-            v = v + reinterpret_cast<const size_t &>(element.first);
+            v = v + 1;//reinterpret_cast<const size_t &>(element.first);
         }
     }
 
@@ -750,7 +756,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
     const s64 t4{now()};
     // Erase
     for (const K& key : keys) {
-        container.erase(key);
+        v += container.erase(key);
     }
 
     const s64 t5{now()};
@@ -1107,7 +1113,6 @@ template <typename K>
 struct TslSparseSetInfo
 {
     using Container = tsl::sparse_set<K>;
-    //using AllocatorContainer = tsl::sparse_set<K, typename tsl::sparse_set<K>::hasher, typename tsl::sparse_set<K>::key_equal, qc::memory::RecordAllocator<K>>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"tsl::sparse_hash_set"};
@@ -1117,8 +1122,7 @@ template <typename K, typename V>
 struct TslSparseMapInfo
 {
     using Container = tsl::sparse_map<K, V, QintHasher>;
-    using AllocatorContainer = tsl::sparse_map<K, V, typename tsl::sparse_map<K, V>::hasher, typename tsl::sparse_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
-
+    using AllocatorContainer = void;
     static inline const std::string name{"tsl::sparse_hash_map"};
 };
 
@@ -1205,6 +1209,16 @@ struct RigtorpMapInfo
     static inline const std::string name{"rigtorp::HashMap"};
 };
 
+#if CK_HMAP
+template <typename K, typename V>
+struct CkHashMapInfo
+{
+    using Container = ck::HashMap<K, V>;
+    using AllocatorContainer = void;
+
+    static inline const std::string name{"ck::f_hash_map  "};
+};
+#endif
 
 #if 0
 template <typename K>
@@ -1275,7 +1289,12 @@ int main(const int argc, const char* argv[])
             AbslMapInfo<K, V>,
 #endif
 
+#if CK_HMAP
+
+#endif
+
 #if ET
+            RigtorpMapInfo<K, V>,
             PhMapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
 
@@ -1290,10 +1309,14 @@ int main(const int argc, const char* argv[])
             EmHash8MapInfo<K, V>,
             RobinDenseMapInfo<K, V>,
 
+
+#if CK_HMAP
+            CkHashMapInfo<K, V>,
+#endif
+
 #ifdef CXX20
             //FphDyamicMapInfo<K,V>,
             JgDenseMapInfo<K, V>,
-            RigtorpMapInfo<K, V>,
 #if QC_HASH
             QcHashMapInfo<K, V>,
 #endif
@@ -1304,6 +1327,7 @@ int main(const int argc, const char* argv[])
             EmHash5MapInfo<K, V>
         >();
     }
+
 #if QC_HASH
     // Architecture comparison
     else if constexpr (false) {
