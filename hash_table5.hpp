@@ -393,7 +393,8 @@ public:
 #if EMH_SMALL_SIZE
             if (_pairs != (PairT*)_small)
 #endif
-            free(_pairs); _pairs = nullptr;
+            free(_pairs);
+            _pairs = nullptr;
 
             rehash(rhs._num_filled + 2);
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
@@ -499,10 +500,17 @@ public:
     {
 #if EMH_SMALL_SIZE
         if (_pairs == (PairT*)_small || rhs._pairs == (PairT*)rhs._small) {
-            HashMap tmp(*this);
-            *this = rhs;
-            rhs = tmp;
-            return;
+            if (is_copy_trivially()) {
+                char tmp[(EMH_SMALL_SIZE + 2) * sizeof(PairT)];
+                memcpy(tmp,  _small, sizeof(tmp));
+                memcpy(_small, rhs._small, sizeof(tmp));
+                memcpy(rhs._small, tmp,  sizeof(tmp)); //copy once if only one small map
+            } else {
+                HashMap tmp(*this);
+                *this = rhs;
+                rhs = tmp;
+                return;
+            }
         }
 #endif
         //      std::swap(_eq, rhs._eq);

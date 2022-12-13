@@ -119,7 +119,7 @@ CXXFLAGS += $(MF)
 endif
 
 ifneq ($(CK),)
-CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
+CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1 -static -static-libstdc++
 endif
 
 
@@ -128,8 +128,8 @@ ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -I. qbench.cpp -o qbench
 endif
 
-	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) martinus_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) bstring.cpp -o bs
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench

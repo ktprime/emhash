@@ -286,7 +286,7 @@ public:
   }
 
   void reserve(size_type count) {
-    if (count * 9 > buckets_.size() * 8) {
+    if (count * 2 > buckets_.size() * 1) {
       rehash(count * 2);
     }
   }

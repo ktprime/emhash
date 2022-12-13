@@ -12,6 +12,10 @@
 #include "ck/Common/HashTable/HashMap.h"
 #endif
 
+#if HAVE_BOOST && CXX20
+#include <boost/unordered/unordered_flat_map.hpp>
+#endif
+
 #include "jg/dense_hash_map.hpp"
 #include "rigtorp/rigtorp.hpp"
 
@@ -1068,6 +1072,16 @@ struct FphDyamicMapInfo
     using AllocatorContainer = void;
     static inline const std::string name{"fph::DynamicFph "};
 };
+
+#if HAVE_BOOST
+template <typename K, typename V>
+struct BoostFlapMapInfo
+{
+    using Container = boost::unordered_flat_map<K, V, QintHasher>;
+    using AllocatorContainer = void;
+    static inline const std::string name{"boost::fhash_map"};
+};
+#endif
 #endif
 
 template <typename K>
@@ -1289,8 +1303,10 @@ int main(const int argc, const char* argv[])
             AbslMapInfo<K, V>,
 #endif
 
-#if CK_HMAP
-
+#if HAVE_BOOST
+#if CXX20
+            BoostFlapMapInfo<K, V>,
+#endif
 #endif
 
 #if ET

@@ -27,7 +27,7 @@
 #include <chrono>
 
 using namespace std::chrono_literals;
-#if TKey == 1
+#if TKey == 0
 using KeyType = uint64_t;
 using ValType = uint64_t;
 #else
@@ -47,7 +47,7 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
 static unsigned N = 2'000'000;
 static int K = 10;
 
-static std::vector< uint64_t > indices1, indices2, indices3;
+static std::vector< KeyType > indices1, indices2, indices3;
 
 static void init_indices()
 {
@@ -92,7 +92,7 @@ template<class Map>  void test_insert( Map& map, std::chrono::steady_clock::time
 
     for( unsigned i = 1; i <= N; ++i )
     {
-        map.emplace(  indices2[ i ], i  );
+        map.emplace(  (KeyType)indices2[ i ], (ValType)i  );
     }
 
     print_time( t1, "Random insert",  0, map.size() );

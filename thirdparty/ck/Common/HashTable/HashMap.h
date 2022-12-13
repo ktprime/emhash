@@ -114,7 +114,6 @@ struct HashMapCell
 
 namespace std
 {
-
     template <typename Key, typename TMapped, typename Hash, typename TState>
     struct tuple_size<HashMapCell<Key, TMapped, Hash, TState>> : std::integral_constant<size_t, 2> { };
 
@@ -245,7 +244,7 @@ public:
             new (&it->getMapped())V(std::forward<V>(value));
         }
 
-        return {this->begin(), inserted};
+        return {{this, it}, inserted};
     }
 };
 
@@ -271,7 +270,6 @@ template <
     typename Grower = HashTableGrower<>,
     typename Allocator = HashTableAllocator>
 using HashMap = HashMapTable<Key, HashMapCell<Key, Mapped, Hash>, Hash, Grower, Allocator>;
-
 
 template <
     typename Key,
