@@ -16,6 +16,10 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
+#if X86_64
+#include "hrd/hash_set_m.h"         //https://github.com/tessil/robin-map
+#endif
+
 #include "jg/dense_hash_map.hpp"
 #include "rigtorp/rigtorp.hpp"
 
@@ -713,7 +717,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
     static_assert(std::is_same_v<K, typename Container::key_type>);
 
     static constexpr bool isSet{!IsMap<Container>};
-    static size_t volatile v{0};
+    static size_t v{0};
 
     const double invElementCount{1.0 / double(keys.size())};
 
@@ -762,6 +766,8 @@ static void timeTypical(const size_t containerI, Container& container, const std
     for (const K& key : keys) {
         v += container.erase(key);
     }
+
+	assert(v != 0);
 
     const s64 t5{now()};
     results.get(containerI, keys.size(), Stat::accessPresent) += double(t2 - t1) * invElementCount;
@@ -1084,6 +1090,15 @@ struct BoostFlapMapInfo
 #endif
 #endif
 
+template <typename K, typename V>
+struct HrdmHashMap
+{
+    using Container = hrd_m::hash_map<K, V, QintHasher>;
+    using AllocatorContainer = void;
+
+    static inline const std::string name{"hrd_m::fhash_map"};
+};
+
 template <typename K>
 struct SkaSetInfo
 {
@@ -1295,7 +1310,7 @@ int main(const int argc, const char* argv[])
 #if X86
 //            EmiLib1MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
-            EmiLib3MapInfo<K, V>,
+//            EmiLib3MapInfo<K, V>,
 //            EmLibMapInfo<K, V>,
 #endif
 
@@ -1310,7 +1325,6 @@ int main(const int argc, const char* argv[])
 #endif
 
 #if ET
-            RigtorpMapInfo<K, V>,
             PhMapInfo<K, V>,
             RobinHoodMapInfo<K, V>,
 
@@ -1325,9 +1339,12 @@ int main(const int argc, const char* argv[])
             EmHash8MapInfo<K, V>,
             RobinDenseMapInfo<K, V>,
 
-
 #if CK_HMAP
             CkHashMapInfo<K, V>,
+#if X86_64
+            HrdmHashMap<K, V>,
+            RigtorpMapInfo<K, V>,
+#endif
 #endif
 
 #ifdef CXX20
@@ -1339,7 +1356,7 @@ int main(const int argc, const char* argv[])
 #endif
 
             EmHash7MapInfo<K, V>,
-            EmHash6MapInfo<K, V>,
+//            EmHash6MapInfo<K, V>,
             EmHash5MapInfo<K, V>
         >();
     }

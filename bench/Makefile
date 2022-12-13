@@ -1,13 +1,13 @@
-ifeq ($(shell expr `g++ -dumpversion` '>=' 5.), 1)
-CXX?=g++ -fwhole-program -flto
+ifeq ($(shell expr `g++ -dumpversion` '>=' 1.), 1)
+CXX?=g++ -fwhole-program
 endif
 
 ifeq ($(shell expr `clang++ -dumpversion` '>=' 1.), 1)
-CXX?=clang++ -stdlib=libc++ -flto
+CXX?=clang++ -stdlib=libc++
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 endif
 
-CXXFLAGS = -O3 -march=native -mtune=native -I.. -I../thirdparty -DNDEBUG=1
+CXXFLAGS = -flto -O3 -march=native -mtune=native -I.. -I../thirdparty -DNDEBUG=1
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)
@@ -119,9 +119,10 @@ CXXFLAGS += $(MF)
 endif
 
 ifneq ($(CK),)
-CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1 -static -static-libstdc++
+CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
+CXXFLAGS += -static -static-libstdc++ #clang libc++ ?
 
 all:
 ifneq ($(QB),)
