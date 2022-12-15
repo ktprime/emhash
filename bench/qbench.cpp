@@ -744,9 +744,12 @@ static void timeTypical(const size_t containerI, Container& container, const std
 
     const s64 t2{now()};
     // AccessEmpty
+    v = 1;
+    size_t hit = 0;
     for (const K& key : keys) {
-        v = v + container.count(key + v);
+        hit += container.count(key + v);
     }
+    v = hit;
 
     const s64 t3{now()};
     // Iterate
@@ -1233,7 +1236,8 @@ struct JgDenseMapInfo
 template <typename K, typename V>
 struct RigtorpMapInfo
 {
-    using Container = rigtorp::HashMap<K, V, QintHasher>;
+    //using Container = rigtorp::HashMap<K, V, QintHasher>;
+    using Container = rigtorp::HashMap<K, V, DefaultHash<K>>;
     using AllocatorContainer = void;
     static inline const std::string name{"rigtorp::HashMap"};
 };
@@ -1242,7 +1246,7 @@ struct RigtorpMapInfo
 template <typename K, typename V>
 struct CkHashMapInfo
 {
-    using Container = ck::HashMap<K, V>;
+    using Container = ck::HashMap<K, V, DefaultHash<K>>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"ck::f_hash_map  "};
@@ -1272,7 +1276,7 @@ int main(const int argc, const char* argv[])
 //        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
 #if 1
 //        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib3MapInfo<K, int>>();
-        compare<CompareMode::oneVsOne, K, EmHash8MapInfo<K, int>, RobinDenseMapInfo<K, int>>();
+        compare<CompareMode::oneVsOne, K, RigtorpMapInfo<K, uint64_t>, CkHashMapInfo<K, uint64_t>>();
 #endif
 //        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K,int>, EmHash5MapInfo<K, int>>();
 
