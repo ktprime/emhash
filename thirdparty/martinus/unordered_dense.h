@@ -1,7 +1,7 @@
 ///////////////////////// ankerl::unordered_dense::{map, set} /////////////////////////
 
 // A fast & densely stored hashmap and hashset based on robin-hood backward shift deletion.
-// Version 2.0.2
+// Version 3.0.1
 // https://github.com/martinus/unordered_dense
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -30,9 +30,9 @@
 #define ANKERL_UNORDERED_DENSE_H
 
 // see https://semver.org/spec/v2.0.0.html
-#define ANKERL_UNORDERED_DENSE_VERSION_MAJOR 2 // NOLINT(cppcoreguidelines-macro-usage) incompatible API changes
+#define ANKERL_UNORDERED_DENSE_VERSION_MAJOR 3 // NOLINT(cppcoreguidelines-macro-usage) incompatible API changes
 #define ANKERL_UNORDERED_DENSE_VERSION_MINOR 0 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible functionality
-#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 2 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible bug fixes
+#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 1 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible bug fixes
 
 // API versioning with inline namespace, see https://www.foonathan.net/2018/11/inline-namespaces/
 #define ANKERL_UNORDERED_DENSE_VERSION_CONCAT1(major, minor, patch) v##major##_##minor##_##patch
@@ -371,8 +371,10 @@ using detect_reserve = decltype(std::declval<T&>().reserve(size_t{}));
 template <typename Mapped>
 constexpr bool is_map_v = !std::is_void_v<Mapped>;
 
+// clang-format off
 template <typename Hash, typename KeyEqual>
 constexpr bool is_transparent_v = is_detected_v<detect_is_transparent, Hash>&& is_detected_v<detect_is_transparent, KeyEqual>;
+// clang-format on
 
 template <typename From, typename To1, typename To2>
 constexpr bool is_neither_convertible_v = !std::is_convertible_v<From, To1> && !std::is_convertible_v<From, To2>;
@@ -396,12 +398,12 @@ template <class Key,
           class KeyEqual,
           class AllocatorOrContainer,
           class Bucket>
-class table : public std::conditional_t<std::is_void_v<T>, base_table_type_set, base_table_type_map<T>> {
+class table : public std::conditional_t<is_map_v<T>, base_table_type_map<T>, base_table_type_set> {
 public:
     using value_container_type = std::conditional_t<
         is_detected_v<detect_iterator, AllocatorOrContainer>,
         AllocatorOrContainer,
-        typename std::vector<typename std::conditional_t<std::is_void_v<T>, Key, std::pair<Key, T>>, AllocatorOrContainer>>;
+        typename std::vector<typename std::conditional_t<is_map_v<T>, std::pair<Key, T>, Key>, AllocatorOrContainer>>;
 
 private:
     using bucket_alloc =
@@ -423,8 +425,8 @@ public:
     using const_reference = typename value_container_type::const_reference;
     using pointer = typename value_container_type::pointer;
     using const_pointer = typename value_container_type::const_pointer;
-    using iterator = typename value_container_type::iterator;
     using const_iterator = typename value_container_type::const_iterator;
+    using iterator = std::conditional_t<is_map_v<T>, typename value_container_type::iterator, const_iterator>;
     using bucket_type = Bucket;
 
 private:
@@ -491,10 +493,10 @@ private:
     }
 
     [[nodiscard]] static constexpr auto get_key(value_type const& vt) -> key_type const& {
-        if constexpr (std::is_void_v<T>) {
-            return vt;
-        } else {
+        if constexpr (is_map_v<T>) {
             return vt.first;
+        } else {
+            return vt;
         }
     }
 
@@ -842,8 +844,10 @@ public:
         : table(init, bucket_count, hash, KeyEqual(), alloc) {}
 
     ~table() {
-        auto ba = bucket_alloc(m_values.get_allocator());
-        bucket_alloc_traits::deallocate(ba, m_buckets, bucket_count());
+        if (nullptr != m_buckets) {
+            auto ba = bucket_alloc(m_values.get_allocator());
+            bucket_alloc_traits::deallocate(ba, m_buckets, bucket_count());
+        }
     }
 
     auto operator=(table const& other) -> table& {
@@ -1202,6 +1206,7 @@ public:
         return begin() + static_cast<difference_type>(value_idx_to_remove);
     }
 
+    template <typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto erase(const_iterator it) -> iterator {
         return erase(begin() + (it - cbegin()));
     }
@@ -1432,14 +1437,14 @@ public:
         }
         for (auto const& b_entry : b) {
             auto it = a.find(get_key(b_entry));
-            if constexpr (std::is_void_v<T>) {
-                // set: only check that the key is here
-                if (a.end() == it) {
+            if constexpr (is_map_v<T>) {
+                // map: check that key is here, then also check that value is the same
+                if (a.end() == it || !(b_entry.second == it->second)) {
                     return false;
                 }
             } else {
-                // map: check that key is here, then also check that value is the same
-                if (a.end() == it || !(b_entry.second == it->second)) {
+                // set: only check that the key is here
+                if (a.end() == it) {
                     return false;
                 }
             }
