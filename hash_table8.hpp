@@ -1066,13 +1066,13 @@ public:
 
     static value_type* alloc_bucket(size_type num_buckets)
     {
-        auto new_pairs = (char*)malloc((uint64_t)num_buckets * sizeof(value_type));
+        auto new_pairs = (char*)aligned_alloc(32, (uint64_t)num_buckets * sizeof(value_type));
         return (value_type *)(new_pairs);
     }
 
     static Index* alloc_index(size_type num_buckets)
     {
-        auto new_index = (char*)malloc((uint64_t)(EAD + num_buckets) * sizeof(Index));
+        auto new_index = (char*)aligned_alloc(16, (uint64_t)(EAD + num_buckets) * sizeof(Index));
         return (Index *)(new_index);
     }
 

@@ -166,6 +166,12 @@ namespace emhash7 {
     static constexpr size_type INACTIVE = 0 - 0x1u;
 #endif
 
+#ifndef EMH_MALIGN
+    static constexpr uint32_t EMH_MALIGN = 16;
+#endif
+
+static_assert(EMH_MALIGN >= 16);
+
 #ifndef EMH_SIZE_TYPE_16BIT
 static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
 #endif
@@ -543,7 +549,7 @@ public:
     HashMap(const HashMap& rhs) noexcept
     {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs = (PairT*)malloc(AllocSize(rhs._num_buckets));
+            _pairs = (PairT*)aligned_alloc(EMH_MALIGN, AllocSize(rhs._num_buckets));
             clone(rhs);
         } else {
             init(rhs._num_filled + 2, EMH_DEFAULT_LOAD_FACTOR);
@@ -596,7 +602,7 @@ public:
 
         if (_num_buckets != rhs._num_buckets) {
             free(_pairs);
-            _pairs = (PairT*)malloc(AllocSize(rhs._num_buckets));
+            _pairs = (PairT*)aligned_alloc(EMH_MALIGN, AllocSize(rhs._num_buckets));
         }
 
         clone(rhs);
@@ -1355,7 +1361,7 @@ public:
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
 
-        _pairs = (PairT*)malloc(AllocSize(_num_buckets));
+        _pairs = (PairT*)aligned_alloc(EMH_MALIGN, AllocSize(_num_buckets));
         memset((char*)(_pairs + _num_buckets), 0, sizeof(PairT) * EPACK_SIZE);
 
         _bitmask     = decltype(_bitmask)(_pairs + EPACK_SIZE + num_buckets);
