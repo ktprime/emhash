@@ -1,7 +1,7 @@
 ///////////////////////// ankerl::unordered_dense::{map, set} /////////////////////////
 
 // A fast & densely stored hashmap and hashset based on robin-hood backward shift deletion.
-// Version 3.0.1
+// Version 3.0.2
 // https://github.com/martinus/unordered_dense
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -32,7 +32,7 @@
 // see https://semver.org/spec/v2.0.0.html
 #define ANKERL_UNORDERED_DENSE_VERSION_MAJOR 3 // NOLINT(cppcoreguidelines-macro-usage) incompatible API changes
 #define ANKERL_UNORDERED_DENSE_VERSION_MINOR 0 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible functionality
-#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 1 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible bug fixes
+#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 2 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible bug fixes
 
 // API versioning with inline namespace, see https://www.foonathan.net/2018/11/inline-namespaces/
 #define ANKERL_UNORDERED_DENSE_VERSION_CONCAT1(major, minor, patch) v##major##_##minor##_##patch
@@ -55,6 +55,18 @@
 #    define ANKERL_UNORDERED_DENSE_PACK(decl) __pragma(pack(push, 1)) decl __pragma(pack(pop))
 #endif
 
+// exceptions
+#if !defined(__cpp_exceptions) && !defined(__EXCEPTIONS) && !defined(_CPPUNWIND)
+#    define ANKERL_UNORDERED_DENSE_HAS_EXCEPTIONS 0
+#else
+#    define ANKERL_UNORDERED_DENSE_HAS_EXCEPTIONS 1
+#endif
+#ifdef _MSC_VER
+#    define ANKERL_UNORDERED_DENSE_NOINLINE __declspec(noinline)
+#else
+#    define ANKERL_UNORDERED_DENSE_NOINLINE __attribute__((noinline))
+#endif
+
 #if ANKERL_UNORDERED_DENSE_CPP_VERSION < 201703L
 #    error ankerl::unordered_dense requires C++17 or higher
 #else
@@ -73,13 +85,24 @@
 #    include <type_traits>      // for enable_if_t, declval, conditional_t, ena...
 #    include <utility>          // for forward, exchange, pair, as_const, piece...
 #    include <vector>           // for vector
+#    if ANKERL_UNORDERED_DENSE_HAS_EXCEPTIONS == 0
+#        include <cstdlib> // for abort
+#    endif
 
 #    define ANKERL_UNORDERED_DENSE_PMR 0 // NOLINT(cppcoreguidelines-macro-usage)
 #    if defined(__has_include)
 #        if __has_include(<memory_resource>)
 #            undef ANKERL_UNORDERED_DENSE_PMR
 #            define ANKERL_UNORDERED_DENSE_PMR 1 // NOLINT(cppcoreguidelines-macro-usage)
+#            define ANKERL_UNORDERED_DENSE_PMR_ALLOCATOR \
+                std::pmr::polymorphic_allocator // NOLINT(cppcoreguidelines-macro-usage)
 #            include <memory_resource>           // for polymorphic_allocator
+#        elif __has_include(<experimental/memory_resource>)
+#            undef ANKERL_UNORDERED_DENSE_PMR
+#            define ANKERL_UNORDERED_DENSE_PMR 1 // NOLINT(cppcoreguidelines-macro-usage)
+#            define ANKERL_UNORDERED_DENSE_PMR_ALLOCATOR \
+                std::experimental::pmr::polymorphic_allocator // NOLINT(cppcoreguidelines-macro-usage)
+#            include <experimental/memory_resource>           // for polymorphic_allocator
 #        endif
 #    endif
 
@@ -98,6 +121,23 @@
 
 namespace ankerl::unordered_dense {
 inline namespace ANKERL_UNORDERED_DENSE_NAMESPACE {
+
+template <typename E, typename... Args>
+[[noreturn]]
+#    if ANKERL_UNORDERED_DENSE_HAS_EXCEPTIONS
+// make sure this is not inlined as it is slow and dramatically enlarges code, thus making other
+// inlinings more difficult. Throws are also generally the slow path.
+// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+ANKERL_UNORDERED_DENSE_NOINLINE void
+doThrow(Args&&... args) {
+    throw E(std::forward<Args>(args)...);
+}
+#    else
+// abort does not generate much code, so no need to avoid inlining.
+void doThrow(Args&&... /*unused*/) {
+    abort();
+}
+#    endif
 
 // hash ///////////////////////////////////////////////////////////////////////
 
@@ -592,7 +632,7 @@ private:
 
     void increase_size() {
         if (ANKERL_UNORDERED_DENSE_UNLIKELY(m_max_bucket_capacity == max_bucket_count())) {
-            throw std::overflow_error("ankerl::unordered_dense: reached max bucket size, cannot increase size");
+            doThrow<std::overflow_error>("ankerl::unordered_dense: reached max bucket size, cannot increase size");
         }
         --m_shifts;
         deallocate_buckets();
@@ -747,10 +787,10 @@ private:
 
     template <typename K, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto do_at(K const& key) -> Q& {
-        if (auto it = find(key); end() != it) {
+        if (auto it = find(key); ANKERL_UNORDERED_DENSE_LIKELY(end() != it)) {
             return it->second;
         }
-        throw std::out_of_range("ankerl::unordered_dense::map::at(): key not found");
+        doThrow<std::out_of_range>("ankerl::unordered_dense::map::at(): key not found");
     }
 
     template <typename K, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
@@ -989,10 +1029,9 @@ public:
     // nonstandard API:
     // Discards the internally held container and replaces it with the one passed. Erases non-unique elements.
     auto replace(value_container_type&& container) {
-        if (container.size() > max_size()) {
-            throw std::out_of_range("ankerl::unordered_dense::map::replace(): too many elements");
+        if (ANKERL_UNORDERED_DENSE_UNLIKELY(container.size() > max_size())) {
+            doThrow<std::out_of_range>("ankerl::unordered_dense::map::replace(): too many elements");
         }
-
         auto shifts = calc_shifts_for_size(container.size());
         if (0 == m_num_buckets || shifts < m_shifts || container.get_allocator() != m_values.get_allocator()) {
             m_shifts = shifts;
@@ -1483,10 +1522,10 @@ template <class Key,
           class Hash = hash<Key>,
           class KeyEqual = std::equal_to<Key>,
           class Bucket = bucket_type::standard>
-using map = detail::table<Key, T, Hash, KeyEqual, std::pmr::polymorphic_allocator<std::pair<Key, T>>, Bucket>;
+using map = detail::table<Key, T, Hash, KeyEqual, ANKERL_UNORDERED_DENSE_PMR_ALLOCATOR<std::pair<Key, T>>, Bucket>;
 
 template <class Key, class Hash = hash<Key>, class KeyEqual = std::equal_to<Key>, class Bucket = bucket_type::standard>
-using set = detail::table<Key, void, Hash, KeyEqual, std::pmr::polymorphic_allocator<Key>, Bucket>;
+using set = detail::table<Key, void, Hash, KeyEqual, ANKERL_UNORDERED_DENSE_PMR_ALLOCATOR<Key>, Bucket>;
 
 } // namespace pmr
 

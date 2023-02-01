@@ -156,6 +156,16 @@ namespace fph {
 #endif
 #endif
 
+#ifndef FPH_HAVE_EXCEPTIONS
+
+#if !(defined(__GNUC__) && !defined(__cpp_exceptions)) && \
+    !(defined(__GNUC__) && defined(__cpp_exceptions) && __cpp_exceptions == 0 ) && \
+    !(defined(_MSC_VER) && !defined(_CPPUNWIND))
+#define FPH_HAVE_EXCEPTIONS 1
+#endif
+
+#endif
+
 // From absl library
 // A function-like feature checking macro that accepts C++11 style attributes.
 // It's a wrapper around `__has_cpp_attribute`, defined by ISO C++ SD-6
@@ -332,8 +342,37 @@ namespace fph {
             using promoted_type = typename std::common_type<int, T>::type;
             using unsigned_promoted_type = typename std::make_unsigned<promoted_type>::type;
             return ((unsigned_promoted_type{v} >> mb)
-                    | (unsigned_promoted_type{v} << (0-mb & count_mask)));
+                    | (unsigned_promoted_type{v} << (-mb & count_mask)));
         }
+
+
+        inline void ThrowRuntimeError(const char* what) {
+#ifdef FPH_HAVE_EXCEPTIONS
+            throw std::runtime_error(what);
+#else
+            (void)what;
+            std::abort();
+#endif
+        }
+
+        inline void ThrowInvalidArgument(const char* what) {
+#ifdef FPH_HAVE_EXCEPTIONS
+            throw std::invalid_argument(what);
+#else
+            (void)what;
+            std::abort();
+#endif
+        }
+
+        inline void ThrowOutOfRange(const char* what) {
+#ifdef FPH_HAVE_EXCEPTIONS
+            throw std::out_of_range(what);
+#else
+            (void)what;
+            std::abort();
+#endif
+        }
+
 
 
     } // namespace dynamic::detail
@@ -687,7 +726,7 @@ namespace fph {
 
         template<class CharT>
         struct SimpleSeedHash<std::basic_string_view<CharT>> {
-            size_t operator()(const std::basic_string_view<CharT> &str, size_t seed) const noexcept {
+            size_t operator()(std::basic_string_view<CharT> str, size_t seed) const noexcept {
                 return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
             }
         };
@@ -743,7 +782,7 @@ namespace fph {
 
         template<class CharT>
         struct MixSeedHash<std::basic_string_view<CharT>> {
-            size_t operator()(const std::basic_string_view<CharT> &str, size_t seed) const {
+            size_t operator()(std::basic_string_view<CharT> str, size_t seed) const {
                 return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
             }
         };
@@ -799,7 +838,7 @@ namespace fph {
 
         template<class CharT>
         struct StrongSeedHash<std::basic_string_view<CharT>> {
-            size_t operator()(const std::basic_string_view<CharT> &str, size_t seed) const noexcept {
+            size_t operator()(std::basic_string_view<CharT> str, size_t seed) const noexcept {
                 return dynamic::detail::HashBytes(str.data(), sizeof(CharT) * str.length(), seed);
             }
         };
@@ -894,12 +933,13 @@ namespace fph {
 
     namespace dynamic::detail {
 
-        template<class Key, class KeyPointerAllocator=std::allocator<const Key *>,
-                class SizeTAllocator=std::allocator<size_t>>
+        template<class Key,
+                class KeyPointerAllocator=std::allocator<const Key *>,
+                class BucketParamType = uint32_t>
         struct FphBucket {
         public:
-            size_t entry_cnt;
-            size_t index;
+            BucketParamType entry_cnt;
+            BucketParamType index;
             std::vector<const Key *, KeyPointerAllocator> key_array;
 
             explicit FphBucket(size_t index) noexcept: entry_cnt(0), index(index) {}
@@ -1198,7 +1238,7 @@ namespace fph {
             size_t init_seed;
 
         protected:
-            std::minstd_rand random_engine;
+            std::mt19937_64 random_engine;
             std::uniform_int_distribution<uint32_t> random_gen;
         };
 
@@ -1304,9 +1344,37 @@ namespace fph {
 
         };
 
-    } // namespace detail
+    } // namespace dynamic::detail
 
     namespace dynamic::detail {
+
+        // For Heterogeneous lookup
+        // https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1690r0.html
+
+        template<typename... Ts> struct make_void { typedef void type;};
+        template<typename... Ts> using void_t = typename make_void<Ts...>::type;
+
+        template <class, class = void>
+        struct IsTransparent : std::false_type {};
+        template <class T>
+        struct IsTransparent<T, void_t<typename T::is_transparent>>
+        : std::true_type {};
+
+        template <bool is_transparent>
+        struct KeyArg {
+            // Transparent. Forward `K`.
+            template <typename K, typename key_type>
+            using type = K;
+        };
+
+        template <>
+        struct KeyArg<false> {
+            // Not transparent. Always use `key_type`.
+            template <typename K, typename key_type>
+            using type = key_type;
+        };
+
+
 
         template<class Policy, class SeedHash, class KeyEqual, class Allocator, class BucketParamType,
                 class RandomKeyGenerator>
@@ -1332,6 +1400,12 @@ namespace fph {
             using const_iterator = ConstForwardIterator<DynamicRawSet, typename Policy::slot_type>;
             friend const_iterator;
 #endif
+        private:
+            using KeyArgImpl = KeyArg<IsTransparent<key_equal>::value
+                    && IsTransparent<hasher>::value>;
+        public:
+            template <class K>
+            using key_arg = typename KeyArgImpl::template type<K, key_type>;
 
             explicit DynamicRawSet(size_type bucket_count, const SeedHash& hash = SeedHash(),
                                    const key_equal& equal = key_equal(),
@@ -1364,7 +1438,7 @@ namespace fph {
 //                item_num_mask_ = param_->item_num_ceil_ - 1U;
                 slot_index_policy_ = IndexMapPolicy(param_->item_num_ceil_);
 
-                Build<false, true>(end(), end(), 0, false, DEFAULT_BITS_PER_KEY,
+                Build<false, false, true>(end(), end(), 0, false, DEFAULT_BITS_PER_KEY,
                                    DEFAULT_KEYS_FIRST_PART_RATIO,
                                    DEFAULT_BUCKETS_FIRST_PART_RATIO);
                 (void)hash;
@@ -1573,18 +1647,20 @@ namespace fph {
             }
 
 
-            template<bool is_rehash, bool use_move=false, bool last_element_only_has_key=false, class InputIt>
+            template<bool is_rehash, bool called_by_rehash,
+                    bool use_move=false, bool last_element_only_has_key=false, class InputIt>
             void Build(InputIt pair_begin, InputIt pair_end, uint64_t seed = 0,
                        bool verbose = false, double c = DEFAULT_BITS_PER_KEY,
                        double keys_first_part_ratio = DEFAULT_KEYS_FIRST_PART_RATIO, double buckets_first_part_ratio = DEFAULT_BUCKETS_FIRST_PART_RATIO,
                        size_t max_try_seed2_time = 1000, size_t max_reseed2_time = 1000) {
                 constexpr size_t max_try_seed0_time = 10;
                 constexpr size_t max_try_seed1_time = 100;
-                BuildImp<is_rehash, use_move, last_element_only_has_key>(pair_begin, pair_end, seed,
-                                                                         verbose, c, keys_first_part_ratio,
-                                                                         buckets_first_part_ratio,
-                                                                         max_try_seed0_time,
-                                                                         max_try_seed1_time, max_try_seed2_time, max_reseed2_time);
+                BuildImp<is_rehash, called_by_rehash, use_move,
+                            last_element_only_has_key>(pair_begin, pair_end, seed,
+                             verbose, c, keys_first_part_ratio,
+                             buckets_first_part_ratio,
+                             max_try_seed0_time,
+                             max_try_seed1_time, max_try_seed2_time, max_reseed2_time);
             }
 
             void rehash(size_type count) {
@@ -1607,7 +1683,7 @@ namespace fph {
                                                                     temp_value_buf++, std::move(*it));
                     }
 
-                    Build<true, true>(temp_value_buf_start, temp_value_buf_start + param_->item_num_, seed1_,
+                    Build<true, true, true>(temp_value_buf_start, temp_value_buf_start + param_->item_num_, seed1_,
 #if FPH_DEBUG_FLAG
                             true,
 #else
@@ -1623,6 +1699,8 @@ namespace fph {
                     for (auto *temp_buf_ptr = temp_value_buf_start; temp_buf_ptr != temp_value_buf_start + param_->item_num_; temp_buf_ptr++) {
                         std::allocator_traits<Allocator>::destroy(param_->alloc_, temp_buf_ptr);
                     }
+                    param_->temp_pair_buf_.clear();
+                    param_->temp_pair_buf_.shrink_to_fit();
                 }
 
 
@@ -1686,7 +1764,7 @@ namespace fph {
                     for (; first != last; ++first) emplace(*first);
                 }
                 else {
-                    Build<false, false>(first, last, seed1_, false, param_->bits_per_key_);
+                    Build<false, false, false>(first, last, seed1_, false, param_->bits_per_key_);
                 }
 
             }
@@ -1756,7 +1834,9 @@ namespace fph {
                 return end();
             }
 
-            FPH_ALWAYS_INLINE iterator find(const key_type& FPH_RESTRICT key) FPH_FUNC_RESTRICT noexcept {
+            template<class K = key_type>
+            FPH_ALWAYS_INLINE iterator find(const key_arg<K>&
+                            FPH_RESTRICT key) FPH_FUNC_RESTRICT noexcept {
                 auto slot_pos = GetSlotPos(key);
                 slot_type *pair_address = slot_ + slot_pos;
                 if FPH_LIKELY(key_equal_(pair_address->key, key)) {
@@ -1765,7 +1845,9 @@ namespace fph {
                 return end();
             }
 
-            FPH_ALWAYS_INLINE const_iterator find(const key_type& FPH_RESTRICT key) const FPH_FUNC_RESTRICT noexcept {
+            template<class K = key_type>
+            FPH_ALWAYS_INLINE const_iterator find(const key_arg<K>&
+                        FPH_RESTRICT key) const FPH_FUNC_RESTRICT noexcept {
                 auto slot_pos = GetSlotPos(key);
                 slot_type *pair_address = slot_ + slot_pos;
                 if FPH_LIKELY(key_equal_(pair_address->key, key)) {
@@ -1774,11 +1856,6 @@ namespace fph {
                 return end();
             }
 
-            // TODO: support transparent key
-//            template<class K>
-//            iterator find(const K &x) {
-//
-//            }
 
 #endif
 
@@ -1852,17 +1929,19 @@ namespace fph {
                 }
             }
 
-            size_t count(const key_type &key) const {
+            template<class K = key_type>
+            size_t count(const key_arg<K> &key) const {
                 auto pos = GetSlotPos(key);
-                if (key_equal_(key, slot_[pos].key)) {
+                if (key_equal_(slot_[pos].key, key)) {
                     return 1U;
                 }
                 return 0U;
             }
 
-            bool contains(const key_type& key ) const {
+            template<class K = key_type>
+            bool contains(const key_arg<K>& key ) const {
                 auto pos = GetSlotPos(key);
-                if (key_equal_(key, slot_[pos].key)) {
+                if (key_equal_(slot_[pos].key, key)) {
                     return true;
                 }
                 return false;
@@ -1872,7 +1951,8 @@ namespace fph {
                 return contains(slot_type::GetSlotAddressByValueAddress(std::addressof(ele))->key);
             }
 
-            std::pair<iterator,iterator> equal_range( const key_type& key ) {
+            template<class K = key_type>
+            std::pair<iterator,iterator> equal_range( const key_arg<K>& key ) {
                 auto it = find(key);
                 if (it != end()) {
                     return {it, std::next(it)};
@@ -1880,7 +1960,9 @@ namespace fph {
                 return {it, it};
             }
 
-            std::pair<const_iterator,const_iterator> equal_range( const key_type& key ) const {
+            template<class K = key_type>
+            std::pair<const_iterator,const_iterator> equal_range(
+                    const key_arg<K>& key ) const {
                 auto it = find(key);
                 if (it != end()) {return {it, std::next(it)};}
                 return {it, it};
@@ -1925,13 +2007,17 @@ namespace fph {
              * @param key
              * @return
              */
-            FPH_ALWAYS_INLINE pointer GetPointerNoCheck(const key_type& FPH_RESTRICT key)
+            template<class K = key_type>
+            FPH_ALWAYS_INLINE pointer GetPointerNoCheck(const key_arg<K>&
+                    FPH_RESTRICT key)
             FPH_FUNC_RESTRICT noexcept {
                 size_t pos = GetSlotPos(key);
                 return std::addressof(slot_[pos].value);
             }
 
-            FPH_ALWAYS_INLINE const_pointer GetPointerNoCheck(const key_type& FPH_RESTRICT key)
+            template<class K = key_type>
+            FPH_ALWAYS_INLINE const_pointer GetPointerNoCheck(const key_arg<K>&
+                    FPH_RESTRICT key)
             const FPH_FUNC_RESTRICT noexcept {
                 size_t pos = GetSlotPos(key);
                 return std::addressof(slot_[pos].value);
@@ -1939,11 +2025,13 @@ namespace fph {
 
 
             /**
-             * Get the position in the underlying slot of one key
+             *
+             * @tparam K
              * @param key
              * @return
              */
-            FPH_ALWAYS_INLINE size_t GetSlotPos(const key_type &key) const FPH_FUNC_RESTRICT noexcept {
+            template<class K = key_type>
+            FPH_ALWAYS_INLINE size_t GetSlotPos(const key_arg<K> &key) const FPH_FUNC_RESTRICT noexcept {
                 auto k_seed0_hash = hash_(key, seed0_);
                 size_t bucket_index = GetBucketIndex(k_seed0_hash);
                 auto bucket_param = bucket_p_array_[bucket_index];
@@ -1977,7 +2065,8 @@ namespace fph {
                 return slot_pos;
             }
 
-            FPH_ALWAYS_INLINE size_t GetSlotPos(const key_type &key, size_t offset, size_t optional_bit)
+            template<class K = key_type>
+            FPH_ALWAYS_INLINE size_t GetSlotPos(const key_arg<K> &key, size_t offset, size_t optional_bit)
             const FPH_FUNC_RESTRICT noexcept {
                 auto k_seed0_hash = hash_(key, seed0_);
                 auto temp_hash_value = MidHash(k_seed0_hash, MixSeedAndBit(seed2_, optional_bit));
@@ -2053,7 +2142,7 @@ namespace fph {
             size_t seed1_, seed2_; // direct
 
             using BucketParamAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<BucketParamType>;
-//            using BucketParamArray = std::vector<BucketParamType, BucketParamAllocator>;
+            using BucketParamVector = std::vector<BucketParamType, BucketParamAllocator>;
             BucketParamType *bucket_p_array_; // direct
 
             using slot_type = typename Policy::slot_type;
@@ -2068,7 +2157,8 @@ namespace fph {
             using KeyAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<key_type>;
             using CharAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<char>;
 
-            using BucketType = detail::FphBucket<key_type, KeyPointerAllocator>;
+            using BucketType = detail::FphBucket<key_type, KeyPointerAllocator,
+                                                BucketParamType>;
             using BucketAllocator = typename std::allocator_traits<Allocator>::template rebind_alloc<BucketType>;
 
             using SizeTVector = std::vector<size_t, SizeTAllocator>;
@@ -2224,8 +2314,8 @@ namespace fph {
                 std::vector<bool, BoolAllocator> seed2_test_table_;
                 SizeTVector tested_hash_vec_;
 
-                SizeTVector random_table_;
-                SizeTVector map_table_;
+                BucketParamVector random_table_;
+                BucketParamVector map_table_;
                 std::vector<BucketType, BucketAllocator> bucket_array_;
 //                BucketType *bucket_array_;
                 // TODO: may use pointer to replace vector to save space
@@ -2683,7 +2773,6 @@ namespace fph {
             }
 
 
-
             std::pair<slot_type*, bool> FindOrAlloc(const key_type& key) {
 
                 if FPH_UNLIKELY(param_->item_num_ + 1U > param_->should_expand_item_num_ &&
@@ -2856,7 +2945,7 @@ namespace fph {
                                                                            std::addressof(temp_slot_ptr->key), key);
 
                             ++param_->item_num_;
-                            Build<true, true, true>(temp_value_buf_start,
+                            Build<true, false, true, true>(temp_value_buf_start,
                                                     temp_value_buf_start + param_->item_num_, seed1_,
 #if FPH_DEBUG_FLAG
                                     true, // verbose
@@ -2882,6 +2971,8 @@ namespace fph {
                                     std::allocator_traits<KeyAllocator>::destroy(key_alloc, std::addressof(slot_type::GetSlotAddressByValueAddress(temp_value_ptr)->key));
                                 }
                             }
+                            param_->temp_pair_buf_.clear();
+                            param_->temp_pair_buf_.shrink_to_fit();
                             auto temp_pos = GetSlotPos(key);
                             insert_address = slot_ + temp_pos;
                         }
@@ -2967,10 +3058,10 @@ namespace fph {
 #endif
                                     // TODO: free the memory when throw
                                     if FPH_UNLIKELY(++try_gen_second_key_cnt > 10000ULL) {
-                                        throw std::runtime_error("Failed to find second default key "
-                                                                 "with different position than the first default key, maybe "
-                                                                 "the seed hash is not strong enough or the key generator "
-                                                                 "cannot generate enough different keys");
+                                        ThrowRuntimeError("Failed to find second default key "
+                                                          "with different position than the first default key, maybe "
+                                                          "the seed hash is not strong enough or the key generator "
+                                                          "cannot generate enough different keys");
                                     }
                                 }
                                 if (original_default_key_pos_empty_status) {
@@ -3060,7 +3151,9 @@ namespace fph {
             }
 
 
-            template<bool is_rehash, bool use_move, bool last_element_only_has_key=false, class InputIt>
+            template<bool is_rehash, bool called_by_rehash, bool use_move,
+                    bool last_element_only_has_key=false,
+                    class InputIt>
             void BuildImp(InputIt pair_begin, InputIt pair_end, uint64_t seed = 0,
                           bool verbose = false, double c = 3.0,
                           double keys_first_part_ratio = 0.6, double buckets_first_part_ratio = 0.3,
@@ -3072,15 +3165,15 @@ namespace fph {
                 auto build_start_time = std::chrono::high_resolution_clock::now();
 
                 if FPH_UNLIKELY(c < 1.45) {
-                    throw std::invalid_argument("c must be no less than 1.45");
+                    ThrowRuntimeError("c must be no less than 1.45");
                 }
 
                 if FPH_UNLIKELY(keys_first_part_ratio < 0.0 || keys_first_part_ratio > 1.0) {
-                    throw std::invalid_argument("keys_first_part_ratio must be in [0.0, 1.0]");
+                    ThrowRuntimeError("keys_first_part_ratio must be in [0.0, 1.0]");
                 }
 
                 if FPH_UNLIKELY(buckets_first_part_ratio < 0.0 || buckets_first_part_ratio > 1.0) {
-                    throw std::invalid_argument("buckets_first_part_ratio must be in [0.0, 1.0]");
+                    ThrowInvalidArgument("buckets_first_part_ratio must be in [0.0, 1.0]");
                 }
 
 
@@ -3090,7 +3183,7 @@ namespace fph {
 
 
                 if FPH_UNLIKELY(temp_key_num < 0) {
-                    throw std::invalid_argument("Input pair_begin > pair_end");
+                    ThrowInvalidArgument("Input pair_begin > pair_end");
                     return;
                 }
 
@@ -3142,14 +3235,20 @@ namespace fph {
                 param_->should_expand_item_num_ = std::ceil(param_->item_num_ceil_ * param_->max_load_factor_);
 
                 if (key_num > param_->item_num_ceil_) {
-                    throw std::invalid_argument("BucketParamType num_bits: " +
+                    ThrowInvalidArgument(("BucketParamType num_bits: " +
                                                 std::to_string(bucket_param_type_num_bits_) +
-                                                " ,key number: " + std::to_string(key_num));
+                                                " ,key number: " + std::to_string(key_num)).c_str());
                     return;
 
                 }
 
-                param_->slot_capacity_ = std::max(param_->item_num_ceil_, param_->slot_capacity_);
+                if (called_by_rehash) {
+                    param_->slot_capacity_ = param_->item_num_ceil_;
+                }
+                else {
+                    param_->slot_capacity_ = std::max(param_->item_num_ceil_, param_->slot_capacity_);
+                }
+
 
 
                 // mapping
@@ -3181,6 +3280,9 @@ namespace fph {
                 p1_ = temp_p1;
 
 #else
+
+
+
                 param_->bucket_num_ = dynamic::detail::Ceil2(temp_bucket_num);
                 if (param_->bucket_num_ <= 1UL) {
                     param_->bucket_num_ = 2U;
@@ -3189,17 +3291,29 @@ namespace fph {
                 bucket_index_policy_.UpdateBySlotNum(param_->bucket_num_);
 #endif
 
-                param_->bucket_capacity_ = std::max(param_->bucket_num_, param_->bucket_capacity_);
+                if (called_by_rehash) {
+                    param_->bucket_capacity_ = param_->bucket_num_;
+                }
+                else {
+                    param_->bucket_capacity_ = std::max(param_->bucket_num_, param_->bucket_capacity_);
+                }
 
-                if (old_bucket_capacity < param_->bucket_capacity_ || bucket_p_array_ == nullptr) {
+
+                if (old_bucket_capacity < param_->bucket_capacity_
+                    || (old_bucket_capacity > param_->bucket_capacity_ && called_by_rehash)
+                    || bucket_p_array_ == nullptr) {
                     BucketParamAllocator bucket_param_alloc;
                     if (bucket_p_array_ != nullptr) {
                         bucket_param_alloc.deallocate(bucket_p_array_, old_bucket_capacity);
                         bucket_p_array_ = nullptr;
                     }
                     bucket_p_array_ = bucket_param_alloc.allocate(param_->bucket_capacity_);
+                    if (old_bucket_capacity > param_->bucket_capacity_) {
+                        param_->bucket_array_.clear();
+                        param_->bucket_array_.shrink_to_fit();
+                    }
+                    param_->bucket_array_.reserve(param_->bucket_num_);
                 }
-
 
                 if (verbose) {
                     size_t buckets_use_bytes = param_->bucket_num_ * sizeof(BucketParamType);
@@ -3214,7 +3328,6 @@ namespace fph {
                 }
 
 
-                param_->bucket_array_.reserve(param_->bucket_num_);
 
                 std::mt19937_64 random_engine(seed);
                 std::uniform_int_distribution<size_t> random_dis;
@@ -3280,10 +3393,16 @@ namespace fph {
                         param_->seed2_test_table_.resize(param_->item_num_ceil_, false);
                         param_->tested_hash_vec_.clear();
 
+                        size_t old_random_table_size = param_->random_table_.size();
                         param_->random_table_.resize(param_->item_num_ceil_);
                         param_->map_table_.resize(param_->item_num_ceil_);
-
-
+                        // only cause possible allocation when rehash
+                        if (called_by_rehash) {
+                            if (param_->item_num_ceil_ < old_random_table_size) {
+                                param_->random_table_.shrink_to_fit();
+                                param_->map_table_.shrink_to_fit();
+                            }
+                        }
 
                         for (size_t try_seed2_time = 0; try_seed2_time < max_try_seed2_time; ++try_seed2_time) {
 
@@ -3437,22 +3556,27 @@ namespace fph {
                 } // for try_seed0_time
 
                 if (!build_succeed_flag) {
-                    throw std::invalid_argument("timeout when try to build fph map, consider using a stronger seed hash function, key_num: "
-                                                + std::to_string(key_num) + ", item_num_ceil: " + std::to_string(param_->item_num_ceil_)
-                                                + ", bucket num: " + std::to_string(param_->bucket_num_));
+                    ThrowInvalidArgument(("timeout when try to build fph map,"
+                         "consider using a stronger seed hash function, key_num: "
+                            + std::to_string(key_num) + ", item_num_ceil: " +
+                            std::to_string(param_->item_num_ceil_)
+                            + ", bucket num: " +
+                            std::to_string(param_->bucket_num_)).c_str());
                 }
 
 
 
                 // allocate
-                if (old_slot_capacity < param_->slot_capacity_ || slot_ == nullptr) {
-
+                if ((old_slot_capacity < param_->slot_capacity_)
+                    || (old_slot_capacity > param_->slot_capacity_ && called_by_rehash)
+                    || slot_ == nullptr) {
                     if (slot_ != nullptr) {
                         SlotAllocator{}.deallocate(slot_, old_slot_capacity);
                         slot_ = nullptr;
                     }
 
                     slot_ = SlotAllocator().allocate(param_->slot_capacity_);
+
                 }
 
 
@@ -3480,7 +3604,7 @@ namespace fph {
                         }
 #endif
                         if (++try_fill_key_time > 100000ULL) {
-                            throw std::invalid_argument("Failed to find a valid fill for key zero");
+                            ThrowInvalidArgument("Failed to find a valid fill for key zero");
                         }
                         std::allocator_traits<KeyAllocator>::destroy(key_alloc, &fill_key);
                         if constexpr(std::is_move_constructible<key_type>::value) {
@@ -3627,9 +3751,9 @@ namespace fph {
         }; // class raw set
 
 
-    } // namespace detail
+    } // namespace dynamic detail
 
-    namespace detail {
+    namespace dynamic::detail {
 
         template<class T>
         union DynamicSetSlotType {
@@ -3723,7 +3847,7 @@ namespace fph {
 //            using index_map_policy = LowBitsIndexMapPolicy;
         };
 
-    } // namespace detail
+    } // namespace dynamic::detail
 
     /**
      * The dynamic perfect hash set container
@@ -3740,7 +3864,8 @@ namespace fph {
             class Allocator = std::allocator<Key>,
             class BucketParamType = uint32_t,
             class RandomKeyGenerator = dynamic::RandomGenerator<Key> >
-    class DynamicFphSet: public dynamic::detail::DynamicRawSet<detail::DynamicFphSetPolicy<Key>,
+    class DynamicFphSet: public dynamic::detail::DynamicRawSet<
+            dynamic::detail::DynamicFphSetPolicy<Key>,
             SeedHash, KeyEqual, Allocator, BucketParamType, RandomKeyGenerator> {
         using Base = typename DynamicFphSet::DynamicRawSet;
     public:
@@ -3753,7 +3878,15 @@ namespace fph {
 
     };
 
-    namespace detail {
+    template<class Key, class SeedHash = SimpleSeedHash<Key>,
+            class KeyEqual = std::equal_to<Key>,
+            class Allocator = std::allocator<Key>,
+            class BucketParamType = uint32_t,
+            class RandomKeyGenerator = dynamic::RandomGenerator<Key> >
+    using dynamic_fph_set = DynamicFphSet<Key, SeedHash, KeyEqual, Allocator,
+                                BucketParamType, RandomKeyGenerator>;
+
+    namespace dynamic::detail {
 
         namespace memory {
 
@@ -3844,7 +3977,7 @@ namespace fph {
             using index_map_policy = HighBitsIndexMapPolicy;
         };
 
-    } // namespace detail
+    } // namespace dynamic detail
 
     /**
      * The dynamic perfect hash map container
@@ -3863,9 +3996,12 @@ namespace fph {
             class BucketParamType = uint32_t,
             class RandomKeyGenerator = fph::dynamic::RandomGenerator<Key>
     >
-    class DynamicFphMap : public dynamic::detail::DynamicRawSet<detail::DynamicFphMapPolicy<Key, T>,
-            SeedHash, KeyEqual, Allocator, BucketParamType, RandomKeyGenerator> {
+    class DynamicFphMap : public dynamic::detail::DynamicRawSet<
+        dynamic::detail::DynamicFphMapPolicy<Key, T>,
+        SeedHash, KeyEqual, Allocator, BucketParamType, RandomKeyGenerator> {
         using Base = typename DynamicFphMap::DynamicRawSet;
+        template<class K>
+        using key_arg = typename Base::template key_arg<K>;
     public:
 
         using mapped_type = T;
@@ -3874,8 +4010,6 @@ namespace fph {
 
         using iterator = typename Base::iterator;
         using key_type = typename Base::key_type;
-
-
 
         using Base::find;
 
@@ -3891,45 +4025,52 @@ namespace fph {
 
         template<class... Args>
         std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args) {
-            return this-> template TryEmplaceImp<>(std::move(k), std::forward<Args>(args)...);
+            return this-> template TryEmplaceImp<>(std::move(k),
+                    std::forward<Args>(args)...);
         }
 
-        T& operator[] (const Key &key) {
+        T& operator[] (const key_type &key) {
             return this->try_emplace(key).first->second;
         }
 
-        T& operator[] (Key&& key) {
+        T& operator[] (key_type&& key) {
             return this->try_emplace(std::move(key)).first->second;
         }
 
-        const T& operator[] (const Key &key) const noexcept {
+        template<class K = key_type>
+        const T& operator[] (const key_arg<K> &key) const noexcept {
             return this->GetPointerNoCheck(key)->second;
         }
 
-        T& at (const Key& key) {
+        template<class K = key_type>
+        T& at (const key_arg<K> &key) {
             auto *pair_ptr = this->GetPointerNoCheck(key);
-
-            if FPH_LIKELY(this->key_equal_(key, pair_ptr->first)) {
-                return pair_ptr->second;
+            if FPH_UNLIKELY(!this->key_equal_(pair_ptr->first, key)) {
+                dynamic::detail::ThrowOutOfRange("Can not find key in at");
             }
-            else {
-                throw std::out_of_range("Can not find key in at");
-            }
+            return pair_ptr->second;
         }
 
-        const T& at (const Key& key) const {
+        template<class K = key_type>
+        const T& at (const key_arg<K>& key) const {
             const auto *pair_ptr = this->GetPointerNoCheck(key);
-
-            if FPH_LIKELY(this->key_equal_(key, pair_ptr->first)) {
-                return pair_ptr->second;
+            if FPH_UNLIKELY(!this->key_equal_(pair_ptr->first, key)) {
+                dynamic::detail::ThrowOutOfRange("Can not find key in at");
             }
-            else {
-                throw std::out_of_range("Can not find key in at");
-            }
+            return pair_ptr->second;
         }
 
     protected:
     };
+
+    template <class Key, class T,
+            class SeedHash = SimpleSeedHash<Key>,
+            class KeyEqual = std::equal_to<Key>,
+            class Allocator = std::allocator<std::pair<const Key, T>>,
+            class BucketParamType = uint32_t,
+            class RandomKeyGenerator = fph::dynamic::RandomGenerator<Key> >
+    using dynamic_fph_map = DynamicFphMap<Key, T, SeedHash, KeyEqual, Allocator,
+                            BucketParamType, RandomKeyGenerator>;
 
 
 } // namespace fph
