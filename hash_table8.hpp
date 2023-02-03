@@ -1,9 +1,9 @@
-// emhash8::HashMap for C++11/14/17
-// version 1.6.3
+// emhash8::HashMap for C++14/17
+// version 1.6.4
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2019-2022 Huang Yuanbing & bailuzhou AT 163.com
+// Copyright (c) 2021-2023 Huang Yuanbing & bailuzhou AT 163.com
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -1066,13 +1066,17 @@ public:
 
     static value_type* alloc_bucket(size_type num_buckets)
     {
-        auto new_pairs = (char*)aligned_alloc(32, (uint64_t)num_buckets * sizeof(value_type));
+#if _WIN32
+        auto new_pairs = malloc((uint64_t)num_buckets * sizeof(value_type));
+#else
+        auto new_pairs = aligned_alloc(32, (uint64_t)num_buckets * sizeof(value_type));
+#endif
         return (value_type *)(new_pairs);
     }
 
     static Index* alloc_index(size_type num_buckets)
     {
-        auto new_index = (char*)aligned_alloc(16, (uint64_t)(EAD + num_buckets) * sizeof(Index));
+        auto new_index = (char*)malloc((uint64_t)(EAD + num_buckets) * sizeof(Index));
         return (Index *)(new_index);
     }
 
@@ -1139,6 +1143,8 @@ public:
         assert(required_buckets < max_size());
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
+        if (sizeof(KeyT) < sizeof(size_type) && num_buckets >= (1ul << (2 * 8)))
+            num_buckets = 2ul << (sizeof(KeyT) * 8);
 
 #if EMH_REHASH_LOG
         auto last = _last;

@@ -1,10 +1,10 @@
 // emhash5::HashMap for C++11/14/17
-// version 2.1.1
+// version 2.1.2
 // https://github.com/ktprime/ktprime/blob/master/hash_table5.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2019-2022 Huang Yuanbing & bailuzhou AT 163.com
+// Copyright (c) 2019-2023 Huang Yuanbing & bailuzhou AT 163.com
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -98,6 +98,11 @@ namespace emhash5 {
     typedef uint32_t size_type;
     const constexpr size_type INACTIVE = 0xFFFFFFFF;
 #endif
+
+#ifndef EMH_MALIGN
+    static constexpr uint32_t EMH_MALIGN = 16;
+#endif
+static_assert(EMH_MALIGN >= 16 && (EMH_MALIGN & (EMH_MALIGN - 1)) == 0);
 
 template <typename First, typename Second>
 struct entry {
@@ -887,7 +892,7 @@ public:
         if (bucket == _num_buckets)
             return false;
 
-        EMH_VAL(_pairs, bucket) = std::forward<ValueT>(val);
+        EMH_VAL(_pairs, bucket) = std::move(ValueT);
         return true;
     }
 
@@ -1468,7 +1473,11 @@ private:
     static PairT* alloc_bucket(size_type num_buckets)
     {
         //TODO: call realloc
+#if _WIN32
         auto* new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
+#else
+        auto* new_pairs = (PairT*)aligned_alloc(EMH_MALIGN, (2 + num_buckets) * sizeof(PairT));
+#endif
         return new_pairs;
     }
 
@@ -1710,8 +1719,8 @@ private:
 
     //kick out bucket and find empty to occpuy
     //it will break the orgin link and relnik again.
-    //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
-    //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
+    //before: main_bucket-->prev_bucket --> kbucket   --> next_bucket
+    //after : main_bucket-->prev_bucket --> (removed)--> new_bucket(kbucket)--> next_bucket
     size_type kickout_bucket(const size_type kmain, const size_type kbucket) noexcept
     {
         const auto next_bucket = EMH_BUCKET(_pairs, kbucket);
