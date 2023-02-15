@@ -1066,10 +1066,10 @@ public:
 
     static value_type* alloc_bucket(size_type num_buckets)
     {
-#if _WIN32
-        auto new_pairs = malloc((uint64_t)num_buckets * sizeof(value_type));
-#else
+#ifdef EMH_ALLOC
         auto new_pairs = aligned_alloc(32, (uint64_t)num_buckets * sizeof(value_type));
+#else
+        auto new_pairs = malloc((uint64_t)num_buckets * sizeof(value_type));
 #endif
         return (value_type *)(new_pairs);
     }
@@ -1143,8 +1143,10 @@ public:
         assert(required_buckets < max_size());
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
+#if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && num_buckets >= (1ul << (2 * 8)))
             num_buckets = 2ul << (sizeof(KeyT) * 8);
+#endif
 
 #if EMH_REHASH_LOG
         auto last = _last;

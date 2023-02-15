@@ -56,10 +56,12 @@
     #define QintHasher Int64Hasher<K>
 #elif HOOD_HASH
     #define QintHasher robin_hood::hash<K>
-#elif QC_HASH == 0
-    #define QintHasher std::hash<K>
-#else
+#elif ANKERL_HASH
+    #define QintHasher ankerl::unordered_dense::hash<K>
+#elif QC_HASH
     #define QintHasher typename qc::hash::RawMap<K, V>::hasher
+#else
+    #define QintHasher std::hash<K>
 #endif
 
 using namespace qc::types;
@@ -770,7 +772,7 @@ static void timeTypical(const size_t containerI, Container& container, const std
         v += container.erase(key);
     }
 
-	assert(v != 0);
+    assert(v != 0);
 
     const s64 t5{now()};
     results.get(containerI, keys.size(), Stat::accessPresent) += double(t2 - t1) * invElementCount;
@@ -1237,7 +1239,7 @@ template <typename K, typename V>
 struct RigtorpMapInfo
 {
     //using Container = rigtorp::HashMap<K, V, QintHasher>;
-    using Container = rigtorp::HashMap<K, V, DefaultHash<K>>;
+    using Container = rigtorp::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
     static inline const std::string name{"rigtorp::HashMap"};
 };
@@ -1246,7 +1248,7 @@ struct RigtorpMapInfo
 template <typename K, typename V>
 struct CkHashMapInfo
 {
-    using Container = ck::HashMap<K, V, DefaultHash<K>>;
+    using Container = ck::HashMap<K, V, QintHasher>;
     using AllocatorContainer = void;
 
     static inline const std::string name{"ck::f_hash_map  "};
@@ -1276,7 +1278,7 @@ int main(const int argc, const char* argv[])
 //        compare<CompareMode::oneVsOne, K, QcHashMapInfo<K,int>, EmHash7MapInfo<K, int>>();
 #if 1
 //        compare<CompareMode::oneVsOne, K, AbslMapInfo<K,int>, EmiLib3MapInfo<K, int>>();
-        compare<CompareMode::oneVsOne, K, RigtorpMapInfo<K, uint64_t>, CkHashMapInfo<K, uint64_t>>();
+//        compare<CompareMode::oneVsOne, K, RigtorpMapInfo<K, uint64_t>, CkHashMapInfo<K, uint64_t>>();
 #endif
 //        compare<CompareMode::oneVsOne, K, EmHash6MapInfo<K,int>, EmHash5MapInfo<K, int>>();
 

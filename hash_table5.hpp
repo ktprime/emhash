@@ -1473,10 +1473,10 @@ private:
     static PairT* alloc_bucket(size_type num_buckets)
     {
         //TODO: call realloc
-#if _WIN32
-        auto* new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
-#else
+#ifdef EMH_ALLOC
         auto* new_pairs = (PairT*)aligned_alloc(EMH_MALIGN, (2 + num_buckets) * sizeof(PairT));
+#else
+        auto* new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
 #endif
         return new_pairs;
     }

@@ -547,10 +547,10 @@ public:
 
     static PairT* alloc_bucket(size_type num_buckets)
     {
-#if _WIN32
-        auto* new_pairs = (PairT*)malloc(AllocSize(num_buckets));
-#else
+#ifdef EMH_ALLOC
         auto* new_pairs = (PairT*)aligned_alloc(EMH_MALIGN, AllocSize(num_buckets));
+#else
+        auto* new_pairs = (PairT*)malloc(AllocSize(num_buckets));
 #endif
         return new_pairs;
     }
