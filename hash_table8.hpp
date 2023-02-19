@@ -352,8 +352,7 @@ public:
         memcpy((char*)_index, (char*)rhs._index, (_num_buckets + EAD) * sizeof(Index));
 
         if (is_copy_trivially()) {
-            if (opairs)
-                memcpy((char*)_pairs, (char*)opairs, _num_filled * sizeof(value_type));
+            memcpy((char*)_pairs, (char*)opairs, _num_filled * sizeof(value_type));
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++)
                 new(_pairs + slot) value_type(opairs[slot]);
@@ -1119,6 +1118,7 @@ public:
         free(_index);
         auto new_pairs = (value_type*)alloc_bucket((size_type)(num_buckets * max_load_factor()) + 4);
         if (is_copy_trivially()) {
+            if (_pairs)
             memcpy((char*)new_pairs, (char*)_pairs, _num_filled * sizeof(value_type));
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++) {
