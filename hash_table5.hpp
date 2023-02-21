@@ -892,7 +892,7 @@ public:
         if (bucket == _num_buckets)
             return false;
 
-        EMH_VAL(_pairs, bucket) = std::move(ValueT);
+        EMH_VAL(_pairs, bucket) = std::move(val);
         return true;
     }
 
