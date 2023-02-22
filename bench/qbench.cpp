@@ -5,6 +5,7 @@
 #include "util.h"
 
 #if QC_HASH
+#include <qc-core/core.hpp>
 #include "qchash/qc-hash.hpp"
 #endif
 
@@ -23,8 +24,6 @@
 #include "jg/dense_hash_map.hpp"
 #include "rigtorp/rigtorp.hpp"
 
-#include "qc-core/memory.hpp"
-#include "qc-core/random.hpp"
 
 #include "hash_table5.hpp"
 #include "hash_table6.hpp"
@@ -32,7 +31,7 @@
 #include "hash_table8.hpp"
 
 #include "emilib/emilib2s.hpp"
-#include "emilib/emilib2.hpp"
+#include "emilib/emilib2o.hpp"
 #include "emilib/emilib.hpp"
 #include "emilib/emilib12.hpp"
 //#include "emilib/emiset2.hpp"
@@ -64,7 +63,10 @@
     #define QintHasher std::hash<K>
 #endif
 
-using namespace qc::types;
+inline int64_t now()
+{
+    return std::chrono::nanoseconds(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 template <typename C> concept IsMap = !std::is_same_v<typename C::mapped_type, void>;
 
@@ -106,14 +108,14 @@ static const size_t detailedChartRows{std::max(detailedElementRoundCountsRelease
 
 static const std::vector<std::pair<size_t, size_t>> typicalElementRoundCounts {
 #if 1
-    {         10u,  1000'000u},
+    {         32u,   500'000u},
     {        200u,   100'000u},
     {      3'000u,    10'000u},
     {     40'000u,     1'000u},
 #if 1
-    {    500'000u,       70u},
-    {   7200'000u,        4u},
-    { 10'000'000u,        3u},
+    {    500'000u,       60u},
+    {  3'000'000u,        12u},
+    { 10'000'000u,        4u},
     { 50'000'000u,        2u},
 #endif
 #else
@@ -183,28 +185,29 @@ enum class Stat : size_t
 };
 
 static const std::array<std::string, size_t(Stat::_n)> statNames{
-    "ObjectSize",
-        "IteratorSize",
-        "MemoryOverhead",
-        "Construct",
-        "Insert",
-        "InsertReserved",
-        "InsertPresent",
-        "AccessPresent",
-        "AccessAbsent",
-        "AccessEmpty",
-        "IterateFull",
-        "IterateHalf",
-        "iterateEmpty",
-        "Erase",
-        "EraseAbsent",
-        "Refill",
-        "Clear",
-        "LoneBegin",
-        "LoneEnd",
-        "Destruction"
+	"ObjectSize",
+	"IteratorSize",
+	"MemoryOverhead",
+	"Construct",
+	"Insert",
+	"InsertReserved",
+	"InsertPresent",
+	"AccessPresent",
+	"AccessAbsent",
+	"AccessEmpty",
+	"IterateFull",
+	"IterateHalf",
+	"iterateEmpty",
+	"Erase",
+	"EraseAbsent",
+	"Refill",
+	"Clear",
+	"LoneBegin",
+	"LoneEnd",
+	"Destruction"
 };
 
+#if QC_HASH
 template <size_t size> struct Trivial;
 
 template <size_t size> requires (size <= 8)
@@ -216,7 +219,7 @@ template <size_t size> requires (size <= 8)
 template <size_t size> requires (size > 8)
     struct Trivial<size>
 {
-    std::array<u64, size / 8> val;
+    std::array<uint64_t, size / 8> val;
 };
 
 static_assert(std::is_trivial_v<Trivial<1>>);
@@ -249,7 +252,6 @@ static_assert(!std::is_trivial_v<Complex<1>>);
 static_assert(!std::is_trivial_v<Complex<8>>);
 static_assert(!std::is_trivial_v<Complex<64>>);
 
-#if QC_HASH
 template <size_t size> requires (size <= sizeof(size_t))
 struct qc::hash::IdentityHash<Trivial<size>>
 {
@@ -324,35 +326,30 @@ public:
     std::vector<std::string> _containerNames{};
 };
 
-static s64 now()
-{
-    return std::chrono::nanoseconds(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-
-static void printTime(const s64 nanoseconds, const size_t width)
+static void printTime(const int64_t nanoseconds, const size_t width)
 {
     if (nanoseconds < 10000) {
         std::cout << std::setw(width - 3) << nanoseconds << " ns";
         return;
     }
 
-    const s64 microseconds{(nanoseconds + 500) / 1000};
+    const int64_t microseconds{(nanoseconds + 500) / 1000};
     if (microseconds < 10000) {
         std::cout << std::setw(width - 3) << microseconds << " us";
         return;
     }
 
-    const s64 milliseconds{(microseconds + 500) / 1000};
+    const int64_t milliseconds{(microseconds + 500) / 1000};
     if (milliseconds < 10000) {
         std::cout << std::setw(width - 3) << milliseconds << " ms";
         return;
     }
 
-    const s64 seconds{(milliseconds + 500) / 1000};
+    const int64_t seconds{(milliseconds + 500) / 1000};
     std::cout << std::setw(width - 3) << seconds << " s ";
 }
 
-static void printFactor(const s64 t1, const s64 t2, const size_t width)
+static void printFactor(const int64_t t1, const int64_t t2, const size_t width)
 {
     const double absFactor{t1 >= t2 ? double(t1) / double(t2) : double(t2) / double(t1)};
     int percent{int(std::round(absFactor * 100.0)) - 100};
@@ -373,7 +370,7 @@ static void reportComparison(const Stats & results, const size_t container1I, co
 
     size_t c1Width{c1Header.size()};
     for (const Stat stat : results.presentStats()) {
-        qc::maxify(c1Width, statNames[size_t(stat)].size());
+        std::max(c1Width, statNames[size_t(stat)].size());
     }
     const size_t c2Width{std::max(name1.size(), size_t(7u))};
     const size_t c3Width{std::max(name2.size(), size_t(7u))};
@@ -388,8 +385,8 @@ static void reportComparison(const Stats & results, const size_t container1I, co
     std::cout << std::setfill('-') << std::setw(c1Width + 5u) << "+" << std::setw(c2Width + 5u) << "+" << std::setw(c3Width + 5u) << "+" << std::setw(c4Width + 2u) << "" << std::setfill(' ') << std::endl;
 
     for (const Stat stat : results.presentStats()) {
-        const s64 t1{s64(std::round(results.at(container1I, elementCount, stat)))};
-        const s64 t2{s64(std::round(results.at(container2I, elementCount, stat)))};
+        const int64_t t1{int64_t(std::round(results.at(container1I, elementCount, stat)))};
+        const int64_t t2{int64_t(std::round(results.at(container2I, elementCount, stat)))};
 
 //        std::cout << std::format(" {:^{}} | ", statNames[size_t(stat)], c1Width);
     printf("%20s:%zd | ", statNames[size_t(stat)].data(), c1Width);
@@ -468,7 +465,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Construct
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         containerPtr = new (backingMemory) Container{};
 
@@ -479,7 +476,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Insert to full capacity
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : presentKeys) {
             if constexpr (isSet) {
@@ -495,7 +492,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Full capacity insert present elements
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : presentKeys) {
             if constexpr (isSet) {
@@ -512,7 +509,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
     auto v = 0;
     // Full capacity access present elements
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : presentKeys) {
             v = v + container.count(reinterpret_cast<const typename Container::key_type &>(key));
@@ -523,7 +520,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Full capacity access absent elements
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : absentKeys) {
             v = v + container.count(key);
@@ -534,7 +531,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Full capacity iteration
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const auto & element : container) {
             // Important to actually use the value as to load the memory
@@ -551,7 +548,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Full capacity erase absent elements
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : absentKeys) {
             container.erase(key);
@@ -562,7 +559,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Half erasure
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : secondHalfPresentKeys) {
             container.erase(key);
@@ -573,7 +570,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Half capacity iteration
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const auto & element : container) {
             // Important to actually use the value as to load the memory
@@ -590,7 +587,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Erase remaining elements
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : firstHalfPresentKeys) {
             container.erase(key);
@@ -601,7 +598,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Empty access
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : presentKeys) {
             v = v + container.count(key);
@@ -612,7 +609,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Empty iteration
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const auto & element : container) {
             // Important to actually use the value as to load the memory
@@ -637,7 +634,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Single element begin
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         volatile const auto it{container.cbegin()};
 
@@ -646,7 +643,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Single element end
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         volatile const auto it{container.cend()};
 
@@ -658,7 +655,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Reinsertion
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : presentKeys) {
             if constexpr (isSet) {
@@ -674,7 +671,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Clear
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         container.clear();
 
@@ -685,7 +682,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
     {
         container.reserve(presentKeys.size());
 
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         for (const K & key : presentKeys) {
             if constexpr (isSet) {
@@ -701,7 +698,7 @@ static void time(const size_t containerI, const std::span<const K> presentKeys, 
 
     // Destruct
     {
-        const s64 t0{now()};
+        const int64_t t0{now()};
 
         container.~Container();
 
@@ -723,9 +720,9 @@ static void timeTypical(const size_t containerI, Container& container, const std
 
     const double invElementCount{1.0 / double(keys.size())};
 
-    const s64 t0{now()};
+    const int64_t t0{now()};
     // Insert
-    for (const K& key : keys) {
+    for (const K key : keys) {
         if constexpr (isSet) {
             container.emplace(key);
         }
@@ -734,28 +731,28 @@ static void timeTypical(const size_t containerI, Container& container, const std
         }
     }
 
-    s64 t1{now()};
+    int64_t t1{now()};
     results.get(containerI, keys.size(), Stat::insertReserved)+= double(t1 - t0) * invElementCount;
 
     //container.reserve(2);
     t1 = now();
     // Access
-    for (const K& key : keys) {
+    for (const K key : keys) {
         v = v + container.count(key);
     }
 
-    const s64 t2{now()};
+    const int64_t t2{now()};
     // AccessEmpty
     v = 1;
     size_t hit = 0;
-    for (const K& key : keys) {
+    for (const K key : keys) {
         hit += container.count(key + v);
     }
     v = hit;
 
-    const s64 t3{now()};
+    const int64_t t3{now()};
     // Iterate
-    for (const auto & element : container) {
+    for (const auto element : container) {
         // Important to actually use the value as to load the memory
         if constexpr (isSet) {
             v = v + reinterpret_cast<const size_t &>(element);
@@ -766,15 +763,15 @@ static void timeTypical(const size_t containerI, Container& container, const std
     }
 
     auto lf = container.load_factor();
-    const s64 t4{now()};
+    const int64_t t4{now()};
     // Erase
-    for (const K& key : keys) {
+    for (const K key : keys) {
         v += container.erase(key);
     }
 
     assert(v != 0);
 
-    const s64 t5{now()};
+    const int64_t t5{now()};
     results.get(containerI, keys.size(), Stat::accessPresent) += double(t2 - t1) * invElementCount;
     results.get(containerI, keys.size(), Stat::accessEmpty)   += double(t3 - t2) * invElementCount;
     results.get(containerI, keys.size(), Stat::iterateFull)   += double(t4 - t3) * invElementCount;
@@ -812,7 +809,7 @@ static void timeContainersTypical(const size_t containerI, const std::vector<Com
 
         const std::span<const K> keys_{reinterpret_cast<const K *>(keys.data()), keys.size()};
         Container container;
-        container.max_load_factor(0.87);
+        container.max_load_factor(0.875);
         container.reserve(keys_.size() / 2);
         timeTypical<Container>(containerI, container, keys_, results);
     }
@@ -858,17 +855,19 @@ static void compareMemory(const size_t containerI, const std::vector<CommonKey> 
 }
 
 template <typename CommonKey, typename... ContainerInfos>
-static void compareDetailedSized(const size_t elementCount, const size_t roundCount, qc::Random & random, Stats & results)
+static void compareDetailedSized(const size_t elementCount, const size_t roundCount, Stats & results)
 {
+    auto nowms = getus();
+    WyRand wyrandom(nowms);
     const double invRoundCount{1.0 / double(roundCount)};
 
     std::vector<CommonKey> presentKeys(elementCount);
     std::vector<CommonKey> absentKeys(elementCount);
-    for (CommonKey & key : presentKeys) key = random.next<CommonKey>();
+    for (CommonKey & key : presentKeys) key = wyrandom();
 
     for (size_t round{0u}; round < roundCount; ++round) {
         std::swap(presentKeys, absentKeys);
-        for (CommonKey & key : presentKeys) key = random.next<CommonKey>();
+        for (CommonKey & key : presentKeys) key = wyrandom();
 
         timeContainers<CommonKey, ContainerInfos...>(0u, presentKeys, absentKeys, results);
     }
@@ -885,16 +884,10 @@ static void compareDetailedSized(const size_t elementCount, const size_t roundCo
 template <typename CommonKey, typename... ContainerInfos>
 static void compareDetailed(Stats & results)
 {
-    qc::Random random{size_t(std::chrono::steady_clock::now().time_since_epoch().count())};
-
     for (const auto [elementCount, roundCount] : detailedElementRoundCounts) {
-        if (elementCount > std::numeric_limits<qc::utype<CommonKey>>::max()) {
-            break;
-        }
-
         std::cout << "Comparing " << elementCount << " elements " << roundCount << " rounds of ...";
         auto nowms = getus();
-        compareDetailedSized<CommonKey, ContainerInfos...>(elementCount, roundCount, random, results);
+        compareDetailedSized<CommonKey, ContainerInfos...>(elementCount, roundCount, results);
         std::cout << " done use " << ((getus() - nowms) / 1e9) << " sec" << std::endl;
     }
 
@@ -902,14 +895,15 @@ static void compareDetailed(Stats & results)
 }
 
 template <typename CommonKey, typename... ContainerInfos>
-static void compareTypicalSized(const size_t elementCount, const size_t roundCount, qc::Random & random, Stats & results)
+static void compareTypicalSized(const size_t elementCount, const size_t roundCount, Stats & results)
 {
     std::vector<CommonKey> keys(elementCount);
 
     std::cout << "Comparing " << elementCount << " elements " << roundCount << " rounds of ...";
     auto nowms = getus();
+    WyRand wyrandom(nowms);
     for (size_t round{0u}; round < roundCount; ++round) {
-        for (CommonKey & key : keys) key = random.next<CommonKey>();
+        for (CommonKey & key : keys) key = wyrandom(); //random.next<CommonKey>();
         timeContainersTypical<CommonKey, ContainerInfos...>(0u, keys, results);
     }
     std::cout << " done use " << ((getus() - nowms) / 1e6) << " sec" << std::endl;
@@ -925,13 +919,8 @@ static void compareTypicalSized(const size_t elementCount, const size_t roundCou
 template <typename CommonKey, typename... ContainerInfos>
 static void compareTypical(Stats & results)
 {
-    qc::Random random{size_t(std::chrono::steady_clock::now().time_since_epoch().count())};
-
     for (const auto&[elementCount, roundCount] : typicalElementRoundCounts) {
-        if (elementCount > std::numeric_limits<qc::utype<CommonKey>>::max()) {
-            break;
-        }
-        compareTypicalSized<CommonKey, ContainerInfos...>(elementCount, roundCount, random, results);
+        compareTypicalSized<CommonKey, ContainerInfos...>(elementCount, roundCount, results);
     }
 
     results.setContainerNames<ContainerInfos...>();
@@ -1003,7 +992,7 @@ template <typename K>
 struct StdSetInfo
 {
     using Container = std::unordered_set<K>;
-    using AllocatorContainer = std::unordered_set<K, typename std::unordered_set<K>::hasher, typename std::unordered_set<K>::key_equal, qc::memory::RecordAllocator<K>>;
+    using AllocatorContainer = std::unordered_set<K, typename std::unordered_set<K>::hasher, typename std::unordered_set<K>::key_equal>;
 
     static inline const std::string name{"std::unordered_map"};
 };
@@ -1012,7 +1001,7 @@ template <typename K, typename V>
 struct StdMapInfo
 {
     using Container = std::unordered_map<K, V, QintHasher>;
-    using AllocatorContainer = std::unordered_map<K, V, typename std::unordered_map<K, V>::hasher, typename std::unordered_map<K, V>::key_equal, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    using AllocatorContainer = std::unordered_map<K, V, typename std::unordered_map<K, V>::hasher, typename std::unordered_map<K, V>::key_equal>;
 
     static inline const std::string name{"std::unorder_map"};
 };
@@ -1108,7 +1097,7 @@ template <typename K>
 struct SkaSetInfo
 {
     using Container = ska::flat_hash_set<K>;
-    using AllocatorContainer = ska::flat_hash_set<K, typename ska::flat_hash_set<K>::hasher, typename ska::flat_hash_set<K>::key_equal, qc::memory::RecordAllocator<K>>;
+    using AllocatorContainer = ska::flat_hash_set<K, typename ska::flat_hash_set<K>::hasher, typename ska::flat_hash_set<K>::key_equal>;
 
     static inline const std::string name{"ska::flat_hash_set"};
 };
@@ -1342,27 +1331,27 @@ int main(const int argc, const char* argv[])
 #endif
 #endif
 
-            EmHash8MapInfo<K, V>,
             RobinDenseMapInfo<K, V>,
+            EmHash8MapInfo<K, V>,
 
 #if CK_HMAP
             CkHashMapInfo<K, V>,
+#endif
+
+#if CXX20 && JG
+            //FphDyamicMapInfo<K,V>,
+            JgDenseMapInfo<K, V>,
 #if X86_64
             HrdmHashMap<K, V>,
             RigtorpMapInfo<K, V>,
 #endif
-#endif
-
-#ifdef CXX20
-            //FphDyamicMapInfo<K,V>,
-            JgDenseMapInfo<K, V>,
 #if QC_HASH
             QcHashMapInfo<K, V>,
 #endif
 #endif
 
             EmHash7MapInfo<K, V>,
-//            EmHash6MapInfo<K, V>,
+            EmHash6MapInfo<K, V>,
             EmHash5MapInfo<K, V>
         >();
     }

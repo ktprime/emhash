@@ -4,14 +4,12 @@
 // contributors: Reini Urban, Dietrich Epp, Joshua Haberman, Tommy Ettinger, Daniel Lemire, Otmar Ertl, cocowalla, leo-yuriev, Diego Barrios Romero, paulie-g, dumblob, Yann Collet, ivte-ms, hyb, James Z.M. Gao, easyaspi314 (Devin), TheOneric
 
 /* quick example:
-   uint64_t _wyp[4];
-   make_secret(time(NULL),_wyp);
    string s="fjsakfdsjkf";
    uint64_t hash=wyhash(s.c_str(), s.size(), 0, _wyp);
 */
 
-#ifndef wyhash_final_version_3
-#define wyhash_final_version_3
+#ifndef wyhash_final_version_4
+#define wyhash_final_version_4
 
 #ifndef WYHASH_CONDOM
 //protections that produce different results:
@@ -118,7 +116,7 @@ static inline uint64_t _wyr4(const uint8_t *p) {
 static inline uint64_t _wyr3(const uint8_t *p, size_t k) { return (((uint64_t)p[0])<<16)|(((uint64_t)p[k>>1])<<8)|p[k-1];}
 //wyhash main function
 static inline uint64_t wyhash(const void *key, size_t len, uint64_t seed, const uint64_t *secret){
-  const uint8_t *p=(const uint8_t *)key; seed^=*secret; uint64_t a, b;
+  const uint8_t *p=(const uint8_t *)key; seed^=_wymix(seed^secret[0],secret[1]);	uint64_t	a,	b;
   if(_likely_(len<=16)){
     if(_likely_(len>=4)){ a=(_wyr4(p)<<32)|_wyr4(p+((len>>3)<<2)); b=(_wyr4(p+len-4)<<32)|_wyr4(p+len-4-((len>>3)<<2)); }
     else if(_likely_(len>0)){ a=_wyr3(p,len); b=0;}
@@ -142,7 +140,6 @@ static inline uint64_t wyhash(const void *key, size_t len, uint64_t seed, const 
 
   a^=secret[1]; b^=seed;  _wymum(&a,&b);
   return  _wymix(a^secret[0]^len,b^secret[1]);
-//  return _wymix(secret[1]^len,_wymix(a^secret[1],b^seed));
 }
 
 //the default secret parameters
@@ -161,6 +158,18 @@ static inline double wy2u01(uint64_t r){ const double _wynorm=1.0/(1ull<<52); re
 
 //convert any 64 bit pseudo random numbers to APPROXIMATE Gaussian distribution. It can be combined with wyrand, wyhash64 or wyhash.
 static inline double wy2gau(uint64_t r){ const double _wynorm=1.0/(1ull<<20); return ((r&0x1fffff)+((r>>21)&0x1fffff)+((r>>42)&0x1fffff))*_wynorm-3.0;}
+
+#ifdef	WYTRNG
+#include <sys/time.h>
+//The wytrand true random number generator, passed BigCrush.
+static inline uint64_t wytrand(uint64_t *seed){
+	struct	timeval	t;	gettimeofday(&t,0);
+	uint64_t	teed=(((uint64_t)t.tv_sec)<<32)|t.tv_usec;
+	teed=_wymix(teed^_wyp[0],*seed^_wyp[1]);
+	*seed=_wymix(teed^_wyp[0],_wyp[2]);
+	return _wymix(*seed,*seed^_wyp[3]);
+}
+#endif
 
 #if(!WYHASH_32BIT_MUM)
 //fast range integer random number generation on [0,k) credit to Daniel Lemire. May not work when WYHASH_32BIT_MUM=1. It can be combined with wyrand, wyhash64 or wyhash.
@@ -195,56 +204,6 @@ static inline void make_secret(uint64_t seed, uint64_t *secret){
   }
 }
 
-/*  This is world's fastest hash map: 2x faster than bytell_hash_map.
-    It does not store the keys, but only the hash/signature of keys.
-    First we use pos=hash1(key) to approximately locate the bucket.
-    Then we search signature=hash2(key) from pos linearly.
-    If we find a bucket with matched signature we report the bucket
-    Or if we meet a bucket whose signature=0, we report a new position to insert
-    The signature collision probability is very low as we usually searched N~10 buckets.
-    By combining hash1 and hash2, we acturally have 128 bit anti-collision strength.
-    hash1 and hash2 can be the same function, resulting lower collision resistance but faster.
-    The signature is 64 bit, but can be modified to 32 bit if necessary for save space.
-    The above two can be activated by define WYHASHMAP_WEAK_SMALL_FAST
-    simple examples:
-    const	size_t	size=213432;
-    vector<wyhashmap_t>	idx(size);	//	allocate the index of fixed size. idx MUST be zeroed.
-    vector<value_class>	value(size);	//	we only care about the index, user should maintain his own value vectors.
-    string  key="dhskfhdsj"	//	the object to be inserted into idx
-    size_t	pos=wyhashmap(idx.data(), idx.size(), key.c_str(), key.size(), 1);	//	get the position and insert
-    if(pos<size)	value[pos]++;	//	we process the vallue
-    else	cerr<<"map is full\n";
-    pos=wyhashmap(idx.data(), idx.size(), key.c_str(), key.size(), 0);	// just lookup by setting insert=0
-    if(pos<size)	value[pos]++;	//	we process the vallue
-    else	cerr<<"the key does not exist\n";
-*/
-/*
-#ifdef	WYHASHMAP_WEAK_SMALL_FAST	// for small hashmaps whose size < 2^24 and acceptable collision
-typedef	uint32_t	wyhashmap_t;
-#else
-typedef	uint64_t	wyhashmap_t;
-#endif
-
-static	inline	size_t	wyhashmap(wyhashmap_t	*idx,	size_t	idx_size,	const	void *key, size_t	key_size,	uint8_t	insert, uint64_t *secret){
-	size_t	i=1;	uint64_t	h2;	wyhashmap_t	sig;
-	do{	sig=h2=wyhash(key,key_size,i,secret);	i++;	}while(_unlikely_(!sig));
-#ifdef	WYHASHMAP_WEAK_SMALL_FAST
-	size_t	i0=wy2u0k(h2,idx_size);
-#else
-	size_t	i0=wy2u0k(wyhash(key,key_size,0,secret),idx_size);
-#endif
-	for(i=i0;	i<idx_size&&idx[i]&&idx[i]!=sig;	i++);
-	if(_unlikely_(i==idx_size)){
-		for(i=0;	i<i0&&idx[i]&&idx[i]!=sig;  i++);
-		if(i==i0)	return	idx_size;
-	}
-	if(!idx[i]){
-		if(insert)	idx[i]=sig;
-		else	return	idx_size;
-	}
-	return	i;
-}
-*/
 #endif
 
 /* The Unlicense

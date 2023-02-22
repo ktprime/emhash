@@ -102,7 +102,6 @@ namespace emhash5 {
 #ifndef EMH_MALIGN
     static constexpr uint32_t EMH_MALIGN = 16;
 #endif
-static_assert(EMH_MALIGN >= 16 && (EMH_MALIGN & (EMH_MALIGN - 1)) == 0);
 
 template <typename First, typename Second>
 struct entry {
@@ -1314,13 +1313,8 @@ public:
     bool reserve(uint64_t num_elems)
     {
 #if EMH_HIGH_LOAD < 1000
-#if EMH_PACK_TAIL
-        const auto required_buckets = 1 + (size_type)(num_elems * _mlf >> 27);
-        if (EMH_LIKELY(required_buckets < _num_buckets))
-#else
         const auto required_buckets = (size_type)(num_elems * _mlf >> 27);
         if (EMH_LIKELY(required_buckets < _mask))
-#endif
             return false;
 #else
         const auto required_buckets = (size_type)(num_elems + num_elems * 1 / 9);
@@ -1355,12 +1349,10 @@ public:
             return;
 
 #if EMH_SMALL_SIZE
-        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : EMH_SMALL_SIZE;
-        static_assert(EMH_SMALL_SIZE >= 2 && EMH_SMALL_SIZE < 1024);
-        static_assert((EMH_SMALL_SIZE & (EMH_SMALL_SIZE - 1)) == 0);
-#else
-        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2;
+        static_assert(EMH_SMALL_SIZE >= 2);
 #endif
+        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2;
+
         while (buckets < required_buckets) { buckets *= 2; }
 
         // no need alloc too many bucket for small key.
@@ -1389,7 +1381,7 @@ public:
         _last        = num_buckets / 4;
 
 #if EMH_PACK_TAIL > 1 && EMH_PACK_TAIL <= 100
-        _last = num_buckets;
+        _last = _mask;
         num_buckets += num_buckets * EMH_PACK_TAIL / 100; //add more 5-10%
 #endif
         _num_buckets = num_buckets;
@@ -1861,22 +1853,31 @@ one-way search strategy.
 #ifndef _MSC_VER
         //__builtin_prefetch(static_cast<const void*>(_pairs + bucket + 1), 0, 1);
 #endif
-        constexpr auto linear_probe_length = 5;//2-3 cache line miss
+        constexpr auto linear_probe_length = 6;//2-3 cache line miss
         for (size_type step = 2, slot = bucket + 1 + csize / 2; ; slot += step++) {
             if (step < linear_probe_length) {
                 auto bucket1 = slot & _mask;
-                if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
+                if (EMH_EMPTY(_pairs, bucket1))
                     return bucket1;
-            } else { //if (step++ > 5) {
-                if (EMH_EMPTY(_pairs, ++_last))// || EMH_EMPTY(_pairs, _last++))
-                    return _last;
 
-                _last &= _mask;
+				bucket1 += 1 + (step % 2);
+				if (EMH_EMPTY(_pairs, bucket1))
+                    return bucket1;
+            } else {
 #if EMH_PACK_TAIL
-                auto tail = _num_buckets - _last;
-                if (EMH_EMPTY(_pairs, tail) || EMH_EMPTY(_pairs, ++tail))
-                    return tail;
+                if (EMH_EMPTY(_pairs, _last++))
+                    return _last++ - 1;
+
+                if (EMH_UNLIKELY(_last >= _num_buckets))
+                    _last = 0;
+
+                auto medium = (_mask / 4 + _last) & _mask;
+                if (EMH_EMPTY(_pairs, medium))
+                    return medium;
 #else
+                if (EMH_EMPTY(_pairs, ++_last))
+                    return _last++;
+                _last &= _mask;
                 auto medium = (_num_buckets / 2 + _last) & _mask;
                 if (EMH_EMPTY(_pairs, medium))// && EMH_EMPTY(_pairs, ++medium))
                     return _last = medium;
@@ -1943,7 +1944,7 @@ one-way search strategy.
 
 #if EMH_INT_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
-    inline uint64_t hash64(uint64_t key)
+    inline static uint64_t hash64(uint64_t key)
     {
 #if __SIZEOF_INT128__ && EMH_INT_HASH == 1
         __uint128_t r = key; r *= KC;
