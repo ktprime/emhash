@@ -53,10 +53,10 @@ namespace boost {
       {
       };
 
-      template <class, class A, class B> struct are_transparent
+      template <class, class Hash, class KeyEqual> struct are_transparent
       {
         static bool const value =
-          is_transparent<A>::value && is_transparent<B>::value;
+          is_transparent<Hash>::value && is_transparent<KeyEqual>::value;
       };
 
       template <class Key, class UnorderedMap> struct transparent_non_iterable

@@ -1477,7 +1477,22 @@ namespace boost {
         }
 
 #endif
-      }
+
+        template <typename T, typename Alloc, typename Key>
+        inline typename boost::allocator_pointer<Alloc>::type
+        construct_node_from_key(T*, Alloc& alloc, BOOST_FWD_REF(Key) k)
+        {
+          return construct_node(alloc, boost::forward<Key>(k));
+        }
+
+        template <typename T, typename V, typename Alloc, typename Key>
+        inline typename boost::allocator_pointer<Alloc>::type
+        construct_node_from_key(
+          std::pair<T const, V>*, Alloc& alloc, BOOST_FWD_REF(Key) k)
+        {
+          return construct_node_pair(alloc, boost::forward<Key>(k));
+        }
+      } // namespace func
     }
   }
 }
@@ -2640,8 +2655,10 @@ namespace boost {
           } else {
             node_allocator_type alloc = node_alloc();
 
-            node_tmp tmp(
-              detail::func::construct_node_pair(alloc, boost::forward<Key>(k)),
+            value_type* dispatch = BOOST_NULLPTR;
+
+            node_tmp tmp(detail::func::construct_node_from_key(
+                           dispatch, alloc, boost::forward<Key>(k)),
               alloc);
 
             if (size_ + 1 > max_load_) {
@@ -2660,7 +2677,7 @@ namespace boost {
         template <typename Key>
         iterator try_emplace_hint_unique(c_iterator hint, BOOST_FWD_REF(Key) k)
         {
-          if (hint.p && this->key_eq()(hint->first, k)) {
+          if (hint.p && this->key_eq()(extractor::extract(*hint), k)) {
             return iterator(hint.p, hint.itb);
           } else {
             return try_emplace_unique(k).first;

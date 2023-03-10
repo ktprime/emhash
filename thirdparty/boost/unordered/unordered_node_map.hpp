@@ -1,9 +1,9 @@
-// Copyright (C) 2022 Christian Mazakas
+// Copyright (C) 2022-2023 Christian Mazakas
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef BOOST_UNORDERED_UNORDERED_FLAT_MAP_HPP_INCLUDED
-#define BOOST_UNORDERED_UNORDERED_FLAT_MAP_HPP_INCLUDED
+#ifndef BOOST_UNORDERED_UNORDERED_NODE_MAP_HPP_INCLUDED
+#define BOOST_UNORDERED_UNORDERED_NODE_MAP_HPP_INCLUDED
 
 #include <boost/config.hpp>
 #if defined(BOOST_HAS_PRAGMA_ONCE)
@@ -11,8 +11,10 @@
 #endif
 
 #include <boost/unordered/detail/foa.hpp>
+#include <boost/unordered/detail/foa/element_type.hpp>
+#include <boost/unordered/detail/foa/node_handle.hpp>
 #include <boost/unordered/detail/type_traits.hpp>
-#include <boost/unordered/unordered_flat_map_fwd.hpp>
+#include <boost/unordered/unordered_node_map_fwd.hpp>
 
 #include <boost/core/allocator_access.hpp>
 #include <boost/functional/hash.hpp>
@@ -33,19 +35,20 @@ namespace boost {
 #endif
 
     namespace detail {
-      template <class Key, class T> struct flat_map_types
+      template <class Key, class T> struct node_map_types
       {
         using key_type = Key;
+        using mapped_type = T;
         using raw_key_type = typename std::remove_const<Key>::type;
         using raw_mapped_type = typename std::remove_const<T>::type;
 
         using init_type = std::pair<raw_key_type, raw_mapped_type>;
-        using moved_type = std::pair<raw_key_type&&, raw_mapped_type&&>;
         using value_type = std::pair<Key const, T>;
+        using moved_type = std::pair<raw_key_type&&, raw_mapped_type&&>;
 
-        using element_type = value_type;
+        using element_type=foa::element_type<value_type>;
 
-        static value_type& value_from(element_type& x) { return x; }
+        static value_type& value_from(element_type const& x) { return *(x.p); }
 
         template <class K, class V>
         static raw_key_type const& extract(std::pair<K, V> const& kv)
@@ -53,16 +56,34 @@ namespace boost {
           return kv.first;
         }
 
+        static raw_key_type const& extract(element_type const& kv)
+        {
+          return kv.p->first;
+        }
+
+        static element_type&& move(element_type& x) { return std::move(x); }
         static moved_type move(init_type& x)
         {
           return {std::move(x.first), std::move(x.second)};
         }
 
-        static moved_type move(element_type& x)
+        static moved_type move(value_type& x)
         {
-          // TODO: we probably need to launder here
           return {std::move(const_cast<raw_key_type&>(x.first)),
             std::move(const_cast<raw_mapped_type&>(x.second))};
+        }
+
+        template <class A>
+        static void construct(A&, element_type* p, element_type&& x) noexcept
+        {
+          p->p = x.p;
+          x.p = nullptr;
+        }
+
+        template <class A>
+        static void construct(A& al, element_type* p, element_type const& copy)
+        {
+          construct(al, p, *copy.p);
         }
 
         template <class A, class... Args>
@@ -77,32 +98,98 @@ namespace boost {
           boost::allocator_construct(al, p, std::forward<Args>(args)...);
         }
 
-        template <class A> static void destroy(A& al, init_type* p) noexcept
+        template <class A, class... Args>
+        static void construct(A& al, element_type* p, Args&&... args)
         {
-          boost::allocator_destroy(al, p);
+          p->p = boost::to_address(boost::allocator_allocate(al, 1));
+          BOOST_TRY
+          {
+            boost::allocator_construct(al, p->p, std::forward<Args>(args)...);
+          }
+          BOOST_CATCH(...)
+          {
+            using pointer_type = typename boost::allocator_pointer<A>::type;
+            using pointer_traits = boost::pointer_traits<pointer_type>;
+
+            boost::allocator_deallocate(
+              al, pointer_traits::pointer_to(*(p->p)), 1);
+            BOOST_RETHROW
+          }
+          BOOST_CATCH_END
         }
 
         template <class A> static void destroy(A& al, value_type* p) noexcept
         {
           boost::allocator_destroy(al, p);
         }
+
+        template <class A> static void destroy(A& al, init_type* p) noexcept
+        {
+          boost::allocator_destroy(al, p);
+        }
+
+        template <class A> static void destroy(A& al, element_type* p) noexcept
+        {
+          if (p->p) {
+            using pointer_type = typename boost::allocator_pointer<A>::type;
+            using pointer_traits = boost::pointer_traits<pointer_type>;
+
+            destroy(al, p->p);
+            boost::allocator_deallocate(
+              al, pointer_traits::pointer_to(*(p->p)), 1);
+          }
+        }
+      };
+
+      template <class TypePolicy, class Allocator>
+      struct node_map_handle
+          : public detail::foa::node_handle_base<TypePolicy, Allocator>
+      {
+      private:
+        using base_type = detail::foa::node_handle_base<TypePolicy, Allocator>;
+
+        using typename base_type::type_policy;
+
+        template <class Key, class T, class Hash, class Pred, class Alloc>
+        friend class boost::unordered::unordered_node_map;
+
+      public:
+        using key_type = typename TypePolicy::key_type;
+        using mapped_type = typename TypePolicy::mapped_type;
+
+        constexpr node_map_handle() noexcept = default;
+        node_map_handle(node_map_handle&& nh) noexcept = default;
+
+        node_map_handle& operator=(node_map_handle&&) noexcept = default;
+
+        key_type& key() const
+        {
+          BOOST_ASSERT(!this->empty());
+          return const_cast<key_type&>(this->data().first);
+        }
+
+        mapped_type& mapped() const
+        {
+          BOOST_ASSERT(!this->empty());
+          return const_cast<mapped_type&>(this->data().second);
+        }
       };
     } // namespace detail
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
-    class unordered_flat_map
+    class unordered_node_map
     {
-      using map_types = detail::flat_map_types<Key, T>;
+      using map_types = detail::node_map_types<Key, T>;
 
       using table_type = detail::foa::table<map_types, Hash, KeyEqual,
         typename boost::allocator_rebind<Allocator,
-          typename map_types::value_type>::type>;
+          std::pair<Key const, T> >::type>;
 
       table_type table_;
 
       template <class K, class V, class H, class KE, class A, class Pred>
-      typename unordered_flat_map<K, V, H, KE, A>::size_type friend erase_if(
-        unordered_flat_map<K, V, H, KE, A>& set, Pred pred);
+      typename unordered_node_map<K, V, H, KE, A>::size_type friend erase_if(
+        unordered_node_map<K, V, H, KE, A>& set, Pred pred);
 
     public:
       using key_type = Key;
@@ -121,72 +208,77 @@ namespace boost {
         typename boost::allocator_const_pointer<allocator_type>::type;
       using iterator = typename table_type::iterator;
       using const_iterator = typename table_type::const_iterator;
+      using node_type = detail::node_map_handle<map_types,
+        typename boost::allocator_rebind<Allocator,
+          typename map_types::value_type>::type>;
+      using insert_return_type =
+        detail::foa::insert_return_type<iterator, node_type>;
 
-      unordered_flat_map() : unordered_flat_map(0) {}
+      unordered_node_map() : unordered_node_map(0) {}
 
-      explicit unordered_flat_map(size_type n, hasher const& h = hasher(),
+      explicit unordered_node_map(size_type n, hasher const& h = hasher(),
         key_equal const& pred = key_equal(),
         allocator_type const& a = allocator_type())
           : table_(n, h, pred, a)
       {
       }
 
-      unordered_flat_map(size_type n, allocator_type const& a)
-          : unordered_flat_map(n, hasher(), key_equal(), a)
+      unordered_node_map(size_type n, allocator_type const& a)
+          : unordered_node_map(n, hasher(), key_equal(), a)
       {
       }
 
-      unordered_flat_map(size_type n, hasher const& h, allocator_type const& a)
-          : unordered_flat_map(n, h, key_equal(), a)
+      unordered_node_map(size_type n, hasher const& h, allocator_type const& a)
+          : unordered_node_map(n, h, key_equal(), a)
       {
       }
 
       template <class InputIterator>
-      unordered_flat_map(
+      unordered_node_map(
         InputIterator f, InputIterator l, allocator_type const& a)
-          : unordered_flat_map(f, l, size_type(0), hasher(), key_equal(), a)
+          : unordered_node_map(f, l, size_type(0), hasher(), key_equal(), a)
       {
       }
 
-      explicit unordered_flat_map(allocator_type const& a)
-          : unordered_flat_map(0, a)
+      explicit unordered_node_map(allocator_type const& a)
+          : unordered_node_map(0, a)
       {
       }
 
       template <class Iterator>
-      unordered_flat_map(Iterator first, Iterator last, size_type n = 0,
+      unordered_node_map(Iterator first, Iterator last, size_type n = 0,
         hasher const& h = hasher(), key_equal const& pred = key_equal(),
         allocator_type const& a = allocator_type())
-          : unordered_flat_map(n, h, pred, a)
+          : unordered_node_map(n, h, pred, a)
       {
         this->insert(first, last);
       }
 
       template <class Iterator>
-      unordered_flat_map(
+      unordered_node_map(
         Iterator first, Iterator last, size_type n, allocator_type const& a)
-          : unordered_flat_map(first, last, n, hasher(), key_equal(), a)
+          : unordered_node_map(first, last, n, hasher(), key_equal(), a)
       {
       }
 
       template <class Iterator>
-      unordered_flat_map(Iterator first, Iterator last, size_type n,
+      unordered_node_map(Iterator first, Iterator last, size_type n,
         hasher const& h, allocator_type const& a)
-          : unordered_flat_map(first, last, n, h, key_equal(), a)
+          : unordered_node_map(first, last, n, h, key_equal(), a)
       {
       }
 
-      unordered_flat_map(unordered_flat_map const& other) : table_(other.table_)
+      unordered_node_map(unordered_node_map const& other) : table_(other.table_)
       {
       }
 
-      unordered_flat_map(
-        unordered_flat_map const& other, allocator_type const& a)
+      unordered_node_map(
+        unordered_node_map const& other, allocator_type const& a)
           : table_(other.table_, a)
       {
       }
 
-      unordered_flat_map(unordered_flat_map&& other)
+      unordered_node_map(unordered_node_map&& other)
         noexcept(std::is_nothrow_move_constructible<hasher>::value&&
             std::is_nothrow_move_constructible<key_equal>::value&&
               std::is_nothrow_move_constructible<allocator_type>::value)
@@ -194,46 +286,46 @@ namespace boost {
       {
       }
 
-      unordered_flat_map(unordered_flat_map&& other, allocator_type const& al)
+      unordered_node_map(unordered_node_map&& other, allocator_type const& al)
           : table_(std::move(other.table_), al)
       {
       }
 
-      unordered_flat_map(std::initializer_list<value_type> ilist,
+      unordered_node_map(std::initializer_list<value_type> ilist,
         size_type n = 0, hasher const& h = hasher(),
         key_equal const& pred = key_equal(),
         allocator_type const& a = allocator_type())
-          : unordered_flat_map(ilist.begin(), ilist.end(), n, h, pred, a)
+          : unordered_node_map(ilist.begin(), ilist.end(), n, h, pred, a)
       {
       }
 
-      unordered_flat_map(
+      unordered_node_map(
         std::initializer_list<value_type> il, allocator_type const& a)
-          : unordered_flat_map(il, size_type(0), hasher(), key_equal(), a)
+          : unordered_node_map(il, size_type(0), hasher(), key_equal(), a)
       {
       }
 
-      unordered_flat_map(std::initializer_list<value_type> init, size_type n,
+      unordered_node_map(std::initializer_list<value_type> init, size_type n,
         allocator_type const& a)
-          : unordered_flat_map(init, n, hasher(), key_equal(), a)
+          : unordered_node_map(init, n, hasher(), key_equal(), a)
       {
       }
 
-      unordered_flat_map(std::initializer_list<value_type> init, size_type n,
+      unordered_node_map(std::initializer_list<value_type> init, size_type n,
         hasher const& h, allocator_type const& a)
-          : unordered_flat_map(init, n, h, key_equal(), a)
+          : unordered_node_map(init, n, h, key_equal(), a)
       {
       }
 
-      ~unordered_flat_map() = default;
+      ~unordered_node_map() = default;
 
-      unordered_flat_map& operator=(unordered_flat_map const& other)
+      unordered_node_map& operator=(unordered_node_map const& other)
       {
         table_ = other.table_;
         return *this;
       }
 
-      unordered_flat_map& operator=(unordered_flat_map&& other) noexcept(
+      unordered_node_map& operator=(unordered_node_map&& other) noexcept(
         noexcept(std::declval<table_type&>() = std::declval<table_type&&>()))
       {
         table_ = std::move(other.table_);
@@ -308,6 +400,40 @@ namespace boost {
       void insert(std::initializer_list<value_type> ilist)
       {
         this->insert(ilist.begin(), ilist.end());
+      }
+
+      insert_return_type insert(node_type&& nh)
+      {
+        if (nh.empty()) {
+          return {end(), false, node_type{}};
+        }
+
+        BOOST_ASSERT(get_allocator() == nh.get_allocator());
+
+        auto itp = table_.insert(std::move(nh.element()));
+        if (itp.second) {
+          nh.reset();
+          return {itp.first, true, node_type{}};
+        } else {
+          return {itp.first, false, std::move(nh)};
+        }
+      }
+
+      iterator insert(const_iterator, node_type&& nh)
+      {
+        if (nh.empty()) {
+          return end();
+        }
+
+        BOOST_ASSERT(get_allocator() == nh.get_allocator());
+
+        auto itp = table_.insert(std::move(nh.element()));
+        if (itp.second) {
+          nh.reset();
+          return itp.first;
+        } else {
+          return itp.first;
+        }
       }
 
       template <class M>
@@ -398,7 +524,7 @@ namespace boost {
       template <class K, class... Args>
       BOOST_FORCEINLINE typename std::enable_if<
         boost::unordered::detail::transparent_non_iterable<K,
-          unordered_flat_map>::value,
+          unordered_node_map>::value,
         std::pair<iterator, bool> >::type
       try_emplace(K&& key, Args&&... args)
       {
@@ -424,7 +550,7 @@ namespace boost {
       template <class K, class... Args>
       BOOST_FORCEINLINE typename std::enable_if<
         boost::unordered::detail::transparent_non_iterable<K,
-          unordered_flat_map>::value,
+          unordered_node_map>::value,
         iterator>::type
       try_emplace(const_iterator, K&& key, Args&&... args)
       {
@@ -453,22 +579,48 @@ namespace boost {
 
       template <class K>
       BOOST_FORCEINLINE typename std::enable_if<
-        detail::transparent_non_iterable<K, unordered_flat_map>::value,
+        detail::transparent_non_iterable<K, unordered_node_map>::value,
         size_type>::type
       erase(K const& key)
       {
         return table_.erase(key);
       }
 
-      void swap(unordered_flat_map& rhs) noexcept(
+      void swap(unordered_node_map& rhs) noexcept(
         noexcept(std::declval<table_type&>().swap(std::declval<table_type&>())))
       {
         table_.swap(rhs.table_);
       }
 
+      node_type extract(const_iterator pos)
+      {
+        BOOST_ASSERT(pos != end());
+        node_type nh;
+        auto elem = table_.extract(pos);
+        nh.emplace(std::move(elem), get_allocator());
+        return nh;
+      }
+
+      node_type extract(key_type const& key)
+      {
+        auto pos = find(key);
+        return pos != end() ? extract(pos) : node_type();
+      }
+
+      template <class K>
+      typename std::enable_if<
+        boost::unordered::detail::transparent_non_iterable<K,
+          unordered_node_map>::value,
+        node_type>::type
+      extract(K const& key)
+      {
+        auto pos = find(key);
+        return pos != end() ? extract(pos) : node_type();
+      }
+
       template <class H2, class P2>
       void merge(
-        unordered_flat_map<key_type, mapped_type, H2, P2, allocator_type>&
+        unordered_node_map<key_type, mapped_type, H2, P2, allocator_type>&
           source)
       {
         table_.merge(source.table_);
@@ -476,7 +628,7 @@ namespace boost {
 
       template <class H2, class P2>
       void merge(
-        unordered_flat_map<key_type, mapped_type, H2, P2, allocator_type>&&
+        unordered_node_map<key_type, mapped_type, H2, P2, allocator_type>&&
           source)
       {
         table_.merge(std::move(source.table_));
@@ -495,7 +647,7 @@ namespace boost {
         // include it in the error message
         //
         boost::throw_exception(
-          std::out_of_range("key was not found in unordered_flat_map"));
+          std::out_of_range("key was not found in unordered_node_map"));
       }
 
       mapped_type const& at(key_type const& key) const
@@ -505,7 +657,7 @@ namespace boost {
           return pos->second;
         }
         boost::throw_exception(
-          std::out_of_range("key was not found in unordered_flat_map"));
+          std::out_of_range("key was not found in unordered_node_map"));
       }
 
       template <class K>
@@ -519,7 +671,7 @@ namespace boost {
           return pos->second;
         }
         boost::throw_exception(
-          std::out_of_range("key was not found in unordered_flat_map"));
+          std::out_of_range("key was not found in unordered_node_map"));
       }
 
       template <class K>
@@ -533,7 +685,7 @@ namespace boost {
           return pos->second;
         }
         boost::throw_exception(
-          std::out_of_range("key was not found in unordered_flat_map"));
+          std::out_of_range("key was not found in unordered_node_map"));
       }
 
       BOOST_FORCEINLINE mapped_type& operator[](key_type const& key)
@@ -699,8 +851,8 @@ namespace boost {
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
     bool operator==(
-      unordered_flat_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
-      unordered_flat_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
+      unordered_node_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
+      unordered_node_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
     {
       if (&lhs == &rhs) {
         return true;
@@ -719,15 +871,15 @@ namespace boost {
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
     bool operator!=(
-      unordered_flat_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
-      unordered_flat_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
+      unordered_node_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
+      unordered_node_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
     {
       return !(lhs == rhs);
     }
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
-    void swap(unordered_flat_map<Key, T, Hash, KeyEqual, Allocator>& lhs,
-      unordered_flat_map<Key, T, Hash, KeyEqual, Allocator>& rhs)
+    void swap(unordered_node_map<Key, T, Hash, KeyEqual, Allocator>& lhs,
+      unordered_node_map<Key, T, Hash, KeyEqual, Allocator>& rhs)
       noexcept(noexcept(lhs.swap(rhs)))
     {
       lhs.swap(rhs);
@@ -735,9 +887,9 @@ namespace boost {
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator,
       class Pred>
-    typename unordered_flat_map<Key, T, Hash, KeyEqual, Allocator>::size_type
+    typename unordered_node_map<Key, T, Hash, KeyEqual, Allocator>::size_type
     erase_if(
-      unordered_flat_map<Key, T, Hash, KeyEqual, Allocator>& map, Pred pred)
+      unordered_node_map<Key, T, Hash, KeyEqual, Allocator>& map, Pred pred)
     {
       return erase_if(map.table_, pred);
     }
@@ -771,10 +923,10 @@ namespace boost {
       class = boost::enable_if_t<detail::is_hash_v<Hash> >,
       class = boost::enable_if_t<detail::is_pred_v<Pred> >,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(InputIterator, InputIterator,
+    unordered_node_map(InputIterator, InputIterator,
       std::size_t = boost::unordered::detail::foa::default_bucket_count,
       Hash = Hash(), Pred = Pred(), Allocator = Allocator())
-      -> unordered_flat_map<boost::unordered::detail::iter_key_t<InputIterator>,
+      -> unordered_node_map<boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>, Hash, Pred,
         Allocator>;
 
@@ -785,17 +937,17 @@ namespace boost {
       class = boost::enable_if_t<detail::is_hash_v<Hash> >,
       class = boost::enable_if_t<detail::is_pred_v<Pred> >,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(std::initializer_list<std::pair<Key, T> >,
+    unordered_node_map(std::initializer_list<std::pair<Key, T> >,
       std::size_t = boost::unordered::detail::foa::default_bucket_count,
       Hash = Hash(), Pred = Pred(), Allocator = Allocator())
-      -> unordered_flat_map<boost::remove_const_t<Key>, T, Hash, Pred,
+      -> unordered_node_map<boost::remove_const_t<Key>, T, Hash, Pred,
         Allocator>;
 
     template <class InputIterator, class Allocator,
       class = boost::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(InputIterator, InputIterator, std::size_t, Allocator)
-      -> unordered_flat_map<boost::unordered::detail::iter_key_t<InputIterator>,
+    unordered_node_map(InputIterator, InputIterator, std::size_t, Allocator)
+      -> unordered_node_map<boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>,
         boost::hash<boost::unordered::detail::iter_key_t<InputIterator> >,
         std::equal_to<boost::unordered::detail::iter_key_t<InputIterator> >,
@@ -804,8 +956,8 @@ namespace boost {
     template <class InputIterator, class Allocator,
       class = boost::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(InputIterator, InputIterator, Allocator)
-      -> unordered_flat_map<boost::unordered::detail::iter_key_t<InputIterator>,
+    unordered_node_map(InputIterator, InputIterator, Allocator)
+      -> unordered_node_map<boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>,
         boost::hash<boost::unordered::detail::iter_key_t<InputIterator> >,
         std::equal_to<boost::unordered::detail::iter_key_t<InputIterator> >,
@@ -815,32 +967,32 @@ namespace boost {
       class = boost::enable_if_t<detail::is_hash_v<Hash> >,
       class = boost::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(
+    unordered_node_map(
       InputIterator, InputIterator, std::size_t, Hash, Allocator)
-      -> unordered_flat_map<boost::unordered::detail::iter_key_t<InputIterator>,
+      -> unordered_node_map<boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>, Hash,
         std::equal_to<boost::unordered::detail::iter_key_t<InputIterator> >,
         Allocator>;
 
     template <class Key, class T, class Allocator,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
-      Allocator) -> unordered_flat_map<boost::remove_const_t<Key>, T,
+    unordered_node_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
+      Allocator) -> unordered_node_map<boost::remove_const_t<Key>, T,
       boost::hash<boost::remove_const_t<Key> >,
       std::equal_to<boost::remove_const_t<Key> >, Allocator>;
 
     template <class Key, class T, class Allocator,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(std::initializer_list<std::pair<Key, T> >, Allocator)
-      -> unordered_flat_map<boost::remove_const_t<Key>, T,
+    unordered_node_map(std::initializer_list<std::pair<Key, T> >, Allocator)
+      -> unordered_node_map<boost::remove_const_t<Key>, T,
         boost::hash<boost::remove_const_t<Key> >,
         std::equal_to<boost::remove_const_t<Key> >, Allocator>;
 
     template <class Key, class T, class Hash, class Allocator,
       class = boost::enable_if_t<detail::is_hash_v<Hash> >,
       class = boost::enable_if_t<detail::is_allocator_v<Allocator> > >
-    unordered_flat_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
-      Hash, Allocator) -> unordered_flat_map<boost::remove_const_t<Key>, T,
+    unordered_node_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
+      Hash, Allocator) -> unordered_node_map<boost::remove_const_t<Key>, T,
       Hash, std::equal_to<boost::remove_const_t<Key> >, Allocator>;
 #endif
 
