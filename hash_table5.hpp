@@ -270,7 +270,7 @@ public:
         }
 
         reference operator*() const { return _map->EMH_PKV(_pairs, _bucket); }
-        pointer operator->() const { return &(_map->EMH_PKV(_pairs, _bucket)); }
+        pointer operator->() const { return std::addressof(_map->EMH_PKV(_pairs, _bucket)); }
 
         bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
@@ -637,8 +637,8 @@ public:
 
     size_type get_diss(uint32_t bucket, uint32_t next_bucket, const uint32_t slots) const
     {
-        auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<std::ptrdiff_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<std::ptrdiff_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
             return 0;
         uint32_t diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
@@ -1224,12 +1224,6 @@ public:
         clear_bucket(bucket);
     }
 
-    void _erase(iterator it) noexcept
-    {
-        const auto bucket = erase_bucket(it._bucket);
-        clear_bucket(bucket);
-    }
-
     template<typename Pred>
     size_type erase_if(Pred pred)
     {
@@ -1757,7 +1751,7 @@ private:
         else if (next_bucket == bucket)
             return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket, 1);
 
-        int csize = 0;
+        uint32_t csize = 0;
 #if EMH_LRU_SET
         auto prev_bucket = bucket;
 #endif
@@ -1860,8 +1854,8 @@ one-way search strategy.
                 if (EMH_EMPTY(_pairs, bucket1))
                     return bucket1;
 
-				bucket1 += 1 + (step % 2);
-				if (EMH_EMPTY(_pairs, bucket1))
+                bucket1 += 1 + (step % 2);
+                if (EMH_EMPTY(_pairs, bucket1))
                     return bucket1;
             } else {
 #if EMH_PACK_TAIL

@@ -14,11 +14,6 @@
 //
 //#define EMH_PACK_TAIL 16
 //#define EMH_HIGH_LOAD 123456
-#if EM3
-#include "emhash/hash_table2.hpp"
-#include "emhash/hash_table3.hpp"
-#include "emhash/hash_table4.hpp"
-#endif
 
 #if CK_HMAP
 #include "ck/Common/HashTable/HashMap.h"
@@ -66,11 +61,6 @@ static float max_lf = 0.80;
 
 static std::map<std::string, std::string> show_name =
 {
-#if EM3
-    {"emhash2", "emhash2"},
-    //{"emhash3", "emhash3"},
-    {"emhash4", "emhash4"},
-#endif
    {"emhash7", "emhash7"},
    {"emhash8", "emhash8"},
    {"emhash5", "emhash5"},
@@ -82,7 +72,7 @@ static std::map<std::string, std::string> show_name =
 #endif
 
 #if HAVE_BOOST
-    {"boost",  "boost_flat"},
+    {"boost",  "boost flat"},
 #endif
 #if CK_HMAP
     {"HashMapCell",  "ck_hashmap"},
@@ -258,7 +248,8 @@ static inline float now2sec()
 #endif
 }
 
-template<class MAP> void bench_insert(MAP& map)
+template<class MAP>
+static void bench_insert(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -266,13 +257,13 @@ template<class MAP> void bench_insert(MAP& map)
     printf("    %s\n", map_name);
 
 #if X86_64
-    size_t maxn = 10000000;
+    size_t maxn = 1000000;
 #else
-    size_t maxn = 10000000 / 5;
+    size_t maxn = 1000000 / 5;
 #endif
 
     map.max_load_factor(max_lf);
-    for (int  i = 0; i < 2; i++) {
+    for (int  i = 0; i < 3; i++) {
         auto nows = now2sec();
         {
             {
@@ -305,7 +296,7 @@ template<class MAP> void bench_insert(MAP& map)
                 printf(", clear %.3f", now2sec() - ts);
             }
         }
-        printf(", total %dM int time = %.2f s\n", int(maxn / 1000000), now2sec() - nows);
+        printf(" total %dM int time = %.2f s\n", int(maxn / 1000000), now2sec() - nows);
         maxn *= 10;
     }
 }
@@ -327,7 +318,7 @@ std::ostream& operator<<(std::ostream& os, as_bits_t<T> const& t) {
 }
 
 template<class RandomIt, class URBG>
-void rshuffle(RandomIt first, RandomIt last, URBG&& g)
+static void rshuffle(RandomIt first, RandomIt last, URBG&& g)
 {
     typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
     typedef std::uniform_int_distribution<diff_t> distr_t;
@@ -342,7 +333,7 @@ void rshuffle(RandomIt first, RandomIt last, URBG&& g)
 }
 
 template<class ForwardIt, class T>
-void iotas(ForwardIt first, ForwardIt last, T value)
+static void iotas(ForwardIt first, ForwardIt last, T value)
 {
     while(first != last) {
         *first++ = value;
@@ -350,7 +341,8 @@ void iotas(ForwardIt first, ForwardIt last, T value)
     }
 }
 
-template<class MAP> void bench_randomInsertErase(MAP& map)
+template<class MAP>
+static void bench_randomInsertErase(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -372,7 +364,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
                 map.emplace(rng(), 0);
             }
 
-            auto ts = now2sec();
+            //auto ts = now2sec();
             maxn = max_loop * 10 / (10 + 4*j);
             // benchmark randomly inserting & erasing
             for (size_t i = 0; i < maxn; ++i) {
@@ -409,7 +401,7 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
                 bitMask |= UINT64_C(1) << *bitsIt++;
             }
 
-            auto ts = now2sec();
+//            auto ts = now2sec();
             for (size_t i = 0; i < max_n; ++i) {
                 map2.emplace(rng() & bitMask, 0);
                 map2.erase(rng() & bitMask);
@@ -419,10 +411,11 @@ template<class MAP> void bench_randomInsertErase(MAP& map)
         }
     }
 
-    printf(", total time = %.2f s\n", now2sec() - nows);
+    printf(" total time = %.2f s\n", now2sec() - nows);
 }
 
-template<class MAP> void bench_randomDistinct2(MAP& map)
+template<class MAP>
+static void bench_randomDistinct2(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -440,7 +433,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
     map.max_load_factor(max_lf);
     int checksum;
     {
-        auto ts = now2sec();
+        //auto ts = now2sec();
         checksum = 0;
         size_t const max_rng = n / 20;
         for (size_t i = 0; i < n; ++i) {
@@ -452,7 +445,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
 
     {
         map.clear();
-        auto ts = now2sec();
+        //auto ts = now2sec();
         checksum = 0;
         size_t const max_rng = n / 4;
         for (size_t i = 0; i < n; ++i) {
@@ -464,7 +457,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
 
     {
         map.clear();
-        auto ts = now2sec();
+        //auto ts = now2sec();
         size_t const max_rng = n / 2;
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng(max_rng))];
@@ -475,7 +468,7 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
 
     {
         map.clear();
-        auto ts = now2sec();
+        //auto ts = now2sec();
         checksum = 0;
         for (size_t i = 0; i < n; ++i) {
             checksum += ++map[static_cast<int>(rng())];
@@ -485,10 +478,222 @@ template<class MAP> void bench_randomDistinct2(MAP& map)
     }
     //#endif
 
-    printf(", total time = %.2f s\n", now2sec() - nows);
+    printf(" total time = %.2f s\n", now2sec() - nows);
 }
 
-template<class MAP> void bench_copy(MAP& map)
+#define CODE_FOR_NUCLEOTIDE(nucleotide) (" \0 \1\3  \2"[nucleotide & 0x7])
+
+template<class Map>
+static size_t kcount(const std::vector<char> &poly, const std::string &oligo) {
+
+    Map map;
+    //map.max_load_factor(0.5);
+
+    uint64_t key = 0;
+    const uint64_t mask = ((uint64_t)1 << 2 * oligo.size()) - 1;
+
+    // For the first several nucleotides we only need to append them to key in
+    // preparation for the insertion of complete oligonucleotides to map.
+    for (size_t i = 0; i < oligo.size() - 1; ++i)
+        key = (key << 2 & mask) | poly[i];
+
+    // Add all the complete oligonucleotides of oligo.size() to
+    // map and update the count for each oligonucleotide.
+    for (size_t i = oligo.size() - 1; i < poly.size(); ++i){
+        key= (key << 2 & mask) | poly[i];
+        ++map[key];
+    }
+
+    // Generate the key for oligonucleotide.
+    key = 0;
+    for (size_t i = 0; i < oligo.size(); ++i) {
+        key = (key << 2) | CODE_FOR_NUCLEOTIDE(oligo[i]);
+    }
+
+    if (oligo == "GGT")
+        printf(" (lf=%.2f) ", map.load_factor());
+
+    return map[key];
+}
+
+static int state = 42;
+static inline int fasta_next() {
+    static constexpr int IM = 139968, IA = 3877, IC = 29573;
+
+    state = (state * IA + IC) % IM;
+    float p = state * (1.0f / IM);
+    return (p >= 0.3029549426680f) + (p >= 0.5009432431601f) + (p >= 0.6984905497992f);
+}
+
+template<class MAP>
+static void bench_knucleotide(MAP& map) {
+    static constexpr size_t n = 25000000;
+
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+    printf("\t%20s", map_name);
+
+    state = 42;
+    for (size_t i = 0; i < n * 3; ++i)
+        (void)fasta_next();
+
+    std::vector<char> poly(n * 5);
+    for (size_t i = 0; i < poly.size(); ++i) {
+        poly[i] = fasta_next();
+    }
+
+    auto nows = now2sec();
+    int ans = 0;
+    ans += kcount<MAP>(poly, "GGTATTTTAATTTATAGT");
+    ans += kcount<MAP>(poly, "GGTATTTTAATT");
+    ans += kcount<MAP>(poly, "GGTATT");
+    ans += kcount<MAP>(poly, "GGTA");
+    ans += kcount<MAP>(poly, "GGT");
+    printf(" ans = %d time = %.2f s\n", ans, now2sec() - nows);
+}
+
+class vec2 {
+    uint32_t m_xy;
+
+public:
+    constexpr vec2(uint16_t x, uint16_t y)
+        : m_xy{static_cast<uint32_t>(x) << 16U | y} {}
+
+    constexpr explicit vec2(uint32_t xy)
+        : m_xy(xy) {}
+
+    [[nodiscard]] constexpr auto pack() const -> uint32_t {
+        return m_xy;
+    };
+
+    [[nodiscard]] constexpr auto add_x(uint16_t x) const -> vec2 {
+        return vec2{m_xy + (static_cast<uint32_t>(x) << 16U)};
+    }
+
+    [[nodiscard]] constexpr auto add_y(uint16_t y) const -> vec2 {
+        return vec2{(m_xy & 0xffff0000) | ((m_xy + y) & 0xffff)};
+    }
+
+    template <typename Op>
+    constexpr void for_each_surrounding(Op&& op) const {
+        uint32_t v = m_xy;
+
+        uint32_t upper = (v & 0xffff0000U);
+        uint32_t l1 = (v - 1) & 0xffffU;
+        uint32_t l2 = v & 0xffffU;
+        uint32_t l3 = (v + 1) & 0xffffU;
+
+        op((upper - 0x10000) | l1);
+        op((upper - 0x10000) | l2);
+        op((upper - 0x10000) | l3);
+
+        op(upper | l1);
+        // op(upper | l2);
+        op(upper | l3);
+
+        op((upper + 0x10000) | l1);
+        op((upper + 0x10000) | l2);
+        op((upper + 0x10000) | l3);
+    }
+};
+
+template <typename M>
+void game_of_life(const char* name, size_t nsteps, size_t finalPopulation, M& map1, std::vector<vec2> state) {
+
+    map1.clear();
+    auto map2 = map1;
+
+    for (auto& v : state) {
+        v = v.add_x(UINT16_MAX / 2).add_y(UINT16_MAX / 2);
+        map1[v.pack()] = true;
+        v.for_each_surrounding([&](uint32_t xy) { map1.emplace(xy, false); });
+    }
+
+    auto* m1 = &map1;
+    auto* m2 = &map2;
+    for (size_t i = 0; i < nsteps; ++i) {
+        for (auto const kv : *m1) {
+            auto const& pos = kv.first;
+            auto alive = kv.second;
+            int neighbors = 0;
+            vec2{pos}.for_each_surrounding([&](uint32_t xy) {
+                if (auto x = m1->find(xy); x != m1->end()) {
+                    neighbors += x->second;
+                }
+            });
+            if ((alive && (neighbors == 2 || neighbors == 3)) || (!alive && neighbors == 3)) {
+                (*m2)[pos] = true;
+                vec2{pos}.for_each_surrounding([&](uint32_t xy) { m2->emplace(xy, false); });
+            }
+        }
+        m1->clear();
+        std::swap(m1, m2);
+    }
+
+    size_t count = 0;
+    for (auto const kv : *m1) {
+        count += kv.second;
+    }
+    assert(finalPopulation ==count);
+}
+
+template<class MAP>
+static void bench_GameOfLife(MAP& map)
+{
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+    printf("\t%20s", map_name);
+
+    auto stastabilizing = now2sec();
+    {
+        // https://conwaylife.com/wiki/R-pentomino
+        game_of_life( "R-pentomino", 1103, 116, map, {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {1, 2}});
+
+        // https://conwaylife.com/wiki/Acorn
+        game_of_life( "Acorn", 5206, 633, map, {{1, 0}, {3, 1}, {0, 2}, {1, 2}, {4, 2}, {5, 2}, {6, 2}});
+
+        // https://conwaylife.com/wiki/Jaydot
+        game_of_life( "Jaydot", 6929, 1124, map, {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 3}, {1, 4}, {2, 4}, {0, 5}});
+
+        // https://conwaylife.com/wiki/Bunnies
+        game_of_life( "Bunnies", 17332, 1744, map, {{0, 0}, {6, 0}, {2, 1}, {6, 1}, {2, 2}, {5, 2}, {7, 2}, {1, 3}, {3, 3}});
+
+        printf(" stastabilizing = %.2f", now2sec() - stastabilizing);
+    }
+
+    auto grow = now2sec();
+    {
+        auto map1 = map;
+        // https://conwaylife.com/wiki/Gotts_dots
+        game_of_life( "Gotts dots", 2000, 4599, map1,
+        {
+                {0, 0},    {0, 1},    {0, 2},                                                                                 // 1
+                {4, 11},   {5, 12},   {6, 13},   {7, 12},   {8, 11},                                                          // 2
+                {9, 13},   {9, 14},   {9, 15},                                                                                // 3
+                {185, 24}, {186, 25}, {186, 26}, {186, 27}, {185, 27}, {184, 27}, {183, 27}, {182, 26},                       // 4
+                {179, 28}, {180, 29}, {181, 29}, {179, 30},                                                                   // 5
+                {182, 32}, {183, 31}, {184, 31}, {185, 31}, {186, 31}, {186, 32}, {186, 33}, {185, 34},                       // 6
+                {175, 35}, {176, 36}, {170, 37}, {176, 37}, {171, 38}, {172, 38}, {173, 38}, {174, 38}, {175, 38}, {176, 38}, // 7
+        });
+
+        // https://conwaylife.com/wiki/Puffer_2
+        game_of_life( "Puffer 2", 2000, 7400, map1,
+        {
+                {1, 0}, {2, 0}, {3, 0},  {15, 0}, {16, 0}, {17, 0}, // line 0
+                {0, 1}, {3, 1}, {14, 1}, {17, 1},                   // line 1
+                {3, 2}, {8, 2}, {9, 2},  {10, 2}, {17, 2},          // line 2
+                {3, 3}, {8, 3}, {11, 3}, {17, 3},                   // line 3
+                {2, 4}, {7, 4}, {16, 4},                            // line 4
+        });
+    }
+
+    printf(", grow = %.2f (total %.2f) time s\n", now2sec() - grow, now2sec() - stastabilizing);
+}
+
+template<class MAP>
+static void bench_copy(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -519,7 +724,7 @@ template<class MAP> void bench_copy(MAP& map)
     }
     assert(result == 300019900);
     auto copyt = now2sec();
-    printf(", copy time = %.2f s", copyt - nows);
+    printf(" copy = %.2f", copyt - nows);
     mapForCopy = mapSource;
 
     MAP m;
@@ -533,7 +738,7 @@ template<class MAP> void bench_copy(MAP& map)
 }
 
 template<class MAP>
-size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask )
+static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask)
 {
     //printf("%s map = %s\n", __FUNCTION__, typeid(MAP).name());
     MRNG rng(RND + 4);
@@ -551,7 +756,7 @@ size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask
     MAP map;
     map.max_load_factor(max_lf);
 
-    auto ts = now2sec();
+//    auto ts = now2sec();
     for (size_t i = 0; i < max_n; ++i) {
         *strData32 = rng() & bitMask;
 #if 0
@@ -575,7 +780,7 @@ size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask
 }
 
 template<class MAP>
-uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t numInserts, size_t numFindsPerInsert)
+static uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t numInserts, size_t numFindsPerInsert)
 {
     size_t constexpr NumTotal = 4;
     size_t const numSequential = NumTotal - numRandom;
@@ -645,17 +850,17 @@ uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t 
     }
 
     if (map.size() > 12)
-    printf("    %s success time = %.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
+    printf("    %s success time = %.2f s %8d loadf = %.2f\n",
+            title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
     return num_found;
 }
 
 template<class MAP>
-void bench_randomFindString(MAP& map)
+static void bench_randomFindString(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
-    if (!map_name) {
+    if (!map_name)
         return;
-    }
     printf("\t%20s\n", map_name);
 
     auto nows = now2sec();
@@ -684,11 +889,11 @@ void bench_randomFindString(MAP& map)
         randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
         now2 = now2sec();
     }
-    printf("total time = %.2f + %.2f = %.2f\n", now1 - nows, now2 - now1, now2 - nows);
+    printf("total time = %.2f + %.2f = %.2f s\n", now1 - nows, now2 - now1, now2 - nows);
 }
 
 template<class MAP>
-void bench_randomEraseString(MAP& map)
+static void bench_randomEraseString(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -704,11 +909,11 @@ void bench_randomEraseString(MAP& map)
     { runInsertEraseString<MAP>(8000000,  200, 0x3ffff); }
     { runInsertEraseString<MAP>(6000000,  1000,0x7ffff); }
 
-    printf(", total time = %.2f s\n", now2sec() - nows);
+    printf(" total time = %.2f s\n", now2sec() - nows);
 }
 
 template<class MAP>
-uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t numInserts, const size_t numFindsPerInsert) {
+static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t numInserts, const size_t numFindsPerInsert) {
     size_t constexpr NumTotal = 4;
     size_t const numSequential = NumTotal - numRandom;
 
@@ -771,12 +976,11 @@ uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t num
 }
 
 template<class MAP>
-void bench_IterateIntegers(MAP& map)
+static void bench_IterateIntegers(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
-    if (!map_name) {
+    if (!map_name)
         return;
-    }
     printf("\t%20s", map_name);
 
     size_t const num_iters = 50000;
@@ -787,7 +991,7 @@ void bench_IterateIntegers(MAP& map)
         MRNG rng(123);
         for (size_t n = 0; n < num_iters; ++n) {
             map[rng()] = n;
-            for (auto & keyVal : map)
+            for (const auto & keyVal : map)
 #ifndef CK_HMAP
                 result += keyVal.second;
 #else
@@ -815,7 +1019,7 @@ void bench_IterateIntegers(MAP& map)
 }
 
 template<class MAP>
-void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
+static void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -837,10 +1041,10 @@ void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
     sum += randomFindInternal<MAP>(0, lower32bit, numInserts, numFindsPerInsert);
 
     if (sum != 123)
-    printf(" nums = %zd total time = %.2f\n", numInserts, now2sec() - ts);
+    printf(" nums = %zd total time = %.2f s\n", numInserts, now2sec() - ts);
 }
 
-void runTest(int sflags, int eflags)
+static void runTest(int sflags, int eflags)
 {
     const auto start = now2sec();
 
@@ -863,11 +1067,6 @@ void runTest(int sflags, int eflags)
         { fph::DynamicFphMap<uint64_t, uint64_t, fph::MixSeedHash<uint64_t>> emap; bench_IterateIntegers(emap); }
 #endif
 
-#if EM3
-        { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
-        { emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
-        { emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
-#endif
         { emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
         { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
@@ -932,11 +1131,6 @@ void runTest(int sflags, int eflags)
 #endif
 
         { emhash8::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-#if EM3
-        { emhash2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        { emhash3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        { emhash4::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-#endif
         { emhash6::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { emhash5::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #if QC_HASH
@@ -995,11 +1189,6 @@ void runTest(int sflags, int eflags)
 #endif
         printf("bench_randomEraseString:\n");
 
-#if EM3
-        { emhash4::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        { emhash2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-        { emhash3::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-#endif
 #if X86
         { emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { emilib::HashMap<std::string,  int, hash_func> bench; bench_randomEraseString(bench); }
@@ -1110,11 +1299,6 @@ void runTest(int sflags, int eflags)
 #if FOLLY_F14
             { folly::F14VectorMap <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
-#if EM3
-            { emhash4::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
-            { emhash2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
-            { emhash3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
-#endif
             putchar('\n');
         }
     }
@@ -1164,11 +1348,6 @@ void runTest(int sflags, int eflags)
         { emhash8::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         { emhash6::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         { emhash5::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-#if EM3
-        { emhash2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-        { emhash4::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-        { emhash3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
-#endif
 #if X86
         { emilib::HashMap<int, int, hash_func>  emap; bench_insert(emap); }
         { emilib2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
@@ -1222,11 +1401,6 @@ void runTest(int sflags, int eflags)
 #if QC_HASH==2
         { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hang
 #endif
-#endif
-#if EM3
-        { emhash2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emhash3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emhash4::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
 #endif
 
 #if X86
@@ -1288,11 +1462,6 @@ void runTest(int sflags, int eflags)
         { emhash6::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { emhash5::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
         { emhash7::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-#if EM3
-        { emhash2::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-        { emhash4::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-        { emhash3::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
-#endif
 
 #if X86
         { emilib::HashMap<int, int, hash_func> emap;  bench_randomDistinct2(emap); }
@@ -1353,11 +1522,6 @@ void runTest(int sflags, int eflags)
         { ankerl::unordered_dense::map <uint64_t, int, hash_func> martin; bench_copy(martin); }
 #endif
 
-#if EM3
-        { emhash2::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-        { emhash4::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-        { emhash3::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-#endif
 
 #if X86
         { emilib::HashMap<uint64_t, int, hash_func> emap;  bench_copy(emap); }
@@ -1389,7 +1553,127 @@ void runTest(int sflags, int eflags)
         putchar('\n');
     }
 
-    printf("total time = %.3f s\n", now2sec() - start);
+    if (eflags >= 9)
+    {
+#if ABSL_HASH
+        typedef absl::Hash<uint64_t> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<uint64_t> hash_func;
+#elif STD_HASH
+        typedef std::hash<uint64_t> hash_func;
+#else
+        typedef robin_hood::hash<uint64_t> hash_func;
+#endif
+        printf("bench_knucleotide:\n");
+
+#if QC_HASH
+        { qc::hash::RawMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+#endif
+
+#if CXX20
+        { jg::dense_hash_map<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+        { rigtorp::HashMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+#endif
+        { ankerl::unordered_dense::map <uint64_t, uint32_t, hash_func> martin; bench_knucleotide(martin); }
+#if HAVE_BOOST
+        { boost::unordered_flat_map <uint64_t, uint32_t, hash_func> hmap; bench_knucleotide(hmap); }
+#endif
+#if ABSL
+        { absl::flat_hash_map <uint64_t, uint32_t, hash_func> pmap; bench_knucleotide(pmap); }
+#endif
+
+        { emhash6::HashMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+        { emhash5::HashMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+        { emhash7::HashMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+        { emhash8::HashMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+
+#if X86
+        { emilib::HashMap <uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+        { emilib2::HashMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+        { emilib3::HashMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
+#endif
+#if ET
+        { hrd_m::hash_map <uint64_t, uint32_t, hash_func> hmap; bench_knucleotide(hmap); }
+        { tsl::robin_map  <uint64_t, uint32_t, hash_func> rmap; bench_knucleotide(rmap); }
+        { robin_hood::unordered_map <uint64_t, uint32_t, hash_func> martin; bench_knucleotide(martin); }
+
+#if X86_64
+        { ska::flat_hash_map <uint64_t, uint32_t, hash_func> fmap; bench_knucleotide(fmap); }
+#endif
+        { phmap::flat_hash_map <uint64_t, uint32_t, hash_func> pmap; bench_knucleotide(pmap); }
+#endif
+
+#if FOLLY
+        { folly::F14VectorMap <uint64_t, uint32_t, hash_func> pmap; bench_knucleotide(pmap); }
+#endif
+#if CK_HMAP
+        { ck::HashMap <uint64_t, uint32_t, hash_func> hmap; bench_knucleotide(hmap); }
+#endif
+
+        putchar('\n');
+    }
+
+    if (eflags > 9)
+    {
+#if ABSL_HASH
+        typedef absl::Hash<uint32_t> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<uint32_t> hash_func;
+#elif STD_HASH
+        typedef std::hash<uint32_t> hash_func;
+#else
+        typedef robin_hood::hash<uint32_t> hash_func;
+#endif
+        printf("bench_GameOfLife:\n");
+
+        { emhash6::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+        { emhash5::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+        { emhash7::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+        { emhash8::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+
+#if QC_HASH
+        { qc::hash::RawMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+#endif
+
+#if CXX20
+        { jg::dense_hash_map<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+        { rigtorp::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+#endif
+        { ankerl::unordered_dense::map <uint32_t, bool, hash_func> martin; bench_GameOfLife(martin); }
+#if HAVE_BOOST
+        { boost::unordered_flat_map <uint32_t, bool, hash_func> hmap; bench_GameOfLife(hmap); }
+#endif
+#if ABSL
+        { absl::flat_hash_map <uint32_t, bool, hash_func> pmap; bench_GameOfLife(pmap); }
+#endif
+
+#if X86
+        { emilib::HashMap <uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+        { emilib2::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+        { emilib3::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
+#endif
+#if ET
+        { hrd_m::hash_map <uint32_t, bool, hash_func> hmap; bench_GameOfLife(hmap); }
+        { tsl::robin_map  <uint32_t, bool, hash_func> rmap; bench_GameOfLife(rmap); }
+        { robin_hood::unordered_map <uint32_t, bool, hash_func> martin; bench_GameOfLife(martin); }
+
+#if X86_64
+        { ska::flat_hash_map <uint32_t, bool, hash_func> fmap; bench_GameOfLife(fmap); }
+#endif
+        { phmap::flat_hash_map <uint32_t, bool, hash_func> pmap; bench_GameOfLife(pmap); }
+#endif
+
+#if FOLLY
+        { folly::F14VectorMap <uint32_t, bool, hash_func> pmap; bench_GameOfLife(pmap); }
+#endif
+#if CK_HMAP
+        //{ ck::HashMap <uint32_t, bool, hash_func> hmap; bench_GameOfLife(hmap); }
+#endif
+
+        putchar('\n');
+    }
+
+    printf("total time = %.2f s", now2sec() - start);
 }
 
 static void checkSet(const std::string& map_name)
@@ -1407,11 +1691,11 @@ int main(int argc, char* argv[])
     for (auto& m : show_name)
         printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
 
-    int sflags = 1, eflags = 8;
+    int sflags = 1, eflags = 10;
     if (argc > 1) {
         printf("cmd agrs = %s\n", argv[1]);
         for (int c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
-            if (c > '3' && c < '9') {
+            if (c > '3' && c <= '8') {
                 std::string map_name("emhash");
                 map_name += c;
                 checkSet(map_name);
