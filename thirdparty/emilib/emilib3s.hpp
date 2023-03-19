@@ -465,8 +465,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    void max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 8.0f/9)
     {
+        return 7/8.0f;
     }
 
     // ------------------------------------------------------------
@@ -854,7 +855,7 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__) || EMH_PREFETCH
+#if EMH_PREFETCH
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #endif
     }

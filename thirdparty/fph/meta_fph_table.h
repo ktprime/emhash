@@ -350,7 +350,7 @@ namespace fph {
             using promoted_type = typename std::common_type<int, T>::type;
             using unsigned_promoted_type = typename std::make_unsigned<promoted_type>::type;
             return ((unsigned_promoted_type{v} >> mb)
-                    | (unsigned_promoted_type{v} << (-mb & count_mask)));
+                    | (unsigned_promoted_type{v} << (0-mb & count_mask)));
         }
 
         inline void ThrowRuntimeError(const char* what) {

@@ -209,7 +209,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -287,7 +287,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -461,8 +461,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    void max_load_factor(float lf = 8.0f/9)
+    inline float max_load_factor(float lf = 8.0f/9)
     {
+        return 7/8.0f;
     }
 
     // ------------------------------------------------------------
@@ -609,7 +610,8 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = hash_key2(key_hash, key);
+        //_states[bucket] = hash_key2(key_hash, key);
+        set_states(bucket, hash_key2(key_hash, key));
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
     }
@@ -830,11 +832,12 @@ public:
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 const auto key_hash = _hasher(src_pair.first);
-                const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
+                const auto main_bucket = key_hash & _mask;
+                const auto dst_bucket = find_empty_slot(main_bucket, 0);
 
-                _states[dst_bucket] = hash_key2(key_hash, src_pair.first);
+                set_states(dst_bucket, hash_key2(key_hash, src_pair.first));
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
-                _num_filled += 1;
+                _num_filled ++;
                 src_pair.~PairT();
             }
         }
@@ -853,9 +856,14 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__) || EMH_PREFETCH
+#if EMH_PREFETCH
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #endif
+    }
+
+    inline void set_states(size_t ebucket, uint8_t key_h2)
+    {
+        _states[ebucket] = key_h2;
     }
 
     // Find the bucket with this key, or return (size_t)-1
@@ -865,13 +873,13 @@ private:
         const auto key_hash = _hasher(key);
         auto next_bucket = (size_t)(key_hash & _mask);
 
-        //prefetch_heap_block((char*)_states + next_bucket);
+        prefetch_heap_block((char*)_states + next_bucket);
 
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         int i = _max_probe_length;
 
         while (true) {
-            const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+            const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
@@ -882,7 +890,7 @@ private:
             }
 
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (EMH_LIKELY(maske != 0))
+            if (maske != 0)
                 break;
 
             next_bucket += simd_bytes;
@@ -908,7 +916,7 @@ private:
         const auto key_hash = _hasher(key);
         const auto key_h2 = hash_key2(key_hash, key);
         const auto bucket = (size_t)(key_hash & _mask);
-        //prefetch_heap_block((char*)_states + bucket);
+        prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         const auto round  = bucket + _max_probe_length;

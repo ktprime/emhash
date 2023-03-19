@@ -1076,7 +1076,7 @@ GNEXT:
             const auto maske = filled_mask(next_bucket);
             if (EMH_LIKELY(maske != 0))
                 return next_bucket + CTZ(maske);
-            next_bucket = next_bucket + simd_bytes;
+            next_bucket += simd_bytes;
         }
         return 0;
     }

@@ -19,6 +19,8 @@
 #include <cstring>
 
 #include "absl/base/config.h"
+#include "absl/base/dynamic_annotations.h"
+#include "absl/hash/hash.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -26,29 +28,59 @@ namespace container_internal {
 
 // A single block of empty control bytes for tables without any slots allocated.
 // This enables removing a branch in the hot path of find().
-// We have 17 bytes because there may be a generation counter. Any constant is
-// fine for the generation counter.
-alignas(16) ABSL_CONST_INIT ABSL_DLL const ctrl_t kEmptyGroup[17] = {
+alignas(16) ABSL_CONST_INIT ABSL_DLL const ctrl_t kEmptyGroup[16] = {
     ctrl_t::kSentinel, ctrl_t::kEmpty, ctrl_t::kEmpty, ctrl_t::kEmpty,
     ctrl_t::kEmpty,    ctrl_t::kEmpty, ctrl_t::kEmpty, ctrl_t::kEmpty,
     ctrl_t::kEmpty,    ctrl_t::kEmpty, ctrl_t::kEmpty, ctrl_t::kEmpty,
-    ctrl_t::kEmpty,    ctrl_t::kEmpty, ctrl_t::kEmpty, ctrl_t::kEmpty,
-    static_cast<ctrl_t>(0)};
+    ctrl_t::kEmpty,    ctrl_t::kEmpty, ctrl_t::kEmpty, ctrl_t::kEmpty};
 
 #ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
 constexpr size_t Group::kWidth;
 #endif
 
+namespace {
+
 // Returns "random" seed.
 inline size_t RandomSeed() {
 #ifdef ABSL_HAVE_THREAD_LOCAL
   static thread_local size_t counter = 0;
+  // On Linux kernels >= 5.4 the MSAN runtime has a false-positive when
+  // accessing thread local storage data from loaded libraries
+  // (https://github.com/google/sanitizers/issues/1265), for this reason counter
+  // needs to be annotated as initialized.
+  ABSL_ANNOTATE_MEMORY_IS_INITIALIZED(&counter, sizeof(size_t));
   size_t value = ++counter;
 #else   // ABSL_HAVE_THREAD_LOCAL
   static std::atomic<size_t> counter(0);
   size_t value = counter.fetch_add(1, std::memory_order_relaxed);
 #endif  // ABSL_HAVE_THREAD_LOCAL
   return value ^ static_cast<size_t>(reinterpret_cast<uintptr_t>(&counter));
+}
+
+}  // namespace
+
+GenerationType* EmptyGeneration() {
+  if (SwisstableGenerationsEnabled()) {
+    constexpr size_t kNumEmptyGenerations = 1024;
+    static constexpr GenerationType kEmptyGenerations[kNumEmptyGenerations]{};
+    return const_cast<GenerationType*>(
+        &kEmptyGenerations[RandomSeed() % kNumEmptyGenerations]);
+  }
+  return nullptr;
+}
+
+bool CommonFieldsGenerationInfoEnabled::
+    should_rehash_for_bug_detection_on_insert(const ctrl_t* ctrl,
+                                              size_t capacity) const {
+  if (reserved_growth_ == kReservedGrowthJustRanOut) return true;
+  if (reserved_growth_ > 0) return false;
+  // Note: we can't use the abseil-random library because abseil-random
+  // depends on swisstable. We want to return true with probability
+  // `min(1, RehashProbabilityConstant() / capacity())`. In order to do this,
+  // we probe based on a random hash and see if the offset is less than
+  // RehashProbabilityConstant().
+  return probe(ctrl, capacity, absl::HashOf(RandomSeed())).offset() <
+         RehashProbabilityConstant();
 }
 
 bool ShouldInsertBackwards(size_t hash, const ctrl_t* ctrl) {
