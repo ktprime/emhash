@@ -23,7 +23,7 @@ func hash(seg, factor int) {
 
     var sarr = make ([]int, len(arr))
     for i := 0; i < len(arr); i++ {
-        sarr[arr[i]] += 1;
+        sarr[arr[i]] += 1
     }
 
     var sum = 0

@@ -43,7 +43,7 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
 {
     auto t2 = std::chrono::steady_clock::now();
 
-    std::cout << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")\n";
+    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")\n";
 
     t1 = t2;
 }
@@ -286,7 +286,7 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     #define BstrHasher absl::Hash<K>
 #elif BOOST_HASH
     #define BstrHasher boost::hash<K>
-#elif ROBIN_HASH
+#elif HOOD_HASH
     #define BstrHasher robin_hood::hash<K>
 #elif CXX17
     #define BstrHasher ankerl::unordered_dense::hash<K>
@@ -302,7 +302,7 @@ template<class K, class V> using std_unordered_map =
     std::unordered_map<K, V, BstrHasher, std::equal_to<K>, allocator_for<K, V>>;
 
 template<class K, class V> using boost_unordered_flat_map =
-    boost::unordered_flat_map<K, V, BstrHasher, std::equal_to<K>, allocator_for<K, V>>;
+    boost::unordered_flat_map<K, V, BstrHasher, std::equal_to<K>>;
 
 template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BstrHasher, std::equal_to<K>>;
@@ -391,7 +391,7 @@ template<class K, class V> using std_unordered_map_fnv1a =
 std::unordered_map<K, V, fnv1a_hash, std::equal_to<K>, allocator_for<K, V>>;
 
 template<class K, class V> using boost_unordered_flat_map_fnv1a =
-    boost::unordered_flat_map<K, V, fnv1a_hash, std::equal_to<K>, allocator_for<K, V>>;
+    boost::unordered_flat_map<K, V, fnv1a_hash, std::equal_to<K>>;
 
 #ifdef ABSL_HMAP
 
@@ -399,7 +399,7 @@ template<class K, class V> using absl_node_hash_map_fnv1a =
     absl::node_hash_map<K, V, fnv1a_hash, absl::container_internal::hash_default_eq<K>, allocator_for<K, V>>;
 
 template<class K, class V> using absl_flat_hash_map_fnv1a =
-    absl::flat_hash_map<K, V, fnv1a_hash, absl::container_internal::hash_default_eq<K>, allocator_for<K, V>>;
+    absl::flat_hash_map<K, V, fnv1a_hash, absl::container_internal::hash_default_eq<K>>;
 
 #endif
 

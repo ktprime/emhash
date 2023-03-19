@@ -29,7 +29,7 @@
 using namespace std::chrono_literals;
 #if TKey == 0
 using KeyType = uint64_t;
-using ValType = uint64_t;
+using ValType = uint32_t;
 #else
 using KeyType = uint32_t;
 using ValType = uint32_t;
@@ -39,7 +39,7 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
 {
     auto t2 = std::chrono::steady_clock::now();
 
-    std::cout << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")\n";
+    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")\n";
 
     t1 = t2;
 }
@@ -145,8 +145,8 @@ template<class Map>  void test_lookup( Map& map, std::chrono::steady_clock::time
     {
         for( unsigned i = 1; i <= N * 2; ++i )
         {
-            auto it = map.find( indices3[ i ] );
-            if( it != map.end() ) s += it->second;
+//            auto it = map.find( indices3[ i ] ); if( it != map.end() ) s += it->second;
+            s += map.count(indices2[ i ]);
         }
     }
 
@@ -299,7 +299,7 @@ template<template<class...> class Map>  void test( char const* label )
     #define BintHasher boost::hash<K>
 #elif FIB_HASH
     #define BintHasher Int64Hasher<K>
-#elif ROBIN_HASH
+#elif HOOD_HASH
     #define BintHasher robin_hood::hash<K>
 #elif CXX17
     #define BintHasher ankerl::unordered_dense::hash<K>
@@ -310,7 +310,7 @@ template<template<class...> class Map>  void test( char const* label )
 template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;
 
 template<class K, class V> using boost_unordered_flat_map =
-    boost::unordered_flat_map<K, V, BintHasher, std::equal_to<K>, allocator_for<K, V>>;
+    boost::unordered_flat_map<K, V, BintHasher, std::equal_to<K>>;
 
 template<class K, class V> using std_unordered_map =
     std::unordered_map<K, V, BintHasher, std::equal_to<K>, allocator_for<K, V>>;
@@ -359,12 +359,12 @@ int main(int argc, const char* argv[])
     test<martinus_dense>("martinus_dense" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
+    test<emhash_map7> ("emhash_map7" );
     test<tsl_robin_map> ("tsl_robin_map" );
     test<phmap_flat> ("phmap_flat" );
 
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6> ("emhash_map6" );
-    test<emhash_map7> ("emhash_map7" );
     test<martinus_flat> ("martinus_flat" );
     test<emilib_map2> ("emilib_map2" );
     test<emilib_map3> ("emilib_map3" );

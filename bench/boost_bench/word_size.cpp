@@ -183,7 +183,7 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     #define BstrHasher absl::Hash<K>
 #elif BOOST_HASH
     #define BstrHasher boost::hash<K>
-#elif ROBIN_HASH
+#elif HOOD_HASH
     #define BstrHasher robin_hood::hash<K>
 #elif CXX17 && !STD_HASH
     #define BstrHasher ankerl::unordered_dense::hash<K>

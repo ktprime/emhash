@@ -127,7 +127,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -599,7 +599,7 @@ public:
 };
 
 template <typename M>
-void game_of_life(const char* name, size_t nsteps, size_t finalPopulation, M& map1, std::vector<vec2> state) {
+static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation, M& map1, std::vector<vec2> state) {
 
     map1.clear();
     auto map2 = map1;
@@ -1251,8 +1251,8 @@ static void runTest(int sflags, int eflags)
 #endif
         printf("bench_randomFind:\n");
 
-        static constexpr size_t numInserts[]        = {100,     5000,  1000000, 10000000};
-        static constexpr size_t numFindsPerInsert[] = {1000000, 10000, 50, 10};
+        static constexpr size_t numInserts[]        = {123,     5234,  1234567, 12345678};
+        static constexpr size_t numFindsPerInsert[] = {800000,  20000, 50, 5};
         for (size_t i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
         {
 #if ET

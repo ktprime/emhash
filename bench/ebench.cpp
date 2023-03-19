@@ -46,7 +46,7 @@ std::map<std::string, std::string> maps =
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
 
-//    {"emilib2", "emilib2"},
+    {"emilib2", "emilib2"},
 //    {"emilib1", "emilib1"},
 //    {"emilib3", "emilib3"},
 //    {"simd_hash", "simd_hash"},
@@ -92,22 +92,20 @@ std::map<std::string, std::string> maps =
 
 //feature of emhash
 //#define EMH_INT_HASH        1
-//#define EMH_BUCKET_INDEX    2
+//#define EMH_BUCKET_INDEX    0
 //#define EMH_REHASH_LOG      1234567
 
-//#define EMH_STATIS          1
+//#define EMH_STATIS            123456
 //#define EMH_SAFE_HASH       1
 //#define EMH_IDENTITY_HASH   1
 
 //#define EMH_LRU_SET         1
-//#define EMH_ERASE_SMALL     1
-//#define EMH_HIGH_LOAD       2345
-//#define EMH_FIND_HIT        1
-//#define EMH_PACK_TAIL       5
+//#define EMH_HIGH_LOAD       234567
+//#define EMH_PACK_TAIL         8
 //#define EMH_ITER_SAFE       1
 //#define EMH_ALIGN64         1
-#define EMH_FIND_HIT      1
-#define EMH_SMALL_SIZE    4
+//#define EMH_FIND_HIT        1
+//#define EMH_SMALL_SIZE        12345
 
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
@@ -923,18 +921,25 @@ void erase_50_find(const hash_type& ht_hash, const std::string& hash_name, const
 template<class hash_type>
 void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto tmp = ht_hash; auto id = 1;
+    auto tmp = ht_hash;
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList)
         sum += ht_hash.erase(v);
 
     for (auto it = tmp.begin(); it != tmp.end(); ) {
+#if TKey < 2
+        if (it->first % 4 < 2) {
+            it ++; continue;
+        }
+#endif
+
 #if CXX17
         if constexpr( std::is_void_v< decltype( tmp.erase( it ) ) > )
-            ++it;
+            tmp.erase( it++ );
         else
 #endif
             it = tmp.erase(it);
+       sum += 1;
     }
     sum += tmp.size();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -1081,9 +1086,9 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
         printf("%s:size %zd\n", hash_name.data(), sizeof(hash_type));
 
     hash_type hash;
-    const uint32_t l1_size = (32 * 1024)   / (sizeof(keyType) + sizeof(valueType));
+    const uint32_t l1_size = (48 * 1024)   / (sizeof(keyType) + sizeof(valueType));
     //const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
-    const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
+    const uint32_t l3_size = (16 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
     func_index = 0;
 #if 1
