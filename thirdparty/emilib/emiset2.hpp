@@ -497,7 +497,8 @@ public:
         return insert(key);
     }
 
-    void insert(const_iterator beginc, const_iterator endc)
+    template<typename T>
+    void insert(T beginc, T endc)
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc) {
@@ -505,7 +506,8 @@ public:
         }
     }
 
-    void insert_unique(const_iterator beginc, const_iterator endc)
+    template<typename T>
+    void insert_unique(T beginc, T endc)
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc) {

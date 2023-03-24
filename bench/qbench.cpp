@@ -13,7 +13,7 @@
 #include "ck/Common/HashTable/HashMap.h"
 #endif
 
-#if HAVE_BOOST && CXX20
+#if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
@@ -33,10 +33,9 @@
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib.hpp"
-#include "emilib/emilib12.hpp"
+//#include "emilib/emilib12.hpp"
 //#include "emilib/emiset2.hpp"
 
-#include "absl/container/flat_hash_map.h"
 #include "martinus/robin_hood.h"
 #include "ska/flat_hash_map.hpp"
 #include "phmap/phmap.h"
@@ -185,26 +184,26 @@ enum class Stat : size_t
 };
 
 static const std::array<std::string, size_t(Stat::_n)> statNames{
-	"ObjectSize",
-	"IteratorSize",
-	"MemoryOverhead",
-	"Construct",
-	"Insert",
-	"InsertReserved",
-	"InsertPresent",
-	"AccessPresent",
-	"AccessAbsent",
-	"AccessEmpty",
-	"IterateFull",
-	"IterateHalf",
-	"iterateEmpty",
-	"Erase",
-	"EraseAbsent",
-	"Refill",
-	"Clear",
-	"LoneBegin",
-	"LoneEnd",
-	"Destruction"
+    "ObjectSize",
+    "IteratorSize",
+    "MemoryOverhead",
+    "Construct",
+    "Insert",
+    "InsertReserved",
+    "InsertPresent",
+    "AccessPresent",
+    "AccessAbsent",
+    "AccessEmpty",
+    "IterateFull",
+    "IterateHalf",
+    "iterateEmpty",
+    "Erase",
+    "EraseAbsent",
+    "Refill",
+    "Clear",
+    "LoneBegin",
+    "LoneEnd",
+    "Destruction"
 };
 
 #if QC_HASH
@@ -1208,6 +1207,7 @@ struct EmiLib1MapInfo
     static inline const std::string name{"emilib1::HashMap"};
 };
 
+#if 0
 template <typename K, typename V>
 struct EmLibMapInfo
 {
@@ -1215,6 +1215,7 @@ struct EmLibMapInfo
     using AllocatorContainer = void;
     static inline const std::string name{"emilib::HashMap "};
 };
+#endif
 
 template <typename K, typename V>
 struct JgDenseMapInfo
@@ -1304,8 +1305,8 @@ int main(const int argc, const char* argv[])
         compare<CompareMode::typical, K,
 #if X86
 //            EmiLib1MapInfo<K, V>,
+            EmiLib3MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
-//            EmiLib3MapInfo<K, V>,
 //            EmLibMapInfo<K, V>,
 #endif
 
@@ -1314,9 +1315,7 @@ int main(const int argc, const char* argv[])
 #endif
 
 #if HAVE_BOOST
-#if CXX20
             BoostFlapMapInfo<K, V>,
-#endif
 #endif
 
 #if ET

@@ -27,9 +27,9 @@
 #include <chrono>
 
 using namespace std::chrono_literals;
-#if TKey == 0
+#if TKey == 1
 using KeyType = uint64_t;
-using ValType = uint32_t;
+using ValType = uint64_t;
 #else
 using KeyType = uint32_t;
 using ValType = uint32_t;
@@ -99,7 +99,7 @@ template<class Map>  void test_insert( Map& map, std::chrono::steady_clock::time
 
     for( unsigned i = 1; i <= N; ++i )
     {
-        map.insert( { indices3[ i ], i } );
+        map[indices3[ i ]] = i;
     }
 
     print_time( t1, "Consecutive shifted insert",  0, map.size() );
@@ -276,7 +276,7 @@ template<template<class...> class Map>  void test( char const* label )
 
     test_insert( map, t1 );
 
-    std::cout << "Memory: " << s_alloc_bytes << " bytes in " << s_alloc_count << " allocations\n\n";
+    //std::cout << "Memory: " << s_alloc_bytes << " bytes in " << s_alloc_count << " allocations\n\n";
 
     record rec = { label, 0, s_alloc_bytes, s_alloc_count };
 
@@ -293,18 +293,18 @@ template<template<class...> class Map>  void test( char const* label )
 }
 
 // aliases using the counting allocator
-#if ABSL_HASH
-    #define BintHasher absl::Hash<K>
-#elif BOOST_HASH
+#if BOOST_HASH
     #define BintHasher boost::hash<K>
 #elif FIB_HASH
     #define BintHasher Int64Hasher<K>
 #elif HOOD_HASH
     #define BintHasher robin_hood::hash<K>
-#elif CXX17
-    #define BintHasher ankerl::unordered_dense::hash<K>
-#else
+#elif ABSL_HASH
+    #define BintHasher absl::Hash<K>
+#elif STD_HASH
     #define BintHasher std::hash<K>
+#else
+    #define BintHasher ankerl::unordered_dense::hash<K>
 #endif
 
 template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;

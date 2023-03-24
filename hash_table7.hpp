@@ -92,7 +92,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #include "wyhash.h"
 #endif
 
-#ifdef EMH_KEY
+#ifdef EMH_NEW
     #undef  EMH_KEY
     #undef  EMH_VAL
     #undef  EMH_PKV

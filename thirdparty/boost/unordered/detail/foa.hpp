@@ -161,6 +161,7 @@ static const std::size_t default_bucket_count = 0;
 struct group15
 {
   static constexpr int N=15;
+  static constexpr bool regular_layout=true;
 
   struct dummy_group_type
   {
@@ -184,6 +185,11 @@ struct group15
   {
     BOOST_ASSERT(pos<N);
     return at(pos)==sentinel_;
+  }
+
+  static inline bool is_sentinel(unsigned char* pc)noexcept
+  {
+    return *pc==sentinel_;
   }
 
   inline void reset(std::size_t pos)
@@ -230,6 +236,11 @@ struct group15
   {
     return _mm_movemask_epi8(
       _mm_cmpeq_epi8(m,_mm_setzero_si128()))&0x7FFF;
+  }
+
+  static inline bool is_occupied(unsigned char* pc)noexcept
+  {
+    return *pc!=available_;
   }
 
   inline int match_occupied()const
@@ -320,6 +331,7 @@ private:
 struct group15
 {
   static constexpr int N=15;
+  static constexpr bool regular_layout=true;
 
   struct dummy_group_type
   {
@@ -343,6 +355,11 @@ struct group15
   {
     BOOST_ASSERT(pos<N);
     return pos==N-1&&at(N-1)==sentinel_;
+  }
+
+  static inline bool is_sentinel(unsigned char* pc)noexcept
+  {
+    return *pc==sentinel_;
   }
 
   inline void reset(std::size_t pos)
@@ -384,6 +401,11 @@ struct group15
   inline int match_available()const
   {
     return simde_mm_movemask_epi8(vceqq_s8(m,vdupq_n_s8(0)))&0x7FFF;
+  }
+
+  static inline bool is_occupied(unsigned char* pc)noexcept
+  {
+    return *pc!=available_;
   }
 
   inline int match_occupied()const
@@ -478,6 +500,7 @@ private:
 struct group15
 {
   static constexpr int N=15;
+  static constexpr bool regular_layout=false;
 
   struct dummy_group_type
   {
@@ -809,8 +832,7 @@ class table;
  *   - pg = pc-n
  *
  * (for explanatory purposes pg and pc are treated above as if they were memory
- * addresses rather than pointers).The main drawback of this two-pointer
- * representation is that iterator increment is relatively slow.
+ * addresses rather than pointers).
  *
  * p = nullptr is conventionally used to mark end() iterators.
  */
@@ -823,6 +845,9 @@ class table_iterator
 {
   using type_policy=TypePolicy;
   using table_element_type=typename type_policy::element_type;
+  using group_type=Group;
+  static constexpr auto N=group_type::N;
+  static constexpr auto regular_layout=group_type::regular_layout;
 
 public:
   using difference_type=std::ptrdiff_t;
@@ -861,32 +886,65 @@ private:
   template<typename,typename,typename,typename> friend class table;
 
   table_iterator(Group* pg,std::size_t n,const table_element_type* p_):
-    pc{reinterpret_cast<unsigned char*>(const_cast<Group*>(pg))+n},
+    pc{reinterpret_cast<unsigned char*>(const_cast<group_type*>(pg))+n},
     p{const_cast<table_element_type*>(p_)}
     {}
 
-  inline std::size_t rebase() noexcept
-  {
-    std::size_t off=reinterpret_cast<uintptr_t>(pc)%sizeof(Group);
-    pc-=off;
-    return off;
-  }
-
   inline void increment()noexcept
   {
-    std::size_t n0=rebase();
+    BOOST_ASSERT(p!=nullptr);
+    increment(std::integral_constant<bool,regular_layout>{});
+  }
 
-    int mask=(reinterpret_cast<Group*>(pc)->match_occupied()>>(n0+1))<<(n0+1);
+  inline void increment(std::true_type /* regular layout */)noexcept
+  {
+    for(;;){
+      ++p;
+      if(reinterpret_cast<uintptr_t>(pc)%sizeof(group_type)==N-1){
+        pc+=sizeof(group_type)-(N-1);
+        break;
+      }
+      ++pc;
+      if(!group_type::is_occupied(pc))continue;
+      if(BOOST_UNLIKELY(group_type::is_sentinel(pc)))p=nullptr;
+      return;
+    }
+
+    for(;;){
+      int mask=reinterpret_cast<group_type*>(pc)->match_occupied();
+      if(mask!=0){
+        auto n=unchecked_countr_zero(mask);
+        if(BOOST_UNLIKELY(reinterpret_cast<group_type*>(pc)->is_sentinel(n))){
+          p=nullptr;
+        }
+        else{
+          pc+=n;
+          p+=n;
+        }
+        return;
+      }
+      pc+=sizeof(group_type);
+      p+=N;
+    }
+  }
+
+  inline void increment(std::false_type /* interleaved */)noexcept
+  {
+    std::size_t n0=reinterpret_cast<uintptr_t>(pc)%sizeof(group_type);
+    pc-=n0;
+
+    int mask=(
+      reinterpret_cast<group_type*>(pc)->match_occupied()>>(n0+1))<<(n0+1);
     if(!mask){
       do{
-        pc+=sizeof(Group);
-        p+=Group::N;
+        pc+=sizeof(group_type);
+        p+=N;
       }
-      while((mask=reinterpret_cast<Group*>(pc)->match_occupied())==0);
+      while((mask=reinterpret_cast<group_type*>(pc)->match_occupied())==0);
     }
 
     auto n=unchecked_countr_zero(mask);
-    if(BOOST_UNLIKELY(reinterpret_cast<Group*>(pc)->is_sentinel(n))){
+    if(BOOST_UNLIKELY(reinterpret_cast<group_type*>(pc)->is_sentinel(n))){
       p=nullptr;
     }
     else{
@@ -1414,7 +1472,7 @@ public:
   iterator begin()noexcept
   {
     iterator it{arrays.groups,0,arrays.elements};
-    if(!(arrays.groups[0].match_occupied()&0x1))++it;
+    if(arrays.elements&&!(arrays.groups[0].match_occupied()&0x1))++it;
     return it;
   }
 

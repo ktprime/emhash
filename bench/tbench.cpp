@@ -17,6 +17,9 @@
 #if CXX17
 #include "martinus/unordered_dense.h"
 #endif
+#if HAVE_BOOST
+#include <boost/unordered/unordered_flat_map.hpp>
+#endif
 
 #include <algorithm>
 #include <numeric>
@@ -234,6 +237,10 @@ int main(int argc, const char* argv[])
 #if ET > 1
     hash_table_test<ska::flat_hash_map<ktype, vtype>>("ska_flat");
     hash_table_test<emilib::HashMap<ktype, vtype, QintHasher>>("emilib1");
+#endif
+
+#if HAVE_BOOST
+    hash_table_test<boost::unordered_flat_map<ktype, vtype, QintHasher>>("boost::fhash");
 #endif
 
     hash_table_test<emilib2::HashMap<ktype, vtype, QintHasher>>("emilib2");

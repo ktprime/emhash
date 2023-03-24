@@ -10,6 +10,9 @@
 //#include <ext/pb_ds/assoc_container.hpp>
 #endif
 
+#if HAVE_BOOST
+#include <boost/unordered/unordered_flat_map.hpp>
+#endif
 //#define EMH_INT_HASH 1
 
 #include "martinus/robin_hood.h"
@@ -22,7 +25,7 @@
 //#include "patchmap/patchmap.hpp"
 //#include "emilib/emilib33.hpp"
 #include "emilib/emilib.hpp"
-#include "emilib/emilib2.hpp"
+#include "emilib/emilib2o.hpp"
 #include "emilib/emilib2s.hpp"
 
 #include "hash_table8.hpp"
@@ -474,6 +477,10 @@ int main(int argc, char* argv[])
         run_udb2<emilib::HashMap<uint32_t, uint32_t, Hash32>>("emilib");
         run_udb2<emilib2::HashMap<uint32_t, uint32_t, Hash32>>("emilib2");
         run_udb2<emilib3::HashMap<uint32_t, uint32_t, Hash32>>("emilib3");
+#if HAVE_BOOST
+        run_udb2<boost::unordered_flat_map<uint32_t, uint32_t, Hash32>>("boost");
+#endif
+
 #if ABSL_HMAP
         run_udb2<absl::flat_hash_map<uint32_t, uint32_t, Hash32>>("absl");
 #endif
@@ -551,6 +558,11 @@ int main(int argc, char* argv[])
     run_table <emilib::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
     run_table <emilib2::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
     run_table <emilib3::HashMap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+
+#if HAVE_BOOST
+    run_table <boost::unordered_flat_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+#endif
+
     run_table <emhash6::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <emhash7::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);
     run_table <robin_hood::unordered_flat_map<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);

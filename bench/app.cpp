@@ -5,6 +5,9 @@
 #ifndef _WIN32
 #include <cxxabi.h>
 #endif
+#if HAVE_BOOST
+#include <boost/unordered/unordered_flat_map.hpp>
+#endif
 
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
@@ -14,7 +17,7 @@
 #include "hash_table5.hpp"
 #include "hash_set2.hpp"
 #include "hash_set4.hpp"
-#include "emilib/emilib.hpp"
+#include "emilib/emilib2o.hpp"
 #include "emilib/emiset.hpp"
 
 // https://github.com/Tessil/robin-map
@@ -325,7 +328,10 @@ int main(__attribute__((unused)) int argc,
     benchmarkMap<emhash5::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<emhash6::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<emhash7::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
-    benchmarkMap<emilib::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<emilib2::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
+#if HAVE_BOOST
+    benchmarkMap<boost::unordered_flat_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+#endif
 
     cout << "\n# Ordered Maps:" << endl;
     benchmarkMap<std::map<Sample, Sample>>(ulongArray, runCount);

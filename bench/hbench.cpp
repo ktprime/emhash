@@ -8,7 +8,7 @@
 #include "phmap/phmap.h"
 //#include "emilib/emilib33.hpp"
 #include "emilib/emilib.hpp"
-#include "emilib/emilib2.hpp"
+#include "emilib/emilib2o.hpp"
 //#include "patchmap/patchmap.hpp"
 
 
@@ -16,6 +16,10 @@
 #include "hash_table7.hpp"
 #include "hash_table5.hpp"
 //#include "old/hash_table2.hpp"
+
+#if HAVE_BOOST
+#include <boost/unordered/unordered_flat_map.hpp>
+#endif
 
 #ifdef _WIN32
 class Timer
@@ -370,6 +374,9 @@ int main()
     { robin_hood::unordered_flat_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_flat_map"); }
     { emilib::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib::HashMap"); }
     { emilib2::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib2::HashMap"); }
+#if HAVE_BOOST
+    { boost::unordered_flat_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nboost::unordered_flat_map"); }
+#endif
     { robin_hood::unordered_node_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_node_map"); }
 //    { emhash4::HashMap<uint64_t, Value, hash_t> m7; ret -= test(m7, "\nemhash4::HashMap"); }
 //    { emilib3::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib3::HashMap"); }

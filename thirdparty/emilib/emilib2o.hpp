@@ -375,8 +375,13 @@ public:
 
         _hasher     = other._hasher;
         if (is_copy_trivially()) {
-            _num_filled = _num_buckets = 0;
-            reserve(other._num_buckets / 2);
+            if (other._num_buckets != _num_buckets) {
+                _num_filled = _num_buckets = 0;
+                reserve(other._num_buckets / 2);
+            } else {
+                _num_buckets = other._num_buckets;
+                _mask = other._mask;
+            }
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
             clear();
@@ -387,8 +392,8 @@ public:
 
         //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
-        memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]));
-        memcpy(_states, other._states, (_num_buckets + simd_bytes) * sizeof(_states[0]));
+        //memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]));
+        memcpy(_states, other._states, (2 * _num_buckets + simd_bytes) * sizeof(_states[0]));
     }
 
     void swap(HashMap& other) noexcept

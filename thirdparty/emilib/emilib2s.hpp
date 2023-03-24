@@ -214,7 +214,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -292,7 +292,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (EMH_LIKELY(_bmask != 0)) {
+            if (_bmask != 0) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -381,8 +381,13 @@ public:
 
         _hasher     = other._hasher;
         if (is_copy_trivially()) {
-            _num_filled = _num_buckets = 0;
-            reserve(other._num_buckets / 2);
+            if (other._num_buckets != _num_buckets) {
+                _num_filled = _num_buckets = 0;
+                reserve(other._num_buckets / 2);
+            } else {
+                _num_buckets = other._num_buckets;
+                _mask = other._mask;
+            }
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
             clear();

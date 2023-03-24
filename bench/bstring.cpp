@@ -48,8 +48,8 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
     t1 = t2;
 }
 
-constexpr unsigned N = 2'000'000;
-constexpr int K = 10;
+static unsigned N = 2'000'000;
+static int K = 10;
 
 static std::vector<std::string> indices1, indices2;
 
@@ -103,7 +103,7 @@ template<class Map> BOOST_NOINLINE void test_insert( Map& map, std::chrono::stea
 
     for( unsigned i = 1; i <= N; ++i )
     {
-        map.insert( { indices2[ i ], i } );
+        map.emplace(  indices2[ i ], i  );
     }
 
     print_time( t1, "Random insert",  0, map.size() );
@@ -114,15 +114,14 @@ template<class Map> BOOST_NOINLINE void test_insert( Map& map, std::chrono::stea
 template<class Map> BOOST_NOINLINE void test_lookup( Map& map, std::chrono::steady_clock::time_point & t1 )
 {
     std::uint32_t s;
-    
+
     s = 0;
 
     for( int j = 0; j < K; ++j )
     {
         for( unsigned i = 1; i <= N * 2; ++i )
         {
-            auto it = map.find( indices1[ i ] );
-            if( it != map.end() ) s += it->second;
+            s += map.count( indices1[ i ] );
         }
     }
 
@@ -266,6 +265,7 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
 
     test_insert( map, t1 );
 
+    if (s_alloc_bytes > 0)
     std::cout << "Memory: " << s_alloc_bytes << " bytes in " << s_alloc_count << " allocations\n\n";
 
     record rec = { label, 0, s_alloc_bytes, s_alloc_count };
@@ -282,16 +282,16 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     times.push_back( rec );
 }
 
-#if ABSL_HASH
-    #define BstrHasher absl::Hash<K>
-#elif BOOST_HASH
+#if BOOST_HASH
     #define BstrHasher boost::hash<K>
 #elif HOOD_HASH
     #define BstrHasher robin_hood::hash<K>
-#elif CXX17
-    #define BstrHasher ankerl::unordered_dense::hash<K>
-#else
+#elif STD_HASH
     #define BstrHasher std::hash<K>
+#elif ABSL_HASH
+    #define BstrHasher absl::Hash<K>
+#else
+    #define BstrHasher ankerl::unordered_dense::hash<K>
 #endif
 
 // aliases using the counting allocator
@@ -425,11 +425,17 @@ template<class K, class V> using tsl_robin_pg_map_fnv1a =
 
 //
 
-int main()
+int main(int argc, const char* argv[])
 {
+    if (argc > 1 && isdigit(argv[1][0]))
+        N = atoi(argv[1]);
+    if (argc > 2 && isdigit(argv[2][0]))
+        K = atoi(argv[2]);
+
     init_indices();
 
-//    test<std_unordered_map>( "std::unordered_map" );
+    test<emilib3_map> ("emilib3_map" );
+    test<std_unordered_map>( "std::unordered_map" );
     test<emhash_map5>( "emhash5::hash_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
@@ -439,7 +445,6 @@ int main()
     test<martinus_flat>("martinus::flat_hash_map" );
 
     test<emilib2_map> ("emilib2_map" );
-    test<emilib3_map> ("emilib3_map" );
 
 #ifdef ABSL_HMAP
 
