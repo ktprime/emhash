@@ -378,15 +378,18 @@ public:
             clear();
             return;
         }
+        if (is_triviall_destructable()) {
+            clear();
+        }
 
-        _hasher     = other._hasher;
-        if (is_copy_trivially()) {
+        if (other._num_buckets != _num_buckets) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
+        }
+
+        if (is_copy_trivially()) {
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
-            clear();
-            reserve(other._num_buckets / 2);
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
         }
@@ -772,7 +775,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 4;
+        size_t required_buckets = num_elems + num_elems / 8;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 

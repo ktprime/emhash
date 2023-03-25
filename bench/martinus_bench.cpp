@@ -703,13 +703,14 @@ static void bench_copy(MAP& map)
     size_t result = 0;
     sfc64 rng(987);
 
-    map.max_load_factor(max_lf);
-    MAP mapSource(1'000'000);
-    mapSource.max_load_factor(max_lf);
+	constexpr int KN = 1000;
+	constexpr int KL = 1000;
+    MAP mapSource(1'000);
+//    mapSource.max_load_factor(max_lf);
     uint64_t rememberKey = 0;
-    for (size_t i = 0; i < 1'000'000; ++i) {
+    for (size_t i = 0; i < 200'000; ++i) {
         auto key = rng();
-        if (i == 500'000) {
+        if (i == 100'000) {
             rememberKey = key;
         }
         mapSource[key] = i;
@@ -717,24 +718,26 @@ static void bench_copy(MAP& map)
 
     auto nows = now2sec();
     MAP mapForCopy = mapSource;
-    for (size_t n = 0; n < 200; ++n) {
+    for (size_t n = 0; n < KL; ++n) {
         MAP m = mapForCopy;
         result += m.size() + m[rememberKey];
-        mapForCopy[rng()] = rng();
+        for (int i = 0; i < KN; i++) //with different load factor
+            mapForCopy[rng()] = rng();
     }
-    assert(result == 300019900);
+//    assert(result == 300019900);
     auto copyt = now2sec();
     printf(" copy = %.2f", copyt - nows);
-    mapForCopy = mapSource;
 
+    mapForCopy = mapSource;
     MAP m;
-    for (size_t n = 0; n < 200; ++n) {
+    for (size_t n = 0; n < KL; ++n) {
         m = mapForCopy;
         result += m.size() + m[rememberKey];
-        mapForCopy[rng()] = rng();
+        for (int i = 0; i < KN; i++)
+            mapForCopy[rng()] = rng();
     }
-    assert(result == 600039800);
-    printf(", assign time = %.2f s\n", now2sec() - copyt);
+//    assert(result == 600039800);
+    printf(", assign time = %.2f s, result = %ld\n", now2sec() - copyt, result);
 }
 
 template<class MAP>
@@ -1439,6 +1442,8 @@ static void runTest(int sflags, int eflags)
         typedef Int64Hasher<int> hash_func;
 #elif STD_HASH
         typedef std::hash<int> hash_func;
+#elif HOOD_HASH
+        typedef robin_hood::hash<int> hash_func;
 #else
         typedef robin_hood::hash<int> hash_func;
 #endif
@@ -1561,8 +1566,10 @@ static void runTest(int sflags, int eflags)
         typedef Int64Hasher<uint64_t> hash_func;
 #elif STD_HASH
         typedef std::hash<uint64_t> hash_func;
-#else
+#elif HOOD_HASH
         typedef robin_hood::hash<uint64_t> hash_func;
+#else
+        typedef ankerl::unordered_dense::hash<uint64_t> hash_func;
 #endif
         printf("bench_knucleotide:\n");
 
@@ -1621,8 +1628,10 @@ static void runTest(int sflags, int eflags)
         typedef Int64Hasher<uint32_t> hash_func;
 #elif STD_HASH
         typedef std::hash<uint32_t> hash_func;
-#else
+#elif HOOD_HASH
         typedef robin_hood::hash<uint32_t> hash_func;
+#else
+        typedef ankerl::unordered_dense::hash<uint32_t> hash_func;
 #endif
         printf("bench_GameOfLife:\n");
 

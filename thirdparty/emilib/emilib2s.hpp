@@ -149,7 +149,7 @@ public:
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
     {
         (void)key_hash;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 52) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
     }
 #endif
 
@@ -378,20 +378,18 @@ public:
             clear();
             return;
         }
+        if (is_triviall_destructable()) {
+            clear();
+        }
 
-        _hasher     = other._hasher;
+        if (other._num_buckets != _num_buckets) {
+            _num_filled = _num_buckets = 0;
+            reserve(other._num_buckets / 2);
+        }
+
         if (is_copy_trivially()) {
-            if (other._num_buckets != _num_buckets) {
-                _num_filled = _num_buckets = 0;
-                reserve(other._num_buckets / 2);
-            } else {
-                _num_buckets = other._num_buckets;
-                _mask = other._mask;
-            }
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
-            clear();
-            reserve(other._num_buckets / 2);
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
         }
@@ -480,25 +478,25 @@ public:
     // ------------------------------------------------------------
 
     template<typename K>
-    inline iterator find(const K& key) noexcept
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    inline const_iterator find(const K& key) const noexcept
+    const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    inline bool contains(const K& k) const noexcept
+    bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    inline size_t count(const K& k) const noexcept
+    size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
@@ -621,7 +619,8 @@ public:
         const auto key_hash = H1(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        _states[bucket] = key_2hash(key_hash, key);
+
+        set_states(bucket, key_2hash(key_hash, key));
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
     }
@@ -638,6 +637,20 @@ public:
         } else {
             _pairs[bucket].second = std::forward<V>(val);
         }
+    }
+
+    bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
+    {
+        check_expand_need();
+
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
+        /* Check if inserting a new value rather than overwriting an old entry */
+        if (bempty) {
+            new(_pairs + bucket) PairT(key,val); _num_filled++;
+        } else
+            oldv = _pairs[bucket].second;
+        return bempty;
     }
 
     ValueT& operator[](const KeyT& key) noexcept
@@ -697,8 +710,13 @@ public:
 
     inline uint8_t group_mask(size_t gbucket) const noexcept
     {
-        assert(stat_bytes >= simd_bytes);
+        //assert(gbucket % simd_bytes == 0);
         return _states[gbucket + simd_bytes - 1] % 4;
+    }
+
+    void set_states(size_t ebucket, uint8_t key_h2)
+    {
+        _states[ebucket] = key_h2;
     }
 
     void _erase(size_t bucket) noexcept
@@ -825,7 +843,7 @@ public:
                 collision += _states[key_hash & _mask] % 2 == State::EFILLED;
 #endif
 
-                _states[dst_bucket] = key_2hash(key_hash, src_pair.first);
+                set_states(dst_bucket, key_2hash(key_hash, src_pair.first));
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 _num_filled += 1;
                 src_pair.~PairT();
@@ -934,8 +952,7 @@ private:
                 const int doffset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(doffset > _max_probe_length))
                     _max_probe_length = doffset / simd_bytes * simd_bytes + simd_bytes - 1;
-
-                _states[ebucket] = key_h2;
+               set_states(ebucket, key_h2);
                 return ebucket;
             }
 
@@ -950,7 +967,7 @@ private:
             next_bucket = (next_bucket + simd_bytes) & _mask;
             if (EMH_UNLIKELY((offset += simd_bytes) > round)) {
                 if (EMH_LIKELY(hole != (size_t)-1)) {
-                    _states[hole] = key_h2;
+                    set_states(hole, key_h2);
                     return hole;
                 }
                 break;
@@ -958,7 +975,7 @@ private:
         }
 
         const auto ebucket = find_empty_slot(next_bucket, offset - bucket);
-        _states[ebucket] = key_h2;
+        set_states(ebucket, key_h2);
         return ebucket;
     }
 

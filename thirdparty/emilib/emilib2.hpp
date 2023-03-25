@@ -372,15 +372,18 @@ public:
             clear();
             return;
         }
+        if (is_triviall_destructable()) {
+            clear();
+        }
 
-        _hasher     = other._hasher;
-        if (is_copy_trivially()) {
+        if (other._num_buckets != _num_buckets) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
+        }
+
+        if (is_copy_trivially()) {
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
-            clear();
-            reserve(other._num_buckets / 2);
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
         }
@@ -461,7 +464,7 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    inline float max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 8.0f/9)
     {
         return 7/8.0f;
     }
@@ -469,25 +472,25 @@ public:
     // ------------------------------------------------------------
 
     template<typename K>
-    inline iterator find(const K& key) noexcept
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    inline const_iterator find(const K& key) const noexcept
+    const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    inline bool contains(const K& k) const noexcept
+    bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    inline size_t count(const K& k) const noexcept
+    size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
@@ -610,7 +613,6 @@ public:
         const auto key_hash = _hasher(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
-        //_states[bucket] = hash_key2(key_hash, key);
         set_states(bucket, hash_key2(key_hash, key));
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
@@ -635,6 +637,20 @@ public:
         }
 
         return { {this, bucket, false}, bempty };
+    }
+
+    bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
+    {
+        check_expand_need();
+
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
+        /* Check if inserting a new value rather than overwriting an old entry */
+        if (bempty) {
+            new(_pairs + bucket) PairT(key,val); _num_filled++;
+        } else
+            oldv = _pairs[bucket].second;
+        return bempty;
     }
 
     ValueT& operator[](const KeyT& key) noexcept
@@ -1027,6 +1043,16 @@ private:
             next_bucket += simd_bytes;
         }
         return 0;
+    }
+
+    inline size_t H1(const KeyT& key) const noexcept
+    {
+#ifdef EMH_H3
+        const auto key_hash = _hasher(key);
+        return (key_hash >> 7) ^ (reinterpret_cast<uintptr_t>(_states) >> 12);
+#else
+        return (size_t)_hasher(key);
+#endif
     }
 
 private:

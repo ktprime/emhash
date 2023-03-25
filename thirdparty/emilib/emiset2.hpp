@@ -316,14 +316,18 @@ public:
             return;
         }
 
-        _hasher     = other._hasher;
-        if (is_copy_trivially()) {
+        if (is_triviall_destructable()) {
+            clear();
+        }
+
+        if (other._num_buckets != _num_buckets) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
+        }
+
+        if (is_copy_trivially()) {
             memcpy(_keys,  other._keys,  _num_buckets * sizeof(_keys[0]));
         } else {
-            clear();
-            reserve(other._num_buckets / 2);
             for (auto it = other.cbegin();  it != other.cend(); ++it)
                 new(_keys + it.bucket()) KeyT(*it);
         }
@@ -384,7 +388,7 @@ public:
 
     bool empty() const
     {
-        return _num_filled==0;
+        return _num_filled == 0;
     }
 
     // Returns the number of buckets.
@@ -399,8 +403,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    void max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 8.0f/9)
     {
+        return 7/8.0f;
     }
 
     // ------------------------------------------------------------
