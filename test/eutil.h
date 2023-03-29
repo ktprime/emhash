@@ -25,7 +25,7 @@
     #define NOMINMAX
     #endif
     # include <windows.h>
-
+    #pragma warning(disable : 4996)
 #else
     # include <unistd.h>
     # include <sys/resource.h>

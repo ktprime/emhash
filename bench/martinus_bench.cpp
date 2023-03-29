@@ -32,8 +32,8 @@
 #endif
 
 #if X86
-    #include "emilib/emilib3so.hpp"
     #include "emilib/emilib2s.hpp"
+    #include "emilib/emilib3so.hpp"
     #include "emilib/emilib2o.hpp"
 #endif
 
@@ -65,7 +65,7 @@ static std::map<std::string, std::string> show_name =
    {"emhash8", "emhash8"},
    {"emhash5", "emhash5"},
 #if X86
-//    {"emilib", "emilibo"},
+//    {"emilib", "emilib"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
     {"hrd_m", "hrdm"},
@@ -1585,7 +1585,7 @@ static void runTest(int sflags, int eflags)
 #if HAVE_BOOST
         { boost::unordered_flat_map <uint64_t, uint32_t, hash_func> hmap; bench_knucleotide(hmap); }
 #endif
-#if ABSL
+#if ABSL_HMAP
         { absl::flat_hash_map <uint64_t, uint32_t, hash_func> pmap; bench_knucleotide(pmap); }
 #endif
 
@@ -1652,7 +1652,7 @@ static void runTest(int sflags, int eflags)
 #if HAVE_BOOST
         { boost::unordered_flat_map <uint32_t, bool, hash_func> hmap; bench_GameOfLife(hmap); }
 #endif
-#if ABSL
+#if ABSL_HMAP
         { absl::flat_hash_map <uint32_t, bool, hash_func> pmap; bench_GameOfLife(pmap); }
 #endif
 

@@ -346,6 +346,9 @@ int main(int argc, const char* argv[])
     init_indices();
 
 
+    test<emilib_map3> ("emilib_map3" );
+    test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+    test<emilib_map2> ("emilib_map2" );
 #if ABSL_HMAP
     test<absl_flat_hash_map>("absl::flat_hash_map" );
 #endif
@@ -357,17 +360,14 @@ int main(int argc, const char* argv[])
 #endif
     test<emhash_map8> ("emhash_map8" );
     test<martinus_dense>("martinus_dense" );
-    test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
     test<emhash_map7> ("emhash_map7" );
     test<tsl_robin_map> ("tsl_robin_map" );
     test<phmap_flat> ("phmap_flat" );
+    test<martinus_flat> ("martinus_flat" );
 
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6> ("emhash_map6" );
-    test<martinus_flat> ("martinus_flat" );
-    test<emilib_map2> ("emilib_map2" );
-    test<emilib_map3> ("emilib_map3" );
 
     std::cout << "---\n\n";
 

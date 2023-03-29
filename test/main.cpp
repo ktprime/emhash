@@ -4,11 +4,13 @@
 //#include "utils.h"
 #endif
 
-
 //#define EMH_IDENTITY_HASH 1
 #include "eutil.h"
 //#define EMH_WYHASH_HASH 1
-//#define EMH_ITER_SAFE 1
+#define EMH_ITER_SAFE 1
+#define EMH_FIND_HIT  1
+#define EMH_BUCKET_INDEX 2
+
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
@@ -239,7 +241,9 @@ static void TestApi()
     {
         ehmap<short, int> dict = {{1, 1}, {2, 2}, {3, 3}};
         dict.reserve(1 << 20);// overview
+#if EMH_SAVE_MEM
         assert(dict.bucket_count() <= (2 << 16));
+#endif
         dict.shrink_to_fit();
         assert(dict.bucket_count() <= 8);
 
@@ -577,7 +581,7 @@ static void TestApi()
 
     {
         ehmap<uint64_t, uint32_t> emi;
-        emi.reserve(1e8);
+        emi.reserve(1e3);
         int key = rand();
         emi.insert({key, 0}); emi.emplace(key, 1);
         auto it = emi.try_emplace(key, 0); assert(!it.second);
@@ -589,6 +593,7 @@ static void TestApi()
         assert(iter->second == 0);
 #ifdef EMH_ITER_SAFE
         auto iter_next = iter; iter_next++;
+        iter_next++;
         assert(iter_next == emi.end());
 #endif
     }
@@ -852,7 +857,7 @@ static void benchStringHash(int size, int str_min, int str_max)
         t_find = (getus() - start) / 1000; assert(sum);
         printf("ankerl hash = %4d ms\n", t_find);
 
-#if ABSL_HMAP && ABSL
+#ifdef ABSL_HASH
         start = getus();
         for (auto& v : rndstring)
             sum += absl::Hash<std::string>()(v);

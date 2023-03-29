@@ -27,7 +27,7 @@
     #define NOMINMAX
     #endif
     # include <windows.h>
-
+    # pragma warning(disable : 4996)
 #else
     # include <unistd.h>
     # include <sys/resource.h>
@@ -690,10 +690,12 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE3 1
 #define  ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSSE2 1
 #endif
-#define ABSL 1
+
+#if ABSL_HMAP
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/internal/raw_hash_set.cc"
+#endif
 
 #if ABSL_HASH
 #include "absl/hash/internal/low_level_hash.cc"
@@ -704,7 +706,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #if __cplusplus > 201402L || CXX17 || _MSC_VER > 1730
 #define CXX17 1
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
-#include "fph/meta_fph_table.h" //https://github.com/renzibei/fph-table
+#include "fph/meta_fph_table.h"
 #endif
 
 #if __cplusplus > 201704L || CXX20 || _MSC_VER >= 1929

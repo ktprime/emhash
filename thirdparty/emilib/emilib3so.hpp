@@ -149,7 +149,7 @@ public:
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
     {
         (void)key_hash;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 52) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
     }
 #endif
 
@@ -639,6 +639,20 @@ public:
         }
     }
 
+    bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
+    {
+        check_expand_need();
+
+        bool bempty = true;
+        const auto bucket = find_or_allocate(key, bempty);
+        /* Check if inserting a new value rather than overwriting an old entry */
+        if (bempty) {
+            new(_pairs + bucket) PairT(key,val); _num_filled++;
+        } else
+            oldv = _pairs[bucket].second;
+        return bempty;
+    }
+
     ValueT& operator[](const KeyT& key) noexcept
     {
         bool bempty = true;
@@ -1055,7 +1069,6 @@ private:
     size_t  _num_buckets      = 0;
     size_t  _mask             = 0; // _num_buckets minus one
     size_t  _num_filled       = 0;
-    int     _max_probe_length = -1; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };
 
 } // namespace emilib

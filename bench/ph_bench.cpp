@@ -15,7 +15,7 @@
     #include "hash_table6.hpp"
     #define MAPNAME emhash6::HashMap
     #define EXTRAARGS
-#elif ABSL
+#elif ABSL_HMAP
 #include "absl/hash/internal/low_level_hash.cc"
 #include "absl/hash/internal/hash.cc"
 #include "absl/hash/internal/city.cc"
