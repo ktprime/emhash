@@ -779,4 +779,26 @@
 #define ABSL_ATTRIBUTE_TRIVIAL_ABI
 #endif
 
+// ABSL_ATTRIBUTE_NO_UNIQUE_ADDRESS
+//
+// Indicates a data member can be optimized to occupy no space (if it is empty)
+// and/or its tail padding can be used for other members.
+//
+// For code that is assured to only build with C++20 or later, prefer using
+// the standard attribute `[[no_unique_address]]` directly instead of this
+// macro.
+//
+// https://devblogs.microsoft.com/cppblog/msvc-cpp20-and-the-std-cpp20-switch/#c20-no_unique_address
+// Current versions of MSVC have disabled `[[no_unique_address]]` since it
+// breaks ABI compatibility, but offers `[[msvc::no_unique_address]]` for
+// situations when it can be assured that it is desired. Since Abseil does not
+// claim ABI compatibility in mixed builds, we can offer it unconditionally.
+#if defined(_MSC_VER) && _MSC_VER >= 1929
+#define ABSL_ATTRIBUTE_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#elif ABSL_HAVE_CPP_ATTRIBUTE(no_unique_address)
+#define ABSL_ATTRIBUTE_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#else
+#define ABSL_ATTRIBUTE_NO_UNIQUE_ADDRESS
+#endif
+
 #endif  // ABSL_BASE_ATTRIBUTES_H_

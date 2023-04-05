@@ -896,6 +896,8 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if EMH_PREFETCH
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+#elif _WIN32
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
     }
 
@@ -912,8 +914,6 @@ private:
         auto next_bucket = (size_t)(key_hash & _mask);
         const auto bucket = next_bucket;
 
-        prefetch_heap_block((char*)_states + next_bucket);
-
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         size_t offset = 0;
 
@@ -923,6 +923,7 @@ private:
 
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
+                //prefetch_heap_block((char*)&_pairs[fbucket]);
                 if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                     return fbucket;
                 maskf &= maskf - 1;
@@ -935,7 +936,7 @@ private:
             if (maske != 0)
                 break;
 
-            if (++offset > _offset[bucket])
+            else if (++offset > _offset[bucket])
                 break;
 
             next_bucket += simd_bytes;
@@ -956,7 +957,6 @@ private:
         const auto key_hash = _hasher(key);
         const auto key_h2 = hash_key2(key_hash, key);
         const auto bucket = (size_t)(key_hash & _mask);
-        prefetch_heap_block((char*)_states + bucket);
 
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket  = bucket, offset = 0u;
@@ -969,6 +969,7 @@ private:
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
+                //prefetch_heap_block((char*)&_pairs[fbucket]);
                 if (_eq(_pairs[fbucket].first, key)) {
                     bnew = false;
                     return fbucket;

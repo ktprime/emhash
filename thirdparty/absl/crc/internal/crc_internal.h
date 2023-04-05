@@ -64,7 +64,7 @@ class CRCImpl : public CRC {  // Implemention of the abstract class CRC
  public:
   using Uint32By256 = uint32_t[256];
 
-  CRCImpl() {}
+  CRCImpl() = default;
   ~CRCImpl() override = default;
 
   // The internal version of CRC::New().
@@ -96,8 +96,8 @@ class CRCImpl : public CRC {  // Implemention of the abstract class CRC
 // This is the 32-bit implementation.  It handles all sizes from 8 to 32.
 class CRC32 : public CRCImpl {
  public:
-  CRC32() {}
-  ~CRC32() override {}
+  CRC32() = default;
+  ~CRC32() override = default;
 
   void Extend(uint32_t* crc, const void* bytes, size_t length) const override;
   void ExtendByZeroes(uint32_t* crc, size_t length) const override;
@@ -118,9 +118,9 @@ class CRC32 : public CRCImpl {
   //
   // These will be set to reverse_zeroes_ and reverse_table0_ for Unextend, and
   // CRC32::zeroes_ and CRC32::table0_ for Extend.
-  void ExtendByZeroesImpl(uint32_t* crc, size_t length,
-                          const uint32_t zeroes_table[256],
-                          const uint32_t poly_table[256]) const;
+  static void ExtendByZeroesImpl(uint32_t* crc, size_t length,
+                                 const uint32_t zeroes_table[256],
+                                 const uint32_t poly_table[256]);
 
   uint32_t table0_[256];  // table of byte extensions
   uint32_t zeroes_[256];  // table of zero extensions

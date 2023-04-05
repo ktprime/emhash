@@ -187,7 +187,12 @@ class Duration {
   Duration& operator%=(Duration rhs);
 
   // Overloads that forward to either the int64_t or double overloads above.
-  // Integer operands must be representable as int64_t.
+  // Integer operands must be representable as int64_t. Integer division is
+  // truncating, so values less than the resolution will be returned as zero.
+  // Floating-point multiplication and division is rounding (halfway cases
+  // rounding away from zero), so values less than the resolution may be
+  // returned as either the resolution or zero.  In particular, `d / 2.0`
+  // can produce `d` when it is the resolution and "even".
   template <typename T, time_internal::EnableIfIntegral<T> = 0>
   Duration& operator*=(T r) {
     int64_t x = r;
@@ -607,6 +612,12 @@ ABSL_ATTRIBUTE_CONST_FUNCTION std::string FormatDuration(Duration d);
 // Output stream operator.
 inline std::ostream& operator<<(std::ostream& os, Duration d) {
   return os << FormatDuration(d);
+}
+
+// Support for StrFormat(), StrCat() etc.
+template <typename Sink>
+void AbslStringify(Sink& sink, Duration d) {
+  sink.Append(FormatDuration(d));
 }
 
 // ParseDuration()
@@ -1384,6 +1395,12 @@ ABSL_ATTRIBUTE_PURE_FUNCTION std::string FormatTime(Time t);
 // Output stream operator.
 inline std::ostream& operator<<(std::ostream& os, Time t) {
   return os << FormatTime(t);
+}
+
+// Support for StrFormat(), StrCat() etc.
+template <typename Sink>
+void AbslStringify(Sink& sink, Time t) {
+  sink.Append(FormatTime(t));
 }
 
 // ParseTime()

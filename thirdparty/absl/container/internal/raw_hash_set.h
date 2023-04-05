@@ -186,7 +186,7 @@
 
 #include "absl/base/config.h"
 #include "absl/base/internal/endian.h"
-//#include "absl/base/internal/raw_logging.h"
+#include "absl/base/internal/raw_logging.h"
 #include "absl/base/optimization.h"
 #include "absl/base/port.h"
 #include "absl/base/prefetch.h"
@@ -194,7 +194,7 @@
 #include "absl/container/internal/compressed_tuple.h"
 #include "absl/container/internal/container_memory.h"
 #include "absl/container/internal/hash_policy_traits.h"
-//#include "absl/container/internal/hashtable_debug_hooks.h"
+#include "absl/container/internal/hashtable_debug_hooks.h"
 #include "absl/container/internal/hashtablez_sampler.h"
 #include "absl/memory/memory.h"
 #include "absl/meta/type_traits.h"
@@ -2093,15 +2093,14 @@ class raw_hash_set {
   //     m.erase(copy_it);
   //   }
   // }
-  iterator erase(const_iterator cit) { return erase(cit.inner_); }
+  void erase(const_iterator cit) { erase(cit.inner_); }
 
   // This overload is necessary because otherwise erase<K>(const K&) would be
   // a better match if non-const iterator is passed as an argument.
-  iterator erase(iterator it) {
+  void erase(iterator it) {
     AssertIsFull(it.ctrl_, it.generation(), it.generation_ptr(), "erase()");
     PolicyTraits::destroy(&alloc_ref(), it.slot_);
     erase_meta_only(it);
-    return ++it;
   }
 
   iterator erase(const_iterator first, const_iterator last) {
@@ -2327,8 +2326,8 @@ class raw_hash_set {
 
  private:
   template <class Container, typename Enabler>
-//  friend struct absl::container_internal::hashtable_debug_internal::
-//      HashtableDebugAccess;
+  friend struct absl::container_internal::hashtable_debug_internal::
+      HashtableDebugAccess;
 
   struct FindElement {
     template <class K, class... Args>
@@ -2718,7 +2717,6 @@ typename raw_hash_set<P, H, E, A>::size_type EraseIf(
   return initial_size - c->size();
 }
 
-#if 0
 namespace hashtable_debug_internal {
 template <typename Set>
 struct HashtableDebugAccess<Set, absl::void_t<typename Set::raw_hash_set>> {
@@ -2780,7 +2778,6 @@ struct HashtableDebugAccess<Set, absl::void_t<typename Set::raw_hash_set>> {
 };
 
 }  // namespace hashtable_debug_internal
-#endif
 }  // namespace container_internal
 ABSL_NAMESPACE_END
 }  // namespace absl

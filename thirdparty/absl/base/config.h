@@ -237,15 +237,8 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE
 //
 // Checks whether `std::is_trivially_destructible<T>` is supported.
-//
-// Notes: All supported compilers using libc++ support this feature, as does
-// gcc >= 4.8.1 using libstdc++, and Visual Studio.
 #ifdef ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE
 #error ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE cannot be directly set
-#elif defined(_LIBCPP_VERSION) || defined(_MSC_VER) || \
-    (defined(__clang__) && __clang_major__ >= 15) ||   \
-    (!defined(__clang__) && defined(__GLIBCXX__) &&    \
-     ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(4, 8))
 #define ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE 1
 #endif
 
@@ -253,36 +246,26 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 //
 // Checks whether `std::is_trivially_default_constructible<T>` and
 // `std::is_trivially_copy_constructible<T>` are supported.
+#ifdef ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE
+#error ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE cannot be directly set
+#else
+#define ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE 1
+#endif
 
 // ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE
 //
 // Checks whether `std::is_trivially_copy_assignable<T>` is supported.
-
-// Notes: Clang with libc++ supports these features, as does gcc >= 7.4 with
-// libstdc++, or gcc >= 8.2 with libc++, and Visual Studio (but not NVCC).
-#if defined(ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE)
-#error ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE cannot be directly set
-#elif defined(ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE)
-#error ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE cannot directly set
-#elif (defined(__clang__) && defined(_LIBCPP_VERSION)) ||                    \
-    (defined(__clang__) && __clang_major__ >= 15) ||                         \
-    (!defined(__clang__) &&                                                  \
-     ((ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(7, 4) && defined(__GLIBCXX__)) || \
-      (ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(8, 2) &&                          \
-       defined(_LIBCPP_VERSION)))) ||                                        \
-    (defined(_MSC_VER) && !defined(__NVCC__) && !defined(__clang__))
-#define ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE 1
+#ifdef ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE
+#error ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE cannot be directly set
+#else
 #define ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE 1
 #endif
 
 // ABSL_HAVE_STD_IS_TRIVIALLY_COPYABLE
 //
 // Checks whether `std::is_trivially_copyable<T>` is supported.
-//
-// Notes: Clang 15+ with libc++ supports these features, GCC hasn't been tested.
-#if defined(ABSL_HAVE_STD_IS_TRIVIALLY_COPYABLE)
+#ifdef ABSL_HAVE_STD_IS_TRIVIALLY_COPYABLE
 #error ABSL_HAVE_STD_IS_TRIVIALLY_COPYABLE cannot be directly set
-#elif defined(__clang__) && (__clang_major__ >= 15)
 #define ABSL_HAVE_STD_IS_TRIVIALLY_COPYABLE 1
 #endif
 
@@ -816,6 +799,20 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #define ABSL_HAVE_HWADDRESS_SANITIZER 1
 #endif
 
+// ABSL_HAVE_DATAFLOW_SANITIZER
+//
+// Dataflow Sanitizer (or DFSAN) is a generalised dynamic data flow analysis.
+#ifdef ABSL_HAVE_DATAFLOW_SANITIZER
+#error "ABSL_HAVE_DATAFLOW_SANITIZER cannot be directly set."
+#elif defined(DATAFLOW_SANITIZER)
+// GCC provides no method for detecting the presence of the standalone
+// DataFlowSanitizer (-fsanitize=dataflow), so GCC users of -fsanitize=dataflow
+// should also use -DDATAFLOW_SANITIZER.
+#define ABSL_HAVE_DATAFLOW_SANITIZER 1
+#elif ABSL_HAVE_FEATURE(dataflow_sanitizer)
+#define ABSL_HAVE_DATAFLOW_SANITIZER 1
+#endif
+
 // ABSL_HAVE_LEAK_SANITIZER
 //
 // LeakSanitizer (or lsan) is a detector of memory leaks.
@@ -830,7 +827,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #ifdef ABSL_HAVE_LEAK_SANITIZER
 #error "ABSL_HAVE_LEAK_SANITIZER cannot be directly set."
 #elif defined(LEAK_SANITIZER)
-// GCC provides no method for detecting the presense of the standalone
+// GCC provides no method for detecting the presence of the standalone
 // LeakSanitizer (-fsanitize=leak), so GCC users of -fsanitize=leak should also
 // use -DLEAK_SANITIZER.
 #define ABSL_HAVE_LEAK_SANITIZER 1
@@ -878,7 +875,9 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // RTTI support.
 #ifdef ABSL_INTERNAL_HAS_RTTI
 #error ABSL_INTERNAL_HAS_RTTI cannot be directly set
-#elif !defined(__GNUC__) || defined(__GXX_RTTI)
+#elif (defined(__GNUC__) && defined(__GXX_RTTI)) || \
+    (defined(_MSC_VER) && defined(_CPPRTTI)) ||     \
+    (!defined(__GNUC__) && !defined(_MSC_VER))
 #define ABSL_INTERNAL_HAS_RTTI 1
 #endif  // !defined(__GNUC__) || defined(__GXX_RTTI)
 
@@ -889,7 +888,8 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #error ABSL_INTERNAL_HAVE_SSE cannot be directly set
 #elif defined(__SSE__)
 #define ABSL_INTERNAL_HAVE_SSE 1
-#elif defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#elif (defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)) && \
+    !defined(_M_ARM64EC)
 // MSVC only defines _M_IX86_FP for x86 32-bit code, and _M_IX86_FP >= 1
 // indicates that at least SSE was targeted with the /arch:SSE option.
 // All x86-64 processors support SSE, so support can be assumed.
@@ -904,7 +904,8 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #error ABSL_INTERNAL_HAVE_SSE2 cannot be directly set
 #elif defined(__SSE2__)
 #define ABSL_INTERNAL_HAVE_SSE2 1
-#elif defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#elif (defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)) && \
+    !defined(_M_ARM64EC)
 // MSVC only defines _M_IX86_FP for x86 32-bit code, and _M_IX86_FP >= 2
 // indicates that at least SSE2 was targeted with the /arch:SSE2 option.
 // All x86-64 processors support SSE2, so support can be assumed.

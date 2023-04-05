@@ -56,6 +56,10 @@
 #include "absl/types/variant.h"
 #include "absl/utility/utility.h"
 
+#ifdef ABSL_HAVE_STD_STRING_VIEW
+#include <string_view>
+#endif
+
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
@@ -516,14 +520,15 @@ H AbslHashValue(H hash_state, const std::shared_ptr<T>& ptr) {
 // the same character sequence. These types are:
 //
 //  - `absl::Cord`
-//  - `std::string` (and std::basic_string<char, std::char_traits<char>, A> for
-//      any allocator A)
-//  - `absl::string_view` and `std::string_view`
+//  - `std::string` (and std::basic_string<T, std::char_traits<T>, A> for
+//      any allocator A and any T in {char, wchar_t, char16_t, char32_t})
+//  - `absl::string_view`, `std::string_view`, `std::wstring_view`,
+//    `std::u16string_view`, and `std::u32_string_view`.
 //
-// For simplicity, we currently support only `char` strings. This support may
-// be broadened, if necessary, but with some caution - this overload would
-// misbehave in cases where the traits' `eq()` member isn't equivalent to `==`
-// on the underlying character type.
+// For simplicity, we currently support only strings built on `char`, `wchar_t`,
+// `char16_t`, or `char32_t`. This support may be broadened, if necessary, but
+// with some caution - this overload would misbehave in cases where the traits'
+// `eq()` member isn't equivalent to `==` on the underlying character type.
 template <typename H>
 H AbslHashValue(H hash_state, absl::string_view str) {
   return H::combine(
@@ -543,6 +548,21 @@ H AbslHashValue(
       H::combine_contiguous(std::move(hash_state), str.data(), str.size()),
       str.size());
 }
+
+#ifdef ABSL_HAVE_STD_STRING_VIEW
+
+// Support std::wstring_view, std::u16string_view and std::u32string_view.
+template <typename Char, typename H,
+          typename = absl::enable_if_t<std::is_same<Char, wchar_t>::value ||
+                                       std::is_same<Char, char16_t>::value ||
+                                       std::is_same<Char, char32_t>::value>>
+H AbslHashValue(H hash_state, std::basic_string_view<Char> str) {
+  return H::combine(
+      H::combine_contiguous(std::move(hash_state), str.data(), str.size()),
+      str.size());
+}
+
+#endif  // ABSL_HAVE_STD_STRING_VIEW
 
 // -----------------------------------------------------------------------------
 // AbslHashValue for Sequence Containers
@@ -969,7 +989,8 @@ class ABSL_DLL MixingHashState : public HashStateBase<MixingHashState> {
   // The result should be the same as running the whole algorithm, but faster.
   template <typename T, absl::enable_if_t<IntegralFastPath<T>::value, int> = 0>
   static size_t hash(T value) {
-    return static_cast<size_t>(Mix(Seed(), static_cast<uint64_t>(value)));
+    return static_cast<size_t>(
+        Mix(Seed(), static_cast<std::make_unsigned_t<T>>(value)));
   }
 
   // Overload of MixingHashState::hash()
@@ -1073,6 +1094,7 @@ class ABSL_DLL MixingHashState : public HashStateBase<MixingHashState> {
 
   // Reads 1 to 3 bytes from p. Zero pads to fill uint32_t.
   static uint32_t Read1To3(const unsigned char* p, size_t len) {
+    // The trick used by this implementation is to avoid branches if possible.
     unsigned char mem0 = p[0];
     unsigned char mem1 = p[len / 2];
     unsigned char mem2 = p[len - 1];
@@ -1082,7 +1104,7 @@ class ABSL_DLL MixingHashState : public HashStateBase<MixingHashState> {
     unsigned char significant0 = mem0;
 #else
     unsigned char significant2 = mem0;
-    unsigned char significant1 = mem1;
+    unsigned char significant1 = len == 2 ? mem0 : mem1;
     unsigned char significant0 = mem2;
 #endif
     return static_cast<uint32_t>(significant0 |                     //
@@ -1135,7 +1157,8 @@ class ABSL_DLL MixingHashState : public HashStateBase<MixingHashState> {
   // probably per-build and not per-process.
   ABSL_ATTRIBUTE_ALWAYS_INLINE static uint64_t Seed() {
 #if (!defined(__clang__) || __clang_major__ > 11) && \
-    !defined(__apple_build_version__)
+    (!defined(__apple_build_version__) ||            \
+     __apple_build_version__ >= 19558921)  // Xcode 12
     return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&kSeed));
 #else
     // Workaround the absence of
