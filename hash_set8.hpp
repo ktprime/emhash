@@ -679,6 +679,7 @@ public:
     template <class... Args>
     iterator emplace_hint(const_iterator hint, Args&&... args)
     {
+        (void)hint;
         check_expand_need();
         return do_insert(std::forward<Args>(args)...).first;
     }
@@ -809,6 +810,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems, bool force)
     {
+        (void)force;
         const auto required_buckets = (uint32_t)(num_elems * _mlf >> 27);
         if (EMH_LIKELY(required_buckets < _mask)) // && !force
             return false;
@@ -1203,9 +1205,9 @@ private:
 
         //find next linked bucket and check key
         while (true) {
-            const auto slot = EMH_SLOT(_index, next_bucket);
+            const auto slot2 = EMH_SLOT(_index, next_bucket);
             if (EMH_UNLIKELY(EMH_EQHASH(next_bucket, key_hash))) {
-                if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))
+                if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot2))))
                 return next_bucket;
             }
 
