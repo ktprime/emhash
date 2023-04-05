@@ -783,13 +783,14 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
         sum += ht_hash.erase(v);
 
 #if QC_HASH == 0
-    int flag = 0;
-    for (auto it = tmp.begin(); it != tmp.end(); ) {
-       if (++flag & 1)
-           it = tmp.erase(it);
-       else
-           ++it;
-    }
+	for (auto it = tmp.begin(); it != tmp.end(); ) {
+		if constexpr( std::is_void_v< decltype( tmp.erase( it ) ) > ) {
+			tmp.erase( it++ );
+		} else {
+			it = tmp.erase(it);
+		}
+		sum += 1;
+	}
 #endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }

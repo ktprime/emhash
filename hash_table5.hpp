@@ -831,7 +831,6 @@ public:
         }
     }
 
-#ifdef EMH_EXT
     /// Return the old value or ValueT() if it didn't exist.
     ValueT set_get(const KeyT& key, const ValueT& val)
     {
@@ -848,6 +847,7 @@ public:
         }
     }
 
+#ifdef EMH_EXT
     /// Returns the matching ValueT or nullptr if k isn't found.
     bool try_get(const KeyT& key, ValueT& val) const
     {
@@ -1079,6 +1079,7 @@ public:
         return do_insert(std::move(value)).first;
     }
 
+#if 0
     //TODO: fix tuple
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
@@ -1103,6 +1104,7 @@ public:
         }
         return { {this, bucket}, bempty };
     }
+#endif
 
     template<class... Args>
     iterator try_emplace(const_iterator hint, const KeyT& key, Args&&... args)

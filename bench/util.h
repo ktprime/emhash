@@ -62,7 +62,7 @@
     #define PHMAP_NON_DETERMINISTIC               1
 #endif
 
-#if X86
+#if X64
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
 #endif

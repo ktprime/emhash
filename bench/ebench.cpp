@@ -5,7 +5,7 @@
     #define TKey              1
 #endif
 #ifndef TVal
-    #define TVal              1
+    #define TVal              0
 #endif
 
 #if __GNUC__ > 4 && __linux__
@@ -78,9 +78,9 @@ std::map<std::string, std::string> maps =
 };
 
 
-//rand data type
+//rand data 3ype
 #ifndef RT
-    #define RT 1 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 3 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP     1
@@ -362,7 +362,7 @@ static void check_func_result(const std::string& hash_name, const std::string& f
     }
 }
 
-static void inline hash_convert(const std::map<std::string, int64_t>& hash_score, std::multimap <int64_t, std::string>& score_hash)
+static void hash_convert(const std::map<std::string, int64_t>& hash_score, std::multimap <int64_t, std::string>& score_hash)
 {
     for (const auto& v : hash_score)
         score_hash.emplace(v.second, v.first);
@@ -538,7 +538,7 @@ void iter_all(const hash_type& ht_hash, const std::string& hash_name)
 }
 
 template<class hash_type>
-void erase_50_reinsert(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void erase_50_reinsert(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -553,7 +553,7 @@ void erase_50_reinsert(hash_type& ht_hash, const std::string& hash_name, const s
 }
 
 template<class hash_type>
-void insert_erase(const std::string& hash_name, const std::vector<keyType>& vList)
+static void insert_erase(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum(0);
@@ -596,7 +596,7 @@ void insert_erase(const std::string& hash_name, const std::vector<keyType>& vLis
 }
 
 template<class hash_type>
-void insert_no_reserve(const std::string& hash_name, const std::vector<keyType>& vList)
+static void insert_no_reserve(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
@@ -613,7 +613,7 @@ void insert_no_reserve(const std::string& hash_name, const std::vector<keyType>&
 }
 
 template<class hash_type>
-void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
 #ifndef SMAP
@@ -627,7 +627,7 @@ void insert_reserve(hash_type& ht_hash, const std::string& hash_name, const std:
 }
 
 template<class hash_type>
-void insert_hit(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void insert_hit(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -637,7 +637,7 @@ void insert_hit(hash_type& ht_hash, const std::string& hash_name, const std::vec
 }
 
 template<class hash_type>
-void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& vList)
+static void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& vList)
 {
 #if KEY_INT
     size_t sum = 0;
@@ -686,7 +686,7 @@ void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& v
 }
 
 template<class hash_type>
-void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
+static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 1;
     hash_type tmp(ht_hash);
@@ -717,7 +717,7 @@ void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, s
 }
 
 template<class hash_type>
-void insert_cache_size(const std::string& hash_name, const std::vector<keyType>& vList, const char* level, const uint32_t cache_size, const uint32_t min_size)
+static void insert_cache_size(const std::string& hash_name, const std::vector<keyType>& vList, const char* level, const uint32_t cache_size, const uint32_t min_size)
 {
     const auto lsize = cache_size + vList.size() % min_size;
     hash_type tmp, empty;
@@ -739,7 +739,7 @@ void insert_cache_size(const std::string& hash_name, const std::vector<keyType>&
 }
 
 template<class hash_type>
-void insert_high_load(const std::string& hash_name, const std::vector<keyType>& vList)
+static void insert_high_load(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     size_t sum = 0;
     size_t pow2 = 2u << ilog(vList.size(), 2);
@@ -793,7 +793,7 @@ void insert_high_load(const std::string& hash_name, const std::vector<keyType>& 
 }
 
 template<class hash_type>
-void insert_erase_high(const std::string& hash_name, size_t vSize)
+static void insert_erase_high(const std::string& hash_name, size_t vSize)
 {
 #if TKey < 2
     hash_type ht_hash;
@@ -827,7 +827,7 @@ void insert_erase_high(const std::string& hash_name, size_t vSize)
 static uint8_t l1_cache[64 * 1024];
 #endif
 template<class hash_type>
-void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
+static void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
 {
     size_t sum = 0;
 
@@ -859,7 +859,7 @@ void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, std::vec
 }
 
 template<class hash_type>
-void find_hit_50(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void find_hit_50(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto vl = vList;
     shuffle(vl.begin(), vl.end());
@@ -875,7 +875,7 @@ void find_hit_50(const hash_type& ht_hash, const std::string& hash_name, const s
 }
 
 template<class hash_type>
-void find_erase50(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void find_erase50(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto tmp = ht_hash;
     auto ts1 = getus(); size_t sum = 0;
@@ -890,7 +890,7 @@ void find_erase50(const hash_type& ht_hash, const std::string& hash_name, const 
 }
 
 template<class hash_type>
-void find_hit_100(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void find_hit_100(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto vl = vList;
     shuffle(vl.begin(), vl.end());
@@ -906,7 +906,7 @@ void find_hit_100(const hash_type& ht_hash, const std::string& hash_name, const 
 }
 
 template<class hash_type>
-void erase_50_find(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void erase_50_find(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : vList) {
@@ -919,7 +919,7 @@ void erase_50_find(const hash_type& ht_hash, const std::string& hash_name, const
 }
 
 template<class hash_type>
-void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+static void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto tmp = ht_hash;
     auto ts1 = getus(); size_t sum = 0;
@@ -946,7 +946,7 @@ void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vecto
 }
 
 template<class hash_type>
-void hash_clear(hash_type& ht_hash, const std::string& hash_name)
+static void hash_clear(hash_type& ht_hash, const std::string& hash_name)
 {
     if (ht_hash.size() > 1000000) {
         auto ts1 = getus();
@@ -957,7 +957,7 @@ void hash_clear(hash_type& ht_hash, const std::string& hash_name)
 }
 
 template<class hash_type>
-void copy_clear(hash_type& ht_hash, const std::string& hash_name)
+static void copy_clear(hash_type& ht_hash, const std::string& hash_name)
 {
     size_t sum = 0;
     auto ts1 = getus();
@@ -1077,7 +1077,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 }
 
 template<class hash_type>
-void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
+static void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 {
     if (maps.find(hash_name) == maps.end())
         return;
@@ -1147,7 +1147,7 @@ void benOneHash(const std::string& hash_name, const std::vector<keyType>& oList)
 
 constexpr static auto base1 = 300000000;
 constexpr static auto base2 =      20000;
-void reset_top3(std::map<std::string, int64_t>& top3, const std::multimap <int64_t, std::string>& once_score_hash)
+static void reset_top3(std::map<std::string, int64_t>& top3, const std::multimap <int64_t, std::string>& once_score_hash)
 {
     auto it0 = once_score_hash.begin();
     auto it1 = *(it0++);
@@ -1245,16 +1245,14 @@ static int benchHashMap(int n)
     using ehash_func = Int64Hasher<keyType>; //9 difference hashers
 #elif PHMAP_HASH
     using ehash_func = phmap::Hash<keyType>;
-#elif ANKERL_HASH
-    using ehash_func = ankerl::unordered_dense::hash<keyType>;
 #elif QCH
     using ehash_func = qc::hash::RawMap<keyType, valueType>::hasher;
 #elif STD_HASH
     using ehash_func = std::hash<keyType>;
-#elif CXX17
-    using ehash_func = ankerl::unordered_dense::hash<keyType>;
+#elif HOOD_HASH
+	using ehash_func = robin_hood::hash<keyType>;
 #else
-    using ehash_func = robin_hood::hash<keyType>;
+    using ehash_func = ankerl::unordered_dense::hash<keyType>;
 #endif
 
     {
@@ -1348,15 +1346,17 @@ static int benchHashMap(int n)
         {  benOneHash<fph::DynamicFphMap<keyType, valueType, fph::MixSeedHash<keyType>>>("fph", vList); }
 #endif
 
+#if HAVE_BOOST
+        {  benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
+#endif
+
+        {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
 #if X86
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
 #endif
 
-#if HAVE_BOOST
-        {  benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
-#endif
 #if ABSL_HMAP
         {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("abslf", vList); }
 #endif
@@ -1364,7 +1364,6 @@ static int benchHashMap(int n)
         {  benOneHash<emhash8::HashMap <keyType, valueType, ehash_func>>("emhash8", vList); }
         {  benOneHash<emhash7::HashMap <keyType, valueType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash6::HashMap <keyType, valueType, ehash_func>>("emhash6", vList); }
-        {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
 
 #if CXX17
         {  benOneHash<ankerl::unordered_dense::map <keyType, valueType, ehash_func>>("martind", vList); }
@@ -1435,6 +1434,11 @@ static void testHashInt(int loops = 500000009)
     for (int i = 0; i < loops; i++)
         sum += robin_hood::hash_int(i + r);
     printf("martinus hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+
+    ts = getus(); sum = r;
+    for (int i = 0; i < loops; i++)
+        sum += ankerl::unordered_dense::detail::wyhash::hash(i + r);
+    printf("ankerl hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 #endif
 
     ts = getus(); sum = r;
@@ -1626,7 +1630,7 @@ int main(int argc, char* argv[])
         } else if (run_type == 1) {
             n = (srng() % (maxn - minn)) + minn;
         } else {
-            n += n / 15;
+            n += n / 20;
             if (n > maxn)
                 n = (srng() % (maxn - minn)) + minn;
         }
@@ -1637,7 +1641,7 @@ int main(int argc, char* argv[])
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
             hlf = 1.0f * n / pow2;
         }
-        if (n < 1e5 || n > 1e9)
+        if (n < 1e5 || n > 2e9)
             n = minn + srng() % minn;
 
         int tc = benchHashMap(n);
@@ -1648,4 +1652,3 @@ int main(int argc, char* argv[])
     printf("total time = %.3lf s", (getus() - start) / 1000000.0);
     return 0;
 }
-
