@@ -503,7 +503,7 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 }
 
 template<class hash_type>
-void iter_all(const hash_type& ht_hash, const std::string& hash_name)
+static void iter_all(const hash_type& ht_hash, const std::string& hash_name)
 {
     auto ts1 = getus(); size_t sum = 0;
     for (const auto& v : ht_hash)

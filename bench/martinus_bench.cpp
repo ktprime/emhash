@@ -301,6 +301,40 @@ static void bench_insert(MAP& map)
     }
 }
 
+template<class MAP>
+static void bench_AccidentallyQuadratic(MAP& map)
+{
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+    printf("    %s", map_name);
+
+    auto nows = now2sec();
+    sfc64 rng(12345);
+
+    for (size_t n = 0; n < 10'000'000; ++n) {
+        map[static_cast<int>(rng())];
+    }
+    assert(9988513 == map.size());
+
+    //bench.beginMeasure("iterate");
+    uint64_t sum = 0;
+    for (auto const& kv : map) {
+        sum += kv.first;
+        sum += kv.second;
+    }
+    if (sum != UINT64_C(18446739465311920326))
+		puts("error\n");
+
+//    bench.beginMeasure("iterate & copy");
+    MAP map2;
+    for (auto const& kv : map) {
+        map2[kv.first] = kv.second;
+    }
+    assert(map.size() == map2.size());
+    printf(" time use %.2f s\n", now2sec() - nows);
+}
+
 template <typename T>
 struct as_bits_t {
     T value;
@@ -703,8 +737,8 @@ static void bench_copy(MAP& map)
     size_t result = 0;
     sfc64 rng(987);
 
-	constexpr int KN = 1000;
-	constexpr int KL = 1000;
+    constexpr int KN = 1000;
+    constexpr int KL = 1000;
     MAP mapSource(1'000);
 //    mapSource.max_load_factor(max_lf);
     uint64_t rememberKey = 0;
@@ -1063,7 +1097,7 @@ static void runTest(int sflags, int eflags)
         typedef robin_hood::hash<uint64_t> hash_func;
 #endif
 
-        printf("bench_IterateIntegers:\n");
+        puts("\nbench_IterateIntegers:");
 
 #if QC_HASH
         { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
@@ -1109,7 +1143,6 @@ static void runTest(int sflags, int eflags)
 #if FOLLY_F14
         { folly::F14VectorMap<uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
 #endif
-        putchar('\n');
     }
 
     if (sflags <= 2 && eflags >= 2)
@@ -1127,7 +1160,7 @@ static void runTest(int sflags, int eflags)
 #else
         typedef WysHasher hash_func;
 #endif
-        printf("bench_randomFindString:\n");
+        puts("\nbench_randomFindString:");
 
 #if CXX17
         { ankerl::unordered_dense::map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
@@ -1172,7 +1205,6 @@ static void runTest(int sflags, int eflags)
 #if ABSL_HMAP
         { absl::flat_hash_map<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
 #endif
-        putchar('\n');
     }
 
     if (sflags <= 3 && eflags >= 3)
@@ -1190,7 +1222,7 @@ static void runTest(int sflags, int eflags)
 #else
         typedef WysHasher hash_func;
 #endif
-        printf("bench_randomEraseString:\n");
+        puts("\nbench_randomEraseString:");
 
 #if X86
         { emilib2::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
@@ -1236,7 +1268,6 @@ static void runTest(int sflags, int eflags)
 #if CK_HMAP //crash TODO
 //        { ck::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
-
     }
 
     if (sflags <= 4 && eflags >= 4)
@@ -1252,7 +1283,7 @@ static void runTest(int sflags, int eflags)
 #else
         typedef robin_hood::hash<size_t> hash_func;
 #endif
-        printf("bench_randomFind:\n");
+        puts("\nbench_randomFind:");
 
         static constexpr size_t numInserts[]        = {123,     5234,  1234567, 12345678};
         static constexpr size_t numFindsPerInsert[] = {800000,  20000, 50, 5};
@@ -1320,7 +1351,7 @@ static void runTest(int sflags, int eflags)
         typedef robin_hood::hash<int> hash_func;
 #endif
 
-        printf("bench_insert:\n");
+        puts("\nbench_insert:");
 
 #if ABSL_HMAP
         { absl::flat_hash_map <int, int, hash_func> amap; bench_insert(amap); }
@@ -1366,7 +1397,6 @@ static void runTest(int sflags, int eflags)
 #endif
         { phmap::flat_hash_map <int, int, hash_func> hmap; bench_insert(hmap); }
 #endif
-        putchar('\n');
     }
 
     if (sflags <= 6 && eflags >= 6)
@@ -1383,7 +1413,7 @@ static void runTest(int sflags, int eflags)
         typedef robin_hood::hash<uint64_t> hash_func;
 #endif
 
-        printf("bench_randomInsertErase:\n");
+        puts("\nbench_randomInsertErase:");
 
 #if HAVE_BOOST
         { boost::unordered_flat_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
@@ -1431,7 +1461,6 @@ static void runTest(int sflags, int eflags)
         { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
         //{ rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hange
 #endif
-        putchar('\n');
     }
 
     if (sflags <= 7 && eflags >= 7)
@@ -1448,7 +1477,7 @@ static void runTest(int sflags, int eflags)
         typedef robin_hood::hash<int> hash_func;
 #endif
 
-        printf("bench_randomDistinct2:\n");
+        puts("\nbench_randomDistinct2:");
 #if QC_HASH
         { qc::hash::RawMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 //        { fph::DynamicFphMap<int, int, fph::MixSeedHash<int>> emap; bench_randomDistinct2(emap); } //hang
@@ -1496,7 +1525,6 @@ static void runTest(int sflags, int eflags)
 #if FOLLY_F14
         { folly::F14VectorMap <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
 #endif
-        putchar('\n');
     }
 
     if (sflags <= 8 && eflags >= 8)
@@ -1508,7 +1536,7 @@ static void runTest(int sflags, int eflags)
 #else
         typedef robin_hood::hash<uint64_t> hash_func;
 #endif
-        printf("bench_copy:\n");
+        puts("\nbench_copy:");
 
         { emhash6::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
         { emhash5::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
@@ -1555,10 +1583,9 @@ static void runTest(int sflags, int eflags)
 #if FOLLY_F14
         { folly::F14VectorMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
 #endif
-        putchar('\n');
     }
 
-    if (eflags >= 9)
+    if (sflags <= 9 && eflags >= 9)
     {
 #if ABSL_HASH
         typedef absl::Hash<uint64_t> hash_func;
@@ -1571,7 +1598,7 @@ static void runTest(int sflags, int eflags)
 #else
         typedef ankerl::unordered_dense::hash<uint64_t> hash_func;
 #endif
-        printf("bench_knucleotide:\n");
+        puts("\nbench_knucleotide:");
 
 #if QC_HASH
         { qc::hash::RawMap<uint64_t, uint32_t, hash_func> emap; bench_knucleotide(emap); }
@@ -1616,11 +1643,9 @@ static void runTest(int sflags, int eflags)
 #if CK_HMAP
         { ck::HashMap <uint64_t, uint32_t, hash_func> hmap; bench_knucleotide(hmap); }
 #endif
-
-        putchar('\n');
     }
 
-    if (eflags > 9)
+    if (sflags <= 10 && eflags >= 10)
     {
 #if ABSL_HASH
         typedef absl::Hash<uint32_t> hash_func;
@@ -1633,7 +1658,7 @@ static void runTest(int sflags, int eflags)
 #else
         typedef ankerl::unordered_dense::hash<uint32_t> hash_func;
 #endif
-        printf("bench_GameOfLife:\n");
+        puts("\nbench_GameOfLife:\n");
 
         { emhash6::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
         { emhash5::HashMap<uint32_t, bool, hash_func> emap; bench_GameOfLife(emap); }
@@ -1678,11 +1703,71 @@ static void runTest(int sflags, int eflags)
 #if CK_HMAP
         //{ ck::HashMap <uint32_t, bool, hash_func> hmap; bench_GameOfLife(hmap); }
 #endif
-
-        putchar('\n');
     }
 
-    printf("total time = %.2f s", now2sec() - start);
+    if (sflags <= 11 && eflags >= 11)
+    {
+#if ABSL_HASH
+        typedef absl::Hash<uint32_t> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<int> hash_func;
+#elif STD_HASH
+        typedef std::hash<int> hash_func;
+#elif HOOD_HASH
+        typedef robin_hood::hash<int> hash_func;
+#else
+        typedef ankerl::unordered_dense::hash<int> hash_func;
+#endif
+
+        puts("\nbench_AccidentallyQuadratic (10M int insert.copy.iterator):");
+
+        { emhash6::HashMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+        { emhash5::HashMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+        { emhash7::HashMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+        { emhash8::HashMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+
+#if QC_HASH
+        { qc::hash::RawMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+#endif
+
+#if CXX20
+        { jg::dense_hash_map<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+        { rigtorp::HashMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+#endif
+        { ankerl::unordered_dense::map <int, int, hash_func> martin; bench_AccidentallyQuadratic(martin); }
+#if HAVE_BOOST
+        { boost::unordered_flat_map <int, int, hash_func> hmap; bench_AccidentallyQuadratic(hmap); }
+#endif
+#if ABSL_HMAP
+        { absl::flat_hash_map <int, int, hash_func> pmap; bench_AccidentallyQuadratic(pmap); }
+#endif
+
+#if X86
+        { emilib::HashMap <int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+        { emilib2::HashMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+        { emilib3::HashMap<int, int, hash_func> emap; bench_AccidentallyQuadratic(emap); }
+#endif
+#if ET
+        { hrd_m::hash_map <int, int, hash_func> hmap; bench_AccidentallyQuadratic(hmap); }
+        { tsl::robin_map  <int, int, hash_func> rmap; bench_AccidentallyQuadratic(rmap); }
+        { robin_hood::unordered_map <int, int, hash_func> martin; bench_AccidentallyQuadratic(martin); }
+
+#if X86_64
+        { ska::flat_hash_map <int, int, hash_func> fmap; bench_AccidentallyQuadratic(fmap); }
+#endif
+        { phmap::flat_hash_map <int, int, hash_func> pmap; bench_AccidentallyQuadratic(pmap); }
+#endif
+
+#if FOLLY
+        { folly::F14VectorMap <int, int, hash_func> pmap; bench_AccidentallyQuadratic(pmap); }
+#endif
+#if CK_HMAP
+        //{ ck::HashMap <int, int, hash_func> hmap; bench_AccidentallyQuadratic(hmap); }
+#endif
+
+    }
+
+    printf("\ntotal time = %.2f s", now2sec() - start);
 }
 
 static void checkSet(const std::string& map_name)
@@ -1700,11 +1785,11 @@ int main(int argc, char* argv[])
     for (auto& m : show_name)
         printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
 
-    int sflags = 1, eflags = 10;
+    int sflags = 1, eflags = 11;
     if (argc > 1) {
         printf("cmd agrs = %s\n", argv[1]);
         for (int c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
-            if (c > '3' && c <= '8') {
+            if (c > '4' && c <= '8') {
                 std::string map_name("emhash");
                 map_name += c;
                 checkSet(map_name);
@@ -1736,19 +1821,23 @@ int main(int argc, char* argv[])
                 checkSet("HashMapTable");
                 checkSet("HashMapCell");
             }
-            else if (c == 'b' && !isdigit(argv[1][i + 1]))
-                checkSet("boost");
             else if (c == 'q')
                 checkSet("qc");
             else if (c == 'f')
                 checkSet("fph");
-            else if (c == 'b')
-                sflags = atoi(&argv[1][++i]);
-            else if (c == 'e')
+            else if (c == 'b') {
+                 if (isdigit(argv[1][i + 1]))
+                    sflags = atoi(&argv[1][++i]);
+                else
+                    checkSet("boost");
+                if (isdigit(argv[1][i + 1])) i++;
+            }
+            else if (c == 'e') {
                 eflags = atoi(&argv[1][++i]);
+                if (isdigit(argv[1][i + 1])) i++;
+            }
             else if (c == 'l')
               max_lf = atoi(&argv[1][++i]) / 10.0f;
-
         }
     }
 

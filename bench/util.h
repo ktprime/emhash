@@ -53,13 +53,15 @@
     #define X86 1
     #define X86_64 1
     #define PHMAP_HAVE_SSSE3                      1
-    #define PHMAP_NON_DETERMINISTIC               1
+    #define PHMAP_HAVE_SSE2                       1
+//    #define PHMAP_NON_DETERMINISTIC               1
 #endif
 #if  _M_IX86 || __i386__
     #define X86 1
     #define X86_32 1
     #define PHMAP_HAVE_SSSE3                      1
-    #define PHMAP_NON_DETERMINISTIC               1
+    #define PHMAP_HAVE_SSE2                       1
+//    #define PHMAP_NON_DETERMINISTIC               1
 #endif
 
 #if X64
