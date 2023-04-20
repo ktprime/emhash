@@ -636,6 +636,19 @@ static void insert_hit(hash_type& ht_hash, const std::string& hash_name, const s
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
+
+template<class hash_type>
+static void insert_accident(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+{
+    auto ts1 = getus(); size_t sum = 0;
+    hash_type h;
+    for (const auto& v : ht_hash) {
+        h[v.first] = v.second;
+        sum += 1;
+    }
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+}
+
 template<class hash_type>
 static void multi_small_ife(const std::string& hash_name, const std::vector<keyType>& vList)
 {
@@ -1104,6 +1117,7 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     insert_no_reserve <hash_type>(hash_name, oList);
     insert_reserve<hash_type>(hash, hash_name, oList);
     insert_hit<hash_type>(hash, hash_name, oList);
+    insert_accident<hash_type>(hash, hash_name, oList);
 
     find_hit_100<hash_type>(hash, hash_name, oList);
 
@@ -1250,7 +1264,7 @@ static int benchHashMap(int n)
 #elif STD_HASH
     using ehash_func = std::hash<keyType>;
 #elif HOOD_HASH
-	using ehash_func = robin_hood::hash<keyType>;
+    using ehash_func = robin_hood::hash<keyType>;
 #else
     using ehash_func = ankerl::unordered_dense::hash<keyType>;
 #endif
