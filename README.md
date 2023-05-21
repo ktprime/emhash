@@ -59,7 +59,7 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
 
 # example
 
-```
+```cpp
         // default constructor: empty map
         emhash5::HashMap<std::string, std::string> m1;
         // list constructor
