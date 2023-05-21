@@ -18,7 +18,7 @@
 //
 // Includes work from abseil-cpp (https://github.com/abseil/abseil-cpp)
 // with modifications.
-// 
+//
 // Copyright 2018 The Abseil Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,7 +36,7 @@
 
 #define PHMAP_VERSION_MAJOR 1
 #define PHMAP_VERSION_MINOR 3
-#define PHMAP_VERSION_PATCH 8
+#define PHMAP_VERSION_PATCH 11
 
 // Included for the __GLIBC__ macro (or similar macros on other systems).
 #include <limits.h>
@@ -81,14 +81,14 @@
     #error "phmap requires __apple_build_version__ of 4211165 or higher."
 #endif
 
-// Enforce C++11 as the minimum. 
+// Enforce C++11 as the minimum.
 #if defined(__cplusplus) && !defined(_MSC_VER)
     #if __cplusplus < 201103L
         #error "C++ versions less than C++11 are not supported."
     #endif
 #endif
 
-// We have chosen glibc 2.12 as the minimum 
+// We have chosen glibc 2.12 as the minimum
 #if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
     #if !__GLIBC_PREREQ(2, 12)
         #error "Minimum required version of glibc is 2.12."
@@ -100,10 +100,10 @@
 #endif
 
 #if CHAR_BIT != 8
-    #error "phmap assumes CHAR_BIT == 8."
+    #warning "phmap assumes CHAR_BIT == 8."
 #endif
 
-// phmap currently assumes that an int is 4 bytes. 
+// phmap currently assumes that an int is 4 bytes.
 #if INT_MAX < 2147483647
     #error "phmap assumes that int is at least 4 bytes. "
 #endif
@@ -154,7 +154,7 @@
 // -------------------------------------------------------------------
 #ifdef PHMAP_HAVE_THREAD_LOCAL
     #error PHMAP_HAVE_THREAD_LOCAL cannot be directly set
-#elif defined(__APPLE__)
+#elif defined(__APPLE__) && defined(__clang__)
     #if __has_feature(cxx_thread_local) && \
         !(TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_9_0)
         #define PHMAP_HAVE_THREAD_LOCAL 1
@@ -175,10 +175,10 @@
         #undef PHMAP_HAVE_TLS
         #undef PHMAP_HAVE_THREAD_LOCAL
     #endif
-#endif 
+#endif
 
 // ------------------------------------------------------------
-// Checks whether the __int128 compiler extension for a 128-bit 
+// Checks whether the __int128 compiler extension for a 128-bit
 // integral type is supported.
 // ------------------------------------------------------------
 #ifdef PHMAP_HAVE_INTRINSIC_INT128
@@ -196,7 +196,7 @@
 #endif
 
 // ------------------------------------------------------------------
-// Checks whether the compiler both supports and enables exceptions. 
+// Checks whether the compiler both supports and enables exceptions.
 // ------------------------------------------------------------------
 #ifdef PHMAP_HAVE_EXCEPTIONS
     #error PHMAP_HAVE_EXCEPTIONS cannot be directly set.
@@ -641,7 +641,7 @@
 // ----------------------------------------------------------------------
 #if PHMAP_HAVE_CC17
     #define PHMAP_IF_CONSTEXPR(expr) if constexpr ((expr))
-#else 
+#else
     #define PHMAP_IF_CONSTEXPR(expr) if ((expr))
 #endif
 

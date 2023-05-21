@@ -6,19 +6,19 @@ import os
 
 class SparseppConan(ConanFile):
     name = "parallel_hashmap"
-    version = "1.36"
+    version = "1.3.11"
     description = "A header-only, very fast and memory-friendly hash map"
     url = "https://github.com/greg7mdp/parallel-hashmap/blob/master/parallel_hashmap/conanfile.py"
-    
+
     # Indicates License type of the packaged library
     license = "https://github.com/greg7mdp/parallel-hashmap/blob/master/LICENSE"
-    
+
     # Packages the license for the conanfile.py
     exports = ["LICENSE"]
-    
+
     # Custom attributes for Bincrafters recipe conventions
     source_subfolder = "source_subfolder"
-    
+
     def source(self):
         source_url = "https://github.com/greg7mdp/parallel-hashmap"
         tools.get("{0}/archive/{1}.tar.gz".format(source_url, self.version))
