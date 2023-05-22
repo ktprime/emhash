@@ -7,15 +7,15 @@
 //#define EMH_IDENTITY_HASH 1
 #include "eutil.h"
 //#define EMH_WYHASH_HASH 1
-#define EMH_ITER_SAFE 1
-#define EMH_FIND_HIT  1
-#define EMH_BUCKET_INDEX 2
+//#define EMH_ITER_SAFE 1
+//#define EMH_FIND_HIT  1
+//#define EMH_BUCKET_INDEX 2
 
 #include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
-#include "emilib/emilib2.hpp"
+#include "emilib/emilib2o.hpp"
 
 
 #include "martinus/robin_hood.h"
@@ -128,7 +128,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash7::HashMap
+#define ehmap  emhash8::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -623,13 +623,13 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint64_t;
 
-#if X860
+#if X86
     emilib2::HashMap <keyType, int> shash;
 #else
-    ehmap7<keyType, int> shash;
+    ehmap5<keyType, int> shash;
 #endif
 
-    ehmap5<keyType, int> ehash5;
+    ehmap7<keyType, int> ehash7;
 
 #if EMH6
     ehmap6<keyType, int> unhash;
@@ -641,25 +641,25 @@ static int RandTest(size_t n, int max_loops = 1234567)
     const auto step = n % 2 + 1;
     for (int i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
-        ehash5[ki] = unhash[ki] = shash[ki] = (int)srng();
+        ehash7[ki] = unhash[ki] = shash[ki] = (int)srng();
     }
 
     {
-        assert(ehash5 == shash);
-        assert(ehash5 == unhash);
+        assert(ehash7 == shash);
+        assert(ehash7 == unhash);
     }
 
     int loops = max_loops;
     while (loops -- > 0) {
-        assert(shash.size() == unhash.size()); assert(ehash5.size() == unhash.size());
+        assert(shash.size() == unhash.size()); assert(ehash7.size() == unhash.size());
 
         const uint32_t type = srng() % 100;
         auto rid  = srng();// n ++;
         auto id   = TO_KEY(rid);
         if (type <= 40 || shash.size() < 1000) {
-            shash[id] += type; ehash5[id] += type; unhash[id] += type;
+            shash[id] += type; ehash7[id] += type; unhash[id] += type;
 
-            assert(shash[id] == unhash[id]); assert(ehash5[id] == unhash[id]);
+            assert(shash[id] == unhash[id]); assert(ehash7[id] == unhash[id]);
         }
         else if (type < 60) {
             if (srng() % 3 == 0)
@@ -667,31 +667,31 @@ static int RandTest(size_t n, int max_loops = 1234567)
             else if (srng() % 2 == 0)
                 id = shash.begin()->first;
             else
-                id = ehash5.begin()->first;
+                id = ehash7.begin()->first;
 
-            ehash5.erase(id);
+            ehash7.erase(id);
             unhash.erase(unhash.find(id));
             shash.erase(id);
 
-            assert(ehash5.count(id) == unhash.count(id));
+            assert(ehash7.count(id) == unhash.count(id));
             assert(shash.count(id) == unhash.count(id));
         }
         else if (type < 80) {
-            auto it = ehash5.begin();
+            auto it = ehash7.begin();
             for (int i = n % 64; i > 0; i--)
                 it ++;
             id = it->first;
             unhash.erase(id);
             shash.erase(shash.find(id));
-            ehash5.erase(it);
+            ehash7.erase(it);
             assert(shash.count(id) == 0);
-            assert(ehash5.count(id) == unhash.count(id));
+            assert(ehash7.count(id) == unhash.count(id));
         }
         else if (type < 100) {
             if (unhash.count(id) == 0) {
                 const auto vid = (int)rid;
-                ehash5.emplace(id, vid);
-                assert(ehash5.count(id) == 1);
+                ehash7.emplace(id, vid);
+                assert(ehash7.count(id) == 1);
 
                 assert(shash.count(id) == 0);
                 //if (id == 1043)
@@ -701,20 +701,20 @@ static int RandTest(size_t n, int max_loops = 1234567)
                 assert(unhash.count(id) == 0);
                 unhash[id] = shash[id];
                 assert(unhash[id] == shash[id]);
-                assert(unhash[id] == ehash5[id]);
+                assert(unhash[id] == ehash7[id]);
             } else {
                 unhash[id] = shash[id] = 1;
-                ehash5.insert_or_assign(id, 1);
+                ehash7.insert_or_assign(id, 1);
                 unhash.erase(id);
                 shash.erase(id);
-                ehash5.erase(id);
+                ehash7.erase(id);
             }
         }
-        if (loops % 100000 == 0) {
+        if (loops % 10000 == 0) {
             printf("%d %d\r", loops, (int)shash.size());
 #if 1
-            assert(ehash5 == shash);
-            assert(ehash5 == unhash);
+            assert(ehash7 == shash);
+            assert(ehash7 == unhash);
 #endif
         }
     }
@@ -801,7 +801,7 @@ static void benchStringHash(int size, int str_min, int str_max)
     for (int i = 1; i <= 6; i++)
     {
         rndstring.clear();
-		printf("%d - %d bytes\n", str_min * i, str_max * i);
+        printf("%d - %d bytes\n", str_min * i, str_max * i);
         buildRandString(size * i, rndstring, str_min * i, str_max * i);
 
         int64_t start = 0;

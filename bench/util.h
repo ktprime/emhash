@@ -108,23 +108,24 @@ int64_t getus()
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif WIN32_TICK
     return GetTickCount() * 1000;
-#elif WIN32_HTIME || _WIN32
+#elif WIN32_HTIME || _WIN320
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;
     QueryPerformanceCounter(&nowus);
     return (nowus.QuadPart * 1000000) / (freq.QuadPart);
-#elif WIN32_STIME
-    FILETIME    file_time;
-    SYSTEMTIME  system_time;
-    ULARGE_INTEGER ularge;
-
-    GetSystemTime(&system_time);
-    SystemTimeToFileTime(&system_time, &file_time);
-    ularge.LowPart  = file_time.dwLowDateTime;
-    ularge.HighPart = file_time.dwHighDateTime;
-    return ularge.QuadPart / 10 + system_time.wMilliseconds / 1000;
+#elif _WIN32
+    FILETIME ft;
+    GetSystemTimePreciseAsFileTime(&ft);
+    /* In 100-nanosecond increments from 1601-01-01 UTC because why not? */
+    int64_t t = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
+    /* Convert to UNIX epoch, 1970-01-01. Still in 100 ns increments. */
+    //t -= 116444736000000000ll;
+    /* Now convert to seconds and nanoseconds. */
+    //ts->tv_sec = t / 10000000;
+    //ts->tv_nsec = t % 10000000 * 100;
+    return t / 10000000 * 1000'000 + t % 10000000 / 10;
 #elif LINUX_RUS
     struct rusage rup;
     getrusage(RUSAGE_SELF, &rup);
@@ -697,12 +698,13 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/internal/raw_hash_set.cc"
-#endif
-
-#if ABSL_HASH
 #include "absl/hash/internal/low_level_hash.cc"
 #include "absl/hash/internal/hash.cc"
 #include "absl/hash/internal/city.cc"
+
+#if ABSL_HASH
+#include "absl/crc/internal/crc_x86_arm_combined.cc"
+#endif
 #endif
 
 #if __cplusplus > 201402L || CXX17 || _MSC_VER > 1730

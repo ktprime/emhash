@@ -1005,6 +1005,7 @@ struct StdMapInfo
     static inline const std::string name{"std::unorder_map"};
 };
 
+#if ABSL_HMAP
 template <typename K>
 struct AbslSetInfo
 {
@@ -1024,6 +1025,7 @@ struct AbslMapInfo
 
     static inline const std::string name{"absl::f_hash_map"};
 };
+#endif
 
 template <typename K, typename V>
 struct PhMapInfo
