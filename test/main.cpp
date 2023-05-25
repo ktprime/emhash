@@ -15,7 +15,7 @@
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
-#include "emilib/emilib2o.hpp"
+#include "emilib/emilib2.hpp"
 
 
 #include "martinus/robin_hood.h"
@@ -155,6 +155,7 @@ static void TestApi()
 
         m2[2] = "frist";
         m2.find(2)->second = "second";
+        assert(m2.at(2) == "second");
         m2.insert({3, "null"}).first->second = "third";
         m2.emplace(4, "null").first->second = "four";
         m2.insert(std::pair<int, std::string>(5, "insert"));
@@ -179,6 +180,7 @@ static void TestApi()
 
         // move constructor
         auto m4 = std::move(m2);
+        assert(m2.empty());
 
         //copy constructor
         m2 = std::move(m4);
@@ -292,10 +294,13 @@ static void TestApi()
         // uses pair's move constructor
         m.emplace(std::make_pair(std::string("a"), std::string("a")));
         // uses pair's converting move constructor
-        m.emplace(std::make_pair("b", "abcd"));
+        m.emplace(std::make_pair("b", "b"));
         m.emplace(std::move(std::make_pair("b", "abcd")));
         // uses pair's template constructor
         m.emplace("d", "ddd");
+        assert(m.size() == 3);
+        assert(m["d"] == "ddd");
+        assert(m["b"] == "b");
 
 #if 0
         // uses pair's piecewise constructor
@@ -623,7 +628,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint64_t;
 
-#if X86
+#if X860
     emilib2::HashMap <keyType, int> shash;
 #else
     ehmap5<keyType, int> shash;
@@ -634,7 +639,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 #if EMH6
     ehmap6<keyType, int> unhash;
 #else
-    ehmap8<keyType, int> unhash;
+    robin_hood::unordered_flat_map<keyType, int> unhash;
 #endif
 
     Sfc4 srng(n + time(0));
@@ -657,7 +662,17 @@ static int RandTest(size_t n, int max_loops = 1234567)
         auto rid  = srng();// n ++;
         auto id   = TO_KEY(rid);
         if (type <= 40 || shash.size() < 1000) {
-            shash[id] += type; ehash7[id] += type; unhash[id] += type;
+            if (type % 3 == 0) {
+                shash[id] += type; ehash7[id] += type; unhash[id] += type;
+            } else if (type % 2 == 0) {
+                shash.insert_or_assign(id, type);
+                ehash7.insert_or_assign(id, type);
+                unhash.insert_or_assign(id, type);
+            } else {
+                shash.emplace(id, type);
+                ehash7.emplace(id, type);
+                unhash.emplace(id, type);
+            }
 
             assert(shash[id] == unhash[id]); assert(ehash7[id] == unhash[id]);
         }
@@ -667,11 +682,11 @@ static int RandTest(size_t n, int max_loops = 1234567)
             else if (srng() % 2 == 0)
                 id = shash.begin()->first;
             else
-                id = ehash7.begin()->first;
+                id = ehash7.last()->first;
 
             ehash7.erase(id);
-            unhash.erase(unhash.find(id));
             shash.erase(id);
+            unhash.erase(unhash.find(id));
 
             assert(ehash7.count(id) == unhash.count(id));
             assert(shash.count(id) == unhash.count(id));
@@ -710,12 +725,10 @@ static int RandTest(size_t n, int max_loops = 1234567)
                 ehash7.erase(id);
             }
         }
-        if (loops % 10000 == 0) {
+        if (loops % 100000 == 0) {
             printf("%d %d\r", loops, (int)shash.size());
-#if 1
-            assert(ehash7 == shash);
+            assert(ehash7.operator==(shash));
             assert(ehash7 == unhash);
-#endif
         }
     }
 
