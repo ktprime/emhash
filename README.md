@@ -64,9 +64,9 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
         emhash5::HashMap<int, int> m1(10);
         m1.reserve(100);
         for (int i = 1; i < 100; i++)
-          m1.emplace_unique(i, i); //key is not unique
+          m1.emplace_unique(i, i); //key must be unique, performance is better than emplace, operator[].
        
-        auto no_value = m1.at(0); //no exception throw herr!!!. only return zero for integer value.
+        auto no_value = m1.at(0); //no_value = 0; no exception throw herr!!!. only return zero for integer value.
 
         // list constructor
         emhash5::HashMap<int, std::string> m2 = {
@@ -75,7 +75,7 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
             {2, "baz"},
         };
    
-        auto* pvalue = m2.try_get(1); //return null if not exist
+        auto* pvalue = m2.try_get(1); //return nullptr if key is not exist
         if (m2.try_set(4, "for"))   printf("set success");
         if (!m2.try_set(1, "new"))  printf("set failed");        
         string ovalue = m2.set_get("1", "new"); //ovalue = "foo"
