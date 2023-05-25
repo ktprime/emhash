@@ -61,28 +61,46 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
 
 ```cpp
         // default constructor: empty map
-        emhash5::HashMap<std::string, std::string> m1;
+        emhash5::HashMap<int, int> m1(10);
+        m1.reserve(100);
+        for (int i = 1; i < 100; i++)
+          m1.emplace_unique(i, i); //key is not unique
+       
+        auto no_value = m1.at(0); //no exception throw herr!!!. only return zero for integer value.
+
         // list constructor
-        emhash5::HashMap<int, std::string> m2 =
-        {
+        emhash5::HashMap<int, std::string> m2 = {
             {1, "foo"},
             {3, "bar"},
             {2, "baz"},
         };
+   
+        auto* pvalue = m2.try_get(1); //return null if not exist
+        if (m2.try_set(4, "for"))   printf("set success");
+        if (!m2.try_set(1, "new"))  printf("set failed");        
+        string ovalue = m2.set_get("1", "new"); //ovalue = "foo"
+
+        for(auto& p: m2)
+           std::cout << " " << p.first << " => " << p.second << '\n';
 
         // copy constructor
         emhash5::HashMap<int, std::string> m3 = m2;
-
         // move constructor
         emhash5::HashMap<int, std::string> m4 = std::move(m2);
+        
+        //inserrt
+        m2.insert_unique(4, "four");
+        m2[4] = "four_";
+        m2.emplace(std::make_pair(4, "four"));
+        m2.insert({{6, "six"}, {5, "five"}});
 
         // range constructor
         std::vector<std::pair<std::bitset<8>, int>> v = { {0x12, 1}, {0x01,-1} };
         emhash5::HashMap<std::bitset<8>, double> m5(v.begin(), v.end());
 
         //Option 1 for a constructor with a custom Key type
-        // Define the KeyHash and KeyEqual structs and use them in the template
-        emhash5::HashMap<Key, std::string, KeyHash, KeyEqual> m6 = {
+        //Define the KeyHash and KeyEqual structs and use them in the template
+        emhash8::HashMap<Key, std::string, YourKeyHash, YourKeyEqual> m6 = {
             { {"John", "Doe"}, "example"},
             { {"Mary", "Sue"}, "another"}
         };
@@ -90,7 +108,7 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
         //Option 2 for a constructor with a custom Key type
         // Define a const == operator for the class/struct and specialize std::hash
         // structure in the std namespace
-        emhash5::HashMap<Foo, std::string> m7 = {
+        emhash7::HashMap<Foo, std::string> m7 = {
             { Foo(1), "One"}, { 2, "Two"}, { 3, "Three"}
         };
 
@@ -101,14 +119,13 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
         emhash5::HashMap<Goo, double, decltype(hash), decltype(comp)> m8;
 #endif
 
-        emhash5::HashMap<int,char> example = {{1,'a'},{2,'b'}};
-        for(int x: {2, 5}) {
-            if(example.contains(x)) {
-                std::cout << x << ": Found\n";
-            } else {
-                std::cout << x << ": Not found\n";
-            }
-        }
+        emhash8::HashMap<int,char> m8 = {{1,'a'},{2,'b'}};
+        for(const auto [k, v] : m8}) 
+            printf("%d %c\n", k, v);
+
+        const auto* data = m8.values();//order by insert
+        for (int i = 0; i < m8.size(); i++)
+            printf("%d %c\n", data[i].first, data[i].second);
 
 ```
 
