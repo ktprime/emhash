@@ -273,7 +273,7 @@ class ABSL_LOCKABLE Mutex {
   // Aliases for `Mutex::Lock()`, `Mutex::Unlock()`, and `Mutex::TryLock()`.
   //
   // These methods may be used (along with the complementary `Reader*()`
-  // methods) to distingish simple exclusive `Mutex` usage (`Lock()`,
+  // methods) to distinguish simple exclusive `Mutex` usage (`Lock()`,
   // etc.) from reader/writer lock usage.
   void WriterLock() ABSL_EXCLUSIVE_LOCK_FUNCTION() { this->Lock(); }
 
@@ -695,6 +695,20 @@ class Condition {
   template<typename T>
   Condition(bool (*func)(T *), T *arg);
 
+  // Same as above, but allows for cases where `arg` comes from a pointer that
+  // is convertible to the function parameter type `T*` but not an exact match.
+  //
+  // For example, the argument might be `X*` but the function takes `const X*`,
+  // or the argument might be `Derived*` while the function takes `Base*`, and
+  // so on for cases where the argument pointer can be implicitly converted.
+  //
+  // Implementation notes: This constructor overload is required in addition to
+  // the one above to allow deduction of `T` from `arg` for cases such as where
+  // a function template is passed as `func`. Also, the dummy `typename = void`
+  // template parameter exists just to work around a MSVC mangling bug.
+  template <typename T, typename = void>
+  Condition(bool (*func)(T *), typename absl::internal::identity<T>::type *arg);
+
   // Templated version for invoking a method that returns a `bool`.
   //
   // `Condition(object, &Class::Method)` constructs a `Condition` that evaluates
@@ -1023,6 +1037,12 @@ inline Condition::Condition(bool (*func)(T *), T *arg)
   StoreCallback(func);
 }
 
+template <typename T, typename>
+inline Condition::Condition(bool (*func)(T *),
+                            typename absl::internal::identity<T>::type *arg)
+    // Just delegate to the overload above.
+    : Condition(func, arg) {}
+
 template <typename T>
 inline Condition::Condition(T *object,
                             bool (absl::internal::identity<T>::type::*method)())
@@ -1084,23 +1104,6 @@ void RegisterMutexTracer(void (*fn)(const char *msg, const void *obj,
 // This has the same ordering and single-use limitations as
 // RegisterMutexProfiler() above.
 void RegisterCondVarTracer(void (*fn)(const char *msg, const void *cv));
-
-// Register a hook for symbolizing stack traces in deadlock detector reports.
-//
-// 'pc' is the program counter being symbolized, 'out' is the buffer to write
-// into, and 'out_size' is the size of the buffer.  This function can return
-// false if symbolizing failed, or true if a NUL-terminated symbol was written
-// to 'out.'
-//
-// This has the same ordering and single-use limitations as
-// RegisterMutexProfiler() above.
-//
-// DEPRECATED: The default symbolizer function is absl::Symbolize() and the
-// ability to register a different hook for symbolizing stack traces will be
-// removed on or after 2023-05-01.
-ABSL_DEPRECATED("absl::RegisterSymbolizer() is deprecated and will be removed "
-                "on or after 2023-05-01")
-void RegisterSymbolizer(bool (*fn)(const void *pc, char *out, int out_size));
 
 // EnableMutexInvariantDebugging()
 //
