@@ -10,7 +10,8 @@
 #pragma once
 #endif
 
-#include <boost/unordered/detail/foa.hpp>
+#include <boost/unordered/detail/foa/flat_map_types.hpp>
+#include <boost/unordered/detail/foa/table.hpp>
 #include <boost/unordered/detail/type_traits.hpp>
 #include <boost/unordered/unordered_flat_map_fwd.hpp>
 
@@ -32,73 +33,20 @@ namespace boost {
 #pragma warning(disable : 4714) /* marked as __forceinline not inlined */
 #endif
 
-    namespace detail {
-      template <class Key, class T> struct flat_map_types
-      {
-        using key_type = Key;
-        using raw_key_type = typename std::remove_const<Key>::type;
-        using raw_mapped_type = typename std::remove_const<T>::type;
-
-        using init_type = std::pair<raw_key_type, raw_mapped_type>;
-        using moved_type = std::pair<raw_key_type&&, raw_mapped_type&&>;
-        using value_type = std::pair<Key const, T>;
-
-        using element_type = value_type;
-
-        static value_type& value_from(element_type& x) { return x; }
-
-        template <class K, class V>
-        static raw_key_type const& extract(std::pair<K, V> const& kv)
-        {
-          return kv.first;
-        }
-
-        static moved_type move(init_type& x)
-        {
-          return {std::move(x.first), std::move(x.second)};
-        }
-
-        static moved_type move(element_type& x)
-        {
-          // TODO: we probably need to launder here
-          return {std::move(const_cast<raw_key_type&>(x.first)),
-            std::move(const_cast<raw_mapped_type&>(x.second))};
-        }
-
-        template <class A, class... Args>
-        static void construct(A& al, init_type* p, Args&&... args)
-        {
-          boost::allocator_construct(al, p, std::forward<Args>(args)...);
-        }
-
-        template <class A, class... Args>
-        static void construct(A& al, value_type* p, Args&&... args)
-        {
-          boost::allocator_construct(al, p, std::forward<Args>(args)...);
-        }
-
-        template <class A> static void destroy(A& al, init_type* p) noexcept
-        {
-          boost::allocator_destroy(al, p);
-        }
-
-        template <class A> static void destroy(A& al, value_type* p) noexcept
-        {
-          boost::allocator_destroy(al, p);
-        }
-      };
-    } // namespace detail
-
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
     class unordered_flat_map
     {
-      using map_types = detail::flat_map_types<Key, T>;
+      using map_types = detail::foa::flat_map_types<Key, T>;
 
       using table_type = detail::foa::table<map_types, Hash, KeyEqual,
         typename boost::allocator_rebind<Allocator,
           typename map_types::value_type>::type>;
 
       table_type table_;
+
+      template <class K, class V, class H, class KE, class A>
+      bool friend operator==(unordered_flat_map<K, V, H, KE, A> const& lhs,
+        unordered_flat_map<K, V, H, KE, A> const& rhs);
 
       template <class K, class V, class H, class KE, class A, class Pred>
       typename unordered_flat_map<K, V, H, KE, A>::size_type friend erase_if(
@@ -433,11 +381,18 @@ namespace boost {
           .first;
       }
 
-      BOOST_FORCEINLINE void erase(iterator pos) { table_.erase(pos); }
-      BOOST_FORCEINLINE void erase(const_iterator pos)
+      BOOST_FORCEINLINE typename table_type::erase_return_type erase(
+        iterator pos)
       {
         return table_.erase(pos);
       }
+
+      BOOST_FORCEINLINE typename table_type::erase_return_type erase(
+        const_iterator pos)
+      {
+        return table_.erase(pos);
+      }
+
       iterator erase(const_iterator first, const_iterator last)
       {
         while (first != last) {
@@ -702,19 +657,7 @@ namespace boost {
       unordered_flat_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
       unordered_flat_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
     {
-      if (&lhs == &rhs) {
-        return true;
-      }
-
-      return (lhs.size() == rhs.size()) && ([&] {
-        for (auto const& kvp : lhs) {
-          auto pos = rhs.find(kvp.first);
-          if ((pos == rhs.end()) || (*pos != kvp)) {
-            return false;
-          }
-        }
-        return true;
-      })();
+      return lhs.table_ == rhs.table_;
     }
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
@@ -747,18 +690,6 @@ namespace boost {
 #endif
 
 #if BOOST_UNORDERED_TEMPLATE_DEDUCTION_GUIDES
-
-    namespace detail {
-      template <typename T>
-      using iter_key_t =
-        typename std::iterator_traits<T>::value_type::first_type;
-      template <typename T>
-      using iter_val_t =
-        typename std::iterator_traits<T>::value_type::second_type;
-      template <typename T>
-      using iter_to_alloc_t =
-        typename std::pair<iter_key_t<T> const, iter_val_t<T> >;
-    } // namespace detail
 
     template <class InputIterator,
       class Hash =

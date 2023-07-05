@@ -63,6 +63,8 @@
 #if X86
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
+#include "ahash-cxx/hasher.h"
+#include "ahash-cxx/ahash-cxx.h"
 #endif
 
 #if _WIN32 && _WIN64 == 0
@@ -470,6 +472,16 @@ struct Ahash64er
     std::size_t operator()(const std::string& str) const
     {
         return ahash64(str.data(), str.size(), str.size());
+    }
+};
+
+struct Axxhasher
+{
+    std::size_t operator()(const std::string& str) const
+    {
+		ahash::Hasher hasher{1};
+        hasher.consume(str.data(), str.size());
+        return hasher.finalize();
     }
 };
 #endif

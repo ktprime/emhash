@@ -809,6 +809,7 @@ static void benchStringHash(int size, int str_min, int str_max)
     printf("\n%s loops = %d\n", __FUNCTION__, size);
     std::vector<std::string> rndstring;
     rndstring.reserve(size * 4);
+	const uint64_t rseed = rand();
 
     long sum = 0;
     for (int i = 1; i <= 6; i++)
@@ -821,67 +822,76 @@ static void benchStringHash(int size, int str_min, int str_max)
         int t_find = 0;
 
         start = getus();
-        for (auto& v : rndstring)
-            sum += std::hash<std::string>()(v);
+        for (const auto& v : rndstring)
+            sum = std::hash<std::string>()(v);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("std hash    = %4d ms\n", t_find);
 
 #ifdef WYHASH_LITTLE_ENDIAN
         start = getus();
-        for (auto& v : rndstring)
-            sum += wyhash(v.data(), v.size(), 1);
+        for (const auto& v : rndstring)
+            sum = wyhash(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("wyhash      = %4d ms\n", t_find);
 #endif
 
 #if KOMI_HESH
         start = getus();
-        for (auto& v : rndstring)
-            sum += komihash(v.data(), v.size(), 1);
+        for (const auto& v : rndstring)
+            sum = komihash(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("komi_hash   = %4d ms\n", t_find);
 #endif
 
 #ifdef AHASH_AHASH_H
         start = getus();
-        for (auto& v : rndstring)
-            sum += ahash64(v.data(), v.size(), 1);
+        for (const auto& v : rndstring)
+            sum = ahash64(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("ahash       = %4d ms\n", t_find);
+
+        start = getus();
+        for (const auto& v : rndstring) {
+			ahash::Hasher hasher{rseed};
+            hasher.consume(v.data(), v.size());
+            sum = hasher.finalize();
+        }
+        t_find = (getus() - start) / 1000; assert(sum);
+        printf("axxxhash    = %4d ms\n", t_find);
 #endif
 
         start = getus();
-        for (auto& v : rndstring)
-            sum += robin_hood::hash_bytes(v.data(), v.size());
+        for (const auto& v : rndstring)
+            sum = robin_hood::hash_bytes(v.data(), v.size());
         t_find = (getus() - start) / 1000; assert(sum);
         printf("martius hash= %4d ms\n", t_find);
 
 #if 0
         start = getus(); sum = 0;
-        for (auto& v : rndstring)
+        for (const auto& v : rndstring)
             sum += emhash8::HashMap<int,int>::wyhashstr (v.data(), v.size());
         t_find = (getus() - start) / 1000; assert(sum);
         printf("emhash8 hash= %4d ms\n", t_find);
 #endif
 
         start = getus(); sum = 0;
-        for (auto& v : rndstring)
-          sum += ankerl::unordered_dense::detail::wyhash::hash(v.data(), v.size());
+        for (const auto& v : rndstring)
+          sum = ankerl::unordered_dense::detail::wyhash::hash(v.data(), v.size());
         t_find = (getus() - start) / 1000; assert(sum);
         printf("ankerl hash = %4d ms\n", t_find);
 
 #ifdef ABSL_HASH
         start = getus();
-        for (auto& v : rndstring)
-            sum += absl::Hash<std::string>()(v);
+        for (const auto& v : rndstring)
+            sum = absl::Hash<std::string>()(v);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("absl hash   = %4d ms\n", t_find);
 #endif
 
 #ifdef PHMAP_VERSION_MAJOR
         start = getus();
-        for (auto& v : rndstring)
-            sum += phmap::Hash<std::string>()(v);
+        for (const auto& v : rndstring)
+            sum = phmap::Hash<std::string>()(v);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("phmap hash  = %4d ms\n", t_find);
 #endif

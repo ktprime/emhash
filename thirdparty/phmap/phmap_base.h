@@ -223,6 +223,36 @@ struct disjunction<> : std::false_type {};
 template <typename T>
 struct negation : std::integral_constant<bool, !T::value> {};
 
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__) && !defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+    #define PHMAP_OLD_GCC 1
+#else
+    #define PHMAP_OLD_GCC 0
+#endif
+
+#if PHMAP_OLD_GCC
+  template <typename T>
+  struct is_trivially_copy_constructible
+     : std::integral_constant<bool,
+                              __has_trivial_copy(typename std::remove_reference<T>::type) &&
+                              std::is_copy_constructible<T>::value &&
+                              std::is_trivially_destructible<T>::value> {};
+ 
+  template <typename T>
+  struct is_trivially_copy_assignable :
+     std::integral_constant<bool,
+                            __has_trivial_assign(typename std::remove_reference<T>::type) &&
+                            phmap::is_copy_assignable<T>::value> {};
+
+  template <typename T>
+  struct is_trivially_copyable :
+     std::integral_constant<bool, __has_trivial_copy(typename std::remove_reference<T>::type)> {};
+
+#else
+  template <typename T> using is_trivially_copy_constructible = std::is_trivially_copy_constructible<T>;
+  template <typename T> using is_trivially_copy_assignable = std::is_trivially_copy_assignable<T>;
+  template <typename T> using is_trivially_copyable = std::is_trivially_copyable<T>;
+#endif
+
 // -----------------------------------------------------------------------------
 // C++14 "_t" trait aliases
 // -----------------------------------------------------------------------------
@@ -626,7 +656,7 @@ namespace {
 #ifdef PHMAP_HAVE_EXCEPTIONS
   #define PHMAP_THROW_IMPL(e) throw e
 #else
-  #define PHMAP_THROW_IMPL(e) do { (void)(e); std::abort(); } while(0)
+  #define PHMAP_THROW_IMPL(...) std::abort()
 #endif
 }  // namespace
 
@@ -1788,8 +1818,8 @@ protected:
 // supported now, so we use is_trivially_* traits instead.
 template <typename T,
           bool unused =
-          std::is_trivially_copy_constructible<T>::value &&
-          std::is_trivially_copy_assignable<typename std::remove_cv<T>::type>::value &&
+          phmap::is_trivially_copy_constructible<T>::value &&
+          phmap::is_trivially_copy_assignable<typename std::remove_cv<T>::type>::value &&
           std::is_trivially_destructible<T>::value>
 class optional_data;
 
@@ -2021,6 +2051,11 @@ struct optional_hash_base<T, decltype(std::hash<phmap::remove_const_t<T> >()(
 // -----------------------------------------------------------------------------
 // phmap::optional class definition
 // -----------------------------------------------------------------------------
+#if PHMAP_OLD_GCC
+    #define PHMAP_OPTIONAL_NOEXCEPT
+#else
+    #define PHMAP_OPTIONAL_NOEXCEPT noexcept
+#endif
 
 template <typename T>
 class optional : private optional_internal::optional_data<T>,
@@ -2047,7 +2082,7 @@ public:
     optional(const optional& src) = default;
 
     // Move constructor, standard semantics
-    optional(optional&& src) noexcept = default;
+    optional(optional&& src) PHMAP_OPTIONAL_NOEXCEPT = default;
 
     // Constructs a non-empty `optional` direct-initialized value of type `T` from
     // the arguments `std::forward<Args>(args)...`  within the `optional`.
@@ -2187,7 +2222,7 @@ public:
     optional& operator=(const optional& src) = default;
 
     // Move assignment operator, standard semantics
-    optional& operator=(optional&& src) noexcept = default;
+    optional& operator=(optional&& src) PHMAP_OPTIONAL_NOEXCEPT = default;
 
     // Value assignment operators
     template <
@@ -4869,12 +4904,12 @@ public:
 
     struct AbslMutex : protected absl::Mutex
     {
-        void lock()            { this->Lock(); }
-        void unlock()          { this->Unlock(); }
-        void try_lock()        { this->TryLock(); }
-        void lock_shared()     { this->ReaderLock(); }
-        void unlock_shared()   { this->ReaderUnlock(); }
-        void try_lock_shared() { this->ReaderTryLock(); }
+        void lock()            ABSL_EXCLUSIVE_LOCK_FUNCTION()        { this->Lock(); }
+        void unlock()          ABSL_UNLOCK_FUNCTION()                { this->Unlock(); }
+        void try_lock()        ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) { this->TryLock(); }
+        void lock_shared()     ABSL_SHARED_LOCK_FUNCTION()           { this->ReaderLock(); }
+        void unlock_shared()   ABSL_UNLOCK_FUNCTION()                { this->ReaderUnlock(); }
+        void try_lock_shared() ABSL_SHARED_TRYLOCK_FUNCTION(true)    { this->ReaderTryLock(); }
     };
 
     template <>
@@ -4898,7 +4933,6 @@ public:
 // --------------------------------------------------------------------------
 #ifdef BOOST_THREAD_SHARED_MUTEX_HPP
 
-#if 1
     // ---------------------------------------------------------------------------
     template <>
     class  LockableImpl<boost::shared_mutex> : public boost::shared_mutex
@@ -4913,21 +4947,6 @@ public:
         using UniqueLocks     = typename Base::WriteLocks;
         using UpgradeToUnique = typename Base::DoNothing;  // we already have unique ownership
     };
-#else
-    // ---------------------------------------------------------------------------
-    template <>
-    class  LockableImpl<boost::upgrade_mutex> : public boost::upgrade_mutex
-    {
-    public:
-        using mutex_type      = boost::upgrade_mutex;
-        using SharedLock      = boost::shared_lock<mutex_type>;
-        using UpgradeLock     = boost::upgrade_lock<mutex_type>;
-        using UniqueLock      = boost::unique_lock<mutex_type>;
-        using SharedLocks     = typename Base::ReadLocks;
-        using UniqueLocks     = typename Base::WriteLocks;
-        using UpgradeToUnique = boost::upgrade_to_unique_lock<mutex_type>;
-    };
-#endif
 
 #endif // BOOST_THREAD_SHARED_MUTEX_HPP
 

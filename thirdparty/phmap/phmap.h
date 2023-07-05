@@ -2271,17 +2271,19 @@ private:
     }
 
     // Reset all ctrl bytes back to kEmpty, except the sentinel.
-    void reset_ctrl(size_t capacity) {
-        std::memset(ctrl_, kEmpty, capacity + Group::kWidth);
-        ctrl_[capacity] = kSentinel;
-        SanitizerPoisonMemoryRegion(slots_, sizeof(slot_type) * capacity);
+    void reset_ctrl(size_t new_capacity) {
+        std::memset(ctrl_, kEmpty, new_capacity + Group::kWidth);
+        ctrl_[new_capacity] = kSentinel;
+        SanitizerPoisonMemoryRegion(slots_, sizeof(slot_type) * new_capacity);
     }
 
-    void reset_growth_left(size_t capacity) {
-        growth_left() = CapacityToGrowth(capacity) - size_;
+    void reset_growth_left(size_t new_capacity) {
+        growth_left() = CapacityToGrowth(new_capacity) - size_;
     }
 
     size_t& growth_left() { return std::get<0>(settings_); }
+
+    const size_t& growth_left() const { return std::get<0>(settings_); }
 
     template <size_t N,
               template <class, class, class, class> class RefSet,

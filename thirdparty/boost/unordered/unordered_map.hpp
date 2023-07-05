@@ -1061,18 +1061,6 @@ namespace boost {
 
 #if BOOST_UNORDERED_TEMPLATE_DEDUCTION_GUIDES
 
-    namespace detail {
-      template <typename T>
-      using iter_key_t =
-        typename std::iterator_traits<T>::value_type::first_type;
-      template <typename T>
-      using iter_val_t =
-        typename std::iterator_traits<T>::value_type::second_type;
-      template <typename T>
-      using iter_to_alloc_t =
-        typename std::pair<iter_key_t<T> const, iter_val_t<T> >;
-    } // namespace detail
-
     template <class InputIterator,
       class Hash =
         boost::hash<boost::unordered::detail::iter_key_t<InputIterator> >,

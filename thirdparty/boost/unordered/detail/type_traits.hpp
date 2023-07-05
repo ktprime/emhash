@@ -20,6 +20,9 @@
 #include <boost/type_traits/enable_if.hpp>
 #include <boost/type_traits/is_integral.hpp>
 #include <boost/type_traits/remove_const.hpp>
+
+#include <iterator>
+#include <utility>
 #endif
 
 // BOOST_UNORDERED_TEMPLATE_DEDUCTION_GUIDES
@@ -101,6 +104,16 @@ namespace boost {
         !boost::is_integral<H>::value && !is_allocator_v<H>;
 
       template <class P> constexpr bool const is_pred_v = !is_allocator_v<P>;
+
+      template <typename T>
+      using iter_key_t =
+        typename std::iterator_traits<T>::value_type::first_type;
+      template <typename T>
+      using iter_val_t =
+        typename std::iterator_traits<T>::value_type::second_type;
+      template <typename T>
+      using iter_to_alloc_t =
+        typename std::pair<iter_key_t<T> const, iter_val_t<T> >;
 #endif
     } // namespace detail
   }   // namespace unordered
