@@ -459,8 +459,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    void max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 8.0f/9)
     {
+        return lf;
     }
 
     // ------------------------------------------------------------

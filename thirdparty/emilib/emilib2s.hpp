@@ -871,8 +871,10 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if EMH_PREFETCH
+#if __linux__
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+#elif _WIN32
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
     }
 
@@ -887,6 +889,7 @@ private:
 
         const auto filled = SET1_EPI8(key_2hash(key_hash, key));
         int offset = _max_probe_length;
+        prefetch_heap_block((char*)&_pairs[next_bucket]);
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -925,6 +928,7 @@ private:
         const auto round  = bucket + _max_probe_length;
         auto next_bucket  = bucket, offset = bucket;
         size_t hole = (size_t)-1;
+        prefetch_heap_block((char*)&_pairs[next_bucket]);
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -952,7 +956,7 @@ private:
                 const int doffset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(doffset > _max_probe_length))
                     _max_probe_length = doffset / simd_bytes * simd_bytes + simd_bytes - 1;
-               set_states(ebucket, key_h2);
+                set_states(ebucket, key_h2);
                 return ebucket;
             }
 

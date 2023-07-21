@@ -130,8 +130,12 @@ public:
     typedef KeyT   key_type;
 
 #ifdef EMH_H2
-    #define hash_key2(key_hash, key) ((uint8_t)(key_hash >> 24)) << 1
-    //#define hash_key2(key_hash, key) (((uint8_t)(key_hash >> 57)) << 1)
+    template<typename UType>
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    {
+        (void)key_hash;
+        return (uint8_t)((uint8_t)(key_hash >> 24)) << 1;
+    }
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const

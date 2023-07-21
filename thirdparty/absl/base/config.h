@@ -412,7 +412,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
     defined(__asmjs__) || defined(__wasm__) || defined(__Fuchsia__) ||    \
     defined(__sun) || defined(__ASYLO__) || defined(__myriad2__) ||       \
     defined(__HAIKU__) || defined(__OpenBSD__) || defined(__NetBSD__) ||  \
-    defined(__QNX__) || defined(__VXWORKS__)
+    defined(__QNX__) || defined(__VXWORKS__) || defined(__hexagon__)
 #define ABSL_HAVE_MMAP 1
 #endif
 
@@ -487,6 +487,8 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #elif defined(__Fuchsia__)
 // Signals don't exist on fuchsia.
 #elif defined(__native_client__)
+// Signals don't exist on hexagon/QuRT
+#elif defined(__hexagon__)
 #else
 // other standard libraries
 #define ABSL_HAVE_ALARM 1
@@ -520,41 +522,29 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #error "absl endian detection needs to be set up for your compiler"
 #endif
 
-// macOS < 10.13 and iOS < 11 don't let you use <any>, <optional>, or <variant>
-// even though the headers exist and are publicly noted to work, because the
-// libc++ shared library shipped on the system doesn't have the requisite
-// exported symbols.  See https://github.com/abseil/abseil-cpp/issues/207 and
+// macOS < 10.13 and iOS < 12 don't support <any>, <optional>, or <variant>
+// because the libc++ shared library shipped on the system doesn't have the
+// requisite exported symbols.  See
+// https://github.com/abseil/abseil-cpp/issues/207 and
 // https://developer.apple.com/documentation/xcode_release_notes/xcode_10_release_notes
 //
 // libc++ spells out the availability requirements in the file
 // llvm-project/libcxx/include/__config via the #define
-// _LIBCPP_AVAILABILITY_BAD_OPTIONAL_ACCESS.
-//
-// Unfortunately, Apple initially mis-stated the requirements as macOS < 10.14
-// and iOS < 12 in the libc++ headers. This was corrected by
+// _LIBCPP_AVAILABILITY_BAD_OPTIONAL_ACCESS. The set of versions has been
+// modified a few times, via
 // https://github.com/llvm/llvm-project/commit/7fb40e1569dd66292b647f4501b85517e9247953
-// which subsequently made it into the XCode 12.5 release. We need to match the
-// old (incorrect) conditions when built with old XCode, but can use the
-// corrected earlier versions with new XCode.
-#if defined(__APPLE__) && defined(_LIBCPP_VERSION) &&               \
-    ((_LIBCPP_VERSION >= 11000 && /* XCode 12.5 or later: */        \
-      ((defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) &&   \
-        __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101300) ||  \
-       (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) &&  \
-        __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 110000) || \
-       (defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) &&   \
-        __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 40000) ||   \
-       (defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) &&      \
-        __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 110000))) ||   \
-     (_LIBCPP_VERSION < 11000 && /* Pre-XCode 12.5: */              \
-      ((defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) &&   \
-        __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101400) ||  \
-       (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) &&  \
-        __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 120000) || \
-       (defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) &&   \
-        __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 50000) ||   \
-       (defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) &&      \
-        __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 120000))))
+// and
+// https://github.com/llvm/llvm-project/commit/0bc451e7e137c4ccadcd3377250874f641ca514a
+// The second has the actually correct versions, thus, is what we copy here.
+#if defined(__APPLE__) &&                                           \
+    ((defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) &&     \
+      __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101300) ||    \
+     (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) &&    \
+      __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 120000) ||   \
+     (defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) &&     \
+      __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 50000) ||     \
+     (defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) &&        \
+      __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 120000))
 #define ABSL_INTERNAL_APPLE_CXX17_TYPES_UNAVAILABLE 1
 #else
 #define ABSL_INTERNAL_APPLE_CXX17_TYPES_UNAVAILABLE 0
@@ -922,6 +912,26 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #define ABSL_HAVE_CONSTANT_EVALUATED 1
 #elif ABSL_HAVE_BUILTIN(__builtin_is_constant_evaluated)
 #define ABSL_HAVE_CONSTANT_EVALUATED 1
+#endif
+
+// ABSL_INTERNAL_EMSCRIPTEN_VERSION combines Emscripten's three version macros
+// into an integer that can be compared against.
+#ifdef ABSL_INTERNAL_EMSCRIPTEN_VERSION
+#error ABSL_INTERNAL_EMSCRIPTEN_VERSION cannot be directly set
+#endif
+#ifdef __EMSCRIPTEN__
+#include <emscripten/version.h>
+#ifdef __EMSCRIPTEN_major__
+#if __EMSCRIPTEN_minor__ >= 1000
+#error __EMSCRIPTEN_minor__ is too big to fit in ABSL_INTERNAL_EMSCRIPTEN_VERSION
+#endif
+#if __EMSCRIPTEN_tiny__ >= 1000
+#error __EMSCRIPTEN_tiny__ is too big to fit in ABSL_INTERNAL_EMSCRIPTEN_VERSION
+#endif
+#define ABSL_INTERNAL_EMSCRIPTEN_VERSION                          \
+  ((__EMSCRIPTEN_major__)*1000000 + (__EMSCRIPTEN_minor__)*1000 + \
+   (__EMSCRIPTEN_tiny__))
+#endif
 #endif
 
 #endif  // ABSL_BASE_CONFIG_H_

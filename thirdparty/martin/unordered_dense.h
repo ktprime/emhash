@@ -1,7 +1,7 @@
 ///////////////////////// ankerl::unordered_dense::{map, set} /////////////////////////
 
 // A fast & densely stored hashmap and hashset based on robin-hood backward shift deletion.
-// Version 4.0.1
+// Version 4.0.4
 // https://github.com/martinus/unordered_dense
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -32,7 +32,7 @@
 // see https://semver.org/spec/v2.0.0.html
 #define ANKERL_UNORDERED_DENSE_VERSION_MAJOR 4 // NOLINT(cppcoreguidelines-macro-usage) incompatible API changes
 #define ANKERL_UNORDERED_DENSE_VERSION_MINOR 0 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible functionality
-#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 1 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible bug fixes
+#define ANKERL_UNORDERED_DENSE_VERSION_PATCH 4 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible bug fixes
 
 // API versioning with inline namespace, see https://www.foonathan.net/2018/11/inline-namespaces/
 
@@ -598,23 +598,17 @@ public:
         : m_blocks(vec_alloc(alloc)) {}
 
     segmented_vector(segmented_vector&& other, Allocator alloc)
-        : m_blocks(vec_alloc(alloc)) {
-        if (other.get_allocator() == alloc) {
-            *this = std::move(other);
-        } else {
-            // Oh my, allocator is different so we need to copy everything.
-            append_everything_from(std::move(other));
-        }
+        : segmented_vector(alloc) {
+        *this = std::move(other);
     }
-
-    segmented_vector(segmented_vector&& other) noexcept
-        : m_blocks(std::move(other.m_blocks))
-        , m_size(std::exchange(other.m_size, {})) {}
 
     segmented_vector(segmented_vector const& other, Allocator alloc)
         : m_blocks(vec_alloc(alloc)) {
         append_everything_from(other);
     }
+
+    segmented_vector(segmented_vector&& other) noexcept
+        : segmented_vector(std::move(other), get_allocator()) {}
 
     segmented_vector(segmented_vector const& other) {
         append_everything_from(other);
@@ -632,8 +626,14 @@ public:
     auto operator=(segmented_vector&& other) noexcept -> segmented_vector& {
         clear();
         dealloc();
-        m_blocks = std::move(other.m_blocks);
-        m_size = std::exchange(other.m_size, {});
+        if (other.get_allocator() == get_allocator()) {
+            m_blocks = std::move(other.m_blocks);
+            m_size = std::exchange(other.m_size, {});
+        } else {
+            // make sure to construct with other's allocator!
+            m_blocks = std::vector<pointer, vec_alloc>(vec_alloc(other.get_allocator()));
+            append_everything_from(std::move(other));
+        }
         return *this;
     }
 
@@ -906,8 +906,8 @@ private:
         auto ba = bucket_alloc(m_values.get_allocator());
         if (nullptr != m_buckets) {
             bucket_alloc_traits::deallocate(ba, m_buckets, bucket_count());
+            m_buckets = nullptr;
         }
-        m_buckets = nullptr;
         m_num_buckets = 0;
         m_max_bucket_capacity = 0;
     }
@@ -1169,15 +1169,8 @@ public:
         : table(std::move(other), other.m_values.get_allocator()) {}
 
     table(table&& other, allocator_type const& alloc) noexcept
-        : m_values(std::move(other.m_values), alloc)
-        , m_buckets(std::exchange(other.m_buckets, nullptr))
-        , m_num_buckets(std::exchange(other.m_num_buckets, 0))
-        , m_max_bucket_capacity(std::exchange(other.m_max_bucket_capacity, 0))
-        , m_max_load_factor(std::exchange(other.m_max_load_factor, default_max_load_factor))
-        , m_hash(std::exchange(other.m_hash, {}))
-        , m_equal(std::exchange(other.m_equal, {}))
-        , m_shifts(std::exchange(other.m_shifts, initial_shifts)) {
-        other.m_values.clear();
+        : m_values(alloc) {
+        *this = std::move(other);
     }
 
     table(std::initializer_list<value_type> ilist,
@@ -1221,14 +1214,30 @@ public:
         if (&other != this) {
             deallocate_buckets(); // deallocate before m_values is set (might have another allocator)
             m_values = std::move(other.m_values);
-            m_buckets = std::exchange(other.m_buckets, nullptr);
-            m_num_buckets = std::exchange(other.m_num_buckets, 0);
-            m_max_bucket_capacity = std::exchange(other.m_max_bucket_capacity, 0);
-            m_max_load_factor = std::exchange(other.m_max_load_factor, default_max_load_factor);
-            m_hash = std::exchange(other.m_hash, {});
-            m_equal = std::exchange(other.m_equal, {});
-            m_shifts = std::exchange(other.m_shifts, initial_shifts);
             other.m_values.clear();
+
+            // we can only reuse m_buckets when both maps have the same allocator!
+            if (get_allocator() == other.get_allocator()) {
+                m_buckets = std::exchange(other.m_buckets, nullptr);
+                m_num_buckets = std::exchange(other.m_num_buckets, 0);
+                m_max_bucket_capacity = std::exchange(other.m_max_bucket_capacity, 0);
+                m_shifts = std::exchange(other.m_shifts, initial_shifts);
+                m_max_load_factor = std::exchange(other.m_max_load_factor, default_max_load_factor);
+                m_hash = std::exchange(other.m_hash, {});
+                m_equal = std::exchange(other.m_equal, {});
+            } else {
+                // set max_load_factor *before* copying the other's buckets, so we have the same
+                // behavior
+                m_max_load_factor = other.m_max_load_factor;
+
+                // copy_buckets sets m_buckets, m_num_buckets, m_max_bucket_capacity, m_shifts
+                copy_buckets(other);
+                // clear's the other's buckets so other is now already usable.
+                other.clear_buckets();
+                m_hash = other.m_hash;
+                m_equal = other.m_equal;
+            }
+            // map "other" is now already usable, it's empty.
         }
         return *this;
     }

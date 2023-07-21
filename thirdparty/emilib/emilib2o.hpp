@@ -130,8 +130,12 @@ public:
     typedef KeyT   key_type;
 
 #ifdef EMH_H2
-    #define hash_key2(key_hash, key) ((uint8_t)(key_hash >> 24)) << 1
-    //#define hash_key2(key_hash, key) (((uint8_t)(key_hash >> 57)) << 1)
+    template<typename UType>
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    {
+        (void)key_hash;
+        return (uint8_t)((uint8_t)(key_hash >> 24)) << 1;
+    }
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
@@ -144,7 +148,7 @@ public:
     inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
         (void)key_hash;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 40) << 1;
     }
 #endif
 
@@ -806,13 +810,16 @@ public:
         for (int i = 0; i < _num_buckets; i++)
             off[_offset[i]]++;
 
+        size_t total = 0;
         for (int i = 0; i < 256; i++) {
-            if (off[i])
-                printf("\n%3d %3d %.3lf", i, off[i], 100.0 * off[i] / _num_buckets);
+            if (off[i]) {
+                total += off[i];
+                printf("\n%3d %3d %.3lf%% %3.lf%%", i, off[i], 10000.0 * off[i] / _num_buckets, 10000.0 * total / _num_buckets);
+            }
         }
     }
 
-//#define EMH_STATIS 1000'000
+//#define EMH_STATIS 2000'000
     /// Make room for this many elements
     void rehash(size_t num_elems) noexcept
     {
@@ -894,16 +901,33 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if EMH_PREFETCH
+#if __linux__
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
     }
 
+    inline void set_offset(size_t ebucket, uint8_t off)
+    {
+        //if (off > 2)
+        _offset[ebucket] = off;
+    }
+
     inline void set_states(size_t ebucket, uint8_t key_h2)
     {
         _states[ebucket] = key_h2;
+    }
+
+    size_t get_next_bucket(size_t next_bucket, size_t offset) const
+    {
+        next_bucket = (next_bucket + simd_bytes);
+        if (next_bucket > _num_buckets) {
+            next_bucket = offset & _mask;
+        }
+//        else if (offset > 1) next_bucket -= next_bucket % simd_bytes;
+
+        return next_bucket;
     }
 
     // Find the bucket with this key, or return (size_t)-1
@@ -916,6 +940,7 @@ private:
 
         const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         size_t offset = 0;
+        prefetch_heap_block((char*)&_pairs[next_bucket]);
 
         while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -939,9 +964,7 @@ private:
             else if (++offset > _offset[bucket])
                 break;
 
-            next_bucket += simd_bytes;
-            if (EMH_UNLIKELY(next_bucket >= _num_buckets))
-                next_bucket = 0;
+            next_bucket = get_next_bucket(next_bucket, offset);
         }
 
         return _num_buckets;
@@ -961,6 +984,7 @@ private:
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket  = bucket, offset = 0u;
         size_t hole = (size_t)-1;
+        prefetch_heap_block((char*)&_pairs[next_bucket]);
 
         while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -969,7 +993,6 @@ private:
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                //prefetch_heap_block((char*)&_pairs[fbucket]);
                 if (_eq(_pairs[fbucket].first, key)) {
                     bnew = false;
                     return fbucket;
@@ -993,16 +1016,14 @@ private:
             }
 
             //4. next round
-            next_bucket += simd_bytes;
-            if (EMH_UNLIKELY(next_bucket >= _num_buckets))
-                next_bucket = 0;
+            next_bucket = get_next_bucket(next_bucket, ++offset);
 
-            if (++offset > _offset[bucket])
+            if (offset > _offset[bucket])
                 break;
         }
 
         if (EMH_LIKELY(hole != (size_t)-1)) {
-            _offset[bucket] = offset - 1;
+            set_offset(bucket, offset - 1);
             set_states(hole, key_h2);
             return hole;
         }
@@ -1046,9 +1067,9 @@ private:
             new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
             _pairs[kbucket].~PairT();
 
-            _offset[kbucket] = offset - kprobe + 1;
+            set_offset(kbucket, offset - kprobe + 1);
             if (kprobe >= _offset[gbucket])
-                _offset[gbucket] = kprobe + 1;
+                set_offset(gbucket, kprobe + 1);
             return kbucket;
         }
 
@@ -1069,20 +1090,18 @@ private:
 
             else if (offset <= _offset[bucket])
                 return ebucket;
-
-            else if (EMH_UNLIKELY(offset > 32)) {
+#if 1
+            else if (EMH_UNLIKELY(offset > 16)) {
                 const auto kbucket = update_probe(bucket, ebucket, offset);
                 if (kbucket)
                     return kbucket;
             }
-            _offset[bucket] = offset;
+#endif
+            set_offset(bucket, offset);
             return ebucket;
 
 GNEXT:
-            offset      += 1;
-            next_bucket += simd_bytes;
-            if (EMH_UNLIKELY(next_bucket >= _num_buckets))
-                next_bucket = 0;
+            next_bucket = get_next_bucket(next_bucket, ++offset);
         }
 
         return 0;
