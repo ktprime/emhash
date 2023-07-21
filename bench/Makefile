@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS = -flto -O2 -march=native -mtune=native -I.. -I../thirdparty -DNDEBUG=1
+CXXFLAGS = -flto=auto -O3 -march=native -mtune=native -I.. -I../thirdparty -DNDEBUG=1
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)
@@ -122,14 +122,14 @@ ifneq ($(CK),)
 CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
-CXXFLAGS += -static -static-libstdc++ #clang libc++ ?
+CXXFLAGS += -static  #clang libc++  -static-libstdc++?
 
 all:
 ifneq ($(QB),)
-	$(CXX) $(CXXFLAGS) -I. qbench.cpp -o qbench
+	$(CXX) $(CXXFLAGS) -std=c++20 -I. qbench.cpp -o qbench
 endif
 
-	$(CXX) $(CXXFLAGS) martinus_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) bstring.cpp -o bs

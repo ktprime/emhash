@@ -11,8 +11,8 @@
 # include "absl/container/node_hash_map.h"
 # include "absl/container/flat_hash_map.h"
 #endif
-#include "martinus/robin_hood.h"
-#include "martinus/unordered_dense.h"
+#include "martin/robin_hood.h"
+#include "martin/unordered_dense.h"
 #include "../hash_table8.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table5.hpp"
@@ -206,8 +206,8 @@ template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BstrHasher
 template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 
-template<class K, class V> using martinus_flat = robin_hood::unordered_map<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using martin_dense = ankerl::unordered_dense::map<K, V, BstrHasher, std::equal_to<K>>;
 
 template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emilib3_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
@@ -234,8 +234,8 @@ int main()
     test<emhash_map7>( "emhash7::hash_map" );
     test<emhash_map5>( "emhash5::hash_map" );
 
-    test<martinus_dense>("martinus::dense_hash_map" );
-    test<martinus_flat>("martinus::flat_hash_map" );
+    test<martin_dense>("martin::dense_hash_map" );
+    test<martin_flat>("martin::flat_hash_map" );
 
     test<emilib2_map> ("emilib2_map" );
     test<emilib3_map> ("emilib3_map" );

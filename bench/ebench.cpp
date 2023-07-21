@@ -164,7 +164,8 @@ std::map<std::string, std::string> maps =
 //https://martin.ankerl.com/2022/08/27/hashmap-bench-01/
 //https://bannalia.blogspot.com/2022/11/inside-boostunorderedflatmap.html
 
-//
+//https://thenumb.at/Hashtables/#open-addressing-vs-separate-chaining
+//https://www.youtube.com/watch?v=IMnbytvHCjM
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
 #include "fht/fht_ht.hpp"
@@ -179,10 +180,10 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if CXX17
-#include "martinus/unordered_dense.h"
+#include "martin/unordered_dense.h"
 #endif
 
-#include "martinus/robin_hood.h"
+#include "martin/robin_hood.h"
 
 #if PHMAP_HASH
     #include "phmap/phmap.h"
@@ -950,9 +951,9 @@ static void erase_50(hash_type& ht_hash, const std::string& hash_name, const std
         if constexpr( std::is_void_v< decltype( tmp.erase( it ) ) > )
             tmp.erase( it++ );
         else
-#endif
             it = tmp.erase(it);
        sum += 1;
+#endif
     }
     sum += tmp.size();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
@@ -1254,7 +1255,7 @@ static int benchHashMap(int n)
 #elif WY_HASH && KEY_STR
     using ehash_func = WysHasher;
 #elif A_HASH && KEY_STR
-    using ehash_func = Ahash64er;
+    using ehash_func = Axxhasher<std::string>;
 #elif KEY_INT && FIB_HASH > 0
     using ehash_func = Int64Hasher<keyType>; //9 difference hashers
 #elif PHMAP_HASH
@@ -1447,12 +1448,13 @@ static void testHashInt(int loops = 500000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += robin_hood::hash_int(i + r);
-    printf("martinus hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-
+    printf("martin hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+#if CXX17
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += ankerl::unordered_dense::detail::wyhash::hash(i + r);
     printf("ankerl hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+#endif
 #endif
 
     ts = getus(); sum = r;
@@ -1523,7 +1525,7 @@ int main(int argc, char* argv[])
 //    test_lru(100'000'000);
     testHashInt(int(2e7+8));
 
-#ifdef AHASH_AHASH_H
+#ifdef A_HASH
     printf("ahash_version = %s\n", ahash_version());
 #endif
 
@@ -1577,6 +1579,8 @@ int main(int argc, char* argv[])
             }
             else if (c == 'm')
                 maps.erase("martinf");
+            else if (c == 'b')
+                maps.erase("boostf");
             else if (c == 'd')
                 maps.erase("martind");
              else if (c == 'p')

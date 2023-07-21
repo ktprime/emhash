@@ -64,9 +64,11 @@
 //    #define PHMAP_NON_DETERMINISTIC               1
 #endif
 
-#if X64
+#if A_HASH
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
+#include "ahash-cxx/hasher.h"
+#include "ahash-cxx/ahash-cxx.h"
 #endif
 
 #if _WIN32 && _WIN64 == 0
@@ -394,7 +396,7 @@ static inline uint64_t hashmix(uint64_t key)
     auto low  = key * 0xA24BAED4963EE407ull;
     auto high = ror * 0x9FB21C651E98DF25ull;
     auto mix  = low + high;
-    return mix;// (mix >> 32) | (mix << 32);
+    return (mix >> 32) | (mix << 32);
 }
 
 static inline uint64_t rrxmrrxmsx_0(uint64_t v)
@@ -419,6 +421,17 @@ static inline uint64_t hash_mur3(uint64_t key)
     return h;
 }
 
+static inline uint64_t squirrel3(uint64_t at) 
+{
+    constexpr uint64_t BIT_NOISE1 = 0x9E3779B185EBCA87ULL;
+    constexpr uint64_t BIT_NOISE2 = 0xC2B2AE3D27D4EB4FULL;
+    constexpr uint64_t BIT_NOISE3 = 0x27D4EB2F165667C5ULL;
+    at *= BIT_NOISE1; at ^= (at >> 8);
+    at += BIT_NOISE2; at ^= (at << 8);
+    at *= BIT_NOISE3; at ^= (at >> 8);
+    return at;
+}
+
 template<typename T>
 struct Int64Hasher
 {
@@ -435,11 +448,13 @@ struct Int64Hasher
         return hashmix(key);
 #elif FIB_HASH == 5
         return rrxmrrxmsx_0(key);
+#elif FIB_HASH == 6
+        return squirrel3(key);
 #elif FIB_HASH > 10000
         return key % FIB_HASH; //bad hash
 #elif FIB_HASH > 100
         return key * FIB_HASH; //bad hash
-#elif FIB_HASH == 6
+#elif FIB_HASH == 7
         return wyhash64(key, KC);
 #else
         auto x = key;
@@ -468,12 +483,23 @@ void shuffle(RandomIt first, RandomIt last)
     }
 }
 
-#if AHASH_AHASH_H
+#if A_HASH
 struct Ahash64er
 {
     std::size_t operator()(const std::string& str) const
     {
         return ahash64(str.data(), str.size(), str.size());
+    }
+};
+
+template<typename T>
+struct Axxhasher
+{
+    std::size_t operator()(const T& str) const
+    {
+        ahash::Hasher hasher{1};
+        hasher.consume(str.data(), str.size());
+        return hasher.finalize();
     }
 };
 #endif
@@ -711,6 +737,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #define CXX17 1
 #include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 #include "fph/meta_fph_table.h"
+#include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #endif
 
 #if __cplusplus > 201704L || CXX20 || _MSC_VER >= 1929
@@ -718,7 +745,6 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 #endif
 #define CXX20 1
-#include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #include "rigtorp/rigtorp.hpp"   //https://github.com/rigtorp/HashMap/blob/master/include/rigtorp/HashMap.h
 
 //#include "ck/Common/HashTable/HashMap.h"

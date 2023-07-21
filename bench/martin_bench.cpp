@@ -128,7 +128,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -663,7 +663,7 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
             int neighbors = 0;
             vec2{pos}.for_each_surrounding([&](uint32_t xy) {
                 auto x = m1->find(xy);
-				if (x != m1->end()) {
+		    if (x != m1->end()) {
                     neighbors += x->second;
                 }
             });

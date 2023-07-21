@@ -19,8 +19,8 @@
 #endif
 
 #include "./util.h"
-#include "martinus/robin_hood.h"
-#include "martinus/unordered_dense.h"
+#include "martin/robin_hood.h"
+#include "martin/unordered_dense.h"
 
 #include "../hash_table8.hpp"
 #include "../hash_table7.hpp"
@@ -43,7 +43,7 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
 {
     auto t2 = std::chrono::steady_clock::now();
 
-    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")\n";
+    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms;// << " ms (s=" << s << ", size=" << size << ")\n";
 
     t1 = t2;
 }
@@ -244,7 +244,7 @@ struct record
 
 static std::vector<record> times;
 
-#if STD_VIEW && CXX17
+#if STD_VIEW || 1
 #include <string_view>
 using keyType = std::string_view;
 #else
@@ -308,8 +308,8 @@ template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BstrHasher
 template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 
-template<class K, class V> using martinus_flat = robin_hood::unordered_map<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using martin_dense = ankerl::unordered_dense::map<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emilib3_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 
@@ -441,8 +441,8 @@ int main(int argc, const char* argv[])
 
     test<emhash_map7>( "emhash7::hash_map" );
     test<emhash_map8>( "emhash8::hash_map" );
-    test<martinus_dense>("martinus::dense_hash_map" );
-    test<martinus_flat>("martinus::flat_hash_map" );
+    test<martin_dense>("martin::dense_hash_map" );
+    test<martin_flat>("martin::flat_hash_map" );
 
     test<emilib2_map> ("emilib2_map" );
 

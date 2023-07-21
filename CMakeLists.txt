@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(emhash_bench)
 
@@ -28,12 +28,12 @@ if(WIN32)
     add_compile_options(/Ob2 /DNDEBUG /O2 /Ot /Oi /Oy /GL /arch:AVX)
 elseif(1)
 	set(CMAKE_CXX_FLAGS_DEBUG "-g fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
-    set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -march=native -O3 ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-flto -march=native  ${CMAKE_CXX_FLAGS}")
 endif()
 
 add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)
 add_executable(sbench ${PROJECT_SOURCE_DIR}/bench/sbench.cpp)
-add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martinus_bench.cpp)
+add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martin_bench.cpp)
 add_executable(bs ${PROJECT_SOURCE_DIR}/bench/bstring.cpp)
 add_executable(bi ${PROJECT_SOURCE_DIR}/bench/buint64.cpp)
 add_executable(fbench ${PROJECT_SOURCE_DIR}/bench/fbench.cpp)

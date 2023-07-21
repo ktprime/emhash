@@ -36,7 +36,7 @@
 //#include "emilib/emilib12.hpp"
 //#include "emilib/emiset2.hpp"
 
-#include "martinus/robin_hood.h"
+#include "martin/robin_hood.h"
 #include "ska/flat_hash_map.hpp"
 #include "phmap/phmap.h"
 
@@ -45,7 +45,7 @@
 #include "tsl/sparse_map.h"
 #include "tsl/sparse_set.h"
 
-#include "martinus/unordered_dense.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martin/unordered_dense.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #if CXX20
 #include "fph/dynamic_fph_table.h"
 #endif
@@ -56,8 +56,8 @@
     #define QintHasher robin_hood::hash<K>
 #elif ANKERL_HASH
     #define QintHasher ankerl::unordered_dense::hash<K>
-#elif QC_HASH
-    #define QintHasher typename qc::hash::RawMap<K, V>::hasher
+//#elif QC_HASH
+//    #define QintHasher typename qc::hash::RawMap<K, V>::hasher
 #else
     #define QintHasher std::hash<K>
 #endif
@@ -963,22 +963,12 @@ static void compare()
 }
 
 #if QC_HASH
-template <typename K, bool sizeMode = false, bool doTrivialComplex = false>
-struct QcHashSetInfo
-{
-    using Container = qc::hash::RawSet<K>;
-    using AllocatorContainer = qc::hash::RawSet<K, typename qc::hash::RawSet<K>::hasher, qc::memory::RecordAllocator<K>>;
-
-    static constexpr bool isTrivial{std::is_same_v<K, Trivial<sizeof(K)>>};
-//    static inline const std::string name{sizeMode ? std::format("{}{}", (doTrivialComplex ? isTrivial ? "Trivial " : "Complex " : ""), sizeof(K)) : "qc::hash::RawSet"};
-    static inline const std::string name{"qc::hash::RawSet"};
-};
-
 template <typename K, typename V, bool sizeMode = false, bool doTrivialComplex = false>
 struct QcHashMapInfo
 {
     using Container = qc::hash::RawMap<K, V>;
-    using AllocatorContainer = qc::hash::RawMap<K, V, QintHasher, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    //using AllocatorContainer = qc::hash::RawMap<K, V, QintHasher, qc::memory::RecordAllocator<std::pair<K, V>>>;
+    using AllocatorContainer = void;
 
     static constexpr bool isKeyTrivial{std::is_same_v<K, Trivial<sizeof(K)>>};
     static constexpr bool isValTrivial{std::is_same_v<V, Trivial<sizeof(V)>>};
@@ -1260,7 +1250,7 @@ struct EmiLib2SetInfo
 
 int main(const int argc, const char* argv[])
 {
-    assert(argv);
+    printInfo(nullptr);
     // 1v1
     if (argc == 2) {
         using K = size_t;
@@ -1296,9 +1286,9 @@ int main(const int argc, const char* argv[])
         using K = uint32_t;
 #endif
 
-#if TVal == 1
+#if TVal == 0
         using V = size_t;
-#elif TVal == 0
+#elif TVal == 1
         using V = uint32_t;
 #else
         using V = std::string;
@@ -1335,11 +1325,7 @@ int main(const int argc, const char* argv[])
             RobinDenseMapInfo<K, V>,
             EmHash8MapInfo<K, V>,
 
-#if CK_HMAP
-            CkHashMapInfo<K, V>,
-#endif
-
-#if CXX20 && JG
+#if CXX23
             //FphDyamicMapInfo<K,V>,
             JgDenseMapInfo<K, V>,
 #if X86_64
@@ -1351,13 +1337,17 @@ int main(const int argc, const char* argv[])
 #endif
 #endif
 
+#if CK_HMAP
+            CkHashMapInfo<K, V>,
+#endif
+
             EmHash7MapInfo<K, V>,
             EmHash6MapInfo<K, V>,
             EmHash5MapInfo<K, V>
         >();
     }
 
-#if QC_HASH
+#if QC_HASH_
     // Architecture comparison
     else if constexpr (false) {
         using K = u32;

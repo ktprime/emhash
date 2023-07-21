@@ -10,7 +10,7 @@
 #endif
 
 #if CXX17
-#include "martinus/unordered_dense.h"
+#include "martin/unordered_dense.h"
 #endif
 
 #ifdef ET
@@ -121,7 +121,7 @@ std::map<std::string, std::string> maps =
 
 
 #if HOOD_HASH
-    #include "martinus/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #endif
 #if PHMAP_HASH
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
@@ -138,7 +138,7 @@ std::map<std::string, std::string> maps =
 #endif
     #include "tsl/robin_set.h"        //https://github.com/tessil/robin-map
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
-    #include "martinus/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+    #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 #if ET > 1
     #include "tsl/hopscotch_set.h"    //https://github.com/tessil/hopscotch-map
 #endif

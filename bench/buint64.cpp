@@ -7,8 +7,8 @@
 #include <boost/endian/conversion.hpp>
 #include <boost/core/detail/splitmix64.hpp>
 #include <boost/config.hpp>
-#include "martinus/robin_hood.h"
-#include "martinus/unordered_dense.h"
+#include "martin/robin_hood.h"
+#include "martin/unordered_dense.h"
 #include "phmap/phmap.h"
 #include "hash_table7.hpp"
 #include "hash_table6.hpp"
@@ -39,7 +39,7 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
 {
     auto t2 = std::chrono::steady_clock::now();
 
-    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")\n";
+    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms;//<< " ms (s=" << s << ", size=" << size << ")\n";
 
     t1 = t2;
 }
@@ -310,26 +310,26 @@ template<template<class...> class Map>  void test( char const* label )
 template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;
 
 template<class K, class V> using boost_unordered_flat_map =
-    boost::unordered_flat_map<K, V, BintHasher, std::equal_to<K>>;
+    boost::unordered_flat_map<K, V, BintHasher>;
 
 template<class K, class V> using std_unordered_map =
-    std::unordered_map<K, V, BintHasher, std::equal_to<K>, allocator_for<K, V>>;
+    std::unordered_map<K, V, BintHasher, allocator_for<K, V>>;
 
-template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emhash_map6 = emhash6::HashMap<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BintHasher>;
+template<class K, class V> using emhash_map6 = emhash6::HashMap<K, V, BintHasher>;
+template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BintHasher>;
+template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BintHasher>;
 
-template<class K, class V> using martinus_flat = robin_hood::unordered_map<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emilib_map2 = emilib2::HashMap<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using emilib_map3 = emilib3::HashMap<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BintHasher>;
+template<class K, class V> using emilib_map2 = emilib2::HashMap<K, V, BintHasher>;
+template<class K, class V> using emilib_map3 = emilib3::HashMap<K, V, BintHasher>;
 
 #ifdef CXX20
-template<class K, class V> using jg_densemap = jg::dense_hash_map<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using jg_densemap = jg::dense_hash_map<K, V, BintHasher>;
 #endif
-template<class K, class V> using martinus_dense = ankerl::unordered_dense::map<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using phmap_flat  = phmap::flat_hash_map<K, V, BintHasher, std::equal_to<K>>;
-template<class K, class V> using tsl_robin_map= tsl::robin_map<K, V, BintHasher, std::equal_to<K>>;
+template<class K, class V> using martin_dense = ankerl::unordered_dense::map<K, V, BintHasher>;
+template<class K, class V> using phmap_flat  = phmap::flat_hash_map<K, V, BintHasher>;
+template<class K, class V> using tsl_robin_map= tsl::robin_map<K, V, BintHasher>;
 
 #if ABSL_HMAP
 template<class K, class V> using absl_flat_hash_map = absl::flat_hash_map<K, V, BintHasher>;
@@ -359,12 +359,12 @@ int main(int argc, const char* argv[])
     test<jg_densemap> ("jg_densemap" );
 #endif
     test<emhash_map8> ("emhash_map8" );
-    test<martinus_dense>("martinus_dense" );
+    test<martin_dense>("martin_dense" );
 
     test<emhash_map7> ("emhash_map7" );
     test<tsl_robin_map> ("tsl_robin_map" );
     test<phmap_flat> ("phmap_flat" );
-    test<martinus_flat> ("martinus_flat" );
+    test<martin_flat> ("martin_flat" );
 
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6> ("emhash_map6" );

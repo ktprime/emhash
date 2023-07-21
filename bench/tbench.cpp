@@ -2,7 +2,7 @@
 
 #include "tsl/robin_map.h"
 #include "ska/flat_hash_map.hpp"
-#include "martinus/robin_hood.h"
+#include "martin/robin_hood.h"
 #include "phmap/phmap.h"
 #include "hash_table7.hpp"
 #include "hash_table6.hpp"
@@ -15,7 +15,7 @@
 #include "rigtorp/rigtorp.hpp"
 
 #if CXX17
-#include "martinus/unordered_dense.h"
+#include "martin/unordered_dense.h"
 #endif
 #if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -222,7 +222,7 @@ int main(int argc, const char* argv[])
 #endif
 
 
-    hash_table_test<robin_hood::unordered_map<ktype, vtype, QintHasher>>("martinus");
+    hash_table_test<robin_hood::unordered_map<ktype, vtype, QintHasher>>("martin");
     hash_table_test<phmap::flat_hash_map<ktype, vtype, QintHasher>>("phmap_flat");
     hash_table_test<tsl::robin_map<ktype, vtype, QintHasher>>("tsl_robin_map");
 
