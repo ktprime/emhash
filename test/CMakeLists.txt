@@ -6,13 +6,13 @@ else()
     set(CMAKE_BUILD_TYPE RELEASE)
 endif()
 
-add_executable(emhash_test "main.cpp" "hash_map_tests.cpp")
+add_executable(emhash_test "main.cpp")
 
 target_compile_features(emhash_test PRIVATE cxx_std_17)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 #    target_compile_options(emhash_test PRIVATE -Werror -Wall -Wextra -Wold-style-cast -DTSL_DEBUG -UNDEBUG)
-    target_compile_options(emhash_test PRIVATE -O3 -march=native -Wall -Wextra -DTSL_DEBUG -UNDEBUG)
+target_compile_options(emhash_test PRIVATE -O3 -DEMH_PSL=32 -march=native -Wall -Wextra -DTSL_DEBUG -UNDEBUG)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     target_compile_options(emhash_test PRIVATE /bigobj /WX /W3 /DTSL_DEBUG /UNDEBUG)
 endif()

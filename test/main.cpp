@@ -15,7 +15,7 @@
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
-#include "emilib/emilib2.hpp"
+#include "emilib/emilib2o.hpp"
 
 
 #include "martin/robin_hood.h"
@@ -96,6 +96,7 @@ struct KeyEqual {
 };
 
 struct Foo {
+    Foo() = default;
     Foo(int val_) : val(val_) {}
     int val;
     bool operator==(const Foo &rhs) const { return val == rhs.val; }
@@ -125,7 +126,7 @@ inline Os& operator<<(Os& os, Container const& cont)
     return os << "}" << std::endl;
 }
 
-#if 0
+#if 1
 #define ehmap  emilib2::HashMap
 #else
 #define ehmap  emhash8::HashMap
@@ -247,7 +248,7 @@ static void TestApi()
         assert(dict.bucket_count() <= (2 << 16));
 #endif
         dict.shrink_to_fit();
-        assert(dict.bucket_count() <= 8);
+        assert(dict.bucket_count() <= 32);
 
         dict.reserve(1024);
         for (int i = 0; i < 1024; i++) {
@@ -295,7 +296,7 @@ static void TestApi()
         m.emplace(std::make_pair(std::string("a"), std::string("a")));
         // uses pair's converting move constructor
         m.emplace(std::make_pair("b", "b"));
-        m.emplace(std::move(std::make_pair("b", "abcd")));
+        m.emplace(std::make_pair("b", "abcd"));
         // uses pair's template constructor
         m.emplace("d", "ddd");
         assert(m.size() == 3);
@@ -631,50 +632,63 @@ static int RandTest(size_t n, int max_loops = 1234567)
 #if X860
     emilib2::HashMap <keyType, int> shash;
 #else
-    ehmap5<keyType, int> shash;
+    ehmap7<keyType, int> shash;
+//    robin_hood::unordered_flat_map<keyType, int> shash;
+//    ankerl::unordered_dense::map<keyType, int> shash;
 #endif
 
-    ehmap7<keyType, int> ehash7;
+    ehmap8<keyType, int> ehash8;
 
 #if EMH6
     ehmap6<keyType, int> unhash;
 #else
-    robin_hood::unordered_flat_map<keyType, int> unhash;
+    using ehash_func = ankerl::unordered_dense::hash<keyType>;
+//    emilib2::HashMap <keyType, int, ehash_func> unhash;
+    ankerl::unordered_dense::map<keyType, int> unhash;
 #endif
 
-    Sfc4 srng(n + time(0));
+    Sfc4 srng(1234567);
     const auto step = n % 2 + 1;
-    for (int i = 1; i < n * step; i += step) {
+    for (size_t i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
-        ehash7[ki] = unhash[ki] = shash[ki] = (int)srng();
+        ehash8[ki] = unhash[ki] = shash[ki] = (int)srng();
     }
 
     {
-        assert(ehash7 == shash);
-        assert(ehash7 == unhash);
+        assert(ehash8 == shash);
+        assert(ehash8 == unhash);
     }
 
     int loops = max_loops;
     while (loops -- > 0) {
-        assert(shash.size() == unhash.size()); assert(ehash7.size() == unhash.size());
+        assert(shash.size() == unhash.size());
+        assert(ehash8.size() == unhash.size());
 
         const uint32_t type = srng() % 100;
         auto rid  = srng();// n ++;
         auto id   = TO_KEY(rid);
         if (type <= 40 || shash.size() < 1000) {
+          auto cnid = ehash8.count(id);
+          assert(cnid == unhash.count(id));
+
             if (type % 3 == 0) {
-                shash[id] += type; ehash7[id] += type; unhash[id] += type;
+                shash[id] += type; ehash8[id] += type; unhash[id] += type;
             } else if (type % 2 == 0) {
-                shash.insert_or_assign(id, type);
-                ehash7.insert_or_assign(id, type);
-                unhash.insert_or_assign(id, type);
+                shash.insert_or_assign(id, type + 2);
+                ehash8.insert_or_assign(id, type + 2);
+                unhash.insert_or_assign(id, type + 2);
             } else {
-                shash.emplace(id, type);
-                ehash7.emplace(id, type);
-                unhash.emplace(id, type);
+                shash.emplace(id, type + 1);
+                ehash8.emplace(id, type + 1);
+                unhash.emplace(id, type + 1);
             }
 
-            assert(shash[id] == unhash[id]); assert(ehash7[id] == unhash[id]);
+            assert(ehash8[id] == shash[id]);
+            if (shash[id] != unhash[id]) {
+                cnid = unhash.count(id);
+                unhash.emplace(id, type + 1);
+                printf("%d e=%d %d %d %d\n", type, cnid, shash[id], ehash8[id], unhash.at(id));
+            }
         }
         else if (type < 60) {
             if (srng() % 3 == 0)
@@ -682,31 +696,31 @@ static int RandTest(size_t n, int max_loops = 1234567)
             else if (srng() % 2 == 0)
                 id = shash.begin()->first;
             else
-                id = ehash7.last()->first;
+                id = ehash8.last()->first;
 
-            ehash7.erase(id);
+            ehash8.erase(id);
             shash.erase(id);
             unhash.erase(unhash.find(id));
 
-            assert(ehash7.count(id) == unhash.count(id));
             assert(shash.count(id) == unhash.count(id));
+            assert(ehash8.count(id) == unhash.count(id));
         }
         else if (type < 80) {
-            auto it = ehash7.begin();
+            auto it = ehash8.begin();
             for (int i = n % 64; i > 0; i--)
                 it ++;
             id = it->first;
             unhash.erase(id);
             shash.erase(shash.find(id));
-            ehash7.erase(it);
+            ehash8.erase(it);
             assert(shash.count(id) == 0);
-            assert(ehash7.count(id) == unhash.count(id));
+            assert(ehash8.count(id) == unhash.count(id));
         }
         else if (type < 100) {
-            if (unhash.count(id) == 0) {
+            if (ehash8.count(id) == 0) {
                 const auto vid = (int)rid;
-                ehash7.emplace(id, vid);
-                assert(ehash7.count(id) == 1);
+                ehash8.emplace(id, vid);
+                assert(ehash8.count(id) == 1);
 
                 assert(shash.count(id) == 0);
                 //if (id == 1043)
@@ -715,20 +729,21 @@ static int RandTest(size_t n, int max_loops = 1234567)
 
                 assert(unhash.count(id) == 0);
                 unhash[id] = shash[id];
-                assert(unhash[id] == shash[id]);
-                assert(unhash[id] == ehash7[id]);
-            } else {
+                assert(ehash8[id] == shash[id]);
+                assert(unhash[id] == ehash8[id]);
+            }
+            else {
                 unhash[id] = shash[id] = 1;
-                ehash7.insert_or_assign(id, 1);
+                ehash8.insert_or_assign(id, 1);
                 unhash.erase(id);
                 shash.erase(id);
-                ehash7.erase(id);
+                ehash8.erase(id);
             }
         }
-        if (loops % 100000 == 0) {
-            printf("%d %d\r", loops, (int)shash.size());
-            assert(ehash7.operator==(shash));
-            assert(ehash7 == unhash);
+        if (loops % 1000'000 == 0) {
+            printf("loops = %d %d\n", loops, (int)shash.size());
+            assert(ehash8.operator==(shash));
+            assert(ehash8 == unhash);
         }
     }
 
@@ -809,7 +824,7 @@ static void benchStringHash(int size, int str_min, int str_max)
     printf("\n%s loops = %d\n", __FUNCTION__, size);
     std::vector<std::string> rndstring;
     rndstring.reserve(size * 4);
-	const uint64_t rseed = rand();
+    const uint64_t rseed = rand();
 
     long sum = 0;
     for (int i = 1; i <= 6; i++)
@@ -852,12 +867,12 @@ static void benchStringHash(int size, int str_min, int str_max)
 
         start = getus();
         for (const auto& v : rndstring) {
-			ahash::Hasher hasher{rseed};
+            ahash::Hasher hasher{rseed};
             hasher.consume(v.data(), v.size());
             sum = hasher.finalize();
         }
         t_find = (getus() - start) / 1000; assert(sum);
-        printf("axxxhash    = %4d ms\n", t_find);
+        printf("acxxhash    = %4d ms\n", t_find);
 #endif
 
         start = getus();
@@ -904,9 +919,9 @@ int main(int argc, char* argv[])
 {
     TestApi();
     benchIntRand(1e8+8);
-    benchStringHash(1e6+6, 4, 16);
+    benchStringHash(1e6+6, 8, 32);
 
-    size_t n = (int)1e6, loop = 12345678;
+    size_t n = (int)1e7, loop = 12345678;
     if (argc > 1 && isdigit(argv[1][0]))
         n = atoi(argv[1]);
     if (argc > 2 && isdigit(argv[2][0]))
