@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS = -flto=auto -O3 -march=native -mtune=native -I.. -I../thirdparty -DNDEBUG=1
+CXXFLAGS = -flto=auto -O3 -DEMH_PSL=16 -DNDEBUG=1 -march=native -I.. -I../thirdparty 
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)

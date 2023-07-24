@@ -18,7 +18,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/thirdparty)
 include_directories(${PROJECT_SOURCE_DIR}/bench)
 
-add_definitions(-DHAVE_BOOST=1 -DABSL_HAMP=1 -DET=1)
+add_definitions(-DHAVE_BOOST=1 -DABSL_HAMP=1 -DEMH_PSL=16)# -DET=1)
 find_package(Threads REQUIRED)
 
 if(WIN32)

@@ -166,16 +166,16 @@ template <typename HashTableType> void hash_table_test(const char* map)
 
         if (max_trials >= 20) {
             printf("|95%%       |");
-            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_95); printf("\n");
+            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_95 / 100); printf("\n");
         }
 
         if (max_trials >= 100) {
             printf("|99%%       |");
-            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_99); printf("\n");
+            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_99 / 100); printf("\n");
         }
         if (max_trials >= 1000) {
             printf("|999%%      |");
-            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_999); printf("\n");
+            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_999 / 100); printf("\n");
         }
         printf("\n");
     }
@@ -210,8 +210,10 @@ int main(int argc, const char* argv[])
     using QintHasher = Int64Hasher<ktype>;
 #elif HOOD_HASH
     using QintHasher = robin_hood::hash<ktype>;
-#else
+#elif STD_HASH
     using QintHasher = std::hash<ktype>;
+#else
+    using QintHasher = ankerl::unordered_dense::hash<ktype>;
 #endif
 
     hash_table_test<rigtorp::HashMap<ktype, vtype, QintHasher>>("rigtorp");

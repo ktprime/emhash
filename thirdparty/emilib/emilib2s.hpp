@@ -142,14 +142,14 @@ public:
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
     {
         (void)key;
-        return (uint8_t)(key_hash >> 28) << 1;
+        return (uint8_t)(key_hash >> 24) << 1;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
     inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
     {
         (void)key_hash;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) << 1;
     }
 #endif
 
@@ -285,6 +285,8 @@ public:
         reference operator*() const { return _map->_pairs[_bucket]; }
         pointer operator->() const { return _map->_pairs + _bucket; }
 
+        bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
+        bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
         bool operator==(const const_iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const const_iterator& rhs) const { return _bucket != rhs._bucket; }
 
@@ -501,6 +503,20 @@ public:
         return find_filled_bucket(k) != _num_buckets;
     }
 
+    template<typename Key = KeyT>
+    ValueT& at(const KeyT& key)
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
+    }
+
+    template<typename Key = KeyT>
+    const ValueT& at(const KeyT& key) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
+    }
+
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
     ValueT* try_get(const K& k)
@@ -516,6 +532,23 @@ public:
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
     }
+
+    template<typename Con>
+    bool operator == (const Con& rhs) const
+    {
+        if (size() != rhs.size())
+            return false;
+
+        for (auto it = begin(), last = end(); it != last; ++it) {
+            auto oi = rhs.find(it->first);
+            if (oi == rhs.end() || it->second != oi->second)
+                return false;
+        }
+        return true;
+    }
+
+    template<typename Con>
+    bool operator != (const Con& rhs) const { return !(*this == rhs); }
 
     void merge(HashMap& rhs)
     {
@@ -587,14 +620,14 @@ public:
     {
         return do_insert(value);
     }
-
+#if 0
     iterator insert(iterator hint, const value_type& value) noexcept
     {
         (void)hint;
         return do_insert(value).first;
     }
+#endif
 
-#if 0
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
@@ -602,7 +635,20 @@ public:
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
     }
-#endif
+
+    template<class... Args>
+    std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
+    {
+        check_expand_need();
+        return do_insert(key, std::forward<Args>(args)...);
+    }
+
+    template<class... Args>
+    std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
+    {
+        check_expand_need();
+        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
+    }
 
     void insert(std::initializer_list<value_type> ilist) noexcept
     {

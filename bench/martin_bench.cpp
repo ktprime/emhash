@@ -5,6 +5,7 @@
 #include <sys/resource.h>
 #endif
 
+//#define EMH_ITER_SAFE 1
 //#include "wyhash.h"
 
 //#define EMH_STATIS 1
@@ -339,7 +340,83 @@ static void bench_AccidentallyQuadratic()
     }
     assert(map.size() == map2.size());
 #endif
-    printf(" time use %.2f s\n", now2sec() - nows);
+    printf(" time %.2f s\n", now2sec() - nows);
+}
+
+template<class MAP>
+static void bench_insert_erase_begin()
+{
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+    printf("    %s", map_name);
+
+    size_t max_n = 100000;
+    auto nows = now2sec();
+
+    for (int i = 0; i < 3; ++i) {
+        auto starts = now2sec();
+        MAP map;
+        MRNG rng(999 + i);
+
+        // benchmark randomly inserting & erasing begin
+        for (size_t i = 0; i < max_n / 2; ++i) 
+            map.emplace((int64_t)rng(), 0);
+
+        for (size_t i = 0; i < max_n; ++i) {
+            map.erase(map.begin());
+            map.emplace((int64_t)rng(), 0);
+        }
+
+        printf("\n\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
+        max_n *= 5;
+    }
+
+    printf(" total (%.2f s)\n", now2sec() - nows);
+}
+
+template<class MAP>
+static void bench_insert_erase_continue()
+{
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+    printf("    %s", map_name);
+
+    size_t max_n = 1000000;
+    auto nows = now2sec();
+
+    for (int i = 0; i < 4; ++i) {
+        auto starts = now2sec();
+        MAP map;
+        MRNG rng(2023 + i);
+
+        // benchmark randomly inserting & erasing begin
+        for (size_t i = 0; i < max_n / 3; ++i)
+            map.emplace((uint32_t)rng(), 0);
+
+        auto key = map.begin()->first;
+        for (size_t i = max_n; i > 0; i--) {
+            auto it = map.find(key);
+            if (it == map.end()) {
+                it = map.begin();
+                key = it->first;
+            }
+
+            if constexpr(std::is_void_v<decltype(map.erase(it))>) {
+                map.erase(it), key = (++it)->first;
+            } else {
+                it = map.erase(it), key = it->first;
+            }
+
+            map.emplace((uint32_t)rng(), 0);
+        }
+
+        printf("\n\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
+        max_n *= 3;
+    }
+
+    printf(" total (%.2f s)\n", now2sec() - nows);
 }
 
 template <typename T>
@@ -663,7 +740,7 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
             int neighbors = 0;
             vec2{pos}.for_each_surrounding([&](uint32_t xy) {
                 auto x = m1->find(xy);
-		    if (x != m1->end()) {
+                if (x != m1->end()) {
                     neighbors += x->second;
                 }
             });
@@ -1780,6 +1857,113 @@ static void runTest(int sflags, int eflags)
 #endif
     }
 
+    if (sflags <= 12 && eflags >= 12)
+    {
+#if ABSL_HASH
+        typedef absl::Hash<int> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<int> hash_func;
+#elif STD_HASH
+        typedef std::hash<int> hash_func;
+#elif HOOD_HASH
+        typedef robin_hood::hash<int> hash_func;
+#else
+        typedef ankerl::unordered_dense::hash<int> hash_func;
+#endif
+
+        puts("\nbench_InsertEraseContinue:");
+
+        {  bench_insert_erase_continue<emhash6::HashMap<int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<emhash7::HashMap<int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<emhash5::HashMap<int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<emhash8::HashMap<int, int, hash_func>>(); }
+
+#if QC_HASH
+        {  bench_insert_erase_continue<qc::hash::RawMap<int, int, hash_func>>(); }
+#endif
+#if CXX20
+        {  bench_insert_erase_continue<jg::dense_hash_map<int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<rigtorp::HashMap<int, int, hash_func>>(); }
+#endif
+#if CXX17
+        {  bench_insert_erase_continue<ankerl::unordered_dense::map <int, int, hash_func>>(); }
+#endif
+#if HAVE_BOOST
+        {  bench_insert_erase_continue<boost::unordered_flat_map <int, int, hash_func>>(); }
+#endif
+#if ABSL_HMAP
+        {  bench_insert_erase_continue<absl::flat_hash_map <int, int, hash_func>>(); }
+#endif
+
+#if X860
+        {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
+#endif
+#if ET
+        {  bench_insert_erase_continue<hrd_m::hash_map <int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<tsl::robin_map  <int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<robin_hood::unordered_map <int, int, hash_func>>(); }
+
+#if X86_64
+        {  bench_insert_erase_continue<ska::flat_hash_map <int, int, hash_func>>(); }
+#endif
+        {  bench_insert_erase_continue<phmap::flat_hash_map <int, int, hash_func>>(); }
+#endif
+    }
+
+    if (sflags <= 13 && eflags >= 13)
+    {
+#if ABSL_HASH
+        typedef absl::Hash<int64_t> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<int64_t> hash_func;
+#elif STD_HASH
+        typedef std::hash<int64_t> hash_func;
+#elif HOOD_HASH
+        typedef robin_hood::hash<int64_t> hash_func;
+#else
+        typedef ankerl::unordered_dense::hash<int64_t> hash_func;
+#endif
+
+        puts("\nbench_InsertEraseBegin:");
+
+        {  bench_insert_erase_begin<emhash6::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_insert_erase_begin<emhash7::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_insert_erase_begin<emhash5::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_insert_erase_begin<emhash8::HashMap<int64_t, int, hash_func>>(); }
+
+#if QC_HASH
+        {  bench_insert_erase_begin<qc::hash::RawMap<int64_t, int, hash_func>>(); }
+#endif
+#if CXX20
+        {  bench_insert_erase_begin<jg::dense_hash_map<int64_t, int, hash_func>>(); }
+//        {  bench_insert_erase_begin<rigtorp::HashMap<int64_t, int, hash_func>>(); }
+#endif
+#if CXX17
+        {  bench_insert_erase_begin<ankerl::unordered_dense::map <int64_t, int, hash_func>>(); }
+#endif
+#if HAVE_BOOST
+        {  bench_insert_erase_begin<boost::unordered_flat_map <int64_t, int, hash_func>>(); }
+#endif
+#if ABSL_HMAP
+        {  bench_insert_erase_begin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
+#endif
+
+#if X860
+        {  bench_insert_erase_begin<emilib2::HashMap <int64_t, int, hash_func>>(); }
+#endif
+#if ET
+//        {  bench_insert_erase_begin<hrd_m::hash_map <int64_t, int, hash_func>>(); }
+        {  bench_insert_erase_begin<tsl::robin_map  <int64_t, int, hash_func>>(); }
+        {  bench_insert_erase_begin<robin_hood::unordered_map <int64_t, int, hash_func>>(); }
+
+#if X86_64
+//        {  bench_insert_erase_begin<ska::flat_hash_map <int64_t, int, hash_func>>(); }
+#endif
+        //{  bench_insert_erase_begin<phmap::flat_hash_map <int64_t, int, hash_func>>(); }
+#endif
+    }
+
+
     printf("\ntotal time = %.2f s", now2sec() - start);
 }
 
@@ -1799,7 +1983,7 @@ int main(int argc, char* argv[])
     for (auto& m : show_name)
         printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
 
-    int sflags = 1, eflags = 11;
+    int sflags = 1, eflags = 20;
     if (argc > 1) {
         printf("cmd agrs = %s\n", argv[1]);
         for (int c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {

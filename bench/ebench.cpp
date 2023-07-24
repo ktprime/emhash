@@ -569,7 +569,7 @@ static void insert_erase(const std::string& hash_name, const std::vector<keyType
     if (vList.size() % 3 == 0)
         ht_hash.clear();
 
-#if CXX17 && !SMAP
+#if CXX17 && SMAP == 0
     //load_factor = 0.5
     const auto vmedium = (1u << ilog(vList.size() / 100, 2)) * 5 / 10;
     for (size_t i = 0; i < vList.size(); i++) {
@@ -705,7 +705,7 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
     auto ts1 = getus(); size_t sum = 1;
     hash_type tmp(ht_hash);
 
-    for (auto & v : vList) {
+    for (const auto & v : vList) {
 #if KEY_INT
         auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
 #elif KEY_CLA
@@ -728,6 +728,56 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 #endif
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1, 3);
+}
+
+template<class hash_type>
+static void insert_erase_first(const std::string& hash_name, int nsize)
+{
+#if KEY_INT
+    hash_type ht_hash;
+    auto ts1 = getus(); size_t sum = 0;
+    WyRand srng(nsize);
+    for (int i = nsize; i > 0; i--) {
+        ht_hash.emplace((keyType)srng(), TO_VAL(0));
+        if (ht_hash.size() > nsize / 4) {
+            ht_hash.erase(ht_hash.begin());
+            sum += i;
+        }
+    }
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+#endif
+}
+
+template<class hash_type>
+static void insert_erase_continue(const std::string& hash_name, int nsize)
+{
+#if KEY_INT
+    hash_type ht_hash;
+    auto ts1 = getus(); size_t sum = 0;
+    WyRand srng(nsize);
+    for (int i = nsize / 3; i > 0; i--) {
+        sum += i;
+        ht_hash.emplace((keyType)srng(), TO_VAL(0));
+    }
+
+    auto key = ht_hash.begin()->first;
+    for (int i = nsize; i > 0; i--) {
+        auto it = ht_hash.find(key);
+        if (it == ht_hash.end()) {
+            it = ht_hash.begin();
+            key = it->first;
+        }
+
+        if constexpr(std::is_void_v< decltype(ht_hash.erase(it))>)
+            ht_hash.erase(it), key = (++it)->first;
+        else
+            it = ht_hash.erase(it), key = it->first;
+
+        ht_hash.emplace((keyType)srng(), TO_VAL(0));
+    }
+
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+#endif
 }
 
 template<class hash_type>
@@ -811,11 +861,12 @@ static void insert_erase_high(const std::string& hash_name, size_t vSize)
 {
 #if TKey < 2
     hash_type ht_hash;
-    ht_hash.max_load_factor(0.99f);
-    auto mlf = ht_hash.max_load_factor() - 0.001f;
+    auto max_lf = 0.90;
+    ht_hash.max_load_factor(max_lf);
+    auto mlf = max_lf - 0.001f;
     ht_hash.reserve(vSize);
 
-    WyRand srng(vSize / 10);
+    WyRand srng(vSize);
     int loop = 0;
     for (auto i = vSize; i > 0; i--) {
         ht_hash.emplace((keyType)srng(), TO_VAL(0));
@@ -827,7 +878,7 @@ static void insert_erase_high(const std::string& hash_name, size_t vSize)
 
     auto sum = 0;
     auto ts1 = getus();
-    WyRand srng2(vSize / 10);
+    WyRand srng2(vSize);
     for (size_t i = 0; i < vSize; i++) {
         ht_hash[(keyType)srng()];
         sum += ht_hash.erase(srng2());
@@ -1147,6 +1198,8 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     erase_50_reinsert<hash_type>(hash, hash_name, oList);
 
     insert_find_erase <hash_type>(hash, hash_name, nList);
+    insert_erase_first<hash_type>(hash_name, oList.size() % 123456);
+    insert_erase_continue<hash_type>(hash_name, oList.size() % 2123456);
     iter_all          <hash_type>(hash, hash_name);
 
     if (test_extra) {

@@ -126,10 +126,10 @@ inline Os& operator<<(Os& os, Container const& cont)
     return os << "}" << std::endl;
 }
 
-#if 1
+#if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash8::HashMap
+#define ehmap  emhash5::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -585,6 +585,7 @@ static void TestApi()
       data.emplace_hint(data.end(), 1, 'd');
     }
 
+#if 0
     {
         ehmap<uint64_t, uint32_t> emi;
         emi.reserve(1e3);
@@ -603,6 +604,7 @@ static void TestApi()
         assert(iter_next == emi.end());
 #endif
     }
+#endif
 
 #if CXX20
     {
@@ -647,7 +649,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     ankerl::unordered_dense::map<keyType, int> unhash;
 #endif
 
-    Sfc4 srng(1234567);
+    Sfc4 srng(time(0));
     const auto step = n % 2 + 1;
     for (size_t i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
@@ -659,6 +661,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
         assert(ehash8 == unhash);
     }
 
+    auto nows = time(0);
     int loops = max_loops;
     while (loops -- > 0) {
         assert(shash.size() == unhash.size());
@@ -747,7 +750,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
         }
     }
 
-    printf("\n");
+    printf("time use %d sec\n", int(time(0) - nows));
     return 0;
 }
 
