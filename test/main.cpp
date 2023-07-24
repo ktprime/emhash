@@ -16,6 +16,7 @@
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
 #include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
 
 
 #include "martin/robin_hood.h"
@@ -129,7 +130,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash5::HashMap
+#define ehmap  emhash7::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -585,7 +586,7 @@ static void TestApi()
       data.emplace_hint(data.end(), 1, 'd');
     }
 
-#if 0
+#if 1
     {
         ehmap<uint64_t, uint32_t> emi;
         emi.reserve(1e3);
@@ -634,7 +635,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 #if X860
     emilib2::HashMap <keyType, int> shash;
 #else
-    ehmap7<keyType, int> shash;
+    ehmap6<keyType, int> shash;
 //    robin_hood::unordered_flat_map<keyType, int> shash;
 //    ankerl::unordered_dense::map<keyType, int> shash;
 #endif
@@ -645,7 +646,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     ehmap6<keyType, int> unhash;
 #else
     using ehash_func = ankerl::unordered_dense::hash<keyType>;
-//    emilib2::HashMap <keyType, int, ehash_func> unhash;
+//    emhash5::HashMap <keyType, int> unhash;
     ankerl::unordered_dense::map<keyType, int> unhash;
 #endif
 

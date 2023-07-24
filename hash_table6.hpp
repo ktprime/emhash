@@ -119,7 +119,7 @@ namespace emhash6 {
 static_assert((int)INACTIVE < 0, "INACTIVE must be even and < 0(to int)");
 
 //https://gist.github.com/jtbr/1896790eb6ad50506d5f042991906c30
-static size_type CTZ(size_t n)
+static inline size_type CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -268,7 +268,7 @@ public:
 #if EMH_ITER_SAFE
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 #else
-        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _from = -1; }
 #endif
 
         void init()
@@ -302,6 +302,9 @@ public:
 
         iterator& operator++()
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_type)-1) init();
+#endif
             _bmask &= _bmask - 1;
             goto_next_element();
             return *this;
@@ -309,6 +312,9 @@ public:
 
         iterator operator++(int)
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_type)-1) init();
+#endif
             iterator old = *this;
             _bmask &= _bmask - 1;
             goto_next_element();
@@ -363,11 +369,11 @@ public:
         typedef const value_pair&          reference;
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
-        const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+        //const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 #if EMH_ITER_SAFE
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 #else
-        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _from = -1; }
 #endif
 
         void init()
@@ -389,12 +395,18 @@ public:
 
         const_iterator& operator++()
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_type)-1) init();
+#endif
             goto_next_element();
             return *this;
         }
 
         const_iterator operator++(int)
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_type)-1) init();
+#endif
             const_iterator old(*this);
             goto_next_element();
             return old;
@@ -612,9 +624,10 @@ public:
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this, CTZ(bmask), true};
+            return {this, CTZ(bmask)};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
+        it.init();
         return it.next();
     }
 
@@ -627,9 +640,10 @@ public:
 
         const auto bmask = ~(*(size_t*)_bitmask);
         if (bmask != 0)
-            return {this, CTZ(bmask), true};
+            return {this, CTZ(bmask)};
 
         iterator it(this, sizeof(bmask) * 8 - 1);
+        it.init();
         return it.next();
     }
 
