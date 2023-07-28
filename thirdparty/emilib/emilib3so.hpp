@@ -132,24 +132,29 @@ public:
     typedef ValueT mapped_type;
     typedef ValueT val_type;
     typedef KeyT   key_type;
+    typedef HashT  hasher;
+    typedef EqT    key_equal;
 
 #ifdef EMH_H2
-    #define key_2hash(key_hash, key) ((uint8_t)(key_hash >> 24)) << 1
-#elif EMH_H3
-    #define key_2hash(key_hash, key) (uint8_t)(key_hash & 0xFE)
+    template<typename UType>
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    {
+        (void)key_hash;
+        return (uint8_t)((uint8_t)(key_hash >> 28)) << 1;
+    }
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
         (void)key;
         return (uint8_t)(key_hash >> 28) << 1;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
         (void)key_hash;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) << 1;
     }
 #endif
 
@@ -285,6 +290,8 @@ public:
         reference operator*() const { return _map->_pairs[_bucket]; }
         pointer operator->() const { return _map->_pairs + _bucket; }
 
+        bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
+        bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
         bool operator==(const const_iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const const_iterator& rhs) const { return _bucket != rhs._bucket; }
 
@@ -499,6 +506,20 @@ public:
         return find_filled_bucket(k) != _num_buckets;
     }
 
+    template<typename Key = KeyT>
+    ValueT& at(const KeyT& key)
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
+    }
+
+    template<typename Key = KeyT>
+    const ValueT& at(const KeyT& key) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
+    }
+
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
     ValueT* try_get(const K& k)
@@ -514,6 +535,23 @@ public:
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
     }
+
+    template<typename Con>
+    bool operator == (const Con& rhs) const
+    {
+        if (size() != rhs.size())
+            return false;
+
+        for (auto it = begin(), last = end(); it != last; ++it) {
+            auto oi = rhs.find(it->first);
+            if (oi == rhs.end() || it->second != oi->second)
+                return false;
+        }
+        return true;
+    }
+
+    template<typename Con>
+    bool operator != (const Con& rhs) const { return !(*this == rhs); }
 
     void merge(HashMap& rhs)
     {
@@ -586,13 +624,14 @@ public:
         return do_insert(value);
     }
 
+#if 0
     iterator insert(iterator hint, const value_type& value) noexcept
     {
         (void)hint;
         return do_insert(value).first;
     }
+#endif
 
-#if 0
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
@@ -600,7 +639,20 @@ public:
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
     }
-#endif
+
+    template<class... Args>
+    std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
+    {
+        check_expand_need();
+        return do_insert(key, std::forward<Args>(args)...);
+    }
+
+    template<class... Args>
+    std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
+    {
+        check_expand_need();
+        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
+    }
 
     void insert(std::initializer_list<value_type> ilist) noexcept
     {
@@ -620,7 +672,7 @@ public:
         const auto gbucket = main_bucket - main_bucket % simd_bytes;
         const auto bucket = find_empty_slot(gbucket, gbucket, 0);
 
-        set_states(bucket, key_2hash(key_hash, key));
+        set_states(bucket, hash_key2(key_hash, key));
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
     }
@@ -741,11 +793,8 @@ public:
             _pairs[bucket].~PairT();
 
         const auto gbucket = bucket / simd_bytes * simd_bytes;
-        const auto is_empty = group_mask(gbucket) == State::EEMPTY;
-        if (is_empty)
-            _states[bucket] = State::EEMPTY;
-        else
-            _states[bucket] = State::EDELETE;
+        _states[bucket] = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
+        //if next is empty()
     }
 
     static constexpr bool is_triviall_destructable()
@@ -852,7 +901,7 @@ public:
                 const auto gbucket = main_bucket - main_bucket % simd_bytes;
                 const auto bucket = find_empty_slot(gbucket, gbucket, 0);
 
-                set_states(bucket, key_2hash(key_hash, src_pair.first));
+                set_states(bucket, hash_key2(key_hash, src_pair.first));
                 new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled += 1;
                 src_pair.~PairT();
@@ -874,8 +923,10 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if EMH_PREFETCH
+#if __linux__
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+#elif _WIN32
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
     }
 
@@ -889,7 +940,7 @@ private:
         const auto gbucket = next_bucket;
         prefetch_heap_block((char*)_states + next_bucket);
 
-        const auto filled = SET1_EPI8(key_2hash(key_hash, key));
+        const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         size_t offset = 0;
 
         while (true) {
@@ -922,7 +973,7 @@ private:
         check_expand_need();
 
         const auto key_hash = H1(key);
-        const auto key_h2 = key_2hash(key_hash, key);
+        const auto key_h2 = hash_key2(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
         bucket -= bucket % simd_bytes;
         prefetch_heap_block((char*)_states + bucket);

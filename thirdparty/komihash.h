@@ -1,8 +1,11 @@
 /**
- * komihash.h version 5.1
+ * komihash.h version 5.4
  *
  * The inclusion file for the "komihash" hash function, "komirand" 64-bit
  * PRNG, and streamed "komihash" implementation.
+ *
+ * This function is named the way it is named is to honor the Komi Republic
+ * (located in Russia), native to the author.
  *
  * Description is available at https://github.com/avaneev/komihash
  *
@@ -286,9 +289,22 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 		*rh = (uint64_t) ( r >> 64 );
 	}
 
+#elif defined( _MSC_VER ) && ( defined( _M_ARM64 ) || \
+	( defined( _M_X64 ) && defined( __INTEL_COMPILER )))
+
+	#include <intrin.h>
+
+	static inline void kh_m128( const uint64_t m1, const uint64_t m2,
+		uint64_t* const rl, uint64_t* const rh )
+	{
+		*rl = m1 * m2;
+		*rh = __umulh( m1, m2 );
+	}
+
 #elif defined( _MSC_VER ) && defined( _M_X64 )
 
 	#include <intrin.h>
+	#pragma intrinsic(_umul128)
 
 	static inline void kh_m128( const uint64_t m1, const uint64_t m2,
 		uint64_t* const rl, uint64_t* const rh )
@@ -296,16 +312,30 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 		*rl = _umul128( m1, m2, rh );
 	}
 
-#else // defined( _MSC_VER )
+#else // defined( _MSC_VER ) && defined( _M_X64 )
 
 	// _umul128() code for 32-bit systems, adapted from mullu(),
 	// from https://go.dev/src/runtime/softfloat64.go
 	// Licensed under BSD-style license.
 
-	static inline uint64_t kh__emulu( const uint32_t x, const uint32_t y )
-	{
-		return( (uint64_t) x * y );
-	}
+	#if defined( _MSC_VER ) && !defined( __INTEL_COMPILER )
+
+		#include <intrin.h>
+		#pragma intrinsic(__emulu)
+
+		static inline uint64_t kh__emulu( const uint32_t x, const uint32_t y )
+		{
+			return( __emulu( x, y ));
+		}
+
+	#else // defined( _MSC_VER ) && !defined( __INTEL_COMPILER )
+
+		static inline uint64_t kh__emulu( const uint32_t x, const uint32_t y )
+		{
+			return( (uint64_t) x * y );
+		}
+
+	#endif // defined( _MSC_VER ) && !defined( __INTEL_COMPILER )
 
 	static inline void kh_m128( const uint64_t u, const uint64_t v,
 		uint64_t* const rl, uint64_t* const rh )
@@ -323,7 +353,7 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 		*rh = kh__emulu( u1, v1 ) + ( w1 >> 32 ) + ( t >> 32 );
 	}
 
-#endif // defined( _MSC_VER )
+#endif // defined( _MSC_VER ) && defined( _M_X64 )
 
 // Macro for common hashing round with 16-byte input, using the "r1h"
 // temporary variable.
@@ -448,7 +478,7 @@ static inline uint64_t komihash_epi( const uint8_t* Msg, size_t MsgLen,
  *
  * @param Msg0 The message to produce a hash from. The alignment of this
  * pointer is unimportant. It is valid to pass 0 when MsgLen==0 (assuming that
- * compiler's implementation of the address prefetch is non-failing for zero
+ * compiler's implementation of the address prefetch permits use of zero
  * address).
  * @param MsgLen Message's length, in bytes, can be zero.
  * @param UseSeed Optional value, to use instead of the default seed. To use
@@ -471,13 +501,13 @@ static inline uint64_t komihash( const void* const Msg0, size_t MsgLen,
 	uint64_t r1h, r2h;
 
 	// The three instructions in the "KOMIHASH_HASHROUND" macro represent the
-	// simplest constant-less PRNG, scalable to any even-sized state
+	// simplest constantless PRNG, scalable to any even-sized state
 	// variables, with the `Seed1` being the PRNG output (2^64 PRNG period).
 	// It passes `PractRand` tests with rare non-systematic "unusual"
 	// evaluations.
 	//
 	// To make this PRNG reliable, self-starting, and eliminate a risk of
-	// stopping, the following variant can be used, which is a "register
+	// stopping, the following variant can be used, which adds a "register
 	// checker-board", a source of raw entropy. The PRNG is available as the
 	// komirand() function. Not required for hashing (but works for it) since
 	// the input entropy is usually available in abundance during hashing.
@@ -490,7 +520,7 @@ static inline uint64_t komihash( const void* const Msg0, size_t MsgLen,
 
 	KOMIHASH_PREFETCH( Msg );
 
-	KOMIHASH_HASHROUND(); // Required for PerlinNoise.
+	KOMIHASH_HASHROUND(); // Required for Perlin Noise.
 
 	if( KOMIHASH_LIKELY( MsgLen < 16 ))
 	{
@@ -592,7 +622,7 @@ static inline uint64_t komirand( uint64_t* const Seed1, uint64_t* const Seed2 )
  * Context structure that holds streamed hashing state. The komihash_init()
  * function should be called to initalize the structure before hashing. Note
  * that the default buffer size is modest, permitting placement of this
- * structure on stack. Seed[ 0 ] is used as initial UseSeed storage.
+ * structure on stack. Seed[ 0 ] is used as UseSeed value storage.
  */
 
 typedef struct {
@@ -764,7 +794,7 @@ static inline void komihash_stream_update( komihash_stream_t* const ctx,
  * hash value of the previously hashed data. This value is equal to the value
  * returned by the komihash() function for the same provided data.
  *
- * Note that since this function is non-destructive for the context structure,
+ * Note that since this function is non-destructive to the context structure,
  * the function can be used to obtain intermediate hashes of the data stream
  * being hashed, and the hashing can then be resumed.
  *

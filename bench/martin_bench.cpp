@@ -61,7 +61,7 @@
 static const auto RND = getus() + rand();
 static float max_lf = 0.80;
 
-static std::map<std::string, std::string> show_name =
+static std::map<std::string_view, std::string_view> show_name =
 {
    {"emhash7", "emhash7"},
    {"emhash8", "emhash8"},
@@ -122,7 +122,7 @@ static const char* find_hash(const std::string& map_name)
     for (const auto& kv : show_name)
     {
         if (map_name.find(kv.first) < 10)
-            return kv.second.c_str();
+            return kv.second.data();
     }
 
     return nullptr;
@@ -230,10 +230,17 @@ class sfc64 {
 
 static inline float now2sec()
 {
-#if _WIN32
-    FILETIME ptime[4];
-    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
-    return (ptime[3].dwLowDateTime + ptime[2].dwLowDateTime) / 10000000.0f;
+#if _WIN320
+    FILETIME ft;
+    GetSystemTimePreciseAsFileTime(&ft);
+    /* In 100-nanosecond increments from 1601-01-01 UTC because why not? */
+    int64_t t = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
+    /* Convert to UNIX epoch, 1970-01-01. Still in 100 ns increments. */
+    //t -= 116444736000000000ll;
+    /* Now convert to seconds and nanoseconds. */
+    //ts->tv_sec = t / 10000000;
+    //ts->tv_nsec = t % 10000000 * 100;
+    return (t / 10000000 * 1000'000 + t % 10000000 / 10) / 1000.f;
 #elif __linux__
     struct rusage rup;
     getrusage(RUSAGE_SELF, &rup);
@@ -393,7 +400,7 @@ static void bench_insert_erase_continue()
 
         // benchmark randomly inserting & erasing begin
         for (size_t i = 0; i < max_n / 3; ++i)
-            map.emplace((uint32_t)rng(), 0);
+            map.emplace((int)rng(), 0);
 
         auto key = map.begin()->first;
         for (size_t i = max_n; i > 0; i--) {
@@ -409,7 +416,7 @@ static void bench_insert_erase_continue()
                 it = map.erase(it), key = it->first;
             }
 
-            map.emplace((uint32_t)rng(), 0);
+            map.emplace((int)rng(), 0);
         }
 
         printf("\n\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
@@ -736,7 +743,7 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
     for (size_t i = 0; i < nsteps; ++i) {
         for (auto const kv : *m1) {
             auto const& pos = kv.first;
-            auto alive = kv.second;
+            const auto alive = kv.second;
             int neighbors = 0;
             vec2{pos}.for_each_surrounding([&](uint32_t xy) {
                 auto x = m1->find(xy);
@@ -744,7 +751,7 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
                     neighbors += x->second;
                 }
             });
-            if ((alive && (neighbors == 2 || neighbors == 3)) || (!alive && neighbors == 3)) {
+            if ((alive && neighbors == 2) || neighbors == 3) {
                 (*m2)[pos] = true;
                 vec2{pos}.for_each_surrounding([&](uint32_t xy) { m2->emplace(xy, false); });
             }
@@ -1683,12 +1690,12 @@ static void runTest(int sflags, int eflags)
         typedef absl::Hash<uint64_t> hash_func;
 #elif FIB_HASH
         typedef Int64Hasher<uint64_t> hash_func;
-#elif STD_HASH
-        typedef std::hash<uint64_t> hash_func;
+#elif ANKERL_HASH
+        typedef ankerl::unordered_dense::hash<uint64_t> hash_func;
 #elif HOOD_HASH
         typedef robin_hood::hash<uint64_t> hash_func;
 #else
-        typedef ankerl::unordered_dense::hash<uint64_t> hash_func;
+        typedef std::hash<uint64_t> hash_func;
 #endif
         puts("\nbench_knucleotide:");
 
@@ -1863,12 +1870,12 @@ static void runTest(int sflags, int eflags)
         typedef absl::Hash<int> hash_func;
 #elif FIB_HASH
         typedef Int64Hasher<int> hash_func;
-#elif STD_HASH
-        typedef std::hash<int> hash_func;
+#elif ANKERL_HASH
+        typedef ankerl::unordered_dense::hash<int> hash_func;
 #elif HOOD_HASH
         typedef robin_hood::hash<int> hash_func;
 #else
-        typedef ankerl::unordered_dense::hash<int> hash_func;
+        typedef std::hash<int> hash_func;
 #endif
 
         puts("\nbench_InsertEraseContinue:");
@@ -1883,7 +1890,7 @@ static void runTest(int sflags, int eflags)
 #endif
 #if CXX20
         {  bench_insert_erase_continue<jg::dense_hash_map<int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<rigtorp::HashMap<int, int, hash_func>>(); }
+//        {  bench_insert_erase_continue<rigtorp::HashMap<int, int, hash_func>>(); }
 #endif
 #if CXX17
         {  bench_insert_erase_continue<ankerl::unordered_dense::map <int, int, hash_func>>(); }
@@ -1916,19 +1923,18 @@ static void runTest(int sflags, int eflags)
         typedef absl::Hash<int64_t> hash_func;
 #elif FIB_HASH
         typedef Int64Hasher<int64_t> hash_func;
-#elif STD_HASH
-        typedef std::hash<int64_t> hash_func;
+#elif ANKERL_HASH
+        typedef ankerl::unordered_dense::hash<int64_t> hash_func;
 #elif HOOD_HASH
         typedef robin_hood::hash<int64_t> hash_func;
 #else
-        typedef ankerl::unordered_dense::hash<int64_t> hash_func;
+        typedef std::hash<int64_t> hash_func;
 #endif
 
         puts("\nbench_InsertEraseBegin:");
 
         {  bench_insert_erase_begin<emhash6::HashMap<int64_t, int, hash_func>>(); }
         {  bench_insert_erase_begin<emhash7::HashMap<int64_t, int, hash_func>>(); }
-        {  bench_insert_erase_begin<emhash5::HashMap<int64_t, int, hash_func>>(); }
         {  bench_insert_erase_begin<emhash8::HashMap<int64_t, int, hash_func>>(); }
 
 #if QC_HASH
@@ -1961,13 +1967,14 @@ static void runTest(int sflags, int eflags)
 #endif
         //{  bench_insert_erase_begin<phmap::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
+        {  bench_insert_erase_begin<emhash5::HashMap<int64_t, int, hash_func>>(); }
     }
 
 
     printf("\ntotal time = %.2f s", now2sec() - start);
 }
 
-static void checkSet(const std::string& map_name)
+static void checkSet(const std::string_view& map_name)
 {
     if (show_name.count(map_name) == 1)
         show_name.erase(map_name);
@@ -1980,8 +1987,8 @@ int main(int argc, char* argv[])
     srand(time(0));
     printInfo(nullptr);
     puts("./test [2-9mptseb0d2 rjqf] n");
-    for (auto& m : show_name)
-        printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
+    for (const auto& m : show_name)
+        printf("%10s %20s\n", m.first.data(), m.second.data());
 
     int sflags = 1, eflags = 20;
     if (argc > 1) {
@@ -2040,8 +2047,8 @@ int main(int argc, char* argv[])
     }
 
     printf("test hash: max_load_factor = %.2f\n", max_lf);
-    for (auto& m : show_name)
-        printf("%10s %20s\n", m.first.c_str(), m.second.c_str());
+    for (const auto& m : show_name)
+        printf("%10s %20s\n", m.first.data(), m.second.data());
 
     runTest(sflags, eflags);
     return 0;

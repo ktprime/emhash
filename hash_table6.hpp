@@ -1819,7 +1819,7 @@ private:
     size_type _hash_inter;
 #endif
 
-    static constexpr uint32_t BIT_PACK = sizeof(_bitmask[0]) * 2;
+    static constexpr uint32_t BIT_PACK = sizeof(uint64_t);
     static constexpr uint32_t MASK_BIT = sizeof(_bitmask[0]) * 8;
     static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
     static constexpr uint32_t PACK_SIZE = 2; // > 1

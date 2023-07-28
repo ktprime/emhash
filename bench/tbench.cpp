@@ -66,7 +66,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
 
     for (int t = 0; t < max_trials; ++t)
     {
-        HashTableType h; h.reserve(max_n);
+        HashTableType h; h.reserve(max_n / 8);
         float duration = 0.0f;
         {
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();

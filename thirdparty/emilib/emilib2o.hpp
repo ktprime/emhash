@@ -128,6 +128,8 @@ public:
     typedef ValueT mapped_type;
     typedef ValueT val_type;
     typedef KeyT   key_type;
+    typedef HashT  hasher;
+    typedef EqT    key_equal;
 
 #ifdef EMH_H2
     template<typename UType>
@@ -957,8 +959,10 @@ private:
 
     inline uint32_t get_offset(size_t ebucket) const
     {
+#if SAFE_PSL
         if (EMH_UNLIKELY(_offset[ebucket] > 128))
             return (_offset[ebucket] - 127) * 128;
+#endif
         return _offset[ebucket];
     }
 
@@ -966,7 +970,12 @@ private:
     {
 //        if (off < _offset[ebucket])
         //assert(off < 127 * 128);
+#if SAFE_PSL
         _offset[ebucket] = off <= 128 ? off : 128 + off / 128;
+#else
+        assert(off < 255);
+        _offset[ebucket] = off;
+#endif
     }
 
     inline void set_states(size_t ebucket, uint8_t key_h2)
@@ -977,11 +986,8 @@ private:
     size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
         next_bucket += simd_bytes;
-        if (EMH_UNLIKELY(next_bucket > _num_buckets)) {
+        if (EMH_UNLIKELY(next_bucket > _num_buckets))
             next_bucket = offset & _mask;
-        }
-//        else if (offset > 1) next_bucket -= next_bucket % simd_bytes;
-
         return next_bucket;
     }
 

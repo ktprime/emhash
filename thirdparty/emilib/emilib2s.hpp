@@ -132,21 +132,26 @@ public:
     typedef ValueT mapped_type;
     typedef ValueT val_type;
     typedef KeyT   key_type;
+    typedef HashT  hasher;
+    typedef EqT    key_equal;
 
 #ifdef EMH_H2
-    #define key_2hash(key_hash, key) ((uint8_t)(key_hash >> 24)) << 1
-#elif EMH_H3
-    #define key_2hash(key_hash, key) (uint8_t)(key_hash & 0xFE)
+    template<typename UType>
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    {
+        (void)key_hash;
+        return (uint8_t)((uint8_t)(key_hash >> 28)) << 1;
+    }
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
         (void)key;
-        return (uint8_t)(key_hash >> 24) << 1;
+        return (uint8_t)(key_hash >> 28) << 1;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t key_2hash(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
         (void)key_hash;
         return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) << 1;
@@ -620,6 +625,7 @@ public:
     {
         return do_insert(value);
     }
+
 #if 0
     iterator insert(iterator hint, const value_type& value) noexcept
     {
@@ -666,7 +672,7 @@ public:
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
 
-        set_states(bucket, key_2hash(key_hash, key));
+        set_states(bucket, hash_key2(key_hash, key));
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
     }
@@ -889,7 +895,7 @@ public:
                 collision += _states[key_hash & _mask] % 2 == State::EFILLED;
 #endif
 
-                set_states(dst_bucket, key_2hash(key_hash, src_pair.first));
+                set_states(dst_bucket, hash_key2(key_hash, src_pair.first));
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
                 _num_filled += 1;
                 src_pair.~PairT();
@@ -933,7 +939,7 @@ private:
         next_bucket -= next_bucket % simd_bytes;
         //prefetch_heap_block((char*)_states + next_bucket);
 
-        const auto filled = SET1_EPI8(key_2hash(key_hash, key));
+        const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         int offset = _max_probe_length;
         prefetch_heap_block((char*)&_pairs[next_bucket]);
 
@@ -965,7 +971,7 @@ private:
         check_expand_need();
 
         const auto key_hash = H1(key);
-        const auto key_h2 = key_2hash(key_hash, key);
+        const auto key_h2 = hash_key2(key_hash, key);
         auto bucket = (size_t)(key_hash & _mask);
         const auto boffset = bucket % simd_bytes; bucket -= boffset;
         //prefetch_heap_block((char*)_states + bucket);
@@ -1098,4 +1104,4 @@ private:
     int     _max_probe_length = -1; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };
 
-} // namespace emilib
+}

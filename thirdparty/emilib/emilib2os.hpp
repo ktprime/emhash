@@ -128,22 +128,29 @@ public:
     typedef ValueT mapped_type;
     typedef ValueT val_type;
     typedef KeyT   key_type;
+    typedef HashT  hasher;
+    typedef EqT    key_equal;
 
 #ifdef EMH_H2
-    #define hash_key2(key_hash, key) ((uint16_t)(key_hash >> 24)) << 1
-#else
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint16_t>::type = 0>
-    inline uint16_t hash_key2(uint64_t key_hash, const UType& key) const
-    {
-        (void)key;
-        return (uint16_t)(key_hash >> 28) << 1;
-    }
-
-    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint16_t>::type = 0>
-    inline uint16_t hash_key2(uint64_t key_hash, const UType& key) const
+    template<typename UType>
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
     {
         (void)key_hash;
-        return (uint16_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 50) << 1;
+        return (uint8_t)((uint8_t)(key_hash >> 28)) << 1;
+    }
+#else
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    {
+        (void)key;
+        return (uint8_t)(key_hash >> 28) << 1;
+    }
+
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
+    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    {
+        (void)key_hash;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) << 1;
     }
 #endif
 
@@ -279,6 +286,8 @@ public:
         reference operator*() const { return _map->_pairs[_bucket]; }
         pointer operator->() const { return _map->_pairs + _bucket; }
 
+        bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
+        bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
         bool operator==(const const_iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const const_iterator& rhs) const { return _bucket != rhs._bucket; }
 
@@ -468,27 +477,41 @@ public:
     // ------------------------------------------------------------
 
     template<typename K>
-    inline iterator find(const K& key) noexcept
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    inline const_iterator find(const K& key) const noexcept
+    const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key), false};
     }
 
     template<typename K>
-    inline bool contains(const K& k) const noexcept
+    bool contains(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
     }
 
     template<typename K>
-    inline size_t count(const K& k) const noexcept
+    size_t count(const K& k) const noexcept
     {
         return find_filled_bucket(k) != _num_buckets;
+    }
+
+    template<typename Key = KeyT>
+    ValueT& at(const KeyT& key)
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
+    }
+
+    template<typename Key = KeyT>
+    const ValueT& at(const KeyT& key) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
@@ -506,6 +529,23 @@ public:
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
     }
+
+    template<typename Con>
+    bool operator == (const Con& rhs) const
+    {
+        if (size() != rhs.size())
+            return false;
+
+        for (auto it = begin(), last = end(); it != last; ++it) {
+            auto oi = rhs.find(it->first);
+            if (oi == rhs.end() || it->second != oi->second)
+                return false;
+        }
+        return true;
+    }
+
+    template<typename Con>
+    bool operator != (const Con& rhs) const { return !(*this == rhs); }
 
     void merge(HashMap& rhs)
     {
@@ -578,21 +618,35 @@ public:
         return do_insert(value);
     }
 
+#if 0
     iterator insert(iterator hint, const value_type& value) noexcept
     {
         (void)hint;
         return do_insert(value).first;
     }
+#endif
 
-#if 0
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
         reserve(endc - beginc + _num_filled);
         for (; beginc != endc; ++beginc)
-            insert(beginc->first, beginc->second);
+            do_insert(beginc->first, beginc->second);
     }
-#endif
+
+    template<class... Args>
+    std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
+    {
+        check_expand_need();
+        return do_insert(key, std::forward<Args>(args)...);
+    }
+
+    template<class... Args>
+    std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
+    {
+        check_expand_need();
+        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
+    }
 
     void insert(std::initializer_list<value_type> ilist) noexcept
     {
@@ -763,8 +817,8 @@ public:
         if (_num_filled) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
             std::fill_n(_offset, _num_buckets, 0);
+            _num_filled = 0;
         }
-        _num_filled = 0;
     }
 
     void shrink_to_fit()
@@ -858,8 +912,31 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__) || EMH_PREFETCH
+#if __linux__
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+#elif _WIN32
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#endif
+    }
+
+    inline uint32_t get_offset(size_t ebucket) const
+    {
+#if SAFE_PSL
+        if (EMH_UNLIKELY(_offset[ebucket] > 128))
+            return (_offset[ebucket] - 127) * 128;
+#endif
+        return _offset[ebucket];
+    }
+
+    inline void set_offset(size_t ebucket, uint32_t off)
+    {
+//        if (off < _offset[ebucket])
+        //assert(off < 127 * 128);
+#if SAFE_PSL
+        _offset[ebucket] = off <= 128 ? off : 128 + off / 128;
+#else
+        assert(off < 255);
+        _offset[ebucket] = off;
 #endif
     }
 
@@ -937,7 +1014,9 @@ private:
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = hole == (size_t)-1 ? next_bucket + CTZ(maske) : hole;
+                auto ebucket = next_bucket + CTZ(maske);
+                if (EMH_UNLIKELY(hole != (size_t)-1))
+                    ebucket = hole;
                 set_states(ebucket, key_h2);
                 return ebucket;
             }

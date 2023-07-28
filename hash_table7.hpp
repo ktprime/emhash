@@ -1863,7 +1863,7 @@ private:
     }
 
 private:
-    uint32_t* _bitmask;
+    uint8_t* _bitmask;
     PairT*    _pairs;
     HashT     _hasher;
     EqT       _eq;
@@ -1874,7 +1874,7 @@ private:
     uint32_t  _mlf;
 
 private:
-    static constexpr uint32_t BIT_PACK = sizeof(_bitmask[0]) * 2;
+    static constexpr uint32_t BIT_PACK = sizeof(uint64_t);
     static constexpr uint32_t MASK_BIT = sizeof(_bitmask[0]) * 8;
     static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
     static constexpr uint32_t EPACK_SIZE = sizeof(PairT) >= sizeof(size_t) == 0 ? 1 : 2; // > 1
