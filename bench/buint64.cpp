@@ -2,11 +2,12 @@
 
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #define _SILENCE_CXX20_CISO646_REMOVED_WARNING
-#include "tsl/robin_map.h"
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/endian/conversion.hpp>
 #include <boost/core/detail/splitmix64.hpp>
-#include <boost/config.hpp>
+#include "util.h"
+
+#include "tsl/robin_map.h"
 #include "martin/robin_hood.h"
 #include "martin/unordered_dense.h"
 #include "phmap/phmap.h"
@@ -16,13 +17,6 @@
 #include "hash_table8.hpp"
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
-
-#include "util.h"
-#include <unordered_map>
-#include <vector>
-#include <memory>
-#include <cstdint>
-#include <iostream>
 #include <iomanip>
 #include <chrono>
 
@@ -31,9 +25,12 @@ using namespace std::chrono_literals;
 using KeyType = uint64_t;
 using ValType = uint64_t;
 #else
-using KeyType = uint32_t;
-using ValType = uint32_t;
+using KeyType = uint64_t;
+using ValType = uint8_t;
 #endif
+
+static unsigned N = 2'000'000;
+static int K = 10;
 
 static void print_time( std::chrono::steady_clock::time_point & t1, char const* label, uint64_t s, std::size_t size )
 {
@@ -44,15 +41,15 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
     t1 = t2;
 }
 
-static unsigned N = 2'000'000;
-static int K = 10;
-
 static std::vector< KeyType > indices1, indices2, indices3;
 
 static void init_indices()
 {
-    indices1.push_back( 0 );
+    indices1.reserve(N * 2);
+    indices2.reserve(N * 2);
+    indices3.reserve(N * 2);
 
+    indices1.push_back( 0 );
     for( unsigned i = 1; i <= N*2; ++i )
     {
         indices1.push_back( i );
@@ -345,10 +342,14 @@ int main(int argc, const char* argv[])
 
     init_indices();
 
-
-    test<emilib_map3> ("emilib_map3" );
+    test<emhash_map5> ("emhash_map5" );
+    test<emhash_map6>("emhash_map6");
+    //test<emilib_map3> ("emilib_map3" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
     test<emilib_map2> ("emilib_map2" );
+    test<emhash_map8>("emhash_map8");
+    test<emhash_map7>("emhash_map7");
+
 #if ABSL_HMAP
     test<absl_flat_hash_map>("absl::flat_hash_map" );
 #endif
@@ -358,16 +359,12 @@ int main(int argc, const char* argv[])
 #ifdef CXX20
     test<jg_densemap> ("jg_densemap" );
 #endif
-    test<emhash_map8> ("emhash_map8" );
-    test<martin_dense>("martin_dense" );
 
-    test<emhash_map7> ("emhash_map7" );
+    test<martin_dense>("martin_dense" );
     test<tsl_robin_map> ("tsl_robin_map" );
     test<phmap_flat> ("phmap_flat" );
     test<martin_flat> ("martin_flat" );
 
-    test<emhash_map5> ("emhash_map5" );
-    test<emhash_map6> ("emhash_map6" );
 
     std::cout << "---\n\n";
 

@@ -768,10 +768,14 @@ static void insert_erase_continue(const std::string& hash_name, int nsize)
             key = it->first;
         }
 
-        if constexpr(std::is_void_v< decltype(ht_hash.erase(it))>)
-            ht_hash.erase(it), key = (++it)->first;
-        else
-            it = ht_hash.erase(it), key = it->first;
+        if constexpr (std::is_void_v< decltype(ht_hash.erase(it))>) {
+            ht_hash.erase(it);
+            if (++it != ht_hash.end()) key = it->first;
+        }
+        else {
+            it = ht_hash.erase(it);
+            if (it != ht_hash.end()) key = it->first;
+        }
 
         ht_hash.emplace((keyType)srng(), TO_VAL(0));
     }

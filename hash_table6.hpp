@@ -1802,8 +1802,8 @@ private:
 
     //8 * 2 + 4 * 5 = 16 + 20 = 32
 private:
-    PairT*    _pairs;
     uint32_t* _bitmask;
+    PairT*    _pairs;
     HashT     _hasher;
     EqT       _eq;
     size_type _mask;

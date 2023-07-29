@@ -986,7 +986,7 @@ private:
     size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
         next_bucket += simd_bytes;
-        if (EMH_UNLIKELY(next_bucket > _num_buckets))
+        if (EMH_UNLIKELY(next_bucket >= _num_buckets))
             next_bucket = offset & _mask;
         return next_bucket;
     }

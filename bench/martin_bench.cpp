@@ -228,7 +228,7 @@ class sfc64 {
         uint64_t m_counter;
 };
 
-static inline float now2sec()
+static inline double now2sec()
 {
 #if _WIN320
     FILETIME ft;
@@ -240,7 +240,7 @@ static inline float now2sec()
     /* Now convert to seconds and nanoseconds. */
     //ts->tv_sec = t / 10000000;
     //ts->tv_nsec = t % 10000000 * 100;
-    return (t / 10000000 * 1000'000 + t % 10000000 / 10) / 1000.f;
+    return (t / 10000000 * 1000'000 + t % 10000000 / 10) / 1000.0;
 #elif __linux__
     struct rusage rup;
     getrusage(RUSAGE_SELF, &rup);
@@ -253,7 +253,7 @@ static inline float now2sec()
     return start.tv_sec + start.tv_usec / 1000000.0;
 #else
     auto tp = std::chrono::steady_clock::now().time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count() / 1000000.0f;
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp).count() / 1000000.0;
 #endif
 }
 
@@ -411,9 +411,11 @@ static void bench_insert_erase_continue()
             }
 
             if constexpr(std::is_void_v<decltype(map.erase(it))>) {
-                map.erase(it), key = (++it)->first;
+                map.erase(it);
+                if (++it != map.end()) key = it->first;
             } else {
-                it = map.erase(it), key = it->first;
+                it = map.erase(it);
+                if (it != map.end()) key = it->first;
             }
 
             map.emplace((int)rng(), 0);
