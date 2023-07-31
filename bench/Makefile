@@ -122,7 +122,7 @@ ifneq ($(CK),)
 CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
-CXXFLAGS += -static  #clang libc++  -static-libstdc++?
+CXXFLAGS += -static #clang libc++ -static-libstdc++?
 
 all:
 ifneq ($(QB),)
@@ -133,6 +133,7 @@ endif
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) bstring.cpp -o bs
+	$(CXX) $(CXXFLAGS) word_count.cpp -o wc
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
@@ -152,7 +153,9 @@ mb:
 	./mbench
 qb:
 	./qbench
+ww:
+	./wc
 
 clean:
-	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench
+	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench wc bi bs
 
