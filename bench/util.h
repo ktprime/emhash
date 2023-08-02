@@ -118,16 +118,18 @@ int64_t getus()
     QueryPerformanceCounter(&nowus);
     return (nowus.QuadPart * 1000000) / (freq.QuadPart);
 #elif _WIN32
-    FILETIME ft;
+	FILETIME ft;
+#if _WIN32_WINNT >= 0x0602
     GetSystemTimePreciseAsFileTime(&ft);
-    /* In 100-nanosecond increments from 1601-01-01 UTC because why not? */
-    int64_t t = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
+#else
+    GetSystemTimeAsFileTime(&ft);
+#endif  /* Windows 8  */
+
+    int64_t t1 = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
     /* Convert to UNIX epoch, 1970-01-01. Still in 100 ns increments. */
-    //t -= 116444736000000000ll;
-    /* Now convert to seconds and nanoseconds. */
-    //ts->tv_sec = t / 10000000;
-    //ts->tv_nsec = t % 10000000 * 100;
-    return t / 10000000 * 1000'000 + t % 10000000 / 10;
+    t1 -= 116444736000000000ull;
+    t1 = t1 / 10;
+    return t1;
 #elif LINUX_RUS
     struct rusage rup;
     getrusage(RUSAGE_SELF, &rup);
@@ -421,7 +423,7 @@ static inline uint64_t hash_mur3(uint64_t key)
     return h;
 }
 
-static inline uint64_t squirrel3(uint64_t at) 
+static inline uint64_t squirrel3(uint64_t at)
 {
     constexpr uint64_t BIT_NOISE1 = 0x9E3779B185EBCA87ULL;
     constexpr uint64_t BIT_NOISE2 = 0xC2B2AE3D27D4EB4FULL;

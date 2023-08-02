@@ -283,7 +283,7 @@ static void bench_insert(MAP& map)
                 MRNG rng(RND + 15 + i);
                 for (size_t n = 0; n < maxn; ++n)
                     map[static_cast<int>(rng())];
-                printf("\t(lf=%.2f) insert %.2f",  map.load_factor(), now2sec() - ts);
+                printf("\t\t(lf=%.2f) insert %.2f",  map.load_factor(), now2sec() - ts);
                 fflush(stdout);
             }
             {
@@ -378,7 +378,7 @@ static void bench_insert_erase_begin()
             map.emplace((int64_t)rng(), 0);
         }
 
-        printf("\n\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
+        printf("\n\t\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
         max_n *= 5;
     }
 
@@ -424,7 +424,7 @@ static void bench_insert_erase_continue()
             map.emplace((int)rng(), 0);
         }
 
-        printf("\n\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
+        printf("\n\t\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
         max_n *= 3;
     }
 
@@ -988,7 +988,7 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
     }
 
     if (map.size() > 12)
-    printf("    %s success time = %.2f s %8d loadf = %.2f\n",
+    printf("\t\t%s time = %.2f s %8d loadf = %.2f\n",
             title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
     return num_found;
 }
@@ -999,7 +999,7 @@ static void bench_randomFindString(MAP& map)
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s\n", map_name);
+    printf("\t%8s\n", map_name);
 
     auto nows = now2sec();
     auto now1 = nows, now2 = nows;
