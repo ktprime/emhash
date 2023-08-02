@@ -70,7 +70,6 @@ static std::map<std::string_view, std::string_view> show_name =
 //    {"emilib", "emilib"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
-    {"hrd_m", "hrdm"},
 #endif
 
 #if HAVE_BOOST
@@ -97,6 +96,7 @@ static std::map<std::string_view, std::string_view> show_name =
     {"jg", "jg_dense"},
 #endif
 #if ET
+    {"hrd_m", "hrdm"},
     {"phmap", "phmap flat"},
     {"robin_hood", "martin flat"},
 //    {"folly", "f14_vector"},
@@ -230,17 +230,20 @@ class sfc64 {
 
 static inline double now2sec()
 {
-#if _WIN320
+#if _WIN32
     FILETIME ft;
+#if _WIN32_WINNT >= 0x0602
     GetSystemTimePreciseAsFileTime(&ft);
-    /* In 100-nanosecond increments from 1601-01-01 UTC because why not? */
-    int64_t t = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
-    /* Convert to UNIX epoch, 1970-01-01. Still in 100 ns increments. */
-    //t -= 116444736000000000ll;
-    /* Now convert to seconds and nanoseconds. */
-    //ts->tv_sec = t / 10000000;
-    //ts->tv_nsec = t % 10000000 * 100;
-    return (t / 10000000 * 1000'000 + t % 10000000 / 10) / 1000.0;
+#else
+    GetSystemTimeAsFileTime(&ft);
+#endif  /* Windows 8  */
+
+    /* `t := (low + high * 0x1p32) / 10000`  */
+    double t = (double) ft.dwLowDateTime + (double) ft.dwHighDateTime * 0x1p32;
+
+    /* 11644473600000 is number of milliseconds from 1601-01-01T00:00:00Z
+     * (the NT epoch) to 1970-01-01T00:00:00Z (the Unix Epoch).  */
+    return (t / 10000'000 - 11644473600);
 #elif __linux__
     struct rusage rup;
     getrusage(RUSAGE_SELF, &rup);
@@ -367,7 +370,7 @@ static void bench_insert_erase_begin()
         MRNG rng(999 + i);
 
         // benchmark randomly inserting & erasing begin
-        for (size_t i = 0; i < max_n / 2; ++i) 
+        for (size_t i = 0; i < max_n / 2; ++i)
             map.emplace((int64_t)rng(), 0);
 
         for (size_t i = 0; i < max_n; ++i) {
@@ -1908,7 +1911,7 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
-        {  bench_insert_erase_continue<hrd_m::hash_map <int, int, hash_func>>(); }
+//        {  bench_insert_erase_continue<hrd_m::hash_map <int, int, hash_func>>(); }
         {  bench_insert_erase_continue<tsl::robin_map  <int, int, hash_func>>(); }
         {  bench_insert_erase_continue<robin_hood::unordered_map <int, int, hash_func>>(); }
 
@@ -1984,17 +1987,36 @@ static void checkSet(const std::string_view& map_name)
         show_name.emplace(map_name, map_name);
 }
 
+static const char* cases[] = {
+    "bench_IterateIntegers",
+    "bench_randomFindString",
+    "bench_randomEraseString",
+    "bench_copy",
+    "bench_randomFind",
+    "bench_insert",
+    "bench_randomInsertErase",
+    "bench_randomDistinct2",
+    "bench_knucleotide",
+    "bench_GameOfLife",
+    "bench_AccidentallyQuadratic",
+    "bench_InsertEraseContinue",
+    "bench_InsertEraseBegin",
+};
+
 int main(int argc, char* argv[])
 {
     srand(time(0));
     printInfo(nullptr);
-    puts("./test [2-9mptseb0d2 rjqf] n");
-    for (const auto& m : show_name)
-        printf("%10s %20s\n", m.first.data(), m.second.data());
+
+    puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d]");
+    puts("all test case:");
+    for (int i = 0; i < 13; i++)
+        printf("    %2d %s\n", i + 1, cases[i]);
+    puts("-------------------------------------------------------------------------");
 
     int sflags = 1, eflags = 20;
     if (argc > 1) {
-        printf("cmd agrs = %s\n", argv[1]);
+        //printf("cmd agrs = %s\n", argv[1]);
         for (int c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
             if (c > '4' && c <= '8') {
                 std::string map_name("emhash");
@@ -2028,15 +2050,19 @@ int main(int argc, char* argv[])
                 checkSet("HashMapTable");
                 checkSet("HashMapCell");
             }
+#if QC_HASH
             else if (c == 'q')
                 checkSet("qc");
             else if (c == 'f')
                 checkSet("fph");
+#endif
             else if (c == 'b') {
                  if (isdigit(argv[1][i + 1]))
                     sflags = atoi(&argv[1][++i]);
+#if HAVE_BOOST
                 else
                     checkSet("boost");
+#endif
                 if (isdigit(argv[1][i + 1])) i++;
             }
             else if (c == 'e') {
@@ -2048,9 +2074,11 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("test hash: max_load_factor = %.2f\n", max_lf);
+    printf("test with max_load_factor = %.2f\n", max_lf);
+    puts("all test hashmap:");
     for (const auto& m : show_name)
         printf("%10s %20s\n", m.first.data(), m.second.data());
+    puts("-------------------------------------------------------------------------");
 
     runTest(sflags, eflags);
     return 0;
