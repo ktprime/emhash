@@ -118,7 +118,7 @@ int64_t getus()
     QueryPerformanceCounter(&nowus);
     return (nowus.QuadPart * 1000000) / (freq.QuadPart);
 #elif _WIN32
-	FILETIME ft;
+    FILETIME ft;
 #if _WIN32_WINNT >= 0x0602
     GetSystemTimePreciseAsFileTime(&ft);
 #else
@@ -169,59 +169,71 @@ static inline uint64_t randomseed() {
     return g();
 }
 
-#ifndef _MSC_VER
+#if __SIZEOF_INT128__
 class Lehmer64 {
-    __uint128_t g_lehmer64_state;
+public:
+    __uint128_t g_lehmer64_state = 1;
+    uint64_t splitmix64_x; /* The state can be seeded wit// original documentation by Vigna:
+    This is a fixed-increment version of Java 8's SplittableRandom generator
+    See http://dx.doi.org/10.1145/2714064.2660195 and
+http://docs.oracle.com/javase/8/docs/api/java/util/SplittableRandom.html
 
-    uint64_t splitmix64_x; /* The state can be seeded with any value. */
+It is a very fast generator passing BigCrush, and it can be useful if
+for some reason you absolutely want 64 bits of state; otherwise, we
+rather suggest to use a xoroshiro128+ (for moderately parallel
+computations) or xorshift1024* (for massively parallel computations)
+generator. */
 
-    public:
+    Lehmer64(uint64_t seed) {
+        splitmix64_seed(seed);
+        g_lehmer64_state = (((__uint128_t)splitmix64_stateless(seed, 0)) << 64) + splitmix64_stateless(seed, 1);
+    }
+
+private:
     // call this one before calling splitmix64
-    Lehmer64(uint64_t seed) { splitmix64_x = seed; }
+    inline void splitmix64_seed(uint64_t seed) { splitmix64_x = seed; }
 
-    // returns random number, modifies splitmix64_x
+    // floor( ( (1+sqrt(5))/2 ) * 2**64 MOD 2**64)
+#define GOLDEN_GAMMA UINT64_C(0x9E3779B97F4A7C15)
+
+    // returns random number, modifies seed[0]
     // compared with D. Lemire against
     // http://grepcode.com/file/repository.grepcode.com/java/root/jdk/openjdk/8-b132/java/util/SplittableRandom.java#SplittableRandom.0gamma
-    inline uint64_t splitmix64(void) {
-        uint64_t z = (splitmix64_x += UINT64_C(0x9E3779B97F4A7C15));
+    inline uint64_t splitmix64_r(uint64_t *seed) {
+        uint64_t z = (*seed += GOLDEN_GAMMA);
+        // David Stafford's Mix13 for MurmurHash3's 64-bit finalizer
         z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
         z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
         return z ^ (z >> 31);
     }
 
+    // returns random number, modifies splitmix64_x
+   inline uint64_t splitmix64(void) {
+        return splitmix64_r(&splitmix64_x);
+    }
+
     // returns the 32 least significant bits of a call to splitmix64
-    // this is a simple function call followed by a cast
+    // this is a simple (inlined) function call followed by a cast
     inline uint32_t splitmix64_cast32(void) {
         return (uint32_t)splitmix64();
     }
 
-    // same as splitmix64, but does not change the state, designed by D. Lemire
-    inline uint64_t splitmix64_stateless(uint64_t index) {
-        uint64_t z = (index + UINT64_C(0x9E3779B97F4A7C15));
-        z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
-        z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
-        return z ^ (z >> 31);
-    }
+    // returns the value of splitmix64 "offset" steps from seed
+    inline uint64_t splitmix64_stateless(uint64_t seed, uint64_t offset) {
+        seed += offset*GOLDEN_GAMMA;
+        return splitmix64_r(&seed);
+    }/*h any value. */
 
-    inline void lehmer64_seed(uint64_t seed) {
-        g_lehmer64_state = (((__uint128_t)splitmix64_stateless(seed)) << 64) +
-            splitmix64_stateless(seed + 1);
-    }
-
+public:
     inline uint64_t operator()() {
         g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
         return g_lehmer64_state >> 64;
     }
-        // this is a bit biased, but for our use case that's not important.
+
+    // this is a bit biased, but for our use case that's not important.
     uint64_t operator()(uint64_t boundExcluded) noexcept {
-#ifdef __SIZEOF_INT128__
-        return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _WIN32
-        uint64_t high;
-        uint64_t a = operator()();
-        _umul128(a, boundExcluded, &high);
-        return high;
-#endif
+        g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
+        return g_lehmer64_state >> 64;
     }
 };
 #endif

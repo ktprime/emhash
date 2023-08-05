@@ -1302,12 +1302,11 @@ int main(const int argc, const char* argv[])
 //            EmLibMapInfo<K, V>,
 #endif
 
-#if ABSL_HMAP
-            AbslMapInfo<K, V>,
-#endif
-
 #if HAVE_BOOST
             BoostFlapMapInfo<K, V>,
+#endif
+#if ABSL_HMAP
+            AbslMapInfo<K, V>,
 #endif
 
 #if ET

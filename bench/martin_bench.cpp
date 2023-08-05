@@ -36,7 +36,7 @@
 #if X86
     #include "emilib/emilib2o.hpp"
     #include "emilib/emilib3so.hpp"
-    #include "emilib/emilib2s.hpp"
+    #include "emilib/emilib2oq.hpp"
 #endif
 
 #include "martin/robin_hood.h"
@@ -367,10 +367,10 @@ static void bench_insert_erase_begin()
     for (int i = 0; i < 3; ++i) {
         auto starts = now2sec();
         MAP map;
-        MRNG rng(999 + i);
+        MRNG rng(987654321 + i * i * i);
 
         // benchmark randomly inserting & erasing begin
-        for (size_t i = 0; i < max_n / 2; ++i)
+        for (size_t i = 0; i < max_n / 5; ++i)
             map.emplace((int64_t)rng(), 0);
 
         for (size_t i = 0; i < max_n; ++i) {
@@ -378,7 +378,7 @@ static void bench_insert_erase_begin()
             map.emplace((int64_t)rng(), 0);
         }
 
-        printf("\n\t\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
+        printf("\n\t\t%.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
         max_n *= 5;
     }
 
@@ -396,13 +396,14 @@ static void bench_insert_erase_continue()
     size_t max_n = 1000000;
     auto nows = now2sec();
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 3; ++i) {
         auto starts = now2sec();
         MAP map;
-        MRNG rng(2023 + i);
+        //map.reserve((std::size_t)(max_n * .));
+        MRNG rng(2345 + i * i * i);
 
         // benchmark randomly inserting & erasing begin
-        for (size_t i = 0; i < max_n / 3; ++i)
+        for (size_t i = 0; i < max_n / 5; ++i)
             map.emplace((int)rng(), 0);
 
         auto key = map.begin()->first;
@@ -424,8 +425,8 @@ static void bench_insert_erase_continue()
             map.emplace((int)rng(), 0);
         }
 
-        printf("\n\t\t%.2lf %d cycles time %.2f", (max_n / 1000000.0), (int)map.size(), now2sec() - starts);
-        max_n *= 3;
+        printf("\n\t\t%.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
+        max_n *= 5;
     }
 
     printf(" total (%.2f s)\n", now2sec() - nows);
@@ -559,7 +560,7 @@ static void bench_randomDistinct2(MAP& map)
     constexpr size_t const n = 50000000 / 2;
 #endif
     auto nows = now2sec();
-    MRNG rng(RND + 100);
+    MRNG rng(RND + 786512);
 
     map.max_load_factor(max_lf);
     int checksum;
@@ -1635,7 +1636,7 @@ static void runTest(int sflags, int eflags)
         typedef std::hash<uint64_t> hash_func;
 #elif FIB_HASH
         typedef Int64Hasher<uint64_t> hash_func;
-#elif CXX17
+#elif ANKERL_HASH
         using hash_func = ankerl::unordered_dense::hash<uint64_t>;
 #else
         typedef std::hash<uint64_t> hash_func;
@@ -1850,7 +1851,7 @@ static void runTest(int sflags, int eflags)
         {  bench_AccidentallyQuadratic<absl::flat_hash_map <int, int, hash_func>>(); }
 #endif
 
-#if X860
+#if X86 && EMH_QUADRATIC
         {  bench_AccidentallyQuadratic<emilib2::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
@@ -1877,10 +1878,10 @@ static void runTest(int sflags, int eflags)
         typedef Int64Hasher<int> hash_func;
 #elif ANKERL_HASH
         typedef ankerl::unordered_dense::hash<int> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
+#elif STD_HASH
         typedef std::hash<int> hash_func;
+#else
+        typedef robin_hood::hash<int> hash_func;
 #endif
 
         puts("\nbench_InsertEraseContinue:");
@@ -1907,7 +1908,7 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_continue<absl::flat_hash_map <int, int, hash_func>>(); }
 #endif
 
-#if X860
+#if X86 && EMH_QUADRATIC
         {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
@@ -1959,7 +1960,7 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_begin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
 
-#if X860
+#if X86 && EMH_QUADRATIC
         {  bench_insert_erase_begin<emilib2::HashMap <int64_t, int, hash_func>>(); }
 #endif
 #if ET

@@ -131,26 +131,37 @@ public:
     typedef HashT  hasher;
     typedef EqT    key_equal;
 
-#ifdef EMH_H2
+#if EMH_H2 == 1
     template<typename UType>
-    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(size_t& bucket, const UType& key) const
     {
-        (void)key_hash;
-        return (uint8_t)((uint8_t)(key_hash >> 28)) << 1;
+        const auto key_hash = _hasher(key);
+        bucket = key_hash & _mask;
+        return (uint8_t)((uint8_t)(key_hash >> 28)) * 2;
+    }
+#elif EMH_H2 == 2
+    template<typename UType>
+    inline uint8_t hash_key2(size_t& bucket, const UType& key) const
+    {
+        const auto key_hash = _hasher(key);
+        bucket = (key_hash >> 4) & _mask;
+        return (uint8_t)(key_hash >> 32) * 2;
     }
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(size_t& bucket, const UType& key) const
     {
-        (void)key;
-        return (uint8_t)(key_hash >> 28) << 1;
+        const auto key_hash = _hasher(key);
+        bucket = key_hash & _mask;
+        return (uint8_t)(key_hash >> 28) * 2;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(size_t& bucket, const UType& key) const
     {
-        (void)key_hash;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) << 1;
+        const auto key_hash = _hasher(key);
+        bucket = key_hash & _mask;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) * 2;
     }
 #endif
 
@@ -663,11 +674,11 @@ public:
     {
         check_expand_need();
 
-        const auto key_hash = _hasher(key);
-        const auto main_bucket = key_hash & _mask;
+        size_t main_bucket;
+        const auto key_h2 = hash_key2(main_bucket, key);
         const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
 
-        set_states(bucket, hash_key2(key_hash, key));
+        set_states(main_bucket, key_h2);
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
     }
@@ -767,14 +778,26 @@ public:
         _num_filled -= 1;
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
-        auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
-        if (state == State::EEMPTY) {
-            _offset[bucket] = 0;
-            while (bucket > 1 && _states[--bucket] == State::EDELETE) {
-                _states[bucket] = State::EEMPTY;
-                _offset[bucket] = 0;
+#if EMH_QUADRATIC == 0
+        set_states(bucket, (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE);
+#else
+        set_states(bucket, State::EDELETE);
+#endif
+
+#if EMH_PSL_ERASE && EMH_QUADRATIC == 0
+        if (_states[bucket] == State::EEMPTY) {
+            _offset[bucket] = 0; bucket = (bucket - 1) & _mask;
+            while (_states[bucket] == State::EDELETE) {
+                set_states(bucket, State::EEMPTY); _offset[bucket] = 0;
+                bucket = (bucket - 1) & _mask;
             }
         }
+#else
+        if (EMH_UNLIKELY(_num_filled == 0)) {
+            std::fill_n(_states, _num_buckets, State::EEMPTY);
+            std::fill_n(_offset, _num_buckets, 0);
+        }
+#endif
     }
 
     iterator erase(const_iterator first, const_iterator last)
@@ -827,7 +850,7 @@ public:
                     _pairs[bucket].~PairT();
                     _num_filled --;
                 }
-                _states[bucket] = State::EEMPTY;
+                set_states(bucket, State::EEMPTY);
             }
         }
 
@@ -910,12 +933,11 @@ public:
         std::fill_n(_states + num_buckets, simd_bytes, State::SENTINEL);
 
         {
-            //set last packet tombstone
+            //set last packet tombstone.TODO maybe bugs
             new(_pairs + num_buckets) PairT(KeyT(), ValueT());
-
             const auto key      = _pairs[num_buckets].first;
-            const auto key_hash = _hasher(key);
-            const auto key_h2   = hash_key2(key_hash, key);
+            size_t bucket;
+            const auto key_h2   = hash_key2(bucket, key);
             _states[num_buckets] = key_h2 * 2 + 4 + EFILLED; //iterator end tombstone:
         }
 
@@ -925,12 +947,13 @@ public:
         for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
-                const auto key_hash = _hasher(src_pair.first);
-                const auto main_bucket = key_hash & _mask;
-                const auto dst_bucket = find_empty_slot(main_bucket, main_bucket, 0);
 
-                set_states(dst_bucket, hash_key2(key_hash, src_pair.first));
-                new(_pairs + dst_bucket) PairT(std::move(src_pair));
+                size_t main_bucket;
+                const auto key_h2 = hash_key2(main_bucket, src_pair.first);
+                const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
+
+                set_states(bucket, key_h2);
+                new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled ++;
                 src_pair.~PairT();
             }
@@ -959,7 +982,7 @@ private:
 
     inline uint32_t get_offset(size_t ebucket) const
     {
-#if SAFE_PSL
+#if EMH_SAFE_PSL
         if (EMH_UNLIKELY(_offset[ebucket] > 128))
             return (_offset[ebucket] - 127) * 128;
 #endif
@@ -969,8 +992,8 @@ private:
     inline void set_offset(size_t ebucket, uint32_t off)
     {
 //        if (off < _offset[ebucket])
-        //assert(off < 127 * 128);
-#if SAFE_PSL
+#if EMH_SAFE_PSL
+        assert(off < 127 * 128);
         _offset[ebucket] = off <= 128 ? off : 128 + off / 128;
 #else
         assert(off < 255);
@@ -983,23 +1006,29 @@ private:
         _states[ebucket] = key_h2;
     }
 
-    size_t get_next_bucket(size_t next_bucket, size_t offset) const
+    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
+#if EMH_QUADRATIC
+        next_bucket += offset < 30 ? simd_bytes + offset * offset : _num_buckets / 64;
+        if (next_bucket >= _num_buckets) {
+            next_bucket += simd_bytes;
+        }
+#else
         next_bucket += simd_bytes;
-        if (EMH_UNLIKELY(next_bucket >= _num_buckets))
-            next_bucket = offset & _mask;
-        return next_bucket;
+        if (next_bucket >= _num_buckets)
+            next_bucket = offset;
+#endif
+        return next_bucket & _mask;
     }
 
     // Find the bucket with this key, or return (size_t)-1
     template<typename K>
     size_t find_filled_bucket(const K& key) const noexcept
     {
-        const auto key_hash = _hasher(key);
-        auto next_bucket = (size_t)(key_hash & _mask);
+        size_t next_bucket;
+        const auto filled = SET1_EPI8(hash_key2(next_bucket, key));
         const auto bucket = next_bucket;
 
-        const auto filled = SET1_EPI8(hash_key2(key_hash, key));
         size_t offset = 0;
         prefetch_heap_block((char*)&_pairs[next_bucket]);
 
@@ -1009,19 +1038,12 @@ private:
 
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                //prefetch_heap_block((char*)&_pairs[fbucket]);
                 if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                     return fbucket;
                 maskf &= maskf - 1;
             }
-
-//            if ((_states[next_bucket + simd_bytes - 1] % 4) == State::EEMPTY)
-//                break;
-
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (maske != 0)
-                break;
-            else if (++offset > get_offset(bucket))
+            if (maske != 0 || ++offset > get_offset(bucket))
                 break;
 
             next_bucket = get_next_bucket(next_bucket, offset);
@@ -1037,14 +1059,13 @@ private:
     {
         check_expand_need();
 
-        const auto key_hash = _hasher(key);
-        const auto key_h2 = hash_key2(key_hash, key);
-        const auto bucket = (size_t)(key_hash & _mask);
-
+        size_t bucket;
+        const auto key_h2 = hash_key2(bucket, key);
         const auto filled = SET1_EPI8(key_h2);
+
         auto next_bucket  = bucket, offset = 0u;
         size_t hole = (size_t)-1;
-        prefetch_heap_block((char*)&_pairs[next_bucket]);
+        prefetch_heap_block((char*)&_pairs[bucket]);
 
         while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -1079,7 +1100,6 @@ private:
 
             //4. next round
             next_bucket = get_next_bucket(next_bucket, ++offset);
-
             if (offset > get_offset(bucket))
                 break;
         }
@@ -1113,8 +1133,8 @@ private:
     }
 
 #if EMH_PSL
-    //unlike robin hood, only move large offset
-    size_t update_probe(size_t gbucket, size_t new_bucket, size_t offset) noexcept
+    //unlike robin hood, only move large offset once
+    size_t update_offset(size_t gbucket, size_t new_bucket, size_t offset) noexcept
     {
         const auto kdiff  = offset / 2;
         const auto kprobe = offset - kdiff;
@@ -1123,7 +1143,9 @@ private:
             const auto kbucket = (kgroup + i) & _mask;
             if (_offset[kbucket] == 0)
                 continue;
-            const auto kmain_bucket = _hasher(_pairs[kbucket].first) & _mask;
+
+            size_t kmain_bucket;
+            hash_key2(kmain_bucket, _pairs[kbucket].first);
             if (kmain_bucket != kbucket)
                 continue;
 
@@ -1157,9 +1179,9 @@ private:
 
             else if (offset <= get_offset(bucket))
                 return ebucket;
-#if EMH_PSL > 8
+#if EMH_PSL > 8 && EMH_QUADRATIC == 0
             else if (EMH_UNLIKELY(offset >= EMH_PSL)) {
-                const auto kbucket = update_probe(bucket, ebucket, offset);
+                const auto kbucket = update_offset(bucket, ebucket, offset);
                 if (kbucket != (size_t)-1)
                     return kbucket;
             }

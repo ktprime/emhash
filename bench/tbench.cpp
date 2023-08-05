@@ -64,6 +64,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
     mt19937 gen(max_n);
     for (auto& a : v) a = gen();
 
+    double load_factor = 1.0;
     for (int t = 0; t < max_trials; ++t)
     {
         HashTableType h; h.reserve(max_n / 8);
@@ -74,6 +75,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
             for (auto num : v)
                 sum += h.emplace(num, 0).second;
 
+            load_factor = h.load_factor();
             auto end = chrono::steady_clock::now();
             duration += chrono::duration_cast<chrono::duration<float, micro>>(end - start).count();
             durations_insert.push_back(duration);
@@ -159,7 +161,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
         printf("|Insert  |Find    |Miss    |Erase   |Iter    |\n");
         printf("|----------|--------|--------|--------|--------|--------|\n");
         printf("|Average   |");
-        for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].average / 100); printf("\n");
+        for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].average / 100); printf("lf = %.2lf\n", load_factor * 100);
 
         printf("|Stdev%%    |");
         for (int i = 0; i < 5; i++) printf("%-7.2f%%|", 100.0 * v[i].stdev / v[i].average); printf("\n");

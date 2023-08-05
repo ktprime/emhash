@@ -779,6 +779,10 @@ public:
 
         const auto gbucket = bucket / simd_bytes * simd_bytes;
         _states[bucket] = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
+        if (EMH_UNLIKELY(_num_filled == 0)) {
+            _max_probe_length = -1;
+            std::fill_n(_states, _num_buckets, State::EEMPTY);
+        }
         //if next is empty()
     }
 

@@ -4,6 +4,9 @@
 //#include "utils.h"
 #endif
 
+#define EMH_SAFE_PSL 1
+#define EMH_PSL      32
+#define EMH_QUADRATIC 1
 //#define EMH_IDENTITY_HASH 1
 #include "eutil.h"
 //#define EMH_WYHASH_HASH 1
@@ -127,7 +130,7 @@ inline Os& operator<<(Os& os, Container const& cont)
     return os << "}" << std::endl;
 }
 
-#if 0
+#if 1
 #define ehmap  emilib2::HashMap
 #else
 #define ehmap  emhash7::HashMap
@@ -632,7 +635,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint64_t;
 
-#if X860
+#if X86
     emilib2::HashMap <keyType, int> shash;
 #else
     ehmap6<keyType, int> shash;
@@ -921,9 +924,11 @@ static void benchStringHash(int size, int str_min, int str_max)
 
 int main(int argc, char* argv[])
 {
+	if (argc == 2) {
     TestApi();
     benchIntRand(1e8+8);
     benchStringHash(1e6+6, 8, 32);
+	}
 
     size_t n = (int)1e7, loop = 12345678;
     if (argc > 1 && isdigit(argv[1][0]))

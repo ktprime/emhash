@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS = -flto=auto -O3 -DEMH_PSL=16 -DNDEBUG=1 -march=native -I.. -I../thirdparty 
+CXXFLAGS = -flto=auto -O3 -DNDEBUG=1 -march=native -I.. -I../thirdparty
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)
@@ -81,7 +81,7 @@ CXXFLAGS += -DAVX2_EHASH=$(AVX2) -mavx2
 endif
 
 ifneq ($(H2),)
-CXXFLAGS += -DEMH_H2=1
+CXXFLAGS += -DEMH_H2=$(H2)
 endif
 
 ifneq ($(SMAP),)
@@ -102,7 +102,7 @@ ifneq ($(check),)
 CXXFLAGS += -fsanitize=undefined -g
 endif
 
-ifneq ($(addr),)
+ifneq ($(santi),)
 CXXFLAGS += -fsanitize=address
 endif
 
@@ -124,6 +124,10 @@ endif
 
 CXXFLAGS += -static #clang libc++ -static-libstdc++?
 
+ifneq ($(PSL),)
+CXXFLAGS += -DPSL= (PSL)
+endif
+
 all:
 ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -std=c++20 -I. qbench.cpp -o qbench
@@ -142,7 +146,7 @@ endif
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
 ifneq ($(EMH),)
-	$(CXX) $(CXXFLAGS) -DEMH_HASH2=1 template.cc -o template
+	$(CXX) $(CXXFLAGS) template.cc -o template
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
 endif

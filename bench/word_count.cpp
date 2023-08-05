@@ -41,17 +41,15 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
     t1 = t2;
 }
 
-static void init_words(int argc)
+static void init_words(const char* fn)
 {
-    char const* fn = argc == 8 ? "./enwik8" : "./enwik9";
-
     std::cout << fn << " download from http://mattmahoney.net/dc/textdata.html\n";
     auto t1 = std::chrono::steady_clock::now();
 
     std::ifstream is( fn );
     std::string line;
 
-    uint64_t sums = 0; gbuffer = (char*)malloc(argc == 9 ? (656 << 20) : (70 << 20));
+    uint64_t sums = 0; gbuffer = (char*)malloc("./enwik9" == fn ? (700 << 20) : (70 << 20));
 
     while (std::getline(is, line))
     {
@@ -65,7 +63,7 @@ static void init_words(int argc)
         };
         for (int i = 0; i < line.size(); i++) {
             const auto c = line[i];
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '.' || c == '-')) {
                 if (start < 0) start = i;
             }
             else if (start >= 0) {
@@ -362,7 +360,7 @@ int main(int argc, const char* argv[])
 {
     printInfo(nullptr);
 
-    init_words(argc > 1 ? 8 : 9);
+    init_words(argc > 1 ? argv[1] : "./enwik9");
 
 //    test<std_unordered_map>( "std::unordered_map" );
 //    test<boost_unordered_map>( "boost::unordered_map" );
