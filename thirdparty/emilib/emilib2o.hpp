@@ -42,6 +42,7 @@ namespace emilib2 {
         SENTINEL = EDELETE + 0xF0,
     };
 
+	constexpr static uint8_t  EMPTY_OFFSET = 0;
     constexpr static uint64_t EMPTY_MASK   = 0x0101010101010101ull;
     constexpr static uint64_t EFILLED_FIND = 0xFEFEFEFEFEFEFEFEull;
 
@@ -177,7 +178,11 @@ public:
 
         iterator() {}
         iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+#if EMH_ITER_SAFE
+        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+#else
+        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _from = -1; }
+#endif
 
         void init()
         {
@@ -203,12 +208,18 @@ public:
 
         iterator& operator++()
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_t)-1) init();
+#endif
             goto_next_element();
             return *this;
         }
 
         iterator operator++(int)
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_t)-1) init();
+#endif
             iterator old(*this);
             goto_next_element();
             return old;
@@ -257,7 +268,7 @@ public:
         explicit const_iterator(const iterator& it)
             : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
         const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        const_iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+        const_iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init()
         {
@@ -431,14 +442,14 @@ public:
     {
         if (_num_filled == 0)
             return {this, _num_buckets, false};
-        return {this, find_filled_slot(0)};
+        return {this, find_filled_slot(0), false};
     }
 
     const_iterator cbegin() const noexcept
     {
         if (_num_filled == 0)
             return {this, _num_buckets, false};
-        return {this, find_filled_slot(0)};
+        return {this, find_filled_slot(0), false};
     }
 
     const_iterator begin() const noexcept
@@ -483,9 +494,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    float max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 7.0f / 8)
     {
-        return 7/8.0f;
+        return 7.0f / 8;
     }
 
     // ------------------------------------------------------------
@@ -778,24 +789,24 @@ public:
         _num_filled -= 1;
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
-#if EMH_QUADRATIC == 0
+#if EMH_PSL_LINEAR
         set_states(bucket, (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE);
 #else
         set_states(bucket, State::EDELETE);
 #endif
 
-#if EMH_PSL_ERASE && EMH_QUADRATIC == 0
+#if EMH_PSL_ERASE && EMH_PSL_LINEAR
         if (_states[bucket] == State::EEMPTY) {
-            _offset[bucket] = 0; bucket = (bucket - 1) & _mask;
+            _offset[bucket] = EMPTY_OFFSET; bucket = (bucket - 1) & _mask;
             while (_states[bucket] == State::EDELETE) {
-                set_states(bucket, State::EEMPTY); _offset[bucket] = 0;
+                set_states(bucket, State::EEMPTY); _offset[bucket] = EMPTY_OFFSET;
                 bucket = (bucket - 1) & _mask;
             }
         }
 #else
         if (EMH_UNLIKELY(_num_filled == 0)) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets, 0);
+            std::fill_n(_offset, _num_buckets, EMPTY_OFFSET);
         }
 #endif
     }
@@ -856,7 +867,7 @@ public:
 
         if (_num_filled) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets, 0);
+            std::fill_n(_offset, _num_buckets, EMPTY_OFFSET);
             _num_filled = 0;
         }
     }
@@ -882,13 +893,15 @@ public:
         for (int i = 0; i < _num_buckets; i++)
             off[_offset[i]]++;
 
-        size_t total = 0;
+        size_t total = 0, sums = 0;
         for (int i = 0; i < 256; i++) {
-            if (off[i]) {
+            if (off[i] != EMPTY_OFFSET) {
                 total += off[i];
+                sums  += (size_t)off[i] * (i + 1);
                 printf("\n%3d %3d %.3lf%% %3.lf%%", i, off[i], 10000.0 * off[i] / _num_buckets, 10000.0 * total / _num_buckets);
             }
         }
+        printf(", average probe sequence length PSL = %.4lf\n", 1.0 * sums / total);
     }
 
 //#define EMH_STATIS 2000'000
@@ -942,7 +955,7 @@ public:
         }
 
         //fill offset to 0
-        std::fill_n(_offset, num_buckets, 0);
+        std::fill_n(_offset, num_buckets, EMPTY_OFFSET);
 
         for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
@@ -996,7 +1009,7 @@ private:
         assert(off < 127 * 128);
         _offset[ebucket] = off <= 128 ? off : 128 + off / 128;
 #else
-        assert(off < 255);
+        assert(off < EMPTY_OFFSET);
         _offset[ebucket] = off;
 #endif
     }
@@ -1008,10 +1021,10 @@ private:
 
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
-#if EMH_QUADRATIC
-        next_bucket += offset < 30 ? simd_bytes + offset * offset : _num_buckets / 64;
+#if EMH_PSL_LINEAR == 0
+        next_bucket += offset < 8 ? 1 + simd_bytes * offset : _num_buckets / 16;
         if (next_bucket >= _num_buckets) {
-            next_bucket += simd_bytes;
+            next_bucket += 1;
         }
 #else
         next_bucket += simd_bytes;
@@ -1123,10 +1136,15 @@ private:
 
     inline uint64_t filled_mask(size_t gbucket) const noexcept
     {
-#if 1
+#ifndef AVX2_EHASH
         const auto vec = GET_EMPTY((decltype(&simd_empty))(&_states[gbucket]));
-        return ~MOVEMASK_EPI8(vec) & ((1 << simd_bytes) - 1);
+        return ~MOVEMASK_EPI8(vec) & ((1u << simd_bytes) - 1);
+#elif SSE2_EMHASH == 0
+        const auto vec = GET_EMPTY((decltype(&simd_empty))(&_states[gbucket]));
+        return ~MOVEMASK_EPI8(vec);
 #else
+        const static auto simd_filled = _mm_set1_epi8(EFILLED);
+        #define LOAD_EMPTY(u)  _mm_and_si128(_mm_load_si128(u), simd_empty)
         const auto vec = LOAD_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
         return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
 #endif
@@ -1179,7 +1197,7 @@ private:
 
             else if (offset <= get_offset(bucket))
                 return ebucket;
-#if EMH_PSL > 8 && EMH_QUADRATIC == 0
+#if EMH_PSL > 8 && EMH_PSL_LINEAR
             else if (EMH_UNLIKELY(offset >= EMH_PSL)) {
                 const auto kbucket = update_offset(bucket, ebucket, offset);
                 if (kbucket != (size_t)-1)
