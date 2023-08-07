@@ -5,8 +5,12 @@
 #endif
 
 #define EMH_SAFE_PSL 1
-#define EMH_PSL      32
-#define EMH_QUADRATIC 1
+#define EMH_STATIS   1234567
+//#define EMH_PSL_LINEAR 1
+
+//#define EMH_PSL      32
+//#define EMH_QUADRATIC 1
+
 //#define EMH_IDENTITY_HASH 1
 #include "eutil.h"
 //#define EMH_WYHASH_HASH 1
@@ -19,10 +23,10 @@
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
 #include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+//#include "emilib/emilib2s.hpp"
 
 
-#include "martin/robin_hood.h"
+//#include "martin/robin_hood.h"
 #include "martin/unordered_dense.h"
 #include "phmap/phmap.h"
 
@@ -56,6 +60,9 @@ struct string_equal
     }
 
     bool operator()(const char* lhs, const std::string& rhs) const {
+        return std::strcmp(lhs, rhs.data()) == 0;
+    }
+    bool operator()(const std::string& rhs, const char* lhs) const {
         return std::strcmp(lhs, rhs.data()) == 0;
     }
 };
@@ -130,7 +137,7 @@ inline Os& operator<<(Os& os, Container const& cont)
     return os << "}" << std::endl;
 }
 
-#if 1
+#if 0
 #define ehmap  emilib2::HashMap
 #else
 #define ehmap  emhash7::HashMap
@@ -247,7 +254,7 @@ static void TestApi()
     //copy
     {
         ehmap<short, int> dict = {{1, 1}, {2, 2}, {3, 3}};
-        dict.reserve(1 << 20);// overview
+        dict.reserve(1u << 20);// overview
 #if EMH_SAVE_MEM
         assert(dict.bucket_count() <= (2 << 16));
 #endif
@@ -377,9 +384,15 @@ static void TestApi()
         // erase all odd numbers from c
         for(auto it = c.begin(); it != c.end(); ) {
             printf("%d:%s\n", it->first,  it->second.data());
-            if(it->first % 2 != 0)
-                it = c.erase(it);
-            else
+            if(it->first % 2 != 0) {
+				if constexpr (std::is_void_v<decltype(c.erase(it))>) {
+					c.erase(it++);
+				} else {
+//					c.erase(it++);
+					it = c.erase(it);
+				}
+			}
+			else
                 ++it;
         }
 
@@ -470,7 +483,7 @@ static void TestApi()
         }
 
         //Repeat the above with the range-based for loop
-        for(auto i : mag) {
+        for(auto& i : mag) {
             auto cur = i.first;
             cur->y = i.second;
             mag[cur] = std::hypot(cur->x, cur->y);
@@ -507,7 +520,7 @@ static void TestApi()
         }
 
         //Repeat the above with the range-based for loop
-        for(auto i : mag) {
+        for(auto& i : mag) {
             auto cur = i.first;
             cur->y = i.second;
             mag[cur] = std::hypot(cur->x, cur->y);
@@ -592,7 +605,7 @@ static void TestApi()
 #if 1
     {
         ehmap<uint64_t, uint32_t> emi;
-        emi.reserve(1e3);
+        emi.reserve(1000);
         int key = rand();
         emi.insert({key, 0}); emi.emplace(key, 1);
         auto it = emi.try_emplace(key, 0); assert(!it.second);
@@ -648,9 +661,10 @@ static int RandTest(size_t n, int max_loops = 1234567)
 #if EMH6
     ehmap6<keyType, int> unhash;
 #else
-    using ehash_func = ankerl::unordered_dense::hash<keyType>;
+//    using ehash_func = ankerl::unordered_dense::hash<keyType>;
 //    emhash5::HashMap <keyType, int> unhash;
-    ankerl::unordered_dense::map<keyType, int> unhash;
+//    ankerl::unordered_dense::map<keyType, int> unhash;
+    ehmap7<keyType, int> unhash;
 #endif
 
     Sfc4 srng(time(0));
@@ -674,7 +688,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
         const uint32_t type = srng() % 100;
         auto rid  = srng();// n ++;
         auto id   = TO_KEY(rid);
-        if (type <= 40 || shash.size() < 1000) {
+        if (type <= 40 || ehash8.size() < 1000) {
           auto cnid = ehash8.count(id);
           assert(cnid == unhash.count(id));
 
@@ -882,11 +896,13 @@ static void benchStringHash(int size, int str_min, int str_max)
         printf("acxxhash    = %4d ms\n", t_find);
 #endif
 
+#if ROBIN_HOOD_VERSION_MAJOR
         start = getus();
         for (const auto& v : rndstring)
             sum = robin_hood::hash_bytes(v.data(), v.size());
         t_find = (getus() - start) / 1000; assert(sum);
         printf("martius hash= %4d ms\n", t_find);
+#endif
 
 #if 0
         start = getus(); sum = 0;
@@ -924,10 +940,11 @@ static void benchStringHash(int size, int str_min, int str_max)
 
 int main(int argc, char* argv[])
 {
-	if (argc == 2) {
-    TestApi();
-    benchIntRand(1e8+8);
-    benchStringHash(1e6+6, 8, 32);
+    printInfo(nullptr);
+	if (argc == 0) {
+		TestApi();
+		benchIntRand(1e8+8);
+		benchStringHash(1e6+6, 8, 32);
 	}
 
     size_t n = (int)1e7, loop = 12345678;

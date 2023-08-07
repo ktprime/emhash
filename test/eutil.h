@@ -60,7 +60,7 @@
     #define PHMAP_NON_DETERMINISTIC               1
 #endif
 
-#if X86
+#if X86 && _WIN32 == 0
 #include "ahash/ahash.c"
 #include "ahash/random_state.c"
 #include "ahash-cxx/hasher.h"
@@ -107,7 +107,7 @@ int64_t getus()
 #elif WIN32_TICK
     return GetTickCount() * 1000;
 #elif WIN32_HTIME || _WIN32
-    LARGE_INTEGER freq = {0, 0};
+    LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;

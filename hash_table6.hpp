@@ -1185,7 +1185,8 @@ public:
 
     void clearkv()
     {
-        for (auto it = cbegin(); _num_filled; ++it)
+        auto it = cbegin(); it.init();
+        for (; _num_filled; ++it)
             clear_bucket(it.bucket());
     }
 
@@ -1658,19 +1659,19 @@ private:
                 return step * SIZE_BIT + CTZ(bmask3);
         }
 
-        auto& _last = EMH_ADDR(_pairs, _mask + 1);
+        auto& last = EMH_ADDR(_pairs, _mask + 1);
         while ( true ) {
-            const auto bmask2 = *((size_t*)_bitmask + _last);
+            const auto bmask2 = *((size_t*)_bitmask + last);
             if (bmask2 != 0)
-                return _last * SIZE_BIT + CTZ(bmask2);
+                return last * SIZE_BIT + CTZ(bmask2);
 
-            const auto next1 = (qmask / 2 + _last) & qmask;
-            const auto bmask1 = *((size_t*)_bitmask + next1);
+            const auto next = (qmask / 2 + last) & qmask;
+            const auto bmask1 = *((size_t*)_bitmask + next);
             if (bmask1 != 0) {
-                return next1 * SIZE_BIT + CTZ(bmask1);
+				last = next;
+                return next * SIZE_BIT + CTZ(bmask1);
             }
-
-            _last = (_last + 1) & qmask;
+            last = (last + 1) & qmask;
         }
         return 0;
     }

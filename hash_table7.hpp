@@ -887,7 +887,7 @@ public:
         int bsize = sprintf (buff, "============== buckets size ration ========\n");
 
         miss += _num_buckets - _num_filled;
-        for (int i = 1, factorial = 1; i < sizeof(buckets) / sizeof(buckets[0]); i++) {
+        for (int i = 1, factorial = 1; i < int(sizeof(buckets) / sizeof(buckets[0])); i++) {
             double poisson = fk / factorial; factorial *= i; fk *= lf;
             if (poisson > 1e-13 && i < 20)
             sum_poisson += poisson * 100.0 * (i - 1) / i;
@@ -1315,7 +1315,8 @@ public:
     void clearkv()
     {
         if (is_triviall_destructable()) {
-            for (auto it = cbegin(); _num_filled; ++it)
+            auto it = cbegin(); it.init();
+            for (; _num_filled; ++it)
                 clear_bucket(it.bucket());
         }
     }
@@ -1704,19 +1705,34 @@ private:
                 return step * SIZE_BIT + CTZ(bmask3);
         }
 
-        for (; ;) {
-            auto& _last = EMH_BUCKET(_pairs, _num_buckets);
-            const auto bmask2 = *((size_t*)_bitmask + _last);
+        auto next_bucket = (bucket_from + 0 * SIZE_BIT) & qmask;
+        auto& last = EMH_BUCKET(_pairs, _num_buckets);
+        for (size_type offset = 1; ; offset += 1) {
+            last &= qmask;
+            const auto bmask2 = *((size_t*)_bitmask + last);
             if (bmask2 != 0)
-                return _last * SIZE_BIT + CTZ(bmask2);
-
-            const auto next1 = (qmask / 2 + _last) & qmask;
+                return last * SIZE_BIT + CTZ(bmask2);
+#if 1
+            const auto next1 = (qmask / 2 + last) & qmask;
             const auto bmask1 = *((size_t*)_bitmask + next1);
             if (bmask1 != 0) {
-                //_last = next1;
+                last = next1;
                 return next1 * SIZE_BIT + CTZ(bmask1);
             }
-            _last = (_last + 1) & qmask;
+            last += 1;
+#else
+            next_bucket += offset < 10 ? 1 + SIZE_BIT * offset : 1 + qmask / 32;
+            if (next_bucket >= qmask) {
+                next_bucket += 1;
+                next_bucket &= qmask;
+            }
+
+            const auto bmask1 = *((size_t*)_bitmask + next_bucket);
+            if (bmask1 != 0) {
+                last = next_bucket;
+                return next_bucket * SIZE_BIT + CTZ(bmask1);
+            }
+#endif
         }
 
         return 0;

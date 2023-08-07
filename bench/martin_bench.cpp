@@ -34,9 +34,13 @@
 #endif
 
 #if X86
+//    #define EMH_QUADRATIC 1
+//    #define EMH_STATIS 123456
+//    #define AVX2_EHASH 1
+//    #define EMH_PSL_LINEAR 1
     #include "emilib/emilib2o.hpp"
     #include "emilib/emilib3so.hpp"
-    #include "emilib/emilib2oq.hpp"
+    #include "emilib/emilib2s.hpp"
 #endif
 
 #include "martin/robin_hood.h"
@@ -393,7 +397,7 @@ static void bench_insert_erase_continue()
         return;
     printf("    %s", map_name);
 
-    size_t max_n = 1000000;
+    size_t max_n = 400000;
     auto nows = now2sec();
 
     for (int i = 0; i < 3; ++i) {
@@ -403,7 +407,7 @@ static void bench_insert_erase_continue()
         MRNG rng(2345 + i * i * i);
 
         // benchmark randomly inserting & erasing begin
-        for (size_t i = 0; i < max_n / 5; ++i)
+        for (size_t i = 0; i < max_n / 3; ++i)
             map.emplace((int)rng(), 0);
 
         auto key = map.begin()->first;
@@ -426,7 +430,7 @@ static void bench_insert_erase_continue()
         }
 
         printf("\n\t\t%.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
-        max_n *= 5;
+        max_n *= 7;
     }
 
     printf(" total (%.2f s)\n", now2sec() - nows);
@@ -1851,7 +1855,7 @@ static void runTest(int sflags, int eflags)
         {  bench_AccidentallyQuadratic<absl::flat_hash_map <int, int, hash_func>>(); }
 #endif
 
-#if X86 && EMH_QUADRATIC
+#if X86
         {  bench_AccidentallyQuadratic<emilib2::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
@@ -1908,7 +1912,7 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_continue<absl::flat_hash_map <int, int, hash_func>>(); }
 #endif
 
-#if X86 && EMH_QUADRATIC
+#if X86
         {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
@@ -1960,7 +1964,7 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_begin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
 
-#if X86 && EMH_QUADRATIC
+#if X86
         {  bench_insert_erase_begin<emilib2::HashMap <int64_t, int, hash_func>>(); }
 #endif
 #if ET

@@ -1,3 +1,4 @@
+
 #include "util.h"
 #include <algorithm>
 
@@ -80,7 +81,7 @@ std::map<std::string, std::string> maps =
 
 //rand data 3ype
 #ifndef RT
-    #define RT 3 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP     1
@@ -705,7 +706,7 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
     auto ts1 = getus(); size_t sum = 1;
     hash_type tmp(ht_hash);
 
-    for (const auto & v : vList) {
+    for (auto & v : vList) {
 #if KEY_INT
         auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
 #elif KEY_CLA
@@ -731,37 +732,35 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 }
 
 template<class hash_type>
-static void insert_erase_first(const std::string& hash_name, int nsize)
+static void insert_erase_first(const std::string& hash_name, const std::vector<keyType>& vList)
 {
-#if KEY_INT
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    WyRand srng(nsize);
-    for (int i = nsize; i > 0; i--) {
-        ht_hash.emplace((keyType)srng(), TO_VAL(0));
+    const auto nsize = vList.size();
+    for (int i = nsize - 1; i >= 0; i--) {
+        ht_hash.emplace(vList[i], TO_VAL(0));
         if (ht_hash.size() > nsize / 4) {
             ht_hash.erase(ht_hash.begin());
-            sum += i;
         }
+        sum += 1;
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
-#endif
 }
 
 template<class hash_type>
-static void insert_erase_continue(const std::string& hash_name, int nsize)
+static void insert_erase_continue(const std::string& hash_name, const std::vector<keyType>& vList)
 {
-#if KEY_INT
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    WyRand srng(nsize);
-    for (int i = nsize / 3; i > 0; i--) {
+    const auto nsize = vList.size();
+    int i = 0;
+    for ( ; i  < nsize / 4; i++) {
         sum += i;
-        ht_hash.emplace((keyType)srng(), TO_VAL(0));
+        ht_hash.emplace(vList[i], TO_VAL(0));
     }
 
     auto key = ht_hash.begin()->first;
-    for (int i = nsize; i > 0; i--) {
+    for (; i < nsize ; i--) {
         auto it = ht_hash.find(key);
         if (it == ht_hash.end()) {
             it = ht_hash.begin();
@@ -777,11 +776,10 @@ static void insert_erase_continue(const std::string& hash_name, int nsize)
             if (it != ht_hash.end()) key = it->first;
         }
 
-        ht_hash.emplace((keyType)srng(), TO_VAL(0));
+        ht_hash.emplace(vList[i], TO_VAL(0));
     }
 
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
-#endif
 }
 
 template<class hash_type>
@@ -1167,8 +1165,8 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     insert_erase     <hash_type>(hash_name, oList);
 #endif
 
-    insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
     insert_cache_size <hash_type>(hash_name, oList, "insert_l3_cache", l3_size, l3_size + 1000);
+    insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
 
     insert_no_reserve <hash_type>(hash_name, oList);
     insert_reserve<hash_type>(hash, hash_name, oList);
@@ -1202,8 +1200,8 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     erase_50_reinsert<hash_type>(hash, hash_name, oList);
 
     insert_find_erase <hash_type>(hash, hash_name, nList);
-    insert_erase_first<hash_type>(hash_name, oList.size() % 123456);
-    insert_erase_continue<hash_type>(hash_name, oList.size() % 2123456);
+    insert_erase_first<hash_type>(hash_name, oList);
+    insert_erase_continue<hash_type>(hash_name, oList);
     iter_all          <hash_type>(hash, hash_name);
 
     if (test_extra) {
@@ -1424,9 +1422,9 @@ static int benchHashMap(int n)
 
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
 #if X86
-        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
-        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
+        //{  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
+        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 #endif
 
 #if ABSL_HMAP

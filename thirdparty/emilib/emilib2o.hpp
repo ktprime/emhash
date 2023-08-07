@@ -24,7 +24,7 @@
 #undef EMH_UNLIKELY
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
+#if (__GNUC__ >= 4 || __clang__) && _MSC_VER == 0
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
 #    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
@@ -42,7 +42,7 @@ namespace emilib2 {
         SENTINEL = EDELETE + 0xF0,
     };
 
-	constexpr static uint8_t  EMPTY_OFFSET = 0;
+    constexpr static uint8_t  EMPTY_OFFSET = 0;
     constexpr static uint64_t EMPTY_MASK   = 0x0101010101010101ull;
     constexpr static uint64_t EFILLED_FIND = 0xFEFEFEFEFEFEFEFEull;
 
@@ -177,11 +177,13 @@ public:
         using reference         = value_type&;
 
         iterator() {}
+        iterator(const const_iterator& it)
+            : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
         iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
 #if EMH_ITER_SAFE
         iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 #else
-        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _from = -1; }
+        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = 0; _from = -1; }
 #endif
 
         void init()
@@ -583,7 +585,7 @@ public:
             auto fit = find(rit->first);
             if (fit.bucket() > _mask) {
                 insert_unique(rit->first, std::move(rit->second));
-                rit = rhs.erase(rit);
+                rit = rhs.erase_(rit);
             } else {
                 ++rit;
             }
@@ -766,17 +768,21 @@ public:
         return 1;
     }
 
-    iterator erase(const const_iterator& cit) noexcept
+    void erase(const const_iterator& cit) noexcept
     {
         do_erase(cit._bucket);
-        iterator it(cit);
-        return ++it;
     }
 
-    iterator erase(iterator it) noexcept
+    iterator erase_(iterator it) noexcept
     {
         do_erase(it._bucket);
         return ++it;
+    }
+
+    void erase(iterator it) noexcept
+    {
+      do_erase(it._bucket);
+//      return ++it;
     }
 
     void _erase(iterator& it) noexcept
@@ -827,9 +833,8 @@ public:
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last; ) {
             if (pred(*it))
-                it = erase(it);
-            else
-                ++it;
+                erase_(it);
+            ++it;
         }
         return old_size - size();
     }
@@ -890,7 +895,7 @@ public:
     void dump_statics() const
     {
         int off[256] = {0};
-        for (int i = 0; i < _num_buckets; i++)
+        for (size_t i = 0; i < _num_buckets; i++)
             off[_offset[i]]++;
 
         size_t total = 0, sums = 0;
@@ -898,7 +903,7 @@ public:
             if (off[i] != EMPTY_OFFSET) {
                 total += off[i];
                 sums  += (size_t)off[i] * (i + 1);
-                printf("\n%3d %3d %.3lf%% %3.lf%%", i, off[i], 10000.0 * off[i] / _num_buckets, 10000.0 * total / _num_buckets);
+                printf("\n%3d %8d %.5lf%% %3.lf%%", i, off[i], 1.0 * off[i] / _num_buckets, 10000.0 * total / _num_buckets);
             }
         }
         printf(", average probe sequence length PSL = %.4lf\n", 1.0 * sums / total);
@@ -971,7 +976,6 @@ public:
                 src_pair.~PairT();
             }
         }
-
         free(old_states);
     }
 
@@ -1022,7 +1026,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += offset < 8 ? 1 + simd_bytes * offset : _num_buckets / 16;
+        next_bucket += offset < 8 ? 1 + simd_bytes * offset : _mask / 32 + 1;
         if (next_bucket >= _num_buckets) {
             next_bucket += 1;
         }
@@ -1141,7 +1145,7 @@ private:
         return ~MOVEMASK_EPI8(vec) & ((1u << simd_bytes) - 1);
 #elif SSE2_EMHASH == 0
         const auto vec = GET_EMPTY((decltype(&simd_empty))(&_states[gbucket]));
-        return ~MOVEMASK_EPI8(vec);
+        return (uint32_t)~MOVEMASK_EPI8(vec);
 #else
         const static auto simd_filled = _mm_set1_epi8(EFILLED);
         #define LOAD_EMPTY(u)  _mm_and_si128(_mm_load_si128(u), simd_empty)
