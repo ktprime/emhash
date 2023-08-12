@@ -1857,6 +1857,7 @@ static void runTest(int sflags, int eflags)
 
 #if X86
         {  bench_AccidentallyQuadratic<emilib2::HashMap <int, int, hash_func>>(); }
+        {  bench_AccidentallyQuadratic<emilib3::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
         {  bench_AccidentallyQuadratic<hrd_m::hash_map <int, int, hash_func>>(); }
@@ -1914,6 +1915,7 @@ static void runTest(int sflags, int eflags)
 
 #if X86
         {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<emilib3::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
 //        {  bench_insert_erase_continue<hrd_m::hash_map <int, int, hash_func>>(); }
@@ -1966,6 +1968,7 @@ static void runTest(int sflags, int eflags)
 
 #if X86
         {  bench_insert_erase_begin<emilib2::HashMap <int64_t, int, hash_func>>(); }
+        {  bench_insert_erase_begin<emilib3::HashMap <int64_t, int, hash_func>>(); }
 #endif
 #if ET
 //        {  bench_insert_erase_begin<hrd_m::hash_map <int64_t, int, hash_func>>(); }

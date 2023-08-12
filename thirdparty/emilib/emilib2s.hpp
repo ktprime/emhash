@@ -135,26 +135,41 @@ public:
     typedef HashT  hasher;
     typedef EqT    key_equal;
 
-#ifdef EMH_H2
+#if EMH_H2 == 1
     template<typename UType>
-    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
-        (void)key_hash;
-        return (uint8_t)((uint8_t)(key_hash >> 28)) << 1;
+        const auto key_hash = _hasher(key);
+        main_bucket = key_hash & _mask;
+        main_bucket -= main_bucket % simd_bytes;
+        return (uint8_t)((uint8_t)(key_hash >> 28)) * 2;
+    }
+#elif EMH_H2 == 2
+    template<typename UType>
+    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
+    {
+        const auto key_hash = _hasher(key);
+        main_bucket = (key_hash >> 4) & _mask;
+        main_bucket -= main_bucket % simd_bytes;
+        return (uint8_t)(key_hash >> 32) * 2;
     }
 #else
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
-        (void)key;
-        return (uint8_t)(key_hash >> 28) << 1;
+        const auto key_hash = _hasher(key);
+        main_bucket = key_hash & _mask;
+        main_bucket -= main_bucket % simd_bytes;
+        return (uint8_t)(key_hash >> 28) * 2;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash_key2(uint64_t key_hash, const UType& key) const
+    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
-        (void)key_hash;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) << 1;
+        const auto key_hash = _hasher(key);
+        main_bucket = key_hash & _mask;
+        main_bucket -= main_bucket % simd_bytes;
+        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) * 2;
     }
 #endif
 
@@ -477,9 +492,9 @@ public:
         return _num_filled / static_cast<float>(_num_buckets);
     }
 
-    float max_load_factor(float lf = 8.0f/9)
+    float max_load_factor(float lf = 7.0f / 8)
     {
-        return 7/8.0f;
+        return 7.0f / 8;
     }
 
     // ------------------------------------------------------------
@@ -566,7 +581,7 @@ public:
             auto fit = find(rit->first);
             if (fit.bucket() > _mask) {
                 insert_unique(rit->first, std::move(rit->second));
-                rit = rhs.erase(rit);
+                rhs.erase(rit++);
             } else {
                 ++rit;
             }
@@ -668,11 +683,11 @@ public:
     {
         check_expand_need();
 
-        const auto key_hash = H1(key);
-        const auto bucket = find_empty_slot(key_hash & _mask, 0);
+        size_t main_bucket;
+        const auto key_h2 = hash_key2(main_bucket, key);
+        const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
 
-
-        set_states(bucket, hash_key2(key_hash, key));
+        set_states(bucket, key_h2);
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
     }
@@ -742,20 +757,12 @@ public:
         return 1;
     }
 
-    iterator erase(const const_iterator& cit) noexcept
+    void erase(const const_iterator& cit) noexcept
     {
         _erase(cit._bucket);
-        iterator it(cit);
-        return ++it;
     }
 
-    iterator erase(iterator it) noexcept
-    {
-        _erase(it._bucket);
-        return ++it;
-    }
-
-    void _erase(iterator& it) noexcept
+    void erase(iterator it) noexcept
     {
         _erase(it._bucket);
     }
@@ -827,7 +834,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 8;
+        size_t required_buckets = num_elems + num_elems / 7;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -893,15 +900,13 @@ public:
         for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
-                const auto key_hash = H1(src_pair.first);
-                const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
-#if EMH_DUMP
-                collision += _states[key_hash & _mask] % 2 == State::EFILLED;
-#endif
+                size_t main_bucket;
+                const auto key_h2 = hash_key2(main_bucket, src_pair.first);
+                const auto bucket = find_empty_slot(main_bucket, 0);
 
-                set_states(dst_bucket, hash_key2(key_hash, src_pair.first));
-                new(_pairs + dst_bucket) PairT(std::move(src_pair));
-                _num_filled += 1;
+                set_states(bucket, key_h2);
+                new(_pairs + bucket) PairT(std::move(src_pair));
+                _num_filled ++;
                 src_pair.~PairT();
             }
         }
@@ -934,17 +939,34 @@ private:
 #endif
     }
 
+    inline void set_offset(int32_t offset)
+    {
+        _max_probe_length = offset;
+    }
+
+    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
+    {
+#if EMH_PSL_LINEAR == 0
+        if (offset < 8)
+            next_bucket += simd_bytes * offset;
+        else
+            next_bucket += _num_buckets / 8 + simd_bytes;
+#else
+        next_bucket += 3 * simd_bytes;
+        if (next_bucket >= _num_buckets)
+            next_bucket += simd_bytes;
+#endif
+        return next_bucket & _mask;
+    }
+
     // Find the bucket with this key, or return (size_t)-1
     template<typename K>
     size_t find_filled_bucket(const K& key) const noexcept
     {
-        const auto key_hash = H1(key);
-        auto next_bucket = (size_t)(key_hash & _mask);
-        next_bucket -= next_bucket % simd_bytes;
-        //prefetch_heap_block((char*)_states + next_bucket);
-
-        const auto filled = SET1_EPI8(hash_key2(key_hash, key));
-        int offset = _max_probe_length;
+        size_t main_bucket;
+        const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
+        auto next_bucket = main_bucket;
+        int offset = 0;
         prefetch_heap_block((char*)&_pairs[next_bucket]);
 
         while (true) {
@@ -960,10 +982,11 @@ private:
 
             if (group_mask(next_bucket) == State::EEMPTY)
                 break;
-            else if (EMH_UNLIKELY((offset -= simd_bytes) < 0))
+            if (++offset > _max_probe_length)
                 break;
-            next_bucket = (next_bucket + simd_bytes) & _mask;
+            next_bucket = get_next_bucket(next_bucket, offset);
         }
+
         return _num_buckets;
     }
 
@@ -974,17 +997,13 @@ private:
     {
         check_expand_need();
 
-        const auto key_hash = H1(key);
-        const auto key_h2 = hash_key2(key_hash, key);
-        auto bucket = (size_t)(key_hash & _mask);
-        const auto boffset = bucket % simd_bytes; bucket -= boffset;
-        //prefetch_heap_block((char*)_states + bucket);
-
+        size_t main_bucket;
+        const auto key_h2 = hash_key2(main_bucket, key);
         const auto filled = SET1_EPI8(key_h2);
-        const auto round  = bucket + _max_probe_length;
-        auto next_bucket  = bucket, offset = bucket;
+
+        auto next_bucket = main_bucket; int offset = 0u;
         size_t hole = (size_t)-1;
-        prefetch_heap_block((char*)&_pairs[next_bucket]);
+        prefetch_heap_block((char*)&_pairs[main_bucket]);
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -1004,14 +1023,9 @@ private:
             //if (group_mask(next_bucket) == State::EEMPTY) {
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-#if EMH_FIND_HIT0
-                const auto ebucket = hole == (size_t)-1 ? next_bucket + ((maske & (1 << boffset)) ? boffset : CTZ(maske)) : hole;
-#else
-                const auto ebucket = hole == (size_t)-1 ? next_bucket + CTZ(maske) : hole;
-#endif
-                const int doffset = (ebucket - bucket + _num_buckets) & _mask;
-                if (EMH_UNLIKELY(doffset > _max_probe_length))
-                    _max_probe_length = doffset / simd_bytes * simd_bytes + simd_bytes - 1;
+                auto ebucket = next_bucket + CTZ(maske);
+                if (EMH_UNLIKELY(hole != (size_t)-1))
+                    ebucket = hole;
                 set_states(ebucket, key_h2);
                 return ebucket;
             }
@@ -1024,17 +1038,18 @@ private:
             }
 
             //4. next round
-            next_bucket = (next_bucket + simd_bytes) & _mask;
-            if (EMH_UNLIKELY((offset += simd_bytes) > round)) {
-                if (EMH_LIKELY(hole != (size_t)-1)) {
-                    set_states(hole, key_h2);
-                    return hole;
-                }
+            next_bucket = get_next_bucket(next_bucket, ++offset);
+            if (offset > _max_probe_length)
                 break;
-            }
         }
 
-        const auto ebucket = find_empty_slot(next_bucket, offset - bucket);
+        if (EMH_LIKELY(hole != (size_t)-1)) {
+            set_offset(offset - 1);
+            set_states(hole, key_h2);
+            return hole;
+        }
+
+        const auto ebucket = find_empty_slot(next_bucket, offset);
         set_states(ebucket, key_h2);
         return ebucket;
     }
@@ -1058,18 +1073,15 @@ private:
 
     size_t find_empty_slot(size_t next_bucket, int offset) noexcept
     {
-        next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = empty_delete(next_bucket);
             if (EMH_LIKELY(maske != 0)) {
-                const auto probe = CTZ(maske);
-                offset += probe;
-                if (EMH_UNLIKELY(offset > _max_probe_length))
-                    _max_probe_length = offset / simd_bytes * simd_bytes + simd_bytes - 1;
-                return next_bucket + probe;
+                const auto probe = CTZ(maske) + next_bucket;
+                if (offset > _max_probe_length)
+                    set_offset(offset);
+                return probe;
             }
-            offset      += simd_bytes;
-            next_bucket = (next_bucket + simd_bytes) & _mask;
+            next_bucket = get_next_bucket(next_bucket, ++offset);
         }
         return 0;
     }

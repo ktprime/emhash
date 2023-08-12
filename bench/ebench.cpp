@@ -1,4 +1,5 @@
 
+
 #include "util.h"
 #include <algorithm>
 
@@ -49,7 +50,7 @@ std::map<std::string, std::string> maps =
 
     {"emilib2", "emilib2"},
 //    {"emilib1", "emilib1"},
-//    {"emilib3", "emilib3"},
+    {"emilib3", "emilib3"},
 //    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
 //    {"emilib3", "emilib3"},
@@ -732,11 +733,35 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 }
 
 template<class hash_type>
+static void insert_backtrace(const std::string& hash_name, const std::vector<keyType>& vList)
+{
+#if KEY_INT
+    hash_type ht_hash;
+    auto ts1 = getus(); size_t sum = 0;
+
+    WyRand srng(vList.size());
+    ht_hash[srng()] = 1;
+
+    for (int i = 1; i < 22; i++) {
+        auto tmp = ht_hash;
+        const auto add = srng();
+        for (auto it = ht_hash.begin(); it != ht_hash.end(); ++it) {
+            tmp[it->first + add] += 1;
+        }
+        ht_hash = std::move(tmp);
+    }
+
+    sum = ht_hash.size();
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+#endif
+}
+
+template<class hash_type>
 static void insert_erase_first(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    const auto nsize = vList.size();
+    auto nsize = vList.size() % 1234567;
     for (int i = nsize - 1; i >= 0; i--) {
         ht_hash.emplace(vList[i], TO_VAL(0));
         if (ht_hash.size() > nsize / 4) {
@@ -754,7 +779,7 @@ static void insert_erase_continue(const std::string& hash_name, const std::vecto
     auto ts1 = getus(); size_t sum = 0;
     const auto nsize = vList.size();
     int i = 0;
-    for ( ; i  < nsize / 4; i++) {
+    for ( ; i < nsize / 4; i++) {
         sum += i;
         ht_hash.emplace(vList[i], TO_VAL(0));
     }
@@ -1202,6 +1227,7 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     insert_find_erase <hash_type>(hash, hash_name, nList);
     insert_erase_first<hash_type>(hash_name, oList);
     insert_erase_continue<hash_type>(hash_name, oList);
+    insert_backtrace<hash_type>(hash_name, oList);
     iter_all          <hash_type>(hash, hash_name);
 
     if (test_extra) {

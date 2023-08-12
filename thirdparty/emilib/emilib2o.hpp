@@ -786,14 +786,10 @@ public:
 
     void erase(iterator it) noexcept
     {
-      do_erase(it._bucket);
+        do_erase(it._bucket);
 //      return ++it;
     }
 
-    void _erase(iterator& it) noexcept
-    {
-        do_erase(it._bucket);
-    }
 
     void do_erase(size_t bucket)
     {
@@ -827,7 +823,7 @@ public:
         auto iend = cend();
         auto next = first;
         for (; next != last && next != iend; )
-            next = erase(next);
+            erase(next++);
 
         return {this, next.bucket()};
     }
@@ -889,7 +885,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 8;
+        size_t required_buckets = num_elems + num_elems / 7;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -1033,9 +1029,14 @@ private:
     {
 #if EMH_PSL_LINEAR == 0
         next_bucket += offset < 8 ? 1 + simd_bytes * offset : _mask / 32 + 1;
-        if (next_bucket >= _num_buckets) {
+        if (next_bucket >= _num_buckets)
             next_bucket += 1;
-        }
+#elif EMH_PSL_LINEAR == 1
+        if (offset < 8)
+            next_bucket += simd_bytes * offset;
+        //else if (offset == 8) next_bucket += _num_buckets / 2;
+        else
+            next_bucket += _num_buckets / 4 + simd_bytes;
 #else
         next_bucket += simd_bytes;
         if (next_bucket >= _num_buckets)
@@ -1053,7 +1054,27 @@ private:
         auto next_bucket = main_bucket;
 
         size_t offset = 0;
-        prefetch_heap_block((char*)&_pairs[next_bucket]);
+
+        if (0)
+        {
+            prefetch_heap_block((char*)&_pairs[next_bucket]);
+            const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+
+            while (maskf != 0) {
+                const auto fbucket = next_bucket + CTZ(maskf);
+                if (_eq(_pairs[fbucket].first, key))
+                    return fbucket;
+                maskf &= maskf - 1;
+            }
+            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            if (maske != 0)
+                return _num_buckets;
+            else if (0 == get_offset(main_bucket))
+                return _num_buckets;
+
+            next_bucket = get_next_bucket(next_bucket, ++offset);
+        }
 
         while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
