@@ -328,7 +328,7 @@ public:
 
     public:
         const htype*  _map;
-        uint64_t      _bmask;
+        size_t        _bmask;
         size_t        _bucket;
         size_t        _from;
     };
@@ -692,18 +692,25 @@ public:
         return bucket;
     }
 
+    template <class M>
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) { return do_assign(key, std::forward<M>(val)); }
+    template <class M>
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) { return do_assign(std::move(key), std::forward<M>(val)); }
+
     template<typename K, typename V>
-    void insert_or_assign(K&& key, V&& val) noexcept
+    std::pair<iterator, bool> do_assign(K&& key, V&& val)
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
 
-        // Check if inserting a new value rather than overwriting an old entry
+        // Check if inserting a new val rather than overwriting an old entry
         if (bempty) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         } else {
             _pairs[bucket].second = std::forward<V>(val);
         }
+
+        return { {this, bucket, false}, bempty };
     }
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
@@ -790,7 +797,28 @@ public:
             _max_probe_length = -1;
             std::fill_n(_states, _num_buckets, State::EEMPTY);
         }
-        //if next is empty()
+    }
+
+    iterator erase(const_iterator first, const_iterator last)
+    {
+        auto iend = cend();
+        auto next = first;
+        for (; next != last && next != iend; )
+            erase(next++);
+
+        return {this, next.bucket()};
+    }
+
+    template<typename Pred>
+    size_t erase_if(Pred pred)
+    {
+        auto old_size = size();
+        for (auto it = begin(), last = end(); it != last; ) {
+            if (pred(*it))
+                erase(it);
+            ++it;
+        }
+        return old_size - size();
     }
 
     static constexpr bool is_triviall_destructable()
@@ -1044,7 +1072,6 @@ private:
         }
 
         if (EMH_LIKELY(hole != (size_t)-1)) {
-            set_offset(offset - 1);
             set_states(hole, key_h2);
             return hole;
         }
@@ -1096,16 +1123,6 @@ private:
             next_bucket += simd_bytes;
         }
         return 0;
-    }
-
-    inline size_t H1(const KeyT& key) const noexcept
-    {
-#ifdef EMH_H3
-        const auto key_hash = _hasher(key);
-        return (key_hash >> 7) ^ (reinterpret_cast<uintptr_t>(_states) >> 12);
-#else
-        return (size_t)_hasher(key);
-#endif
     }
 
 private:

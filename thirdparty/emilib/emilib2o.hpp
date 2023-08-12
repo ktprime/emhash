@@ -590,7 +590,7 @@ public:
             auto fit = find(rit->first);
             if (fit.bucket() > _mask) {
                 insert_unique(rit->first, std::move(rit->second));
-                rit = rhs.erase_(rit);
+                rhs.erase(rit++);
             } else {
                 ++rit;
             }
@@ -696,7 +696,7 @@ public:
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
 
-        set_states(main_bucket, key_h2);
+        set_states(bucket, key_h2);
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         return bucket;
     }
@@ -769,29 +769,22 @@ public:
         if (bucket == _num_buckets)
             return 0;
 
-        do_erase(bucket);
+        _erase(bucket);
         return 1;
     }
 
     void erase(const const_iterator& cit) noexcept
     {
-        do_erase(cit._bucket);
-    }
-
-    iterator erase_(iterator it) noexcept
-    {
-        do_erase(it._bucket);
-        return ++it;
+        _erase(cit._bucket);
     }
 
     void erase(iterator it) noexcept
     {
-        do_erase(it._bucket);
-//      return ++it;
+        _erase(it._bucket);
     }
 
 
-    void do_erase(size_t bucket)
+    void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
         if (is_triviall_destructable())
@@ -834,7 +827,7 @@ public:
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last; ) {
             if (pred(*it))
-                erase_(it);
+                erase(it);
             ++it;
         }
         return old_size - size();
@@ -859,19 +852,15 @@ public:
     }
 
     /// Remove all elements, keeping full capacity.
-    void clear()
+    void clear() noexcept
     {
         if (is_triviall_destructable()) {
-            for (size_t bucket = 0; _num_filled; ++bucket) {
-                if (_states[bucket] % 2 == State::EFILLED) {
-                    _pairs[bucket].~PairT();
-                    _num_filled --;
-                }
-                set_states(bucket, State::EEMPTY);
+            for (auto it = begin(); it.bucket() != _num_buckets; ++it) {
+                const auto bucket = it.bucket();
+                _states[bucket] = State::EEMPTY;
+                _pairs[bucket].~PairT();
             }
-        }
-
-        if (_num_filled) {
+        } else if (_num_filled) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
             std::fill_n(_offset, _num_buckets, EMPTY_OFFSET);
             _num_filled = 0;
@@ -1149,7 +1138,7 @@ private:
         }
 
         if (hole != (size_t)-1) {
-            set_offset(main_bucket, offset - 1);
+            //set_offset(main_bucket, offset - 1);
             set_states(hole, key_h2);
             return hole;
         }

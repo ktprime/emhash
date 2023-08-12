@@ -344,9 +344,9 @@ int main(int argc, const char* argv[])
 
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6>("emhash_map6");
-    //test<emilib_map3> ("emilib_map3" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
     test<emilib_map2> ("emilib_map2" );
+    test<emilib_map3> ("emilib_map3" );
     test<emhash_map8>("emhash_map8");
     test<emhash_map7>("emhash_map7");
 
