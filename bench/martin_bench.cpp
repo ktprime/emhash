@@ -17,6 +17,8 @@
 //#define EMH_PACK_TAIL 16
 //#define EMH_HIGH_LOAD 123456
 
+//#define EMH_STATIS 1234567
+
 #if CK_HMAP
 #include "ck/Common/HashTable/HashMap.h"
 #endif
@@ -39,7 +41,7 @@
 //    #define AVX2_EHASH 1
 //    #define EMH_PSL_LINEAR 1
     #include "emilib/emilib2o.hpp"
-    #include "emilib/emilib3so.hpp"
+    #include "emilib/emilib2so.hpp"
     #include "emilib/emilib2s.hpp"
 #endif
 
@@ -71,7 +73,7 @@ static std::map<std::string_view, std::string_view> show_name =
    {"emhash8", "emhash8"},
    {"emhash5", "emhash5"},
 #if X86
-//    {"emilib", "emilib"},
+    {"emilib",  "emilib1"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
 #endif
@@ -1795,6 +1797,7 @@ static void runTest(int sflags, int eflags)
 #endif
 
 #if X86
+        { bench_GameOfLife<emilib::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emilib2::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emilib3::HashMap<uint32_t, bool, hash_func>>(); }
 #endif
@@ -1856,6 +1859,7 @@ static void runTest(int sflags, int eflags)
 #endif
 
 #if X86
+        {  bench_AccidentallyQuadratic<emilib::HashMap <int, int, hash_func>>(); }
         {  bench_AccidentallyQuadratic<emilib2::HashMap <int, int, hash_func>>(); }
         {  bench_AccidentallyQuadratic<emilib3::HashMap <int, int, hash_func>>(); }
 #endif
@@ -1914,8 +1918,9 @@ static void runTest(int sflags, int eflags)
 #endif
 
 #if X86
-        {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
         {  bench_insert_erase_continue<emilib3::HashMap <int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<emilib::HashMap <int, int, hash_func>>(); }
+        {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
 //        {  bench_insert_erase_continue<hrd_m::hash_map <int, int, hash_func>>(); }
@@ -1969,6 +1974,7 @@ static void runTest(int sflags, int eflags)
 #if X86
         {  bench_insert_erase_begin<emilib2::HashMap <int64_t, int, hash_func>>(); }
         {  bench_insert_erase_begin<emilib3::HashMap <int64_t, int, hash_func>>(); }
+        {  bench_insert_erase_begin<emilib::HashMap <int64_t, int, hash_func>>(); }
 #endif
 #if ET
 //        {  bench_insert_erase_begin<hrd_m::hash_map <int64_t, int, hash_func>>(); }

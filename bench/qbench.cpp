@@ -32,7 +32,7 @@
 
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
-#include "emilib/emilib.hpp"
+#include "emilib/emilib2so.hpp"
 //#include "emilib/emilib12.hpp"
 //#include "emilib/emiset2.hpp"
 
@@ -1296,7 +1296,7 @@ int main(const int argc, const char* argv[])
 
         compare<CompareMode::typical, K,
 #if X86
-//            EmiLib1MapInfo<K, V>,
+            EmiLib1MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
 //            EmLibMapInfo<K, V>,

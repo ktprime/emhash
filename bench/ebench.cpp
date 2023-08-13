@@ -49,7 +49,7 @@ std::map<std::string, std::string> maps =
 //    {"lru_size", "lru_size"},
 
     {"emilib2", "emilib2"},
-//    {"emilib1", "emilib1"},
+    {"emilib1", "emilib1"},
     {"emilib3", "emilib3"},
 //    {"simd_hash", "simd_hash"},
 //    {"emilib4", "emilib4"},
@@ -194,7 +194,7 @@ std::map<std::string, std::string> maps =
 #if X86
     #include "emilib/emilib2s.hpp"
     #include "emilib/emilib2o.hpp"
-    #include "emilib/emilib3so.hpp"
+    #include "emilib/emilib2so.hpp"
 #endif
 
 #if ET
@@ -1448,7 +1448,7 @@ static int benchHashMap(int n)
 
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
 #if X86
-        //{  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 #endif

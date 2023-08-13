@@ -953,7 +953,7 @@ public:
         //fill offset to 0
         std::fill_n(_offset, num_buckets, EMPTY_OFFSET);
 
-        for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
 
@@ -1025,7 +1025,7 @@ private:
             next_bucket += simd_bytes * offset;
         //else if (offset == 8) next_bucket += _num_buckets / 2;
         else
-            next_bucket += _num_buckets / 4 + simd_bytes;
+            next_bucket += _num_buckets / 8 + simd_bytes;
 #else
         next_bucket += simd_bytes;
         if (next_bucket >= _num_buckets)

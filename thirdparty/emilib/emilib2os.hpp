@@ -32,7 +32,7 @@
 #    define EMH_UNLIKELY(condition) condition
 #endif
 
-namespace emilib2 {
+namespace emilib2_ {
 
     enum State : uint16_t
     {

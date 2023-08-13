@@ -8,7 +8,7 @@
 #include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_table8.hpp"
-#include "emilib/emilib3so.hpp"
+#include "emilib/emilib2so.hpp"
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib2s.hpp"
 
@@ -240,13 +240,13 @@ int main(int argc, const char* argv[])
 
 #if ET > 1
     hash_table_test<ska::flat_hash_map<ktype, vtype>>("ska_flat");
-    hash_table_test<emilib::HashMap<ktype, vtype, QintHasher>>("emilib1");
 #endif
 
 #if HAVE_BOOST
     hash_table_test<boost::unordered_flat_map<ktype, vtype, QintHasher>>("boost::fhash");
 #endif
 
+    hash_table_test<emilib::HashMap<ktype, vtype, QintHasher>>("emilib1");
     hash_table_test<emilib2::HashMap<ktype, vtype, QintHasher>>("emilib2");
     hash_table_test<emilib3::HashMap<ktype, vtype, QintHasher>>("emilib3");
 

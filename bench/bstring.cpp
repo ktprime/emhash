@@ -26,8 +26,9 @@
 #include "../hash_table7.hpp"
 #include "../hash_table5.hpp"
 
-#include "emilib/emilib3so.hpp"
+#include "emilib/emilib2so.hpp"
 #include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
 
 #include <unordered_map>
 #include <vector>
@@ -310,6 +311,7 @@ template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BstrHasher
 
 template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using martin_dense = ankerl::unordered_dense::map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using emilib1_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 template<class K, class V> using emilib3_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
 
@@ -434,6 +436,7 @@ int main(int argc, const char* argv[])
 
     init_indices();
 
+    test<emilib1_map> ("emilib1_map" );
     test<emilib3_map> ("emilib3_map" );
     test<std_unordered_map>( "std::unordered_map" );
     test<emhash_map5>( "emhash5::hash_map" );

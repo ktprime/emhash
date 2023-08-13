@@ -24,7 +24,7 @@
 #undef EMH_UNLIKELY
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
+#if (__GNUC__ >= 4 || __clang__) && _MSC_VER == 0
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
 #    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
@@ -185,7 +185,7 @@ public:
 
         iterator() {}
         iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
+        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
 
         void init()
         {
@@ -502,13 +502,13 @@ public:
     template<typename K>
     iterator find(const K& key) noexcept
     {
-        return {this, find_filled_bucket(key), false};
+        return {this, find_filled_bucket(key)};
     }
 
     template<typename K>
     const_iterator find(const K& key) const noexcept
     {
-        return {this, find_filled_bucket(key), false};
+        return {this, find_filled_bucket(key)};
     }
 
     template<typename K>
@@ -776,7 +776,6 @@ public:
 
     inline uint8_t group_mask(size_t gbucket) const noexcept
     {
-        //assert(gbucket % simd_bytes == 0);
         return _states[gbucket + simd_bytes - 1] % 4;
     }
 
@@ -791,8 +790,8 @@ public:
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
 
-        const auto gbucket = bucket / simd_bytes * simd_bytes;
-        _states[bucket] = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
+        //const auto gbucket = bucket / simd_bytes * simd_bytes;
+        _states[bucket] = /*group_mask(gbucket) == State::EEMPTY ? State::EEMPTY :**/ State::EDELETE;
         if (EMH_UNLIKELY(_num_filled == 0)) {
             _max_probe_length = -1;
             std::fill_n(_states, _num_buckets, State::EEMPTY);
@@ -899,7 +898,8 @@ public:
         auto old_num_filled  = _num_filled;
         auto old_states      = _states;
         auto old_pairs       = _pairs;
-#if EMH_DUMP
+        auto old_buckets     = _num_buckets;
+#if EMH_STATIS
         auto max_probe_length = _max_probe_length;
 #endif
 
@@ -921,11 +921,12 @@ public:
             std::fill_n(_states + num_buckets, simd_bytes - num_buckets + 1, State::SENTINEL);
 
         _max_probe_length = -1;
-#if EMH_DUMP
+#if EMH_STATIS
         auto collision = 0;
 #endif
 
-        for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        //for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 size_t main_bucket;
@@ -939,7 +940,7 @@ public:
             }
         }
 
-#if EMH_DUMP
+#if EMH_STATIS
         if (_num_filled > 1000000)
             printf("\t\t\tmax_probe_length/_max_probe_length = %d/%d, collsions = %d, collision = %.2f%%\n",
                     max_probe_length, _max_probe_length, collision, collision * 100.0f / _num_buckets);
@@ -978,7 +979,7 @@ private:
         if (offset < 8)
             next_bucket += simd_bytes * offset;
         else
-            next_bucket += _num_buckets / 8 + simd_bytes;
+            next_bucket += _num_buckets / 16 + simd_bytes;
 #else
         next_bucket += 3 * simd_bytes;
         if (next_bucket >= _num_buckets)
@@ -995,7 +996,7 @@ private:
         const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
         int offset = 0;
-        prefetch_heap_block((char*)&_pairs[next_bucket]);
+        prefetch_heap_block((char*)&_pairs[main_bucket]);
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -1110,6 +1111,7 @@ private:
             }
             next_bucket = get_next_bucket(next_bucket, ++offset);
         }
+
         return 0;
     }
 

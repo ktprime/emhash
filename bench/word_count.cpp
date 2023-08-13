@@ -23,6 +23,7 @@
 #include "util.h"
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
+#include "emilib/emilib2so.hpp"
 
 #include <iomanip>
 #include <chrono>
@@ -292,6 +293,7 @@ template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BstrHasher
 
 template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BstrHasher>;
 template<class K, class V> using martin_dense = ankerl::unordered_dense::map<K, V, BstrHasher>;
+template<class K, class V> using emilib1_map = emilib::HashMap<K, V, BstrHasher>;
 template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher>;
 template<class K, class V> using emilib3_map = emilib3::HashMap<K, V, BstrHasher>;
 
@@ -372,6 +374,7 @@ int main(int argc, const char* argv[])
     test<martin_flat>("martin::flat_hash_map" );
 
     test<emilib3_map> ("emilib3_map" );
+    test<emilib1_map> ("emilib1_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
 #ifdef ABSL_HMAP

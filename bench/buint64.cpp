@@ -17,6 +17,7 @@
 #include "hash_table8.hpp"
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
+#include "emilib/emilib2so.hpp"
 #include <iomanip>
 #include <chrono>
 
@@ -318,6 +319,7 @@ template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BintHasher
 template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BintHasher>;
 
 template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BintHasher>;
+template<class K, class V> using emilib_map1 = emilib::HashMap<K, V, BintHasher>;
 template<class K, class V> using emilib_map2 = emilib2::HashMap<K, V, BintHasher>;
 template<class K, class V> using emilib_map3 = emilib3::HashMap<K, V, BintHasher>;
 
@@ -345,6 +347,7 @@ int main(int argc, const char* argv[])
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6>("emhash_map6");
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+    test<emilib_map1> ("emilib_map1" );
     test<emilib_map2> ("emilib_map2" );
     test<emilib_map3> ("emilib_map3" );
     test<emhash_map8>("emhash_map8");
