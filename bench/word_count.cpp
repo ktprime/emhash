@@ -368,13 +368,13 @@ int main(int argc, const char* argv[])
 //    test<boost_unordered_map>( "boost::unordered_map" );
 
     test<emilib2_map> ("emilib2_map" );
+    test<emilib1_map> ("emilib1_map" );
     test<emhash_map7>( "emhash7::hash_map" );
     test<emhash_map5>( "emhash5::hash_map" );
     test<martin_dense>("martin::dense_hash_map" );
     test<martin_flat>("martin::flat_hash_map" );
 
     test<emilib3_map> ("emilib3_map" );
-    test<emilib1_map> ("emilib1_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
 
 #ifdef ABSL_HMAP
