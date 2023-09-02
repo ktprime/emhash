@@ -350,7 +350,7 @@ namespace fph {
             using promoted_type = typename std::common_type<int, T>::type;
             using unsigned_promoted_type = typename std::make_unsigned<promoted_type>::type;
             return ((unsigned_promoted_type{v} >> mb)
-                    | (unsigned_promoted_type{v} << (0-mb & count_mask)));
+                    | (unsigned_promoted_type{v} << (-mb & count_mask)));
         }
 
         inline void ThrowRuntimeError(const char* what) {
@@ -1667,14 +1667,17 @@ namespace fph {
 
             template <class InputIt>
             void insert(InputIt first, InputIt last) {
-//
+                for (; first != last; ++first) emplace(*first);
+            }
+
+            template <class InputIt>
+            void InsertNoDuplicated(InputIt first, InputIt last) {
                 if (param_->item_num_ != 0) {
                     for (; first != last; ++first) emplace(*first);
                 }
                 else {
                     Build<false, false, false>(first, last, seed1_, false, param_->bits_per_key_);
                 }
-
             }
 
             void insert(std::initializer_list<value_type> ilist) {
@@ -3144,8 +3147,8 @@ namespace fph {
                             param_->bucket_array_.emplace_back(i);
                         }
 
-                        auto update_bucket_func = [&](const value_type &value) {
-                            const auto *slot_ptr = reinterpret_cast<const slot_type *>(&value);
+                        auto update_bucket_func = [&](const auto* value_ptr) {
+                            const auto *slot_ptr = reinterpret_cast<const slot_type *>(value_ptr);
 //                            size_t hash_value = GetBucketIndex(slot_ptr->key);
                             size_t hash_value = CompleteGetBucketIndex(slot_ptr->key);
                             assert(hash_value < param_->bucket_num_);
@@ -3158,7 +3161,7 @@ namespace fph {
                         };
 
                         for (auto it = pair_begin; it != pair_end; ++it) {
-                            update_bucket_func(*it);
+                            update_bucket_func(std::addressof(*it));
                         }
 
                         std::vector<size_t, SizeTAllocator> sorted_index_array;
@@ -3680,7 +3683,15 @@ namespace fph {
                 return reinterpret_cast<MetaMapSlotType<K, V>*>(value_ptr);
             }
 
+            static MetaMapSlotType<K, V>* GetSlotAddressByValueAddress(mutable_value_type *value_ptr) {
+                return reinterpret_cast<MetaMapSlotType<K, V>*>(value_ptr);
+            }
+
             static const MetaMapSlotType<K, V>* GetSlotAddressByValueAddress(const value_type *value_ptr) {
+                return reinterpret_cast<const MetaMapSlotType<K, V>*>(value_ptr);
+            }
+
+            static const MetaMapSlotType<K, V>* GetSlotAddressByValueAddress(const mutable_value_type *value_ptr) {
                 return reinterpret_cast<const MetaMapSlotType<K, V>*>(value_ptr);
             }
 

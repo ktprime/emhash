@@ -1,7 +1,7 @@
 #pragma once
 
 ///
-/// QC Hash 3.0.5
+/// QC Hash 3.0.6
 ///
 /// https://github.com/daskie/qc-hash
 ///
@@ -51,15 +51,17 @@ namespace qc::hash
     ///
     using u64 = uint64_t;
     using s64 = int64_t;
+    using f64 = double;
     using u32 = uint32_t;
     using s32 = int32_t;
+    using f32 = float;
     using u16 = uint16_t;
     using s16 = int16_t;
     using u8 = uint8_t;
     using s8 = int8_t;
 
     /// Only support 64 bit platforms
-    static_assert(std::is_same_v<size_t, u64> && std::is_same_v<uintptr_t, u64>, "Unsupported architecture");
+    static_assert(std::is_same_v<u64, u64> && std::is_same_v<uintptr_t, u64>, "Unsupported architecture");
 
     inline namespace config
     {
@@ -70,7 +72,7 @@ namespace qc::hash
         ///
         /// Must be a power of two
         ///
-        constexpr u64 minMapCapacity{16u};
+        inline constexpr u64 minMapCapacity{16u};
     }
 
     ///
@@ -295,8 +297,8 @@ namespace qc::hash
 
     template <Rawable K, typename V, typename H, typename A> class RawMap
     {
-        static constexpr bool _isSet{std::is_same_v<V, void>};
-        static constexpr bool _isMap{!_isSet};
+        inline static constexpr bool _isSet{std::is_same_v<V, void>};
+        inline static constexpr bool _isMap{!_isSet};
 
         ///
         /// Element type
@@ -699,12 +701,12 @@ namespace qc::hash
         ///
         /// @returns the ratio of elements to slots, maximum being 0.5
         ///
-        [[nodiscard]] float load_factor() const;
+        [[nodiscard]] f32 load_factor() const;
 
         ///
         /// @returns 0.5, the maximum possible load factor
         ///
-        [[nodiscard]] float max_load_factor(float) const;
+        [[nodiscard]] f32 max_load_factor(float) const;
 
         ///
         /// @returns the hasher
@@ -720,13 +722,13 @@ namespace qc::hash
 
         using _RawKey = RawType<K>;
 
-        static constexpr _RawKey _vacantKey{_RawKey(~_RawKey{})};
-        static constexpr _RawKey _graveKey{_RawKey(~_RawKey{1u})};
-        static constexpr _RawKey _specialKeys[2]{_graveKey, _vacantKey};
-        static constexpr _RawKey _vacantGraveKey{_vacantKey};
-        static constexpr _RawKey _vacantVacantKey{_graveKey};
-        static constexpr _RawKey _vacantSpecialKeys[2]{_vacantGraveKey, _vacantVacantKey};
-        static constexpr _RawKey _terminalKey{0u};
+        inline static constexpr _RawKey _vacantKey{_RawKey(~_RawKey{})};
+        inline static constexpr _RawKey _graveKey{_RawKey(~_RawKey{1u})};
+        inline static constexpr _RawKey _specialKeys[2]{_graveKey, _vacantKey};
+        inline static constexpr _RawKey _vacantGraveKey{_vacantKey};
+        inline static constexpr _RawKey _vacantVacantKey{_graveKey};
+        inline static constexpr _RawKey _vacantSpecialKeys[2]{_vacantGraveKey, _vacantVacantKey};
+        inline static constexpr _RawKey _terminalKey{0u};
 
         static K & _key(E & element);
         static const K & _key(const E & element);
@@ -866,7 +868,7 @@ namespace qc::hash
 {
     namespace _private::qc_hash
     {
-        constexpr u64 minMapSlotN{minMapCapacity * 2u};
+        inline constexpr u64 minMapSlotN{minMapCapacity * 2u};
 
         // Returns the lowest 64 bits from the given object
         template <UnsignedInteger U, typename T>
@@ -948,7 +950,7 @@ namespace qc::hash
         [[nodiscard]] constexpr u64 operator()(const T * const v) const
         {
             // Bit shift away the low zero bits to maximize low-order entropy
-            constexpr int shift{int(std::bit_width(alignof(T)) - 1u)};
+            constexpr s32 shift{s32(std::bit_width(alignof(T)) - 1u)};
             return std::bit_cast<u64>(v) >> shift;
         }
     };
@@ -1044,10 +1046,10 @@ namespace qc::hash
     namespace fastHash
     {
         template <typename H> struct Constants;
-        template <> struct Constants<u64> { static constexpr u64 m{0xC6A4A7935BD1E995u}; static constexpr int r{47}; };
-        template <> struct Constants<u32> { static constexpr u32 m{0x5BD1E995u};         static constexpr int r{24}; };
+        template <> struct Constants<u64> { inline static constexpr u64 m{0xC6A4A7935BD1E995u}; inline static constexpr s32 r{47}; };
+        template <> struct Constants<u32> { inline static constexpr u32 m{0x5BD1E995u};         inline static constexpr s32 r{24}; };
         template <typename H> inline constexpr H m{Constants<H>::m};
-        template <typename H> inline constexpr int r{Constants<H>::r};
+        template <typename H> inline constexpr s32 r{Constants<H>::r};
 
         template <UnsignedInteger H>
         inline constexpr H mix(H v)
@@ -1863,15 +1865,15 @@ namespace qc::hash
     }
 
     template <Rawable K, typename V, typename H, typename A>
-    inline float RawMap<K, V, H, A>::load_factor() const
+    inline f32 RawMap<K, V, H, A>::load_factor() const
     {
-        return float(_size) / float(_slotN);
+        return f32(_size) / f32(_slotN);
     }
 
     template <Rawable K, typename V, typename H, typename A>
-    inline float RawMap<K, V, H, A>::max_load_factor(float lf) const
+    inline f32 RawMap<K, V, H, A>::max_load_factor(float) const
     {
-        return float(minMapCapacity) / float(_private::qc_hash::minMapSlotN);
+        return f32(minMapCapacity) / f32(_private::qc_hash::minMapSlotN);
     }
 
     template <Rawable K, typename V, typename H, typename A>

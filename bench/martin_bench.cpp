@@ -41,7 +41,7 @@
 //    #define AVX2_EHASH 1
 //    #define EMH_PSL_LINEAR 1
     #include "emilib/emilib2o.hpp"
-    #include "emilib/emilib2so.hpp"
+    #include "emilib/emilib2ss.hpp"
     #include "emilib/emilib2s.hpp"
 #endif
 
@@ -64,7 +64,7 @@
 #include "folly/container/F14Map.h"
 #endif
 
-static const auto RND = getus() + rand();
+static const auto RND = getus();
 static float max_lf = 0.80;
 
 static std::map<std::string_view, std::string_view> show_name =
@@ -486,8 +486,9 @@ static void bench_randomInsertErase(MAP& map)
         return;
     printf("\t%20s", map_name);
 
-    auto nows = now2sec();
+    auto nows = now2sec(), erase1 = 0.;
 
+    if (1)
     {
         uint32_t min_n    = 1 << 20;
         uint32_t max_loop = min_n << 5;
@@ -498,7 +499,7 @@ static void bench_randomInsertErase(MAP& map)
             // each iteration, set 4 new random bits.
             // std::cout << (i + 1) << ". " << as_bits(bitMask) << std::endl;
             auto maxn = min_n * (50 + j * 9) / 100;
-            for (size_t i = 0; i < maxn; ++i) {
+            for (size_t i = 0; i < maxn / 8; ++i) {
                 map.emplace(rng(), 0);
             }
 
@@ -514,6 +515,8 @@ static void bench_randomInsertErase(MAP& map)
             min_n *= 2;
             map.clear();
         }
+
+        erase1 = now2sec() - nows;
     }
 
     {
@@ -532,7 +535,7 @@ static void bench_randomInsertErase(MAP& map)
         uint64_t bitMask = 0;
         auto bitsIt = bits.begin();
         //size_t const expectedFinalSizes[] = {7, 127, 2084, 32722, 524149, 8367491};
-        size_t const max_n = 50000000;
+        size_t const max_n = 20000000;
 
         for (int i = 0; i < 6; ++i) {
             for (int b = 0; b < 4; ++b) {
@@ -549,7 +552,55 @@ static void bench_randomInsertErase(MAP& map)
         }
     }
 
-    printf(" total time = %.2f s\n", now2sec() - nows);
+    printf(" erase1 time = %.2f, total = %.2f s\n", erase1, now2sec() - nows);
+}
+
+template<class MAP>
+static void bench_CreateInsert()
+{
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+
+    printf("\t%20s", map_name);
+    const std::array<size_t, 7> counts = {
+        200, 2000, 2000, 20000, 200000, 2000000, 20000000
+    };
+
+    MRNG rng(213 + RND);
+    auto nows = now2sec(), erase1 = 0.;
+    for (size_t i = 0; i < counts.size(); ++i) {
+        size_t count = counts[i];
+        size_t repeats = counts.back() / count;
+        size_t res = 0;
+        MAP map;
+
+        for (size_t j = 0; j < repeats; ++j) {
+            for (size_t n = 0; n < count; ++n)
+                map[static_cast<int>(rng())];
+            res += map.size();
+        }
+    }
+    erase1 = now2sec() - nows;
+    nows = now2sec();
+
+    MRNG rng2(213 + RND);
+    for (size_t i = 0; i < counts.size(); ++i) {
+        size_t count = counts[i];
+        size_t repeats = counts.back() / count;
+        size_t res = 0;
+        MAP map;
+
+        for (size_t j = 0; j < repeats; ++j) {
+            for (size_t n = 0; n < count; ++n)
+                map[static_cast<int>(rng2())];
+            res += map.size();
+            map.clear();
+        }
+    }
+
+    auto erase2 = now2sec() - nows;
+    printf(" CreateInsert/InsertCreate total time = %2.2f + %2.2f (%2.2f) s\n", erase1, erase2, erase1 + erase2);
 }
 
 template<class MAP>
@@ -1989,6 +2040,61 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_begin<emhash5::HashMap<int64_t, int, hash_func>>(); }
     }
 
+    if (sflags <= 14 && eflags >= 14)
+    {
+#if ABSL_HASH
+        typedef absl::Hash<int> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<int> hash_func;
+#elif ANKERL_HASH
+        typedef ankerl::unordered_dense::hash<int> hash_func;
+#elif HOOD_HASH
+        typedef robin_hood::hash<int> hash_func;
+#else
+        typedef std::hash<int> hash_func;
+#endif
+
+        puts("\nbench_CreateInsert:");
+
+        {  bench_CreateInsert<emhash6::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_CreateInsert<emhash7::HashMap<int, int, hash_func>>(); }
+        {  bench_CreateInsert<emhash8::HashMap<int, int, hash_func>>(); }
+
+#if QC_HASH
+        {  bench_CreateInsert<qc::hash::RawMap<int, int, hash_func>>(); }
+#endif
+#if CXX20
+        {  bench_CreateInsert<jg::dense_hash_map<int, int, hash_func>>(); }
+//        {  bench_CreateInsert<rigtorp::HashMap<int, int, hash_func>>(); }
+#endif
+#if CXX17
+        {  bench_CreateInsert<ankerl::unordered_dense::map <int, int, hash_func>>(); }
+#endif
+#if HAVE_BOOST
+        {  bench_CreateInsert<boost::unordered_flat_map <int, int, hash_func>>(); }
+#endif
+#if ABSL_HMAP
+        {  bench_CreateInsert<absl::flat_hash_map <int, int, hash_func>>(); }
+#endif
+
+#if X86
+        {  bench_CreateInsert<emilib2::HashMap <int, int, hash_func>>(); }
+        {  bench_CreateInsert<emilib3::HashMap <int, int, hash_func>>(); }
+        {  bench_CreateInsert<emilib::HashMap <int, int, hash_func>>(); }
+#endif
+#if ET
+//        {  bench_CreateInsert<hrd_m::hash_map <int, int, hash_func>>(); }
+        {  bench_CreateInsert<tsl::robin_map  <int, int, hash_func>>(); }
+        {  bench_CreateInsert<robin_hood::unordered_map <int, int, hash_func>>(); }
+
+#if X86_64
+//        {  bench_CreateInsert<ska::flat_hash_map <int, int, hash_func>>(); }
+#endif
+        //{  bench_CreateInsert<phmap::flat_hash_map <int, int, hash_func>>(); }
+#endif
+        {  bench_CreateInsert<emhash5::HashMap<int, int, hash_func>>(); }
+    }
+
 
     printf("\ntotal time = %.2f s", now2sec() - start);
 }
@@ -2015,6 +2121,7 @@ static const char* cases[] = {
     "bench_AccidentallyQuadratic",
     "bench_InsertEraseContinue",
     "bench_InsertEraseBegin",
+    "bench_CreateInsert",
 };
 
 int main(int argc, char* argv[])
@@ -2024,7 +2131,7 @@ int main(int argc, char* argv[])
 
     puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d]");
     puts("all test case:");
-    for (int i = 0; i < 13; i++)
+    for (int i = 0; i < 14; i++)
         printf("    %2d %s\n", i + 1, cases[i]);
     puts("-------------------------------------------------------------------------");
 

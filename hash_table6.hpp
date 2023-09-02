@@ -1224,7 +1224,7 @@ public:
             return false;
 
 #if EMH_STATIS
-        if (_num_filled > EMH_STATIS) dump_statics();
+        //if (_num_filled > EMH_STATIS) dump_statics();
 #endif
         rehash(required_buckets + 1);
         return true;

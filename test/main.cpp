@@ -5,7 +5,7 @@
 #endif
 
 #define EMH_SAFE_PSL 1
-#define EMH_STATIS   1234567
+//#define EMH_STATIS   1234567
 //#define EMH_PSL_LINEAR 1
 
 //#define EMH_PSL      32
@@ -938,6 +938,34 @@ static void benchStringHash(int size, int str_min, int str_max)
     printf("sum = %ld\n", sum);
 }
 
+static void TestHighLoadFactor()
+{
+    const auto rand_key = clock();
+    WyRand srngi(rand_key), srnge(rand_key);
+
+    const auto max_lf   = 0.999f; //<= 0.9999f
+    const auto vsize    = 1u << (20 + rand_key % 5);//must be power of 2
+    emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
+
+    auto nowus = getus();
+    for (size_t i = 0; i <= size_t(vsize * max_lf); i++)
+        myhash.emplace(srngi(), i);
+
+    //while (myhash.load_factor() < max_lf - 1e-3) myhash.emplace(srngi(), 0);
+    assert(myhash.bucket_count() == vsize && myhash.load_factor() >= max_lf); //no rehash
+
+    const auto insert_time = getus() - nowus; nowus = getus();
+    //erase & insert at a fixed load factor
+    for (size_t i = 0; i < vsize; i++) {
+        myhash.erase(srnge()); //erase a exist old key
+        myhash[srngi()] += 1;
+    }
+    assert(myhash.load_factor() >= max_lf);
+    const auto erase_time = getus() - nowus;
+    printf("vsize = %d, load factor = %.4f, insert/erase ime use %ld:%ld ms\n", 
+        vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
+}
+
 int main(int argc, char* argv[])
 {
     printInfo(nullptr);
@@ -946,6 +974,7 @@ int main(int argc, char* argv[])
 		benchIntRand(1e8+8);
 		benchStringHash(1e6+6, 8, 32);
 	}
+    TestHighLoadFactor();
 
     size_t n = (int)1e7, loop = 12345678;
     if (argc > 1 && isdigit(argv[1][0]))

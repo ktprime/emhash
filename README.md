@@ -129,6 +129,38 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
 
 ```
 
+# only emhash can 
+   the following test case show emhash has very great performance even at high load factor.
+```cpp
+static void RunAtHighLoadFactor()
+{
+    const auto rand_key = clock();
+    WyRand srngi(rand_key), srnge(rand_key);
+
+    const auto max_lf   = 0.999f; //<= 0.9999f
+    const auto vsize    = 1u << (20 + rand_key % 5);//must be power of 2
+    emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
+
+    auto nowus = getus();
+    for (size_t i = 0; i <= size_t(vsize * max_lf); i++)
+        myhash.emplace(srngi(), i);
+
+    //while (myhash.load_factor() < max_lf - 1e-3) myhash.emplace(srngi(), 0);
+    assert(myhash.bucket_count() == vsize && myhash.load_factor() >= max_lf); //no rehash
+
+    const auto insert_time = getus() - nowus; nowus = getus();
+    //erase & insert at a fixed load factor
+    for (size_t i = 0; i < vsize; i++) {
+        myhash.erase(srnge()); //erase a exist old key
+        myhash[srngi()] += 1;
+    }
+    assert(myhash.load_factor() >= max_lf);
+    const auto erase_time = getus() - nowus;
+    printf("vsize = %d, load factor = %.4f, insert/erase ime use %ld:%ld ms\n", 
+        vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
+}
+```
+
 ### benchmark
 
 some of benchmark result is uploaded, I use other hash map (martinus, ska, phmap, dense_hash_map ...) source to compile and benchmark.
