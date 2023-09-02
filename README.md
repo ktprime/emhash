@@ -156,11 +156,15 @@ static void RunAtHighLoadFactor()
     }
     assert(myhash.load_factor() >= max_lf);
     const auto erase_time = getus() - nowus;
-    printf("vsize = %d, load factor = %.4f, insert/erase ime use %ld:%ld ms\n", 
+    printf("vsize = %d, load factor = %.4f, insert/erase time use %ld:%ld ms\n", 
         vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
 }
 ```
-
+```
+  vsize = 1048576, load factor = 0.9990, insert/erase time use 25:76 ms
+  vsize = 2097152, load factor = 0.9990, insert/erase time use 52:222 ms
+  size = 8388608, load factor = 0.9990, insert/erase time use 553:1699 ms
+```
 ### benchmark
 
 some of benchmark result is uploaded, I use other hash map (martinus, ska, phmap, dense_hash_map ...) source to compile and benchmark.
