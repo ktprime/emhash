@@ -163,7 +163,8 @@ static void RunAtHighLoadFactor()
 ```
   vsize = 1048576, load factor = 0.9990, insert/erase time use 25:76 ms
   vsize = 2097152, load factor = 0.9990, insert/erase time use 52:222 ms
-  size = 8388608, load factor = 0.9990, insert/erase time use 553:1699 ms
+  vsize = 4194304, load factor = 0.9990, insert/erase time use 117:450 ms
+  vsize = 8388608, load factor = 0.9990, insert/erase time use 251:1009 ms
 ```
 ### benchmark
 
