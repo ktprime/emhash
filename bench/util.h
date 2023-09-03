@@ -105,7 +105,7 @@ int64_t getus()
     auto tp = std::chrono::high_resolution_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
 #elif WIN32_RUS
-    FILETIME ptime[4];
+    FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
     GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif WIN32_TICK
@@ -139,7 +139,7 @@ int64_t getus()
 //#elif LINUX_TICK || __APPLE__
 //    return clock();
 #elif __linux__
-    struct timespec ts;
+    struct timespec ts = {0};
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000ull + ts.tv_nsec / 1000;
 #elif __unix__
@@ -616,7 +616,7 @@ static void cpuidInfo(int regs[4], int id, int ext)
 static void printInfo(char* out)
 {
     const char* sepator =
-        "------------------------------------------------------------------------------------------------------------";
+        "-----------------------------------------------------------------------------------------------------------------";
 
     puts(sepator);
     //    puts("Copyright (C) by 2019-2022 Huang Yuanbing bailuzhou at 163.com\n");

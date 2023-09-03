@@ -1,6 +1,6 @@
 // emhash7::HashMap for C++11/14/17
-// version 2.2.4
-// https://github.com/ktprime/ktprime/blob/master/hash_table7.hpp
+// version 2.2.5
+// https://github.com/ktprime/emhash/blob/master/hash_table7.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -543,6 +543,7 @@ public:
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_buckets = _num_filled = 0;
+        _mlf = (uint32_t)((1 << 27) / EMH_DEFAULT_LOAD_FACTOR);
         max_load_factor(mlf);
         rehash(bucket);
     }

@@ -32,7 +32,7 @@
 
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
-#include "emilib/emilib2so.hpp"
+#include "emilib/emilib2ss.hpp"
 //#include "emilib/emilib12.hpp"
 //#include "emilib/emiset2.hpp"
 

@@ -1,6 +1,6 @@
 // emhash6::HashMap for C++11/14/17
-// version 1.7.1
-// https://github.com/ktprime/ktprime/blob/master/hash_table6.hpp
+// version 1.7.2
+// https://github.com/ktprime/emhash/blob/master/hash_table6.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -457,6 +457,7 @@ public:
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_filled = 0;
+        _mlf = (uint32_t)((1 << 27) / EMH_DEFAULT_LOAD_FACTOR);
         max_load_factor(lf);
         rehash(bucket);
     }
@@ -674,7 +675,7 @@ public:
 
     void max_load_factor(float mlf)
     {
-        if (mlf < 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
+        if (mlf <= 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
             _mlf = decltype(_mlf)((1 << 27) / mlf);
     }
 
@@ -1803,7 +1804,7 @@ private:
 
     //8 * 2 + 4 * 5 = 16 + 20 = 32
 private:
-    uint32_t* _bitmask;
+    uint8_t*  _bitmask;
     PairT*    _pairs;
     HashT     _hasher;
     EqT       _eq;

@@ -1962,7 +1962,7 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_continue<ankerl::unordered_dense::map <int, int, hash_func>>(); }
 #endif
 #if HAVE_BOOST
-        {  bench_insert_erase_continue<boost::unordered_flat_map <int, int, hash_func>>(); }
+//        {  bench_insert_erase_continue<boost::unordered_flat_map <int, int, hash_func>>(); }
 #endif
 #if ABSL_HMAP
         {  bench_insert_erase_continue<absl::flat_hash_map <int, int, hash_func>>(); }
@@ -2019,7 +2019,7 @@ static void runTest(int sflags, int eflags)
         {  bench_insert_erase_begin<boost::unordered_flat_map <int64_t, int, hash_func>>(); }
 #endif
 #if ABSL_HMAP
-        {  bench_insert_erase_begin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
+//        {  bench_insert_erase_begin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
 
 #if X86
@@ -2037,7 +2037,7 @@ static void runTest(int sflags, int eflags)
 #endif
         //{  bench_insert_erase_begin<phmap::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
-        {  bench_insert_erase_begin<emhash5::HashMap<int64_t, int, hash_func>>(); }
+//        {  bench_insert_erase_begin<emhash5::HashMap<int64_t, int, hash_func>>(); }
     }
 
     if (sflags <= 14 && eflags >= 14)

@@ -4,6 +4,7 @@
 //#include "utils.h"
 #endif
 
+//#define TKey 2
 #define EMH_SAFE_PSL 1
 //#define EMH_STATIS   1234567
 //#define EMH_PSL_LINEAR 1
@@ -140,7 +141,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash7::HashMap
+#define ehmap  emhash8::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -385,14 +386,14 @@ static void TestApi()
         for(auto it = c.begin(); it != c.end(); ) {
             printf("%d:%s\n", it->first,  it->second.data());
             if(it->first % 2 != 0) {
-				if constexpr (std::is_void_v<decltype(c.erase(it))>) {
-					c.erase(it++);
-				} else {
-//					c.erase(it++);
-					it = c.erase(it);
-				}
-			}
-			else
+                if constexpr (std::is_void_v<decltype(c.erase(it))>) {
+                    c.erase(it++);
+                } else {
+//                    c.erase(it++);
+                    it = c.erase(it);
+                }
+            }
+            else
                 ++it;
         }
 
@@ -646,7 +647,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 {
     printf("n = %d, loop = %d\n", (int)n, (int)max_loops);
     printf("============================== %s ============================\n", __FUNCTION__);
-    using keyType = uint64_t;
+    using keyType = uint32_t;
 
 #if X86
     emilib2::HashMap <keyType, int> shash;
@@ -667,7 +668,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     ehmap7<keyType, int> unhash;
 #endif
 
-    Sfc4 srng(time(0));
+    WyRand srng(time(0));
     const auto step = n % 2 + 1;
     for (size_t i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
@@ -940,41 +941,48 @@ static void benchStringHash(int size, int str_min, int str_max)
 
 static void TestHighLoadFactor()
 {
-    const auto rand_key = clock();
+    std::random_device rd;
+    const auto rand_key = rd();
+#if 1
     WyRand srngi(rand_key), srnge(rand_key);
+#else
+    std::mt19937_64 srngi(rand_key), srnge(rand_key);
+#endif
 
     const auto max_lf   = 0.999f; //<= 0.9999f
-    const auto vsize    = 1u << (20 + rand_key % 5);//must be power of 2
+    const auto vsize    = 1u << (20 + rand_key % 6);//must be power of 2
     emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
+    //emhash5::HashMap<int64_t, int> myhash(vsize, max_lf);
 
     auto nowus = getus();
-    for (size_t i = 0; i <= size_t(vsize * max_lf); i++)
+    for (size_t i = 0; i < size_t(vsize * max_lf); i++)
         myhash.emplace(srngi(), i);
+    assert(myhash.bucket_count() == vsize); //no rehash
 
     //while (myhash.load_factor() < max_lf - 1e-3) myhash.emplace(srngi(), 0);
-    assert(myhash.bucket_count() == vsize && myhash.load_factor() >= max_lf); //no rehash
-
     const auto insert_time = getus() - nowus; nowus = getus();
     //erase & insert at a fixed load factor
     for (size_t i = 0; i < vsize; i++) {
         myhash.erase(srnge()); //erase a exist old key
-        myhash[srngi()] += 1;
+        myhash[srngi()] = 1;
     }
-    assert(myhash.load_factor() >= max_lf);
     const auto erase_time = getus() - nowus;
-    printf("vsize = %d, load factor = %.4f, insert/erase ime use %ld:%ld ms\n", 
+    printf("vsize = %d, load factor = %.4f, insert/erase = %ld/%ld ms\n",
         vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
+    assert(myhash.bucket_count() == vsize); //no rehash
+    assert(myhash.load_factor() >= max_lf - 0.001);
 }
 
 int main(int argc, char* argv[])
 {
     printInfo(nullptr);
-	if (argc == 0) {
-		TestApi();
-		benchIntRand(1e8+8);
-		benchStringHash(1e6+6, 8, 32);
-	}
+    srand(time(0));
     TestHighLoadFactor();
+    if (argc == 2) {
+        TestApi();
+        benchIntRand(1e8+8);
+        benchStringHash(1e6+6, 8, 32);
+    }
 
     size_t n = (int)1e7, loop = 12345678;
     if (argc > 1 && isdigit(argv[1][0]))

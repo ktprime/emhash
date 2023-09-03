@@ -102,27 +102,30 @@ int64_t getus()
     return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
 #elif WIN32_RUS
     FILETIME ptime[4] = {0, 0, 0, 0, 0, 0, 0, 0};
-    GetThreadTimes(GetCurrentThread(), NULL, NULL, &ptime[2], &ptime[3]);
+    GetThreadTimes(GetCurrentThread(), &ptime[0], &ptime[2], &ptime[2], &ptime[3]);
     return (ptime[2].dwLowDateTime + ptime[3].dwLowDateTime) / 10;
 #elif WIN32_TICK
     return GetTickCount() * 1000;
-#elif WIN32_HTIME || _WIN32
+#elif WIN32_HTIME || _WIN320
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
 
     LARGE_INTEGER nowus;
     QueryPerformanceCounter(&nowus);
     return (nowus.QuadPart * 1000000) / (freq.QuadPart);
-#elif WIN32_STIME
-    FILETIME    file_time;
-    SYSTEMTIME  system_time;
-    ULARGE_INTEGER ularge;
+#elif _WIN32
+    FILETIME ft;
+#if _WIN32_WINNT >= 0x0602
+    GetSystemTimePreciseAsFileTime(&ft);
+#else
+    GetSystemTimeAsFileTime(&ft);
+#endif  /* Windows 8  */
 
-    GetSystemTime(&system_time);
-    SystemTimeToFileTime(&system_time, &file_time);
-    ularge.LowPart  = file_time.dwLowDateTime;
-    ularge.HighPart = file_time.dwHighDateTime;
-    return ularge.QuadPart / 10 + system_time.wMilliseconds / 1000;
+    int64_t t1 = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
+    /* Convert to UNIX epoch, 1970-01-01. Still in 100 ns increments. */
+    t1 -= 116444736000000000ull;
+    t1 = t1 / 10;
+    return t1;
 #elif LINUX_RUS
     struct rusage rup;
     getrusage(RUSAGE_SELF, &rup);
@@ -158,7 +161,7 @@ static inline uint32_t ilog(uint32_t x, uint32_t n = 2)
 
 static inline uint64_t randomseed() {
     std::random_device rd;
-    std::mt19937 g(rd());
+    std::mt19937_64 g(rd());
     return g();
 }
 
@@ -392,7 +395,7 @@ static inline uint64_t hashmix(uint64_t key)
     auto low  = key * 0xA24BAED4963EE407ull;
     auto high = ror * 0x9FB21C651E98DF25ull;
     auto mix  = low + high;
-    return mix;// (mix >> 32) | (mix << 32);
+    return (mix >> 32) | (mix << 32);
 }
 
 static inline uint64_t rrxmrrxmsx_0(uint64_t v)
@@ -417,6 +420,17 @@ static inline uint64_t hash_mur3(uint64_t key)
     return h;
 }
 
+static inline uint64_t squirrel3(uint64_t at)
+{
+    constexpr uint64_t BIT_NOISE1 = 0x9E3779B185EBCA87ULL;
+    constexpr uint64_t BIT_NOISE2 = 0xC2B2AE3D27D4EB4FULL;
+    constexpr uint64_t BIT_NOISE3 = 0x27D4EB2F165667C5ULL;
+    at *= BIT_NOISE1; at ^= (at >> 8);
+    at += BIT_NOISE2; at ^= (at << 8);
+    at *= BIT_NOISE3; at ^= (at >> 8);
+    return at;
+}
+
 template<typename T>
 struct Int64Hasher
 {
@@ -433,11 +447,13 @@ struct Int64Hasher
         return hashmix(key);
 #elif FIB_HASH == 5
         return rrxmrrxmsx_0(key);
+#elif FIB_HASH == 6
+        return squirrel3(key);
 #elif FIB_HASH > 10000
         return key % FIB_HASH; //bad hash
 #elif FIB_HASH > 100
         return key * FIB_HASH; //bad hash
-#elif FIB_HASH == 6
+#elif FIB_HASH == 7
         return wyhash64(key, KC);
 #else
         auto x = key;
@@ -584,7 +600,7 @@ static void cpuidInfo(int regs[4], int id, int ext)
 static void printInfo(char* out)
 {
     const char* sepator =
-        "------------------------------------------------------------------------------------------------------------";
+        "-----------------------------------------------------------------------------------------------------------------";
 
     puts(sepator);
     //    puts("Copyright (C) by 2019-2022 Huang Yuanbing bailuzhou at 163.com\n");
