@@ -158,16 +158,16 @@ static void RunHighLoadFactor()
         myhash[srngi()] = 1;   //insert a new key
     }
     const auto erase_time = getus() - nowus;
-    printf("vsize = %d, load factor = %.5f, insert/erase = %ld/%ld ms\n",
+    printf("vsize = %d, load factor = %.4f, insert/erase = %ld/%ld ms\n",
         vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
     assert(myhash.load_factor() >= max_lf - 0.001);
 }
 ```
 ```
-  vsize = 1048576, load factor = 0.9990, insert/erase time use 25:76 ms
-  vsize = 2097152, load factor = 0.9990, insert/erase time use 52:222 ms
-  vsize = 4194304, load factor = 0.9990, insert/erase time use 117:450 ms
-  vsize = 8388608, load factor = 0.9990, insert/erase time use 251:1009 ms
+  vsize = 1048576, load factor = 0.9990, insert/erase = 25/76 ms
+  vsize = 2097152, load factor = 0.9990, insert/erase = 52/222 ms
+  vsize = 4194304, load factor = 0.9990, insert/erase = 117/450 ms
+  vsize = 8388608, load factor = 0.9990, insert/erase = 251/1009 ms
 ```
 ### benchmark
 
