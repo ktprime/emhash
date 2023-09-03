@@ -130,34 +130,37 @@ probing strategy to search empty slot. from benchmark even the load factor > 0.9
 ```
 
 # only emhash can 
-   the following test case show emhash has very great performance even at high load factor.
+   The following benchmark shows that emhash has amazing performance even insert & erase with a high load factor 0.999.
 ```cpp
-static void RunAtHighLoadFactor()
+static void RunHighLoadFactor()
 {
-    const auto rand_key = clock();
+    std::random_device rd;
+    const auto rand_key = rd();
+#if 1
     WyRand srngi(rand_key), srnge(rand_key);
+#else
+    std::mt19937_64 srngi(rand_key), srnge(rand_key);
+#endif
 
     const auto max_lf   = 0.999f; //<= 0.9999f
-    const auto vsize    = 1u << (20 + rand_key % 5);//must be power of 2
+    const auto vsize    = 1u << (20 + rand_key % 6);//must be power of 2
     emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
 
     auto nowus = getus();
-    for (size_t i = 0; i <= size_t(vsize * max_lf); i++)
+    for (size_t i = 0; i < size_t(vsize * max_lf); i++)
         myhash.emplace(srngi(), i);
-
-    //while (myhash.load_factor() < max_lf - 1e-3) myhash.emplace(srngi(), 0);
-    assert(myhash.bucket_count() == vsize && myhash.load_factor() >= max_lf); //no rehash
+    assert(myhash.bucket_count() == vsize); //no rehash
 
     const auto insert_time = getus() - nowus; nowus = getus();
     //erase & insert at a fixed load factor
     for (size_t i = 0; i < vsize; i++) {
-        myhash.erase(srnge()); //erase a exist old key
-        myhash[srngi()] += 1;
+        myhash.erase(srnge()); //erase an old key
+        myhash[srngi()] = 1;   //insert a new key
     }
-    assert(myhash.load_factor() >= max_lf);
     const auto erase_time = getus() - nowus;
-    printf("vsize = %d, load factor = %.4f, insert/erase time use %ld:%ld ms\n", 
+    printf("vsize = %d, load factor = %.5f, insert/erase = %ld/%ld ms\n",
         vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
+    assert(myhash.load_factor() >= max_lf - 0.001);
 }
 ```
 ```
