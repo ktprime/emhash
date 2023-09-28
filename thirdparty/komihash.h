@@ -1,5 +1,5 @@
 /**
- * komihash.h version 5.4
+ * komihash.h version 5.7
  *
  * The inclusion file for the "komihash" hash function, "komirand" 64-bit
  * PRNG, and streamed "komihash" implementation.
@@ -8,6 +8,7 @@
  * (located in Russia), native to the author.
  *
  * Description is available at https://github.com/avaneev/komihash
+ * E-mail: aleksey.vaneev@gmail.com or info@voxengo.com
  *
  * License
  *
@@ -38,50 +39,24 @@
 #include <stdint.h>
 #include <string.h>
 
-// Macros that apply byte-swapping.
-
-#if defined( __GNUC__ ) || defined( __clang__ )
-
-	#define KOMIHASH_BYTESW32( v ) __builtin_bswap32( v )
-	#define KOMIHASH_BYTESW64( v ) __builtin_bswap64( v )
-
-#elif defined( _MSC_VER )
-
-	#define KOMIHASH_BYTESW32( v ) _byteswap_ulong( v )
-	#define KOMIHASH_BYTESW64( v ) _byteswap_uint64( v )
-
-#else // defined( _MSC_VER )
-
-	#define KOMIHASH_BYTESW32( v ) ( \
-		( v & 0xFF000000 ) >> 24 | \
-		( v & 0x00FF0000 ) >> 8 | \
-		( v & 0x0000FF00 ) << 8 | \
-		( v & 0x000000FF ) << 24 )
-
-	#define KOMIHASH_BYTESW64( v ) ( \
-		( v & 0xFF00000000000000 ) >> 56 | \
-		( v & 0x00FF000000000000 ) >> 40 | \
-		( v & 0x0000FF0000000000 ) >> 24 | \
-		( v & 0x000000FF00000000 ) >> 8 | \
-		( v & 0x00000000FF000000 ) << 8 | \
-		( v & 0x0000000000FF0000 ) << 24 | \
-		( v & 0x000000000000FF00 ) << 40 | \
-		( v & 0x00000000000000FF ) << 56 )
-
-#endif // defined( _MSC_VER )
-
-// Endianness-definition macro, can be defined externally (e.g. =1, if
-// endianness-correction is unnecessary in any case, to reduce its associated
-// overhead).
+// Endianness definition macro, can be used as a logical constant. Can be
+// defined externally (e.g. =1, if endianness-correction is unnecessary in any
+// case, to reduce its associated overhead).
 
 #if !defined( KOMIHASH_LITTLE_ENDIAN )
-	#if defined( _WIN32 ) || defined( __LITTLE_ENDIAN__ ) || \
-		( defined( __BYTE_ORDER__ ) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ )
+	#if defined( __LITTLE_ENDIAN__ ) || defined( __LITTLE_ENDIAN ) || \
+		defined( _LITTLE_ENDIAN ) || defined( _WIN32 ) || defined( i386 ) || \
+		defined( __i386 ) || defined( __i386__ ) || defined( __x86_64__ ) || \
+		( defined( __BYTE_ORDER__ ) && \
+			__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ )
 
 		#define KOMIHASH_LITTLE_ENDIAN 1
 
-	#elif defined( __BIG_ENDIAN__ ) || \
-		( defined( __BYTE_ORDER__ ) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ )
+	#elif defined( __BIG_ENDIAN__ ) || defined( __BIG_ENDIAN ) || \
+		defined( _BIG_ENDIAN ) || defined( __SYSC_ZARCH__ ) || \
+		defined( __zarch__ ) || defined( __s390x__ ) || defined( __sparc ) || \
+		defined( __sparc__ ) || ( defined( __BYTE_ORDER__ ) && \
+			__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ )
 
 		#define KOMIHASH_LITTLE_ENDIAN 0
 
@@ -94,6 +69,15 @@
 	#endif // defined( __BIG_ENDIAN__ )
 #endif // !defined( KOMIHASH_LITTLE_ENDIAN )
 
+// Macro that denotes availability of required GCC-style built-in functions.
+
+#if defined( __GNUC__ ) || defined( __clang__ ) || \
+	defined( __IBMC__ ) || defined( __IBMCPP__ ) || defined( __COMPCERT__ )
+
+	#define KOMIHASH_GCC_BUILTINS
+
+#endif // GCC built-ins.
+
 // Macros that apply byte-swapping, used for endianness-correction.
 
 #if KOMIHASH_LITTLE_ENDIAN
@@ -103,17 +87,46 @@
 
 #else // KOMIHASH_LITTLE_ENDIAN
 
-	#define KOMIHASH_EC32( v ) KOMIHASH_BYTESW32( v )
-	#define KOMIHASH_EC64( v ) KOMIHASH_BYTESW64( v )
+	#if defined( KOMIHASH_GCC_BUILTINS )
+
+		#define KOMIHASH_EC32( v ) __builtin_bswap32( v )
+		#define KOMIHASH_EC64( v ) __builtin_bswap64( v )
+
+	#elif defined( _MSC_VER )
+
+		#include <intrin.h>
+
+		#define KOMIHASH_EC32( v ) _byteswap_ulong( v )
+		#define KOMIHASH_EC64( v ) _byteswap_uint64( v )
+
+	#else // defined( _MSC_VER )
+
+		#define KOMIHASH_EC32( v ) ( \
+			( v & 0xFF000000 ) >> 24 | \
+			( v & 0x00FF0000 ) >> 8 | \
+			( v & 0x0000FF00 ) << 8 | \
+			( v & 0x000000FF ) << 24 )
+
+		#define KOMIHASH_EC64( v ) ( \
+			( v & 0xFF00000000000000 ) >> 56 | \
+			( v & 0x00FF000000000000 ) >> 40 | \
+			( v & 0x0000FF0000000000 ) >> 24 | \
+			( v & 0x000000FF00000000 ) >> 8 | \
+			( v & 0x00000000FF000000 ) << 8 | \
+			( v & 0x0000000000FF0000 ) << 24 | \
+			( v & 0x000000000000FF00 ) << 40 | \
+			( v & 0x00000000000000FF ) << 56 )
+
+	#endif // defined( _MSC_VER )
 
 #endif // KOMIHASH_LITTLE_ENDIAN
 
 // Likelihood macros that are used for manually-guided micro-optimization.
 
-#if defined( __GNUC__ ) || defined( __clang__ )
+#if defined( KOMIHASH_GCC_BUILTINS )
 
-	#define KOMIHASH_LIKELY( x )  __builtin_expect( x, 1 )
-	#define KOMIHASH_UNLIKELY( x )  __builtin_expect( x, 0 )
+	#define KOMIHASH_LIKELY( x ) __builtin_expect( x, 1 )
+	#define KOMIHASH_UNLIKELY( x ) __builtin_expect( x, 0 )
 
 #else // likelihood macros
 
@@ -125,7 +138,7 @@
 // Memory address prefetch macro (temporal locality=1, in case a collision
 // resolution would be necessary).
 
-#if defined( __GNUC__ ) || defined( __clang__ )
+#if defined( KOMIHASH_GCC_BUILTINS ) && !defined( __COMPCERT__ )
 
 	#define KOMIHASH_PREFETCH( addr ) __builtin_prefetch( addr, 0, 1 )
 
@@ -134,6 +147,18 @@
 	#define KOMIHASH_PREFETCH( addr )
 
 #endif // prefetch macro
+
+// Macro to force code inlining.
+
+#if defined( KOMIHASH_GCC_BUILTINS )
+
+	#define KOMIHASH_INLINE inline __attribute__((always_inline))
+
+#else // defined( KOMIHASH_GCC_BUILTINS )
+
+	#define KOMIHASH_INLINE inline
+
+#endif // defined( KOMIHASH_GCC_BUILTINS )
 
 /**
  * An auxiliary function that returns an unsigned 32-bit value created out of
@@ -145,7 +170,7 @@
  * @return Endianness-corrected 32-bit value from memory.
  */
 
-static inline uint32_t kh_lu32ec( const uint8_t* const p )
+static KOMIHASH_INLINE uint32_t kh_lu32ec( const uint8_t* const p )
 {
 	uint32_t v;
 	memcpy( &v, p, 4 );
@@ -163,7 +188,7 @@ static inline uint32_t kh_lu32ec( const uint8_t* const p )
  * @return Endianness-corrected 64-bit value from memory.
  */
 
-static inline uint64_t kh_lu64ec( const uint8_t* const p )
+static KOMIHASH_INLINE uint64_t kh_lu64ec( const uint8_t* const p )
 {
 	uint64_t v;
 	memcpy( &v, p, 8 );
@@ -182,7 +207,7 @@ static inline uint64_t kh_lu64ec( const uint8_t* const p )
  * @return Final byte-padded value from the message.
  */
 
-static inline uint64_t kh_lpu64ec_l3( const uint8_t* const Msg,
+static KOMIHASH_INLINE uint64_t kh_lpu64ec_l3( const uint8_t* const Msg,
 	const size_t MsgLen )
 {
 	const int ml8 = (int) ( MsgLen * 8 );
@@ -193,13 +218,13 @@ static inline uint64_t kh_lpu64ec_l3( const uint8_t* const Msg,
 		const uint64_t m = (uint64_t) Msg3[ 0 ] | (uint64_t) Msg3[ 1 ] << 8 |
 			(uint64_t) Msg3[ 2 ] << 16;
 
-		return( 1ULL << ml8 | m >> ( 24 - ml8 ));
+		return( (uint64_t) 1 << ml8 | m >> ( 24 - ml8 ));
 	}
 
 	const uint64_t mh = kh_lu32ec( Msg + MsgLen - 4 );
 	const uint64_t ml = kh_lu32ec( Msg );
 
-	return( 1ULL << ml8 | ml | ( mh >> ( 64 - ml8 )) << 32 );
+	return( (uint64_t) 1 << ml8 | ml | ( mh >> ( 64 - ml8 )) << 32 );
 }
 
 /**
@@ -213,7 +238,7 @@ static inline uint64_t kh_lpu64ec_l3( const uint8_t* const Msg,
  * @return Final byte-padded value from the message.
  */
 
-static inline uint64_t kh_lpu64ec_nz( const uint8_t* const Msg,
+static KOMIHASH_INLINE uint64_t kh_lpu64ec_nz( const uint8_t* const Msg,
 	const size_t MsgLen )
 {
 	const int ml8 = (int) ( MsgLen * 8 );
@@ -232,13 +257,13 @@ static inline uint64_t kh_lpu64ec_nz( const uint8_t* const Msg,
 			}
 		}
 
-		return( 1ULL << ml8 | m );
+		return( (uint64_t) 1 << ml8 | m );
 	}
 
 	const uint64_t mh = kh_lu32ec( Msg + MsgLen - 4 );
 	const uint64_t ml = kh_lu32ec( Msg );
 
-	return( 1ULL << ml8 | ml | ( mh >> ( 64 - ml8 )) << 32 );
+	return( (uint64_t) 1 << ml8 | ml | ( mh >> ( 64 - ml8 )) << 32 );
 }
 
 /**
@@ -252,7 +277,7 @@ static inline uint64_t kh_lpu64ec_nz( const uint8_t* const Msg,
  * @return Final byte-padded value from the message.
  */
 
-static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
+static KOMIHASH_INLINE uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 	const size_t MsgLen )
 {
 	const int ml8 = (int) ( MsgLen * 8 );
@@ -261,12 +286,12 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 	{
 		const uint64_t m = kh_lu32ec( Msg + MsgLen - 4 );
 
-		return( 1ULL << ml8 | m >> ( 32 - ml8 ));
+		return( (uint64_t) 1 << ml8 | m >> ( 32 - ml8 ));
 	}
 
 	const uint64_t m = kh_lu64ec( Msg + MsgLen - 8 );
 
-	return( 1ULL << ml8 | m >> ( 64 - ml8 ));
+	return( (uint64_t) 1 << ml8 | m >> ( 64 - ml8 ));
 }
 
 #if defined( __SIZEOF_INT128__ )
@@ -280,13 +305,22 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 	 * @param[out] rh The higher half of the 128-bit result.
 	 */
 
-	static inline void kh_m128( const uint64_t m1, const uint64_t m2,
+	static KOMIHASH_INLINE void kh_m128( const uint64_t m1, const uint64_t m2,
 		uint64_t* const rl, uint64_t* const rh )
 	{
-		const __uint128_t r = (__uint128_t) m1 * m2;
+		const unsigned __int128 r = (unsigned __int128) m1 * m2;
 
-		*rl = (uint64_t) r;
 		*rh = (uint64_t) ( r >> 64 );
+		*rl = (uint64_t) r;
+	}
+
+#elif ( defined( __IBMC__ ) || defined( __IBMCPP__ )) && defined( __LP64__ )
+
+	static KOMIHASH_INLINE void kh_m128( const uint64_t m1, const uint64_t m2,
+		uint64_t* const rl, uint64_t* const rh )
+	{
+		*rh = __mulhdu( m1, m2 );
+		*rl = m1 * m2;
 	}
 
 #elif defined( _MSC_VER ) && ( defined( _M_ARM64 ) || \
@@ -294,46 +328,39 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 
 	#include <intrin.h>
 
-	static inline void kh_m128( const uint64_t m1, const uint64_t m2,
+	static KOMIHASH_INLINE void kh_m128( const uint64_t m1, const uint64_t m2,
 		uint64_t* const rl, uint64_t* const rh )
 	{
-		*rl = m1 * m2;
 		*rh = __umulh( m1, m2 );
+		*rl = m1 * m2;
 	}
 
-#elif defined( _MSC_VER ) && defined( _M_X64 )
+#elif defined( _MSC_VER ) && ( defined( _M_X64 ) || defined( _M_IA64 ))
 
 	#include <intrin.h>
 	#pragma intrinsic(_umul128)
 
-	static inline void kh_m128( const uint64_t m1, const uint64_t m2,
+	static KOMIHASH_INLINE void kh_m128( const uint64_t m1, const uint64_t m2,
 		uint64_t* const rl, uint64_t* const rh )
 	{
 		*rl = _umul128( m1, m2, rh );
 	}
 
-#else // defined( _MSC_VER ) && defined( _M_X64 )
+#else // defined( _MSC_VER )
 
-	// _umul128() code for 32-bit systems, adapted from mullu(),
-	// from https://go.dev/src/runtime/softfloat64.go
-	// Licensed under BSD-style license.
+	// _umul128() code for 32-bit systems, adapted from Hacker's Delight,
+	// Henry S. Warren, Jr.
 
 	#if defined( _MSC_VER ) && !defined( __INTEL_COMPILER )
 
 		#include <intrin.h>
 		#pragma intrinsic(__emulu)
 
-		static inline uint64_t kh__emulu( const uint32_t x, const uint32_t y )
-		{
-			return( __emulu( x, y ));
-		}
+		#define KOMIHASH_EMULU( x, y ) __emulu( x, y )
 
 	#else // defined( _MSC_VER ) && !defined( __INTEL_COMPILER )
 
-		static inline uint64_t kh__emulu( const uint32_t x, const uint32_t y )
-		{
-			return( (uint64_t) x * y );
-		}
+		#define KOMIHASH_EMULU( x, y ) ( (uint64_t) ( x ) * ( y ))
 
 	#endif // defined( _MSC_VER ) && !defined( __INTEL_COMPILER )
 
@@ -344,16 +371,17 @@ static inline uint64_t kh_lpu64ec_l4( const uint8_t* const Msg,
 
 		const uint32_t u0 = (uint32_t) u;
 		const uint32_t v0 = (uint32_t) v;
-		const uint64_t w0 = kh__emulu( u0, v0 );
+		const uint64_t w0 = KOMIHASH_EMULU( u0, v0 );
 		const uint32_t u1 = (uint32_t) ( u >> 32 );
 		const uint32_t v1 = (uint32_t) ( v >> 32 );
-		const uint64_t t = kh__emulu( u1, v0 ) + ( w0 >> 32 );
-		const uint64_t w1 = kh__emulu( u0, v1 ) + (uint32_t) t;
+		const uint64_t t = KOMIHASH_EMULU( u1, v0 ) + (uint32_t) ( w0 >> 32 );
+		const uint64_t w1 = KOMIHASH_EMULU( u0, v1 ) + (uint32_t) t;
 
-		*rh = kh__emulu( u1, v1 ) + ( w1 >> 32 ) + ( t >> 32 );
+		*rh = KOMIHASH_EMULU( u1, v1 ) + (uint32_t) ( w1 >> 32 ) +
+			(uint32_t) ( t >> 32 );
 	}
 
-#endif // defined( _MSC_VER ) && defined( _M_X64 )
+#endif // defined( _MSC_VER )
 
 // Macro for common hashing round with 16-byte input, using the "r1h"
 // temporary variable.

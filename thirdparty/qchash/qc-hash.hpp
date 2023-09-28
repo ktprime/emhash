@@ -83,7 +83,7 @@ namespace qc::hash
     template <typename T> concept Enum = std::is_enum_v<T>;
     template <typename T> concept Pointer = std::is_pointer_v<T>;
 
-    namespace _private::qc_hash
+    namespace _private
     {
         template <u64 size> struct UnsignedHelper;
         template <> struct UnsignedHelper<1u> { using type = u8; };
@@ -95,7 +95,7 @@ namespace qc::hash
     ///
     /// Aliases the unsigned integer type of a certain size
     ///
-    template <u64 size> using Unsigned = typename _private::qc_hash::UnsignedHelper<size>::type;
+    template <u64 size> using Unsigned = typename _private::UnsignedHelper<size>::type;
 
     ///
     /// Represents an "unsigned" value by compositing multiple native unsigned types. Useful to alias types that are
@@ -134,7 +134,7 @@ namespace qc::hash
     ///
     template <typename T> concept Rawable = IsUniquelyRepresentable<T>::value;
 
-    namespace _private::qc_hash
+    namespace _private
     {
         template <typename T> struct RawTypeHelper { using type = Unsigned<sizeof(T)>; };
         template <typename T> requires (alignof(T) != sizeof(T) || sizeof(T) > sizeof(uintmax_t))
@@ -148,7 +148,7 @@ namespace qc::hash
     ///
     /// The "raw" type that matches the key type's size and alignment and is used to alias the key
     ///
-    template <typename T> using RawType = typename _private::qc_hash::RawTypeHelper<T>::type;
+    template <typename T> using RawType = typename _private::RawTypeHelper<T>::type;
 
     ///
     /// This default hash simply "grabs" the least significant 64 bits of data from the key's underlying binary
@@ -866,7 +866,7 @@ namespace std
 
 namespace qc::hash
 {
-    namespace _private::qc_hash
+    namespace _private
     {
         inline constexpr u64 minMapSlotN{minMapCapacity * 2u};
 
@@ -940,7 +940,7 @@ namespace qc::hash
     {
         [[nodiscard]] constexpr u64 operator()(const T & v) const
         {
-            return _private::qc_hash::getLowBytes<u64>(v);
+            return _private::getLowBytes<u64>(v);
         }
     };
 
@@ -1067,7 +1067,7 @@ namespace qc::hash
             // Optimized case if the size of the key is less than or equal to the size of the hash
             if constexpr (sizeof(T) <= sizeof(H))
             {
-                return (H(sizeof(T)) * m<H>) ^ mix(_private::qc_hash::getLowBytes<H>(v));
+                return (H(sizeof(T)) * m<H>) ^ mix(_private::getLowBytes<H>(v));
             }
             // General case
             else
@@ -1125,7 +1125,7 @@ namespace qc::hash
     template <Rawable K, typename V, typename H, typename A>
     inline RawMap<K, V, H, A>::RawMap(const u64 capacity, const H & hash, const A & alloc):
         _size{},
-        _slotN{capacity <= minMapCapacity ? _private::qc_hash::minMapSlotN : std::bit_ceil(capacity << 1)},
+        _slotN{capacity <= minMapCapacity ? _private::minMapSlotN : std::bit_ceil(capacity << 1)},
         _elements{},
         _haveSpecial{},
         _hash{hash},
@@ -1193,7 +1193,7 @@ namespace qc::hash
     template <Rawable K, typename V, typename H, typename A>
     inline RawMap<K, V, H, A>::RawMap(RawMap && other) :
         _size{std::exchange(other._size, 0u)},
-        _slotN{std::exchange(other._slotN, _private::qc_hash::minMapSlotN)},
+        _slotN{std::exchange(other._slotN, _private::minMapSlotN)},
         _elements{std::exchange(other._elements, nullptr)},
         _haveSpecial{std::exchange(other._haveSpecial[0], false), std::exchange(other._haveSpecial[1], false)},
         _hash{std::move(other._hash)},
@@ -1290,7 +1290,7 @@ namespace qc::hash
             }
         }
 
-        other._slotN = _private::qc_hash::minMapSlotN;
+        other._slotN = _private::minMapSlotN;
         other._haveSpecial[0] = false;
         other._haveSpecial[1] = false;
 
@@ -1743,7 +1743,7 @@ namespace qc::hash
     template <Rawable K, typename V, typename H, typename A>
     inline void RawMap<K, V, H, A>::rehash(u64 slotN)
     {
-        const u64 currentMinSlotN{_size <= minMapCapacity ? _private::qc_hash::minMapSlotN : ((_size - _haveSpecial[0] - _haveSpecial[1]) << 1)};
+        const u64 currentMinSlotN{_size <= minMapCapacity ? _private::minMapSlotN : ((_size - _haveSpecial[0] - _haveSpecial[1]) << 1)};
         if (slotN < currentMinSlotN)
         {
             slotN = currentMinSlotN;
@@ -1871,9 +1871,9 @@ namespace qc::hash
     }
 
     template <Rawable K, typename V, typename H, typename A>
-    inline f32 RawMap<K, V, H, A>::max_load_factor(float) const
+    inline f32 RawMap<K, V, H, A>::max_load_factor() const
     {
-        return f32(minMapCapacity) / f32(_private::qc_hash::minMapSlotN);
+        return f32(minMapCapacity) / f32(_private::minMapSlotN);
     }
 
     template <Rawable K, typename V, typename H, typename A>
