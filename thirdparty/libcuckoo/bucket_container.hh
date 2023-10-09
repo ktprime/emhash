@@ -247,7 +247,7 @@ public:
 private:
   using bucket_traits_ = typename traits_::template rebind_traits<bucket>;
   using bucket_pointer = typename bucket_traits_::pointer;
-  
+
   // true here means the allocators from `src` are propagated on libcuckoo_copy
   template <typename A>
   void copy_allocator(A &dst, const A &src, std::true_type) {

@@ -666,6 +666,7 @@ public:
             }
         }
         free(_pairs);
+        _pairs = nullptr;
     }
 
     void clone(const HashMap& rhs) noexcept

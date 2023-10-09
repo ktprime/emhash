@@ -570,6 +570,7 @@ public:
             }
         }
         free(_pairs);
+        _pairs = nullptr;
     }
 
     void clone(const HashMap& rhs)
@@ -1669,7 +1670,7 @@ private:
             const auto next = (qmask / 2 + last) & qmask;
             const auto bmask1 = *((size_t*)_bitmask + next);
             if (bmask1 != 0) {
-				last = next;
+                last = next;
                 return next * SIZE_BIT + CTZ(bmask1);
             }
             last = (last + 1) & qmask;

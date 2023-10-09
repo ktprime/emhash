@@ -80,7 +80,7 @@ static inline Value make_value(uint64_t v, const Value*) {
 }
 
 template<class T>
-static void iterator(T& m, const char* msg = nullptr) 
+static void iterator(T& m, const char* msg = nullptr)
 {
     Timer t("iterator", msg);
     for (int n = LOOPS; n--;) {

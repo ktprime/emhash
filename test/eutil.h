@@ -495,7 +495,7 @@ struct Axxhasher
 {
     std::size_t operator()(const std::string& str) const
     {
-		ahash::Hasher hasher{1};
+        ahash::Hasher hasher{1};
         hasher.consume(str.data(), str.size());
         return hasher.finalize();
     }

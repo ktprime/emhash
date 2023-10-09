@@ -1206,7 +1206,7 @@ private:
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
 
-#if EMH_X86 
+#if EMH_X86
         const auto bmask = *(size_t*)(start) >> boset;
 #else
         //const auto boset = bucket_from % SIZE_BIT;

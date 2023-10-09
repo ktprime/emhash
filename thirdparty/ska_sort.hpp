@@ -697,7 +697,7 @@ struct FallbackRadixSorter : RadixSorter<decltype(to_radix_sort_key(std::declval
 template<typename...>
 struct nested_void
 {
-	using type = void;
+    using type = void;
 };
 
 template<typename... Args>
@@ -706,12 +706,12 @@ using void_t = typename nested_void<Args...>::type;
 template<typename T>
 struct has_subscript_operator_impl
 {
-	template<typename U, typename = decltype(std::declval<U>()[0])>
-	static std::true_type test(int);
-	template<typename>
-	static std::false_type test(...);
+    template<typename U, typename = decltype(std::declval<U>()[0])>
+    static std::true_type test(int);
+    template<typename>
+    static std::false_type test(...);
 
-	using type = decltype(test<T>(0));
+    using type = decltype(test<T>(0));
 };
 
 template<typename T>
@@ -1366,7 +1366,7 @@ struct InplaceSorter : FallbackInplaceSorter<StdSortThreshold, AmericanFlagSortT
 
 template<std::ptrdiff_t StdSortThreshold, std::ptrdiff_t AmericanFlagSortThreshold, typename CurrentSubKey, typename SubKeyType>
 struct FallbackInplaceSorter<StdSortThreshold, AmericanFlagSortThreshold, CurrentSubKey, SubKeyType, typename std::enable_if<has_subscript_operator<SubKeyType>::value>::type>
-	: ListInplaceSorter<StdSortThreshold, AmericanFlagSortThreshold, CurrentSubKey, SubKeyType>
+    : ListInplaceSorter<StdSortThreshold, AmericanFlagSortThreshold, CurrentSubKey, SubKeyType>
 {
 };
 

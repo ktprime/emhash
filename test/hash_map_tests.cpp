@@ -57,7 +57,7 @@ using test_types = boost::mpl::list<
     emhash5::HashMap<move_only_test, move_only_test, mod_hash<9>>,
     emhash5::HashMap<copy_only_test, copy_only_test, mod_hash<9>>,
     emhash5::HashMap<self_reference_member_test, self_reference_member_test, mod_hash<9>>
-	>;
+    >;
 
 
 /**

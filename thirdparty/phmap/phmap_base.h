@@ -236,7 +236,7 @@ struct negation : std::integral_constant<bool, !T::value> {};
                               __has_trivial_copy(typename std::remove_reference<T>::type) &&
                               std::is_copy_constructible<T>::value &&
                               std::is_trivially_destructible<T>::value> {};
- 
+
   template <typename T>
   struct is_trivially_copy_assignable :
      std::integral_constant<bool,

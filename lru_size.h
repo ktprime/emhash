@@ -1206,7 +1206,7 @@ private:
                 if (_pairs[next_bucket].orderid > _pairs[prev_bucket].orderid) {
                     EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
                     return prev_bucket;
-                } 
+                }
                 else
 #endif
                 return next_bucket;

@@ -314,6 +314,8 @@ public:
         clearkv();
         free(_pairs);
         free(_index);
+        _index = nullptr;
+        _pairs = nullptr;
     }
 
     void clone(const HashMap& rhs)
