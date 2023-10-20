@@ -1211,7 +1211,7 @@ static void bench_IterateIntegers(MAP& map)
         }
     }
     assert(result == 62498750000000ull + 20833333325000ull);
-    printf(", add/removing time = %.2f, %.2f|%zu\n", (ts1 - ts), now2sec() - ts1, result);
+    printf(", add/removing time = %.2f, %.2f|%lu\n", (ts1 - ts), now2sec() - ts1, result);
 }
 
 template<class MAP>

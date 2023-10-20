@@ -1707,10 +1707,9 @@ private:
         return (((uint64_t)p[0]) << 16) | (((uint64_t)p[k >> 1]) << 8) | p[k - 1];
     }
 
-    static constexpr uint64_t secret[4] = {
-        0xa0761d6478bd642full, 0xe7037ed1a0b428dbull,
-        0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
-
+    static const uint64_t secret[4] = {
+        0x2d358dccaa6c78a5ull, 0x8bb84b93962eacc9ull,
+        0x4b33a62ed433d4a3ull, 0x4d5a2da51de1aa47ull};
 public:
     //wyhash main function https://github.com/wangyi-fudan/wyhash
     static uint64_t wyhashstr(const char *key, const size_t len)

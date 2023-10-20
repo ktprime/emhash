@@ -44,7 +44,7 @@ static void print_time( std::chrono::steady_clock::time_point & t1, char const* 
 {
     auto t2 = std::chrono::steady_clock::now();
 
-    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")";
+    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms";// (size=" << size << ")";
 
     t1 = t2;
 }
@@ -109,7 +109,7 @@ template<class Map> BOOST_NOINLINE void test_insert( Map& map, std::chrono::stea
 
     print_time( t1, "Random insert",  0, map.size() );
 
-    std::cout << std::endl;
+//    std::cout << std::endl;
 }
 
 template<class Map> BOOST_NOINLINE void test_lookup( Map& map, std::chrono::steady_clock::time_point & t1 )
@@ -141,7 +141,7 @@ template<class Map> BOOST_NOINLINE void test_lookup( Map& map, std::chrono::stea
 
     print_time( t1, "Random lookup",  s, map.size() );
 
-    std::cout << std::endl;
+//    std::cout << std::endl;
 }
 
 template<class Map> BOOST_NOINLINE void test_iteration( Map& map, std::chrono::steady_clock::time_point & t1 )
@@ -254,8 +254,6 @@ using keyType = std::string;
 
 template<template<class...> class Map> BOOST_NOINLINE void test( char const* label )
 {
-    std::cout << label << ":\n\n";
-
     s_alloc_bytes = 0;
     s_alloc_count = 0;
 
@@ -267,7 +265,7 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     test_insert( map, t1 );
 
     if (s_alloc_bytes > 0)
-    std::cout << "Memory: " << s_alloc_bytes << " bytes in " << s_alloc_count << " allocations\n\n";
+    std::cout << "Memory: " << s_alloc_bytes << " bytes in " << s_alloc_count << " allocations\n";
 
     record rec = { label, 0, s_alloc_bytes, s_alloc_count };
 
@@ -277,10 +275,10 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     test_erase( map, t1 );
 
     auto tN = std::chrono::steady_clock::now();
-    std::cout << "Total: " << ( tN - t0 ) / 1ms << " ms\n\n";
-
     rec.time_ = ( tN - t0 ) / 1ms;
     times.push_back( rec );
+    std::cout << (tN - t0) / 1ms << " ms ";
+    std::cout << label << ":\n\n";
 }
 
 #if BOOST_HASH

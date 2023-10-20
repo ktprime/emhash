@@ -36,9 +36,8 @@ static int K = 10;
 static void print_time( std::chrono::steady_clock::time_point & t1, char const* label, uint64_t s, std::size_t size )
 {
     auto t2 = std::chrono::steady_clock::now();
-
-    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms (s=" << s << ", size=" << size << ")";
-
+	if (size + s)
+    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms";// (s=" << s << ", size=" << size << ")";
     t1 = t2;
 }
 
@@ -150,7 +149,7 @@ template<class Map>  void test_lookup( Map& map, std::chrono::steady_clock::time
 
     print_time( t1, "Consecutive shifted lookup",  s, map.size() );
 
-    std::cout << std::endl;
+//    std::cout << std::endl;
 }
 
 template<class Map>  void test_iteration( Map& map, std::chrono::steady_clock::time_point & t1 )
@@ -262,8 +261,6 @@ static std::vector<record> times;
 
 template<template<class...> class Map>  void test( char const* label )
 {
-    std::cout << label << ":\n\n";
-
     s_alloc_bytes = 0;
     s_alloc_count = 0;
 
@@ -284,10 +281,10 @@ template<template<class...> class Map>  void test( char const* label )
     test_erase( map, t1 );
 
     auto tN = std::chrono::steady_clock::now();
-    std::cout << "Total: " << ( tN - t0 ) / 1ms << " ms\n\n";
-
     rec.time_ = ( tN - t0 ) / 1ms;
     times.push_back( rec );
+    std::cout << (tN - t0) / 1ms << " ms ";
+    std::cout << label << ":\n\n";
 }
 
 // aliases using the counting allocator

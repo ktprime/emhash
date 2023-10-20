@@ -29,7 +29,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <exception>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
@@ -387,11 +386,8 @@ class hopscotch_bucket : public hopscotch_bucket_hash<StoreHash> {
   }
 
  private:
-  using storage = typename std::aligned_storage<sizeof(value_type),
-                                                alignof(value_type)>::type;
-
   neighborhood_bitmap m_neighborhood_infos;
-  storage m_value;
+  alignas(value_type) unsigned char m_value[sizeof(value_type)];
 };
 
 /**
@@ -672,10 +668,13 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
   }
 
   hopscotch_hash(const hopscotch_hash& other)
+      : hopscotch_hash(other, other.get_allocator()) {}
+
+  hopscotch_hash(const hopscotch_hash& other, const Allocator& alloc)
       : Hash(other),
         KeyEqual(other),
         GrowthPolicy(other),
-        m_buckets_data(other.m_buckets_data),
+        m_buckets_data(other.m_buckets_data, alloc),
         m_overflow_elements(other.m_overflow_elements),
         m_buckets(m_buckets_data.empty() ? static_empty_bucket_ptr()
                                          : m_buckets_data.data()),
