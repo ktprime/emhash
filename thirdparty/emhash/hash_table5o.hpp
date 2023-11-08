@@ -38,11 +38,7 @@
 #include <iterator>
 #include <algorithm>
 
-#ifdef __has_include
-    #if __has_include("wyhash.h")
-    #include "wyhash.h"
-    #endif
-#elif EMH_WY_HASH
+#if EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -103,7 +99,7 @@ struct entry {
     using first_type =  First;
     using second_type = Second;
     entry(const First& key, const Second& val, size_type ibucket)
-        :second(val),first(key)
+        :second(val), first(key)
     {
         bucket = ibucket;
     }
@@ -129,8 +125,8 @@ struct entry {
         bucket = ibucket;
     }
 
-    entry(const std::pair<First,Second>& pair)
-        :second(pair.second),first(pair.first)
+    entry(const std::pair<First, Second>& pair)
+        :second(pair.second), first(pair.first)
     {
         bucket = INACTIVE;
     }
@@ -148,18 +144,18 @@ struct entry {
     }
 
     entry(const entry& rhs)
-        :second(rhs.second),first(rhs.first)
+        :second(rhs.second), first(rhs.first)
     {
         bucket = rhs.bucket;
     }
 
     entry(entry&& rhs) noexcept
-        :second(std::move(rhs.second)),first(std::move(rhs.first))
+        :second(std::move(rhs.second)), first(std::move(rhs.first))
     {
         bucket = rhs.bucket;
     }
 
-    entry& operator = (entry&& rhs)
+    entry& operator = (entry&& rhs) noexcept
     {
         second = std::move(rhs.second);
         bucket = rhs.bucket;
@@ -202,6 +198,7 @@ class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
 #endif
 #if EMH_CACHE_LINE_SIZE < 32
     constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
@@ -209,7 +206,7 @@ class HashMap
 
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
-    typedef std::pair<KeyT,ValueT>            value_type;
+    typedef std::pair<KeyT, ValueT>           value_type;
 
 #if EMH_BUCKET_INDEX == 0
     typedef value_type                        value_pair;
@@ -222,11 +219,13 @@ public:
     typedef entry<KeyT, ValueT>               PairT;
 #endif
 
+public:
     typedef KeyT   key_type;
     typedef ValueT val_type;
     typedef ValueT mapped_type;
     typedef HashT  hasher;
     typedef EqT    key_equal;
+
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
@@ -258,7 +257,7 @@ public:
         }
 
         reference operator*() const { return _map->EMH_PKV(_pairs, _bucket); }
-        pointer operator->() const { return &(_map->EMH_PKV(_pairs, _bucket)); }
+        pointer operator->() const { return std::addressof(_map->EMH_PKV(_pairs, _bucket)); }
 
         bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
@@ -564,8 +563,8 @@ public:
 
     size_type get_diss(uint32_t bucket, uint32_t next_bucket, const uint32_t slots) const
     {
-        auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<std::ptrdiff_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<std::ptrdiff_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
             return 0;
         uint32_t diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
@@ -1004,17 +1003,18 @@ public:
         return do_insert(std::move(value)).first;
     }
 
+#if 0
     //TODO: fix tuple
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
 //            EMH_NEW(key, std::forward_as_tuple(std::forward<Args>(args)...), bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
 
     template<class... Args>
@@ -1022,12 +1022,13 @@ public:
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
-        const auto empty = EMH_EMPTY(_pairs, bucket);
-        if (empty) {
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
 //            EMH_NEW(std::move(key), std::forward_as_tuple(std::forward<Args>(args)...), bucket);
         }
-        return { {this, bucket}, empty };
+        return { {this, bucket}, bempty };
     }
+#endif
 
     template<class... Args>
     iterator try_emplace(const_iterator hint, const KeyT& key, Args&&... args)
@@ -1070,8 +1071,8 @@ public:
         return do_assign(std::move(key), std::forward<M>(val)).first;
     }
 
-    /// Like std::map<KeyT,ValueT>::operator[].
-    ValueT& operator[](const KeyT& key)
+    /// Like std::map<KeyT, ValueT>::operator[].
+    ValueT& operator[](const KeyT& key) noexcept
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1083,7 +1084,7 @@ public:
         return EMH_VAL(_pairs, bucket);
     }
 
-    ValueT& operator[](KeyT&& key)
+    ValueT& operator[](KeyT&& key) noexcept
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1243,7 +1244,6 @@ public:
         const auto required_buckets = (size_type)(num_elems * _mlf >> 27);
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
-
 #else
         const auto required_buckets = (size_type)(num_elems + num_elems * 1 / 9);
         if (EMH_LIKELY(required_buckets < _mask))
@@ -1292,8 +1292,7 @@ public:
         _ehead = 0;
         _last = _num_filled  = 0;
         _mask        = num_buckets - 1;
-
-#if EMH_PACK_TAIL > 1 && EMH_PACK_TAIL <= 100
+#if EMH_PACK_TAIL > 1
         _last = num_buckets;
         num_buckets += num_buckets * EMH_PACK_TAIL / 100; //add more 5-10%
 #endif
@@ -1335,7 +1334,7 @@ public:
                     collision ++;
 #endif
 
-                auto& key = EMH_KEY(old_pairs, src_bucket);
+                const auto& key = EMH_KEY(old_pairs, src_bucket);
                 const auto bucket = find_unique_bucket(key);
                 new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
                 EMH_BUCKET(_pairs, bucket) = bucket;

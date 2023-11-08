@@ -1099,15 +1099,10 @@ public:
             do_insert_unqiue(*begin);
     }
 
-    /// Same as above, but contains(key) MUST be false
-    size_type insert_unique(KeyT&& key, ValueT&& val)
+    template<typename K, typename V>
+    size_type insert_unique(K&& key, V&& val)
     {
-        return do_insert_unqiue(std::move(key), std::forward<ValueT>(val));
-    }
-
-    size_type insert_unique(const KeyT& key, ValueT&& val)
-    {
-        return do_insert_unqiue(key, std::forward<ValueT>(val));
+        return do_insert_unqiue(std::forward<K>(key), std::forward<V>(val));
     }
 
     size_type insert_unique(value_type&& value)
@@ -1634,14 +1629,14 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from)
     {
-#if 1
+#if 0
         const auto boset  = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
         const auto bmask  = ((size_t)align[1] << (MASK_BIT - boset)) | (align[0] >> boset);
 #else
         const auto boset  = bucket_from % 8;
         auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
-        const auto bmask  = (*(size_t*)(align) >> boset) & 0xFF9FFF6FFFF96FFFull;//369a
+        const auto bmask  = (*(size_t*)(align) >> boset);// & 0xFF9FFF6FFFF96FFFull;//369a
 #endif
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
