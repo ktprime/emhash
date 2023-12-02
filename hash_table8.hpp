@@ -1707,7 +1707,7 @@ private:
         return (((uint64_t)p[0]) << 16) | (((uint64_t)p[k >> 1]) << 8) | p[k - 1];
     }
 
-    static const uint64_t secret[4] = {
+    inline static const uint64_t secret[4] = {
         0x2d358dccaa6c78a5ull, 0x8bb84b93962eacc9ull,
         0x4b33a62ed433d4a3ull, 0x4d5a2da51de1aa47ull};
 public:
