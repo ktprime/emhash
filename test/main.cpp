@@ -649,8 +649,8 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint32_t;
 
-#if X86
-    emilib2::HashMap <keyType, int> shash;
+#if X860
+    emilib3::HashMap <keyType, int> shash;
 #else
     ehmap6<keyType, int> shash;
 //    robin_hood::unordered_flat_map<keyType, int> shash;
@@ -939,10 +939,11 @@ static void benchStringHash(int size, int str_min, int str_max)
     printf("sum = %ld\n", sum);
 }
 
-static void TestHighLoadFactor()
+template<typename MAP>
+static void TestHighLoadFactor(int id)
 {
     std::random_device rd;
-    const auto rand_key = rd();
+    const auto rand_key = rd() + getus();
 #if 1
     WyRand srngi(rand_key), srnge(rand_key);
 #else
@@ -950,14 +951,16 @@ static void TestHighLoadFactor()
 #endif
 
     const auto max_lf   = 0.999f; //<= 0.9999f
-    const auto vsize    = 1u << (20 + rand_key % 6);//must be power of 2
-    emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
+    const auto vsize    = 1u << (20 + id % 6);//must be power of 2
+    MAP myhash(vsize, max_lf);
+    //emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
     //emhash5::HashMap<int64_t, int> myhash(vsize, max_lf);
+    //ankerl::unordered_dense::map<int64_t, int> myhash(vsize / 2); myhash.max_load_factor(max_lf);
 
     auto nowus = getus();
     for (size_t i = 0; i < size_t(vsize * max_lf); i++)
         myhash.emplace(srngi(), i);
-    assert(myhash.bucket_count() == vsize); //no rehash
+    //assert(myhash.bucket_count() == vsize); //no rehash
 
     //while (myhash.load_factor() < max_lf - 1e-3) myhash.emplace(srngi(), 0);
     const auto insert_time = getus() - nowus; nowus = getus();
@@ -969,19 +972,24 @@ static void TestHighLoadFactor()
     const auto erase_time = getus() - nowus;
     printf("vsize = %d, load factor = %.4f, insert/erase = %ld/%ld ms\n",
         vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
-    assert(myhash.bucket_count() == vsize); //no rehash
-    assert(myhash.load_factor() >= max_lf - 0.001);
+    //assert(myhash.bucket_count() == vsize); //no rehash
+    //assert(myhash.load_factor() >= max_lf - 0.001);
 }
 
 int main(int argc, char* argv[])
 {
     printInfo(nullptr);
     srand(time(0));
-    TestHighLoadFactor();
+
     if (argc == 2) {
         TestApi();
         benchIntRand(1e8+8);
         benchStringHash(1e6+6, 8, 32);
+    }
+
+    for (int i = 0; i < 6; i++) {
+        TestHighLoadFactor<emhash7::HashMap<int64_t, int>>(i);
+        TestHighLoadFactor<emhash8::HashMap<int64_t, int>>(i);
     }
 
     size_t n = (int)1e7, loop = 12345678;

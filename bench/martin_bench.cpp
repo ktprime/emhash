@@ -1211,7 +1211,7 @@ static void bench_IterateIntegers(MAP& map)
         }
     }
     assert(result == 62498750000000ull + 20833333325000ull);
-    printf(", add/removing time = %.2f, %.2f|%lu\n", (ts1 - ts), now2sec() - ts1, result);
+    printf(", add/removing time = %.2f, %.2f|%ld\n", (ts1 - ts), now2sec() - ts1, (long)result);
 }
 
 template<class MAP>
@@ -1444,8 +1444,16 @@ static void runTest(int sflags, int eflags)
 #endif
         puts("\nbench_randomFind:");
 
-        const size_t numInserts[]        = {(size_t)rand() % 100 + 123,  (size_t)rand() % 1000 + 5234, (size_t)rand() % 1000000 +  1234567, (size_t)time(0) % 1000000 + 12345678};
-        constexpr size_t numFindsPerInsert[] = {800000,  20000, 50, 5};
+        MRNG rng(time(0));
+        const size_t numInserts[]        = {
+			(size_t)rng() % 123 + 123,
+			(size_t)rng() % 1234 + 1234, 
+			(size_t)rng() % 12345 + 12345, 
+			(size_t)rng() % 123456 + 123456, 
+			(size_t)rng() % 1234567 + 1234567, 
+			(size_t)rng() % 12345678 + 12345678};
+        constexpr size_t numFindsPerInsert[] = {800000, 50000, 5000, 200, 10, 2};
+
         for (size_t i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
         {
 #if ET
@@ -1470,9 +1478,9 @@ static void runTest(int sflags, int eflags)
             { rigtorp::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if X86
-            { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emilib3::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
             { emilib::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
+            { emilib2::HashMap<size_t, size_t, hash_func> emap; bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if ABSL_HMAP
             { absl::flat_hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
