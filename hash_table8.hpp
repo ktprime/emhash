@@ -361,29 +361,37 @@ public:
     }
 
     // -------------------------------------------------------------
-    inline iterator first() const { return {this, 0}; }
-    inline iterator last() const { return {this, _num_filled - 1}; }
+    iterator first() const { return {this, 0}; }
+    iterator last() const { return {this, _num_filled - 1}; }
 
-    inline iterator begin() { return first(); }
-    inline const_iterator cbegin() const { return first(); }
-    inline const_iterator begin() const { return first(); }
+    value_type& front() { return _pairs[0]; }
+    const value_type& front() const { return _pairs[0]; }
+    value_type& back() { return _pairs[_num_filled - 1]; }
+    const value_type& back() const { return _pairs[_num_filled - 1]; }
 
-    inline iterator end() { return {this, _num_filled}; }
-    inline const_iterator cend() const { return {this, _num_filled}; }
-    inline const_iterator end() const { return cend(); }
+    void pop_front() { erase(begin()); } //TODO. only erase first without move last
+    void pop_back() { erase(last()); }
 
-    inline const value_type* values() const { return _pairs; }
-    inline const Index* index() const { return _index; }
+    iterator begin() { return first(); }
+    const_iterator cbegin() const { return first(); }
+    const_iterator begin() const { return first(); }
 
-    inline size_type size() const { return _num_filled; }
-    inline bool empty() const { return _num_filled == 0; }
-    inline size_type bucket_count() const { return _num_buckets; }
+    iterator end() { return {this, _num_filled}; }
+    const_iterator cend() const { return {this, _num_filled}; }
+    const_iterator end() const { return cend(); }
+
+    const value_type* values() const { return _pairs; }
+    const Index* index() const { return _index; }
+
+    size_type size() const { return _num_filled; }
+    bool empty() const { return _num_filled == 0; }
+    size_type bucket_count() const { return _num_buckets; }
 
     /// Returns average number of elements per bucket.
-    inline float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
+    float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
 
-    inline HashT& hash_function() const { return _hasher; }
-    inline EqT& key_eq() const { return _eq; }
+    HashT& hash_function() const { return _hasher; }
+    EqT& key_eq() const { return _eq; }
 
     void max_load_factor(float mlf)
     {
@@ -393,9 +401,9 @@ public:
         }
     }
 
-    inline constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    inline constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
-    inline constexpr size_type max_bucket_count() const { return max_size(); }
+    constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
+    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
+    constexpr size_type max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -529,13 +537,13 @@ public:
 
     // ------------------------------------------------------------
     template<typename K=KeyT>
-    inline iterator find(const K& key) noexcept
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_slot(key)};
     }
 
     template<typename K=KeyT>
-    inline const_iterator find(const K& key) const noexcept
+    const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_slot(key)};
     }
@@ -567,13 +575,13 @@ public:
     }
 
     template<typename K=KeyT>
-    inline bool contains(const K& key) const noexcept
+    bool contains(const K& key) const noexcept
     {
         return find_filled_slot(key) != _num_filled;
     }
 
     template<typename K=KeyT>
-    inline size_type count(const K& key) const noexcept
+    size_type count(const K& key) const noexcept
     {
         return find_filled_slot(key) == _num_filled ? 0 : 1;
         //return find_sorted_bucket(key) == END ? 0 : 1;
@@ -773,13 +781,13 @@ public:
         return insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    inline size_type insert_unique(const value_type& value)
+    size_type insert_unique(const value_type& value)
     {
         return insert_unique(value.first, value.second);
     }
 
     template <class... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    std::pair<iterator, bool> emplace(Args&&... args) noexcept
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -809,7 +817,7 @@ public:
     }
 
     template <class... Args>
-    inline size_type emplace_unique(Args&&... args)
+    size_type emplace_unique(Args&&... args)
     {
         return insert_unique(std::forward<Args>(args)...);
     }
@@ -968,7 +976,7 @@ public:
     }
 
 #if EMH_HIGH_LOAD
-    #define EMH_PREVET(i, n)  i[n].slot
+    #define EMH_PREVET(i, n) i[n].slot
     void set_empty()
     {
         auto prev = 0;
@@ -1208,7 +1216,7 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need()
+    bool check_expand_need()
     {
         return reserve(_num_filled, false);
     }
@@ -1616,12 +1624,12 @@ private:
         }
     }
 
-    inline size_type hash_bucket(const KeyT& key) const noexcept
+    size_type hash_bucket(const KeyT& key) const noexcept
     {
         return (size_type)hash_key(key) & _mask;
     }
 
-    inline size_type hash_main(const size_type bucket) const noexcept
+    size_type hash_main(const size_type bucket) const noexcept
     {
         const auto slot = _index[bucket].slot & _mask;
         return (size_type)hash_key(_pairs[slot].first) & _mask;
@@ -1669,7 +1677,7 @@ private:
 
 #if EMH_WYHASH_HASH
     //#define WYHASH_CONDOM 1
-    inline static uint64_t wymix(uint64_t A, uint64_t B)
+    static uint64_t wymix(uint64_t A, uint64_t B)
     {
 #if defined(__SIZEOF_INT128__)
         __uint128_t r = A; r *= B;
