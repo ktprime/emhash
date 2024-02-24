@@ -654,82 +654,84 @@ namespace base_internal {
 namespace {
 
 #ifdef PHMAP_HAVE_EXCEPTIONS
-  #define PHMAP_THROW_IMPL(e) throw e
+  #define PHMAP_THROW_IMPL_MSG(e, message) throw e(message)
+  #define PHMAP_THROW_IMPL(e) throw e()
 #else
-  #define PHMAP_THROW_IMPL(...) std::abort()
+  #define PHMAP_THROW_IMPL_MSG(e, message) do { (void)(message); std::abort(); } while(0)
+  #define PHMAP_THROW_IMPL(e) std::abort()
 #endif
 }  // namespace
 
 static inline void ThrowStdLogicError(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::logic_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::logic_error, what_arg);
 }
 static inline void ThrowStdLogicError(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::logic_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::logic_error, what_arg);
 }
 static inline void ThrowStdInvalidArgument(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::invalid_argument(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::invalid_argument, what_arg);
 }
 static inline void ThrowStdInvalidArgument(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::invalid_argument(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::invalid_argument, what_arg);
 }
 
 static inline void ThrowStdDomainError(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::domain_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::domain_error, what_arg);
 }
 static inline void ThrowStdDomainError(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::domain_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::domain_error, what_arg);
 }
 
 static inline void ThrowStdLengthError(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::length_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::length_error, what_arg);
 }
 static inline void ThrowStdLengthError(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::length_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::length_error, what_arg);
 }
 
 static inline void ThrowStdOutOfRange(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::out_of_range(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::out_of_range, what_arg);
 }
 static inline void ThrowStdOutOfRange(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::out_of_range(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::out_of_range, what_arg);
 }
 
 static inline void ThrowStdRuntimeError(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::runtime_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::runtime_error, what_arg);
 }
 static inline void ThrowStdRuntimeError(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::runtime_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::runtime_error, what_arg);
 }
 
 static inline void ThrowStdRangeError(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::range_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::range_error, what_arg);
 }
 static inline void ThrowStdRangeError(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::range_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::range_error, what_arg);
 }
 
 static inline void ThrowStdOverflowError(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::overflow_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::overflow_error, what_arg);
 }
 
 static inline void ThrowStdOverflowError(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::overflow_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::overflow_error, what_arg);
 }
 
 static inline void ThrowStdUnderflowError(const std::string& what_arg) {
-  PHMAP_THROW_IMPL(std::underflow_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::underflow_error, what_arg);
 }
 
 static inline void ThrowStdUnderflowError(const char* what_arg) {
-  PHMAP_THROW_IMPL(std::underflow_error(what_arg));
+  PHMAP_THROW_IMPL_MSG(std::underflow_error, what_arg);
 }
 
 static inline void ThrowStdBadFunctionCall() {
-  PHMAP_THROW_IMPL(std::bad_function_call());
+  PHMAP_THROW_IMPL(std::bad_function_call);
 }
 
 static inline void ThrowStdBadAlloc() {
-  PHMAP_THROW_IMPL(std::bad_alloc());
+  PHMAP_THROW_IMPL(std::bad_alloc);
 }
 
 }  // namespace base_internal
@@ -4375,14 +4377,14 @@ namespace memory_internal {
 // ----------------------------------------------------------------------------
 template <class Pair, class = std::true_type>
 struct OffsetOf {
-    static constexpr size_t kFirst = (size_t)-1;
-  static constexpr size_t kSecond = (size_t)-1;
+   static constexpr size_t kFirst  = static_cast<size_t>(-1);
+   static constexpr size_t kSecond = static_cast<size_t>(-1);
 };
 
 template <class Pair>
 struct OffsetOf<Pair, typename std::is_standard_layout<Pair>::type>
 {
-    static constexpr size_t kFirst = offsetof(Pair, first);
+    static constexpr size_t kFirst  = offsetof(Pair, first);
     static constexpr size_t kSecond = offsetof(Pair, second);
 };
 
@@ -4627,8 +4629,13 @@ public:
         template<class T> explicit DoNothing(T&&) {}
         DoNothing& operator=(const DoNothing&) { return *this; }
         DoNothing& operator=(DoNothing&&) noexcept { return *this; }
-        void swap(DoNothing &) {}
+        void swap(DoNothing &)  noexcept {}
         bool owns_lock() const noexcept { return true; }
+        void lock() {}
+        void unlock() {}
+        void lock_shared() {}
+        void unlock_shared() {}
+        bool switch_to_unique() { return false; }
     };
 
     // ----------------------------------------------------
@@ -4703,6 +4710,8 @@ public:
         }
 
         mutex_type *mutex() const noexcept { return m_; }
+
+        bool switch_to_unique() { return false; }
 
     private:
         mutex_type *m_;
@@ -4782,9 +4791,101 @@ public:
 
         mutex_type *mutex() const noexcept { return m_; }
 
+        bool switch_to_unique() { return false; }
+
     private:
         mutex_type *m_;
         bool        locked_;
+    };
+
+    // ----------------------------------------------------
+    class ReadWriteLock
+    {
+    public:
+        using mutex_type = MutexType;
+
+        ReadWriteLock() :  m_(nullptr), locked_(false), locked_shared_(false)  {}
+
+        explicit ReadWriteLock(mutex_type &m) : m_(&m), locked_(false), locked_shared_(true)  {
+            m_->lock_shared();
+        }
+
+        ReadWriteLock(mutex_type& m, defer_lock_t) noexcept :
+            m_(&m), locked_(false), locked_shared_(false)
+        {}
+
+        ReadWriteLock(ReadWriteLock &&o) noexcept :
+            m_(std::move(o.m_)), locked_(o.locked_), locked_shared_(o.locked_shared_) {
+            o.locked_        = false;
+            o.locked_shared_ = false;
+            o.m_             = nullptr;
+        }
+
+        ReadWriteLock& operator=(ReadWriteLock&& other) noexcept {
+            ReadWriteLock temp(std::move(other));
+            swap(temp);
+            return *this;
+        }
+
+        ~ReadWriteLock() {
+            if (locked_shared_)
+                m_->unlock_shared();
+            else if (locked_)
+                m_->unlock();
+        }
+
+        void lock_shared() {
+            assert(!locked_);
+            if (!locked_shared_) {
+                m_->lock_shared();
+                locked_shared_ = true;
+            }
+        }
+
+        void unlock_shared() {
+            if (locked_shared_) {
+                m_->unlock_shared();
+                locked_shared_ = false;
+            }
+        }
+
+        void lock() {
+            assert(!locked_shared_);
+            if (!locked_) {
+                m_->lock();
+                locked_ = true;
+            }
+        }
+
+        void unlock() {
+            if (locked_) {
+                m_->unlock();
+                locked_ = false;
+            }
+        }
+
+        bool owns_lock() const noexcept { return locked_; }
+        bool owns_shared_lock() const noexcept { return locked_shared_; }
+
+        void swap(ReadWriteLock &o) noexcept {
+            std::swap(m_, o.m_);
+            std::swap(locked_, o.locked_);
+            std::swap(locked_shared_, o.locked_shared_);
+        }
+
+        mutex_type *mutex() const noexcept { return m_; }
+
+        bool switch_to_unique() {
+            assert(locked_shared_);
+            unlock_shared();
+            lock();
+            return true;
+        }
+
+    private:
+        mutex_type *m_;
+        bool        locked_;
+        bool        locked_shared_;
     };
 
     // ----------------------------------------------------
@@ -4856,12 +4957,11 @@ public:
 //    using Lockable = phmap::LockableImpl<mutex_type>;
 //    Lockable m;
 //
-//    Lockable::UpgradeLock read_lock(m); // take a upgradable lock
+//    Lockable::ReadWriteLock read_lock(m); // take a lock (read if supported, otherwise write)
+//    ... do something
 //
-//    {
-//        Lockable::UpgradeToUnique unique_lock(read_lock);
-//        // now locked for write
-//    }
+//    m.switch_to_unique(); // returns true if we had a read lock and switched to write
+//    // now locked for write
 //
 // ---------------------------------------------------------------------------
 //         Generic mutex support (always write locks)
@@ -4873,11 +4973,10 @@ public:
     using mutex_type      = Mtx_;
     using Base            = LockableBaseImpl<Mtx_>;
     using SharedLock      = typename Base::WriteLock;
-    using UpgradeLock     = typename Base::WriteLock;
     using UniqueLock      = typename Base::WriteLock;
+    using ReadWriteLock   = typename Base::WriteLock;
     using SharedLocks     = typename Base::WriteLocks;
     using UniqueLocks     = typename Base::WriteLocks;
-    using UpgradeToUnique = typename Base::DoNothing;        // we already have unique ownership
 };
 
 // ---------------------------------------------------------------------------
@@ -4890,15 +4989,15 @@ public:
     using mutex_type      = phmap::NullMutex;
     using Base            = LockableBaseImpl<phmap::NullMutex>;
     using SharedLock      = typename Base::DoNothing;
-    using UpgradeLock     = typename Base::DoNothing;
+    using ReadWriteLock   = typename Base::DoNothing;
     using UniqueLock      = typename Base::DoNothing;
-    using UpgradeToUnique = typename Base::DoNothing;
     using SharedLocks     = typename Base::DoNothing;
     using UniqueLocks     = typename Base::DoNothing;
 };
 
 // --------------------------------------------------------------------------
 //         Abseil Mutex support (read and write lock support)
+//         use: `phmap::AbslMutex` instead of `std::mutex`
 // --------------------------------------------------------------------------
 #ifdef ABSL_SYNCHRONIZATION_MUTEX_H_
 
@@ -4919,11 +5018,44 @@ public:
         using mutex_type      = phmap::AbslMutex;
         using Base            = LockableBaseImpl<phmap::AbslMutex>;
         using SharedLock      = typename Base::ReadLock;
-        using UpgradeLock     = typename Base::WriteLock;
+        using ReadWriteLock   = typename Base::ReadWriteLock;
         using UniqueLock      = typename Base::WriteLock;
         using SharedLocks     = typename Base::ReadLocks;
         using UniqueLocks     = typename Base::WriteLocks;
-        using UpgradeToUnique = typename Base::DoNothing; // we already have unique ownership
+    };
+
+#endif
+
+// --------------------------------------------------------------------------
+//         Microsoft SRWLOCK support (read and write lock support)
+//         use: `phmap::srwlock` instead of `std::mutex`
+// --------------------------------------------------------------------------
+#if defined(_MSC_VER) && defined(SRWLOCK_INIT)
+
+    class srwlock {
+        SRWLOCK _lock;
+    public:
+        srwlock()              { InitializeSRWLock(&_lock); }
+        void lock()            { AcquireSRWLockExclusive(&_lock); }
+        void unlock()          { ReleaseSRWLockExclusive(&_lock); }
+        bool try_lock()        { return !!TryAcquireSRWLockExclusive(&_lock); }
+        void lock_shared()     { AcquireSRWLockShared(&_lock); }
+        void unlock_shared()   { ReleaseSRWLockShared(&_lock); }
+        bool try_lock_shared() { return !!TryAcquireSRWLockShared(&_lock); }
+    };
+
+
+    template<>
+    class LockableImpl<srwlock> : public srwlock
+    {
+    public:
+        using mutex_type    = srwlock;
+        using Base          = LockableBaseImpl<srwlock>;
+        using SharedLock    = typename Base::ReadLock;
+        using ReadWriteLock = typename Base::ReadWriteLock;
+        using UniqueLock    = typename Base::WriteLock;
+        using SharedLocks   = typename Base::ReadLocks;
+        using UniqueLocks   = typename Base::WriteLocks;
     };
 
 #endif
@@ -4941,11 +5073,10 @@ public:
         using mutex_type      = boost::shared_mutex;
         using Base            = LockableBaseImpl<boost::shared_mutex>;
         using SharedLock      = boost::shared_lock<mutex_type>;
-        using UpgradeLock     = boost::unique_lock<mutex_type>; // assume can't upgrade
+        using ReadWriteLock   = typename Base::ReadWriteLock;
         using UniqueLock      = boost::unique_lock<mutex_type>;
         using SharedLocks     = typename Base::ReadLocks;
         using UniqueLocks     = typename Base::WriteLocks;
-        using UpgradeToUnique = typename Base::DoNothing;  // we already have unique ownership
     };
 
 #endif // BOOST_THREAD_SHARED_MUTEX_HPP
@@ -4963,11 +5094,10 @@ public:
         using mutex_type      = std::shared_mutex;
         using Base            = LockableBaseImpl<std::shared_mutex>;
         using SharedLock      = std::shared_lock<mutex_type>;
-        using UpgradeLock     = std::unique_lock<mutex_type>; // assume can't upgrade
+        using ReadWriteLock   = typename Base::ReadWriteLock;
         using UniqueLock      = std::unique_lock<mutex_type>;
         using SharedLocks     = typename Base::ReadLocks;
         using UniqueLocks     = typename Base::WriteLocks;
-        using UpgradeToUnique = typename Base::DoNothing;  // we already have unique ownership
     };
 #endif // PHMAP_HAVE_SHARED_MUTEX
 
