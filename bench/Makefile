@@ -119,7 +119,7 @@ CXXFLAGS += $(MF)
 endif
 
 ifneq ($(CK),)
-CXXFLAGS += -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
+CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
 CXXFLAGS += -static #clang libc++ -static-libstdc++?
@@ -133,6 +133,8 @@ ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -std=c++20 -I. qbench.cpp -o qbench
 endif
 
+	$(CXX) $(CXXFLAGS) hash_join.cpp -o hash_join
+	$(CXX) $(CXXFLAGS) hash_join2.cpp -o hash_join2
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
