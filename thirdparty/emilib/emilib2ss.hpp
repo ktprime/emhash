@@ -873,11 +873,13 @@ public:
             if (off[i] != 0) {
                 total += off[i];
                 sums  += (size_t)off[i] * (i + 1);
-                printf("\n%3d %8d %.5lf%% %3.lf%%", i, off[i], 1.0 * off[i] / _num_buckets, 10000.0 * total / _num_buckets);
+                printf("\n%3d %8d %.5lf %3.lf%%",
+                    i, off[i], 1.0 * off[i] / (_num_buckets / simd_bytes), 100.0 * total / (_num_buckets / simd_bytes));
             }
         }
-        printf(", average probe group length PGL = %.4lf\n", 1.0 * sums / total);
+        printf(", load_factor = %.3f average probe group length PGL = %.4lf\n", load_factor(), 1.0 * sums / total);
     }
+
     /// Make room for this many elements
     void rehash(size_t num_elems) noexcept
     {
@@ -925,8 +927,8 @@ public:
         for (size_t src_bucket = GROUP_INDEX; src_bucket < _num_buckets; src_bucket += simd_bytes)
           _states[src_bucket] = 0;
 
-        //for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
-        for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
+        for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        //for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
             if (old_states[src_bucket] >= State::EFILLED && src_bucket % simd_bytes != GROUP_INDEX) {
                 auto& src_pair = old_pairs[src_bucket];
 
@@ -951,12 +953,13 @@ private:
         reserve(_num_filled);
     }
 
-    void prefetch_heap_block(char* ctrl) const
+    static void prefetch_heap_block(char* ctrl)
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if __linux__
-        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+        __builtin_prefetch(static_cast<const void*>(ctrl));
+//        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
@@ -970,12 +973,11 @@ private:
         const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
 
-        prefetch_heap_block((char*)&_pairs[main_bucket]);
-
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
-
+            if (maskf)
+                prefetch_heap_block((char*)&_pairs[next_bucket]);
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
                 if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
@@ -1002,8 +1004,8 @@ private:
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-        const auto filled = SET1_EPI8(key_h2);
 
+        const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket; int offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
@@ -1043,6 +1045,8 @@ private:
             next_bucket = get_next_bucket(next_bucket, ++offset);
             if (offset > group_probe(main_bucket))
                 break;
+
+            prefetch_heap_block((char*)&_pairs[next_bucket]);
          }
 
         if (EMH_LIKELY(hole != chole)) {
@@ -1051,6 +1055,7 @@ private:
         }
 
         const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
+        prefetch_heap_block((char*)&_pairs[ebucket]);
         set_states(ebucket, key_h2);
         return ebucket;
     }

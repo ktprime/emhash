@@ -977,12 +977,12 @@ private:
         reserve(_num_filled);
     }
 
-    void prefetch_heap_block(char* ctrl) const
+    static void prefetch_heap_block(char* ctrl)
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if __linux__
-        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+        __builtin_prefetch(static_cast<const void*>(ctrl));
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
@@ -1044,12 +1044,13 @@ private:
 
         size_t offset = 0;
 
-        if (0)
+        if (1)
         {
-            prefetch_heap_block((char*)&_pairs[next_bucket]);
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
+            if (maskf)
+                prefetch_heap_block((char*)&_pairs[next_bucket]);
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
                 if (_eq(_pairs[fbucket].first, key))
@@ -1068,16 +1069,21 @@ private:
         while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
-
+            if (maskf)
+                prefetch_heap_block((char*)&_pairs[next_bucket]);
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
                 if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                     return fbucket;
                 maskf &= maskf - 1;
             }
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (maske != 0 || ++offset > get_offset(main_bucket))
+            if (++offset > get_offset(main_bucket))
                 break;
+#if 0
+            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            if (maske != 0)
+                break;
+#endif
 
             next_bucket = get_next_bucket(next_bucket, offset);
         }
@@ -1096,13 +1102,13 @@ private:
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto filled = SET1_EPI8(key_h2);
 
-        auto next_bucket  = main_bucket, offset = 0u;
+        auto next_bucket = main_bucket, offset = 0u;
         size_t hole = (size_t)-1;
-        prefetch_heap_block((char*)&_pairs[main_bucket]);
 
         while (true) {
             const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf  = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            prefetch_heap_block((char*)&_pairs[next_bucket]);
 
             //1. find filled
             while (maskf != 0) {
@@ -1144,6 +1150,7 @@ private:
         }
 
         const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
+        prefetch_heap_block((char*)&_pairs[ebucket]);
         set_states(ebucket, key_h2);
         return ebucket;
     }

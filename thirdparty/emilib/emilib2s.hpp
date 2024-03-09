@@ -957,7 +957,7 @@ private:
         reserve(_num_filled);
     }
 
-    void prefetch_heap_block(char* ctrl) const
+    static void prefetch_heap_block(char* ctrl)
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
@@ -992,16 +992,15 @@ private:
     template<typename K>
     size_t find_filled_bucket(const K& key) const noexcept
     {
-        size_t main_bucket;
+        size_t main_bucket; int offset = 0;
         const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
-        int offset = 0;
-        prefetch_heap_block((char*)&_pairs[main_bucket]);
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
-
+            if (maskf)
+                prefetch_heap_block((char*)&_pairs[next_bucket]);
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
                 if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
@@ -1031,7 +1030,8 @@ private:
         const auto filled = SET1_EPI8(key_h2);
 
         auto next_bucket = main_bucket; int offset = 0u;
-        size_t hole = (size_t)-1;
+        constexpr size_t chole = (size_t)-1;
+        size_t hole = chole;
         prefetch_heap_block((char*)&_pairs[main_bucket]);
 
         while (true) {
@@ -1053,14 +1053,14 @@ private:
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
                 auto ebucket = next_bucket + CTZ(maske);
-                if (EMH_UNLIKELY(hole != (size_t)-1))
+                if (EMH_UNLIKELY(hole != chole))
                     ebucket = hole;
                 set_states(ebucket, key_h2);
                 return ebucket;
             }
 
             //3. find erased
-            else if (hole == (size_t)-1) {
+            else if (hole == chole) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);
@@ -1070,14 +1070,17 @@ private:
             next_bucket = get_next_bucket(next_bucket, ++offset);
             if (offset > _max_probe_length)
                 break;
+
+            prefetch_heap_block((char*)&_pairs[next_bucket]);
         }
 
-        if (EMH_LIKELY(hole != (size_t)-1)) {
+        if (EMH_LIKELY(hole != chole)) {
             set_states(hole, key_h2);
             return hole;
         }
 
         const auto ebucket = find_empty_slot(next_bucket, offset);
+        prefetch_heap_block((char*)&_pairs[ebucket]);
         set_states(ebucket, key_h2);
         return ebucket;
     }
