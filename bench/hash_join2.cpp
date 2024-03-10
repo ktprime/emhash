@@ -39,42 +39,35 @@ using ValType = uint64_t;
 using ValType = uint32_t;
 #endif
 
-static unsigned N = 8'123'456;
+static unsigned N = 1'123'4560;
 
 // aliases using the counting allocator
 #if BOOST_HASH
-    #define BintHasher boost::hash<K>
+    #define BintHasher boost::hash<KeyType>
 #elif FIB_HASH
-    #define BintHasher Int64Hasher<K>
+    #define BintHasher Int64Hasher<KeyType>
 #elif HOOD_HASH
-    #define BintHasher robin_hood::hash<K>
+    #define BintHasher robin_hood::hash<KeyType>
 #elif ABSL_HASH
-    #define BintHasher absl::Hash<K>
+    #define BintHasher absl::Hash<KeyType>
 #elif STD_HASH
-    #define BintHasher std::hash<K>
+    #define BintHasher std::hash<KeyType>
 #else
-    #define BintHasher ankerl::unordered_dense::hash<K>
+    #define BintHasher ankerl::unordered_dense::hash<KeyType>
 #endif
-
-
-static void print_time( std::chrono::steady_clock::time_point & t1, char const* label, uint64_t s, std::size_t size )
-{
-    auto t2 = std::chrono::steady_clock::now();
-    if (size + s)
-    std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms";// (s=" << s << ", size=" << size << ")";
-    t1 = t2;
-}
 
 static std::vector< KeyType > indices1, indices2;
 
 static void init_indices(int n1, int n2, const uint32_t ration = 10)
 {
+    auto t0 = std::chrono::steady_clock::now();
     indices1.resize(n1);
     indices2.resize(n2);
 
-    boost::detail::splitmix64 rng;
+    //boost::detail::splitmix64 rng;
+    WyRand rng;
 
-    for (size_t i = 0; i < indices1.size(); ++i )
+    for (size_t i = 0; i < n1; ++i )
     {
         auto rt = rng();
         indices1[i] = rt;
@@ -85,7 +78,7 @@ static void init_indices(int n1, int n2, const uint32_t ration = 10)
         }
     }
 
-    for (int i = indices1.size(); i < indices2.size(); i++) {
+    for (int i = n1; i < n2; i++) {
         indices2[i] = rng();
     }
 
@@ -93,66 +86,17 @@ static void init_indices(int n1, int n2, const uint32_t ration = 10)
     std::mt19937 gen(rd());
     std::shuffle(indices2.begin(), indices2.end(), gen);
 
-    printf("v1 size = %zd, memory = %zd MB\n", indices1.size(), indices1.size() * sizeof(KeyType) / 1024 / 1024);
-    printf("v2 size = %zd, memory = %zd MB\n", indices2.size(), indices2.size() * sizeof(KeyType) / 1024 / 1024);
+    auto t1 = std::chrono::steady_clock::now();
+    printf("v1 size = %zd, memory = %zd MB\n", indices1.size(), indices1.size() * sizeof(KeyType) >> 20);
+    printf("v2 size = %zd, memory = %zd MB time use %ld ms\n", indices2.size(), indices2.size() * sizeof(KeyType) >> 20, (t1 - t0) / 1ms);
 }
 
-// counting allocator
-
-static std::size_t s_alloc_bytes = 0;
-static std::size_t s_alloc_count = 0;
-
-template<class T> struct allocator
-{
-    using value_type = T;
-
-    allocator() = default;
-
-    template<class U> allocator( allocator<U> const & ) noexcept
-    {
-    }
-
-    template<class U> bool operator==( allocator<U> const & ) const noexcept
-    {
-        return true;
-    }
-
-    template<class U> bool operator!=( allocator<U> const& ) const noexcept
-    {
-        return false;
-    }
-
-    T* allocate( std::size_t n ) const
-    {
-        s_alloc_bytes += n * sizeof(T);
-        s_alloc_count++;
-
-        return std::allocator<T>().allocate( n );
-    }
-
-    void deallocate( T* p, std::size_t n ) const noexcept
-    {
-        s_alloc_bytes -= n * sizeof(T);
-        s_alloc_count--;
-
-        std::allocator<T>().deallocate( p, n );
-    }
-};
-
-//
-
-struct record
-{
-    std::string label_;
-    long long time_;
-    std::size_t bytes_;
-    std::size_t count_;
-};
-
+static float max_lf = 0.99f;
 template<template<class...> class Map>  void test_loops(char const* label)
 {
     auto t0 = std::chrono::steady_clock::now();
-    Map<KeyType, ValType> map(indices1.size());
+    Map<KeyType, ValType> map(indices1.size() / 2);
+    map.max_load_factor(max_lf);
     for (auto v : indices1) {
         map.emplace(v, (ValType)v);
     }
@@ -165,34 +109,35 @@ template<template<class...> class Map>  void test_loops(char const* label)
     }
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s insert %4zd ms, find %4zd ms, join_loops = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+    printf("%20s insert %4zd ms, find %4zd ms, lf = %.2f loops = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map.load_factor(), ans);
 }
+
+constexpr uint32_t HASH_MAPS = 1013u;
+constexpr uint32_t BLOCK_SIZE = 256;
 
 template<template<class...> class Map>  void test_block( char const* label )
 {
-    constexpr uint32_t hash_size = 103u;
-    constexpr uint32_t block_off = 64;
     auto t0 = std::chrono::steady_clock::now();
 
-    Map<KeyType, ValType> map[hash_size];
+    Map<KeyType, ValType> map[HASH_MAPS];
 
-    for (auto& v: map)
-        v.reserve(indices1.size() / hash_size);
+    for (auto& v: map) {
+        v.reserve(indices1.size() / HASH_MAPS);
+        v.max_load_factor(max_lf);
+    }
     for (const auto v:indices1)
-        map[v % hash_size].emplace(v, (ValType)v);
+        map[v % HASH_MAPS].emplace(v, (ValType)v);
 
     auto t1 = std::chrono::steady_clock::now();
 
     size_t ans = 0;
-    std::array<std::array<KeyType, block_off>, hash_size> vblocks = {0};
+    std::array<std::array<KeyType, BLOCK_SIZE>, HASH_MAPS> vblocks = {0};
 
     for (const auto v2:indices2) {
-        const auto vhash = ankerl::unordered_dense::hash<KeyType>()(v2);
-        const uint32_t bindex = v2 % hash_size;// (vhash & capacity) % hash_size; // save hash
+        const uint32_t bindex = v2 % HASH_MAPS;// (vhash & capacity) % HASH_MAPS; // save hash
         auto& bv = vblocks[bindex];
-        if (bv[0] >= block_off - 1) {
-            //sort hash value ?
-            for (int i = 1; i < block_off; i++)
+        if (bv[0] >= BLOCK_SIZE - 1) {
+            for (int i = 1; i < BLOCK_SIZE; i++)
                 ans += map[bindex].count(bv[i]);// map.count(vhash, bv[i])
             bv[0] = 0;
         }
@@ -212,35 +157,71 @@ template<template<class...> class Map>  void test_block( char const* label )
 
 template<template<class...> class Map>  void test_block2( char const* label )
 {
-    constexpr uint32_t hash_size = 103u;
-    constexpr uint32_t block_off = 64;
     auto t0 = std::chrono::steady_clock::now();
 
-    Map<KeyType, ValType> map[hash_size];
+    Map<KeyType, ValType> map[HASH_MAPS];
 
     for (auto& v: map)
-        v.reserve(indices1.size() / hash_size);
+        v.reserve(indices1.size() / HASH_MAPS);
     for (const auto v:indices1)
-        map[v % hash_size].emplace(v, (ValType)v);
+        map[v % HASH_MAPS].emplace(v, (ValType)v);
+
+    auto t1 = std::chrono::steady_clock::now();
+
+    using KeyHashCache = std::pair<uint32_t, KeyType>;
+
+    size_t ans = 0;
+    std::array<std::array<KeyHashCache, BLOCK_SIZE>, HASH_MAPS> vblocks = {};
+
+    for (const auto v2:indices2) {
+        const uint32_t bindex = v2 % HASH_MAPS;// (vhash & capacity) % HASH_MAPS; // save hash
+        auto& bv = vblocks[bindex];
+        if (bv[0].first >= BLOCK_SIZE - 1) {
+            //std::sort(bv.begin() + 1, bv.begin() + BLOCK_SIZE);
+            for (int i = 1; i < BLOCK_SIZE; i++)
+                ans += map[bindex].count_hint(bv[i].second, bv[i].first);// map.count(vhash, bv[i])
+            bv[0].first = 0;
+        }
+        const auto hash_bucket = BintHasher()(v2) & (map[bindex].bucket_count() - 1);
+        bv[++bv[0].first] = {hash_bucket, v2};
+    }
+
+    int bindex = 0;
+    for (const auto& bv:vblocks) {
+        const auto& mapi = map[bindex++];
+        for (int i = 1; i <= bv[0].first; i++)
+            ans += mapi.count_hint(bv[i].second, bv[i].first);
+    }
+
+    auto tN = std::chrono::steady_clock::now();
+    printf("%20s insert %4zd ms, find %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+}
+
+template<template<class...> class Map>  void test_block3( char const* label )
+{
+    auto t0 = std::chrono::steady_clock::now();
+
+    Map<KeyType, ValType> map[HASH_MAPS];
+
+    for (auto& v: map)
+        v.reserve(indices1.size() / HASH_MAPS);
+    for (const auto v:indices1)
+        map[v % HASH_MAPS].emplace(v, (ValType)v);
 
     auto t1 = std::chrono::steady_clock::now();
     size_t ans = 0;
 
     for (const auto v2:indices2) {
-        ans += map[v2 % hash_size].count(v2);
+        ans += map[v2 % HASH_MAPS].count(v2);
     }
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s insert %4zd ms, find %4zd ms, join_block2 = %zd\n\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+    printf("%20s insert %4zd ms, find %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
 }
 
-template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;
+template<class K, class V> using boost_unordered_flat_map = boost::unordered_flat_map<K, V, BintHasher>;
 
-template<class K, class V> using boost_unordered_flat_map =
-    boost::unordered_flat_map<K, V, BintHasher>;
-
-template<class K, class V> using std_unordered_map =
-    std::unordered_map<K, V, BintHasher>;
+template<class K, class V> using std_unordered_map = std::unordered_map<K, V, BintHasher>;
 
 template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BintHasher>;
 template<class K, class V> using emhash_map6 = emhash6::HashMap<K, V, BintHasher>;
@@ -272,27 +253,32 @@ template<class K, class V> using ck_hashmap = ck::HashMap<K, V, BintHasher>;
 int main(int argc, const char* argv[])
 {
     int K = 10, R = 10;
+
+    printInfo(nullptr);
+    puts("v1_size(1-10000)M v1 * r(1-10000) hit_rate(1 - 100)\n ex: ./join_hash 60M 10 1\n");
+
     if (argc > 1 && isdigit(argv[1][0])) N = atoi(argv[1]);
+    if (N < 10000) N = (N * 1024 * 1024) / sizeof(KeyType);
     if (argc > 2 && isdigit(argv[2][0])) K = atoi(argv[2]);
     if (argc > 3 && isdigit(argv[3][0])) R = atoi(argv[3]);
 
     assert(K > 0 && N > 0 && R > 0);
     init_indices(N, N*K, R);
 
-    test_loops<martin_flat> ("martin_flat" );
-    test_block<martin_flat> ("martin_flat" );
+//    test_loops<martin_flat> ("martin_flat" );
+//    test_block<martin_flat> ("martin_flat" );
 
     test_loops<emhash_map5> ("emhash_map5" );
     test_block<emhash_map5>("emhash_map5");
-    test_block2<emhash_map5> ("emhash_map5" );
-
+    //test_block2<emhash_map5> ("emhash_map5" );
+#if 1
     test_loops<emhash_map6>("emhash_map6");
     test_block<emhash_map6>("emhash_map6");
-    test_block2<emhash_map6>("emhash_map6");
+    test_block3<emhash_map6>("emhash_map6");
 
     test_loops<rig_hashmap>( "rigtorp::hashmap" );
     test_block<rig_hashmap>( "rigtorp::hashmap" );
-    test_block2<rig_hashmap>( "rigtorp::hashmap" );
+    test_block3<rig_hashmap>( "rigtorp::hashmap" );
 
 #if CK_HMAP
     test_loops<ck_hashmap>( "ck::hashmap" );
@@ -301,7 +287,7 @@ int main(int argc, const char* argv[])
 
     test_loops<boost_unordered_flat_map>( "boost::flat_hashmap" );
     test_block<boost_unordered_flat_map>("boost::flat_hashmap");
-    test_block2<boost_unordered_flat_map>("boost::flat_hashmap");
+    test_block3<boost_unordered_flat_map>("boost::flat_hashmap");
 
     test_loops<emilib_map1> ("emilib_map1" );
     test_block<emilib_map1> ("emilib_map1");
@@ -338,6 +324,7 @@ int main(int argc, const char* argv[])
 
     test_loops<tsl_robin_map> ("tsl_robin_map" );
     test_block<tsl_robin_map>("tsl_robin_map");
+#endif
 
     return 0;
 }
