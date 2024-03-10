@@ -67,7 +67,7 @@ static void init_indices(int n1, int n2, const uint32_t ration = 10)
     indices2.resize(n2);
 
     //boost::detail::splitmix64 rng;
-    WyRand rng;
+    WyRand rng(time(0));
 
     for (size_t i = 0; i < n1; ++i )
     {
@@ -93,7 +93,7 @@ static void init_indices(int n1, int n2, const uint32_t ration = 10)
     printf("v2 size = %zd, memory = %zd MB time use %ld ms\n", indices2.size(), indices2.size() * sizeof(KeyType) >> 20, (t1 - t0) / 1ms);
 }
 
-static float max_lf = 0.99f;
+static float max_lf = 0.80f;
 template<template<class...> class Map>  void test_loops(char const* label)
 {
     auto t0 = std::chrono::steady_clock::now();
@@ -221,8 +221,8 @@ int main(int argc, const char* argv[])
 //    test_block<martin_flat> ("martin_flat" );
 
 #if CK_HMAP
-    test_loops<ck_hashmap>( "ck::hashmap" );
-    test_block<ck_hashmap>( "ck::hashmap" );
+//    test_loops<ck_hashmap>( "ck::hashmap" );
+//    test_block<ck_hashmap>( "ck::hashmap" );
 #endif
 #endif
 

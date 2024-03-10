@@ -58,6 +58,10 @@ static unsigned N = 1'123'4560;
 
 static std::vector< KeyType > indices1, indices2;
 
+constexpr float max_lf = 0.80f;
+constexpr uint32_t HASH_MAPS = 1013;
+constexpr uint32_t BLOCK_SIZE = 64;
+
 static void init_indices(int n1, int n2, const uint32_t ration = 10)
 {
     auto t0 = std::chrono::steady_clock::now();
@@ -87,11 +91,10 @@ static void init_indices(int n1, int n2, const uint32_t ration = 10)
     std::shuffle(indices2.begin(), indices2.end(), gen);
 
     auto t1 = std::chrono::steady_clock::now();
-    printf("v1 size = %zd, memory = %zd MB\n", indices1.size(), indices1.size() * sizeof(KeyType) >> 20);
-    printf("v2 size = %zd, memory = %zd MB time use %ld ms\n", indices2.size(), indices2.size() * sizeof(KeyType) >> 20, (t1 - t0) / 1ms);
+    printf("left join  size = %zd, memory = %zd MB, hash blocks = %d\n", indices1.size(), indices1.size() * sizeof(KeyType) >> 20, HASH_MAPS);
+    printf("right join size = %zd, memory = %zd MB, init rand data time use %ld ms\n\n", indices2.size(), indices2.size() * sizeof(KeyType) >> 20, (t1 - t0) / 1ms);
 }
 
-static float max_lf = 0.99f;
 template<template<class...> class Map>  void test_loops(char const* label)
 {
     auto t0 = std::chrono::steady_clock::now();
@@ -112,27 +115,42 @@ template<template<class...> class Map>  void test_loops(char const* label)
     printf("%20s insert %4zd ms, find %4zd ms, lf = %.2f loops = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map.load_factor(), ans);
 }
 
-constexpr uint32_t HASH_MAPS = 1013u;
-constexpr uint32_t BLOCK_SIZE = 256;
-
 template<template<class...> class Map>  void test_block( char const* label )
 {
     auto t0 = std::chrono::steady_clock::now();
 
     Map<KeyType, ValType> map[HASH_MAPS];
 
-    for (auto& v: map) {
-        v.reserve(indices1.size() / HASH_MAPS);
-        v.max_load_factor(max_lf);
+#if 1
+    std::vector<KeyType> arr1[HASH_MAPS];
+    for (int i = 0; i < HASH_MAPS; i++)
+        arr1[i].reserve(indices1.size() / HASH_MAPS * 12 / 10);
+    for (const auto v:indices1)
+        arr1[v % HASH_MAPS].emplace_back(v);
+
+    for (int i = 0; i < HASH_MAPS; i++) {
+        auto& mapi = map[i];
+        mapi.reserve(arr1[i].size());
+        mapi.max_load_factor(max_lf);
+        for (const auto v: arr1[i])
+            mapi.emplace(v, (ValType)v);
+        arr1[i].clear();
+        //mapi.clear();
+    }
+#else
+    for (int i = 0; i < HASH_MAPS; i++) {
+        auto& mapi = map[i];
+        mapi.reserve(indices1.size() / HASH_MAPS);
+        mapi.max_load_factor(max_lf);
     }
     for (const auto v:indices1)
         map[v % HASH_MAPS].emplace(v, (ValType)v);
+#endif
 
     auto t1 = std::chrono::steady_clock::now();
-
     size_t ans = 0;
+#if 0
     std::array<std::array<KeyType, BLOCK_SIZE>, HASH_MAPS> vblocks = {0};
-
     for (const auto v2:indices2) {
         const uint32_t bindex = v2 % HASH_MAPS;// (vhash & capacity) % HASH_MAPS; // save hash
         auto& bv = vblocks[bindex];
@@ -143,20 +161,34 @@ template<template<class...> class Map>  void test_block( char const* label )
         }
         bv[++bv[0]] = v2;
     }
-
     int bindex = 0;
     for (const auto& bv:vblocks) {
         const auto& mapi = map[bindex++];
         for (int i = 1; i <= bv[0]; i++)
             ans += mapi.count(bv[i]);
     }
+#else
+    std::vector<KeyType> arr2[HASH_MAPS];
+    for (int i = 0; i < HASH_MAPS; i++)
+        arr2[i].reserve(indices2.size() / HASH_MAPS * 11 / 10);
+    for (const auto v:indices2)
+        arr2[v % HASH_MAPS].emplace_back(v);
+    for (int i = 0; i < HASH_MAPS; i++) {
+        auto& mapi = map[i];
+        for (const auto v: arr2[i])
+            ans += mapi.count(v);
+        arr2[i].clear();
+		//mapi.clear();
+    }
+#endif
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s insert %4zd ms, find %4zd ms, join_block = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+    printf("%20s insert %4zd ms, find %4zd ms, lf = %.2f block = %zd\n\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map[0].load_factor(), ans);
 }
 
 template<template<class...> class Map>  void test_block2( char const* label )
 {
+#if 0
     auto t0 = std::chrono::steady_clock::now();
 
     Map<KeyType, ValType> map[HASH_MAPS];
@@ -195,10 +227,12 @@ template<template<class...> class Map>  void test_block2( char const* label )
 
     auto tN = std::chrono::steady_clock::now();
     printf("%20s insert %4zd ms, find %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+#endif
 }
 
 template<template<class...> class Map>  void test_block3( char const* label )
 {
+#if 0
     auto t0 = std::chrono::steady_clock::now();
 
     Map<KeyType, ValType> map[HASH_MAPS];
@@ -217,6 +251,7 @@ template<template<class...> class Map>  void test_block3( char const* label )
 
     auto tN = std::chrono::steady_clock::now();
     printf("%20s insert %4zd ms, find %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+#endif
 }
 
 template<class K, class V> using boost_unordered_flat_map = boost::unordered_flat_map<K, V, BintHasher>;
