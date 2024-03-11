@@ -33,7 +33,7 @@ using KeyType = uint64_t;
 using KeyType = uint32_t;
 #endif
 
-#if TVal == 0
+#if TVal == 1
 using ValType = uint64_t;
 #else
 using ValType = uint32_t;
@@ -60,7 +60,7 @@ static std::vector< KeyType > indices1, indices2;
 
 constexpr float    max_lf = 0.60f;
 uint32_t HASH_MEM_SIZE = 512 << 10;
-constexpr uint32_t HASH_MAPS  = 1013;
+constexpr uint32_t HASH_MAPS  = 1024;
 constexpr uint32_t BLOCK_SIZE = 64;
 
 static void init_indices(int n1, int n2, const uint32_t ration = 10)
@@ -102,16 +102,16 @@ template<template<class...> class Map>  void test_loops(char const* label)
     auto t0 = std::chrono::steady_clock::now();
     Map<KeyType, ValType> map(indices1.size() / 2);
     map.max_load_factor(max_lf);
-    for (auto v : indices1) {
+    for (const auto v : indices1) {
         map.emplace(v, (ValType)v);
     }
 
     auto t1 = std::chrono::steady_clock::now();
 
     size_t ans = 0;
-    for (auto v : indices2) {
-        ans += map.count(v);
-    }
+    #pragma omp parallel for num_threads(8) reduction(+:ans)
+    for (int i = 0; i < indices2.size(); i++)
+        ans += map.count(indices2[i]);
 
     auto tN = std::chrono::steady_clock::now();
     printf("%20s build %4zd ms, probe %4zd ms, lf = %.2f loops = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map.load_factor(), ans);
@@ -122,18 +122,17 @@ template<template<class...> class Map>  void test_block( char const* label )
     auto t0 = std::chrono::steady_clock::now();
    //TODO: find a prime number or pow of 2
     auto hash_size = 1 + indices1.size() * sizeof(std::pair<KeyType,ValType>) / HASH_MEM_SIZE;
+    hash_size = hash_size / 8 * 8 + 8;
     if (hash_size > HASH_MAPS)
         hash_size = HASH_MAPS;
 
 //    constexpr auto hash_size = HASH_MAPS;
-
     Map<KeyType, ValType> map[HASH_MAPS];
 
 #if 1
-
     std::vector<KeyType> arr1[HASH_MAPS];
     for (int i = 0; i < hash_size; i++)
-        arr1[i].reserve(indices2.size() / hash_size * 11 / 10);
+        arr1[i].reserve(indices1.size() / hash_size * 11 / 10);
     for (const auto v:indices1)
         arr1[v % hash_size].emplace_back(v);
 
@@ -162,7 +161,7 @@ template<template<class...> class Map>  void test_block( char const* label )
 #if 0
     std::array<std::array<KeyType, BLOCK_SIZE>, HASH_MAPS> vblocks = {0};
     for (const auto v2:indices2) {
-        const uint32_t bindex = v2 % HASH_MAPS;// (vhash & capacity) % HASH_MAPS; // save hash
+        const uint32_t bindex = v2 % hash_size;// (vhash & capacity) % HASH_MAPS; // save hash
         auto& bv = vblocks[bindex];
         if (bv[0] >= BLOCK_SIZE - 1) {
             for (int i = 1; i < BLOCK_SIZE; i++)
@@ -177,15 +176,40 @@ template<template<class...> class Map>  void test_block( char const* label )
         for (int i = 1; i <= bv[0]; i++)
             ans += mapi.count(bv[i]);
     }
+#elif 0
+    #pragma omp parallel reduction(+:ans)
+    {
+        #pragma omp for
+        for (int i = 0; i < indices2.size(); i++) {
+            const auto v = indices2[i];
+            ans += map[v % hash_size].count(v);
+        }
+    }
+#elif 1
+    constexpr int threads = 8;
+    const auto hash_threads = hash_size / threads;
+    #pragma omp parallel num_threads(threads)
+    {
+        const int thread_id = omp_get_thread_num();
+        auto ansi = 0;
+        for (int i = 0; i < indices2.size(); i++) {
+            const auto v = indices2[i];
+            const auto idx = v % hash_size;
+            if (idx / hash_threads == thread_id) {
+                ansi += map[idx].count(v);
+            }
+        }
+        ans += ansi;
+    }
 #else
 //    std::vector<KeyType> arr2[HASH_MAPS];
 //    for (int i = 0; i < HASH_MAPS; i++)
 //        arr1[i].reserve(indices2.size() / HASH_MAPS * 11 / 10);
     for (const auto v:indices2)
-        arr1[v % HASH_MAPS].emplace_back(v); //keep row id
+        arr1[v % hash_size].emplace_back(v); //keep row id
 
-    #pragma omp parallel for num_threads(4) reduction(+:ans)
-    for (int i = 0; i < HASH_MAPS; i++) {
+    #pragma omp parallel for num_threads(8) reduction(+:ans)
+    for (int i = 0; i < hash_size; i++) {
         auto& mapi = map[i];
         auto ansi = 0;
         for (const auto v: arr1[i])
@@ -197,8 +221,8 @@ template<template<class...> class Map>  void test_block( char const* label )
 #endif
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s build %4zd ms, probe %4zd ms, mem = %4ld hash_size = %zd\n\n",
-            label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map[0].bucket_count() * sizeof(std::pair<KeyType,ValType>) / 1024, hash_size);
+    printf("%20s build %4zd ms, probe %4zd ms, mem = %4ld hash_size = %zd, ans = %zd\n\n",
+            label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map[0].bucket_count() * sizeof(std::pair<KeyType,ValType>) / 1024, hash_size, ans);
 }
 
 template<template<class...> class Map>  void test_block2( char const* label )
