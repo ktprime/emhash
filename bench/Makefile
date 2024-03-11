@@ -133,8 +133,8 @@ ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -std=c++20 -I. qbench.cpp -o qbench
 endif
 
-	$(CXX) $(CXXFLAGS) hash_join.cpp -o hash_join
-	$(CXX) $(CXXFLAGS) hash_join2.cpp -o hash_join2
+	$(CXX) $(CXXFLAGS) hash_join.cpp -o join_hash
+	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi

@@ -19,7 +19,7 @@
 #include "emilib/emilib2ss.hpp"
 #include <iomanip>
 #include <chrono>
-
+#include <omp.h>
 
 #if CK_HMAP
 #include "util.h"
@@ -27,19 +27,19 @@
 #endif
 
 using namespace std::chrono_literals;
-#if TKey == 1
+#if TKey == 0
 using KeyType = uint64_t;
 #else
 using KeyType = uint32_t;
 #endif
 
-#if TVal == 1
+#if TVal == 0
 using ValType = uint64_t;
 #else
 using ValType = uint32_t;
 #endif
 
-static unsigned N = 1'123'4560;
+static unsigned N = 123'456'78;
 
 // aliases using the counting allocator
 #if BOOST_HASH
@@ -58,8 +58,9 @@ static unsigned N = 1'123'4560;
 
 static std::vector< KeyType > indices1, indices2;
 
-constexpr float max_lf = 0.80f;
-constexpr uint32_t HASH_MAPS = 1013;
+constexpr float    max_lf = 0.60f;
+uint32_t HASH_MEM_SIZE = 512 << 10;
+constexpr uint32_t HASH_MAPS  = 1013;
 constexpr uint32_t BLOCK_SIZE = 64;
 
 static void init_indices(int n1, int n2, const uint32_t ration = 10)
@@ -82,13 +83,14 @@ static void init_indices(int n1, int n2, const uint32_t ration = 10)
         }
     }
 
+    //#pragma omp parallel for schedule(static, 10240)
     for (int i = n1; i < n2; i++) {
         indices2[i] = rng();
     }
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::shuffle(indices2.begin(), indices2.end(), gen);
+    //std::shuffle(indices2.begin(), indices2.end(), gen);
 
     auto t1 = std::chrono::steady_clock::now();
     printf("left join  size = %zd, memory = %zd MB, hash blocks = %d\n", indices1.size(), indices1.size() * sizeof(KeyType) >> 20, HASH_MAPS);
@@ -112,39 +114,47 @@ template<template<class...> class Map>  void test_loops(char const* label)
     }
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s insert %4zd ms, find %4zd ms, lf = %.2f loops = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map.load_factor(), ans);
+    printf("%20s build %4zd ms, probe %4zd ms, lf = %.2f loops = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map.load_factor(), ans);
 }
 
 template<template<class...> class Map>  void test_block( char const* label )
 {
     auto t0 = std::chrono::steady_clock::now();
+   //TODO: find a prime number or pow of 2
+    auto hash_size = 1 + indices1.size() * sizeof(std::pair<KeyType,ValType>) / HASH_MEM_SIZE;
+    if (hash_size > HASH_MAPS)
+        hash_size = HASH_MAPS;
+
+//    constexpr auto hash_size = HASH_MAPS;
 
     Map<KeyType, ValType> map[HASH_MAPS];
 
 #if 1
-    std::vector<KeyType> arr1[HASH_MAPS];
-    for (int i = 0; i < HASH_MAPS; i++)
-        arr1[i].reserve(indices1.size() / HASH_MAPS * 12 / 10);
-    for (const auto v:indices1)
-        arr1[v % HASH_MAPS].emplace_back(v);
 
-    for (int i = 0; i < HASH_MAPS; i++) {
+    std::vector<KeyType> arr1[HASH_MAPS];
+    for (int i = 0; i < hash_size; i++)
+        arr1[i].reserve(indices2.size() / hash_size * 11 / 10);
+    for (const auto v:indices1)
+        arr1[v % hash_size].emplace_back(v);
+
+    #pragma omp parallel for num_threads(8)
+    for (int i = 0; i < hash_size; i++) {
         auto& mapi = map[i];
         mapi.reserve(arr1[i].size());
         mapi.max_load_factor(max_lf);
         for (const auto v: arr1[i])
-            mapi.emplace(v, (ValType)v);
+            mapi.emplace(v, (ValType)i);//row id
         arr1[i].clear();
         //mapi.clear();
     }
 #else
-    for (int i = 0; i < HASH_MAPS; i++) {
+    for (int i = 0; i < hash_size; i++) {
         auto& mapi = map[i];
-        mapi.reserve(indices1.size() / HASH_MAPS);
+        mapi.reserve(indices1.size() / hash_size);
         mapi.max_load_factor(max_lf);
     }
     for (const auto v:indices1)
-        map[v % HASH_MAPS].emplace(v, (ValType)v);
+        map[v % hash_size].emplace(v, (ValType)v);
 #endif
 
     auto t1 = std::chrono::steady_clock::now();
@@ -168,22 +178,27 @@ template<template<class...> class Map>  void test_block( char const* label )
             ans += mapi.count(bv[i]);
     }
 #else
-    std::vector<KeyType> arr2[HASH_MAPS];
-    for (int i = 0; i < HASH_MAPS; i++)
-        arr2[i].reserve(indices2.size() / HASH_MAPS * 11 / 10);
+//    std::vector<KeyType> arr2[HASH_MAPS];
+//    for (int i = 0; i < HASH_MAPS; i++)
+//        arr1[i].reserve(indices2.size() / HASH_MAPS * 11 / 10);
     for (const auto v:indices2)
-        arr2[v % HASH_MAPS].emplace_back(v);
+        arr1[v % HASH_MAPS].emplace_back(v); //keep row id
+
+    #pragma omp parallel for num_threads(4) reduction(+:ans)
     for (int i = 0; i < HASH_MAPS; i++) {
         auto& mapi = map[i];
-        for (const auto v: arr2[i])
-            ans += mapi.count(v);
-        arr2[i].clear();
-		//mapi.clear();
+        auto ansi = 0;
+        for (const auto v: arr1[i])
+            ansi += mapi.count(v);
+        ans += ansi;
+        arr1[i].clear();
+        //mapi.clear();
     }
 #endif
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s insert %4zd ms, find %4zd ms, lf = %.2f block = %zd\n\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map[0].load_factor(), ans);
+    printf("%20s build %4zd ms, probe %4zd ms, mem = %4ld hash_size = %zd\n\n",
+            label, (t1 - t0) / 1ms, (tN - t1) / 1ms, map[0].bucket_count() * sizeof(std::pair<KeyType,ValType>) / 1024, hash_size);
 }
 
 template<template<class...> class Map>  void test_block2( char const* label )
@@ -226,7 +241,7 @@ template<template<class...> class Map>  void test_block2( char const* label )
     }
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s insert %4zd ms, find %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+    printf("%20s build %4zd ms, probe %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
 #endif
 }
 
@@ -250,7 +265,7 @@ template<template<class...> class Map>  void test_block3( char const* label )
     }
 
     auto tN = std::chrono::steady_clock::now();
-    printf("%20s insert %4zd ms, find %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
+    printf("%20s build %4zd ms, probe %4zd ms, join_block2 = %zd\n", label, (t1 - t0) / 1ms, (tN - t1) / 1ms, ans);
 #endif
 }
 
@@ -296,6 +311,7 @@ int main(int argc, const char* argv[])
     if (N < 10000) N = (N * 1024 * 1024) / sizeof(KeyType);
     if (argc > 2 && isdigit(argv[2][0])) K = atoi(argv[2]);
     if (argc > 3 && isdigit(argv[3][0])) R = atoi(argv[3]);
+    if (argc > 4 && isdigit(argv[4][0])) HASH_MEM_SIZE = atoi(argv[4]) * 1024;
 
     assert(K > 0 && N > 0 && R > 0);
     init_indices(N, N*K, R);
