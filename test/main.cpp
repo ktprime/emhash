@@ -660,7 +660,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     ehmap8<keyType, int> ehash8;
 
 #if EMH6
-    ehmap6<keyType, int> unhash;
+    ehmap5<keyType, int> unhash;
 #else
 //    using ehash_func = ankerl::unordered_dense::hash<keyType>;
 //    emhash5::HashMap <keyType, int> unhash;

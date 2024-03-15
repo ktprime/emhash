@@ -34,40 +34,36 @@
 
 namespace emilib2 {
 
-    enum State : uint8_t
+    enum State : int8_t
     {
-        EFILLED  = 0,
-        EDELETE  = 3,
-        EEMPTY   = 1,
-        SENTINEL = EDELETE + 0xF0,
+        EFILLED  = -126, EDELETE = -127, EEMPTY = -128,
+        SENTINEL = EFILLED,
     };
 
     constexpr static uint8_t  EMPTY_OFFSET = 0;
-    constexpr static uint64_t EMPTY_MASK   = 0x0101010101010101ull;
-    constexpr static uint64_t EFILLED_FIND = 0xFEFEFEFEFEFEFEFEull;
 
-#if ITERATOR_BITS < 16
-    #define ITERATOR_BITS 32
+#if EMH_ITERATOR_BITS < 16
+    #define EMH_ITERATOR_BITS 16
 #endif
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm_set1_epi8(EDELETE);
+    const static auto simd_filled = _mm_set1_epi8(EFILLED);
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm_set1_epi8
-    #define LOADU_EPI8     _mm_loadu_si128
-    #define GET_EMPTY(u)   _mm_slli_epi16(_mm_loadu_si128(u), 7)
+    #define LOAD_UEPI8     _mm_loadu_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
+    #define CMPLT_EPI8     _mm_cmplt_epi8
 #elif SSE2_EMHASH == 0
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm256_set1_epi8(EDELETE);
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm256_set1_epi8
-    #define LOADU_EPI8     _mm256_loadu_si256
-    #define GET_EMPTY(u)   _mm256_slli_epi32(_mm256_loadu_si256(u), 7)
+    #define LOAD_UEPI8     _mm256_loadu_si256
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
 #elif AVX512_EHASH
@@ -76,10 +72,9 @@ namespace emilib2 {
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm512_set1_epi8
-    #define LOADU_EPI8     _mm512_loadu_si512
+    #define LOAD_UEPI8     _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
     #define CMPEQ_EPI8     _mm512_test_epi8_mask
-    #define GET_EMPTY(u)   _mm512_slli_epi64(_mm512_loadu_si512(u), 7)
 #else
     //TODO arm neon
 #endif
@@ -136,39 +131,22 @@ public:
     typedef HashT  hasher;
     typedef EqT    key_equal;
 
-#if EMH_H2 == 1
-    template<typename UType>
-    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
+    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
+    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
-        return (uint8_t)((uint8_t)(key_hash >> 28)) * 2;
-    }
-#elif EMH_H2 == 2
-    template<typename UType>
-    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
-    {
-        const auto key_hash = _hasher(key);
-        main_bucket = (key_hash >> 4) & _mask;
-        return (uint8_t)(key_hash >> 32) * 2;
-    }
-#else
-    template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
-    {
-        const auto key_hash = _hasher(key);
-        main_bucket = key_hash & _mask;
-        return (uint8_t)(key_hash >> 28) * 2;
+        return (int8_t)(key_hash % 251 - 125);
     }
 
-    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint8_t>::type = 0>
-    inline uint8_t hash_key2(size_t& main_bucket, const UType& key) const
+    template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
+    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
-        return (uint8_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 47) * 2;
+//        return (int8_t)((uint32_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 32) % 251) - 125;
+        return (int8_t)((size_t)key_hash % 251 - 125);
     }
-#endif
 
     class const_iterator;
     class iterator
@@ -192,11 +170,11 @@ public:
 
         void init()
         {
-            _from = (_bucket / ITERATOR_BITS) * ITERATOR_BITS;
+            _from = (_bucket / EMH_ITERATOR_BITS) * EMH_ITERATOR_BITS;
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= ~((1ull << (_bucket % ITERATOR_BITS)) - 1);
+                _bmask &= ~((1ull << (_bucket % EMH_ITERATOR_BITS)) - 1);
             } else {
                 _bmask = 0;
             }
@@ -249,7 +227,7 @@ public:
             }
 
             do {
-                _bmask = _map->filled_mask(_from += ITERATOR_BITS);
+                _bmask = _map->filled_mask(_from += EMH_ITERATOR_BITS);
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
@@ -278,11 +256,11 @@ public:
 
         void init()
         {
-            _from = (_bucket / ITERATOR_BITS) * ITERATOR_BITS;
+            _from = (_bucket / EMH_ITERATOR_BITS) * EMH_ITERATOR_BITS;
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= ~((1ull << (_bucket % ITERATOR_BITS)) - 1);
+                _bmask &= ~((1ull << (_bucket % EMH_ITERATOR_BITS)) - 1);
             } else {
                 _bmask = 0;
             }
@@ -329,7 +307,7 @@ public:
             }
 
             do {
-                _bmask = _map->filled_mask(_from += ITERATOR_BITS);
+                _bmask = _map->filled_mask(_from += EMH_ITERATOR_BITS);
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
@@ -790,7 +768,7 @@ public:
         if (is_triviall_destructable())
             _pairs[bucket].~PairT();
 #if EMH_PSL_LINEAR
-        set_states(bucket, (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE);
+        set_states(bucket, _states[bucket + 1] == State::EEMPTY ? State::EEMPTY : State::EDELETE);
 #else
         set_states(bucket, State::EDELETE);
 #endif
@@ -859,6 +837,7 @@ public:
                 const auto bucket = it.bucket();
                 _states[bucket] = State::EEMPTY;
                 _pairs[bucket].~PairT();
+                _num_filled --;
             }
         } else if (_num_filled) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
@@ -874,7 +853,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 7;
+        size_t required_buckets = num_elems + num_elems / 5;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -922,7 +901,7 @@ public:
         const auto* new_data = (char*)malloc(pairs_size + state_size * 2 * sizeof(_states[0]));
 
         auto* new_state = (decltype(_states))new_data;
-        _offset         = new_state + state_size;
+        _offset         = (decltype(_offset))(new_state + state_size);
         auto* new_pairs = (decltype(_pairs))(_offset + state_size);
 
         auto old_num_filled  = _num_filled;
@@ -944,8 +923,8 @@ public:
         {
             //set last packet tombstone. not equal key h2
             new(_pairs + num_buckets) PairT(KeyT(), ValueT());
-            size_t main_bucket;
-            _states[num_buckets] = hash_key2(main_bucket, _pairs[num_buckets].first) + 2; //iterator end tombstone:
+            //size_t main_bucket;
+            //_states[num_buckets] = hash_key2(main_bucket, _pairs[num_buckets].first) + 2; //iterator end tombstone:
             if (old_buckets)
                 old_pairs[old_buckets].~PairT();
         }
@@ -954,7 +933,7 @@ public:
         std::fill_n(_offset, num_buckets, EMPTY_OFFSET);
 
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
-            if (old_states[src_bucket] % 2 == State::EFILLED) {
+            if (old_states[src_bucket] >= State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
 
                 size_t main_bucket;
@@ -1009,7 +988,7 @@ private:
 #endif
     }
 
-    inline void set_states(size_t ebucket, uint8_t key_h2)
+    inline void set_states(size_t ebucket, int8_t key_h2)
     {
         _states[ebucket] = key_h2;
     }
@@ -1034,6 +1013,11 @@ private:
         return next_bucket & _mask;
     }
 
+    bool is_empty(size_t bucket) const
+    {
+        return _states[bucket] == State::EEMPTY;
+    }
+
     // Find the main_bucket with this key, or return (size_t)-1
     template<typename K>
     size_t find_filled_bucket(const K& key) const noexcept
@@ -1041,14 +1025,12 @@ private:
         size_t main_bucket;
         const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
-
         size_t offset = 0;
 
         if (1)
         {
-            const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
-
             if (maskf)
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
             while (maskf != 0) {
@@ -1067,7 +1049,7 @@ private:
         }
 
         while (true) {
-            const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf)
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
@@ -1079,7 +1061,7 @@ private:
             }
             if (++offset > get_offset(main_bucket))
                 break;
-#if 0
+#if 1
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0)
                 break;
@@ -1101,12 +1083,12 @@ private:
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto filled = SET1_EPI8(key_h2);
-
         auto next_bucket = main_bucket, offset = 0u;
-        size_t hole = (size_t)-1;
+        constexpr size_t chole = (size_t)-1;
+        size_t hole = chole;
 
         while (true) {
-            const auto vec = LOADU_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf  = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             prefetch_heap_block((char*)&_pairs[next_bucket]);
 
@@ -1122,16 +1104,16 @@ private:
 
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (maske != 0) {
+            if (maske) {
                 auto ebucket = next_bucket + CTZ(maske);
-                if (EMH_UNLIKELY(hole != (size_t)-1))
+                if (EMH_UNLIKELY(hole != chole))
                     ebucket = hole;
                 set_states(ebucket, key_h2);
                 return ebucket;
             }
 
             //3. find erased
-            else if (hole == (size_t)-1) {
+            else if (hole == chole) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);
@@ -1143,37 +1125,35 @@ private:
                 break;
         }
 
-        if (hole != (size_t)-1) {
+        if (hole != chole) {
             //set_offset(main_bucket, offset - 1);
             set_states(hole, key_h2);
             return hole;
         }
 
         const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
-        prefetch_heap_block((char*)&_pairs[ebucket]);
+        //prefetch_heap_block((char*)&_pairs[ebucket]);
         set_states(ebucket, key_h2);
         return ebucket;
     }
 
     inline uint64_t empty_delete(size_t gbucket) const noexcept
     {
-        const auto vec = GET_EMPTY((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(vec);
+        const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
+        return MOVEMASK_EPI8(CMPLT_EPI8(vec, simd_filled));
     }
 
     inline uint64_t filled_mask(size_t gbucket) const noexcept
     {
-#if ITERATOR_BITS == 16
+#if EMH_ITERATOR_BITS == 160
         const auto vec = _mm_slli_epi16(_mm_loadu_si128((__m128i const*) & _states[gbucket]), 7);
         return (uint32_t)~_mm_movemask_epi8(vec) & 0xFFFF;
-#elif ITERATOR_BITS == 32
-        const auto vec = _mm256_slli_epi32(_mm256_loadu_si256((__m256i const*) &_states[gbucket]), 7);
+#elif EMH_ITERATOR_BITS == 320
+        const auto vec = _mm256_slli_epi32(_mm256_loadu_si256((__m256i const*) & _states[gbucket]), 7);
         return (uint32_t)~_mm256_movemask_epi8(vec);
 #else
-        const static auto simd_filled = _mm_set1_epi8(EFILLED);
-        #define LOAD_EMPTY(u)  _mm_and_si128(_mm_load_si128(u), simd_empty)
-        const auto vec = LOAD_EMPTY((decltype(&simd_empty))((char*)_states + gbucket));
-        return MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_filled));
+        const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
+        return MOVEMASK_EPI8(CMPLT_EPI8(simd_delete, vec));
 #endif
     }
 
@@ -1216,11 +1196,11 @@ private:
             size_t ebucket;
             const auto maske = empty_delete(next_bucket);
             if (maske == 0)
-                goto GNEXT;
+                goto JNEXT_BLOCK;
 
             ebucket = next_bucket + CTZ(maske);
             if (EMH_UNLIKELY(ebucket >= _num_buckets))
-                goto GNEXT;
+                goto JNEXT_BLOCK;
 
             else if (offset <= get_offset(main_bucket))
                 return ebucket;
@@ -1234,7 +1214,7 @@ private:
             set_offset(main_bucket, offset);
             return ebucket;
 
-GNEXT:
+JNEXT_BLOCK:
             next_bucket = get_next_bucket(next_bucket, ++offset);
         }
 
@@ -1247,7 +1227,7 @@ GNEXT:
             const auto maske = filled_mask(next_bucket);
             if (EMH_LIKELY(maske != 0))
                 return next_bucket + CTZ(maske);
-            next_bucket += ITERATOR_BITS;
+            next_bucket += EMH_ITERATOR_BITS;
         }
         return 0;
     }
@@ -1256,7 +1236,7 @@ private:
 
     HashT   _hasher;
     EqT     _eq;
-    uint8_t*_states           = nullptr;
+    int8_t* _states           = nullptr;
     uint8_t*_offset           = nullptr;
     PairT*  _pairs            = nullptr;
     size_t  _num_buckets      = 0;

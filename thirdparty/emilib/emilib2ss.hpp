@@ -36,7 +36,6 @@ namespace emilib {
 
     enum State : int8_t
     {
-//        EFILLED  = 125, EDELETE = 126, EEMPTY = 127,
         EFILLED  = -126, EDELETE = -127, EEMPTY = -128,
         SENTINEL = EFILLED,
         GROUP_INDEX = 1,//> 0
@@ -49,10 +48,10 @@ namespace emilib {
     const static auto group_bmask = 0xFFFFFFFF - (1u << GROUP_INDEX);
 
     #define SET1_EPI8      _mm_set1_epi8
-    #define LOAD_UEPI8     _mm_load_si128
+    #define LOAD_EPI8      _mm_load_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
-    #define CMPGT_EPI8     _mm_cmplt_epi8
+    #define CMPLT_EPI8     _mm_cmplt_epi8
 #else
     //TODO sse2neon
 #endif
@@ -82,7 +81,7 @@ inline static uint32_t CTZ(uint64_t n)
     if ((uint32_t)n)
         _BitScanForward(&index, (uint32_t)n);
     else
-        {_BitScanForward(&index, n >> 32); index += 32; }
+        {_BitScanForward(&index, (uint32_t)(n >> 32)); index += 32; }
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
@@ -720,12 +719,12 @@ public:
         return 1;
     }
 
-    inline void erase(const const_iterator& cit) noexcept
+    void erase(const const_iterator& cit) noexcept
     {
         _erase(cit._bucket);
     }
 
-    inline void erase(iterator it) noexcept
+    void erase(iterator it) noexcept
     {
         _erase(it._bucket);
     }
@@ -974,7 +973,7 @@ private:
         auto next_bucket = main_bucket;
 
         while (true) {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
             if (maskf)
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
@@ -1004,7 +1003,6 @@ private:
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket; int offset = 0u;
         constexpr size_t chole = (size_t)-1;
@@ -1012,7 +1010,7 @@ private:
         prefetch_heap_block((char*)&_pairs[main_bucket]);
 
         while (true) {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
 
             //1. find filled
@@ -1062,14 +1060,14 @@ private:
 
     inline size_t empty_delete(size_t gbucket) const noexcept
     {
-        const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_filled));
+        const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
+        return MOVEMASK_EPI8(CMPLT_EPI8(vec, simd_filled));
     }
 
     inline size_t filled_mask(size_t gbucket) const noexcept
     {
-        const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPGT_EPI8(simd_delete, vec)) & group_bmask;
+        const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
+        return MOVEMASK_EPI8(CMPLT_EPI8(simd_delete, vec)) & group_bmask;
     }
 
     //gbucket--->kbucket--->next_bucket|  kick_bucket--->next_bucket--->gbucket

@@ -48,7 +48,7 @@ namespace emilib3 {
     const static auto simd_filled = _mm_set1_epi8(EFILLED);
 
     #define SET1_EPI8      _mm_set1_epi8
-    #define LOAD_UEPI8     _mm_load_si128
+    #define LOAD_EPI8      _mm_load_si128
     #define LOAD_EMPTY(u)  _mm_and_si128(_mm_load_si128(u), simd_empty)
     #define LOAD_EMPTY2(u) _mm_slli_epi16(_mm_load_si128(u), 7)
     #define MOVEMASK_EPI8  _mm_movemask_epi8
@@ -59,7 +59,7 @@ namespace emilib3 {
     const static auto simd_filled = _mm256_set1_epi8(EFILLED);
 
     #define SET1_EPI8      _mm256_set1_epi8
-    #define LOAD_UEPI8     _mm256_loadu_si256
+    #define LOAD_EPI8      _mm256_loadu_si256
     #define LOAD_EMPTY(u)  _mm256_and_si256(_mm256_loadu_si256(u), simd_empty)
     #define LOAD_EMPTY2(u) _mm256_slli_epi32(_mm256_loadu_si256(u), 7)
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
@@ -72,7 +72,7 @@ namespace emilib3 {
     #define LOAD_EMPTY2(u) _mm512_slli_epi64(_mm512_loadu_si512(u), 7)
 
     #define SET1_EPI8      _mm512_set1_epi8
-    #define LOAD_UEPI8     _mm512_loadu_si512
+    #define LOAD_EPI8      _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
     #define CMPEQ_EPI8     _mm512_test_epi8_mask
 #else
@@ -997,7 +997,7 @@ private:
         auto next_bucket = main_bucket;
 
         while (true) {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf)
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
@@ -1035,7 +1035,7 @@ private:
         prefetch_heap_block((char*)&_pairs[main_bucket]);
 
         while (true) {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             //1. find filled
