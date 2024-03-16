@@ -130,10 +130,13 @@ public:
         return (int8_t)((size_t)key_hash % 251 - 125);
     }
 
-    static size_t bucket_to_slot(size_t bucket)
+    static constexpr size_t bucket_to_slot(size_t bucket)
     {
+#ifndef EMH_SAVE_MEM
         return bucket;
-//        return bucket / simd_bytes * slot_size + (bucket - 1) % simd_bytes;
+#else
+        return bucket / simd_bytes * slot_size + (bucket - 1) % simd_bytes;
+#endif
     }
 
     class const_iterator;
@@ -454,7 +457,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return _num_filled / static_cast<float>(_num_buckets);
+        return static_cast<float>(_num_filled) / bucket_to_slot(_num_buckets);
     }
 
     float max_load_factor(float lf = 7.0f / 8)
@@ -563,9 +566,9 @@ public:
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
-
+        const auto slot = bucket_to_slot(bucket);
         if (bempty) {
-            new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
+            new(_pairs + slot) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
         return { {this, bucket, false}, bempty };
     }
@@ -574,8 +577,9 @@ public:
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
+        const auto slot = bucket_to_slot(bucket);
         if (bempty) {
-            new(_pairs + bucket) PairT(value); _num_filled++;
+            new(_pairs + slot) PairT(value); _num_filled++;
         }
         return { {this, bucket, false}, bempty };
     }
@@ -584,8 +588,9 @@ public:
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
+        const auto slot = bucket_to_slot(bucket);
         if (bempty) {
-            new(_pairs + bucket) PairT(std::move(value)); _num_filled++;
+            new(_pairs + slot) PairT(std::move(value)); _num_filled++;
         }
         return { {this, bucket, false}, bempty };
     }
@@ -667,12 +672,12 @@ public:
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
-
+        const auto slot = bucket_to_slot(bucket);
         // Check if inserting a new val rather than overwriting an old entry
         if (bempty) {
-            new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
+            new(_pairs + slot) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         } else {
-            _pairs[bucket].second = std::forward<V>(val);
+            _pairs[slot].second = std::forward<V>(val);
         }
 
         return { {this, bucket, false}, bempty };
@@ -684,11 +689,12 @@ public:
 
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
+        const auto slot = bucket_to_slot(bucket);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bempty) {
-            new(_pairs + bucket) PairT(key,val); _num_filled++;
+            new(_pairs + slot) PairT(key,val); _num_filled++;
         } else
-            oldv = _pairs[bucket].second;
+            oldv = _pairs[slot].second;
         return bempty;
     }
 
@@ -696,23 +702,23 @@ public:
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
+        const auto slot = bucket_to_slot(bucket);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bempty) {
-            new(_pairs + bucket) PairT(key, std::move(ValueT())); _num_filled++;
+            new(_pairs + slot) PairT(key, std::move(ValueT())); _num_filled++;
         }
-
-        return _pairs[bucket].second;
+        return _pairs[slot].second;
     }
 
     ValueT& operator[](KeyT&& key) noexcept
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
+        const auto slot = bucket_to_slot(bucket);
         if (bempty) {
-            new(_pairs + bucket) PairT(std::move(key), std::move(ValueT())); _num_filled++;
+            new(_pairs + slot) PairT(std::move(key), std::move(ValueT())); _num_filled++;
         }
-
-        return _pairs[bucket].second;
+        return _pairs[slot].second;
     }
 
     // -------------------------------------------------------
@@ -909,8 +915,8 @@ public:
         const auto pairs_size = (1 + bucket_to_slot(num_buckets)) * sizeof(PairT);
         const auto state_size = (simd_bytes + num_buckets) * sizeof(State);
 
-        auto* new_state = (decltype(_states))malloc(state_size);
         auto* new_pairs = (decltype(_pairs)) malloc(pairs_size);
+        auto* new_state = (decltype(_states))malloc(state_size);
 
         auto old_num_filled  = _num_filled;
         auto old_states      = _states;
@@ -990,9 +996,10 @@ private:
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
 //            if (maskf) prefetch_heap_block((char*)&_pairs[next_bucket + 1]);
             while (maskf != 0) {
-                const auto slot = bucket_to_slot(next_bucket + CTZ(maskf));
+                const auto fbucket = next_bucket + CTZ(maskf);
+                const auto slot = bucket_to_slot(fbucket);
                 if (EMH_LIKELY(_eq(_pairs[slot].first, key)))
-                    return slot;
+                    return fbucket;
                 maskf &= maskf - 1;
             }
 
@@ -1031,7 +1038,7 @@ private:
                 const auto slot = bucket_to_slot(fbucket);
                 if (_eq(_pairs[slot].first, key)) {
                     bnew = false;
-                    return slot;
+                    return fbucket;
                 }
                 maskf &= maskf - 1;
             }
@@ -1042,7 +1049,7 @@ private:
                 if (EMH_UNLIKELY(hole != chole))
                     ebucket = hole;
                 set_states(ebucket, key_h2);
-                return bucket_to_slot(ebucket);
+                return ebucket;
             }
 
             //3. find erased
@@ -1060,14 +1067,13 @@ private:
 
         if (EMH_LIKELY(hole != chole)) {
             set_states(hole, key_h2);
-            return bucket_to_slot(hole);
+            return hole;
         }
 
         //prefetch_heap_block((char*)&_pairs[next_bucket + 1]);
         const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
         set_states(ebucket, key_h2);
-
-        return bucket_to_slot(ebucket);
+        return ebucket;
     }
 
     inline size_t empty_delete(size_t gbucket) const noexcept
