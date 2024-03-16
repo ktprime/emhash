@@ -764,19 +764,19 @@ public:
         return 1;
     }
 
-    inline void erase(const const_iterator& cit) noexcept
+    void erase(const const_iterator& cit) noexcept
     {
         _erase(cit._bucket);
     }
 
-    inline void erase(iterator it) noexcept
+    void erase(iterator it) noexcept
     {
         _erase(it._bucket);
     }
 
-    inline bool group_isempty(size_t gbucket) const noexcept
+    inline bool group_has_empty(size_t gbucket) const noexcept
     {
-        return _states[gbucket + simd_bytes - 1] % 4 == State::EEMPTY;
+        return _states[gbucket + GROUP_INDEX] == 0;
     }
 
     inline size_t group_probe(size_t gbucket) const noexcept
@@ -821,7 +821,7 @@ public:
             _pairs[bucket].~PairT();
 
         const auto gbucket = bucket / simd_bytes * simd_bytes;
-        _states[bucket] = group_isempty(gbucket) ? State::EEMPTY : State::EDELETE;
+        _states[bucket] = group_has_empty(gbucket) ? State::EEMPTY : State::EDELETE;
         if (EMH_UNLIKELY(_num_filled == 0)) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
         }
@@ -988,7 +988,8 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if __linux__
-        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+        __builtin_prefetch(static_cast<const void*>(ctrl));
+//        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
@@ -1015,7 +1016,7 @@ private:
                 maskf &= maskf - 1;
             }
 
-//            if (group_isempty(next_bucket))
+//            if (group_has_empty(next_bucket))
 //                break;
             if (++offset > group_probe(main_bucket))
                 break;
@@ -1035,7 +1036,6 @@ private:
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto filled = SET1_EPI8(key_h2);
-
         auto next_bucket = main_bucket; int offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;

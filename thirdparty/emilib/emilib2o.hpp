@@ -40,11 +40,12 @@ namespace emilib2 {
         SENTINEL = EFILLED,
     };
 
-    constexpr static uint8_t  EMPTY_OFFSET = 0;
+    constexpr static uint8_t EMPTY_OFFSET = 0;
 
 #if EMH_ITERATOR_BITS < 16
     #define EMH_ITERATOR_BITS 16
 #endif
+#define EMH_MIN_OFFSET_CHECK  2
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
@@ -983,7 +984,7 @@ private:
         assert(off < 127 * 128);
         _offset[main_bucket] = off <= 128 ? off : 128 + off / 128;
 #else
-        assert(off < EMPTY_OFFSET);
+        assert(off < 256);
         _offset[main_bucket] = off;
 #endif
     }
@@ -1027,7 +1028,7 @@ private:
         auto next_bucket = main_bucket;
         size_t offset = 0;
 
-        if (1)
+        if (0)
         {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
@@ -1059,14 +1060,14 @@ private:
                     return fbucket;
                 maskf &= maskf - 1;
             }
-            if (++offset > get_offset(main_bucket))
-                break;
-#if 1
+
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0)
                 break;
-#endif
 
+            offset += 1;
+            if (offset > EMH_MIN_OFFSET_CHECK && offset > get_offset(main_bucket))
+                break;
             next_bucket = get_next_bucket(next_bucket, offset);
         }
 
@@ -1121,7 +1122,7 @@ private:
 
             //4. next round
             next_bucket = get_next_bucket(next_bucket, ++offset);
-            if (offset > get_offset(main_bucket))
+            if (offset > EMH_MIN_OFFSET_CHECK && offset > get_offset(main_bucket))
                 break;
         }
 
