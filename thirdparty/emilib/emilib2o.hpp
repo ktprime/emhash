@@ -751,7 +751,7 @@ public:
         return 1;
     }
 
-    void erase(const const_iterator& cit) noexcept
+    void erase(const_iterator cit) noexcept
     {
         _erase(cit._bucket);
     }
@@ -996,7 +996,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += offset < 8 ? 1 + simd_bytes * offset : _mask / 32 + 1;
+        next_bucket += offset < 8 ? 7 + simd_bytes * offset / 2 : _mask / 32 + 1;
         if (next_bucket >= _num_buckets)
             next_bucket += 1;
 #elif EMH_PSL_LINEAR == 1

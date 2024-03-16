@@ -981,7 +981,7 @@ private:
 
     void clear_buckets() {
         if (m_buckets != nullptr) {
-            std::memset(&*m_buckets, 0, sizeof(Bucket) * bucket_count());
+            std::memset((void*)&*m_buckets, 0, sizeof(Bucket) * bucket_count());
         }
     }
 
