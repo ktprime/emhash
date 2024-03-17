@@ -37,8 +37,8 @@ namespace emilib {
     enum State : int8_t
     {
         EFILLED  = -126, EDELETE = -127, EEMPTY = -128,
-        SENTINEL = EFILLED,
-        GROUP_INDEX = 0,//> 0
+        SENTINEL = 127,
+        GROUP_INDEX = 15,//> 0
     };
 
 #ifndef AVX2_EHASH
@@ -106,11 +106,12 @@ public:
     using value_type      = PairT;
     using reference       = PairT&;
     using const_reference = const PairT&;
-    typedef ValueT mapped_type;
-    typedef ValueT val_type;
-    typedef KeyT   key_type;
-    typedef HashT  hasher;
-    typedef EqT    key_equal;
+
+    using mapped_type     = ValueT;
+    using val_type        = ValueT;
+    using key_type        = KeyT;
+    using hasher          = HashT;
+    using key_equal       = EqT;
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
@@ -118,7 +119,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)(key_hash % 251 - 125);
+        return (int8_t)(key_hash % 251 - 126);
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -127,17 +128,17 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((size_t)key_hash % 251 - 125);
+        return (int8_t)(key_hash % 251 - 126);
     }
 
+#if 0
+    #define bucket_to_slot(bucket) bucket
+#else
     static constexpr size_t bucket_to_slot(size_t bucket)
     {
-#ifndef EMH_SAVE_MEM
-        return bucket;
-#else
-        return bucket / simd_bytes * slot_size + (bucket - 1) % simd_bytes;
-#endif
+        return bucket / simd_bytes * slot_size + bucket % simd_bytes;
     }
+#endif
 
     class const_iterator;
     class iterator
@@ -210,8 +211,6 @@ public:
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
-            if (_bucket > _map->_num_buckets)
-                _bucket = _map->_num_buckets;
         }
 
     public:
@@ -292,8 +291,6 @@ public:
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
-            if (_bucket > _map->_num_buckets)
-                _bucket = _map->_num_buckets;
         }
 
     public:
@@ -491,6 +488,7 @@ public:
         return find_filled_bucket(k) != _num_buckets;
     }
 
+#if 0
     template<typename Key = KeyT>
     ValueT& at(const KeyT& key)
     {
@@ -520,6 +518,7 @@ public:
         auto bucket = find_filled_bucket(k);
         return &_pairs[bucket].second;
     }
+#endif
 
     template<typename Con>
     bool operator == (const Con& rhs) const
@@ -946,7 +945,7 @@ public:
 
         //for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
-            if (old_states[src_bucket] > State::EFILLED && src_bucket % simd_bytes != GROUP_INDEX) {
+            if (old_states[src_bucket] >= State::EFILLED && src_bucket % simd_bytes != GROUP_INDEX) {
                 auto& src_pair = old_pairs[bucket_to_slot(src_bucket)];
 
                 size_t main_bucket;
@@ -994,7 +993,8 @@ private:
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
-//            if (maskf) prefetch_heap_block((char*)&_pairs[next_bucket + 1]);
+            if (maskf) prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
+
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
                 const auto slot = bucket_to_slot(fbucket);
@@ -1026,7 +1026,7 @@ private:
         auto next_bucket = main_bucket; int offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
-        //prefetch_heap_block((char*)&_pairs[main_bucket + 1]);
+        prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
 
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -1070,7 +1070,7 @@ private:
             return hole;
         }
 
-        //prefetch_heap_block((char*)&_pairs[next_bucket + 1]);
+        prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
         const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
         set_states(ebucket, key_h2);
         return ebucket;

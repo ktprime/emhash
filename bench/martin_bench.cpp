@@ -9,7 +9,6 @@
 //#include "wyhash.h"
 
 //#define EMH_STATIS 1
-//#define HOOD_HASH   1
 //#define ET            1
 //#define EMH_WYHASH64   1
 //#define HOOD_HASH     1
@@ -135,7 +134,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 1 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -2087,8 +2086,8 @@ static void runTest(int sflags, int eflags)
 
 #if X86
         {  bench_CreateInsert<emilib2::HashMap <int, int, hash_func>>(); }
-        {  bench_CreateInsert<emilib3::HashMap <int, int, hash_func>>(); }
         {  bench_CreateInsert<emilib::HashMap <int, int, hash_func>>(); }
+        {  bench_CreateInsert<emilib3::HashMap <int, int, hash_func>>(); }
 #endif
 #if ET
 //        {  bench_CreateInsert<hrd_m::hash_map <int, int, hash_func>>(); }

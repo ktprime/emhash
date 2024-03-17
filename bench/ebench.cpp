@@ -1,14 +1,11 @@
-
-
-#include "util.h"
-#include <algorithm>
-
 #ifndef TKey
     #define TKey              1
 #endif
 #ifndef TVal
     #define TVal              0
 #endif
+
+#include "util.h"
 
 #if __GNUC__ > 4 && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
@@ -108,7 +105,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_ALIGN64         1
 //#define EMH_FIND_HIT        1
 //#define EMH_SMALL_SIZE        12345
-
+//#define EMH_SMALL_SIZE   8
 #ifdef EM3
 #include "emhash/hash_table2.hpp"
 #include "emhash/hash_table3.hpp"
@@ -168,6 +165,8 @@ std::map<std::string, std::string> maps =
 
 //https://thenumb.at/Hashtables/#open-addressing-vs-separate-chaining
 //https://www.youtube.com/watch?v=IMnbytvHCjM
+
+
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
 #include "fht/fht_ht.hpp"
@@ -192,9 +191,9 @@ std::map<std::string, std::string> maps =
 #endif
 
 #if X86
-    #include "emilib/emilib2s.hpp"
     #include "emilib/emilib2o.hpp"
-    #include "emilib/emilib2so.hpp"
+    #include "emilib/emilib2s.hpp"
+    #include "emilib/emilib2ss.hpp"
 #endif
 
 #if ET
@@ -1448,8 +1447,8 @@ static int benchHashMap(int n)
 
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
 #if X86
-        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
+        {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 #endif
 

@@ -470,7 +470,7 @@ struct Int64Hasher
         return key * FIB_HASH; //bad hash
 #elif FIB_HASH == 7
         return wyhash64(key, KC);
-#else
+#else //staffort_mix13
         auto x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);

@@ -126,17 +126,18 @@ public:
     using value_type      = PairT;
     using reference       = PairT&;
     using const_reference = const PairT&;
-    typedef ValueT mapped_type;
-    typedef ValueT val_type;
-    typedef KeyT   key_type;
-    typedef HashT  hasher;
-    typedef EqT    key_equal;
+
+    using mapped_type     = ValueT;
+    using val_type        = ValueT;
+    using key_type        = KeyT;
+    using hasher          = HashT;
+    using key_equal       = EqT;
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
-        main_bucket = key_hash & _mask;
+        main_bucket = (size_t)key_hash & _mask;
         return (int8_t)(key_hash % 251 - 125);
     }
 
@@ -144,9 +145,9 @@ public:
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
-        main_bucket = key_hash & _mask;
+        main_bucket = (size_t)key_hash & _mask;
 //        return (int8_t)((uint32_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 32) % 251) - 125;
-        return (int8_t)((size_t)key_hash % 251 - 125);
+        return (int8_t)(key_hash % 251 - 125);
     }
 
     class const_iterator;
@@ -997,15 +998,13 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += offset < 8 ? 7 + simd_bytes * offset / 2 : _mask / 32 + 1;
-        if (next_bucket >= _num_buckets)
-            next_bucket += 1;
+        next_bucket += simd_bytes * offset - 7;  //offset < 8 ? 7 + simd_bytes * offset / 2 : _mask / 32 + 1;
+//        if (next_bucket >= _num_buckets) next_bucket += 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
-            next_bucket += simd_bytes * offset;
-        //else if (offset == 8) next_bucket += _num_buckets / 2;
+            next_bucket += simd_bytes * 2 + offset;
         else
-            next_bucket += _num_buckets / 8 + simd_bytes;
+            next_bucket += _num_buckets / 32 + 1;
 #else
         next_bucket += simd_bytes;
         if (next_bucket >= _num_buckets)

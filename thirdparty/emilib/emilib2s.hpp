@@ -104,7 +104,7 @@ inline static uint32_t CTZ(uint64_t n)
     if ((uint32_t)n)
         _BitScanForward(&index, (uint32_t)n);
     else
-        {_BitScanForward(&index, n >> 32); index += 32; }
+        {_BitScanForward(&index, (uint32_t)(n >> 32)); index += 32; }
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     uint32_t index = __builtin_ctzll(n);
@@ -129,11 +129,12 @@ public:
     using value_type      = PairT;
     using reference       = PairT&;
     using const_reference = const PairT&;
-    typedef ValueT mapped_type;
-    typedef ValueT val_type;
-    typedef KeyT   key_type;
-    typedef HashT  hasher;
-    typedef EqT    key_equal;
+
+    using mapped_type     = ValueT;
+    using val_type        = ValueT;
+    using key_type        = KeyT;
+    using hasher          = HashT;
+    using key_equal       = EqT;
 
 #if EMH_H2 == 1
     template<typename UType>
@@ -962,7 +963,8 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if __linux__
-        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
+        __builtin_prefetch(static_cast<const void*>(ctrl));
+//        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
@@ -1028,11 +1030,10 @@ private:
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto filled = SET1_EPI8(key_h2);
-
         auto next_bucket = main_bucket; int offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
-        prefetch_heap_block((char*)&_pairs[main_bucket]);
+        prefetch_heap_block((char*)&_pairs[next_bucket]);
 
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));

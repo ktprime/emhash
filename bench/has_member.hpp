@@ -20,3 +20,17 @@
 /// @note "define_has_member(member_name)" must be used
 ///       before calling "has_member(class_, member_name)"
 #define has_member(class_, member_name)  has_member_##member_name<class_>::value
+
+
+template<typename, typename = void>
+constexpr bool has_functor_v = false;
+
+template<typename T>
+constexpr bool has_functor_v<T, decltype(std::declval<T>().operator()())> = true;
+
+#if CXX20_
+template<typename T>
+concept has_functor = requires(T t) {
+    t.operator()();
+};
+#endif
