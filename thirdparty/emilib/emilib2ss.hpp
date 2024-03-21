@@ -744,50 +744,6 @@ public:
         _erase(it._bucket);
     }
 
-    inline bool group_has_empty(size_t gbucket) const noexcept
-    {
-        return _states[gbucket + GROUP_INDEX] == 0;
-    }
-
-    inline int group_probe(size_t gbucket) const noexcept
-    {
-        return (uint8_t)_states[gbucket + GROUP_INDEX];
-    }
-
-    inline void set_group_probe(size_t gbucket, size_t group_offset)
-    {
-#if _DEBUG
-        if (group_offset > 124)          printf("group_offset = %d\n", group_offset);
-#endif
-//        if (gbucket % simd_bytes != 0)          printf("gbucket = %d\n", gbucket);
-        //if (EMH_UNLIKELY(group_offset > _states[gbucket + GROUP_INDEX]))
-            _states[gbucket + GROUP_INDEX] = group_offset;
-    }
-
-    inline void set_states(size_t ebucket, int8_t key_h2)
-    {
-//      if (ebucket % simd_bytes == GROUP_INDEX)        printf("ebucket = %d\n", ebucket);
-        //assert(_states[ebucket] < EFILLED && key_h2 <= EFILLED);
-        _states[ebucket] = key_h2;
-    }
-
-    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
-    {
-#if EMH_PSL_LINEAR == 0
-        if (EMH_LIKELY(offset < 16))
-            next_bucket += simd_bytes * offset;
-        else
-            next_bucket += _num_buckets / 32 + simd_bytes;
-#else
-        next_bucket += 3 * simd_bytes;
-        if (next_bucket >= _num_buckets)
-            next_bucket += simd_bytes;
-#endif
-      //        if (next_bucket % simd_bytes != 0)
-      //          printf("next_bucket = %d\n", next_bucket);
-
-        return next_bucket & _mask;
-    }
 
     void _erase(size_t bucket) noexcept
     {
@@ -976,10 +932,49 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if __linux__
         __builtin_prefetch(static_cast<const void*>(ctrl));
-//        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
+    }
+
+    inline bool group_has_empty(size_t gbucket) const noexcept
+    {
+        return _states[gbucket + GROUP_INDEX] == 0;
+    }
+
+    inline int group_probe(size_t gbucket) const noexcept
+    {
+        return (uint8_t)_states[gbucket + GROUP_INDEX];
+    }
+
+    inline void set_group_probe(size_t gbucket, size_t group_offset)
+    {
+#if _DEBUG
+        if (group_offset > 124)          printf("group_offset = %d\n", group_offset);
+#endif
+        //if (EMH_UNLIKELY(group_offset > _states[gbucket + GROUP_INDEX]))
+            _states[gbucket + GROUP_INDEX] = group_offset;
+    }
+
+    inline void set_states(size_t ebucket, int8_t key_h2)
+    {
+        //assert(_states[ebucket] < EFILLED && key_h2 <= EFILLED);
+        _states[ebucket] = key_h2;
+    }
+
+    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
+    {
+#if EMH_PSL_LINEAR == 0
+        if (EMH_LIKELY(offset < 16))
+            next_bucket += simd_bytes * offset;
+        else
+            next_bucket += _num_buckets / 32 + simd_bytes;
+#else
+        next_bucket += 3 * simd_bytes;
+        if (next_bucket >= _num_buckets)
+            next_bucket += simd_bytes;
+#endif
+        return next_bucket & _mask;
     }
 
     // Find the bucket with this key, or return (size_t)-1
