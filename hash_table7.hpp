@@ -141,10 +141,10 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
             _num_filled ++; EMH_SET(bucket)
 #endif
 
-#define EMH_MASK(bucket)               1 << (bucket % MASK_BIT)
-#define EMH_SET(bucket)                _bitmask[bucket / MASK_BIT] &= ~(EMH_MASK(bucket))
-#define EMH_CLS(bucket)                _bitmask[bucket / MASK_BIT] |= EMH_MASK(bucket)
-#define EMH_EMPTY(bitmask, bucket)     (_bitmask[bucket / MASK_BIT] & (EMH_MASK(bucket))) != 0
+#define EMH_MASK(n)       1 << (n % MASK_BIT)
+#define EMH_SET(n)        _bitmask[n / MASK_BIT] &= ~(EMH_MASK(n))
+#define EMH_CLS(n)        _bitmask[n / MASK_BIT] |= EMH_MASK(n)
+#define EMH_EMPTY(n)      (_bitmask[n / MASK_BIT] & (EMH_MASK(n))) != 0
 
 #if _WIN32
     #include <intrin.h>
@@ -688,8 +688,7 @@ public:
             memcpy(_pairs + _num_buckets, opairs + _num_buckets, EPACK_SIZE * sizeof(PairT) + (_num_buckets + 7) / 8 + BIT_PACK);
             for (auto it = rhs.cbegin(); it.bucket() <= _mask; ++it) {
                 const auto bucket = it.bucket();
-                EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
-                new(_pairs + bucket) PairT(opairs[bucket]);
+                new(_pairs + bucket) PairT(opairs[bucket]); EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
             }
         }
     }
@@ -745,7 +744,7 @@ public:
             return end();
 
         auto bucket = _mask;
-        while (EMH_EMPTY(_pairs, bucket)) bucket--;
+        while (EMH_EMPTY(bucket)) bucket--;
         return {this, bucket};
     }
 
@@ -790,7 +789,7 @@ public:
     {
         const auto bucket = hash_key(key) & _mask;
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return 0;
         else if (bucket == next_bucket)
             return bucket + 1;
@@ -802,7 +801,7 @@ public:
     //Returns the number of elements in bucket n.
     size_type bucket_size(const size_type bucket) const
     {
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return 0;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -823,7 +822,7 @@ public:
 
     size_type get_main_bucket(const size_type bucket) const
     {
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return INACTIVE;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -847,7 +846,7 @@ public:
 
     int get_bucket_info(const size_type bucket, size_type steps[], const size_type slots) const
     {
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return -1;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1451,7 +1450,7 @@ private:
     size_type erase_key(const UType& key)
     {
         const auto bucket = hash_key(key) & _mask;
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return INACTIVE;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1495,7 +1494,7 @@ private:
     size_type erase_key(const UType& key)
     {
         const auto bucket = hash_key(key) & _mask;
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return INACTIVE;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1559,7 +1558,7 @@ private:
     size_type find_filled_hash(const K& key, const size_t key_hash) const
     {
         const auto bucket = key_hash & _mask;
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return _num_buckets;
 
         auto next_bucket = bucket;
@@ -1581,7 +1580,7 @@ private:
     size_type find_filled_bucket(const K& key) const
     {
         const auto bucket = hash_key(key) & _mask;
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return _num_buckets;
 
         auto next_bucket = bucket;
@@ -1634,7 +1633,7 @@ private:
     {
         const auto bucket = hash_key(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
-        if (EMH_EMPTY(_pairs, bucket)) {
+        if (EMH_EMPTY(bucket)) {
             isempty = true;
             return bucket;
         }
@@ -1707,7 +1706,7 @@ private:
                 return step * SIZE_BIT + CTZ(bmask3);
         }
 
-        auto next_bucket = (bucket_from + 0 * SIZE_BIT) & qmask;
+        //auto next_bucket = (bucket_from + 0 * SIZE_BIT) & qmask;
         auto& last = EMH_BUCKET(_pairs, _num_buckets);
         for (size_type offset = 1; ; offset += 1) {
             last &= qmask;
@@ -1796,7 +1795,7 @@ private:
     size_type find_unique_bucket(const KeyT& key)
     {
         const size_type bucket = hash_key(key) & _mask;
-        if (EMH_EMPTY(_pairs, bucket))
+        if (EMH_EMPTY(bucket))
             return bucket;
 
         //check current bucket_key is in main bucket or not

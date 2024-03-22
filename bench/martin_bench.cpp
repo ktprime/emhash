@@ -23,8 +23,8 @@
 #endif
 
 #include "../hash_table5.hpp"
-#include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
+#include "../hash_table7s.hpp"
 #include "../hash_table8.hpp"
 
 //#include "../thirdparty/emhash/hash_table8v.hpp"
@@ -134,7 +134,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -288,7 +288,7 @@ static void bench_insert(MAP& map)
                 MRNG rng(RND + 15 + i);
                 for (size_t n = 0; n < maxn; ++n)
                     map[static_cast<int>(rng())];
-                printf("\t\t(lf=%.2f) insert %.2f",  map.load_factor(), now2sec() - ts);
+                printf("        (lf=%.2f) insert %.2f",  map.load_factor(), now2sec() - ts);
                 fflush(stdout);
             }
             {
@@ -324,7 +324,7 @@ static void bench_AccidentallyQuadratic()
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     auto nows = now2sec();
     sfc64 rng(12345);
@@ -383,7 +383,7 @@ static void bench_insert_erase_begin()
             map.emplace((int64_t)rng(), 0);
         }
 
-        printf("\n\t\t%.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
+        printf("\n        %.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
         max_n *= 5;
     }
 
@@ -430,7 +430,7 @@ static void bench_insert_erase_continue()
             map.emplace((int)rng(), 0);
         }
 
-        printf("\n\t\t%.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
+        printf("\n        %.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
         max_n *= 7;
     }
 
@@ -483,7 +483,7 @@ static void bench_randomInsertErase(MAP& map)
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     auto nows = now2sec(), erase1 = 0.;
 
@@ -560,8 +560,8 @@ static void bench_CreateInsert()
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
+    printf("    %20s", map_name);
 
-    printf("\t%20s", map_name);
     const std::array<size_t, 7> counts = {
         200, 2000, 2000, 20000, 200000, 2000000, 20000000
     };
@@ -602,13 +602,71 @@ static void bench_CreateInsert()
     printf(" CreateInsert/InsertCreate total time = %2.2f + %2.2f (%2.2f) s\n", erase1, erase2, erase1 + erase2);
 }
 
+static inline uint32_t udb_hash32(uint32_t key)
+{
+    key += ~(key << 15);
+    key ^=  (key >> 10);
+    key +=  (key << 3);
+    key ^=  (key >> 6);
+    key += ~(key << 11);
+    key ^=  (key >> 16);
+    return key;
+}
+
+static inline uint32_t udb_get_key(const uint32_t n, const uint32_t x)
+{
+    return udb_hash32(x % (n>>2));
+}
+
+struct Hash32 {
+    //using is_avalanching = void;
+    inline size_t operator()(const uint32_t x) const {
+        return x;
+    }
+};
+
+template<class MAP>
+static void bench_udb3()
+{
+    auto map_name = find_hash(typeid(MAP).name());
+    if (!map_name)
+        return;
+    printf("    %20s", map_name);
+
+    auto nows = now2sec();
+
+    constexpr uint32_t n_cp = 11, N = 80000000, n0 = 10000000, x0 = 1, is_del = 1;
+
+    constexpr uint32_t step = (N - n0) / (n_cp - 1);
+    uint64_t z = 0;
+
+    MAP h;
+    for (uint32_t j = 0, i = 0, n = n0, x = x0; j < n_cp; ++j, n += step) {
+        for (; i < n; ++i) {
+            x = udb_hash32(x);
+            uint32_t key = udb_get_key(n, x);
+            if (is_del) {
+                auto p = h.emplace(key, i);
+                if (p.second == false) h.erase(p.first);
+                else ++z;
+            } else {
+                z += ++h[key];
+            }
+        }
+//        udb_measure(n, h.size(), z, &cp[j]);
+    }
+
+    auto erase2 = now2sec() - nows;
+    printf(" z = %ld total time = %.2lf sec\n", z, now2sec() - nows);
+}
+
 template<class MAP>
 static void bench_randomDistinct2(MAP& map)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
 #if X86_64
     constexpr size_t const n = 50000000;
@@ -720,7 +778,7 @@ static void bench_knucleotide() {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     MAP map;
     state = 42;
@@ -835,7 +893,7 @@ static void bench_GameOfLife()
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     MAP map;
     auto stastabilizing = now2sec();
@@ -890,7 +948,7 @@ static void bench_copy(MAP& map)
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     size_t result = 0;
     sfc64 rng(987);
@@ -1045,7 +1103,7 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
     }
 
     if (map.size() > 12)
-    printf("\t\t%s time = %.2f s %8d loadf = %.2f\n",
+    printf("        %s time = %.2f s %8d loadf = %.2f\n",
             title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
     return num_found;
 }
@@ -1056,7 +1114,7 @@ static void bench_randomFindString(MAP& map)
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%8s\n", map_name);
+    printf("    %8s\n", map_name);
 
     auto nows = now2sec();
     auto now1 = nows, now2 = nows;
@@ -1093,7 +1151,7 @@ static void bench_randomEraseString(MAP& map)
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     auto nows = now2sec();
     { runInsertEraseString<MAP>(20000000, 7, 0xfffff); }
@@ -1176,7 +1234,7 @@ static void bench_IterateIntegers(MAP& map)
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
@@ -1219,7 +1277,7 @@ static void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerIn
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
         return;
-    printf("\t%20s", map_name);
+    printf("    %20s", map_name);
 
     static constexpr auto lower32bit = UINT64_C(0x00000000FFFFFFFF);
     static constexpr auto upper32bit = UINT64_C(0xFFFFFFFF00000000);
@@ -1445,12 +1503,12 @@ static void runTest(int sflags, int eflags)
 
         MRNG rng(time(0));
         const size_t numInserts[]        = {
-			(size_t)rng() % 123 + 123,
-			(size_t)rng() % 1234 + 1234, 
-			(size_t)rng() % 12345 + 12345, 
-			(size_t)rng() % 123456 + 123456, 
-			(size_t)rng() % 1234567 + 1234567, 
-			(size_t)rng() % 12345678 + 12345678};
+            (size_t)rng() % 123 + 123,
+            (size_t)rng() % 1234 + 1234,
+            (size_t)rng() % 12345 + 12345,
+            (size_t)rng() % 123456 + 123456,
+            (size_t)rng() % 1234567 + 1234567,
+            (size_t)rng() % 12345678 + 12345678};
         constexpr size_t numFindsPerInsert[] = {800000, 50000, 5000, 200, 10, 2};
 
         for (size_t i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
@@ -2063,7 +2121,7 @@ static void runTest(int sflags, int eflags)
 
         puts("\nbench_CreateInsert:");
 
-        {  bench_CreateInsert<emhash6::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_CreateInsert<emhash6::HashMap<int, int, hash_func>>(); }
         {  bench_CreateInsert<emhash7::HashMap<int, int, hash_func>>(); }
         {  bench_CreateInsert<emhash8::HashMap<int, int, hash_func>>(); }
 
@@ -2102,6 +2160,60 @@ static void runTest(int sflags, int eflags)
         {  bench_CreateInsert<emhash5::HashMap<int, int, hash_func>>(); }
     }
 
+    if (sflags <= 15 && eflags >= 15)
+    {
+#if ABSL_HASH
+        typedef absl::Hash<int> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<int> hash_func;
+#elif ANKERL_HASH
+        typedef ankerl::unordered_dense::hash<int> hash_func;
+#elif HOOD_HASH
+        typedef robin_hood::hash<int> hash_func;
+#else
+        typedef Hash32 hash_func;
+#endif
+
+        puts("\nbench_udb3:");
+
+        {  bench_udb3<emhash6::HashMap<int, int, hash_func>>(); }
+        {  bench_udb3<emhash7::HashMap<uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<emhash8::HashMap<uint32_t, uint32_t, hash_func>>(); }
+
+#if QC_HASH
+        {  bench_udb3<qc::hash::RawMap<uint32_t, uint32_t, hash_func>>(); }
+#endif
+#if CXX20
+        {  bench_udb3<jg::dense_hash_map<uint32_t, uint32_t, hash_func>>(); }
+//        {  bench_udb3<rigtorp::HashMap<uint32_t, uint32_t, hash_func>>(); }
+#endif
+#if CXX17
+        {  bench_udb3<ankerl::unordered_dense::map <uint32_t, uint32_t, hash_func>>(); }
+#endif
+#if HAVE_BOOST
+        {  bench_udb3<boost::unordered_flat_map <uint32_t, uint32_t, hash_func>>(); }
+#endif
+#if ABSL_HMAP
+        {  bench_udb3<absl::flat_hash_map <uint32_t, uint32_t, hash_func>>(); }
+#endif
+
+#if X86
+        {  bench_udb3<emilib2::HashMap <uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<emilib::HashMap <uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<emilib3::HashMap <uint32_t, uint32_t, hash_func>>(); }
+#endif
+#if ET
+//        {  bench_udb3<hrd_m::hash_map <uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<tsl::robin_map  <uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<robin_hood::unordered_map <uint32_t, uint32_t, hash_func>>(); }
+
+#if X86_64
+//        {  bench_udb3<ska::flat_hash_map <uint32_t, uint32_t, hash_func>>(); }
+#endif
+        //{  bench_udb3<phmap::flat_hash_map <uint32_t, uint32_t, hash_func>>(); }
+#endif
+        {  bench_udb3<emhash5::HashMap<uint32_t, uint32_t, hash_func>>(); }
+    }
 
     printf("\ntotal time = %.2f s", now2sec() - start);
 }
@@ -2129,6 +2241,7 @@ static const char* cases[] = {
     "bench_InsertEraseContinue",
     "bench_InsertEraseBegin",
     "bench_CreateInsert",
+    "bench_Udb3",
 };
 
 int main(int argc, char* argv[])

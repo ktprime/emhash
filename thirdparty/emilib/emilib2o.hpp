@@ -45,7 +45,7 @@ namespace emilib2 {
 #if EMH_ITERATOR_BITS < 16
     #define EMH_ITERATOR_BITS 16
 #endif
-#define EMH_MIN_OFFSET_CHECK  2
+#define EMH_MIN_OFFSET_CHECK  1
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
@@ -998,8 +998,8 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += simd_bytes * offset - 7;  //offset < 8 ? 7 + simd_bytes * offset / 2 : _mask / 32 + 1;
-//        if (next_bucket >= _num_buckets) next_bucket += 1;
+        next_bucket += offset < 8 ? 7 + simd_bytes * offset / 2 : _mask / 32 + 2;
+        next_bucket += next_bucket >= _num_buckets;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;
@@ -1095,7 +1095,7 @@ private:
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (_eq(_pairs[fbucket].first, key)) {
+                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key))) {
                     bnew = false;
                     return fbucket;
                 }

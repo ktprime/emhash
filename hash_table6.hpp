@@ -91,10 +91,9 @@
     #define EMH_NEW(key, val, bucket, next) new(_pairs + bucket) PairT(key, val, next), _num_filled ++; EMH_SET(bucket)
 #endif
 
-#define EMH_MASK(bucket) 1 << (bucket % MASK_BIT)
-#define EMH_SET(bucket)  _bitmask[bucket / MASK_BIT] &= ~(EMH_MASK(bucket))
-#define EMH_CLS(bucket)  _bitmask[bucket / MASK_BIT] |= EMH_MASK(bucket)
-//#define EMH_EMPTY(bitmask, bucket)     (_bitmask[bucket / MASK_BIT] & (EMH_MASK(bucket))) != 0
+#define EMH_MASK(n) 1 << (n % MASK_BIT)
+#define EMH_SET(n)  _bitmask[n / MASK_BIT] &= ~(EMH_MASK(n))
+#define EMH_CLS(n)  _bitmask[n / MASK_BIT] |= EMH_MASK(n)
 
 #if _WIN32
     #include <intrin.h>

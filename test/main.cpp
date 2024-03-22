@@ -23,8 +23,9 @@
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
+
 #include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emilib2ss.hpp"
 
 
 //#include "martin/robin_hood.h"
@@ -649,8 +650,8 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint32_t;
 
-#if X860
-    emilib3::HashMap <keyType, int> shash;
+#if 1
+    emilib2::HashMap <keyType, int> shash;
 #else
     ehmap6<keyType, int> shash;
 //    robin_hood::unordered_flat_map<keyType, int> shash;
@@ -662,7 +663,6 @@ static int RandTest(size_t n, int max_loops = 1234567)
 #if EMH6
     ehmap5<keyType, int> unhash;
 #else
-//    using ehash_func = ankerl::unordered_dense::hash<keyType>;
 //    emhash5::HashMap <keyType, int> unhash;
 //    ankerl::unordered_dense::map<keyType, int> unhash;
     ehmap7<keyType, int> unhash;
@@ -1004,4 +1004,3 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-
