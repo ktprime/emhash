@@ -353,8 +353,7 @@ public:
 
     ~HashMap() noexcept
     {
-        if (is_triviall_destructable())
-            clear();
+        clear_data();
 
         _num_filled = 0;
         free(_states);
@@ -367,25 +366,26 @@ public:
             clear();
             return;
         }
-        if (is_triviall_destructable()) {
-            clear();
-        }
+        
+        clear_data();
 
         if (other._num_buckets != _num_buckets) {
             _num_filled = _num_buckets = 0;
-            reserve(other._num_buckets / 2);
+            rehash(other._num_buckets);
         }
 
         if (is_copy_trivially()) {
-            memcpy(_pairs, other._pairs, (1 + bucket_to_slot(_num_buckets)) * sizeof(_pairs[0]));
+            const auto pairs_size = (1 + bucket_to_slot(_num_buckets)) * sizeof(PairT);
+            memcpy(_pairs, other._pairs, pairs_size);
         } else {
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + bucket_to_slot(it.bucket())) PairT(*it);
         }
 
+        const auto state_size = (simd_bytes + _num_buckets) * sizeof(State);
         //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
-        memcpy(_states, other._states, (_num_buckets + simd_bytes) * sizeof(_states[0]));
+        memcpy(_states, other._states, state_size);
     }
 
     void swap(HashMap& other) noexcept
@@ -744,7 +744,6 @@ public:
         _erase(it._bucket);
     }
 
-
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
@@ -753,10 +752,10 @@ public:
             _pairs[slot].~PairT();
         }
 
-        const auto gbucket = bucket / simd_bytes * simd_bytes;
-        _states[bucket] = group_has_empty(gbucket) ? State::EEMPTY : State::EDELETE;
+        //const auto gbucket = bucket / simd_bytes * simd_bytes; _states[bucket] = group_has_empty(gbucket) ? State::EEMPTY : State::EDELETE;
+        _states[bucket] = State::EDELETE;
         if (EMH_UNLIKELY(_num_filled == 0)) {
-            std::fill_n(_states, _num_buckets, State::EEMPTY);
+            clear_meta();
         }
     }
 
@@ -800,23 +799,35 @@ public:
 #endif
     }
 
-    /// Remove all elements, keeping full capacity.
-    void clear() noexcept
+    void clear_meta()
+    {
+        //init empty tombstone
+        std::fill_n(_states, _num_buckets, State::EEMPTY);
+        //set filled tombstone
+        std::fill_n(_states + _num_buckets, simd_bytes, State::SENTINEL);
+        assert(_num_buckets >= simd_bytes);
+        for (size_t src_bucket = GROUP_INDEX; src_bucket < _num_buckets; src_bucket += simd_bytes)
+            _states[src_bucket] = 0;
+        _num_filled = 0;
+    }
+
+    void clear_data()
     {
         if (is_triviall_destructable()) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
-                _states[bucket] = State::EEMPTY;
                 _pairs[bucket_to_slot(bucket)].~PairT();
                 _num_filled -= 1;
             }
-        } else if (_num_filled)
-            std::fill_n(_states, _num_buckets, State::EEMPTY);
+        }
+    }
 
-        for (size_t src_bucket = GROUP_INDEX; src_bucket < _num_buckets; src_bucket += simd_bytes)
-            _states[src_bucket] = 0;
-
-        _num_filled = 0;
+    /// Remove all elements, keeping full capacity.
+    void clear() noexcept
+    {
+        if (0 == _num_filled) return ;
+        clear_data();
+        clear_meta();
     }
 
     void shrink_to_fit()
@@ -887,18 +898,7 @@ public:
         //fill last packet zero
         memset((char*)(_pairs + pairs_size / sizeof(PairT) - 1), 0, sizeof(_pairs[0]));
 
-        //init empty tombstone
-        std::fill_n(_states, num_buckets, State::EEMPTY);
-        //set filled tombstone
-        if (num_buckets >= simd_bytes)
-            std::fill_n(_states + num_buckets, simd_bytes, State::SENTINEL);
-        else
-            std::fill_n(_states + num_buckets, simd_bytes - num_buckets + 1, State::SENTINEL);
-
-        //set group mask
-        _states[GROUP_INDEX] = 0;
-        for (size_t src_bucket = GROUP_INDEX; src_bucket < _num_buckets; src_bucket += simd_bytes)
-            _states[src_bucket] = 0;
+        clear_meta();
 
         //for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
@@ -913,7 +913,8 @@ public:
                 const auto slot = bucket_to_slot(bucket);
                 new(_pairs + slot) PairT(std::move(src_pair));
                 _num_filled ++;
-                src_pair.~PairT();
+                if (is_triviall_destructable())
+                    src_pair.~PairT();
             }
         }
         free(old_states);

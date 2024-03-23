@@ -2057,8 +2057,7 @@ namespace boost {
     unordered_multimap<K, T, H, P, A>::find(CompatibleKey const& k,
       CompatibleHash const& hash, CompatiblePredicate const& eq) const
     {
-      return const_iterator(
-        table_.find_node_impl(table::policy::apply_hash(hash, k), k, eq));
+      return table_.transparent_find(k, hash, eq);
     }
 
     template <class K, class T, class H, class P, class A>
