@@ -2,7 +2,7 @@
     #define TKey              1
 #endif
 #ifndef TVal
-    #define TVal              0
+    #define TVal              1
 #endif
 
 #include "util.h"
@@ -99,6 +99,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_IDENTITY_HASH   1
 
 //#define EMH_LRU_SET         1
+//#define EMH_SAFE_PSL 1
 //#define EMH_HIGH_LOAD       234567
 //#define EMH_PACK_TAIL         8
 //#define EMH_ITER_SAFE       1
@@ -818,10 +819,11 @@ static void insert_cache_size(const std::string& hash_name, const std::vector<ke
         sum += tmp.emplace(v, TO_VAL(0)).second;
         //sum += tmp.count(v);
         if (tmp.size() > lsize) {
-            if (lsize % 2 == 0)
+            if (lsize % 3 == 0)
                 tmp.clear();
+            else if (lsize % 3 == 1)
+                tmp = empty;
             else
-//                tmp = empty;
                 tmp = std::move(empty);
         }
     }

@@ -3,7 +3,7 @@
 
 # how to build (compile options in makefile)
 set c++ compiler and absl hash/some hash map(ET=1 : martin/phmap/ska/tsl. ET=2.. more hash maps)
- ###  make CXX=clang++ ET=1 SW=1
+ ###  make CXX=clang++ ET=1 SW=1 BF=1
 
 set key=string,val=int (0-uint32_t 1-int64_t 2-std::string/(view) 4-struct)
  ###  make Key=2 Val=0

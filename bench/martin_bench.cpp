@@ -1488,6 +1488,66 @@ static void runTest(int sflags, int eflags)
 
     if (sflags <= 4 && eflags >= 4)
     {
+#if STD_HASH
+        typedef std::hash<uint64_t> hash_func;
+#elif FIB_HASH
+        typedef Int64Hasher<uint64_t> hash_func;
+#elif ANKERL_HASH
+        using hash_func = ankerl::unordered_dense::hash<uint64_t>;
+#else
+        typedef std::hash<uint64_t> hash_func;
+#endif
+        puts("\nbench_copy:");
+
+        { emhash6::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+        { emhash5::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+        { emhash7::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+        { emhash8::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+
+#if QC_HASH
+        { qc::hash::RawMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+#endif
+
+#if CXX20
+        { jg::dense_hash_map<uint64_t, int, hash_func> emap; bench_copy(emap); }
+        { rigtorp::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+#endif
+#if CXX17
+        { ankerl::unordered_dense::map <uint64_t, int, hash_func> martin; bench_copy(martin); }
+#endif
+
+
+#if X86
+        { emilib::HashMap<uint64_t, int, hash_func> emap;  bench_copy(emap); }
+        { emilib2::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+        { emilib3::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
+#endif
+#if ET
+        { tsl::robin_map     <uint64_t, int, hash_func> rmap; bench_copy(rmap); }
+        { robin_hood::unordered_map <uint64_t, int, hash_func> martin; bench_copy(martin); }
+
+#if X86_64
+        { ska::flat_hash_map <uint64_t, int, hash_func> fmap; bench_copy(fmap); }
+#endif
+        { phmap::flat_hash_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
+#endif
+#if ABSL_HMAP
+        { absl::flat_hash_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
+#endif
+#if HAVE_BOOST
+        { boost::unordered_flat_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
+#endif
+#if CK_HMAP
+//        { ck::HashMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
+#endif
+
+#if FOLLY_F14
+        { folly::F14VectorMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
+#endif
+    }
+
+    if (sflags <= 5 && eflags >= 5)
+    {
 #if ABSL_HASH
         typedef absl::Hash<size_t> hash_func;
 #elif FIB_HASH
@@ -1563,7 +1623,7 @@ static void runTest(int sflags, int eflags)
         }
     }
 
-    if (sflags <= 5 && eflags >= 5)
+    if (sflags <= 6 && eflags >= 6)
     {
 #if ABSL_HASH
         typedef absl::Hash<int> hash_func;
@@ -1624,7 +1684,7 @@ static void runTest(int sflags, int eflags)
 #endif
     }
 
-    if (sflags <= 6 && eflags >= 6)
+    if (sflags <= 7 && eflags >= 7)
     {
 #if ABSL_HASH
         typedef absl::Hash<uint64_t> hash_func;
@@ -1688,7 +1748,7 @@ static void runTest(int sflags, int eflags)
 #endif
     }
 
-    if (sflags <= 7 && eflags >= 7)
+    if (sflags <= 8 && eflags >= 8)
     {
 #if ABSL_HASH
         typedef absl::Hash<int> hash_func;
@@ -1749,66 +1809,6 @@ static void runTest(int sflags, int eflags)
 
 #if FOLLY_F14
         { folly::F14VectorMap <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
-#endif
-    }
-
-    if (sflags <= 3 && eflags >= 3)
-    {
-#if STD_HASH
-        typedef std::hash<uint64_t> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<uint64_t> hash_func;
-#elif ANKERL_HASH
-        using hash_func = ankerl::unordered_dense::hash<uint64_t>;
-#else
-        typedef std::hash<uint64_t> hash_func;
-#endif
-        puts("\nbench_copy:");
-
-        { emhash6::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-        { emhash5::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-        { emhash7::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-        { emhash8::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-
-#if QC_HASH
-        { qc::hash::RawMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-#endif
-
-#if CXX20
-        { jg::dense_hash_map<uint64_t, int, hash_func> emap; bench_copy(emap); }
-        { rigtorp::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-#endif
-#if CXX17
-        { ankerl::unordered_dense::map <uint64_t, int, hash_func> martin; bench_copy(martin); }
-#endif
-
-
-#if X86
-        { emilib::HashMap<uint64_t, int, hash_func> emap;  bench_copy(emap); }
-        { emilib2::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-        { emilib3::HashMap<uint64_t, int, hash_func> emap; bench_copy(emap); }
-#endif
-#if ET
-        { tsl::robin_map     <uint64_t, int, hash_func> rmap; bench_copy(rmap); }
-        { robin_hood::unordered_map <uint64_t, int, hash_func> martin; bench_copy(martin); }
-
-#if X86_64
-        { ska::flat_hash_map <uint64_t, int, hash_func> fmap; bench_copy(fmap); }
-#endif
-        { phmap::flat_hash_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
-#endif
-#if ABSL_HMAP
-        { absl::flat_hash_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
-#endif
-#if HAVE_BOOST
-        { boost::unordered_flat_map <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
-#endif
-#if CK_HMAP
-//        { ck::HashMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
-#endif
-
-#if FOLLY_F14
-        { folly::F14VectorMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
 #endif
     }
 
@@ -2251,7 +2251,7 @@ int main(int argc, char* argv[])
 
     puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d]");
     puts("all test case:");
-    for (int i = 0; i < 14; i++)
+    for (int i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
         printf("    %2d %s\n", i + 1, cases[i]);
     puts("-------------------------------------------------------------------------");
 

@@ -76,6 +76,9 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 #pragma once
 
+//#pragma GCC optimize("Ofast,unroll-loops")
+//#pragma GCC target("avx2,tune=native")
+
 #include <cstring>
 #include <string>
 #include <cmath>
@@ -1826,3 +1829,4 @@ private:
 //5. support load_factor > 1.0
 //6. add grow ration
 //8. ... https://godbolt.org/
+

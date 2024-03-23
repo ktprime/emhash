@@ -650,8 +650,10 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint32_t;
 
-#if 1
+#ifndef EMI2
     emilib2::HashMap <keyType, int> shash;
+#elif EMH1
+    emilib::HashMap <keyType, int> shash;
 #else
     ehmap6<keyType, int> shash;
 //    robin_hood::unordered_flat_map<keyType, int> shash;
@@ -660,10 +662,9 @@ static int RandTest(size_t n, int max_loops = 1234567)
 
     ehmap8<keyType, int> ehash8;
 
-#if EMH6
+#if EMH5
     ehmap5<keyType, int> unhash;
 #else
-//    emhash5::HashMap <keyType, int> unhash;
 //    ankerl::unordered_dense::map<keyType, int> unhash;
     ehmap7<keyType, int> unhash;
 #endif

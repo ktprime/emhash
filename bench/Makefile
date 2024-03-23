@@ -135,7 +135,7 @@ endif
 
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) hash_join.cpp -o join_hash
-	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
+#	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) bstring.cpp -o bs
