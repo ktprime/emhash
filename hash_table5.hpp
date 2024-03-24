@@ -84,7 +84,7 @@
     #define EMH_BUCKET(p,n)  p[n].bucket
     #define EMH_PREVET(p,n)  *(size_type*)(&p[n].first)
     #define EMH_PKV(p,n)     p[n]
-    #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(key, val, bucket); _num_filled ++;if (bucket < _first) _first = bucket
+    #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(key, val, bucket); _num_filled ++; if (bucket < _first) _first = bucket
 #endif
 
 #define EMH_EMPTY(p, b) (0 > (int)EMH_BUCKET(p, b))
@@ -727,31 +727,33 @@ public:
     template<typename K=KeyT>
     iterator find(const K& key) noexcept
     {
-        return {this, find_filled_bucket(key)};
+        return {this, find_filled_key(key)};
     }
 
     template<typename K=KeyT>
     const_iterator find(const K& key) const noexcept
     {
-        return {this, find_filled_bucket(key)};
+        return {this, find_filled_key(key)};
     }
 
     template<typename K=KeyT>
     iterator find(const K& key, size_type key_hash) noexcept
     {
-        return {this, find_hash_bucket(key, key_hash)};
+        const auto main_bucket = key_hash & _mask;
+        return {this, find_hash_bucket(key, main_bucket)};
     }
 
     template<typename K=KeyT>
     const_iterator find(const K& key, size_type key_hash) const noexcept
     {
-        return {this, find_hash_bucket(key, key_hash)};
+        const auto main_bucket = key_hash & _mask;
+        return {this, find_hash_bucket(key, main_bucket)};
     }
 
     template<typename K=KeyT>
     ValueT& at(const K& key)
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         //throw
         return EMH_VAL(_pairs, bucket);
     }
@@ -759,46 +761,56 @@ public:
     template<typename K=KeyT>
     const ValueT& at(const K& key) const
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         return EMH_VAL(_pairs, bucket);
     }
 
     template<typename K=KeyT>
     ValueT& at(const K& key, size_type key_hash)
     {
-        const auto bucket = find_hash_bucket(key, key_hash);
+        const auto main_bucket = key_hash & _mask;
+        const auto bucket = find_hash_bucket(key, main_bucket);
         return EMH_VAL(_pairs, bucket);
     }
 
     template<typename K=KeyT>
     const ValueT& at(const K& key, size_type key_hash) const
     {
-        const auto bucket = find_hash_bucket(key, key_hash);
+        const auto main_bucket = key_hash & _mask;
+        const auto bucket = find_hash_bucket(key, main_bucket);
         return EMH_VAL(_pairs, bucket);
     }
 
     template<typename K=KeyT>
     bool contains(const K& key) const noexcept
     {
-        return find_filled_bucket(key) != _num_buckets;
+        return find_filled_key(key) != _num_buckets;
     }
 
     template<typename K=KeyT>
     bool contains(const K& key, size_type key_hash) const noexcept
     {
-        return find_hash_bucket(key, key_hash) != _num_buckets;
+        const auto main_bucket = key_hash & _mask;
+        return find_hash_bucket(key, main_bucket) != _num_buckets;
     }
 
     template<typename K=KeyT>
     size_type count(const K& key) const noexcept
     {
-        return find_filled_bucket(key) == _num_buckets ? 0 : 1;
+        return find_filled_key(key) == _num_buckets ? 0 : 1;
     }
 
     template<typename K=KeyT>
     size_type count(const K& key, size_type key_hash) const noexcept
     {
-        return find_hash_bucket(key, key_hash) == _num_buckets ? 0 : 1;
+        const auto main_bucket = key_hash & _mask;
+        return find_hash_bucket(key, main_bucket) == _num_buckets ? 0 : 1;
+    }
+
+    template<typename K=KeyT>
+    size_type count_hint(const K& key, size_type main_bucket) const noexcept
+    {
+        return find_hash_bucket(key, main_bucket) == _num_buckets ? 0 : 1;
     }
 
     template<typename K=KeyT>
@@ -859,7 +871,7 @@ public:
     /// Returns the matching ValueT or nullptr if k isn't found.
     bool try_get(const KeyT& key, ValueT& val) const
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         const auto found = bucket != _num_buckets;
         if (found) {
             val = EMH_VAL(_pairs, bucket);
@@ -870,21 +882,21 @@ public:
     /// Returns the matching ValueT or nullptr if k isn't found.
     ValueT* try_get(const KeyT& key)
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
 
     /// Const version of the above
     ValueT* try_get(const KeyT& key) const
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
 
     /// set value if key exist
     bool try_set(const KeyT& key, const ValueT& val)
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         if (bucket == _num_buckets)
             return false;
 
@@ -895,7 +907,7 @@ public:
     /// set value if key exist
     bool try_set(const KeyT& key, ValueT&& val)
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         if (bucket == _num_buckets)
             return false;
 
@@ -906,7 +918,7 @@ public:
     /// Convenience function.
     ValueT get_or_return_default(const KeyT& key) const
     {
-        const auto bucket = find_filled_bucket(key);
+        const auto bucket = find_filled_key(key);
         return bucket == _num_buckets ? ValueT() : EMH_VAL(_pairs, bucket);
     }
 #endif
@@ -1666,16 +1678,16 @@ private:
     }
 
     template<typename K=KeyT>
-    size_type find_filled_bucket(const K& key) const noexcept
+    size_type find_filled_key(const K& key) const noexcept
     {
-        return find_hash_bucket(key, hash_key(key));
+        const auto main_bucket = key_to_bucket(key);
+        return find_hash_bucket(key, main_bucket);
     }
 
     // Find the bucket with this key, or return bucket size
     template<typename K=KeyT>
-    size_type find_hash_bucket(const K& key, size_type key_hash) const noexcept
+    size_type find_hash_bucket(const K& key, size_t bucket) const noexcept
     {
-        const auto bucket = key_hash & _mask;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
 
 #if EMH_FIND_HIT == 0

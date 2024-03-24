@@ -5,7 +5,7 @@
 #endif
 
 //#define TKey 2
-#define EMH_SAFE_PSL 1
+//#define EMH_SAFE_PSL 1
 //#define EMH_STATIS   1234567
 //#define EMH_PSL_LINEAR 1
 
@@ -25,6 +25,7 @@
 #include "../hash_table8.hpp"
 
 #include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
 #include "emilib/emilib2ss.hpp"
 
 
@@ -650,22 +651,23 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint32_t;
 
-#ifndef EMI2
-    emilib2::HashMap <keyType, int> shash;
-#elif EMH1
-    emilib::HashMap <keyType, int> shash;
+#if EMI == 0
+    emilib3::HashMap <keyType, int> ehash;
+#elif EMI == 2
+    emilib2::HashMap <keyType, int> ehash;
+#elif EMI == 1
+    emilib::HashMap <keyType, int> ehash;
 #else
-    ehmap6<keyType, int> shash;
-//    robin_hood::unordered_flat_map<keyType, int> shash;
-//    ankerl::unordered_dense::map<keyType, int> shash;
+    ankerl::unordered_dense::map<keyType, int> ehash;
 #endif
 
     ehmap8<keyType, int> ehash8;
 
-#if EMH5
+#if EMH == 5
     ehmap5<keyType, int> unhash;
+#elif EMH == 6
+    ehmap6<keyType, int> unhash;
 #else
-//    ankerl::unordered_dense::map<keyType, int> unhash;
     ehmap7<keyType, int> unhash;
 #endif
 
@@ -673,18 +675,18 @@ static int RandTest(size_t n, int max_loops = 1234567)
     const auto step = n % 2 + 1;
     for (size_t i = 1; i < n * step; i += step) {
         auto ki = TO_KEY(i);
-        ehash8[ki] = unhash[ki] = shash[ki] = (int)srng();
+        ehash8[ki] = unhash[ki] = ehash[ki] = (int)srng();
     }
 
     {
-        assert(ehash8 == shash);
+        assert(ehash8 == ehash);
         assert(ehash8 == unhash);
     }
 
     auto nows = time(0);
     int loops = max_loops;
     while (loops -- > 0) {
-        assert(shash.size() == unhash.size());
+        assert(ehash.size() == unhash.size());
         assert(ehash8.size() == unhash.size());
 
         const uint32_t type = srng() % 100;
@@ -695,37 +697,37 @@ static int RandTest(size_t n, int max_loops = 1234567)
           assert(cnid == unhash.count(id));
 
             if (type % 3 == 0) {
-                shash[id] += type; ehash8[id] += type; unhash[id] += type;
+                ehash[id] += type; ehash8[id] += type; unhash[id] += type;
             } else if (type % 2 == 0) {
-                shash.insert_or_assign(id, type + 2);
+                ehash.insert_or_assign(id, type + 2);
                 ehash8.insert_or_assign(id, type + 2);
                 unhash.insert_or_assign(id, type + 2);
             } else {
-                shash.emplace(id, type + 1);
+                ehash.emplace(id, type + 1);
                 ehash8.emplace(id, type + 1);
                 unhash.emplace(id, type + 1);
             }
 
-            assert(ehash8[id] == shash[id]);
-            if (shash[id] != unhash[id]) {
+            assert(ehash8[id] == ehash[id]);
+            if (ehash[id] != unhash[id]) {
                 cnid = unhash.count(id);
                 unhash.emplace(id, type + 1);
-                printf("%d e=%d %d %d %d\n", type, cnid, shash[id], ehash8[id], unhash.at(id));
+                printf("%d e=%d %d %d %d\n", type, cnid, ehash[id], ehash8[id], unhash.at(id));
             }
         }
         else if (type < 60) {
             if (srng() % 3 == 0)
                 id = unhash.begin()->first;
             else if (srng() % 2 == 0)
-                id = shash.begin()->first;
+                id = ehash.begin()->first;
             else
                 id = ehash8.last()->first;
 
             ehash8.erase(id);
-            shash.erase(id);
+            ehash.erase(id);
             unhash.erase(unhash.find(id));
 
-            assert(shash.count(id) == unhash.count(id));
+            assert(ehash.count(id) == unhash.count(id));
             assert(ehash8.count(id) == unhash.count(id));
         }
         else if (type < 80) {
@@ -734,9 +736,9 @@ static int RandTest(size_t n, int max_loops = 1234567)
                 it ++;
             id = it->first;
             unhash.erase(id);
-            shash.erase(shash.find(id));
+            ehash.erase(ehash.find(id));
             ehash8.erase(it);
-            assert(shash.count(id) == 0);
+            assert(ehash.count(id) == 0);
             assert(ehash8.count(id) == unhash.count(id));
         }
         else if (type < 100) {
@@ -745,27 +747,27 @@ static int RandTest(size_t n, int max_loops = 1234567)
                 ehash8.emplace(id, vid);
                 assert(ehash8.count(id) == 1);
 
-                assert(shash.count(id) == 0);
+                assert(ehash.count(id) == 0);
                 //if (id == 1043)
-                shash[id] = vid;
-                assert(shash.count(id) == 1);
+                ehash[id] = vid;
+                assert(ehash.count(id) == 1);
 
                 assert(unhash.count(id) == 0);
-                unhash[id] = shash[id];
-                assert(ehash8[id] == shash[id]);
+                unhash[id] = ehash[id];
+                assert(ehash8[id] == ehash[id]);
                 assert(unhash[id] == ehash8[id]);
             }
             else {
-                unhash[id] = shash[id] = 1;
+                unhash[id] = ehash[id] = 1;
                 ehash8.insert_or_assign(id, 1);
                 unhash.erase(id);
-                shash.erase(id);
+                ehash.erase(id);
                 ehash8.erase(id);
             }
         }
         if (loops % 1000'000 == 0) {
-            printf("loops = %d %d\n", loops, (int)shash.size());
-            assert(ehash8.operator==(shash));
+            printf("loops = %d %d\n", loops, (int)ehash.size());
+            assert(ehash8.operator==(ehash));
             assert(ehash8 == unhash);
         }
     }
@@ -988,11 +990,6 @@ int main(int argc, char* argv[])
         benchStringHash(1e6+6, 8, 32);
     }
 
-    for (int i = 0; i < 6; i++) {
-        TestHighLoadFactor<emhash7::HashMap<int64_t, int>>(i);
-        TestHighLoadFactor<emhash8::HashMap<int64_t, int>>(i);
-    }
-
     size_t n = (int)1e7, loop = 12345678;
     if (argc > 1 && isdigit(argv[1][0]))
         n = atoi(argv[1]);
@@ -1002,6 +999,11 @@ int main(int argc, char* argv[])
 #ifndef GCOV
     RandTest(n, loop);
 #endif
+
+    for (int i = 0; i < 6; i++) {
+        TestHighLoadFactor<emhash7::HashMap<int64_t, int>>(i);
+        TestHighLoadFactor<emhash8::HashMap<int64_t, int>>(i);
+    }
 
     return 0;
 }

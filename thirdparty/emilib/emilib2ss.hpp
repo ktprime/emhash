@@ -751,12 +751,13 @@ public:
             const auto slot = bucket_to_slot(bucket);
             _pairs[slot].~PairT();
         }
-
-        //const auto gbucket = bucket / simd_bytes * simd_bytes; _states[bucket] = group_has_empty(gbucket) ? State::EEMPTY : State::EDELETE;
+#if 0
+        _states[bucket] = group_has_empty(bucket) ? State::EEMPTY : State::EDELETE;
+#else
         _states[bucket] = State::EDELETE;
-        if (EMH_UNLIKELY(_num_filled == 0)) {
+        if (EMH_UNLIKELY(_num_filled == 0))
             clear_meta();
-        }
+ #endif
     }
 
     iterator erase(const_iterator first, const_iterator last)
@@ -939,9 +940,10 @@ private:
 #endif
     }
 
-    inline bool group_has_empty(size_t gbucket) const noexcept
+    inline bool group_has_empty(size_t bucket) const noexcept
     {
-        return _states[gbucket + GROUP_INDEX] == 0;
+        const auto gbucket = bucket / simd_bytes * simd_bytes;
+        return _states[gbucket + simd_bytes - 2] == State::EEMPTY;
     }
 
     inline int group_probe(size_t gbucket) const noexcept

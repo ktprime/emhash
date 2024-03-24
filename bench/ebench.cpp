@@ -166,6 +166,10 @@ std::map<std::string, std::string> maps =
 
 //https://thenumb.at/Hashtables/#open-addressing-vs-separate-chaining
 //https://www.youtube.com/watch?v=IMnbytvHCjM
+//
+//https://www.cnblogs.com/dengn/p/16146722.html#MatrixOne%E6%95%B0%E6%8D%AE%E5%BA%93%E6%98%AF%E4%BB%80%E4%B9%88?
+//https://www.mdpi.com/2076-3417/10/6/1915
+//https://clickhouse.com/blog/clickhouse-fully-supports-joins-hash-joins-part2
 
 
 #if FHT_HMAP && __linux__
@@ -735,7 +739,7 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 template<class hash_type>
 static void insert_backtrace(const std::string& hash_name, const std::vector<keyType>& vList)
 {
-#if KEY_INT
+#if KEY_INT && TVal < 2
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
 

@@ -294,9 +294,9 @@ static void bench_insert(MAP& map)
             {
                 auto ts = now2sec();
                 MRNG rng(RND + 15 + i);
-                for (size_t n = 0; n < maxn; ++n)
+                for (size_t n = 0; n < maxn * 3 / 4; ++n)
                     map.erase(static_cast<int>(rng()));
-                printf(", remove %.2f", now2sec() - ts);
+                printf(", remove 75%% %.2f", now2sec() - ts);
                 fflush(stdout);
                 assert(map.size() == 0);
             }
@@ -625,6 +625,9 @@ struct Hash32 {
     }
 };
 
+const static uint32_t x0 = (uint32_t)now2sec();
+const static bool is_del = x0 % 2 == 0;
+
 template<class MAP>
 static void bench_udb3()
 {
@@ -633,11 +636,10 @@ static void bench_udb3()
         return;
     printf("    %20s", map_name);
 
-    auto nows = now2sec();
-
-    constexpr uint32_t n_cp = 11, N = 80000000, n0 = 10000000, x0 = 1, is_del = 1;
-
+    const auto nows = now2sec();
+    constexpr uint32_t n_cp = 11, N = 80000000, n0 = 10000000;
     constexpr uint32_t step = (N - n0) / (n_cp - 1);
+
     uint64_t z = 0;
 
     MAP h;
@@ -653,10 +655,8 @@ static void bench_udb3()
                 z += ++h[key];
             }
         }
-//        udb_measure(n, h.size(), z, &cp[j]);
     }
 
-    auto erase2 = now2sec() - nows;
     printf(" z = %ld total time = %.2lf sec\n", z, now2sec() - nows);
 }
 
@@ -2176,7 +2176,7 @@ static void runTest(int sflags, int eflags)
 
         puts("\nbench_udb3:");
 
-        {  bench_udb3<emhash6::HashMap<int, int, hash_func>>(); }
+        {  bench_udb3<emhash6::HashMap<uint32_t, uint32_t, hash_func>>(); }
         {  bench_udb3<emhash7::HashMap<uint32_t, uint32_t, hash_func>>(); }
         {  bench_udb3<emhash8::HashMap<uint32_t, uint32_t, hash_func>>(); }
 
