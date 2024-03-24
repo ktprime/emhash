@@ -150,7 +150,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)(key_hash % 251 - 126);
+        return (int8_t)((uint64_t)key % 251 - 126);
     }
 
     class const_iterator;
@@ -753,16 +753,6 @@ public:
         _erase(it._bucket);
     }
 
-    inline int8_t group_mask(size_t gbucket) const noexcept
-    {
-        return _states[gbucket + simd_bytes - 1];
-    }
-
-    void set_states(size_t ebucket, int8_t key_h2)
-    {
-        _states[ebucket] = key_h2;
-    }
-
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
@@ -909,6 +899,7 @@ public:
                 const auto key_h2 = hash_key2(main_bucket, src_pair.first);
                 const auto bucket = find_empty_slot(main_bucket, 0);
 
+                prefetch_heap_block((char*)&_pairs[bucket + 1]);
                 set_states(bucket, key_h2);
                 new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled ++;
@@ -946,6 +937,16 @@ private:
 #endif
     }
 
+    inline int8_t group_mask(size_t gbucket) const noexcept
+    {
+        return _states[gbucket + simd_bytes - 1];
+    }
+
+    void set_states(size_t ebucket, int8_t key_h2)
+    {
+        _states[ebucket] = key_h2;
+    }
+
     inline void set_offset(int32_t offset)
     {
         _max_probe_length = offset;
@@ -954,7 +955,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        if (EMH_LIKELY(offset < 16))
+        if (offset < 16)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
             next_bucket += _num_buckets / 32 + simd_bytes;
@@ -1104,7 +1105,7 @@ private:
 
     HashT   _hasher;
     EqT     _eq;
-    int8_t*_states            = nullptr;
+    int8_t* _states           = nullptr;
     PairT*  _pairs            = nullptr;
     size_t  _num_buckets      = 0;
     size_t  _mask             = 0; // _num_buckets minus one

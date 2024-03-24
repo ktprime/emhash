@@ -380,23 +380,23 @@ protected:
     hash_base() noexcept {
         ctor_empty();
     }
-    
+
     hash_base(const hash_base& r) :
         hash_pred(r)
     {
         ctor_copy(r, IS_TRIVIALLY_COPYABLE());
     }
-    
+
     hash_base(hash_base&& r) noexcept :
         hash_pred(std::move(r))
     {
         ctor_move(std::move(r));
     }
-    
+
     hash_base(const hasher& hf, const key_equal& eql) :
         hash_pred(hf, eql)
     {}
-    
+
     hash_base(size_type hint_size, const hasher& hf = hasher(), const key_equal& eql = key_equal()) :
         hash_pred(hf, eql)
     {

@@ -146,8 +146,8 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = (size_t)key_hash & _mask;
-//        return (int8_t)((uint32_t)((uint64_t)key * 0x9FB21C651E98DF25ull >> 32) % 251) - 125;
-        return (int8_t)(key_hash % 251 - 125);
+        return (int8_t)((key * 0x9FB21C651E98DF25ull % 251) - 125);
+//        return (int8_t)((uint64_t)key % 251 - 125);
     }
 
     class const_iterator;
@@ -1202,10 +1202,7 @@ private:
                 goto JNEXT_BLOCK;
 
             ebucket = next_bucket + CTZ(maske);
-            if (EMH_UNLIKELY(ebucket >= _num_buckets))
-                goto JNEXT_BLOCK;
-
-            else if (offset <= get_offset(main_bucket))
+            if (offset <= get_offset(main_bucket))
                 return ebucket;
 #if EMH_PSL > 8 && EMH_PSL_LINEAR
             else if (EMH_UNLIKELY(offset >= EMH_PSL)) {

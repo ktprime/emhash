@@ -1313,7 +1313,7 @@ private:
 
         EMH_BUCKET(_pairs, prev_bucket) = new_bucket;
         if (is_triviall_destructable())
-            _pairs[bucket].~PairT(); 
+            _pairs[bucket].~PairT();
         EMH_BUCKET(_pairs, bucket) = INACTIVE;
         return bucket;
     }

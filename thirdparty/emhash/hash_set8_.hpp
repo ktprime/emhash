@@ -701,7 +701,7 @@ public:
         if (!std::is_trivially_destructible<KeyT>::value)
             _pairs[bucket].~PairT();
         _pairs[bucket].second = INACTIVE;
-        _num_filled --; 
+        _num_filled --;
 
 #if EMH_HIGH_LOAD
         if (bucket <= _last_colls)

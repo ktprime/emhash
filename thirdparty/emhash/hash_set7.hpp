@@ -1279,7 +1279,7 @@ private:
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
     inline uint32_t hash_inter(const UType& key) const
     {
-#ifndef EMH_FIBONACCI_HASH 
+#ifndef EMH_FIBONACCI_HASH
         return (_hasher(key) * 11400714819323198485ull);
 #else
         return _hasher(key);

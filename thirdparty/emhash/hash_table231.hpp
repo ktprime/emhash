@@ -693,7 +693,7 @@ private:
 		{
 			return flag_probe.flag;
 		}
-		
+
 		void clear()
 		{
 			flag_probe.flag = INACTIVE;

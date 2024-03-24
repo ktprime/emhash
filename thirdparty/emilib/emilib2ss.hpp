@@ -131,7 +131,7 @@ public:
         return (int8_t)(key_hash % 251 - 126);
     }
 
-#if 0
+#if 1
     #define bucket_to_slot(bucket) bucket
 #else
     static constexpr size_t bucket_to_slot(size_t bucket)
@@ -366,7 +366,7 @@ public:
             clear();
             return;
         }
-        
+
         clear_data();
 
         if (other._num_buckets != _num_buckets) {
@@ -751,7 +751,7 @@ public:
             const auto slot = bucket_to_slot(bucket);
             _pairs[slot].~PairT();
         }
-#if 0
+#if 1
         _states[bucket] = group_has_empty(bucket) ? State::EEMPTY : State::EDELETE;
 #else
         _states[bucket] = State::EDELETE;
@@ -974,7 +974,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        if (EMH_LIKELY(offset < 32))
+        if (offset < 16)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
             next_bucket += _num_buckets / 32 + simd_bytes;
@@ -997,8 +997,8 @@ private:
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
-            if (maskf) prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
-
+            if (maskf)
+                prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
                 const auto slot = bucket_to_slot(fbucket);
@@ -1009,10 +1009,8 @@ private:
 
             if ((int)++offset > group_probe(main_bucket))
                 break;
-#if EMH_SAFE_PSL0
-            if (group_has_empty(next_bucket))
-                break;
-#endif
+//            if (group_has_empty(next_bucket))
+//                break;
             next_bucket = get_next_bucket(next_bucket, offset);
         }
 

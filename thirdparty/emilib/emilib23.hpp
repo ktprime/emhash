@@ -726,7 +726,7 @@ private:
         }
 
         return find_empty_bucket(key);
-#if 0    
+#if 0
         while (true) {
             const auto bucket = (main_bucket + offset ++) & _mask;
             if (!is_filled(bucket)) {

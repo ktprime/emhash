@@ -1350,7 +1350,7 @@ private:
             auto bucket1 = (bucket + offset) & _mask;
             if (EMH_EMPTY(_pairs, bucket1) || EMH_EMPTY(_pairs, ++bucket1))
                 return bucket1;
-            
+
             else if (offset >= linear_probe_length) {
                 quadratic += offset / 2;
                 auto bucket3 = (bucket + quadratic) & _mask;

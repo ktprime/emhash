@@ -34,7 +34,7 @@ namespace{
 }
 
 namespace wmath{
-  
+
   using std::allocator_traits;
 
   template<typename T>
@@ -44,7 +44,7 @@ namespace wmath{
 
   struct empty{
   };
-  
+
   template<class key_type    = int,  // int is the default, why not
            class mapped_type = int,  // int is the default, why not
            class hash        = hash_functor<key_type>,
@@ -266,7 +266,7 @@ namespace wmath{
         while(true){
           const size_type k = i/digits<size_type>();
           const size_type l = i%digits<size_type>();
-          const size_type m = (~size_type(0))>>l; 
+          const size_type m = (~size_type(0))>>l;
           assert(k<masksize);
           size_type p = (mask[k]&m)<<l;
           if (k+1<masksize)
@@ -300,7 +300,7 @@ namespace wmath{
         while(true){
           const size_type k = i/digits<size_type>();
           const size_type l = i%digits<size_type>();
-          const size_type m = (~size_type(0))>>l; 
+          const size_type m = (~size_type(0))>>l;
           assert(k<masksize);
                 size_type p = (~(mask[k]&m))<<l;
           if (k+1<masksize) p|=shr(~(mask[k+1]&(~m)),digits<size_type>()-l);
@@ -332,7 +332,7 @@ namespace wmath{
           if ((i!=~size_type(0))&&si){
             const size_type k = i/digits<size_type>();
             const size_type l = i%digits<size_type>();
-            const size_type m = (~size_type(0))>>l; 
+            const size_type m = (~size_type(0))>>l;
                   size_type p = (~(mask[k]&m))<<l;
             if (k+1<masksize) p|=shr(~(mask[k+1]&(~m)),digits<size_type>()-l);
                             si= clz(p);
@@ -393,7 +393,7 @@ namespace wmath{
         while(true){
           if (i==0) break;
           if (!is_set(i-1)) break;
-          if (is_less(data[i-1].first,key,order(data[i-1].first),ok)) break; 
+          if (is_less(data[i-1].first,key,order(data[i-1].first),ok)) break;
           swap(data[i],data[i-1]);
           --i;
         }
@@ -404,7 +404,7 @@ namespace wmath{
         while(true){
           if (i+1>=datasize) break;
           if (!is_set(i+1)) break;
-          if (is_less(key,data[i+1].first,ok,order(data[i+1].first))) break; 
+          if (is_less(key,data[i+1].first,ok,order(data[i+1].first))) break;
           swap(data[i],data[i+1]);
           ++i;
         }
@@ -458,7 +458,7 @@ namespace wmath{
           }
         }
       }
-      
+
       size_type inline interpol(
           const hash_type& ok,
           const hash_type& olo,
@@ -489,7 +489,7 @@ namespace wmath{
           ++i;
         }
       }
-      
+
       size_type inline find_node_interpol(
         const  key_type&   k,
         const hash_type&  ok,
@@ -609,12 +609,12 @@ namespace wmath{
               mok       ,          omi,true );
         }
       }
-      
+
       size_type const inline find_node(
           const  key_type&  k,
           const size_type& ok
           ) const { return find_node(k,ok,map(ok)); }
-      
+
       size_type const inline find_node(const key_type& k)
       const { return find_node(k,order(k)); }
 
@@ -901,7 +901,7 @@ namespace wmath{
       }
       hash hash_function() const{ // get hash function
         return hash{};
-      }  
+      }
       template<bool is_const>
       class const_noconst_iterator {
         friend class sparse_patchmap;
@@ -932,7 +932,7 @@ namespace wmath{
               //cout << "test2" << endl;
               const size_type k = hint/digits<size_type>();
               const size_type l = hint%digits<size_type>();
-              const size_type m = (~size_type(0))>>l; 
+              const size_type m = (~size_type(0))>>l;
               assert(k<map->masksize);
               size_type p = (map->mask[k]&m)<<l;
               if (k+1<map->masksize)
@@ -1001,7 +1001,7 @@ namespace wmath{
             const size_type l = hint%digits<size_type>();
             const size_type m = (~size_type(0))>>l;
                   size_type i = 0;
-                  size_type p = popcount(map->mask[k]&m)-1; 
+                  size_type p = popcount(map->mask[k]&m)-1;
             while (i+p<n){
               if (++k>=map->mapsize){
                 hint=~size_type(0);
@@ -1244,7 +1244,7 @@ namespace wmath{
           }
     };
     typedef const_noconst_iterator<false> iterator;
-    typedef const_noconst_iterator<true>  const_iterator;    
+    typedef const_noconst_iterator<true>  const_iterator;
     iterator begin(){
       //cout << "begin()" << endl;
       const size_type i = find_first();
@@ -1402,7 +1402,7 @@ namespace wmath{
         const_noconst_iterator<is_const> last){
       for (auto it=first;it!=last;it=erase(it));
     }
-  }; 
+  };
 }
 
 

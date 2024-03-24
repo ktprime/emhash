@@ -1335,7 +1335,7 @@ private:
         if (next_bucket == bucket)
             return END;
 
-        while (true) {            
+        while (true) {
             if (EMH_EQHASH(next_bucket, key_hash)) {
                 const auto slot = EMH_SLOT(_index, next_bucket);
                 if (EMH_LIKELY(_eq(key, EMH_KEY(_pairs, slot))))

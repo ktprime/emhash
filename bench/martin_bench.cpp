@@ -24,7 +24,7 @@
 
 #include "../hash_table5.hpp"
 #include "../hash_table7.hpp"
-#include "../hash_table7s.hpp"
+#include "../hash_table6.hpp"
 #include "../hash_table8.hpp"
 
 //#include "../thirdparty/emhash/hash_table8v.hpp"

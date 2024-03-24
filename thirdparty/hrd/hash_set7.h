@@ -661,7 +661,7 @@ protected:
         if (HRD_UNLIKELY(!_elements))
             throw_bad_alloc();
     }
-    
+
     HRD_ALWAYS_INLINE void dtor(std::true_type) noexcept
     {
         if (HRD_LIKELY(_capacity))
