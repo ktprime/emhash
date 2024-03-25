@@ -572,7 +572,7 @@ struct WyRand
 
 static void cpuidInfo(int regs[4], int id, int ext)
 {
-#if X86_64
+#if X86
 #if _MSC_VER >= 1600 //2010
     __cpuidex(regs, id, ext);
 #elif __GNUC__

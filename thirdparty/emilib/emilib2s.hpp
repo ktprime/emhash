@@ -141,7 +141,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)(key_hash % 251 - 126);
+        return (int8_t)((uint64_t)key_hash % 253 + EFILLED);
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -150,7 +150,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((uint64_t)key % 251 - 126);
+        return (int8_t)((uint64_t)key_hash % 251 + EFILLED);
     }
 
     class const_iterator;
@@ -725,7 +725,6 @@ public:
         if (bempty) {
             new(_pairs + bucket) PairT(std::move(key), std::move(ValueT())); _num_filled++;
         }
-
         return _pairs[bucket].second;
     }
 
@@ -955,7 +954,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        if (offset < 16)// || _num_buckets < 32 * simd_bytes)
+        if (offset < simd_bytes)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
             next_bucket += _num_buckets / 32 + simd_bytes;
@@ -978,13 +977,14 @@ private:
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
-            if (maskf)
+            if (maskf) {
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
-            while (maskf != 0) {
-                const auto fbucket = next_bucket + CTZ(maskf);
-                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
-                    return fbucket;
-                maskf &= maskf - 1;
+                do {
+                    const auto fbucket = next_bucket + CTZ(maskf);
+                    if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
+                        return fbucket;
+                    maskf &= maskf - 1;
+                } while (maskf != 0);
             }
 
             if (group_mask(next_bucket) == State::EEMPTY)
@@ -1050,7 +1050,7 @@ private:
                 break;
         }
 
-        if (EMH_LIKELY(hole != chole)) {
+        if (hole != chole) {
             set_states(hole, key_h2);
             return hole;
         }
@@ -1077,7 +1077,7 @@ private:
     {
         while (true) {
             const auto maske = empty_delete(next_bucket);
-            if (EMH_LIKELY(maske != 0)) {
+            if (maske != 0) {
                 const auto probe = CTZ(maske) + next_bucket;
                 if (offset > _max_probe_length)
                     set_offset(offset);
@@ -1094,7 +1094,7 @@ private:
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = filled_mask(next_bucket);
-            if (EMH_LIKELY(maske != 0))
+            if (maske != 0)
                 return next_bucket + CTZ(maske);
             next_bucket += simd_bytes;
         }

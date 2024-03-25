@@ -657,7 +657,7 @@ static void bench_udb3()
         }
     }
 
-    printf(" z = %ld total time = %.2lf sec\n", z, now2sec() - nows);
+    printf(" z = %d total time = %.2lf sec\n", (int)z, now2sec() - nows);
 }
 
 template<class MAP>
@@ -2226,7 +2226,7 @@ static void checkSet(const std::string_view& map_name)
         show_name.emplace(map_name, map_name);
 }
 
-static const char* cases[] = {
+static const char* const cases[] = {
     "bench_IterateIntegers",
     "bench_randomFindString",
     "bench_randomEraseString",

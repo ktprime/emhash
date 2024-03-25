@@ -435,18 +435,19 @@ int main(int argc, const char* argv[])
 
     init_indices();
 
+    printf("N = %d, Loops = %d\n", N, K);
+
     test<emilib1_map> ("emilib1_map" );
     test<emilib3_map> ("emilib3_map" );
-    test<std_unordered_map>( "std::unordered_map" );
-    test<emhash_map5>( "emhash5::hash_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+    test<emilib2_map> ("emilib2_map" );
 
+    test<emhash_map5>( "emhash5::hash_map" );
     test<emhash_map7>( "emhash7::hash_map" );
     test<emhash_map8>( "emhash8::hash_map" );
     test<martin_dense>("martin::dense_hash_map" );
     test<martin_flat>("martin::flat_hash_map" );
 
-    test<emilib2_map> ("emilib2_map" );
 
 #ifdef ABSL_HMAP
 
@@ -489,6 +490,8 @@ int main(int argc, const char* argv[])
     test<tsl_robin_pg_map_fnv1a>( "tsl::robin_pg_map, FNV-1a" );
 
 #endif
+
+    test<std_unordered_map>( "std::unordered_map" );
 
     std::cout << "---\n\n";
 

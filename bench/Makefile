@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS = -flto=auto -O3 -DNDEBUG=1 -march=native -I.. -I../thirdparty
+CXXFLAGS =-O3 -DNDEBUG=1 -march=native -I.. -I../thirdparty
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)
@@ -122,7 +122,7 @@ ifneq ($(CK),)
 CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
-CXXFLAGS += -static #clang libc++ -static-libstdc++?
+CXXFLAGS += -static -flto #clang libc++ -static-libstdc++? 
 
 ifneq ($(PSL),)
 CXXFLAGS += -DPSL= (PSL)
@@ -135,7 +135,6 @@ endif
 
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) hash_join.cpp -o join_hash
-#	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) bstring.cpp -o bs
@@ -147,6 +146,7 @@ endif
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
+	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
 ifneq ($(EMH),)
 	$(CXX) $(CXXFLAGS) template.cc -o template
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench

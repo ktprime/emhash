@@ -50,7 +50,7 @@ struct sherwood_v8_constants
     // 3. add 44 more triangular numbers at a much steeper growth rate
     // to get a sequence that allows large jumps so that a table
     // with 10000 sequential numbers doesn't endlessly re-allocate
-    static constexpr size_t jump_distances[num_jump_distances + 2]
+    static constexpr uint64_t jump_distances[num_jump_distances + 2]
     {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 

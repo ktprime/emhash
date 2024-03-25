@@ -446,6 +446,28 @@ static inline uint64_t squirrel3(uint64_t at)
     return at;
 }
 
+#if X86_64
+#ifdef __SSE4_2__
+#include <nmmintrin.h>
+#endif
+
+#if defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
+#include <arm_acle.h>
+#include <arm_neon.h>
+#endif
+
+static inline uint64_t intHashCRC32(uint64_t x)
+{
+#ifdef __SSE4_2__
+    return _mm_crc32_u64(-1ULL, x);
+#elif defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
+    return __crc32cd(-1U, x);
+#else
+    return x;
+#endif
+}
+#endif
+
 template<typename T>
 struct Int64Hasher
 {
@@ -464,11 +486,13 @@ struct Int64Hasher
         return rrxmrrxmsx_0(key);
 #elif FIB_HASH == 6
         return squirrel3(key);
+#elif FIB_HASH == 7
+        return intHashCRC32(key);
 #elif FIB_HASH > 10000
         return key % FIB_HASH; //bad hash
 #elif FIB_HASH > 100
         return key * FIB_HASH; //bad hash
-#elif FIB_HASH == 7
+#elif FIB_HASH == 8
         return wyhash64(key, KC);
 #else //staffort_mix13
         auto x = key;
@@ -588,7 +612,7 @@ struct WyRand
 
 static void cpuidInfo(int regs[4], int id, int ext)
 {
-#if X86_64
+#if X86
 #if _MSC_VER >= 1600 //2010
     __cpuidex(regs, id, ext);
 #elif __GNUC__
