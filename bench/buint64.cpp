@@ -27,7 +27,7 @@ using KeyType = uint64_t;
 using ValType = uint64_t;
 #else
 using KeyType = uint64_t;
-using ValType = uint8_t;
+using ValType = uint32_t;
 #endif
 
 static unsigned N = 2'000'000;
@@ -340,6 +340,8 @@ int main(int argc, const char* argv[])
         K = atoi(argv[2]);
 
     init_indices();
+
+    printf("N = %d, Loops = %d\n", N, K);
 
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6>("emhash_map6");

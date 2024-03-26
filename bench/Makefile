@@ -122,7 +122,7 @@ ifneq ($(CK),)
 CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
-CXXFLAGS += -static -flto #clang libc++ -static-libstdc++? 
+CXXFLAGS += -flto # -static clang libc++ -static-libstdc++? 
 
 ifneq ($(PSL),)
 CXXFLAGS += -DPSL= (PSL)

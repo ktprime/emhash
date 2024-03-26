@@ -150,7 +150,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = key_hash & _mask;
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((uint64_t)key_hash % 251 + EFILLED);
+        return (int8_t)(key_hash % 253 + EFILLED);
     }
 
     class const_iterator;
@@ -478,39 +478,39 @@ public:
 
     // ------------------------------------------------------------
 
-    template<typename K>
+    template<typename K=KeyT>
     iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    template<typename K>
+    template<typename K=KeyT>
     const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    template<typename K>
-    bool contains(const K& k) const noexcept
+    template<typename K=KeyT>
+    bool contains(const K& key) const noexcept
     {
-        return find_filled_bucket(k) != _num_buckets;
+        return find_filled_bucket(key) != _num_buckets;
     }
 
-    template<typename K>
-    size_t count(const K& k) const noexcept
+    template<typename K=KeyT>
+    size_t count(const K& key) const noexcept
     {
-        return find_filled_bucket(k) != _num_buckets;
+        return find_filled_bucket(key) != _num_buckets;
     }
 
-    template<typename Key = KeyT>
-    ValueT& at(const KeyT& key)
+    template<typename K = KeyT>
+    ValueT& at(const K& key)
     {
         const auto bucket = find_filled_bucket(key);
         return _pairs[bucket].second;
     }
 
-    template<typename Key = KeyT>
-    const ValueT& at(const KeyT& key) const
+    template<typename K = KeyT>
+    const ValueT& at(const K& key) const
     {
         const auto bucket = find_filled_bucket(key);
         return _pairs[bucket].second;
@@ -518,17 +518,17 @@ public:
 
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
-    ValueT* try_get(const K& k)
+    ValueT* try_get(const K& key)
     {
-        auto bucket = find_filled_bucket(k);
+        auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
     }
 
     /// Const version of the above
     template<typename K>
-    ValueT* try_get(const K& k) const
+    ValueT* try_get(const K& key) const
     {
-        auto bucket = find_filled_bucket(k);
+        auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
     }
 

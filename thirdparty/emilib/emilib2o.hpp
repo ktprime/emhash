@@ -147,7 +147,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = (size_t)key_hash & _mask;
 //        return (int8_t)((key * 0x9FB21C651E98DF25ull % 251) - 125);
-        return (int8_t)((uint64_t)key_hash % 251 + EFILLED);
+        return (int8_t)(key_hash % 251 + EFILLED);
     }
 
     class const_iterator;

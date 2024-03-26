@@ -1887,7 +1887,7 @@ static void runTest(int sflags, int eflags)
 #else
         typedef ankerl::unordered_dense::hash<uint32_t> hash_func;
 #endif
-        puts("\nbench_GameOfLife:\n");
+        puts("\nbench_GameOfLife:");
 
         { bench_GameOfLife<emhash6::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emhash5::HashMap<uint32_t, bool, hash_func>>(); }
@@ -1932,7 +1932,7 @@ static void runTest(int sflags, int eflags)
         { bench_GameOfLife<folly::F14VectorMap <uint32_t, bool, hash_func>>(); }
 #endif
 #if CK_HMAP
-        //{ ck::HashMap <uint32_t, bool, hash_func> hmap; bench_GameOfLife<>(hmap); }
+        { bench_GameOfLife<ck::HashMap <uint32_t, bool, hash_func>>(); }
 #endif
     }
 

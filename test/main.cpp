@@ -644,6 +644,16 @@ static void TestApi()
 #endif
 }
 
+#if FIB_HASH
+    #define BintHasher Int64Hasher<keyType>
+#elif HOOD_HASH
+    #define BintHasher robin_hood::hash<keyType>
+#elif STD_HASH
+    #define BintHasher std::hash<keyType>
+#else
+    #define BintHasher ankerl::unordered_dense::hash<keyType>
+#endif
+
 #define TO_KEY(i)  i
 static int RandTest(size_t n, int max_loops = 1234567)
 {
@@ -652,23 +662,23 @@ static int RandTest(size_t n, int max_loops = 1234567)
     using keyType = uint32_t;
 
 #if EMI == 0
-    emilib3::HashMap <keyType, int> ehash;
+    emilib3::HashMap <keyType, int, BintHasher> ehash;
 #elif EMI == 2
-    emilib2::HashMap <keyType, int> ehash;
+    emilib2::HashMap <keyType, int, BintHasher> ehash;
 #elif EMI == 1
-    emilib::HashMap <keyType, int> ehash;
+    emilib::HashMap <keyType, int, BintHasher> ehash;
 #else
     ankerl::unordered_dense::map<keyType, int> ehash;
 #endif
 
-    ehmap8<keyType, int> ehash8;
+    ehmap8<keyType, int, BintHasher> ehash8;
 
 #if EMH == 5
-    ehmap5<keyType, int> unhash;
+    ehmap5<keyType, int, BintHasher> unhash;
 #elif EMH == 6
-    ehmap6<keyType, int> unhash;
+    ehmap6<keyType, int, BintHasher> unhash;
 #else
-    ehmap7<keyType, int> unhash;
+    ehmap7<keyType, int, BintHasher> unhash;
 #endif
 
     WyRand srng(time(0));
