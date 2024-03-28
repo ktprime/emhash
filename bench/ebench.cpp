@@ -2,7 +2,7 @@
     #define TKey              1
 #endif
 #ifndef TVal
-    #define TVal              1
+    #define TVal              0
 #endif
 
 #include "util.h"
@@ -198,7 +198,7 @@ std::map<std::string, std::string> maps =
 #if X86
     #include "emilib/emilib2o.hpp"
     #include "emilib/emilib2s.hpp"
-    #include "emilib/emilib2ss.hpp"
+    #include "emilib/emilib2so.hpp"
 #endif
 
 #if ET
@@ -1201,7 +1201,7 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     insert_no_reserve <hash_type>(hash_name, oList);
     insert_reserve<hash_type>(hash, hash_name, oList);
     insert_hit<hash_type>(hash, hash_name, oList);
-    insert_accident<hash_type>(hash, hash_name, oList);
+    //insert_accident<hash_type>(hash, hash_name, oList);
 
     find_hit_100<hash_type>(hash, hash_name, oList);
 
@@ -1238,8 +1238,8 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     if (test_extra) {
         insert_high_load  <hash_type>(hash_name, oList);
         insert_erase_high <hash_type>(hash_name, oList.size());
-        copy_clear        <hash_type>(hash, hash_name);
     }
+    copy_clear        <hash_type>(hash, hash_name);
 
 #endif
 

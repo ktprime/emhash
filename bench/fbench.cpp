@@ -24,7 +24,7 @@
 
 //#include "patchmap/patchmap.hpp"
 //#include "emilib/emilib33.hpp"
-#include "emilib/emilib2so.hpp"
+#include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib2s.hpp"
 

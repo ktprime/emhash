@@ -6,7 +6,7 @@
 #include "ska/flat_hash_map.hpp"
 #include "ska/bytell_hash_map.hpp"
 #include "phmap/phmap.h"
-#include "emilib/emilib2so.hpp"
+#include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
 //#include "patchmap/patchmap.hpp"
 

@@ -19,7 +19,7 @@
 #include "../hash_table5.hpp"
 
 #include "./util.h"
-#include "emilib/emilib2so.hpp"
+#include "emilib/emilib2s.hpp"
 #include "emilib/emilib2.hpp"
 
 #include <unordered_map>

@@ -8,7 +8,7 @@
 #include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_table8.hpp"
-#include "emilib/emilib2so.hpp"
+#include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib2s.hpp"
 
@@ -26,28 +26,32 @@
 
 using namespace std;
 
-static int max_n = (1 << 21) / 4 * 3;
+static int max_n = (1 << 22) / 4 * 3;
 static int max_trials = (1 << 26) / max_n;
 
 struct stats {
-    float average = 0.0f;
-    float stdev = 0.0f;
-    float percentile_95 = 0.0f;
-    float percentile_99 = 0.0f;
-    float percentile_999 = 0.0f;
+    double average = 0;
+    double stdev = 0;
+    double percentile_95 = 0;
+    double percentile_99 = 0;
+    double percentile_999 = 0;
 };
 
-stats get_statistics(vector<float> &v) {
-    auto n = v.size();
+stats get_statistics(vector<double> &v) {
+    std::sort(v.begin(), v.end());
+    if (v.size() > 10) v.pop_back();
+    if (v.size() > 100) v.pop_back();
+
+    const auto n = v.size();
     stats s;
-    s.average = std::accumulate(v.begin(), v.end(), 0.0f) / n;
-    float variance = 0.0f;
-    for (auto value : v)
-        variance += pow(value - s.average, 2.0f);
+    s.average = std::accumulate(v.begin(), v.end(), 0) / n;
+
+    double variance = 0;
+    for (const auto value : v)
+        variance += (value - s.average) * (value - s.average);
 
     variance /= n;
     s.stdev = sqrt(variance);
-    std::sort(v.begin(), v.end());
     s.percentile_95 = *(v.begin() + (19 * n / 20));
     s.percentile_99 = *(v.begin() + (99 * n / 100));
     s.percentile_999 = *(v.begin() + (999 * n / 1000));
@@ -56,9 +60,9 @@ stats get_statistics(vector<float> &v) {
 
 template <typename HashTableType> void hash_table_test(const char* map)
 {
-    vector<float> durations_insert; vector<float> durations_find;
-    vector<float> durations_miss;   vector<float> durations_erase;
-    vector<float> durations_iter;
+    vector<double> durations_insert; vector<double> durations_find;
+    vector<double> durations_miss;   vector<double> durations_erase;
+    vector<double> durations_iter;
     vector<int64_t> v(max_n);
 
     mt19937 gen(max_n);
@@ -68,7 +72,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
     for (int t = 0; t < max_trials; ++t)
     {
         HashTableType h; h.reserve(max_n / 8);
-        float duration = 0.0f;
+        double duration = 0;
         {
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
             auto sum = 0;
@@ -77,12 +81,12 @@ template <typename HashTableType> void hash_table_test(const char* map)
 
             load_factor = h.load_factor();
             auto end = chrono::steady_clock::now();
-            duration += chrono::duration_cast<chrono::duration<float, micro>>(end - start).count();
+            duration += chrono::duration_cast<chrono::duration<double, micro>>(end - start).count();
             durations_insert.push_back(duration);
         }
 
         {
-            duration = 0.0f;
+            duration = 0;
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
             auto sum = 0;
             for (auto num : v)
@@ -91,12 +95,12 @@ template <typename HashTableType> void hash_table_test(const char* map)
             if (sum != v.size()) exit(0);
 
             auto end = chrono::steady_clock::now();
-            duration += chrono::duration_cast<chrono::duration<float, micro>>(end - start) .count();
+            duration += chrono::duration_cast<chrono::duration<double, micro>>(end - start) .count();
             durations_find.push_back(duration);
         }
 
         {
-            duration = 0.0f;
+            duration = 0;
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
             auto sum = 0;
             for (auto num : v)
@@ -105,12 +109,12 @@ template <typename HashTableType> void hash_table_test(const char* map)
             if (sum > v.size()) exit(0);
 
             auto end = chrono::steady_clock::now();
-            duration += chrono::duration_cast<chrono::duration<float, micro>>(end - start) .count();
+            duration += chrono::duration_cast<chrono::duration<double, micro>>(end - start) .count();
             durations_miss.push_back(duration);
         }
 
         {
-            duration = 0.0f;
+            duration = 0;
             auto start = chrono::steady_clock::now();
             auto sum = 0;
             for (auto num : v)
@@ -118,12 +122,12 @@ template <typename HashTableType> void hash_table_test(const char* map)
 
             assert(sum != h.size());
             auto end = chrono::steady_clock::now();
-            duration += chrono::duration_cast<chrono::duration<float, micro>>(end - start).count() * 100000;
+            duration += chrono::duration_cast<chrono::duration<double, micro>>(end - start).count() * 100000;
             durations_iter.push_back(duration);
         }
 
         {
-            duration = 0.0f;
+            duration = 0;
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
             auto sum = 0;
             for (auto num : v)
@@ -131,7 +135,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
 
             assert(sum == h.size());
             auto end = chrono::steady_clock::now();
-            duration += chrono::duration_cast<chrono::duration<float, micro>>(end - start).count();
+            duration += chrono::duration_cast<chrono::duration<double, micro>>(end - start).count();
             durations_erase.push_back(duration);
         }
 
@@ -151,33 +155,33 @@ template <typename HashTableType> void hash_table_test(const char* map)
         putchar('|');
         if (len < 10) {
             printf("%s", map);
-            for (int i = len; i < 10; i++)
+            for (int i = len; i < 12; i++)
                 putchar(' ');
         } else {
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 12; i++)
                 putchar(map[i]);
         }
 
-        printf("|Insert  |Find    |Miss    |Erase   |Iter    |\n");
-        printf("|----------|--------|--------|--------|--------|--------|\n");
-        printf("|Average   |");
-        for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].average / 100); printf("lf = %.2lf\n", load_factor * 100);
+        printf("|Insert  |FHit    |FMiss   |Erase   |Iter    |\n");
+        printf("|------------|--------|--------|--------|--------|--------|\n");
+        printf("|Average     |");
+        for (int i = 0; i < 5; i++) printf("%-7.lf |", v[i].average / 100); printf("lf = %.2lf\n", load_factor * 100);
 
-        printf("|Stdev%%    |");
-        for (int i = 0; i < 5; i++) printf("%-7.2f%%|", 100.0 * v[i].stdev / v[i].average); printf("\n");
+        printf("|Stdev%%      |");
+        for (int i = 0; i < 5; i++) printf("%-7.2lf%%|", 100.0 * v[i].stdev / v[i].average); printf("\n");
 
-        if (max_trials >= 20) {
-            printf("|95%%       |");
-            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_95 / 100); printf("\n");
+        if (max_trials >= 10) {
+            printf("|95%%         |");
+            for (int i = 0; i < 5; i++) printf("%-7.lf |", v[i].percentile_95 / 100); printf("\n");
         }
 
-        if (max_trials >= 100) {
-            printf("|99%%       |");
-            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_99 / 100); printf("\n");
+        if (max_trials >= 50) {
+            printf("|99%%         |");
+            for (int i = 0; i < 5; i++) printf("%-7.lf |", v[i].percentile_99 / 100); printf("\n");
         }
-        if (max_trials >= 1000) {
-            printf("|999%%      |");
-            for (int i = 0; i < 5; i++) printf("%-7.f |", v[i].percentile_999 / 100); printf("\n");
+        if (max_trials >= 500) {
+            printf("|999%%        |");
+            for (int i = 0; i < 5; i++) printf("%-7.lf |", v[i].percentile_999 / 100); printf("\n");
         }
         printf("\n");
     }
@@ -185,7 +189,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
 
 int main(int argc, const char* argv[])
 {
-    if (argc > 1) {
+    if (argc > 1 && isdigit(argv[1][0])) {
         auto n = atoi(argv[1]);
         if (n > 10000)
             max_n = n;
@@ -195,12 +199,12 @@ int main(int argc, const char* argv[])
     else
         max_n += time(0) % 10024;
 
-    if (argc > 2)
+    if (argc > 2 && isdigit(argv[2][0]))
         max_trials = atoi(argv[2]);
 
     using ktype = int64_t;
 
-#if TKey == 0
+#if TKey == 1
     using vtype = int64_t;
 #else
     using vtype = int;
@@ -213,9 +217,9 @@ int main(int argc, const char* argv[])
 #elif HOOD_HASH
     using QintHasher = robin_hood::hash<ktype>;
 #elif STD_HASH
-    using QintHasher = std::hash<ktype>;
-#else
     using QintHasher = ankerl::unordered_dense::hash<ktype>;
+#else
+    using QintHasher = std::hash<ktype>;
 #endif
 
     hash_table_test<rigtorp::HashMap<ktype, vtype, QintHasher>>("rigtorp");
@@ -227,7 +231,7 @@ int main(int argc, const char* argv[])
 
 
     hash_table_test<robin_hood::unordered_map<ktype, vtype, QintHasher>>("martin");
-    hash_table_test<phmap::flat_hash_map<ktype, vtype, QintHasher>>("phmap_flat");
+    hash_table_test<phmap::flat_hash_map<ktype, vtype, QintHasher>>("phmap_flat  ");
     hash_table_test<tsl::robin_map<ktype, vtype, QintHasher>>("tsl_robin_map");
 
     hash_table_test<emhash5::HashMap<ktype, vtype, QintHasher>>("emhash5");
@@ -243,7 +247,7 @@ int main(int argc, const char* argv[])
 #endif
 
 #if HAVE_BOOST
-    hash_table_test<boost::unordered_flat_map<ktype, vtype, QintHasher>>("boost::fhash");
+    hash_table_test<boost::unordered_flat_map<ktype, vtype, QintHasher>>("boost::hflat");
 #endif
 
     hash_table_test<emilib::HashMap<ktype, vtype, QintHasher>>("emilib1");
@@ -254,7 +258,7 @@ int main(int argc, const char* argv[])
     hash_table_test<absl::flat_hash_map<ktype, vtype, QintHasher>>("absl_flat");
 #endif
 
-    hash_table_test<std::unordered_map<ktype, vtype, QintHasher>>("unordered_map");
+    hash_table_test<std::unordered_map<ktype, vtype, QintHasher>>("std::unormap");
     return 0;
 }
 

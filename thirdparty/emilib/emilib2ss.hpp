@@ -827,6 +827,7 @@ public:
             clear_data();
             clear_meta();
         }
+        _num_filled = 0;
     }
 
     void shrink_to_fit()
