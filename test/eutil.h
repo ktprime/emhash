@@ -374,17 +374,16 @@ private:
     uint64_t mCounter;
 };
 
-
 static inline uint64_t hashfib(uint64_t key)
 {
 #if __SIZEOF_INT128__
-    __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
-    return (uint64_t)(r >> 64) + (uint64_t)r;
+    __uint128_t r =  (__int128)key * UINT64_C(0x9E3779B97F4A7C15);
+    return (uint64_t)(r >> 64) ^ (uint64_t)r;
 #elif _WIN64
     uint64_t high;
     return _umul128(key, UINT64_C(11400714819323198485), &high) + high;
 #else
-    uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+    uint64_t r = key * UINT64_C(0x9E3779B97F4A7C15);
     return (r >> 32) + r;
 #endif
 }

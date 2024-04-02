@@ -1164,7 +1164,7 @@ public:
 #if EMH_HIGH_LOAD
         _ehead = 0;
 #endif
-        _last = _mask / 4;
+        _last = 0;
 
         _mask        = num_buckets - 1;
 #if EMH_PACK_TAIL > 1
@@ -1219,6 +1219,17 @@ private:
     bool check_expand_need()
     {
         return reserve(_num_filled, false);
+    }
+
+    static void prefetch_heap_block(char* ctrl)
+    {
+        // Prefetch the heap-allocated memory region to resolve potential TLB
+        // misses.  This is intended to overlap with execution of calculating the hash for a key.
+#if __linux__
+//        __builtin_prefetch(static_cast<const void*>(ctrl));
+#elif _WIN32
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#endif
     }
 
     size_type slot_to_bucket(const size_type slot) const noexcept
@@ -1301,8 +1312,9 @@ private:
         if (EMH_UNLIKELY((int)next_bucket < 0))
             return INACTIVE;
 
+        const auto slot = _index[bucket].slot & _mask;
+        //prefetch_heap_block((char*)&_pairs[slot]);
         if (EMH_EQHASH(bucket, key_hash)) {
-            const auto slot = _index[bucket].slot & _mask;
             if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
                 return bucket;
         }
@@ -1327,37 +1339,38 @@ private:
 
     // Find the slot with this key, or return bucket size
     template<typename K=KeyT>
-        size_type find_filled_slot(const K& key) const noexcept
-        {
-            const auto key_hash = hash_key(key);
-            const auto bucket = size_type(key_hash & _mask);
-            auto next_bucket = _index[bucket].next;
-            if ((int)next_bucket < 0)
-                return _num_filled;
+    size_type find_filled_slot(const K& key) const noexcept
+    {
+        const auto key_hash = hash_key(key);
+        const auto bucket = size_type(key_hash & _mask);
+        auto next_bucket = _index[bucket].next;
+        if ((int)next_bucket < 0)
+            return _num_filled;
 
-            if (EMH_EQHASH(bucket, key_hash)) {
-                const auto slot = _index[bucket].slot & _mask;
+        const auto slot = _index[bucket].slot & _mask;
+        //prefetch_heap_block((char*)&_pairs[slot]);
+        if (EMH_EQHASH(bucket, key_hash)) {
+            if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
+                return slot;
+        }
+        if (next_bucket == bucket)
+            return _num_filled;
+
+        while (true) {
+            if (EMH_EQHASH(next_bucket, key_hash)) {
+                const auto slot = _index[next_bucket].slot & _mask;
                 if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
                     return slot;
             }
-            if (next_bucket == bucket)
+
+            const auto nbucket = _index[next_bucket].next;
+            if (nbucket == next_bucket)
                 return _num_filled;
-
-            while (true) {
-                if (EMH_EQHASH(next_bucket, key_hash)) {
-                    const auto slot = _index[next_bucket].slot & _mask;
-                    if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
-                        return slot;
-                }
-
-                const auto nbucket = _index[next_bucket].next;
-                if (nbucket == next_bucket)
-                    return _num_filled;
-                next_bucket = nbucket;
-            }
-
-            return _num_filled;
+            next_bucket = nbucket;
         }
+
+        return _num_filled;
+    }
 
 #if EMH_SORT
     size_type find_hash_bucket(const KeyT& key) const noexcept
@@ -1455,50 +1468,52 @@ private:
      ** position), new key goes to an empty position.
      */
     template<typename K=KeyT>
-        size_type find_or_allocate(const K& key, uint64_t key_hash) noexcept
-        {
-            const auto bucket = size_type(key_hash & _mask);
-            auto next_bucket = _index[bucket].next;
-            if ((int)next_bucket < 0) {
+    size_type find_or_allocate(const K& key, uint64_t key_hash) noexcept
+    {
+        const auto bucket = size_type(key_hash & _mask);
+        auto next_bucket = _index[bucket].next;
+        prefetch_heap_block((char*)&_pairs[bucket]);
+        if ((int)next_bucket < 0) {
 #if EMH_HIGH_LOAD
-                if (next_bucket != INACTIVE)
-                    pop_empty(bucket);
+            if (next_bucket != INACTIVE)
+                pop_empty(bucket);
 #endif
-                return bucket;
-            }
-
-            const auto slot = _index[bucket].slot & _mask;
-            if (EMH_EQHASH(bucket, key_hash))
-                if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
-                    return bucket;
-
-            //check current bucket_key is in main bucket or not
-            const auto kmain = hash_bucket(_pairs[slot].first);
-            if (kmain != bucket)
-                return kickout_bucket(kmain, bucket);
-            else if (next_bucket == bucket)
-                return _index[next_bucket].next = find_empty_bucket(next_bucket, 1);
-
-            uint32_t csize = 1;
-            //find next linked bucket and check key
-            while (true) {
-                const auto eslot = _index[next_bucket].slot & _mask;
-                if (EMH_EQHASH(next_bucket, key_hash)) {
-                    if (EMH_LIKELY(_eq(key, _pairs[eslot].first)))
-                        return next_bucket;
-                }
-
-                csize += 1;
-                const auto nbucket = _index[next_bucket].next;
-                if (nbucket == next_bucket)
-                    break;
-                next_bucket = nbucket;
-            }
-
-            //find a empty and link it to tail
-            const auto new_bucket = find_empty_bucket(next_bucket, csize);
-            return _index[next_bucket].next = new_bucket;
+            return bucket;
         }
+
+        const auto slot = _index[bucket].slot & _mask;
+        if (EMH_EQHASH(bucket, key_hash))
+            if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
+                return bucket;
+
+        //check current bucket_key is in main bucket or not
+        const auto kmain = hash_bucket(_pairs[slot].first);
+        if (kmain != bucket)
+            return kickout_bucket(kmain, bucket);
+        else if (next_bucket == bucket)
+            return _index[next_bucket].next = find_empty_bucket(next_bucket, 1);
+
+        uint32_t csize = 1;
+        //find next linked bucket and check key
+        while (true) {
+            const auto eslot = _index[next_bucket].slot & _mask;
+            if (EMH_EQHASH(next_bucket, key_hash)) {
+                if (EMH_LIKELY(_eq(key, _pairs[eslot].first)))
+                    return next_bucket;
+            }
+
+            csize += 1;
+            const auto nbucket = _index[next_bucket].next;
+            if (nbucket == next_bucket)
+                break;
+            next_bucket = nbucket;
+        }
+
+        //find a empty and link it to tail
+        const auto new_bucket = find_empty_bucket(next_bucket, csize);
+        prefetch_heap_block((char*)&_pairs[new_bucket]);
+        return _index[next_bucket].next = new_bucket;
+    }
 
     size_type find_unique_bucket(uint64_t key_hash) noexcept
     {
@@ -1583,10 +1598,10 @@ private:
             if (EMH_EMPTY(medium))
                 return medium;
 #else
+            _last &= _mask;
             if (EMH_EMPTY(++_last))// || EMH_EMPTY(++_last))
                 return _last;
 
-            _last &= _mask;
             auto medium = (_num_buckets / 2 + _last) & _mask;
             if (EMH_EMPTY(medium))// || EMH_EMPTY(++medium))
                 return medium;

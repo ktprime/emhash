@@ -18,6 +18,7 @@
 #include "hash_set2.hpp"
 #include "hash_set4.hpp"
 #include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
 #include "emilib/emiset.hpp"
 
 // https://github.com/Tessil/robin-map
@@ -329,6 +330,7 @@ int main(__attribute__((unused)) int argc,
     benchmarkMap<emhash6::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<emhash7::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
     benchmarkMap<emilib2::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<emilib3::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
 #if HAVE_BOOST
     benchmarkMap<boost::unordered_flat_map<Sample, Sample, hash_t>>(ulongArray, runCount);
 #endif

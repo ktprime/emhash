@@ -2130,7 +2130,7 @@ static void runTest(int sflags, int eflags)
 #endif
 #if CXX20
         {  bench_CreateInsert<jg::dense_hash_map<int, int, hash_func>>(); }
-//        {  bench_CreateInsert<rigtorp::HashMap<int, int, hash_func>>(); }
+        {  bench_CreateInsert<rigtorp::HashMap<int, int, hash_func>>(); }
 #endif
 #if CXX17
         {  bench_CreateInsert<ankerl::unordered_dense::map <int, int, hash_func>>(); }
@@ -2185,7 +2185,7 @@ static void runTest(int sflags, int eflags)
 #endif
 #if CXX20
         {  bench_udb3<jg::dense_hash_map<uint32_t, uint32_t, hash_func>>(); }
-//        {  bench_udb3<rigtorp::HashMap<uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<rigtorp::HashMap<uint32_t, uint32_t, hash_func>>(); }
 #endif
 #if CXX17
         {  bench_udb3<ankerl::unordered_dense::map <uint32_t, uint32_t, hash_func>>(); }
@@ -2324,4 +2324,3 @@ int main(int argc, char* argv[])
     runTest(sflags, eflags);
     return 0;
 }
-
