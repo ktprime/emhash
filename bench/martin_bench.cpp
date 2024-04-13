@@ -131,7 +131,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 1 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -281,11 +281,13 @@ static void bench_insert(MAP& map)
         auto nows = now2sec();
         {
             {
+                if (RND % 2 == 0)
+                map.reserve(maxn / 2);
                 auto ts = now2sec();
                 MRNG rng(RND + 15 + i);
                 for (size_t n = 0; n < maxn; ++n)
                     map[static_cast<int>(rng())];
-                printf("        (lf=%.2f) insert %.2f",  map.load_factor(), now2sec() - ts);
+                printf("        (lf=%.2f) insert %.2f", map.load_factor(), now2sec() - ts);
                 fflush(stdout);
             }
             {
@@ -356,7 +358,7 @@ static void bench_AccidentallyQuadratic()
 }
 
 template<class MAP>
-static void bench_insert_erase_begin()
+static void bench_InsertEraseBegin()
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -388,7 +390,7 @@ static void bench_insert_erase_begin()
 }
 
 template<class MAP>
-static void bench_insert_erase_continue()
+static void bench_InsertEraseContinue()
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -654,7 +656,7 @@ static void bench_udb3()
         }
     }
 
-    printf(" z = %d total time = %.2lf sec\n", (int)z, now2sec() - nows);
+    printf(" z = %d total time = %.2lf s\n", (int)z, now2sec() - nows);
 }
 
 template<class MAP>
@@ -1286,7 +1288,7 @@ static void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerIn
     sum += randomFindInternal<MAP>(4, lower32bit, numInserts, numFindsPerInsert);
     sum += randomFindInternal<MAP>(3, upper32bit, numInserts, numFindsPerInsert);
     sum += randomFindInternal<MAP>(2, mediu32bit, numInserts, numFindsPerInsert);
-//    randomFindInternal<MAP>(2, -1ull,      numInserts, numFindsPerInsert);
+
     sum += randomFindInternal<MAP>(1, upper32bit, numInserts, numFindsPerInsert);
     sum += randomFindInternal<MAP>(0, lower32bit, numInserts, numFindsPerInsert);
 
@@ -1329,11 +1331,11 @@ static void runTest(int sflags, int eflags)
         { rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_IterateIntegers(emap); }
 #endif
 #if ET
-        { hrd_m::hash_map <uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
-        { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
+        { tsl::robin_map <uint64_t, uint64_t, hash_func> rmap; bench_IterateIntegers(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_IterateIntegers(martin); }
 
 #if X86_64
+        { hrd_m::hash_map <uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_IterateIntegers(fmap); }
 #endif
         { phmap::flat_hash_map<uint64_t, uint64_t, hash_func> hmap; bench_IterateIntegers(hmap); }
@@ -1389,22 +1391,22 @@ static void runTest(int sflags, int eflags)
 
         { emilib3::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { emilib2::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-        { emilib::HashMap<std::string,  size_t, hash_func> bench; bench_randomFindString(bench); }
+        { emilib::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 
 #if HAVE_BOOST
-        { boost::unordered_flat_map<std::string,  size_t, hash_func> bench; bench_randomFindString(bench); }
+        { boost::unordered_flat_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if CK_HMAP //crash TODO
-//        { ck::HashMap<std::string,  size_t, hash_func> bench; bench_randomFindString(bench); }
+//        { ck::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 
 #if ET
-        { hrd_m::hash_map <std::string, size_t, hash_func> hmap;   bench_randomFindString(hmap); }
-        { tsl::robin_map  <std::string, size_t, hash_func> bench;     bench_randomFindString(bench); }
+        { tsl::robin_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
         { robin_hood::unordered_map <std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 
 #if X86_64
-        { ska::flat_hash_map<std::string, size_t, hash_func> bench;   bench_randomFindString(bench); }
+        { hrd_m::hash_map <std::string, size_t, hash_func> hmap; bench_randomFindString(hmap); }
+        { ska::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
         { phmap::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
@@ -1413,10 +1415,10 @@ static void runTest(int sflags, int eflags)
         { rigtorp::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if FOLLY_F14
-        { folly::F14VectorMap<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
+        { folly::F14VectorMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
 #if ABSL_HMAP
-        { absl::flat_hash_map<std::string, size_t, hash_func> bench;  bench_randomFindString(bench); }
+        { absl::flat_hash_map<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
 #endif
     }
 
@@ -1459,11 +1461,11 @@ static void runTest(int sflags, int eflags)
 #endif
 
 #if ET
-        { hrd_m::hash_map <std::string, int, hash_func> hmap;   bench_randomEraseString(hmap); }
-        { tsl::robin_map  <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
+        { tsl::robin_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
         { robin_hood::unordered_map <std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 
 #if X86_64
+        { hrd_m::hash_map <std::string, int, hash_func> hmap; bench_randomEraseString(hmap); }
         { ska::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
 #endif
         { phmap::flat_hash_map<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
@@ -1556,7 +1558,7 @@ static void runTest(int sflags, int eflags)
         puts("\nbench_randomFind:");
 
         MRNG rng(time(0));
-        const size_t numInserts[]        = {
+        const size_t numInserts[] = {
             (size_t)rng() % 123 + 123,
             (size_t)rng() % 1234 + 1234,
             (size_t)rng() % 12345 + 12345,
@@ -1573,10 +1575,10 @@ static void runTest(int sflags, int eflags)
 
 #if X86_64
             { ska::flat_hash_map <size_t, size_t, hash_func> fmap; bench_randomFind(fmap, numInserts[i], numFindsPerInsert[i]); }
+            { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 
             { phmap::flat_hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
-            { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]); }
 #endif
 #if QC_HASH
 #if QC_HASH > 1
@@ -1623,12 +1625,12 @@ static void runTest(int sflags, int eflags)
         typedef absl::Hash<int> hash_func;
 #elif FIB_HASH
         typedef Int64Hasher<int> hash_func;
-#elif STD_HASH
-        typedef std::hash<int> hash_func;
+#elif ANKERL_HASH
+        using hash_func = ankerl::unordered_dense::hash<int>;
 #elif HOOD_HASH
         typedef robin_hood::hash<int> hash_func;
 #else
-        using hash_func = ankerl::unordered_dense::hash<int>;
+        typedef std::hash<int> hash_func;
 #endif
 
         puts("\nbench_insert:");
@@ -1667,12 +1669,12 @@ static void runTest(int sflags, int eflags)
         { emilib3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 
 #if ET
-        { hrd_m::hash_map <int, int, hash_func> hmap; bench_insert(hmap); }
-        { tsl::robin_map  <int, int, hash_func> rmap; bench_insert(rmap); }
+        { tsl::robin_map <int, int, hash_func> rmap; bench_insert(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_insert(martin); }
 
 #if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_insert(fmap); }
+        { hrd_m::hash_map <int, int, hash_func> hmap; bench_insert(hmap); }
 #endif
         { phmap::flat_hash_map <int, int, hash_func> hmap; bench_insert(hmap); }
 #endif
@@ -1721,12 +1723,12 @@ static void runTest(int sflags, int eflags)
 #endif
 
 #if ET
-        { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
-        { tsl::robin_map     <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
+        { tsl::robin_map <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
         { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
 
 #if X86_64
         { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
+        { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
         { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
@@ -1781,12 +1783,12 @@ static void runTest(int sflags, int eflags)
         { emilib3::HashMap<int, int, hash_func> emap; bench_randomDistinct2(emap); }
 
 #if ET
-        { hrd_m::hash_map  <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
-        { tsl::robin_map   <int, int, hash_func> rmap; bench_randomDistinct2(rmap); }
+        { tsl::robin_map <int, int, hash_func> rmap; bench_randomDistinct2(rmap); }
         { robin_hood::unordered_map <int, int, hash_func> martin; bench_randomDistinct2(martin); }
 
 #if X86_64
         { ska::flat_hash_map <int, int, hash_func> fmap; bench_randomDistinct2(fmap); }
+        { hrd_m::hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
 #endif
         { phmap::flat_hash_map <int, int, hash_func> hmap; bench_randomDistinct2(hmap); }
 #endif
@@ -1849,12 +1851,12 @@ static void runTest(int sflags, int eflags)
         { bench_knucleotide<emilib3::HashMap<uint64_t, uint32_t, hash_func>>(); }
 
 #if ET
-        { bench_knucleotide<hrd_m::hash_map <uint64_t, uint32_t, hash_func>>(); }
-        { bench_knucleotide<tsl::robin_map  <uint64_t, uint32_t, hash_func>>(); }
+        { bench_knucleotide<tsl::robin_map <uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<robin_hood::unordered_map <uint64_t, uint32_t, hash_func>>(); }
 
 #if X86_64
         { bench_knucleotide<ska::flat_hash_map <uint64_t, uint32_t, hash_func>>(); }
+        { bench_knucleotide<hrd_m::hash_map <uint64_t, uint32_t, hash_func>>(); }
 #endif
         { bench_knucleotide< phmap::flat_hash_map <uint64_t, uint32_t, hash_func>>(); }
 #endif
@@ -1911,12 +1913,12 @@ static void runTest(int sflags, int eflags)
         { bench_GameOfLife<emilib3::HashMap<uint32_t, bool, hash_func>>(); }
 
 #if ET
-        { bench_GameOfLife<hrd_m::hash_map <uint32_t, bool, hash_func>>(); }
-        { bench_GameOfLife<tsl::robin_map  <uint32_t, bool, hash_func>>(); }
+        { bench_GameOfLife<tsl::robin_map <uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<robin_hood::unordered_map <uint32_t, bool, hash_func>>(); }
 
 #if X86_64
         { bench_GameOfLife<ska::flat_hash_map <uint32_t, bool, hash_func>>(); }
+        { bench_GameOfLife<hrd_m::hash_map <uint32_t, bool, hash_func>>(); }
 #endif
         { bench_GameOfLife<phmap::flat_hash_map <uint32_t, bool, hash_func>>(); }
 #endif
@@ -1972,11 +1974,11 @@ static void runTest(int sflags, int eflags)
         {  bench_AccidentallyQuadratic<emilib3::HashMap <int, int, hash_func>>(); }
 
 #if ET
-        {  bench_AccidentallyQuadratic<hrd_m::hash_map <int, int, hash_func>>(); }
-        {  bench_AccidentallyQuadratic<tsl::robin_map  <int, int, hash_func>>(); }
+        {  bench_AccidentallyQuadratic<tsl::robin_map <int, int, hash_func>>(); }
         {  bench_AccidentallyQuadratic<robin_hood::unordered_map <int, int, hash_func>>(); }
 
 #if X86_64
+        {  bench_AccidentallyQuadratic<hrd_m::hash_map <int, int, hash_func>>(); }
         {  bench_AccidentallyQuadratic<ska::flat_hash_map <int, int, hash_func>>(); }
 #endif
         {  bench_AccidentallyQuadratic<phmap::flat_hash_map <int, int, hash_func>>(); }
@@ -2003,41 +2005,41 @@ static void runTest(int sflags, int eflags)
 
         puts("\nbench_InsertEraseContinue:");
 
-        {  bench_insert_erase_continue<emhash6::HashMap<int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<emhash7::HashMap<int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<emhash5::HashMap<int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<emhash8::HashMap<int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<emhash6::HashMap<int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<emhash7::HashMap<int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<emhash5::HashMap<int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<emhash8::HashMap<int, int, hash_func>>(); }
 
 #if QC_HASH
-        {  bench_insert_erase_continue<qc::hash::RawMap<int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<qc::hash::RawMap<int, int, hash_func>>(); }
 #endif
 #if CXX20
-        {  bench_insert_erase_continue<jg::dense_hash_map<int, int, hash_func>>(); }
-//        {  bench_insert_erase_continue<rigtorp::HashMap<int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<jg::dense_hash_map<int, int, hash_func>>(); }
+//        {  bench_InsertEraseContinue<rigtorp::HashMap<int, int, hash_func>>(); }
 #endif
 #if CXX17
-        {  bench_insert_erase_continue<ankerl::unordered_dense::map <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<ankerl::unordered_dense::map <int, int, hash_func>>(); }
 #endif
 #if HAVE_BOOST
-//        {  bench_insert_erase_continue<boost::unordered_flat_map <int, int, hash_func>>(); }
+//        {  bench_InsertEraseContinue<boost::unordered_flat_map <int, int, hash_func>>(); }
 #endif
 #if ABSL_HMAP
-        {  bench_insert_erase_continue<absl::flat_hash_map <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<absl::flat_hash_map <int, int, hash_func>>(); }
 #endif
 
-        {  bench_insert_erase_continue<emilib3::HashMap <int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<emilib::HashMap <int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<emilib2::HashMap <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<emilib3::HashMap <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<emilib::HashMap <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<emilib2::HashMap <int, int, hash_func>>(); }
 
 #if ET
-//        {  bench_insert_erase_continue<hrd_m::hash_map <int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<tsl::robin_map  <int, int, hash_func>>(); }
-        {  bench_insert_erase_continue<robin_hood::unordered_map <int, int, hash_func>>(); }
+//        {  bench_InsertEraseContinue<hrd_m::hash_map <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<tsl::robin_map  <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<robin_hood::unordered_map <int, int, hash_func>>(); }
 
 #if X86_64
-        {  bench_insert_erase_continue<ska::flat_hash_map <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<ska::flat_hash_map <int, int, hash_func>>(); }
 #endif
-        {  bench_insert_erase_continue<phmap::flat_hash_map <int, int, hash_func>>(); }
+        {  bench_InsertEraseContinue<phmap::flat_hash_map <int, int, hash_func>>(); }
 #endif
     }
 
@@ -2057,42 +2059,42 @@ static void runTest(int sflags, int eflags)
 
         puts("\nbench_InsertEraseBegin:");
 
-        {  bench_insert_erase_begin<emhash6::HashMap<int64_t, int, hash_func>>(); }
-        {  bench_insert_erase_begin<emhash7::HashMap<int64_t, int, hash_func>>(); }
-        {  bench_insert_erase_begin<emhash8::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<emhash6::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<emhash7::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<emhash8::HashMap<int64_t, int, hash_func>>(); }
 
 #if QC_HASH
-        {  bench_insert_erase_begin<qc::hash::RawMap<int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<qc::hash::RawMap<int64_t, int, hash_func>>(); }
 #endif
 #if CXX20
-        {  bench_insert_erase_begin<jg::dense_hash_map<int64_t, int, hash_func>>(); }
-//        {  bench_insert_erase_begin<rigtorp::HashMap<int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<jg::dense_hash_map<int64_t, int, hash_func>>(); }
+//        {  bench_InsertEraseBegin<rigtorp::HashMap<int64_t, int, hash_func>>(); }
 #endif
 #if CXX17
-        {  bench_insert_erase_begin<ankerl::unordered_dense::map <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<ankerl::unordered_dense::map <int64_t, int, hash_func>>(); }
 #endif
 #if HAVE_BOOST
-        {  bench_insert_erase_begin<boost::unordered_flat_map <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<boost::unordered_flat_map <int64_t, int, hash_func>>(); }
 #endif
 #if ABSL_HMAP
-//        {  bench_insert_erase_begin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
+//        {  bench_InsertEraseBegin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
 
-        {  bench_insert_erase_begin<emilib2::HashMap <int64_t, int, hash_func>>(); }
-        {  bench_insert_erase_begin<emilib3::HashMap <int64_t, int, hash_func>>(); }
-        {  bench_insert_erase_begin<emilib::HashMap <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<emilib2::HashMap <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<emilib3::HashMap <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<emilib::HashMap <int64_t, int, hash_func>>(); }
 
 #if ET
-//        {  bench_insert_erase_begin<hrd_m::hash_map <int64_t, int, hash_func>>(); }
-        {  bench_insert_erase_begin<tsl::robin_map  <int64_t, int, hash_func>>(); }
-        {  bench_insert_erase_begin<robin_hood::unordered_map <int64_t, int, hash_func>>(); }
+//        {  bench_InsertEraseBegin<hrd_m::hash_map <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<tsl::robin_map <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<robin_hood::unordered_map <int64_t, int, hash_func>>(); }
 
 #if X86_64
-//        {  bench_insert_erase_begin<ska::flat_hash_map <int64_t, int, hash_func>>(); }
+//        {  bench_InsertEraseBegin<ska::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
-        //{  bench_insert_erase_begin<phmap::flat_hash_map <int64_t, int, hash_func>>(); }
+        //{  bench_InsertEraseBegin<phmap::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
-//        {  bench_insert_erase_begin<emhash5::HashMap<int64_t, int, hash_func>>(); }
+//        {  bench_InsertEraseBegin<emhash5::HashMap<int64_t, int, hash_func>>(); }
     }
 
     if (sflags <= 14 && eflags >= 14)
@@ -2139,7 +2141,7 @@ static void runTest(int sflags, int eflags)
 
 #if ET
 //        {  bench_CreateInsert<hrd_m::hash_map <int, int, hash_func>>(); }
-        {  bench_CreateInsert<tsl::robin_map  <int, int, hash_func>>(); }
+        {  bench_CreateInsert<tsl::robin_map <int, int, hash_func>>(); }
         {  bench_CreateInsert<robin_hood::unordered_map <int, int, hash_func>>(); }
 
 #if X86_64
@@ -2193,7 +2195,7 @@ static void runTest(int sflags, int eflags)
 
 #if ET
 //        {  bench_udb3<hrd_m::hash_map <uint32_t, uint32_t, hash_func>>(); }
-        {  bench_udb3<tsl::robin_map  <uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<tsl::robin_map <uint32_t, uint32_t, hash_func>>(); }
         {  bench_udb3<robin_hood::unordered_map <uint32_t, uint32_t, hash_func>>(); }
 
 #if X86_64
@@ -2230,7 +2232,7 @@ static const char* const cases[] = {
     "bench_InsertEraseContinue",
     "bench_InsertEraseBegin",
     "bench_CreateInsert",
-    "bench_Udb3",
+    "bench_udb3",
 };
 
 int main(int argc, char* argv[])
@@ -2304,7 +2306,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("test with max_load_factor = %.2f\n", max_lf);
+    printf("test with max_load_factor = %.2f:rnd=%ld\n", max_lf, RND);
     puts("all test hashmap:");
     for (const auto& m : show_name)
         printf("%10s %20s\n", m.first.data(), m.second.data());
@@ -2313,3 +2315,4 @@ int main(int argc, char* argv[])
     runTest(sflags, eflags);
     return 0;
 }
+

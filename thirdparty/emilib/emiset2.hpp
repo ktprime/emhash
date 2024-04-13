@@ -10,15 +10,17 @@
 #include <cstring>
 #include <iterator>
 #include <utility>
-//#include <cassert>
+#include <cassert>
 
 #ifdef _MSC_VER
 #  include <intrin.h>
 #ifndef __clang__
 #  include <zmmintrin.h>
 #endif
-#else
+#elif __x86_64__ 
 #  include <x86intrin.h>
+#else
+# include "sse2neon.h" 
 #endif
 
 // likely/unlikely

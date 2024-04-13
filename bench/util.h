@@ -445,12 +445,9 @@ static inline uint64_t squirrel3(uint64_t at)
     return at;
 }
 
-#if X86_64
 #ifdef __SSE4_2__
 #include <nmmintrin.h>
-#endif
-
-#if defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
+#elif defined(__aarch64__)
 #include <arm_acle.h>
 #include <arm_neon.h>
 #endif
@@ -459,13 +456,12 @@ static inline uint64_t intHashCRC32(uint64_t x)
 {
 #ifdef __SSE4_2__
     return _mm_crc32_u64(-1ULL, x);
-#elif defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
+#elif defined(__aarch64__)
     return __crc32cd(-1U, x);
 #else
     return x;
 #endif
 }
-#endif
 
 template<typename T>
 struct Int64Hasher

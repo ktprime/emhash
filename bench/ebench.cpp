@@ -197,10 +197,12 @@ std::map<std::string, std::string> maps =
 
     #include "emilib/emilib2o.hpp"
     #include "emilib/emilib2s.hpp"
-    #include "emilib/emilib2so.hpp"
+    #include "emilib/emilib2ss.hpp"
 
 #if ET
+#if X86_64 && CXX17
     #include "hrd/hash_set_m.h"
+#endif
     #include "tsl/robin_map.h"
     #include "tsl/hopscotch_map.h"
 #if ET > 1

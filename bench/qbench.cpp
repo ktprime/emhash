@@ -1075,6 +1075,7 @@ struct BoostFlapMapInfo
 #endif
 #endif
 
+#if X86_64
 template <typename K, typename V>
 struct HrdmHashMap
 {
@@ -1083,6 +1084,7 @@ struct HrdmHashMap
 
     static inline const std::string name{"hrd_m::fhash_map"};
 };
+#endif
 
 template <typename K>
 struct SkaSetInfo
