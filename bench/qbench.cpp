@@ -1295,12 +1295,11 @@ int main(const int argc, const char* argv[])
 #endif
 
         compare<CompareMode::typical, K,
-#if X86
+
             EmiLib1MapInfo<K, V>,
             EmiLib3MapInfo<K, V>,
             EmiLib2MapInfo<K, V>,
 //            EmLibMapInfo<K, V>,
-#endif
 
 #if HAVE_BOOST
             BoostFlapMapInfo<K, V>,

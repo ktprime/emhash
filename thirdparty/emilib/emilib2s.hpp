@@ -16,8 +16,10 @@
 #ifndef __clang__
 #  include <zmmintrin.h>
 #endif
-#else
+#elif __x86_64__ 
 #  include <x86intrin.h>
+#else
+# include "sse2neon.h" 
 #endif
 
 #undef EMH_LIKELY

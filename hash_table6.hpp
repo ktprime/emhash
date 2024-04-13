@@ -91,7 +91,8 @@
     #define EMH_NEW(key, val, bucket, next) new(_pairs + bucket) PairT(key, val, next), _num_filled ++; EMH_SET(bucket)
 #endif
 
-#define EMH_MASK(n) 1 << (n % MASK_BIT)
+
+#define EMH_MASK(n)       uint8_t(1 << (n % MASK_BIT))
 #define EMH_SET(n)  _bitmask[n / MASK_BIT] &= ~(EMH_MASK(n))
 #define EMH_CLS(n)  _bitmask[n / MASK_BIT] |= EMH_MASK(n)
 
@@ -224,7 +225,7 @@ class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
-    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
+    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f;
 #endif
 
 public:

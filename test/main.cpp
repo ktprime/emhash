@@ -143,7 +143,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib2::HashMap
 #else
-#define ehmap  emhash8::HashMap
+#define ehmap  emhash7::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -273,7 +273,7 @@ static void TestApi()
         assert(dict.size() == 1024);
 
         for (int i = 0; i < 1024; i++) {
-            dict.erase(i);
+            dict.erase((short)i);
             decltype(dict) dict3 = {{1, 1}, {2, 2}, {3, 3}};
             dict3 = dict;
             assert(dict3 == dict);
@@ -659,7 +659,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 {
     printf("n = %d, loop = %d\n", (int)n, (int)max_loops);
     printf("============================== %s ============================\n", __FUNCTION__);
-    using keyType = uint32_t;
+    using keyType = uint64_t;
 
 #if EMI == 0
     emilib3::HashMap <keyType, int, BintHasher> ehash;
@@ -1011,8 +1011,8 @@ int main(int argc, char* argv[])
 #endif
 
     for (int i = 0; i < 6; i++) {
-        TestHighLoadFactor<emhash7::HashMap<int64_t, int>>(i);
-        TestHighLoadFactor<emhash8::HashMap<int64_t, int>>(i);
+        TestHighLoadFactor<emhash7::HashMap<uint64_t, int>>(i);
+        TestHighLoadFactor<emhash8::HashMap<uint64_t, int>>(i);
     }
 
     return 0;

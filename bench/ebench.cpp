@@ -195,11 +195,9 @@ std::map<std::string, std::string> maps =
     #include "phmap/phmap.h"
 #endif
 
-#if X86
     #include "emilib/emilib2o.hpp"
     #include "emilib/emilib2s.hpp"
     #include "emilib/emilib2so.hpp"
-#endif
 
 #if ET
     #include "hrd/hash_set_m.h"
@@ -787,7 +785,7 @@ static void insert_erase_continue(const std::string& hash_name, const std::vecto
         sum += i;
         ht_hash.emplace(vList[i], TO_VAL(0));
     }
-
+#if CXX17
     auto key = ht_hash.begin()->first;
     for (; i < nsize ; i--) {
         auto it = ht_hash.find(key);
@@ -807,6 +805,7 @@ static void insert_erase_continue(const std::string& hash_name, const std::vecto
 
         ht_hash.emplace(vList[i], TO_VAL(0));
     }
+#endif
 
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -1350,7 +1349,7 @@ static int benchHashMap(int n)
     using ehash_func = qc::hash::RawMap<keyType, valueType>::hasher;
 #elif STD_HASH
     using ehash_func = std::hash<keyType>;
-#elif HOOD_HASH
+#elif HOOD_HASH || CXX17 == 0
     using ehash_func = robin_hood::hash<keyType>;
 #else
     using ehash_func = ankerl::unordered_dense::hash<keyType>;
@@ -1452,11 +1451,10 @@ static int benchHashMap(int n)
 #endif
 
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
-#if X86
+
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
         {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
-#endif
 
 #if ABSL_HMAP
         {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("abslf", vList); }

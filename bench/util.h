@@ -389,15 +389,14 @@ private:
     uint64_t mCounter;
 };
 
-
 static inline uint64_t hashfib(uint64_t key)
 {
 #if __SIZEOF_INT128__
     __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
-    return (uint64_t)(r >> 64) + (uint64_t)r;
+    return (uint64_t)(r >> 64) ^ (uint64_t)r;
 #elif _WIN64
     uint64_t high;
-    return _umul128(key, UINT64_C(11400714819323198485), &high) + high;
+    return _umul128(key, UINT64_C(11400714819323198485), &high) ^ high;
 #else
     uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
     return (r >> 32) + r;
@@ -606,7 +605,6 @@ struct WyRand
         return high;
 #endif
     }
-
 };
 #endif
 
@@ -655,7 +653,7 @@ static void printInfo(char* out)
 #endif
 
 #if _MSC_VER
-    info += sprintf(info, "ms vc++  %d", _MSC_VER);
+    info += sprintf(info, "ms vc++ %d", _MSC_VER);
 #elif __GNUC__
     info += sprintf(info, "gcc %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
 #elif __INTEL_COMPILER
