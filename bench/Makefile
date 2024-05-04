@@ -8,6 +8,7 @@
 #endif
 
 CXXFLAGS =-O3 -DNDEBUG=1 -march=native -I.. -I../thirdparty
+#-march=armv8.6-a -fpermissive
 #-I/usr/local/include
 
 ifneq ($(FOLLY),)
@@ -140,12 +141,12 @@ endif
 	$(CXX) $(CXXFLAGS) bstring.cpp -o bs
 	$(CXX) $(CXXFLAGS) word_count.cpp -o wc
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
-	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
+	$(CXX) $(CXXFLAGS) app.cpp -o app
 	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
 ifneq ($(EMH),)
 	$(CXX) $(CXXFLAGS) template.cc -o template

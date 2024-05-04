@@ -900,7 +900,6 @@ public:
                 const auto key_h2 = hash_key2(main_bucket, src_pair.first);
                 const auto bucket = find_empty_slot(main_bucket, 0);
 
-                prefetch_heap_block((char*)&_pairs[bucket + 1]);
                 set_states(bucket, key_h2);
                 new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled ++;
@@ -930,11 +929,10 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if __linux__
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        _mm_prefetch((const char*)ctrl, _MM_HINT_NTA);
+#elif defined(__GNUC__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
-//        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
-#elif _WIN32
-        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif
     }
 
@@ -1058,7 +1056,7 @@ private:
         }
 
         const auto ebucket = find_empty_slot(next_bucket, offset);
-        prefetch_heap_block((char*)&_pairs[ebucket]);
+        //prefetch_heap_block((char*)&_pairs[ebucket]);
         set_states(ebucket, key_h2);
         return ebucket;
     }
@@ -1081,8 +1079,10 @@ private:
             const auto maske = empty_delete(next_bucket);
             if (maske != 0) {
                 const auto probe = CTZ(maske) + next_bucket;
-                if (offset > _max_probe_length)
+                prefetch_heap_block((char*)&_pairs[probe]);
+                if (offset > _max_probe_length) {
                     set_offset(offset);
+                }
                 return probe;
             }
             next_bucket = get_next_bucket(next_bucket, ++offset);
