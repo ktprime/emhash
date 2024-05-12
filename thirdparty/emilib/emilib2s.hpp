@@ -100,7 +100,7 @@ inline static uint32_t CTZ(uint64_t n)
 #if _WIN32
     unsigned long index;
     #if defined(_WIN64)
-    _BitScanForward64(&index, n);
+        _BitScanForward64(&index, n);
     #else
     if ((uint32_t)n)
         _BitScanForward(&index, (uint32_t)n);
@@ -846,7 +846,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 5;
+        size_t required_buckets = num_elems + num_elems / 4;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -858,7 +858,7 @@ public:
     void rehash(size_t num_elems) noexcept
     {
         const size_t required_buckets = num_elems;
-        if (EMH_UNLIKELY(required_buckets < _num_filled))
+        if (required_buckets < _num_filled)
             return;
 
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : simd_bytes;
@@ -930,7 +930,7 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-        _mm_prefetch((const char*)ctrl, _MM_HINT_NTA);
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #elif defined(__GNUC__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -954,10 +954,10 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        if (offset < simd_bytes)// || _num_buckets < 32 * simd_bytes)
+        if (offset < 8)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
-            next_bucket += _num_buckets / 32 + simd_bytes;
+            next_bucket += _num_buckets / 16 + simd_bytes;
 #else
         next_bucket += 3 * simd_bytes;
         if (next_bucket >= _num_buckets)

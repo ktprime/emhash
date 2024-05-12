@@ -446,7 +446,15 @@ static inline uint64_t squirrel3(uint64_t at)
     return at;
 }
 
-#ifdef __SSE4_2__
+static inline uint64_t udb_splitmix64(uint64_t x)
+{
+    uint64_t z = x += 0x9e3779b97f4a7c15ULL;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
+#if __SSE4_2__ || _WIN32
 #include <nmmintrin.h>
 #elif defined(__aarch64__)
 #include <arm_acle.h>
@@ -455,7 +463,7 @@ static inline uint64_t squirrel3(uint64_t at)
 
 static inline uint64_t intHashCRC32(uint64_t x)
 {
-#ifdef __SSE4_2__
+#if __SSE4_2__ || _WIN32
     return _mm_crc32_u64(-1ULL, x);
 #elif defined(__aarch64__)
     return __crc32cd(-1U, x);
@@ -484,6 +492,8 @@ struct Int64Hasher
         return squirrel3(key);
 #elif FIB_HASH == 7
         return intHashCRC32(key);
+#elif FIB_HASH == 9
+        return udb_splitmix64(key);
 #elif FIB_HASH > 10000
         return key % FIB_HASH; //bad hash
 #elif FIB_HASH > 100
@@ -679,13 +689,14 @@ static void printInfo(char* out)
 #elif __linux__
     info += sprintf(info, " OS = linux");
 #elif __MAC__ || __APPLE__
-    info += sprintf(info, " OS = MAC");
+    info += sprintf(info, " OS = mac");
 #elif __unix__
     info += sprintf(info, " OS = unix");
 #else
     info += sprintf(info, " OS = unknow");
 #endif
 
+#if X86
     info += sprintf(info, ", cpu = ");
     char vendor[0x40] = {0};
     int (*pTmp)[4] = (int(*)[4])vendor;
@@ -694,6 +705,7 @@ static void printInfo(char* out)
     cpuidInfo(*pTmp ++, 0x80000004, 0);
 
     info += sprintf(info, "%s", vendor);
+#endif
 
     puts(cbuff);
     if (out)

@@ -662,9 +662,9 @@ static int RandTest(size_t n, int max_loops = 1234567)
     using keyType = uint64_t;
 
 #if EMI == 0
-    emilib3::HashMap <keyType, int, BintHasher> ehash;
-#elif EMI == 2
     emilib2::HashMap <keyType, int, BintHasher> ehash;
+#elif EMI == 3
+    emilib3::HashMap <keyType, int, BintHasher> ehash;
 #elif EMI == 1
     emilib::HashMap <keyType, int, BintHasher> ehash;
 #else

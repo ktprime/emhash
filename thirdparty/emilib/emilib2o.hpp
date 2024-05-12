@@ -43,6 +43,7 @@ namespace emilib2 {
     };
 
     constexpr static uint8_t EMPTY_OFFSET = 0;
+    constexpr static uint8_t OFFSET_STEP  = 4;
 
 #if EMH_ITERATOR_BITS < 16
     #define EMH_ITERATOR_BITS 16
@@ -148,7 +149,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = (size_t)key_hash & _mask;
 //        return (int8_t)((key * 0x9FB21C651E98DF25ull % 251) - 125);
-        return (int8_t)(key_hash % 251 + EFILLED);
+        return (int8_t)(key_hash % 253 + EFILLED);
     }
 
     class const_iterator;
@@ -379,7 +380,7 @@ public:
         clear_data();
         _pairs[_num_buckets].~PairT();
         _num_filled = 0;
-        free(_states);
+        free(_pairs);
     }
 
     void clone(const HashMap& other) noexcept
@@ -406,9 +407,9 @@ public:
 
         //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
-        //memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]));
+        memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]) / OFFSET_STEP);
         const auto state_size = simd_bytes + _num_buckets;
-        memcpy(_states, other._states, 2 * state_size * sizeof(_states[0]));
+        memcpy(_states, other._states, state_size * sizeof(_states[0]));
     }
 
     void swap(HashMap& other) noexcept
@@ -785,7 +786,7 @@ public:
 #else
         if (EMH_UNLIKELY(_num_filled == 0)) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets, EMPTY_OFFSET);
+            std::fill_n(_offset, _num_buckets / OFFSET_STEP, EMPTY_OFFSET);
         }
 #endif
     }
@@ -847,7 +848,7 @@ public:
         if (_num_filled) {
             clear_data();
             std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets, EMPTY_OFFSET);
+            std::fill_n(_offset, _num_buckets / OFFSET_STEP, EMPTY_OFFSET);
         }
         _num_filled = 0;
     }
@@ -859,7 +860,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 5;
+        size_t required_buckets = num_elems + num_elems / 4;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -889,7 +890,7 @@ public:
     void rehash(size_t num_elems) noexcept
     {
         const size_t required_buckets = num_elems;
-        if (EMH_UNLIKELY(required_buckets < _num_filled))
+        if (required_buckets < _num_filled)
             return;
 
 #if EMH_STATIS
@@ -905,20 +906,19 @@ public:
         //assert(state_size % 8 == 0);
 
         const auto* new_data = (char*)malloc(pairs_size + state_size * 2 * sizeof(_states[0]));
+        auto old_states      = _states;
 
-        auto* new_state = (decltype(_states))new_data;
-        _offset         = (decltype(_offset))(new_state + state_size);
-        auto* new_pairs = (decltype(_pairs))(_offset + state_size);
+        auto* new_pairs = (decltype(_pairs)) new_data;
+        _states         = (decltype(_states))(new_data + pairs_size);
+        _offset         = (decltype(_offset))(_states + state_size);
 
         auto old_num_filled  = _num_filled;
-        auto old_states      = _states;
         auto old_pairs       = _pairs;
         auto old_buckets     = _num_buckets;
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-        _states      = new_state;
         _pairs       = new_pairs;
 
         //init empty
@@ -926,7 +926,7 @@ public:
         //set sentinel tombstone
         std::fill_n(_states + num_buckets, simd_bytes, State::SENTINEL);
         //fill offset to 0
-        std::fill_n(_offset, num_buckets, EMPTY_OFFSET);
+        std::fill_n(_offset, num_buckets / OFFSET_STEP, EMPTY_OFFSET);
 
         {
             //set last packet tombstone. not equal key h2
@@ -952,7 +952,7 @@ public:
                     src_pair.~PairT();
             }
         }
-        free(old_states);
+        free(old_pairs);
     }
 
 private:
@@ -976,19 +976,18 @@ private:
     inline uint32_t get_offset(size_t main_bucket) const
     {
 #if EMH_SAFE_PSL
-        if (EMH_UNLIKELY(_offset[main_bucket] > 128))
-            return (_offset[main_bucket] - 127) * 128;
+        if (EMH_UNLIKELY(_offset[main_bucket / OFFSET_STEP] > 128))
+            return (_offset[main_bucket / OFFSET_STEP] - 127) * 128;
 #endif
-        return _offset[main_bucket];
+        return _offset[main_bucket / OFFSET_STEP];
     }
 
     inline void set_offset(size_t main_bucket, uint32_t off)
     {
 #if EMH_SAFE_PSL
-        _offset[main_bucket] = off <= 128 ? off : 128 + off / 128;
+        _offset[main_bucket / OFFSET_STEP] = off <= 128 ? off : 128 + off / 128;
 #else
-        assert(off < 256);
-        _offset[main_bucket] = off;
+        _offset[main_bucket / OFFSET_STEP] = (uint8_t)off;
 #endif
     }
 
@@ -1000,8 +999,8 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += offset < 8 ? 7 + simd_bytes * offset / 2 : _mask / 32 + 2;
-        next_bucket += offset % 2;
+        next_bucket += offset < 8 ? simd_bytes * offset: _num_buckets / 32; next_bucket += 1;
+        //next_bucket += simd_bytes * offset + 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;

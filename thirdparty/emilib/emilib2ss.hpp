@@ -839,7 +839,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 5;
+        size_t required_buckets = num_elems + num_elems / 4;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -977,7 +977,7 @@ private:
         if (offset < simd_bytes)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
-            next_bucket += _num_buckets / 32 + simd_bytes;
+            next_bucket += _num_buckets / 16 + simd_bytes;
 #else
         next_bucket += 3 * simd_bytes;
         if (next_bucket >= _num_buckets)

@@ -89,7 +89,7 @@ constexpr int8_t sherwood_v8_constants<T>::bits_for_distance;
 template<typename T>
 constexpr int sherwood_v8_constants<T>::num_jump_distances;
 template<typename T>
-constexpr size_t sherwood_v8_constants<T>::jump_distances[num_jump_distances + 2];
+constexpr uint64_t sherwood_v8_constants<T>::jump_distances[num_jump_distances + 2];
 
 template<typename T, uint8_t BlockSize>
 struct sherwood_v8_block

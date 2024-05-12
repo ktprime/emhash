@@ -1267,7 +1267,7 @@ static void bench_IterateIntegers(MAP& map)
         }
     }
     assert(result == 62498750000000ull + 20833333325000ull);
-    printf(", add/removing time = %.2f, %.2f|%ld\n", (ts1 - ts), now2sec() - ts1, (long)result);
+    printf(", add/removing time = %.2f, %.2f|%d\n", (ts1 - ts), now2sec() - ts1, (int)result);
 }
 
 template<class MAP>
@@ -2306,7 +2306,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("test with max_load_factor = %.2f:rnd=%ld\n", max_lf, RND);
+    printf("test with max_load_factor = %.2f:rnd=%d\n", max_lf, (int)RND);
     puts("all test hashmap:");
     for (const auto& m : show_name)
         printf("%10s %20s\n", m.first.data(), m.second.data());
