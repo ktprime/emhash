@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS =-O3 -DNDEBUG=1 -march=native -I.. -I../thirdparty
+CXXFLAGS =-O3 -Wall -Wno-class-memaccess -DNDEBUG=1 -march=native -I.. -I../thirdparty
 #-march=armv8.6-a -fpermissive
 #-I/usr/local/include
 

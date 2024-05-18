@@ -346,7 +346,7 @@ public:
 
     HashMap(std::initializer_list<value_type> il) noexcept
     {
-        reserve(il.size());
+        reserve((size_t)il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
@@ -484,6 +484,7 @@ public:
 
     float max_load_factor(float lf = 7.0f / 8)
     {
+        (void)lf;
         return 7.0f / 8;
     }
 
@@ -1138,13 +1139,13 @@ private:
         return ebucket;
     }
 
-    inline uint64_t empty_delete(size_t gbucket) const noexcept
+    inline uint32_t empty_delete(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
         return MOVEMASK_EPI8(CMPLT_EPI8(vec, simd_filled));
     }
 
-    inline uint64_t filled_mask(size_t gbucket) const noexcept
+    inline uint32_t filled_mask(size_t gbucket) const noexcept
     {
 #if EMH_ITERATOR_BITS == 160
         const auto vec = _mm_slli_epi16(_mm_loadu_si128((__m128i const*) & _states[gbucket]), 7);

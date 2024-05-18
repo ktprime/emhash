@@ -321,7 +321,7 @@ public:
 
     HashMap(std::initializer_list<value_type> il) noexcept
     {
-        reserve(il.size());
+        reserve((size_t)il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
@@ -458,6 +458,7 @@ public:
 
     float max_load_factor(float lf = 7.0f / 8)
     {
+        (void)lf;
         return 7.0f / 8;
     }
 

@@ -140,7 +140,7 @@ int64_t getus()
 //#elif LINUX_TICK || __APPLE__
 //    return clock();
 #elif __linux__
-    struct timespec ts = {0};
+    struct timespec ts = {0, 0};
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000ull + ts.tv_nsec / 1000;
 #elif __unix__
@@ -233,6 +233,7 @@ public:
 
     // this is a bit biased, but for our use case that's not important.
     uint64_t operator()(uint64_t boundExcluded) noexcept {
+	(void) boundExcluded;
         g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
         return g_lehmer64_state >> 64;
     }
@@ -710,9 +711,9 @@ static void printInfo(char* out)
     puts(cbuff);
     if (out)
 #if _WIN32
-        strncpy_s(out, sizeof(cbuff), cbuff, sizeof(cbuff));
+        strncpy_s(out, sizeof(cbuff), cbuff, sizeof(cbuff) - 1);
 #else
-        strncpy(out, cbuff, sizeof(cbuff));
+        strncpy(out, cbuff, sizeof(cbuff) - 1);
 #endif
 
     puts(sepator);

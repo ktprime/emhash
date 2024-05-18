@@ -513,10 +513,10 @@ template<class hash_type>
 static void iter_all(const hash_type& ht_hash, const std::string& hash_name)
 {
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto& v : ht_hash)
+    for (const auto& _ : ht_hash)
         sum += sum;
 
-    for (auto& v : ht_hash)
+    for (auto& _ : ht_hash)
         sum += 2;
 
     for (auto it = ht_hash.begin(); it != ht_hash.end(); ++it)
@@ -781,7 +781,7 @@ static void insert_erase_continue(const std::string& hash_name, const std::vecto
 {
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
-    const auto nsize = vList.size();
+    const auto nsize = (int)vList.size();
     int i = 0;
     for ( ; i < nsize / 4; i++) {
         sum += i;
@@ -900,7 +900,6 @@ static void insert_erase_high(const std::string& hash_name, size_t vSize)
     ht_hash.reserve(vSize);
 
     WyRand srng(vSize);
-    int loop = 0;
     for (auto i = vSize; i > 0; i--) {
         ht_hash.emplace((keyType)srng(), TO_VAL(0));
     }

@@ -848,6 +848,8 @@ public:
 template <typename M>
 static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation, M& map1, std::vector<vec2> state) {
 
+    (void)name;
+    (void)finalPopulation;
     map1.clear();
     auto map2 = map1;
 
@@ -860,7 +862,7 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
     auto* m1 = &map1;
     auto* m2 = &map2;
     for (size_t i = 0; i < nsteps; ++i) {
-        for (auto const kv : *m1) {
+        for (auto const& kv : *m1) {
             auto const& pos = kv.first;
             const auto alive = kv.second;
             int neighbors = 0;
@@ -880,7 +882,7 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
     }
 
     size_t count = 0;
-    for (auto const kv : *m1) {
+    for (auto const& kv : *m1) {
         count += kv.second;
     }
     assert(finalPopulation ==count);
@@ -942,7 +944,7 @@ static void bench_GameOfLife()
 }
 
 template<class MAP>
-static void bench_copy(MAP& map)
+static void bench_copy(MAP&)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -1108,7 +1110,7 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
 }
 
 template<class MAP>
-static void bench_randomFindString(MAP& map)
+static void bench_randomFindString(MAP&)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -1145,7 +1147,7 @@ static void bench_randomFindString(MAP& map)
 }
 
 template<class MAP>
-static void bench_randomEraseString(MAP& map)
+static void bench_randomEraseString(MAP&)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -1271,7 +1273,7 @@ static void bench_IterateIntegers(MAP& map)
 }
 
 template<class MAP>
-static void bench_randomFind(MAP& bench, size_t numInserts, size_t numFindsPerInsert)
+static void bench_randomFind(MAP&, size_t numInserts, size_t numFindsPerInsert)
 {
     auto map_name = find_hash(typeid(MAP).name());
     if (!map_name)
@@ -2242,7 +2244,7 @@ int main(int argc, char* argv[])
 
     puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d]");
     puts("all test case:");
-    for (int i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+    for (int i = 0; i < int(sizeof(cases) / sizeof(cases[0])); i++)
         printf("    %2d %s\n", i + 1, cases[i]);
     puts("-------------------------------------------------------------------------");
 

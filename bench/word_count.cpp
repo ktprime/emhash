@@ -62,7 +62,7 @@ static void init_words(const char* fn)
             sums += size;
             start = -1;
         };
-        for (int i = 0; i < line.size(); i++) {
+        for (int i = 0; i < (int)line.size(); i++) {
             const auto c = line[i];
             if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '.' || c == '-')) {
                 if (start < 0) start = i;
@@ -124,7 +124,7 @@ static void init_words2(int argc)
 
 template<class Map> void test_word_count( Map& map, std::chrono::steady_clock::time_point & t1 )
 {
-    for( auto const word: words )
+    for( auto const& word: words )
     {
         std::string_view w(gbuffer + word.first, word.second);
         ++map[ w ];
@@ -137,7 +137,7 @@ template<class Map> void test_contains( Map& map, std::chrono::steady_clock::tim
 {
     std::size_t s = 0;
 
-    for( auto const word: words )
+    for( auto const& word: words )
     {
         std::string_view w(gbuffer + word.first, word.second);
 //        w2.remove_prefix( 1 );
@@ -151,7 +151,7 @@ template<class Map> void test_count( Map& map, std::chrono::steady_clock::time_p
 {
     std::size_t s = 0;
 
-    for( auto const word: words )
+    for( auto const& word: words )
     {
         std::string_view w(gbuffer + word.first + 1, word.second - 1);
         s += map.count( w );

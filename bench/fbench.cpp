@@ -192,7 +192,7 @@ rnd_above_perc(int r) {
 static void
 init_keys(std::vector<test_key_t> & insert_keys) {
     insert_keys.clear();
-    for (uint32_t i = 0; i < TEST_LEN; i++) {
+    for (uint32_t i = 0; i < (uint32_t)TEST_LEN; i++) {
         // duplicates here mean nothing...
         insert_keys.push_back(gen_key());
     }
@@ -281,7 +281,7 @@ static int run_table(std::vector<test_key_t> & insert_keys,
     auto start_time = now2ns();
     auto sum = 0;
     auto dvalue = gen_val();
-    for (uint32_t i = 0; i < TEST_LEN; i++) {
+    for (uint32_t i = 0; i < (uint32_t)TEST_LEN; i++) {
         test_table[insert_keys[i]] = dvalue;
         for (uint32_t j = i * QUERY_RATE; j < (i + 1) * QUERY_RATE; j++) {
             sum += test_table.count(query_keys[j]);

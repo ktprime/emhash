@@ -475,6 +475,7 @@ public:
 
     float max_load_factor(float lf = 7.0f / 8)
     {
+        (void)lf;
         return 7.0f / 8;
     }
 

@@ -69,7 +69,7 @@ static void init_indices(int n1, int n2, const uint32_t ration = 10)
     //boost::detail::splitmix64 rng;
     WyRand rng(time(0));
 
-    for (size_t i = 0; i < n1; ++i )
+    for (size_t i = 0; i < (size_t)n1; ++i )
     {
         auto rt = rng();
         indices1[i] = rt;
@@ -152,7 +152,7 @@ template<template<class...> class Map>  void test_block(char const* label)
         const uint32_t bindex = (vhash & capacity) >> high_bit; // save hash
         auto& bv = vblocks[bindex];
         if (bv[0] >= VCACHE_SIZE - 1) {
-            for (int i = 1; i < VCACHE_SIZE; i++) {
+            for (int i = 1; i < (int)VCACHE_SIZE; i++) {
                 ans += map.count(bv[i]);
             }
             bv[0] = 0;
@@ -161,7 +161,7 @@ template<template<class...> class Map>  void test_block(char const* label)
     }
 
     for (const auto& bv:vblocks) {
-        for (int i = 1; i <= bv[0]; i++)
+        for (int i = 1; i <= (int)bv[0]; i++)
             ans += map.count(bv[i]);
     }
 
