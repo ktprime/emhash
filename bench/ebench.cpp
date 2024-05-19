@@ -789,7 +789,7 @@ static void insert_erase_continue(const std::string& hash_name, const std::vecto
     }
 #if CXX17
     auto key = ht_hash.begin()->first;
-    for (; i < nsize ; i--) {
+    for (; i < nsize ; i++) {
         auto it = ht_hash.find(key);
         if (it == ht_hash.end()) {
             it = ht_hash.begin();
@@ -797,14 +797,12 @@ static void insert_erase_continue(const std::string& hash_name, const std::vecto
         }
 
         if constexpr (std::is_void_v< decltype(ht_hash.erase(it))>) {
-            ht_hash.erase(it);
-            if (++it != ht_hash.end()) key = it->first;
+            ht_hash.erase(it++);
         }
         else {
             it = ht_hash.erase(it);
-            if (it != ht_hash.end()) key = it->first;
         }
-
+        if (it != ht_hash.end()) key = it->first;
         ht_hash.emplace(vList[i], TO_VAL(0));
     }
 #endif

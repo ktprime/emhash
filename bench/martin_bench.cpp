@@ -62,7 +62,7 @@
 #endif
 
 static const auto RND = getus();
-static float max_lf = 0.80;
+static float max_lf = 0.80f;
 
 static std::map<std::string_view, std::string_view> show_name =
 {
@@ -271,9 +271,9 @@ static void bench_insert(MAP& map)
     printf("    %s\n", map_name);
 
 #if X86_64
-    size_t maxn = 1000000;
+    uint32_t maxn = 1000000;
 #else
-    size_t maxn = 1000000 / 5;
+    uint32_t maxn = 1000000 / 5;
 #endif
 
     map.max_load_factor(max_lf);
@@ -790,13 +790,13 @@ static void bench_knucleotide() {
     }
 
     auto nows = now2sec();
-    int ans = 0;
+    size_t ans = 0;
     ans += kcount<MAP>(poly, "GGTATTTTAATTTATAGT");
     ans += kcount<MAP>(poly, "GGTATTTTAATT");
     ans += kcount<MAP>(poly, "GGTATT");
     ans += kcount<MAP>(poly, "GGTA");
     ans += kcount<MAP>(poly, "GGT");
-    printf(" ans = %d time = %.2f s\n", ans, now2sec() - nows);
+    printf(" ans = %d time = %.2f s\n", (int)ans, now2sec() - nows);
 }
 
 class vec2 {
@@ -964,7 +964,7 @@ static void bench_copy(MAP&)
         if (i == 100'000) {
             rememberKey = key;
         }
-        mapSource[key] = i;
+        mapSource[key] = (int)i;
     }
 
     auto nows = now2sec();
@@ -973,7 +973,7 @@ static void bench_copy(MAP&)
         MAP m = mapForCopy;
         result += m.size() + m[rememberKey];
         for (int i = 0; i < KN; i++) //with different load factor
-            mapForCopy[rng()] = rng();
+            mapForCopy[rng()] = (int)rng();
     }
 //    assert(result == 300019900);
     auto copyt = now2sec();
@@ -985,7 +985,7 @@ static void bench_copy(MAP&)
         m = mapForCopy;
         result += m.size() + m[rememberKey];
         for (int i = 0; i < KN; i++)
-            mapForCopy[rng()] = rng();
+            mapForCopy[rng()] = (int)rng();
     }
 //    assert(result == 600039800);
     printf(", assign time = %.2f s, result = %zu\n", now2sec() - copyt, result);
@@ -2239,7 +2239,7 @@ static const char* const cases[] = {
 
 int main(int argc, char* argv[])
 {
-    srand(time(0));
+    srand((int)time(0));
     printInfo(nullptr);
 
     puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d]");

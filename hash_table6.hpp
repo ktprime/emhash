@@ -590,7 +590,7 @@ public:
 
         auto _num_buckets = _mask + 1;
         if (is_copy_trivially())
-            memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
+            memcpy((char*)_pairs, opairs, _num_buckets * sizeof(PairT));
         else {
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = EMH_ADDR(_pairs, bucket) = EMH_ADDR(opairs, bucket);
@@ -598,7 +598,7 @@ public:
                     new(_pairs + bucket) PairT(opairs[bucket]);
             }
         }
-        memcpy(_pairs + _num_buckets, opairs + _num_buckets, PACK_SIZE * sizeof(PairT) + _num_buckets / 8 + BIT_PACK);
+        memcpy((char*)(_pairs + _num_buckets), opairs + _num_buckets, PACK_SIZE * sizeof(PairT) + _num_buckets / 8 + BIT_PACK);
     }
 
     void swap(HashMap& rhs)
@@ -1199,8 +1199,8 @@ public:
         if (is_triviall_destructable())
             clearkv();
         else if (_num_filled) {
-            memset(_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
-            memset(_pairs, -1, sizeof(_pairs[0]) * (_mask + 1));
+            memset((char*)_bitmask, 0xFFFFFFFF, (_mask + 1) / 8);
+            memset((char*)_pairs, -1, sizeof(_pairs[0]) * (_mask + 1));
 #if EMH_FIND_HIT
             if constexpr (std::is_integral<KeyT>::value)
             reset_bucket(hash_main(0));
@@ -1248,8 +1248,8 @@ public:
 
         // no need alloc too many bucket for small key.
         // if maybe fail set small load_factor and then call reserve() TODO:
-        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
-            buckets = 2ul << (sizeof(KeyT) * 8);
+        //if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
+        //    buckets = 2ul << (sizeof(KeyT) * 8);
 
         assert(buckets < max_size() && buckets > _num_filled);
         //assert(num_buckets == (2 << CTZ(required_buckets)));
@@ -1286,7 +1286,7 @@ public:
         _num_main = 0;
 #endif
 
-        memset(_pairs, -1, sizeof(_pairs[0]) * num_buckets);
+        memset((char*)_pairs, -1, sizeof(_pairs[0]) * num_buckets);
 
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)
@@ -1298,7 +1298,7 @@ public:
 
         /***************** init bitmask ---------------------- ***********/
         const auto mask_byte = (num_buckets + 7) / 8;
-        memset(_bitmask, 0xFFFFFFFF, mask_byte);
+        memset((char*)_bitmask, 0xFFFFFFFF, mask_byte);
         memset((char*)_bitmask + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8)
             _bitmask[0] = (1 << num_buckets) - 1;
@@ -1645,7 +1645,7 @@ private:
 #elif EMH_ITER_SAFE
         const auto boset = bucket_from % 8;
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
-        size_t bmask; memcpy(&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
+        size_t bmask; memcpy((char*)&bmask, start + 0, sizeof(bmask)); bmask >>= boset;
 #else //maybe not aligned
         const auto boset  = bucket_from % 8;
         auto* const align = (uint8_t*)_bitmask + bucket_from / 8;

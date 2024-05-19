@@ -375,7 +375,7 @@ public:
 
         if (is_copy_trivially()) {
             const auto pairs_size = (1 + bucket_to_slot(_num_buckets)) * sizeof(PairT);
-            memcpy(_pairs, other._pairs, pairs_size);
+            memcpy((char*)_pairs, other._pairs, pairs_size);
         } else {
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + bucket_to_slot(it.bucket())) PairT(*it);

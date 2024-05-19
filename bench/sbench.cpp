@@ -694,14 +694,13 @@ template<class hash_type>
 static void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
     auto n = ht_hash.size();
-    size_t pow2 = 2u << ilog(n, 2), sum = 0;
 
 #if KEY_STR
 #if TKey != 4
     auto skey = get_random_alphanum_string(STR_SIZE);
 #endif
 #endif
-
+    size_t sum = 0;
     auto ts1 = getus();
     for (const auto& v : vList) {
 #if KEY_STR
@@ -944,7 +943,7 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     {
         hash_type hash;
         const uint32_t l1_size = (32 * 1024)   / (sizeof(keyType) + sizeof(valueType));
-        const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
+//        const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
         const uint32_t l3_size = (8 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
         func_index = 0;

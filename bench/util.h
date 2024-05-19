@@ -651,61 +651,61 @@ static void printInfo(char* out)
     puts(sepator);
     //    puts("Copyright (C) by 2019-2022 Huang Yuanbing bailuzhou at 163.com\n");
 
-    char cbuff[512] = {0};
+    char cbuff[1512] = {0};
     char* info = cbuff;
 #ifdef __clang__
-    info += sprintf(info, "clang %s", __clang_version__); //vc/gcc/llvm
+    info += snprintf(info, 20,  "clang %s", __clang_version__); //vc/gcc/llvm
 #if __llvm__
-    info += sprintf(info, " on llvm/");
+    info += snprintf(info, 20,  " on llvm/");
 #endif
 #endif
 
 #if _MSC_VER
-    info += sprintf(info, "ms vc++ %d", _MSC_VER);
+    info += snprintf(info, 20,  "ms vc++ %d", _MSC_VER);
 #elif __GNUC__
-    info += sprintf(info, "gcc %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+    info += snprintf(info, 20,  "gcc %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
 #elif __INTEL_COMPILER
-    info += sprintf(info, "intel c++ %d", __INTEL_COMPILER);
+    info += snprintf(info, 20,  "intel c++ %d", __INTEL_COMPILER);
 #endif
 
 #if __cplusplus > 199711L
-    info += sprintf(info, " __cplusplus = %d", static_cast<int>(__cplusplus));
+    info += snprintf(info, 20,  " __cplusplus = %d", static_cast<int>(__cplusplus));
 #endif
 
 #if X86_64
-    info += sprintf(info, " x86-64");
+    info += snprintf(info, 20,  " x86-64");
 #elif X86_32
-    info += sprintf(info, " x86");
+    info += snprintf(info, 20,  " x86");
 #elif __arm64__ || __aarch64__
-    info += sprintf(info, " arm64");
+    info += snprintf(info, 20,  " arm64");
 #elif __arm__
-    info += sprintf(info, " arm");
+    info += snprintf(info, 20,  " arm");
 #else
-    info += sprintf(info, " unknow");
+    info += snprintf(info, 20,  " unknow");
 #endif
 
 #if _WIN32
-    info += sprintf(info, " OS = Win");
+    info += snprintf(info, 20,  " OS = Win");
 //    SetThreadAffinityMask(GetCurrentThread(), 0x1);
 #elif __linux__
-    info += sprintf(info, " OS = linux");
+    info += snprintf(info, 20,  " OS = linux");
 #elif __MAC__ || __APPLE__
-    info += sprintf(info, " OS = mac");
+    info += snprintf(info, 20,  " OS = mac");
 #elif __unix__
-    info += sprintf(info, " OS = unix");
+    info += snprintf(info, 20,  " OS = unix");
 #else
-    info += sprintf(info, " OS = unknow");
+    info += snprintf(info, 20,  " OS = unknow");
 #endif
 
 #if X86
-    info += sprintf(info, ", cpu = ");
+    info += snprintf(info, 40,  ", cpu = ");
     char vendor[0x40] = {0};
     int (*pTmp)[4] = (int(*)[4])vendor;
     cpuidInfo(*pTmp ++, 0x80000002, 0);
     cpuidInfo(*pTmp ++, 0x80000003, 0);
     cpuidInfo(*pTmp ++, 0x80000004, 0);
 
-    info += sprintf(info, "%s", vendor);
+    info += snprintf(info, 40,  "%s", vendor);
 #endif
 
     puts(cbuff);

@@ -390,7 +390,7 @@ public:
         }
 
         if (is_copy_trivially()) {
-            memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
+            memcpy((char*)_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);

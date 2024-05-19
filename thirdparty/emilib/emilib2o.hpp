@@ -399,7 +399,7 @@ public:
 
         if (is_copy_trivially()) {
             const auto pairs_size = (_num_buckets + 1) * sizeof(PairT);
-            memcpy(_pairs, other._pairs, pairs_size);
+            memcpy((char*)_pairs, other._pairs, pairs_size);
         } else {
             for (auto it = other.cbegin(); it.bucket() <= _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);

@@ -491,7 +491,7 @@ public:
         auto opairs  = rhs._pairs;
 
         if (is_copy_trivially())
-            memcpy(_pairs, opairs, (_num_buckets + 2) * sizeof(PairT));
+            memcpy((char*)_pairs, opairs, (_num_buckets + 2) * sizeof(PairT));
         else {
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
@@ -502,7 +502,7 @@ public:
                     EMH_PREVET(_pairs, bucket) = EMH_PREVET(opairs, bucket);
 #endif
             }
-            memcpy(_pairs + _num_buckets, opairs + _num_buckets, sizeof(PairT) * 2);
+            memcpy((char*)(_pairs + _num_buckets), opairs + _num_buckets, sizeof(PairT) * 2);
         }
     }
 
@@ -1374,8 +1374,8 @@ public:
 
         // no need alloc too many bucket for small key.
         // if maybe fail set small load_factor and then call reserve() TODO:
-        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
-            buckets = 2ul << (sizeof(KeyT) * 8);
+        //if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
+        //    buckets = 2ul << (sizeof(KeyT) * 8);
 
         assert(buckets < max_size() && buckets > _num_filled);
 
@@ -1567,7 +1567,7 @@ private:
         }
         EMH_BUCKET(_pairs, bucket) = INACTIVE; //the status is reset by destructor by some compiler
         _num_filled--;
-
+        (void)bclear;
 #if EMH_HIGH_LOAD
         if (_ehead && bclear) {
             if (10 * _num_filled < 8 * _num_buckets)
@@ -1686,7 +1686,7 @@ private:
 
     // Find the bucket with this key, or return bucket size
     template<typename K=KeyT>
-    size_type find_hash_bucket(const K& key, size_t bucket) const noexcept
+    size_type find_hash_bucket(const K& key, size_type bucket) const noexcept
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
 

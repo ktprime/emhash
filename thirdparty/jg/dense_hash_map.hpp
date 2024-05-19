@@ -728,7 +728,7 @@ public:
 
     constexpr void reserve(std::size_t count)
     {
-        rehash(std::ceil(count / max_load_factor()));
+        rehash((size_t)std::ceil(count / max_load_factor()));
         nodes_.reserve(count);
     }
 
