@@ -378,8 +378,8 @@ public:
     ~HashMap() noexcept
     {
         clear_data();
-        _pairs[_num_buckets].~PairT();
         _num_filled = 0;
+        _pairs[_num_buckets].~PairT();
         free(_pairs);
     }
 
@@ -651,14 +651,14 @@ public:
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
     {
-        check_expand_need();
+        //check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
     {
-        check_expand_need();
+        //check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
@@ -706,7 +706,7 @@ public:
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
     {
-        check_expand_need();
+        //check_expand_need();
 
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
@@ -941,7 +941,6 @@ public:
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
             if (old_states[src_bucket] >= State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
-
                 size_t main_bucket;
                 const auto key_h2 = hash_key2(main_bucket, src_pair.first);
                 const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
@@ -1081,7 +1080,7 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        check_expand_need();
+        reserve(_num_filled);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
@@ -1098,7 +1097,7 @@ private:
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
-                if (EMH_LIKELY(_eq(_pairs[fbucket].first, key))) {
+                if (_eq(_pairs[fbucket].first, key)) {
                     bnew = false;
                     return fbucket;
                 }
@@ -1107,7 +1106,7 @@ private:
 
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (maske) {
+            if (maske != 0) {
                 auto ebucket = next_bucket + CTZ(maske);
                 if (EMH_UNLIKELY(hole != chole))
                     ebucket = hole;
@@ -1195,27 +1194,14 @@ private:
     size_t find_empty_slot(size_t main_bucket, size_t next_bucket, size_t offset) noexcept
     {
         while (true) {
-            size_t ebucket;
             const auto maske = empty_delete(next_bucket);
-            if (maske == 0)
-                goto JNEXT_BLOCK;
-
-            ebucket = next_bucket + CTZ(maske);
-            prefetch_heap_block((char*)&_pairs[ebucket]);
-            if (offset <= get_offset(main_bucket))
+            if (maske != 0) {
+                const auto ebucket = CTZ(maske) + next_bucket;
+                prefetch_heap_block((char*)&_pairs[ebucket]);
+                if (offset > get_offset(main_bucket))
+                    set_offset(main_bucket, offset);
                 return ebucket;
-
-#if EMH_PSL > 8 && EMH_PSL_LINEAR
-            else if (EMH_UNLIKELY(offset >= EMH_PSL)) {
-                const auto kbucket = update_offset(main_bucket, ebucket, offset);
-                if (kbucket != (size_t)-1)
-                    return kbucket;
             }
-#endif
-            set_offset(main_bucket, offset);
-            return ebucket;
-
-JNEXT_BLOCK:
             next_bucket = get_next_bucket(next_bucket, ++offset);
         }
 

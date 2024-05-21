@@ -337,7 +337,7 @@ public:
 
     HashMap(std::initializer_list<value_type> il) noexcept
     {
-        reserve(il.size());
+        reserve((size_t)il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
@@ -369,7 +369,6 @@ public:
     ~HashMap() noexcept
     {
         clear_data();
-
         _num_filled = 0;
         free(_states);
         free(_pairs);
@@ -642,14 +641,14 @@ public:
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
     {
-        check_expand_need();
+        //check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
     {
-        check_expand_need();
+        //check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
@@ -697,7 +696,7 @@ public:
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
     {
-        check_expand_need();
+        //check_expand_need();
 
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
@@ -728,6 +727,7 @@ public:
         if (bempty) {
             new(_pairs + bucket) PairT(std::move(key), std::move(ValueT())); _num_filled++;
         }
+
         return _pairs[bucket].second;
     }
 
@@ -990,7 +990,7 @@ private:
 
             if (group_mask(next_bucket) == State::EEMPTY)
                 break;
-            if (++offset > _max_probe_length)
+            if (EMH_UNLIKELY(++offset > _max_probe_length))
                 break;
             next_bucket = get_next_bucket(next_bucket, offset);
         }
@@ -1003,7 +1003,7 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        check_expand_need();
+        reserve(_num_filled);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
@@ -1047,7 +1047,7 @@ private:
 
             //4. next round
             next_bucket = get_next_bucket(next_bucket, ++offset);
-            if (offset > _max_probe_length)
+            if (EMH_UNLIKELY(offset > _max_probe_length))
                 break;
         }
 
@@ -1059,6 +1059,7 @@ private:
         const auto ebucket = find_empty_slot(next_bucket, offset);
         //prefetch_heap_block((char*)&_pairs[ebucket]);
         set_states(ebucket, key_h2);
+
         return ebucket;
     }
 
@@ -1079,12 +1080,11 @@ private:
         while (true) {
             const auto maske = empty_delete(next_bucket);
             if (maske != 0) {
-                const auto probe = CTZ(maske) + next_bucket;
-                prefetch_heap_block((char*)&_pairs[probe]);
-                if (offset > _max_probe_length) {
+                const auto ebucket = CTZ(maske) + next_bucket;
+                prefetch_heap_block((char*)&_pairs[ebucket]);
+                if (offset > _max_probe_length)
                     set_offset(offset);
-                }
-                return probe;
+                return ebucket;
             }
             next_bucket = get_next_bucket(next_bucket, ++offset);
         }

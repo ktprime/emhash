@@ -629,14 +629,14 @@ public:
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
     {
-        check_expand_need();
+        //check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
     {
-        check_expand_need();
+        //check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
@@ -684,7 +684,7 @@ public:
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
     {
-        check_expand_need();
+        //check_expand_need();
 
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
@@ -1024,7 +1024,7 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        check_expand_need();
+        reserve(_num_filled);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
@@ -1069,7 +1069,7 @@ private:
             next_bucket = get_next_bucket(next_bucket, ++offset);
             if (offset > group_probe(main_bucket))
                 break;
-         }
+        }
 
         if (hole != chole) {
             set_states(hole, key_h2);
@@ -1078,6 +1078,8 @@ private:
 
         const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
         set_states(ebucket, key_h2);
+        //if (EMH_UNLIKELY(reserve(_num_filled + 1)))
+        //    return find_filled_bucket(key);
         return ebucket;
     }
 
