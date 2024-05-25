@@ -9,26 +9,29 @@
 #ifndef BOOST_UNORDERED_DETAIL_FOA_ELEMENT_TYPE_HPP
 #define BOOST_UNORDERED_DETAIL_FOA_ELEMENT_TYPE_HPP
 
+
 namespace boost{
 namespace unordered{
 namespace detail{
 namespace foa{
 
-template<class T>
+template<class T,class VoidPtr>
 struct element_type
 {
   using value_type=T;
-  value_type* p;
+  using pointer=typename std::pointer_traits<VoidPtr>::template rebind<T>;
+
+  pointer p;
 
   /*
    * we use a deleted copy constructor here so the type is no longer
    * trivially copy-constructible which inhibits our memcpy
    * optimizations when copying the tables
    */
-  element_type() = default;
-  element_type(value_type* p_):p(p_){}
-  element_type(element_type const&) = delete;
-  element_type(element_type&& rhs) noexcept
+  element_type()=default;
+  element_type(pointer p_):p(p_){}
+  element_type(element_type const&)=delete;
+  element_type(element_type&& rhs)noexcept
   {
     p = rhs.p;
     rhs.p = nullptr;

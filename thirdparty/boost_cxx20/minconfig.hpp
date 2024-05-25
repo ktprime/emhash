@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <bit>
+
 // This is a minimal header that contains only the small set
 // config entries needed to use boost::unordered, so that the
 // whole boost config lib doesn't need to be pulled in.
@@ -105,4 +108,22 @@
   #if !__has_feature(cxx_rtti) && !defined(BOOST_NO_RTTI)
     #define BOOST_NO_RTTI
   #endif
+#endif
+
+// This is the only predef define needed for boost::unordered, so pull it
+// out here so we don't need to include all of predef.
+#if \
+    defined(__ARM_ARCH) || defined(__TARGET_ARCH_ARM) || \
+    defined(__TARGET_ARCH_THUMB) || defined(_M_ARM) || \
+    defined(__arm__) || defined(__arm64) || defined(__thumb__) || \
+    defined(_M_ARM64) || defined(__aarch64__) || defined(__AARCH64EL__) || \
+    defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || \
+    defined(__ARM_ARCH_7R__) || defined(__ARM_ARCH_7M__) || \
+    defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6Z__) || \
+    defined(__ARM_ARCH_6KZ__) || defined(__ARM_ARCH_6T2__) || \
+    defined(__ARM_ARCH_5TE__) || defined(__ARM_ARCH_5TEJ__) || \
+    defined(__ARM_ARCH_4T__) || defined(__ARM_ARCH_4__)
+#define BOOST_ARCH_ARM 1
+#else
+#define BOOST_ARCH_ARM 0
 #endif

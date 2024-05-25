@@ -11,6 +11,7 @@
 #ifndef BOOST_UNORDERED_HASH_TRAITS_HPP
 #define BOOST_UNORDERED_HASH_TRAITS_HPP
 
+#include <boost/unordered/detail/type_traits.hpp>
 
 namespace boost{
 namespace unordered{
@@ -22,7 +23,7 @@ struct hash_is_avalanching_impl: std::false_type{};
 
 template<typename Hash>
 struct hash_is_avalanching_impl<Hash,
-  typename std::void_t<typename Hash::is_avalanching>>:
+  boost::unordered::detail::void_t<typename Hash::is_avalanching> >:
     std::true_type{};
 
 } /* namespace detail */

@@ -11,10 +11,10 @@
 #include <utility>
 #include <cassert>
 
-#ifdef _MSC_VER
+#if _WIN32
 #  include <intrin.h>
 #ifndef __clang__
-#  include <zmmintrin.h>
+//#  include <zmmintrin.h>
 #endif
 #elif __x86_64__ 
 #  include <x86intrin.h>

@@ -8,7 +8,20 @@ Distributed under the Boost Software License, Version 1.0.
 #ifndef BOOST_CORE_EMPTY_VALUE_HPP
 #define BOOST_CORE_EMPTY_VALUE_HPP
 
+#include <boost/minconfig.hpp>
 #include <utility>
+
+#if defined(BOOST_GCC_VERSION) && (BOOST_GCC_VERSION >= 40700)
+#define BOOST_DETAIL_EMPTY_VALUE_BASE
+#elif defined(BOOST_INTEL) && defined(_MSC_VER) && (_MSC_VER >= 1800)
+#define BOOST_DETAIL_EMPTY_VALUE_BASE
+#elif defined(BOOST_MSVC) && (BOOST_MSVC >= 1800)
+#define BOOST_DETAIL_EMPTY_VALUE_BASE
+#elif defined(BOOST_CLANG) && !defined(__CUDACC__)
+#if __has_feature(is_empty) && __has_feature(is_final)
+#define BOOST_DETAIL_EMPTY_VALUE_BASE
+#endif
+#endif
 
 #if defined(_MSC_VER)
 #pragma warning(push)
@@ -20,7 +33,11 @@ namespace boost {
 template<class T>
 struct use_empty_value_base {
     enum {
+#if defined(BOOST_DETAIL_EMPTY_VALUE_BASE)
         value = __is_empty(T) && !__is_final(T)
+#else
+        value = false
+#endif
     };
 };
 

@@ -5,6 +5,7 @@
 #ifndef BOOST_HASH_DETAIL_HASH_MIX_HPP
 #define BOOST_HASH_DETAIL_HASH_MIX_HPP
 
+#include <cstdint>
 #include <cstddef>
 #include <climits>
 
@@ -67,7 +68,7 @@ template<> struct hash_mix_impl<64>
 {
     inline static std::uint64_t fn( std::uint64_t x )
     {
-        std::uint64_t const m = (std::uint64_t(0xe9846af) << 32) + 0x9b1a615d;
+        std::uint64_t const m = 0xe9846af9b1a615d;
 
         x ^= x >> 32;
         x *= m;

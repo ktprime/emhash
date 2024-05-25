@@ -7,6 +7,8 @@
 
 #include <boost/container_hash/hash_fwd.hpp>
 #include <boost/container_hash/detail/mulx.hpp>
+#include <type_traits>
+#include <cstdint>
 #include <iterator>
 #include <limits>
 #include <cstddef>
@@ -252,8 +254,8 @@ std::size_t>::type
     It p = first;
     std::size_t n = static_cast<std::size_t>( last - first );
 
-    std::uint64_t const q = static_cast<std::uint64_t>( 0x9e3779b9 ) << 32 | 0x7f4a7c15;
-    std::uint64_t const k = static_cast<std::uint64_t>( 0xdf442d22 ) << 32 | 0xce4859b9; // q * q
+    std::uint64_t const q = 0x9e3779b97f4a7c15;
+    std::uint64_t const k = 0xdf442d22ce4859b9; // q * q
 
     std::uint64_t w = mulx( seed + q, k );
     std::uint64_t h = w ^ n;
@@ -304,8 +306,8 @@ std::size_t>::type
 {
     std::size_t n = 0;
 
-    std::uint64_t const q = static_cast<std::uint64_t>( 0x9e3779b9 ) << 32 | 0x7f4a7c15;
-    std::uint64_t const k = static_cast<std::uint64_t>( 0xdf442d22 ) << 32 | 0xce4859b9; // q * q
+    std::uint64_t const q = 0x9e3779b97f4a7c15;
+    std::uint64_t const k = 0xdf442d22ce4859b9; // q * q
 
     std::uint64_t w = mulx( seed + q, k );
     std::uint64_t h = w;

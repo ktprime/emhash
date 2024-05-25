@@ -9,6 +9,8 @@
 #ifndef BOOST_UNORDERED_DETAIL_FOA_NODE_HANDLE_HPP
 #define BOOST_UNORDERED_DETAIL_FOA_NODE_HANDLE_HPP
 
+#include <boost/unordered/detail/opt_storage.hpp>
+
 #include <boost/minconfig.hpp>
 
 namespace boost{
@@ -22,14 +24,6 @@ struct insert_return_type
   Iterator position;
   bool     inserted;
   NodeType node;
-};
-
-template <class T>
-union opt_storage {
-  [[no_unique_address]] T t_;
-
-  opt_storage(){}
-  ~opt_storage(){}
 };
 
 template <class TypePolicy,class Allocator>
@@ -125,7 +119,8 @@ struct node_handle_base
             reset();
           }else{                               /* !empty(), !nh.empty() */
             bool const pocma=
-              std::allocator_traits<Allocator>::propagate_on_container_move_assignment::value;
+              std::allocator_traits<
+                Allocator>::propagate_on_container_move_assignment::value;
 
             BOOST_ASSERT(pocma||al()==nh.al());
 
@@ -179,7 +174,8 @@ struct node_handle_base
             reset();
           }else{
             bool const pocs=
-              std::allocator_traits<Allocator>::propagate_on_container_swap::value;
+              std::allocator_traits<
+                Allocator>::propagate_on_container_swap::value;
 
             BOOST_ASSERT(pocs || al()==nh.al());
 

@@ -6,6 +6,8 @@
 #define BOOST_HASH_IS_CONTIGUOUS_RANGE_HPP_INCLUDED
 
 #include <boost/container_hash/is_range.hpp>
+#include <boost/minconfig.hpp>
+#include <type_traits>
 
 
 #include <iterator>

@@ -6,6 +6,7 @@
 #define BOOST_HASH_IS_UNORDERED_RANGE_HPP_INCLUDED
 
 #include <boost/container_hash/is_range.hpp>
+#include <type_traits>
 
 namespace boost
 {

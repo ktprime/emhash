@@ -1218,12 +1218,8 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
     }
 
     if (map.size() == 0) {
-#if _WIN32
-    printf("    %3u%% %016llx time = %.2f s, %8d loadf = %.2f\n",
-#else
-    printf("    %3u%% %016lx time = %.2f s, %8d loadf = %.2f\n",
-#endif
-            uint32_t(numSequential * 100 / NumTotal), bitMask, now2sec() - ts, (int)num_found, map.load_factor());
+        printf("    %3u%% %016x time = %.2f s, %8d loadf = %.2f\n",
+            uint32_t(numSequential * 100 / NumTotal), (int)bitMask, now2sec() - ts, (int)num_found, map.load_factor());
     }
 
     return map.size();

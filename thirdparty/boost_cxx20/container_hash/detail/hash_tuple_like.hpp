@@ -9,9 +9,8 @@
 #include <boost/container_hash/hash_fwd.hpp>
 #include <boost/container_hash/is_tuple_like.hpp>
 #include <boost/container_hash/is_range.hpp>
-
-
-#include <tuple>
+#include <type_traits>
+#include <utility>
 
 namespace boost
 {
@@ -48,8 +47,6 @@ inline std::size_t hash_tuple_like( T const& v )
 
 } // namespace hash_detail
 
-
-
 template <class T>
 inline
 typename std::enable_if<
@@ -60,9 +57,6 @@ std::size_t>::type
     return boost::hash_detail::hash_tuple_like( v );
 }
 
-
-
 } // namespace boost
-
 
 #endif // #ifndef BOOST_HASH_DETAIL_HASH_TUPLE_LIKE_HPP

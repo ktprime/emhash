@@ -11,10 +11,10 @@
 #include <utility>
 #include <cassert>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #  include <intrin.h>
 #ifndef __clang__
-#  include <zmmintrin.h>
+//#  include <zmmintrin.h>
 #endif
 #elif __x86_64__ 
 #  include <x86intrin.h>
@@ -407,9 +407,9 @@ public:
 
         //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
-        memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]) / OFFSET_STEP);
         const auto state_size = simd_bytes + _num_buckets;
         memcpy(_states, other._states, state_size * sizeof(_states[0]));
+        memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]) / OFFSET_STEP + 1);
     }
 
     void swap(HashMap& other) noexcept
@@ -787,7 +787,7 @@ public:
 #else
         if (EMH_UNLIKELY(_num_filled == 0)) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets / OFFSET_STEP, EMPTY_OFFSET);
+            std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
         }
 #endif
     }
@@ -849,7 +849,7 @@ public:
         if (_num_filled) {
             clear_data();
             std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets / OFFSET_STEP, EMPTY_OFFSET);
+            std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
         }
         _num_filled = 0;
     }
@@ -872,7 +872,8 @@ public:
     void dump_statics() const
     {
         int off[256] = {0};
-        for (int i = 0; i < _num_buckets; i++)
+        const auto off_groups = _num_buckets / OFFSET_STEP + 1;
+        for (int i = 0; i < off_groups; i++)
             off[_offset[i]]++;
 
         size_t total = 0, sums = 0;
@@ -880,7 +881,7 @@ public:
             if (off[i] != EMPTY_OFFSET) {
                 total += off[i];
                 sums  += (size_t)off[i] * (i + 1);
-                printf("\n%3d %8d %.5lf%% %3.lf%%", i, off[i], 1.0 * off[i] / _num_buckets, 10000.0 * total / _num_buckets);
+                printf("\n%3d %8d %.5lf%% %3.lf%%", i, off[i], 1.0 * off[i] / off_groups, 10000.0 * total / off_groups);
             }
         }
         printf(", average probe sequence length PSL = %.4lf\n", 1.0 * sums / total);
@@ -906,7 +907,7 @@ public:
         const auto state_size = (simd_bytes + num_buckets);
         //assert(state_size % 8 == 0);
 
-        const auto* new_data = (char*)malloc(pairs_size + state_size * 2 * sizeof(_states[0]));
+        const auto* new_data = (char*)malloc(pairs_size + state_size * sizeof(_states[0]) + (state_size / OFFSET_STEP) * sizeof(_offset[0]));
         auto old_states      = _states;
 
         auto* new_pairs = (decltype(_pairs)) new_data;
@@ -927,7 +928,7 @@ public:
         //set sentinel tombstone
         std::fill_n(_states + num_buckets, simd_bytes, State::SENTINEL);
         //fill offset to 0
-        std::fill_n(_offset, num_buckets / OFFSET_STEP, EMPTY_OFFSET);
+        std::fill_n(_offset, num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
 
         {
             //set last packet tombstone. not equal key h2

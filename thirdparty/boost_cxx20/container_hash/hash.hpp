@@ -14,9 +14,17 @@
 #include <boost/container_hash/is_range.hpp>
 #include <boost/container_hash/is_contiguous_range.hpp>
 #include <boost/container_hash/is_unordered_range.hpp>
+#include <boost/container_hash/is_described_class.hpp>
+#include <boost/container_hash/detail/hash_integral.hpp>
 #include <boost/container_hash/detail/hash_tuple_like.hpp>
 #include <boost/container_hash/detail/hash_mix.hpp>
 #include <boost/container_hash/detail/hash_range.hpp>
+#include <type_traits>
+#include <cstdint>
+
+#if defined(BOOST_DESCRIBE_CXX14)
+# include <boost/mp11/algorithm.hpp>
+#endif
 
 #include <string>
 #include <iterator>
@@ -26,17 +34,29 @@
 #include <climits>
 #include <cstring>
 
+#if !defined(BOOST_NO_CXX11_SMART_PTR)
 # include <memory>
+#endif
 
+#if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
 #include <typeindex>
+#endif
 
+#if !defined(BOOST_NO_CXX11_HDR_SYSTEM_ERROR)
 #include <system_error>
+#endif
 
+#if !defined(BOOST_NO_CXX17_HDR_OPTIONAL)
 #include <optional>
+#endif
 
+#if !defined(BOOST_NO_CXX17_HDR_VARIANT)
 #include <variant>
+#endif
 
+#if !defined(BOOST_NO_CXX17_HDR_STRING_VIEW)
 # include <string_view>
+#endif
 
 namespace boost
 {
@@ -46,90 +66,7 @@ namespace boost
     //
 
     // integral types
-
-    namespace hash_detail
-    {
-        template<class T,
-            bool bigger_than_size_t = (sizeof(T) > sizeof(std::size_t)),
-            bool is_unsigned = std::is_unsigned<T>::value,
-            std::size_t size_t_bits = sizeof(std::size_t) * CHAR_BIT,
-            std::size_t type_bits = sizeof(T) * CHAR_BIT>
-        struct hash_integral_impl;
-
-        template<class T, bool is_unsigned, std::size_t size_t_bits, std::size_t type_bits> struct hash_integral_impl<T, false, is_unsigned, size_t_bits, type_bits>
-        {
-            static std::size_t fn( T v )
-            {
-                return static_cast<std::size_t>( v );
-            }
-        };
-
-        template<class T, std::size_t size_t_bits, std::size_t type_bits> struct hash_integral_impl<T, true, false, size_t_bits, type_bits>
-        {
-            static std::size_t fn( T v )
-            {
-                typedef typename std::make_unsigned<T>::type U;
-
-                if( v >= 0 )
-                {
-                    return hash_integral_impl<U>::fn( static_cast<U>( v ) );
-                }
-                else
-                {
-                    return ~hash_integral_impl<U>::fn( static_cast<U>( ~static_cast<U>( v ) ) );
-                }
-            }
-        };
-
-        template<class T> struct hash_integral_impl<T, true, true, 32, 64>
-        {
-            static std::size_t fn( T v )
-            {
-                std::size_t seed = 0;
-
-                seed = static_cast<std::size_t>( v >> 32 ) + hash_detail::hash_mix( seed );
-                seed = static_cast<std::size_t>( v  & 0xFFFFFFFF ) + hash_detail::hash_mix( seed );
-
-                return seed;
-            }
-        };
-
-        template<class T> struct hash_integral_impl<T, true, true, 32, 128>
-        {
-            static std::size_t fn( T v )
-            {
-                std::size_t seed = 0;
-
-                seed = static_cast<std::size_t>( v >> 96 ) + hash_detail::hash_mix( seed );
-                seed = static_cast<std::size_t>( v >> 64 ) + hash_detail::hash_mix( seed );
-                seed = static_cast<std::size_t>( v >> 32 ) + hash_detail::hash_mix( seed );
-                seed = static_cast<std::size_t>( v ) + hash_detail::hash_mix( seed );
-
-                return seed;
-            }
-        };
-
-        template<class T> struct hash_integral_impl<T, true, true, 64, 128>
-        {
-            static std::size_t fn( T v )
-            {
-                std::size_t seed = 0;
-
-                seed = static_cast<std::size_t>( v >> 64 ) + hash_detail::hash_mix( seed );
-                seed = static_cast<std::size_t>( v ) + hash_detail::hash_mix( seed );
-
-                return seed;
-            }
-        };
-
-    } // namespace hash_detail
-
-    template <typename T>
-    typename std::enable_if<std::is_integral<T>::value, std::size_t>::type
-        hash_value( T v )
-    {
-        return hash_detail::hash_integral_impl<T>::fn( v );
-    }
+    //   in detail/hash_integral.hpp
 
     // enumeration types
 
@@ -367,8 +304,52 @@ namespace boost
 
 #endif
 
+    // described classes
+
+#if defined(BOOST_DESCRIBE_CXX14)
+
+#if defined(_MSC_VER) && _MSC_VER == 1900
+# pragma warning(push)
+# pragma warning(disable: 4100) // unreferenced formal parameter
+#endif
+
+    template <typename T>
+    typename std::enable_if<container_hash::is_described_class<T>::value, std::size_t>::type
+        hash_value( T const& v )
+    {
+        static_assert( !std::is_union<T>::value, "described unions are not supported" );
+
+        std::size_t r = 0;
+
+        using Bd = describe::describe_bases<T, describe::mod_any_access>;
+
+        mp11::mp_for_each<Bd>([&](auto D){
+
+            using B = typename decltype(D)::type;
+            boost::hash_combine( r, (B const&)v );
+
+        });
+
+        using Md = describe::describe_members<T, describe::mod_any_access>;
+
+        mp11::mp_for_each<Md>([&](auto D){
+
+            boost::hash_combine( r, v.*D.pointer );
+
+        });
+
+        return r;
+    }
+
+#if defined(_MSC_VER) && _MSC_VER == 1900
+# pragma warning(pop)
+#endif
+
+#endif
+
     // std::unique_ptr, std::shared_ptr
 
+#if !defined(BOOST_NO_CXX11_SMART_PTR)
 
     template <typename T>
     std::size_t hash_value( std::shared_ptr<T> const& x )
@@ -382,18 +363,22 @@ namespace boost
         return boost::hash_value( x.get() );
     }
 
+#endif
 
     // std::type_index
 
+#if !defined(BOOST_NO_CXX11_HDR_TYPEINDEX)
 
     inline std::size_t hash_value( std::type_index const& v )
     {
         return v.hash_code();
     }
 
+#endif
 
     // std::error_code, std::error_condition
 
+#if !defined(BOOST_NO_CXX11_HDR_SYSTEM_ERROR)
 
     inline std::size_t hash_value( std::error_code const& v )
     {
@@ -415,9 +400,11 @@ namespace boost
         return seed;
     }
 
+#endif
 
     // std::nullptr_t
 
+#if !defined(BOOST_NO_CXX11_NULLPTR)
 
     template <typename T>
     typename std::enable_if<std::is_same<T, std::nullptr_t>::value, std::size_t>::type
@@ -426,16 +413,18 @@ namespace boost
         return boost::hash_value( static_cast<void*>( nullptr ) );
     }
 
+#endif
 
     // std::optional
 
+#if !defined(BOOST_NO_CXX17_HDR_OPTIONAL)
 
     template <typename T>
     std::size_t hash_value( std::optional<T> const& v )
     {
         if( !v )
         {
-            // Arbitray value for empty optional.
+            // Arbitrary value for empty optional.
             return 0x12345678;
         }
         else
@@ -444,9 +433,11 @@ namespace boost
         }
     }
 
+#endif
 
     // std::variant
 
+#if !defined(BOOST_NO_CXX17_HDR_VARIANT)
 
     inline std::size_t hash_value( std::monostate )
     {
@@ -464,6 +455,7 @@ namespace boost
         return seed;
     }
 
+#endif
 
     //
     // boost::hash_combine
@@ -566,17 +558,11 @@ namespace boost
         template<class T> struct hash_is_avalanching;
         template<class Ch> struct hash_is_avalanching< boost::hash< std::basic_string<Ch> > >: std::is_integral<Ch> {};
 
-#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
-        template<> struct hash_is_avalanching< boost::hash< std::basic_string<char8_t> > >: std::true_type {};
-#endif
-
+#if !defined(BOOST_NO_CXX17_HDR_STRING_VIEW)
 
         template<class Ch> struct hash_is_avalanching< boost::hash< std::basic_string_view<Ch> > >: std::is_integral<Ch> {};
 
-#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
-        template<> struct hash_is_avalanching< boost::hash< std::basic_string_view<char8_t> > >: std::true_type {};
 #endif
-
     } // namespace unordered
 
 } // namespace boost

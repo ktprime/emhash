@@ -5,6 +5,7 @@
 // Distributed under the Boost Software License, Version 1.0.
 // https://www.boost.org/LICENSE_1_0.txt
 
+#include <type_traits>
 #include <utility>
 
 namespace boost
@@ -16,18 +17,16 @@ template<class T, class E = std::true_type> struct is_tuple_like_: std::false_ty
 {
 };
 
-
 template<class T> struct is_tuple_like_<T, std::integral_constant<bool, std::tuple_size<T>::value == std::tuple_size<T>::value> >: std::true_type
 {
 };
-
 
 } // namespace hash_detail
 
 namespace container_hash
 {
 
-template<class T> struct is_tuple_like: hash_detail::is_tuple_like_<T>
+template<class T> struct is_tuple_like: hash_detail::is_tuple_like_< typename std::remove_cv<T>::type >
 {
 };
 

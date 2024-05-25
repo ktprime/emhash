@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS =-O2 -Wall -DNDEBUG=1 -march=native -I.. -I../thirdparty
+CXXFLAGS =-O3 -DNDEBUG=1 -march=native -I.. -I../thirdparty
 #-march=armv8.6-a -fpermissive
 #-I/usr/local/include
 
@@ -123,7 +123,7 @@ ifneq ($(CK),)
 CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
-CXXFLAGS += -flto # -static clang libc++ -static-libstdc++? 
+CXXFLAGS += -flto=auto # -static clang libc++ -static-libstdc++?
 
 ifneq ($(PSL),)
 CXXFLAGS += -DPSL= (PSL)
