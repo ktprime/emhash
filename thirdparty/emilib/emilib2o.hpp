@@ -43,7 +43,7 @@ namespace emilib2 {
     };
 
     constexpr static uint8_t EMPTY_OFFSET = 0;
-    constexpr static uint8_t OFFSET_STEP  = 4;
+    constexpr static uint8_t OFFSET_STEP  = 2;
 
 #if EMH_ITERATOR_BITS < 16
     #define EMH_ITERATOR_BITS 16
@@ -149,7 +149,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = (size_t)key_hash & _mask;
 //        return (int8_t)((key * 0x9FB21C651E98DF25ull % 251) - 125);
-        return (int8_t)(key_hash % 253 + EFILLED);
+        return (int8_t)((size_t)key % 253 + EFILLED);
     }
 
     class const_iterator;
@@ -784,7 +784,7 @@ public:
                 bucket = (bucket - 1) & _mask;
             }
         }
-#else
+#elif 0
         if (EMH_UNLIKELY(_num_filled == 0)) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
             std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
@@ -861,7 +861,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 4;
+        size_t required_buckets = num_elems + num_elems / 6;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -881,13 +881,13 @@ public:
             if (off[i] != EMPTY_OFFSET) {
                 total += off[i];
                 sums  += (size_t)off[i] * (i + 1);
-                printf("\n%3d %8d %.5lf%% %3.lf%%", i, off[i], 1.0 * off[i] / off_groups, 10000.0 * total / off_groups);
+                printf("\n%3d %8d %.5lf %.5lf", i, off[i], 1.0 * off[i] / off_groups, 100.0 * total / off_groups);
             }
         }
-        printf(", average probe sequence length PSL = %.4lf\n", 1.0 * sums / total);
+        printf(", lf = %.3f average probe sequence length PSL = %.5lf\n", load_factor(), 1.0 * sums / total);
     }
 
-//#define EMH_STATIS 2000'000
+    //#define EMH_STATIS 10'000'000
     /// Make room for this many elements
     void rehash(size_t num_elems) noexcept
     {
@@ -1000,7 +1000,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += offset < 8 ? simd_bytes * offset: _num_buckets / 32; next_bucket += 1;
+        next_bucket += offset < 8 ? simd_bytes * offset: _num_buckets / 17; next_bucket += 1;
         //next_bucket += simd_bytes * offset + 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
@@ -1037,7 +1037,7 @@ private:
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
-                    if (_eq(_pairs[fbucket].first, key))
+                    if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
                     maskf &= maskf - 1;
                 } while (maskf != 0);

@@ -661,9 +661,9 @@ static int RandTest(size_t n, int max_loops = 1234567)
     printf("============================== %s ============================\n", __FUNCTION__);
     using keyType = uint64_t;
 
-#if EMI == 0
+#if EMI == 1
     emilib2::HashMap <keyType, int, BintHasher> ehash;
-#elif EMI == 3
+#elif EMI == 0
     emilib3::HashMap <keyType, int, BintHasher> ehash;
 #elif EMI == 1
     emilib::HashMap <keyType, int, BintHasher> ehash;
@@ -678,6 +678,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 #elif EMH == 6
     ehmap6<keyType, int, BintHasher> unhash;
 #else
+    //emilib3::HashMap <keyType, int, BintHasher> ehash;
     ehmap7<keyType, int, BintHasher> unhash;
 #endif
 

@@ -62,7 +62,7 @@
 #ifndef SSE2NEON_PRECISE_MINMAX
 #define SSE2NEON_PRECISE_MINMAX (0)
 #endif
-/* _mm_rcp_ps and _mm_div_ps */
+/* _mm_rcp_ps */
 #ifndef SSE2NEON_PRECISE_DIV
 #define SSE2NEON_PRECISE_DIV (0)
 #endif
@@ -241,7 +241,9 @@ FORCE_INLINE void _sse2neon_smp_mb(void)
 #pragma GCC push_options
 #endif
 #else
-#error "Unsupported target. Must be either ARMv7-A+NEON or ARMv8-A."
+#error \
+    "Unsupported target. Must be either ARMv7-A+NEON or ARMv8-A \
+(you could try setting target explicitly with -march or -mcpu)"
 #endif
 #endif
 
@@ -379,6 +381,11 @@ typedef float64x2_t __m128d; /* 128-bit vector containing 2 doubles */
 typedef float32x4_t __m128d;
 #endif
 typedef int64x2_t __m128i; /* 128-bit vector containing integers */
+
+// Some intrinsics operate on unaligned data types.
+typedef int16_t ALIGN_STRUCT(1) unaligned_int16_t;
+typedef int32_t ALIGN_STRUCT(1) unaligned_int32_t;
+typedef int64_t ALIGN_STRUCT(1) unaligned_int64_t;
 
 // __int64 is defined in the Intrinsics Guide which maps to different datatype
 // in different data model
@@ -1722,7 +1729,7 @@ FORCE_INLINE int64_t _mm_cvttss_si64(__m128 a)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_div_ps
 FORCE_INLINE __m128 _mm_div_ps(__m128 a, __m128 b)
 {
-#if (defined(__aarch64__) || defined(_M_ARM64)) && !SSE2NEON_PRECISE_DIV
+#if defined(__aarch64__) || defined(_M_ARM64)
     return vreinterpretq_m128_f32(
         vdivq_f32(vreinterpretq_f32_m128(a), vreinterpretq_f32_m128(b)));
 #else
@@ -1925,7 +1932,7 @@ FORCE_INLINE __m128 _mm_loadu_ps(const float *p)
 FORCE_INLINE __m128i _mm_loadu_si16(const void *p)
 {
     return vreinterpretq_m128i_s16(
-        vsetq_lane_s16(*(const int16_t *) p, vdupq_n_s16(0), 0));
+        vsetq_lane_s16(*(const unaligned_int16_t *) p, vdupq_n_s16(0), 0));
 }
 
 // Load unaligned 64-bit integer from memory into the first element of dst.
@@ -1933,7 +1940,7 @@ FORCE_INLINE __m128i _mm_loadu_si16(const void *p)
 FORCE_INLINE __m128i _mm_loadu_si64(const void *p)
 {
     return vreinterpretq_m128i_s64(
-        vcombine_s64(vld1_s64((const int64_t *) p), vdup_n_s64(0)));
+        vsetq_lane_s64(*(const unaligned_int64_t *) p, vdupq_n_s64(0), 0));
 }
 
 // Allocate size bytes of memory, aligned to the alignment specified in align,
@@ -4358,7 +4365,7 @@ FORCE_INLINE __m128d _mm_loadu_pd(const double *p)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_loadu_si128
 FORCE_INLINE __m128i _mm_loadu_si128(const __m128i *p)
 {
-    return vreinterpretq_m128i_s32(vld1q_s32((const int32_t *) p));
+    return vreinterpretq_m128i_s32(vld1q_s32((const unaligned_int32_t *) p));
 }
 
 // Load unaligned 32-bit integer from memory into the first element of dst.
@@ -4366,7 +4373,7 @@ FORCE_INLINE __m128i _mm_loadu_si128(const __m128i *p)
 FORCE_INLINE __m128i _mm_loadu_si32(const void *p)
 {
     return vreinterpretq_m128i_s32(
-        vsetq_lane_s32(*(const int32_t *) p, vdupq_n_s32(0), 0));
+        vsetq_lane_s32(*(const unaligned_int32_t *) p, vdupq_n_s32(0), 0));
 }
 
 // Multiply packed signed 16-bit integers in a and b, producing intermediate

@@ -11,7 +11,7 @@
 #include <utility>
 #include <cassert>
 
-#if _WIN32
+#ifdef _WIN32
 #  include <intrin.h>
 #ifndef __clang__
 //#  include <zmmintrin.h>
@@ -847,7 +847,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 4;
+        size_t required_buckets = num_elems + num_elems / 6;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -1028,9 +1028,9 @@ private:
             }
 
             //2. find empty
-            //if (group_mask(next_bucket) == State::EEMPTY) {
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
-            if (maske != 0) {
+            if (group_mask(next_bucket) == State::EEMPTY) {
+            //if (maske != 0) {
+                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
                 auto ebucket = next_bucket + CTZ(maske);
                 if (EMH_UNLIKELY(hole != chole))
                     ebucket = hole;

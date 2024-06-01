@@ -62,13 +62,14 @@
 #endif
 
 static const auto RND = getus();
-static float max_lf = 0.80f;
+static float max_lf = 0.875f;
 
 static std::map<std::string_view, std::string_view> show_name =
 {
    {"emhash7", "emhash7"},
-   {"emhash8", "emhash8"},
-   {"emhash5", "emhash5"},
+//   {"emhash8", "emhash8"},
+//   {"emhash5", "emhash5"},
+//     {"emhash6", "emhash6"},
 
    {"emilib",  "emilib1"},
    {"emilib2", "emilib2"},
@@ -82,14 +83,13 @@ static std::map<std::string_view, std::string_view> show_name =
     {"HashMapTable", "ck_hashmap"},
 #endif
 
-    {"ankerl", "martin dense"},
+//    {"ankerl", "martin dense"},
 
 #if QC_HASH
     {"qc", "qchash"},
     {"fph", "fph"},
 #endif
 
-     {"emhash6", "emhash6"},
 #if ABSL_HMAP
     {"absl", "absl flat"},
 #endif
@@ -131,7 +131,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -270,7 +270,7 @@ static void bench_insert(MAP& map)
         return;
     printf("    %s\n", map_name);
 
-#if X86_64
+#if X86_64 || __MAC__
     uint32_t maxn = 1000000;
 #else
     uint32_t maxn = 1000000 / 5;
@@ -293,9 +293,9 @@ static void bench_insert(MAP& map)
             {
                 auto ts = now2sec();
                 MRNG rng(RND + 15 + i);
-                for (size_t n = 0; n < maxn * 3 / 4; ++n)
+                for (size_t n = 0; n < maxn * 9 / 10; ++n)
                     map.erase(static_cast<int>(rng()));
-                printf(", remove 75%% %.2f", now2sec() - ts);
+                printf(", remove 90%% %.2f", now2sec() - ts);
                 fflush(stdout);
                 assert(map.size() == 0);
             }
@@ -667,7 +667,7 @@ static void bench_randomDistinct2(MAP& map)
         return;
     printf("    %20s", map_name);
 
-#if X86_64
+#if X86_64 || __MAC__
     constexpr size_t const n = 50000000;
 #else
     constexpr size_t const n = 50000000 / 2;
@@ -957,7 +957,7 @@ static void bench_copy(MAP&)
     constexpr int KN = 1000;
     constexpr int KL = 1000;
     MAP mapSource(1'000);
-//    mapSource.max_load_factor(max_lf);
+    mapSource.max_load_factor(max_lf);
     uint64_t rememberKey = 0;
     for (size_t i = 0; i < 200'000; ++i) {
         auto key = rng();
@@ -1636,9 +1636,6 @@ static void runTest(int sflags, int eflags)
 #if ABSL_HMAP
         { absl::flat_hash_map <int, int, hash_func> amap; bench_insert(amap); }
 #endif
-#if HAVE_BOOST
-        { boost::unordered_flat_map <int, int, hash_func> amap; bench_insert(amap); }
-#endif
 #if CK_HMAP
         { ck::HashMap <int, int, hash_func> amap; bench_insert(amap); }
 #endif
@@ -1663,6 +1660,9 @@ static void runTest(int sflags, int eflags)
         { emhash5::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 
         { emilib::HashMap<int, int, hash_func>  emap; bench_insert(emap); }
+#if HAVE_BOOST
+        { boost::unordered_flat_map <int, int, hash_func> amap; bench_insert(amap); }
+#endif
         { emilib2::HashMap<int, int, hash_func> emap; bench_insert(emap); }
         { emilib3::HashMap<int, int, hash_func> emap; bench_insert(emap); }
 
@@ -2304,7 +2304,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("test with max_load_factor = %.2f:rnd=%d\n", max_lf, (int)RND);
+    printf("test with max_load_factor = %.3f:rnd=%d\n", max_lf, (int)RND);
     puts("all test hashmap:");
     for (const auto& m : show_name)
         printf("%10s %20s\n", m.first.data(), m.second.data());

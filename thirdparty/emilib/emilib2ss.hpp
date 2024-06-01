@@ -47,7 +47,6 @@ enum State : int8_t
 const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
 const static auto simd_delete = _mm_set1_epi8(EDELETE);
 const static auto simd_filled = _mm_set1_epi8(EFILLED);
-constexpr static auto group_bmask = 0xFFFF - (1u << GROUP_INDEX);
 
 #define SET1_EPI8      _mm_set1_epi8
 #define LOAD_EPI8      _mm_load_si128
@@ -58,6 +57,7 @@ constexpr static auto group_bmask = 0xFFFF - (1u << GROUP_INDEX);
 //find filled or empty
 constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 constexpr static uint8_t slot_size  = simd_bytes - STATE_BITS;
+constexpr static uint32_t group_bmask = (1 << slot_size) - 1;
 
 inline static uint32_t CTZ(uint64_t n)
 {
@@ -808,7 +808,7 @@ public:
         std::fill_n(_states + _num_buckets, simd_bytes, State::SENTINEL);
         assert(_num_buckets >= simd_bytes);
         for (size_t src_bucket = GROUP_INDEX; src_bucket < _num_buckets; src_bucket += simd_bytes)
-            _states[src_bucket] = 0;
+            _states[src_bucket] = _states[src_bucket - STATE_BITS + 1] = 0;
         _num_filled = 0;
     }
 
@@ -944,7 +944,7 @@ private:
     inline bool group_has_empty(size_t bucket) const noexcept
     {
         const auto gbucket = bucket / simd_bytes * simd_bytes;
-        return _states[gbucket + simd_bytes - STATE_BITS - 1] == State::EEMPTY;
+        return _states[gbucket + slot_size - 1] == State::EEMPTY;
     }
 
     inline int group_probe(size_t gbucket) const noexcept
@@ -1049,8 +1049,8 @@ private:
                 maskf &= maskf - 1;
             }
 
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)) & group_bmask;
-            if (maske) {
+            if (group_has_empty(next_bucket)) {
+                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)) & group_bmask;
                 auto ebucket = next_bucket + CTZ(maske);
                 if (EMH_UNLIKELY(hole != chole))
                     ebucket = hole;
