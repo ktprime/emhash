@@ -38,11 +38,11 @@ private:
 class Timer
 {
 public:
-    Timer(const char* msg, const char* msg2) :_msg(msg) { clock_gettime(CLOCK_MONOTONIC_RAW, &_start); }
+    Timer(const char* msg, const char* msg2) :_msg(msg) { clock_gettime(CLOCK_MONOTONIC, &_start); }
     ~Timer()
     {
         struct timespec end;
-        clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+        clock_gettime(CLOCK_MONOTONIC, &end);
 
         //milliseconds
         double msec = double((end.tv_sec - _start.tv_sec) * 1000ULL) + double(end.tv_nsec - _start.tv_nsec)*0.000001;

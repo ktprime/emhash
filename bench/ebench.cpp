@@ -1563,7 +1563,23 @@ static void testHashInt(int loops = 500000009)
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
         sum += rrxmrrxmsx_0(i + r);
-    printf("rrxmrrxmsx_0= %3d ms [%ld]\n\n", (int)(getus() - ts) / 1000, sum);
+    printf("rrxmrrxmsx_0= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+
+    ts = getus(); sum = r;
+    for (int i = 0; i < loops; i++)
+      sum += squirrel3(i + r);
+    printf("squirrel3  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+
+    ts = getus(); sum = r;
+    for (int i = 0; i < loops; i++)
+      sum += udb_splitmix64(i + r);
+    printf("udb_splitmix64= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
+
+
+    ts = getus(); sum = r;
+    for (int i = 0; i < loops; i++)
+      sum += intHashCRC32(i + r);
+    printf("intHashCRC32= %4d ms [%ld]\n\n", (int)(getus() - ts) / 1000, sum);
 
 #if 1
     constexpr int buff_size = 1024*1024;
@@ -1606,7 +1622,7 @@ int main(int argc, char* argv[])
 #endif
     auto start = getus();
 //    test_lru(100'000'000);
-    testHashInt(int(2e7+8));
+    testHashInt(int(1e8));
 
 #ifdef A_HASH
     printf("ahash_version = %s\n", ahash_version());
