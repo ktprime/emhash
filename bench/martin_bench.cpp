@@ -631,12 +631,12 @@ static inline uint32_t udb_get_key(const uint32_t n, const uint32_t x)
 #endif
 }
 
-static uint64_t udb_splitmix64(uint64_t *x)
+static uint64_t splitmix64(uint64_t& x)
 {
-	uint64_t z = ((*x) += 0x9e3779b97f4a7c15ULL);
-	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-	z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-	return z ^ (z >> 31);
+    uint64_t z = (x += 0x9e3779b97f4a7c15ULL);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
 }
 
 struct Hash32 {
@@ -646,8 +646,8 @@ struct Hash32 {
     }
 };
 
-const static uint32_t x0 = (uint32_t)now2sec();
-const static bool is_del = x0 % 2 == 0;
+const static uint32_t x0 = (uint32_t)getus();
+const static bool is_del = (x0 % 2 == 0);
 
 template<class MAP>
 static void bench_udb3()
@@ -659,15 +659,13 @@ static void bench_udb3()
 
     const auto nows = now2sec();
     constexpr uint32_t n_cp = 11, N = 80000000, n0 = 10000000;
-    const uint32_t step = (N - n0) / (n_cp - 1);
-
+    constexpr uint32_t step = (N - n0) / (n_cp - 1);
 
     MAP h;
-    uint32_t i, n, j;
     uint64_t z = 0, x = x0;
-    for (j = 0, i = 0, n = n0; j < n_cp; ++j, n += step) {
+    for (uint32_t j = 0, i = 0, n = n0; j < n_cp; ++j, n += step) {
         for (; i < n; ++i) {
-            uint64_t y = udb_splitmix64(&x);
+            uint64_t y = splitmix64(x);
             uint32_t key = udb_get_key(n, y);
             if (is_del) {
                 auto p = h.emplace(key, i);
@@ -679,7 +677,7 @@ static void bench_udb3()
         }
     }
 
-    printf(" z = %d total time = %.2lf s\n", (int)z, now2sec() - nows);
+    printf(" z[%d] = %d total time = %.2lf s\n", is_del, (int)z, now2sec() - nows);
 }
 
 template<class MAP>
