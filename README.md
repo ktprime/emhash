@@ -3,7 +3,7 @@
 
     some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
 
-third party bechmark from https://martin.ankerl.com/2022/08/27/hashmap-bench-01/
+third party bechmark from https://martin.ankerl.com/2022/08/27/hashmap-bench-01/ and https://jacksonallan.github.io/c_cpp_hash_tables_benchmark/
 
 
 - **load factor** can be set **0.999** by set marco *EMHASH_HIGH_LOAD == somevalue* (in hash_table[5-8].hpp)
