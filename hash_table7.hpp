@@ -315,8 +315,8 @@ class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
-    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f;
 #endif
+    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f;
 
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
@@ -574,7 +574,7 @@ public:
             _pairs = (PairT*)alloc_bucket(rhs._num_buckets);
             clone(rhs);
         } else {
-            init(rhs._num_filled + 2, EMH_DEFAULT_LOAD_FACTOR);
+            init(rhs._num_filled + 2, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(it->first, it->second);
         }

@@ -213,11 +213,8 @@ class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+#endif
     constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
-#endif
-#if EMH_CACHE_LINE_SIZE < 32
-    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
-#endif
 
 public:
     typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
@@ -361,7 +358,7 @@ public:
             _pairs = alloc_bucket(rhs._num_buckets);
             clone(rhs);
         } else {
-            init(rhs._num_filled + 2, EMH_DEFAULT_LOAD_FACTOR);
+            init(rhs._num_filled + 2, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(it->first, it->second);
         }
@@ -645,6 +642,7 @@ public:
 
     size_type get_diss(uint32_t bucket, uint32_t next_bucket, const uint32_t slots) const
     {
+        constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
         auto pbucket = reinterpret_cast<std::ptrdiff_t>(&_pairs[bucket]);
         auto pnext   = reinterpret_cast<std::ptrdiff_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)

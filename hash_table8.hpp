@@ -36,6 +36,7 @@
 #include <functional>
 #include <iterator>
 #include <algorithm>
+#include <memory>
 
 #undef  EMH_NEW
 #undef  EMH_EMPTY
@@ -59,22 +60,31 @@
 
 namespace emhash8 {
 
-#ifndef EMH_DEFAULT_LOAD_FACTOR
-    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
-    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
-#endif
-#if EMH_CACHE_LINE_SIZE < 32
-    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
-#endif
+struct DefaultPolicy {
+    static constexpr float load_factor = 0.80f;
+    static constexpr float min_load_factor = 0.20f;
+    static constexpr size_t cacheline_size = 64U;
+};
 
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template<typename KeyT, typename ValueT,
+         typename HashT = std::hash<KeyT>,
+         typename EqT = std::equal_to<KeyT>,
+         typename Allocator = std::allocator<std::pair<KeyT, ValueT>>, //never used
+         typename Policy = DefaultPolicy> //never used
 class HashMap
 {
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+#endif
+    constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
+    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64; //debug only
+
 public:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
     using value_type = std::pair<KeyT, ValueT>;
     using key_type = KeyT;
     using mapped_type = ValueT;
+    //using dPolicy = Policy;
 
 #ifdef EMH_SMALL_TYPE
     using size_type = uint16_t;
@@ -231,7 +241,7 @@ public:
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
         } else {
-            init(rhs._num_filled + 2, EMH_DEFAULT_LOAD_FACTOR);
+            init(rhs._num_filled + 2, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(it->first, it->second);
         }
