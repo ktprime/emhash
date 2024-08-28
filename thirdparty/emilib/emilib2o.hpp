@@ -16,10 +16,10 @@
 #ifndef __clang__
 //#  include <zmmintrin.h>
 #endif
-#elif __x86_64__ 
+#elif __x86_64__
 #  include <x86intrin.h>
 #else
-# include "sse2neon.h" 
+# include "sse2neon.h"
 #endif
 
 #undef EMH_LIKELY
@@ -43,11 +43,9 @@ namespace emilib2 {
     };
 
     constexpr static uint8_t EMPTY_OFFSET = 0;
-    constexpr static uint8_t OFFSET_STEP  = 2;
+    constexpr static uint8_t OFFSET_STEP  = 4;
 
-#if EMH_ITERATOR_BITS < 16
-    #define EMH_ITERATOR_BITS 16
-#endif
+#define EMH_ITERATOR_BITS simd_bytes
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
@@ -59,25 +57,30 @@ namespace emilib2 {
     #define LOAD_UEPI8     _mm_loadu_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
-    #define CMPLT_EPI8     _mm_cmplt_epi8
+    #define CMPGT_EPI8     _mm_cmpgt_epi8
 #elif SSE2_EMHASH == 0
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm256_set1_epi8(EDELETE);
+    const static auto simd_filled = _mm256_set1_epi8(EFILLED);
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm256_set1_epi8
     #define LOAD_UEPI8     _mm256_loadu_si256
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
+    #define CMPGT_EPI8     _mm256_cmpgt_epi8
+
 #elif AVX512_EHASH
     const static auto simd_empty  = _mm512_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm512_set1_epi8(EDELETE);
+    const static auto simd_filled = _mm512_set1_epi8(EFILLED);
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm512_set1_epi8
     #define LOAD_UEPI8     _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
     #define CMPEQ_EPI8     _mm512_test_epi8_mask
+    #define CMPGT_EPI8     _mm512_cmpgt_epi8
 #else
     //TODO arm neon
 #endif
@@ -1000,7 +1003,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += offset < 8 ? simd_bytes * offset: _num_buckets / 17; next_bucket += 1;
+        next_bucket += offset < 6 ? simd_bytes * offset + 5 : _num_buckets / 15 + 1;
         //next_bucket += simd_bytes * offset + 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
@@ -1077,7 +1080,7 @@ private:
     }
 
     // Find the main_bucket with this key, or return a good empty main_bucket to place the key in.
-    // In the latter case, the main_bucket is expected to be filled.
+    // In the later case, the main_bucket is expected to be filled.
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
@@ -1142,7 +1145,7 @@ private:
     inline uint32_t empty_delete(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPLT_EPI8(vec, simd_filled));
+        return MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
     }
 
     inline uint32_t filled_mask(size_t gbucket) const noexcept
@@ -1155,7 +1158,7 @@ private:
         return (uint32_t)~_mm256_movemask_epi8(vec);
 #else
         const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPLT_EPI8(simd_delete, vec));
+        return MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete));
 #endif
     }
 
@@ -1215,7 +1218,7 @@ private:
             const auto maske = filled_mask(next_bucket);
             if (maske != 0)
                 return next_bucket + CTZ(maske);
-            next_bucket += EMH_ITERATOR_BITS;
+            next_bucket += simd_bytes;
         }
         return 0;
     }

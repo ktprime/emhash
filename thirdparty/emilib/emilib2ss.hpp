@@ -16,10 +16,9 @@
 #ifndef __clang__
 //#  include <zmmintrin.h>
 #endif
-#elif __x86_64__ 
+#elif __x86_64__
 #  include <x86intrin.h>
 #else
-# include "sse2neon.h" 
 #endif
 
 #undef EMH_LIKELY
@@ -41,23 +40,35 @@ enum State : int8_t
     EFILLED  = -126, EDELETE = -127, EEMPTY = -128,
     SENTINEL = 127,
     STATE_BITS  = 1,
-    GROUP_INDEX = 15,//> 0
 };
 
-const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
-const static auto simd_delete = _mm_set1_epi8(EDELETE);
-const static auto simd_filled = _mm_set1_epi8(EFILLED);
+#ifndef AVX2_EHASH
+    const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
+    const static auto simd_delete = _mm_set1_epi8(EDELETE);
+    const static auto simd_filled = _mm_set1_epi8(EFILLED);
 
-#define SET1_EPI8      _mm_set1_epi8
-#define LOAD_EPI8      _mm_load_si128
-#define MOVEMASK_EPI8  _mm_movemask_epi8
-#define CMPEQ_EPI8     _mm_cmpeq_epi8
-#define CMPLT_EPI8     _mm_cmplt_epi8
+    #define SET1_EPI8      _mm_set1_epi8
+    #define LOAD_EPI8      _mm_load_si128
+    #define MOVEMASK_EPI8  _mm_movemask_epi8
+    #define CMPEQ_EPI8     _mm_cmpeq_epi8
+    #define CMPGT_EPI8     _mm_cmpgt_epi8
+#else
+    const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
+    const static auto simd_delete = _mm256_set1_epi8(EDELETE);
+    const static auto simd_filled = _mm256_set1_epi8(EFILLED);
+
+    #define SET1_EPI8      _mm256_set1_epi8
+    #define LOAD_EPI8      _mm256_loadu_si256
+    #define MOVEMASK_EPI8  _mm256_movemask_epi8
+    #define CMPEQ_EPI8     _mm256_cmpeq_epi8
+    #define CMPGT_EPI8     _mm256_cmpgt_epi8
+#endif
 
 //find filled or empty
 constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 constexpr static uint8_t slot_size  = simd_bytes - STATE_BITS;
-constexpr static uint32_t group_bmask = (1 << slot_size) - 1;
+constexpr static uint8_t group_index = simd_bytes - 1;//> 0
+constexpr static uint32_t group_bmask = (1u << slot_size) - 1;
 
 inline static uint32_t CTZ(uint64_t n)
 {
@@ -807,7 +818,7 @@ public:
         //set filled tombstone
         std::fill_n(_states + _num_buckets, simd_bytes, State::SENTINEL);
         assert(_num_buckets >= simd_bytes);
-        for (size_t src_bucket = GROUP_INDEX; src_bucket < _num_buckets; src_bucket += simd_bytes)
+        for (size_t src_bucket = group_index; src_bucket < _num_buckets; src_bucket += simd_bytes)
             _states[src_bucket] = _states[src_bucket - STATE_BITS + 1] = 0;
         _num_filled = 0;
     }
@@ -949,7 +960,7 @@ private:
 
     inline int group_probe(size_t gbucket) const noexcept
     {
-        const auto offset = (uint8_t)_states[gbucket + GROUP_INDEX];
+        const auto offset = (uint8_t)_states[gbucket + group_index];
 #if EMH_SAFE_PSL
         if (EMH_UNLIKELY(offset > 128))
             return (offset - 127) * 128;
@@ -960,9 +971,9 @@ private:
     inline void set_group_probe(size_t gbucket, size_t group_offset)
     {
 #if EMH_SAFE_PSL
-        _states[gbucket + GROUP_INDEX] = group_offset <= 128 ? group_offset : 128 + group_offset / 128;
+        _states[gbucket + group_index] = group_offset <= 128 ? group_offset : 128 + group_offset / 128;
 #else
-        _states[gbucket + GROUP_INDEX] = group_offset;
+        _states[gbucket + group_index] = group_offset;
 #endif
     }
 
@@ -1086,13 +1097,13 @@ private:
     inline size_t empty_delete(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPLT_EPI8(vec, simd_filled));
+        return MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
     }
 
     inline size_t filled_mask(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPLT_EPI8(simd_delete, vec)) & group_bmask;
+        return MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete)) & group_bmask;
     }
 
     //gbucket--->kbucket--->next_bucket|  kick_bucket--->next_bucket--->gbucket

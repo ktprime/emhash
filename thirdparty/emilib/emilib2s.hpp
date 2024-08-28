@@ -16,10 +16,10 @@
 #ifndef __clang__
 //#  include <zmmintrin.h>
 #endif
-#elif __x86_64__ 
+#elif __x86_64__
 #  include <x86intrin.h>
 #else
-# include "sse2neon.h" 
+# include "sse2neon.h"
 #endif
 
 #undef EMH_LIKELY
@@ -50,11 +50,9 @@ namespace emilib3 {
 
     #define SET1_EPI8      _mm_set1_epi8
     #define LOAD_EPI8      _mm_load_si128
-    #define LOAD_EMPTY(u)  _mm_and_si128(_mm_load_si128(u), simd_empty)
-    #define LOAD_EMPTY2(u) _mm_slli_epi16(_mm_load_si128(u), 7)
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
-    #define CMPLT_EPI8     _mm_cmplt_epi8
+    #define CMPGT_EPI8     _mm_cmpgt_epi8
 #elif 1
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm256_set1_epi8(EDELETE);
@@ -62,16 +60,13 @@ namespace emilib3 {
 
     #define SET1_EPI8      _mm256_set1_epi8
     #define LOAD_EPI8      _mm256_loadu_si256
-    #define LOAD_EMPTY(u)  _mm256_and_si256(_mm256_loadu_si256(u), simd_empty)
-    #define LOAD_EMPTY2(u) _mm256_slli_epi32(_mm256_loadu_si256(u), 7)
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
+    #define CMPGT_EPI8     _mm256_cmpgt_epi8
 #elif AVX512_EHASH
     const static auto simd_empty  = _mm512_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm512_set1_epi8(EDELETE);
     const static auto simd_filled = _mm512_set1_epi8(EFILLED);
-    #define LOAD_EMPTY(u)  _mm512_and_si512(_mm512_loadu_si512(u), simd_empty)
-    #define LOAD_EMPTY2(u) _mm512_slli_epi64(_mm512_loadu_si512(u), 7)
 
     #define SET1_EPI8      _mm512_set1_epi8
     #define LOAD_EPI8      _mm512_loadu_si512
@@ -999,7 +994,7 @@ private:
     }
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
-    // In the latter case, the bucket is expected to be filled.
+    // In the later case, the bucket is expected to be filled.
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
@@ -1066,13 +1061,13 @@ private:
     inline size_t empty_delete(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPLT_EPI8(vec, simd_filled));
+        return MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
     }
 
     inline size_t filled_mask(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPLT_EPI8(simd_delete, vec));
+        return MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete));
     }
 
     size_t find_empty_slot(size_t next_bucket, int offset) noexcept
