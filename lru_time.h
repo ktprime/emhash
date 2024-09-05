@@ -1,6 +1,6 @@
-// By Huang Yuanbing 2019-2022
+// By Huang Yuanbing 2019-2024
 // bailuzhou@163.com
-// version 1.0.0
+// version 2.1.1
 
 // LICENSE:
 //   This software is dual-licensed to the public domain and under the following
@@ -140,9 +140,9 @@ struct entry {
     }
 
     Second second;//int
+    First first; //long
     uint32_t bucket;
     uint32_t timeout;
-    First first; //long
 };// __attribute__ ((packed));
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
@@ -284,22 +284,21 @@ public:
 
     // ------------------------------------------------------------------------
 
-    void init()
+    void init(uint32_t max_bucket = 1 << 10)
     {
         _num_buckets = 0;
         _mask = 0;
+        _time_out = 5;
         _pairs = nullptr;
         _num_filled = 0;
-        _time_out = 5;
-        _max_buckets = 1 << 30;
+        _max_buckets = max_bucket;
         max_load_factor(0.8f);
     }
 
     lru_cache(uint32_t bucket = 4, uint32_t max_bucket = 1 << 24, int timeout = 3600 * 24 * 365)
     {
-        init();
+        init(max_bucket);
         _time_out = timeout;
-        _max_buckets = max_bucket;
         reserve(bucket);
     }
 
@@ -311,18 +310,20 @@ public:
 
     lru_cache(lru_cache&& other)
     {
-        init();
+        init(1);
         reserve(1);
         *this = std::move(other);
     }
 
+    /**
     lru_cache(std::initializer_list<std::pair<KeyT, ValueT>> il)
     {
-        init();
+        init(il.size() * 2);
         reserve((uint32_t)il.size());
         for (auto begin = il.begin(); begin != il.end(); ++begin)
             insert(*begin);
     }
+	*/
 
     lru_cache& operator=(const lru_cache& other)
     {
@@ -365,8 +366,8 @@ public:
         _num_filled  = other._num_filled;
         _mask        = other._mask;
         _loadlf      = other._loadlf;
-        _time_out    = other._time_out;
         _max_buckets = other._max_buckets;
+        _time_out    = other._time_out;
         auto opairs  = other._pairs;
 
         if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
@@ -659,8 +660,8 @@ public:
             return { found, std::next(found) };
     }
 
-    /// Returns the matching ValueT or nullptr if k isn't found.
-    bool try_get(const KeyT& key, ValueT& val) const
+    /// Returns false if key isn't found.
+    bool try_get(const KeyT& key, ValueT& val) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         const auto found = bucket != _num_buckets;
@@ -1097,9 +1098,11 @@ private:
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (is_notrivially())
                 EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
-            else
+            else {
+                const auto timeout = _pairs[bucket].timeout;
                 EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
-
+                _pairs[next_bucket].timeout = timeout;
+            }
             NEXT_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
         }/* else if (EMHASH_UNLIKELY(bucket != hash_bucket(EMH_KEY(_pairs, bucket))))
@@ -1251,14 +1254,14 @@ private:
 
             if (last > 4) {
                 auto& next = NEXT_BUCKET(_pairs, _num_buckets);
+
+                next &= _mask;
                 if (INACTIVE == NEXT_BUCKET(_pairs, next++) || INACTIVE == NEXT_BUCKET(_pairs, next++))
                     return next - 1;
 
                 auto medium = (_num_buckets / 2 + next) & _mask;
                 if (INACTIVE == NEXT_BUCKET(_pairs, medium) || INACTIVE == NEXT_BUCKET(_pairs, ++medium))
                     return medium;
-
-                next &= _mask;
             }
         }
     }
@@ -1387,9 +1390,9 @@ private:
     EqT       _eq;
     uint32_t  _loadlf;
     uint32_t  _num_buckets;
+    uint32_t  _max_buckets;
     uint32_t  _mask;
 
-    uint32_t  _max_buckets;
     uint32_t  _num_filled;
     uint32_t  _time_out;
 };
