@@ -1088,11 +1088,11 @@ private:
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
+        prefetch_heap_block((char*)&_pairs[main_bucket]);
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket, offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
-        prefetch_heap_block((char*)&_pairs[next_bucket]);
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
