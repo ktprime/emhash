@@ -35,8 +35,8 @@
 // ---------------------------------------------------------------------------
 
 #define PHMAP_VERSION_MAJOR 1
-#define PHMAP_VERSION_MINOR 3
-#define PHMAP_VERSION_PATCH 12
+#define PHMAP_VERSION_MINOR 4
+#define PHMAP_VERSION_PATCH 0
 
 // Included for the __GLIBC__ macro (or similar macros on other systems).
 #include <limits.h>
@@ -441,7 +441,9 @@
     #define PHMAP_ATTRIBUTE_NONNULL(...)
 #endif
 
-#if PHMAP_HAVE_ATTRIBUTE(noreturn) || (defined(__GNUC__) && !defined(__clang__))
+#if PHMAP_HAVE_ATTRIBUTE(noreturn)
+    #define PHMAP_ATTRIBUTE_NORETURN [[noreturn]]
+#elif defined(__GNUC__) && !defined(__clang__)
     #define PHMAP_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
     #define PHMAP_ATTRIBUTE_NORETURN __declspec(noreturn)
@@ -680,8 +682,9 @@ namespace macros_internal {
 }  // namespace macros_internal
 }  // namespace phmap
 
-// TODO(zhangxy): Use c++17 standard [[fallthrough]] macro, when supported.
-#if defined(__clang__) && defined(__has_warning)
+#if PHMAP_HAVE_CPP_ATTRIBUTE(fallthrough)
+    #define PHMAP_FALLTHROUGH [[fallthrough]]
+#elif defined(__clang__) && defined(__has_warning)
     #if __has_feature(cxx_attributes) && __has_warning("-Wimplicit-fallthrough")
         #define PHMAP_FALLTHROUGH_INTENDED [[clang::fallthrough]]
     #endif
