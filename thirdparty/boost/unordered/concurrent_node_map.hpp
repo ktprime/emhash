@@ -1,4 +1,4 @@
-/* Fast open-addressing concurrent hashmap.
+/* Fast open-addressing, node-based concurrent hashmap.
  *
  * Copyright 2023 Christian Mazakas.
  * Copyright 2023-2024 Joaquin M Lopez Munoz.
@@ -9,15 +9,17 @@
  * See https://www.boost.org/libs/unordered for library home page.
  */
 
-#ifndef BOOST_UNORDERED_CONCURRENT_FLAT_MAP_HPP
-#define BOOST_UNORDERED_CONCURRENT_FLAT_MAP_HPP
+#ifndef BOOST_UNORDERED_CONCURRENT_NODE_MAP_HPP
+#define BOOST_UNORDERED_CONCURRENT_NODE_MAP_HPP
 
-#include <boost/unordered/concurrent_flat_map_fwd.hpp>
+#include <boost/unordered/concurrent_node_map_fwd.hpp>
 #include <boost/unordered/detail/concurrent_static_asserts.hpp>
 #include <boost/unordered/detail/foa/concurrent_table.hpp>
-#include <boost/unordered/detail/foa/flat_map_types.hpp>
+#include <boost/unordered/detail/foa/element_type.hpp>
+#include <boost/unordered/detail/foa/node_map_handle.hpp>
+#include <boost/unordered/detail/foa/node_map_types.hpp>
 #include <boost/unordered/detail/type_traits.hpp>
-#include <boost/unordered/unordered_flat_map_fwd.hpp>
+#include <boost/unordered/unordered_node_map_fwd.hpp>
 
 #include <boost/container_hash/hash.hpp>
 #include <boost/core/allocator_access.hpp>
@@ -28,17 +30,18 @@
 namespace boost {
   namespace unordered {
     template <class Key, class T, class Hash, class Pred, class Allocator>
-    class concurrent_flat_map
+    class concurrent_node_map
     {
     private:
       template <class Key2, class T2, class Hash2, class Pred2,
         class Allocator2>
-      friend class concurrent_flat_map;
+      friend class concurrent_node_map;
       template <class Key2, class T2, class Hash2, class Pred2,
         class Allocator2>
-      friend class unordered_flat_map;
+      friend class unordered_node_map;
 
-      using type_policy = detail::foa::flat_map_types<Key, T>;
+      using type_policy = detail::foa::node_map_types<Key, T,
+        typename boost::allocator_void_pointer<Allocator>::type>;
 
       using table_type =
         detail::foa::concurrent_table<type_policy, Hash, Pred, Allocator>;
@@ -46,16 +49,16 @@ namespace boost {
       table_type table_;
 
       template <class K, class V, class H, class KE, class A>
-      bool friend operator==(concurrent_flat_map<K, V, H, KE, A> const& lhs,
-        concurrent_flat_map<K, V, H, KE, A> const& rhs);
+      bool friend operator==(concurrent_node_map<K, V, H, KE, A> const& lhs,
+        concurrent_node_map<K, V, H, KE, A> const& rhs);
 
       template <class K, class V, class H, class KE, class A, class Predicate>
-      friend typename concurrent_flat_map<K, V, H, KE, A>::size_type erase_if(
-        concurrent_flat_map<K, V, H, KE, A>& set, Predicate pred);
+      friend typename concurrent_node_map<K, V, H, KE, A>::size_type erase_if(
+        concurrent_node_map<K, V, H, KE, A>& set, Predicate pred);
 
       template<class Archive, class K, class V, class H, class KE, class A>
       friend void serialize(
-        Archive& ar, concurrent_flat_map<K, V, H, KE, A>& c,
+        Archive& ar, concurrent_node_map<K, V, H, KE, A>& c,
         unsigned int version);
 
     public:
@@ -73,18 +76,23 @@ namespace boost {
       using pointer = typename boost::allocator_pointer<allocator_type>::type;
       using const_pointer =
         typename boost::allocator_const_pointer<allocator_type>::type;
+      using node_type = detail::foa::node_map_handle<type_policy,
+        typename boost::allocator_rebind<Allocator,
+          typename type_policy::value_type>::type>;
+      using insert_return_type =
+        detail::foa::iteratorless_insert_return_type<node_type>;
       static constexpr size_type bulk_visit_size = table_type::bulk_visit_size;
 
 #if defined(BOOST_UNORDERED_ENABLE_STATS)
       using stats = typename table_type::stats;
 #endif
 
-      concurrent_flat_map()
-          : concurrent_flat_map(detail::foa::default_bucket_count)
+      concurrent_node_map()
+          : concurrent_node_map(detail::foa::default_bucket_count)
       {
       }
 
-      explicit concurrent_flat_map(size_type n, const hasher& hf = hasher(),
+      explicit concurrent_node_map(size_type n, const hasher& hf = hasher(),
         const key_equal& eql = key_equal(),
         const allocator_type& a = allocator_type())
           : table_(n, hf, eql, a)
@@ -92,7 +100,7 @@ namespace boost {
       }
 
       template <class InputIterator>
-      concurrent_flat_map(InputIterator f, InputIterator l,
+      concurrent_node_map(InputIterator f, InputIterator l,
         size_type n = detail::foa::default_bucket_count,
         const hasher& hf = hasher(), const key_equal& eql = key_equal(),
         const allocator_type& a = allocator_type())
@@ -101,117 +109,116 @@ namespace boost {
         this->insert(f, l);
       }
 
-      concurrent_flat_map(concurrent_flat_map const& rhs)
+      concurrent_node_map(concurrent_node_map const& rhs)
           : table_(rhs.table_,
               boost::allocator_select_on_container_copy_construction(
                 rhs.get_allocator()))
       {
       }
 
-      concurrent_flat_map(concurrent_flat_map&& rhs)
+      concurrent_node_map(concurrent_node_map&& rhs)
           : table_(std::move(rhs.table_))
       {
       }
 
       template <class InputIterator>
-      concurrent_flat_map(
+      concurrent_node_map(
         InputIterator f, InputIterator l, allocator_type const& a)
-          : concurrent_flat_map(f, l, 0, hasher(), key_equal(), a)
+          : concurrent_node_map(f, l, 0, hasher(), key_equal(), a)
       {
       }
 
-      explicit concurrent_flat_map(allocator_type const& a)
+      explicit concurrent_node_map(allocator_type const& a)
           : table_(detail::foa::default_bucket_count, hasher(), key_equal(), a)
       {
       }
 
-      concurrent_flat_map(
-        concurrent_flat_map const& rhs, allocator_type const& a)
+      concurrent_node_map(
+        concurrent_node_map const& rhs, allocator_type const& a)
           : table_(rhs.table_, a)
       {
       }
 
-      concurrent_flat_map(concurrent_flat_map&& rhs, allocator_type const& a)
+      concurrent_node_map(concurrent_node_map&& rhs, allocator_type const& a)
           : table_(std::move(rhs.table_), a)
       {
       }
 
-      concurrent_flat_map(std::initializer_list<value_type> il,
+      concurrent_node_map(std::initializer_list<value_type> il,
         size_type n = detail::foa::default_bucket_count,
         const hasher& hf = hasher(), const key_equal& eql = key_equal(),
         const allocator_type& a = allocator_type())
-          : concurrent_flat_map(n, hf, eql, a)
+          : concurrent_node_map(n, hf, eql, a)
       {
         this->insert(il.begin(), il.end());
       }
 
-      concurrent_flat_map(size_type n, const allocator_type& a)
-          : concurrent_flat_map(n, hasher(), key_equal(), a)
+      concurrent_node_map(size_type n, const allocator_type& a)
+          : concurrent_node_map(n, hasher(), key_equal(), a)
       {
       }
 
-      concurrent_flat_map(
+      concurrent_node_map(
         size_type n, const hasher& hf, const allocator_type& a)
-          : concurrent_flat_map(n, hf, key_equal(), a)
+          : concurrent_node_map(n, hf, key_equal(), a)
       {
       }
 
       template <typename InputIterator>
-      concurrent_flat_map(
+      concurrent_node_map(
         InputIterator f, InputIterator l, size_type n, const allocator_type& a)
-          : concurrent_flat_map(f, l, n, hasher(), key_equal(), a)
+          : concurrent_node_map(f, l, n, hasher(), key_equal(), a)
       {
       }
 
       template <typename InputIterator>
-      concurrent_flat_map(InputIterator f, InputIterator l, size_type n,
+      concurrent_node_map(InputIterator f, InputIterator l, size_type n,
         const hasher& hf, const allocator_type& a)
-          : concurrent_flat_map(f, l, n, hf, key_equal(), a)
+          : concurrent_node_map(f, l, n, hf, key_equal(), a)
       {
       }
 
-      concurrent_flat_map(
+      concurrent_node_map(
         std::initializer_list<value_type> il, const allocator_type& a)
-          : concurrent_flat_map(
+          : concurrent_node_map(
               il, detail::foa::default_bucket_count, hasher(), key_equal(), a)
       {
       }
 
-      concurrent_flat_map(std::initializer_list<value_type> il, size_type n,
+      concurrent_node_map(std::initializer_list<value_type> il, size_type n,
         const allocator_type& a)
-          : concurrent_flat_map(il, n, hasher(), key_equal(), a)
+          : concurrent_node_map(il, n, hasher(), key_equal(), a)
       {
       }
 
-      concurrent_flat_map(std::initializer_list<value_type> il, size_type n,
+      concurrent_node_map(std::initializer_list<value_type> il, size_type n,
         const hasher& hf, const allocator_type& a)
-          : concurrent_flat_map(il, n, hf, key_equal(), a)
+          : concurrent_node_map(il, n, hf, key_equal(), a)
       {
       }
 
-
-      concurrent_flat_map(
-        unordered_flat_map<Key, T, Hash, Pred, Allocator>&& other)
+      concurrent_node_map(
+        unordered_node_map<Key, T, Hash, Pred, Allocator>&& other)
           : table_(std::move(other.table_))
       {
       }
 
-      ~concurrent_flat_map() = default;
+      ~concurrent_node_map() = default;
 
-      concurrent_flat_map& operator=(concurrent_flat_map const& rhs)
+      concurrent_node_map& operator=(concurrent_node_map const& rhs)
       {
         table_ = rhs.table_;
         return *this;
       }
 
-      concurrent_flat_map& operator=(concurrent_flat_map&& rhs) noexcept(
+      concurrent_node_map& operator=(concurrent_node_map&& rhs) noexcept(
         noexcept(std::declval<table_type&>() = std::declval<table_type&&>()))
       {
         table_ = std::move(rhs.table_);
         return *this;
       }
 
-      concurrent_flat_map& operator=(std::initializer_list<value_type> ilist)
+      concurrent_node_map& operator=(std::initializer_list<value_type> ilist)
       {
         table_ = ilist;
         return *this;
@@ -433,6 +440,25 @@ namespace boost {
         return this->insert(ilist.begin(), ilist.end());
       }
 
+      insert_return_type insert(node_type&& nh)
+      {
+        using access = detail::foa::node_handle_access;
+
+        if (nh.empty()) {
+          return {false, node_type{}};
+        }
+
+        // Caveat: get_allocator() incurs synchronization (not cheap)
+        BOOST_ASSERT(get_allocator() == nh.get_allocator());
+
+        if (table_.insert(std::move(access::element(nh)))) {
+          access::reset(nh);
+          return {true, node_type{}};
+        } else {
+          return {false, std::move(nh)};
+        }
+      }
+
       template <class M>
       BOOST_FORCEINLINE bool insert_or_assign(key_type const& k, M&& obj)
       {
@@ -490,6 +516,27 @@ namespace boost {
         return this->insert_or_visit(ilist.begin(), ilist.end(), std::ref(f));
       }
 
+      template <class F>
+      insert_return_type insert_or_visit(node_type&& nh, F f)
+      {
+        BOOST_UNORDERED_STATIC_ASSERT_INVOCABLE(F)
+        using access = detail::foa::node_handle_access;
+
+        if (nh.empty()) {
+          return {false, node_type{}};
+        }
+
+        // Caveat: get_allocator() incurs synchronization (not cheap)
+        BOOST_ASSERT(get_allocator() == nh.get_allocator());
+
+        if (table_.insert_or_visit(std::move(access::element(nh)), f)) {
+          access::reset(nh);
+          return {true, node_type{}};
+        } else {
+          return {false, std::move(nh)};
+        }
+      }
+
       template <class Ty, class F>
       BOOST_FORCEINLINE auto insert_or_cvisit(Ty&& value, F f)
         -> decltype(table_.insert_or_cvisit(std::forward<Ty>(value), f))
@@ -521,6 +568,27 @@ namespace boost {
       {
         BOOST_UNORDERED_STATIC_ASSERT_CONST_INVOCABLE(F)
         return this->insert_or_cvisit(ilist.begin(), ilist.end(), std::ref(f));
+      }
+
+      template <class F>
+      insert_return_type insert_or_cvisit(node_type&& nh, F f)
+      {
+        BOOST_UNORDERED_STATIC_ASSERT_CONST_INVOCABLE(F)
+        using access = detail::foa::node_handle_access;
+
+        if (nh.empty()) {
+          return {false, node_type{}};
+        }
+
+        // Caveat: get_allocator() incurs synchronization (not cheap)
+        BOOST_ASSERT(get_allocator() == nh.get_allocator());
+
+        if (table_.insert_or_cvisit(std::move(access::element(nh)), f)) {
+          access::reset(nh);
+          return {true, node_type{}};
+        } else {
+          return {false, std::move(nh)};
+        }
       }
 
       template <class Ty, class F1, class F2>
@@ -563,6 +631,28 @@ namespace boost {
           ilist.begin(), ilist.end(), std::ref(f1), std::ref(f2));
       }
 
+      template <class F1, class F2>
+      insert_return_type insert_and_visit(node_type&& nh, F1 f1, F2 f2)
+      {
+        BOOST_UNORDERED_STATIC_ASSERT_INVOCABLE(F1)
+        BOOST_UNORDERED_STATIC_ASSERT_INVOCABLE(F2)
+        using access = detail::foa::node_handle_access;
+
+        if (nh.empty()) {
+          return {false, node_type{}};
+        }
+
+        // Caveat: get_allocator() incurs synchronization (not cheap)
+        BOOST_ASSERT(get_allocator() == nh.get_allocator());
+
+        if (table_.insert_and_visit(std::move(access::element(nh)), f1, f2)) {
+          access::reset(nh);
+          return {true, node_type{}};
+        } else {
+          return {false, std::move(nh)};
+        }
+      }
+
       template <class Ty, class F1, class F2>
       BOOST_FORCEINLINE auto insert_and_cvisit(Ty&& value, F1 f1, F2 f2)
         -> decltype(table_.insert_and_cvisit(std::forward<Ty>(value), f1, f2))
@@ -601,6 +691,28 @@ namespace boost {
         BOOST_UNORDERED_STATIC_ASSERT_CONST_INVOCABLE(F2)
         return this->insert_and_cvisit(
           ilist.begin(), ilist.end(), std::ref(f1), std::ref(f2));
+      }
+
+      template <class F1, class F2>
+      insert_return_type insert_and_cvisit(node_type&& nh, F1 f1, F2 f2)
+      {
+        BOOST_UNORDERED_STATIC_ASSERT_INVOCABLE(F1)
+        BOOST_UNORDERED_STATIC_ASSERT_CONST_INVOCABLE(F2)
+        using access = detail::foa::node_handle_access;
+
+        if (nh.empty()) {
+          return {false, node_type{}};
+        }
+
+        // Caveat: get_allocator() incurs synchronization (not cheap)
+        BOOST_ASSERT(get_allocator() == nh.get_allocator());
+
+        if (table_.insert_and_cvisit(std::move(access::element(nh)), f1, f2)) {
+          access::reset(nh);
+          return {true, node_type{}};
+        } else {
+          return {false, std::move(nh)};
+        }
       }
 
       template <class... Args> BOOST_FORCEINLINE bool emplace(Args&&... args)
@@ -837,24 +949,59 @@ namespace boost {
 
       template <class F> size_type erase_if(F f) { return table_.erase_if(f); }
 
-      void swap(concurrent_flat_map& other) noexcept(
+      void swap(concurrent_node_map& other) noexcept(
         boost::allocator_is_always_equal<Allocator>::type::value ||
         boost::allocator_propagate_on_container_swap<Allocator>::type::value)
       {
         return table_.swap(other.table_);
       }
 
+      node_type extract(key_type const& key)
+      {
+        node_type nh;
+        table_.extract(key, detail::foa::node_handle_emplacer(nh));
+        return nh;
+      }
+
+      template <class K>
+      typename std::enable_if<
+        detail::are_transparent<K, hasher, key_equal>::value, node_type>::type
+      extract(K const& key)
+      {
+        node_type nh;
+        table_.extract(key, detail::foa::node_handle_emplacer(nh));
+        return nh;
+      }
+
+      template <class F>
+      node_type extract_if(key_type const& key, F f)
+      {
+        node_type nh;
+        table_.extract_if(key, f, detail::foa::node_handle_emplacer(nh));
+        return nh;
+      }
+
+      template <class K, class F>
+      typename std::enable_if<
+        detail::are_transparent<K, hasher, key_equal>::value, node_type>::type
+      extract_if(K const& key, F f)
+      {
+        node_type nh;
+        table_.extract_if(key, f, detail::foa::node_handle_emplacer(nh));
+        return nh;
+      }
+
       void clear() noexcept { table_.clear(); }
 
       template <typename H2, typename P2>
-      size_type merge(concurrent_flat_map<Key, T, H2, P2, Allocator>& x)
+      size_type merge(concurrent_node_map<Key, T, H2, P2, Allocator>& x)
       {
         BOOST_ASSERT(get_allocator() == x.get_allocator());
         return table_.merge(x.table_);
       }
 
       template <typename H2, typename P2>
-      size_type merge(concurrent_flat_map<Key, T, H2, P2, Allocator>&& x)
+      size_type merge(concurrent_node_map<Key, T, H2, P2, Allocator>&& x)
       {
         return merge(x);
       }
@@ -921,38 +1068,38 @@ namespace boost {
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
     bool operator==(
-      concurrent_flat_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
-      concurrent_flat_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
+      concurrent_node_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
+      concurrent_node_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
     {
       return lhs.table_ == rhs.table_;
     }
 
     template <class Key, class T, class Hash, class KeyEqual, class Allocator>
     bool operator!=(
-      concurrent_flat_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
-      concurrent_flat_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
+      concurrent_node_map<Key, T, Hash, KeyEqual, Allocator> const& lhs,
+      concurrent_node_map<Key, T, Hash, KeyEqual, Allocator> const& rhs)
     {
       return !(lhs == rhs);
     }
 
     template <class Key, class T, class Hash, class Pred, class Alloc>
-    void swap(concurrent_flat_map<Key, T, Hash, Pred, Alloc>& x,
-      concurrent_flat_map<Key, T, Hash, Pred, Alloc>& y)
+    void swap(concurrent_node_map<Key, T, Hash, Pred, Alloc>& x,
+      concurrent_node_map<Key, T, Hash, Pred, Alloc>& y)
       noexcept(noexcept(x.swap(y)))
     {
       x.swap(y);
     }
 
     template <class K, class T, class H, class P, class A, class Predicate>
-    typename concurrent_flat_map<K, T, H, P, A>::size_type erase_if(
-      concurrent_flat_map<K, T, H, P, A>& c, Predicate pred)
+    typename concurrent_node_map<K, T, H, P, A>::size_type erase_if(
+      concurrent_node_map<K, T, H, P, A>& c, Predicate pred)
     {
       return c.table_.erase_if(pred);
     }
 
     template<class Archive, class K, class V, class H, class KE, class A>
     void serialize(
-      Archive& ar, concurrent_flat_map<K, V, H, KE, A>& c, unsigned int)
+      Archive& ar, concurrent_node_map<K, V, H, KE, A>& c, unsigned int)
     {
       ar & core::make_nvp("table",c.table_);
     }
@@ -970,10 +1117,10 @@ namespace boost {
       class = std::enable_if_t<detail::is_hash_v<Hash> >,
       class = std::enable_if_t<detail::is_pred_v<Pred> >,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(InputIterator, InputIterator,
+    concurrent_node_map(InputIterator, InputIterator,
       std::size_t = boost::unordered::detail::foa::default_bucket_count,
       Hash = Hash(), Pred = Pred(), Allocator = Allocator())
-      -> concurrent_flat_map<
+      -> concurrent_node_map<
         boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>, Hash, Pred,
         Allocator>;
@@ -985,17 +1132,17 @@ namespace boost {
       class = std::enable_if_t<detail::is_hash_v<Hash> >,
       class = std::enable_if_t<detail::is_pred_v<Pred> >,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(std::initializer_list<std::pair<Key, T> >,
+    concurrent_node_map(std::initializer_list<std::pair<Key, T> >,
       std::size_t = boost::unordered::detail::foa::default_bucket_count,
       Hash = Hash(), Pred = Pred(), Allocator = Allocator())
-      -> concurrent_flat_map<std::remove_const_t<Key>, T, Hash, Pred,
+      -> concurrent_node_map<std::remove_const_t<Key>, T, Hash, Pred,
         Allocator>;
 
     template <class InputIterator, class Allocator,
       class = std::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(InputIterator, InputIterator, std::size_t, Allocator)
-      -> concurrent_flat_map<
+    concurrent_node_map(InputIterator, InputIterator, std::size_t, Allocator)
+      -> concurrent_node_map<
         boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>,
         boost::hash<boost::unordered::detail::iter_key_t<InputIterator> >,
@@ -1005,8 +1152,8 @@ namespace boost {
     template <class InputIterator, class Allocator,
       class = std::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(InputIterator, InputIterator, Allocator)
-      -> concurrent_flat_map<
+    concurrent_node_map(InputIterator, InputIterator, Allocator)
+      -> concurrent_node_map<
         boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>,
         boost::hash<boost::unordered::detail::iter_key_t<InputIterator> >,
@@ -1017,9 +1164,9 @@ namespace boost {
       class = std::enable_if_t<detail::is_hash_v<Hash> >,
       class = std::enable_if_t<detail::is_input_iterator_v<InputIterator> >,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(
+    concurrent_node_map(
       InputIterator, InputIterator, std::size_t, Hash, Allocator)
-      -> concurrent_flat_map<
+      -> concurrent_node_map<
         boost::unordered::detail::iter_key_t<InputIterator>,
         boost::unordered::detail::iter_val_t<InputIterator>, Hash,
         std::equal_to<boost::unordered::detail::iter_key_t<InputIterator> >,
@@ -1027,23 +1174,23 @@ namespace boost {
 
     template <class Key, class T, class Allocator,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
-      Allocator) -> concurrent_flat_map<std::remove_const_t<Key>, T,
+    concurrent_node_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
+      Allocator) -> concurrent_node_map<std::remove_const_t<Key>, T,
       boost::hash<std::remove_const_t<Key> >,
       std::equal_to<std::remove_const_t<Key> >, Allocator>;
 
     template <class Key, class T, class Allocator,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(std::initializer_list<std::pair<Key, T> >, Allocator)
-      -> concurrent_flat_map<std::remove_const_t<Key>, T,
+    concurrent_node_map(std::initializer_list<std::pair<Key, T> >, Allocator)
+      -> concurrent_node_map<std::remove_const_t<Key>, T,
         boost::hash<std::remove_const_t<Key> >,
         std::equal_to<std::remove_const_t<Key> >, Allocator>;
 
     template <class Key, class T, class Hash, class Allocator,
       class = std::enable_if_t<detail::is_hash_v<Hash> >,
       class = std::enable_if_t<detail::is_allocator_v<Allocator> > >
-    concurrent_flat_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
-      Hash, Allocator) -> concurrent_flat_map<std::remove_const_t<Key>, T,
+    concurrent_node_map(std::initializer_list<std::pair<Key, T> >, std::size_t,
+      Hash, Allocator) -> concurrent_node_map<std::remove_const_t<Key>, T,
       Hash, std::equal_to<std::remove_const_t<Key> >, Allocator>;
 
 #endif
@@ -1051,4 +1198,4 @@ namespace boost {
   } // namespace unordered
 } // namespace boost
 
-#endif // BOOST_UNORDERED_CONCURRENT_FLAT_MAP_HPP
+#endif // BOOST_UNORDERED_CONCURRENT_NODE_MAP_HPP
