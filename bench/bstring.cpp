@@ -5,8 +5,6 @@
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 
 #include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/core/detail/splitmix64.hpp>
-#include <boost/config.hpp>
 #ifdef ABSL_HMAP
 # include "absl/container/node_hash_map.h"
 # include "absl/container/flat_hash_map.h"
@@ -85,7 +83,8 @@ static void init_indices()
     indices2.push_back( make_index( 0 ) );
 
     {
-        boost::detail::splitmix64 rng;
+        //boost::detail::splitmix64 rng;
+        WyRand rng;
 
         for( unsigned i = 1; i <= N*2; ++i )
         {

@@ -337,8 +337,7 @@ static void bench_AccidentallyQuadratic()
     //bench.beginMeasure("iterate");
     uint64_t sum = 0;
     for (auto const& kv : map) {
-        sum += kv.first;
-        sum += kv.second;
+        sum += kv.first + kv.second;
     }
     if (sum != UINT64_C(18446739465311920326))
         puts("error\n");
@@ -350,7 +349,7 @@ static void bench_AccidentallyQuadratic()
         if constexpr (unique)
             map2.insert_unique(kv.first, kv.second);
         else
-            map2[kv.first] = kv.second;
+            map2.emplace(kv.first, kv.second);
     }
     assert(map.size() == map2.size());
 #endif
@@ -665,19 +664,19 @@ static void bench_udb3()
     uint64_t z = 0, x = x0;
     for (uint32_t j = 0, i = 0, n = n0; j < n_cp; ++j, n += step) {
         for (; i < n; ++i) {
-            uint64_t y = splitmix64(x);
-            uint32_t key = udb_get_key(n, y);
+            const uint64_t y = splitmix64(x);
+            const uint32_t key = udb_get_key(n, y);
             if (is_del) {
                 auto p = h.emplace(key, i);
-                if (p.second == false) h.erase(p.first);
-                else ++z;
+                if (!p.second) h.erase(p.first);
+                z += p.second;
             } else {
                 z += ++h[key];
             }
         }
     }
 
-    printf(" z[%d] = %d total time = %.2lf s\n", is_del, (int)z, now2sec() - nows);
+    printf(" z[%d] = %d total time = %.2lf lf = %.2f\n", is_del, (int)z, now2sec() - nows, h.load_factor());
 }
 
 template<class MAP>

@@ -58,7 +58,7 @@ std::map<std::string, std::string> maps =
     {"martind", "martin_dense"},
 //    {"f14_value", "f14_value"},
 
-#if ET
+#if 0
     {"martinf", "martin_flat"},
     {"ck_map", "ck_map"},
     {"hrd_m", "hrd_m"},
@@ -680,12 +680,13 @@ static void multi_small_ife(const std::string& hash_name, const std::vector<keyT
             auto hash_id = ((uint32_t)v) % hash_size;
             sum += mh[hash_id].erase(v % data_size + v % 2);
         }
-
+#if ET < 3
         for (int i = (int)vList.size(); i > 0; i--) {
             const keyType v = srng();
             auto hash_id = ((uint32_t)v) % hash_size;
             sum += mh[hash_id].count(v % data_size);
         }
+#endif
 
         delete []mh;
     } else {
@@ -1228,8 +1229,8 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     erase_50_reinsert<hash_type>(hash, hash_name, oList);
 
     insert_find_erase <hash_type>(hash, hash_name, nList);
-    insert_erase_first<hash_type>(hash_name, oList);
-    insert_erase_continue<hash_type>(hash_name, oList);
+    //insert_erase_first<hash_type>(hash_name, oList);
+    //insert_erase_continue<hash_type>(hash_name, oList);
     insert_backtrace<hash_type>(hash_name, oList);
     iter_all          <hash_type>(hash, hash_name);
 
@@ -1387,8 +1388,8 @@ static int benchHashMap(int n)
     #if FHT_HMAP
         {  benOneHash<fht_table <keyType, valueType, ehash_func>>("fht", vList); }
     #endif
-        {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
         {  benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
+        {  benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
 #endif
 
 

@@ -1,8 +1,6 @@
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #define _SILENCE_CXX20_CISO646_REMOVED_WARNING
 #include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/endian/conversion.hpp>
-#include <boost/core/detail/splitmix64.hpp>
 #include "util.h"
 
 #include "tsl/robin_map.h"

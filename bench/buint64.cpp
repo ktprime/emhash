@@ -3,8 +3,6 @@
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #define _SILENCE_CXX20_CISO646_REMOVED_WARNING
 #include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/endian/conversion.hpp>
-#include <boost/core/detail/splitmix64.hpp>
 #include "util.h"
 
 #include "tsl/robin_map.h"
@@ -36,7 +34,7 @@ static int K = 10;
 static void print_time( std::chrono::steady_clock::time_point & t1, char const* label, uint64_t s, std::size_t size )
 {
     auto t2 = std::chrono::steady_clock::now();
-	if (size + s)
+    if (size + s)
     std::cout << "\t" << label << ": " << ( t2 - t1 ) / 1ms << " ms";// (s=" << s << ", size=" << size << ")";
     t1 = t2;
 }
@@ -58,7 +56,7 @@ static void init_indices()
     indices2.push_back( 0 );
 
     {
-        boost::detail::splitmix64 rng;
+        WyRand rng;
 
         for( unsigned i = 1; i <= N*2; ++i )
         {
@@ -70,7 +68,11 @@ static void init_indices()
 
     for( unsigned i = 1; i <= N*2; ++i )
     {
-        indices3.push_back( boost::endian::endian_reverse( static_cast<std::uint64_t>( i ) ) );
+#if _WIN32
+        indices3.push_back(_byteswap_uint64( i ));
+#else
+        indices3.push_back( bswap_64( static_cast<std::uint64_t>( i ) ) );
+#endif
 //        if (sizeof (KeyType) == sizeof (uint64_t))
 //            indices3.push_back( (KeyType)i << 40 );
 //        else
