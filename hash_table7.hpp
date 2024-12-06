@@ -761,7 +761,7 @@ public:
     inline bool empty() const { return _num_filled == 0; }
 
     inline size_type bucket_count() const { return _num_buckets; }
-    inline float load_factor() const { return ((float)_num_filled) / (_mask + 1); }
+    inline float load_factor() const { return ((float)_num_filled) / ((float)_mask + 1.0f); }
 
     inline HashT& hash_function() const { return _hasher; }
     inline EqT& key_eq() const { return _eq; }

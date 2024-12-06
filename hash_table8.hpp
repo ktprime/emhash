@@ -237,7 +237,7 @@ public:
     HashMap(const HashMap& rhs)
     {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs = alloc_bucket((size_type)(rhs._num_buckets * rhs.max_load_factor()) + 4);
+            _pairs = alloc_bucket((size_type)((float)rhs._num_buckets * rhs.max_load_factor()) + 4);
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
         } else {
@@ -263,7 +263,7 @@ public:
     template<class InputIt>
     HashMap(InputIt first, InputIt last, size_type bucket_count=4)
     {
-        init(std::distance(first, last) + bucket_count);
+        init((size_type)std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             emplace(*first);
     }
@@ -286,7 +286,7 @@ public:
         if (_num_buckets != rhs._num_buckets) {
             free(_pairs); free(_index);
             _index = alloc_index(rhs._num_buckets);
-            _pairs = alloc_bucket((size_type)(rhs._num_buckets * rhs.max_load_factor()) + 4);
+            _pairs = alloc_bucket((size_type)((float)rhs._num_buckets * rhs.max_load_factor()) + 4);
         }
 
         clone(rhs);
@@ -398,7 +398,7 @@ public:
     size_type bucket_count() const { return _num_buckets; }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
+    float load_factor() const { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
 
     HashT& hash_function() const { return _hasher; }
     EqT& key_eq() const { return _eq; }
@@ -1134,7 +1134,7 @@ public:
     void rebuild(size_type num_buckets) noexcept
     {
         free(_index);
-        auto new_pairs = (value_type*)alloc_bucket((size_type)(num_buckets * max_load_factor()) + 4);
+        auto new_pairs = (value_type*)alloc_bucket((size_type)((double)num_buckets * max_load_factor()) + 4);
         if (is_copy_trivially()) {
             if (_pairs)
             memcpy((char*)new_pairs, (char*)_pairs, _num_filled * sizeof(value_type));

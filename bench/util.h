@@ -669,7 +669,7 @@ static void printInfo(char* out)
 #endif
 
 #if __cplusplus > 199711L
-    info += snprintf(info, 20,  " __cplusplus = %d", static_cast<int>(__cplusplus));
+    info += snprintf(info, 40,  " __cplusplus = %d", static_cast<int>(__cplusplus));
 #endif
 
 #if X86_64
