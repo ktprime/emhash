@@ -172,7 +172,7 @@ public:
 #if EMH_ITER_SAFE
         iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 #else
-        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = 0; _from = -1; }
+        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = 0; _from = size_t(- 1); }
 #endif
 
         void init()

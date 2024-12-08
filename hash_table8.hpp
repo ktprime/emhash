@@ -1618,7 +1618,6 @@ private:
 #endif
         }
 
-        return 0;
     }
 
     size_type find_last_bucket(size_type main_bucket) const

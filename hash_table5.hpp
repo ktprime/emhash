@@ -102,8 +102,10 @@ namespace emhash5 {
     const constexpr size_type INACTIVE = 0xFFFF;
 #endif
 
+#ifdef EMH_ALLOC
 #ifndef EMH_MALIGN
     static constexpr uint32_t EMH_MALIGN = 16;
+#endif
 #endif
 
 template <typename First, typename Second>
@@ -1310,7 +1312,7 @@ public:
         if (is_triviall_destructable())
             clearkv();
         else if (_num_filled)
-            memset((char*)_pairs, -1u, sizeof(_pairs[0]) * _num_buckets);
+            memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 #endif
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)
@@ -1415,7 +1417,7 @@ public:
         else
 #endif
         _pairs = (PairT*)alloc_bucket(num_buckets);
-        memset((char*)_pairs, -1u, sizeof(_pairs[0]) * num_buckets);
+        memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
 
 #if EMH_FIND_HIT
@@ -1908,8 +1910,6 @@ one-way search strategy.
 #endif
             }
         }
-
-        return 0;
     }
 
     size_type find_unique_empty(const size_type bucket_from) noexcept
@@ -1923,8 +1923,6 @@ one-way search strategy.
             if (EMH_EMPTY(_pairs, nbucket) || EMH_EMPTY(_pairs, ++nbucket))
                 return nbucket;
         }
-
-        return 0;
     }
 
     size_type find_last_bucket(size_type main_bucket) const noexcept

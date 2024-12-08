@@ -373,10 +373,10 @@ static void bench_InsertEraseBegin()
         MRNG rng(987654321 + i * i * i);
 
         // benchmark randomly inserting & erasing begin
-        for (size_t i = 0; i < max_n / 5; ++i)
+        for (size_t j = 0; j < max_n / 5; ++j)
             map.emplace((int64_t)rng(), 0);
 
-        for (size_t i = 0; i < max_n; ++i) {
+        for (size_t j = 0; j < max_n; ++j) {
             map.erase(map.begin());
             map.emplace((int64_t)rng(), 0);
         }
@@ -406,11 +406,11 @@ static void bench_InsertEraseContinue()
         MRNG rng(2345 + i * i * i);
 
         // benchmark randomly inserting & erasing begin
-        for (size_t i = 0; i < max_n / 3; ++i)
+        for (size_t j = 0; j < max_n / 3; ++j)
             map.emplace((int)rng(), 0);
 
         auto key = map.begin()->first;
-        for (size_t i = max_n; i > 0; i--) {
+        for (size_t j = max_n; j > 0; j--) {
             auto it = map.find(key);
             if (it == map.end()) {
                 it = map.begin();
@@ -540,7 +540,7 @@ static void bench_randomInsertErase(MAP& map)
             }
 
 //            auto ts = now2sec();
-            for (size_t i = 0; i < max_n; ++i) {
+            for (size_t j = 0; j < max_n; ++j) {
                 map2.emplace(rng() & bitMask, 0);
                 map2.erase(rng() & bitMask);
             }

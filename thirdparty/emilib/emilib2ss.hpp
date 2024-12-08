@@ -968,12 +968,12 @@ private:
         return offset;
     }
 
-    inline void set_group_probe(size_t gbucket, size_t group_offset)
+    inline void set_group_probe(size_t gbucket, int group_offset)
     {
 #if EMH_SAFE_PSL
         _states[gbucket + group_index] = group_offset <= 128 ? group_offset : 128 + group_offset / 128;
 #else
-        _states[gbucket + group_index] = group_offset;
+        _states[gbucket + group_index] = (int8_t)group_offset;
 #endif
     }
 

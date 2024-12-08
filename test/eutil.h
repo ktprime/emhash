@@ -135,7 +135,7 @@ int64_t getus()
 //#elif LINUX_TICK || __APPLE__
 //    return clock();
 #elif __linux__
-    struct timespec ts = {0};
+    struct timespec ts = {};
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000ull + ts.tv_nsec / 1000;
 #elif __unix__

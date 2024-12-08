@@ -269,7 +269,7 @@ public:
 #if EMH_ITER_SAFE
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 #else
-        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _from = -1; }
+        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _from = (size_type)-1; }
 #endif
 
         void init()
@@ -374,7 +374,7 @@ public:
 #if EMH_ITER_SAFE
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
 #else
-        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _from = -1; }
+        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { _from = (size_type)-1; }
 #endif
 
         void init()

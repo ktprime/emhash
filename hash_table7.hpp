@@ -163,7 +163,7 @@ namespace emhash7 {
     static constexpr size_type INACTIVE = 0 - 0x1ull;
 #else
     typedef uint32_t size_type;
-    static constexpr size_type INACTIVE = -1;
+    static constexpr size_type INACTIVE = -1u;
 #endif
 
 #ifndef EMH_MALIGN
@@ -993,7 +993,7 @@ public:
     template<typename Key = KeyT>
     inline size_type count(const Key& key) const noexcept
     {
-        return find_filled_bucket(key) != _num_buckets ? 1 : 0;
+        return find_filled_bucket(key) != _num_buckets ? 1u : 0u;
     }
 
     template<typename Key = KeyT>
@@ -1738,8 +1738,6 @@ private:
             offset += 1;
 #endif
         }
-
-        return 0;
     }
 
     // key is not in this map. Find a place to put it.

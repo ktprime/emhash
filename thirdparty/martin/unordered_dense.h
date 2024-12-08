@@ -1,12 +1,12 @@
 ///////////////////////// ankerl::unordered_dense::{map, set} /////////////////////////
 
 // A fast & densely stored hashmap and hashset based on robin-hood backward shift deletion.
-// Version 4.4.0
+// Version 4.5.0
 // https://github.com/martinus/unordered_dense
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2022-2023 Martin Leitner-Ankerl <martin.ankerl@gmail.com>
+// Copyright (c) 2022-2024 Martin Leitner-Ankerl <martin.ankerl@gmail.com>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@
 
 // see https://semver.org/spec/v2.0.0.html
 #define ANKERL_UNORDERED_DENSE_VERSION_MAJOR 4 // NOLINT(cppcoreguidelines-macro-usage) incompatible API changes
-#define ANKERL_UNORDERED_DENSE_VERSION_MINOR 4 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible functionality
+#define ANKERL_UNORDERED_DENSE_VERSION_MINOR 5 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible functionality
 #define ANKERL_UNORDERED_DENSE_VERSION_PATCH 0 // NOLINT(cppcoreguidelines-macro-usage) backwards compatible bug fixes
 
 // API versioning with inline namespace, see https://www.foonathan.net/2018/11/inline-namespaces/
@@ -98,7 +98,7 @@
 #        include <cstdlib> // for abort
 #    endif
 
-#    if defined(__has_include)
+#    if defined(__has_include) && !defined(ANKERL_UNORDERED_DENSE_DISABLE_PMR)
 #        if __has_include(<memory_resource>)
 #            define ANKERL_UNORDERED_DENSE_PMR std::pmr // NOLINT(cppcoreguidelines-macro-usage)
 #            include <memory_resource>                  // for polymorphic_allocator
@@ -271,8 +271,8 @@ inline void mum(uint64_t* a, uint64_t* b) {
 
 ANKERL_UNORDERED_DENSE_EXPORT template <typename T, typename Enable = void>
 struct hash {
-    auto operator()(T const& obj) const
-        noexcept(noexcept(std::declval<std::hash<T>>().operator()(std::declval<T const&>()))) -> uint64_t {
+    auto operator()(T const& obj) const noexcept(noexcept(std::declval<std::hash<T>>().operator()(std::declval<T const&>())))
+        -> uint64_t {
         return std::hash<T>{}(obj);
     }
 };
@@ -280,8 +280,8 @@ struct hash {
 template <typename T>
 struct hash<T, typename std::hash<T>::is_avalanching> {
     using is_avalanching = void;
-    auto operator()(T const& obj) const
-        noexcept(noexcept(std::declval<std::hash<T>>().operator()(std::declval<T const&>()))) -> uint64_t {
+    auto operator()(T const& obj) const noexcept(noexcept(std::declval<std::hash<T>>().operator()(std::declval<T const&>())))
+        -> uint64_t {
         return std::hash<T>{}(obj);
     }
 };
@@ -586,6 +586,12 @@ private:
         constexpr auto operator++() noexcept -> iter_t& {
             ++m_idx;
             return *this;
+        }
+
+        constexpr auto operator++(int) noexcept -> iter_t {
+            iter_t prev(*this);
+            this->operator++();
+            return prev;
         }
 
         constexpr auto operator+(difference_type diff) noexcept -> iter_t {
@@ -1107,9 +1113,8 @@ private:
     }
 
     template <typename... Args>
-    auto do_place_element(dist_and_fingerprint_type dist_and_fingerprint,
-                          value_idx_type bucket_idx,
-                          Args&&... args) -> std::pair<iterator, bool> {
+    auto do_place_element(dist_and_fingerprint_type dist_and_fingerprint, value_idx_type bucket_idx, Args&&... args)
+        -> std::pair<iterator, bool> {
 
         // emplace the new value. If that throws an exception, no harm done; index is still in a valid state
         m_values.emplace_back(std::forward<Args>(args)...);
