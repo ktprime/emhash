@@ -670,7 +670,7 @@ public:
     bool empty() const { return _num_filled == 0; }
 
     size_type bucket_count() const { return _mask + 1; }
-    float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
+    float load_factor() const { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
 
     HashT& hash_function() const { return _hasher; }
     EqT& key_eq() const { return _eq; }
@@ -1301,7 +1301,7 @@ public:
         memset((char*)_bitmask, 0xFFFFFFFF, mask_byte);
         memset((char*)_bitmask + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8)
-            _bitmask[0] = (1 << num_buckets) - 1;
+            _bitmask[0] = (uint8_t)(1 << num_buckets) - 1;
         //pack last position to bit 0
         /**************** -------------------------------- *************/
 
