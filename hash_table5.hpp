@@ -589,7 +589,7 @@ public:
     HashT hash_function() const noexcept { return static_cast<const HashT&>(_hasher); }
     EqT key_eq() const noexcept { return static_cast<const EqT&>(_eq); }
 
-    float load_factor() const noexcept { return static_cast<float>(_num_filled) / _num_buckets; }
+    float load_factor() const noexcept { return static_cast<float>(_num_filled) / (float)_num_buckets; }
     float max_load_factor() const noexcept { return (1 << 27) / (float)_mlf; }
     void max_load_factor(float mlf) noexcept
     {

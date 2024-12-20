@@ -134,7 +134,7 @@ ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -std=c++20 -I. qbench.cpp -o qbench
 endif
 
-	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) -Wextra -Wpedantic martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) hash_join.cpp -o join_hash
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
