@@ -11,7 +11,7 @@
 #include <utility>
 #include <cassert>
 
-#if _WIN32
+#ifdef _WIN32
 #  include <intrin.h>
 #ifndef __clang__
 //#  include <zmmintrin.h>
@@ -19,10 +19,12 @@
 #elif __x86_64__
 #  include <x86intrin.h>
 #else
+# include "sse2neon.h"
 #endif
 
 #undef EMH_LIKELY
 #undef EMH_UNLIKELY
+#undef bucket_to_slot
 
 // likely/unlikely
 #if (__GNUC__ >= 4 || __clang__) && _MSC_VER == 0
@@ -86,7 +88,7 @@ inline static uint32_t CTZ(uint64_t n)
 #if _WIN32
     unsigned long index;
     #if defined(_WIN64)
-    _BitScanForward64(&index, n);
+        _BitScanForward64(&index, n);
     #else
     if ((uint32_t)n)
         _BitScanForward(&index, (uint32_t)n);
@@ -127,7 +129,7 @@ public:
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
-        main_bucket = key_hash & _mask;
+        main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
         return (int8_t)((uint64_t)key_hash % 253 + EFILLED);
     }
@@ -136,7 +138,7 @@ public:
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
-        main_bucket = key_hash & _mask;
+        main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
         return (int8_t)(key_hash % 253 + EFILLED);
     }
@@ -170,7 +172,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= ~((1ull << (_bucket % simd_bytes)) - 1);
+                _bmask &= (size_t) ~((1ull << (_bucket % simd_bytes)) - 1);
             } else {
                 _bmask = 0;
             }
@@ -250,7 +252,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= ~((1ull << (_bucket % simd_bytes)) - 1);
+                _bmask &= (size_t) ~((1ull << (_bucket % simd_bytes)) - 1);
             } else {
                 _bmask = 0;
             }
@@ -364,7 +366,6 @@ public:
     ~HashMap() noexcept
     {
         clear_data();
-
         _num_filled = 0;
         free(_states);
         free(_pairs);
@@ -464,7 +465,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return static_cast<float>(_num_filled) / bucket_to_slot(_num_buckets);
+        return static_cast<float>(_num_filled) / (float)bucket_to_slot(_num_buckets);
     }
 
     float max_load_factor(float lf = 7.0f / 8)

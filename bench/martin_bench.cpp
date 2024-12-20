@@ -381,7 +381,7 @@ static void bench_InsertEraseBegin()
             map.emplace((int64_t)rng(), 0);
         }
 
-        printf("\n        %.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
+        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
         max_n *= 5;
     }
 
@@ -428,7 +428,7 @@ static void bench_InsertEraseContinue()
             map.emplace((int)rng(), 0);
         }
 
-        printf("\n        %.2lf cycles lf = %.2lf mapsize = %d time %.2f", (max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
+        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
         max_n *= 7;
     }
 
@@ -626,7 +626,7 @@ static inline uint32_t udb_get_key(const uint32_t n, const uint32_t x)
 #if 0
     return udb_hash32(x % (n>>2));
 #else
-    return (uint32_t)(x % (n>>2)) * 0x45D9F3B;
+    return (uint32_t)((x % (n>>2)) * 0x45D9F3B);
 #endif
 }
 
@@ -665,7 +665,7 @@ static void bench_udb3()
     for (uint32_t j = 0, i = 0, n = n0; j < n_cp; ++j, n += step) {
         for (; i < n; ++i) {
             const uint64_t y = splitmix64(x);
-            const uint32_t key = udb_get_key(n, y);
+            const uint32_t key = udb_get_key(n, (uint32_t)y);
             if (is_del) {
                 auto p = h.emplace(key, i);
                 if (!p.second) h.erase(p.first);
@@ -806,7 +806,7 @@ static void bench_knucleotide() {
 
     std::vector<char> poly(n * 5);
     for (size_t i = 0; i < poly.size(); ++i) {
-        poly[i] = fasta_next();
+        poly[i] = (char)fasta_next();
     }
 
     auto nows = now2sec();
@@ -1032,7 +1032,7 @@ static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t 
 
 //    auto ts = now2sec();
     for (size_t i = 0; i < max_n; ++i) {
-        *strData32 = rng() & bitMask;
+        *strData32 = uint32_t(rng() & bitMask);
 #if 0
         // create an entry.
         map[str] = 0;
@@ -1044,7 +1044,7 @@ static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t 
         }
 #else
         map.emplace(str, 0);
-        *strData32 = rng() & bitMask;
+        *strData32 = uint32_t(rng() & bitMask);
         verifier += map.erase(str);
 #endif
     }
