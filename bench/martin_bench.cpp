@@ -617,7 +617,7 @@ static inline uint32_t udb_hash32(uint32_t key)
     x ^= x >> 27;
     x *= 0x94d049bb133111ebULL;
     x ^= x >> 31;
-    return x;
+    return (uint32_t)x;
 #endif
 }
 

@@ -969,7 +969,7 @@ public:
         clearkv();
 
         if (_num_filled > 0)
-            memset((char*)_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
+            memset((char*)_index, (int)INACTIVE, sizeof(_index[0]) * _num_buckets);
 
         _last = _num_filled = 0;
         _etail = INACTIVE;
@@ -1115,7 +1115,7 @@ public:
         });
 #endif
 
-        memset((char*)_index, INACTIVE, sizeof(_index[0]) * _num_buckets);
+        memset((char*)_index, (int)INACTIVE, sizeof(_index[0]) * _num_buckets);
         for (size_type slot = 0; slot < _num_filled; slot++) {
             const auto& key = _pairs[slot].first;
             const auto key_hash = hash_key(key);
@@ -1149,7 +1149,7 @@ public:
         _pairs = new_pairs;
         _index = (Index*)alloc_index (num_buckets);
 
-        memset((char*)_index, INACTIVE, sizeof(_index[0]) * num_buckets);
+        memset((char*)_index, (int)INACTIVE, sizeof(_index[0]) * num_buckets);
         memset((char*)(_index + num_buckets), 0, sizeof(_index[0]) * EAD);
     }
 

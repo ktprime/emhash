@@ -195,7 +195,7 @@ public:
   size_type max_size() const noexcept { return buckets_.max_size() / 2; }
 
   float load_factor() const noexcept { return (float)size_ / buckets_.size(); }
-  float max_load_factor(float lf) const noexcept { return 0.5f; }
+  float max_load_factor(float lf = 0.5f) const noexcept { return 0.5f; }
 
   // Modifiers
   void clear() noexcept {

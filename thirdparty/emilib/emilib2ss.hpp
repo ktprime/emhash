@@ -72,7 +72,7 @@ constexpr static uint8_t slot_size  = simd_bytes - STATE_BITS;
 constexpr static uint8_t group_index = simd_bytes - 1;//> 0
 constexpr static uint32_t group_bmask = (1u << slot_size) - 1;
 
-inline static uint32_t CTZ(uint64_t n)
+inline static uint32_t CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -131,7 +131,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((uint64_t)key_hash % 253 + EFILLED);
+        return (int8_t)((size_t)(key_hash % 253) + EFILLED);
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -140,7 +140,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)(key_hash % 253 + EFILLED);
+        return (int8_t)((size_t)(key_hash % 253) + EFILLED);
     }
 
 #if 1
@@ -852,7 +852,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 4;
+        size_t required_buckets = num_elems + num_elems / 5;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -937,7 +937,7 @@ public:
 
 private:
     // Can we fit another element?
-    inline void check_expand_need()
+    void check_expand_need()
     {
         reserve(_num_filled);
     }

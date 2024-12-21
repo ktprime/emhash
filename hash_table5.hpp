@@ -1312,7 +1312,7 @@ public:
         if (is_triviall_destructable())
             clearkv();
         else if (_num_filled)
-            memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+            memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * _num_buckets);
 #endif
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)
@@ -1417,7 +1417,7 @@ public:
         else
 #endif
         _pairs = (PairT*)alloc_bucket(num_buckets);
-        memset((char*)_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
+        memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * num_buckets);
         memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
 
 #if EMH_FIND_HIT

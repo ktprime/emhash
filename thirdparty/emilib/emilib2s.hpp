@@ -79,7 +79,7 @@ namespace emilib3 {
 //find filled or empty
 constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
-inline static uint32_t CTZ(uint64_t n)
+inline static uint32_t CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -138,7 +138,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((uint64_t)key_hash % 253 + EFILLED);
+        return (int8_t)((size_t)(key_hash % 253) + EFILLED);
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -147,7 +147,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)(key_hash % 253 + EFILLED);
+        return (int8_t)((size_t)(key_hash % 253) + EFILLED);
     }
 
     class const_iterator;
@@ -225,7 +225,7 @@ public:
 
     public:
         const htype*  _map;
-        uint64_t      _bmask;
+        size_t        _bmask;
         size_t        _bucket;
         size_t        _from;
     };

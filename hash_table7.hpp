@@ -176,7 +176,7 @@ static_assert((int)INACTIVE < 0, "INACTIVE must negative (to int)");
 #endif
 
 //count the leading zero bit
-static inline int CTZ(size_t n)
+static inline size_type CTZ(size_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -210,7 +210,7 @@ static inline int CTZ(size_t n)
     #endif
 #endif
 
-    return (int)index;
+    return (size_type)index;
 }
 
 template <typename First, typename Second>
@@ -1328,7 +1328,7 @@ public:
     void clear()
     {
         if (!is_triviall_destructable() && _num_filled) {
-            memset(_bitmask, 0xFFFFFFFF, (_num_buckets + 7) / 8);
+            memset(_bitmask, (int)0xFFFFFFFF, (_num_buckets + 7) / 8);
             if (_num_buckets < 8) _bitmask[0] =  uint8_t((1 << _num_buckets) - 1);
         }
         else if (_num_filled)
@@ -1394,7 +1394,7 @@ public:
         _bitmask     = decltype(_bitmask)(_pairs + EPACK_SIZE + num_buckets);
 
         const auto mask_byte = (num_buckets + 7) / 8;
-        memset(_bitmask, 0xFFFFFFFF, mask_byte);
+        memset(_bitmask, (int)0xFFFFFFFF, mask_byte);
         memset(((char*)_bitmask) + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8)
             _bitmask[0] = (uint8_t)((1 << num_buckets) - 1);
