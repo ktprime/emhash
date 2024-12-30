@@ -107,114 +107,124 @@ public:
         size_type slot;
     };
 
-    class const_iterator;
+    class const_iterator; // Forward declaration
+
     class iterator
     {
     public:
         using iterator_category = std::bidirectional_iterator_tag;
+        using iterator_concept = std::bidirectional_iterator_tag; // added for C++20 Ranges
         using difference_type = std::ptrdiff_t;
-        using value_type      = typename htype::value_type;
-        using pointer         = value_type*;
-        using const_pointer   = const value_type* ;
-        using reference       = value_type&;
+        using value_type = typename htype::value_type;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using const_pointer = const value_type*;
         using const_reference = const value_type&;
 
-        iterator() : kv_(nullptr) {}
-        iterator(const_iterator& cit) {
-            kv_ = cit.kv_;
-        }
+        // Maak constructoren constexpr
+        constexpr iterator() : kv_(nullptr) {}
+        constexpr iterator(const const_iterator& cit) : kv_(cit.kv_) {}
+        constexpr iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<int>(bucket)) {}
 
-        iterator(const htype* hash_map, size_type bucket) {
-            kv_ = hash_map->_pairs + (int)bucket;
-        }
-
-        iterator& operator++()
+        // Maak operatoren constexpr
+        constexpr iterator& operator++()
         {
-            kv_ ++;
+            kv_++;
             return *this;
         }
 
-        iterator operator++(int)
+        constexpr iterator operator++(int)
         {
-            auto cur = *this; kv_ ++;
+            iterator cur = *this;
+            kv_++;
             return cur;
         }
 
-        iterator& operator--()
+        constexpr iterator& operator--()
         {
-            kv_ --;
+            kv_--;
             return *this;
         }
 
-        iterator operator--(int)
+        constexpr iterator operator--(int)
         {
-            auto cur = *this; kv_ --;
+            iterator cur = *this;
+            kv_--;
             return cur;
         }
 
-        reference operator*() const { return *kv_; }
-        pointer operator->() const { return kv_; }
+        constexpr reference operator*() const { return *kv_; }
+        constexpr pointer operator->() const { return kv_; }
 
-        bool operator == (const iterator& rhs) const { return kv_ == rhs.kv_; }
-        bool operator != (const iterator& rhs) const { return kv_ != rhs.kv_; }
-        bool operator == (const const_iterator& rhs) const { return kv_ == rhs.kv_; }
-        bool operator != (const const_iterator& rhs) const { return kv_ != rhs.kv_; }
+        // Maak vergelijking operatoren constexpr
+        constexpr bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
+        constexpr bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
+        constexpr bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
+        constexpr bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
 
-    public:
+    private:
         value_type* kv_;
+
+        // Vriend klasse om toegang te geven aan const_iterator
+        friend class const_iterator;
     };
+
+   
 
     class const_iterator
     {
     public:
         using iterator_category = std::bidirectional_iterator_tag;
-        using value_type        = typename htype::value_type;
-        using difference_type   = std::ptrdiff_t;
-        using pointer           = value_type*;
-        using const_pointer     = const value_type*;
-        using reference         = value_type&;
-        using const_reference   = const value_type&;
+        using iterator_concept = std::bidirectional_iterator_tag; // Toegevoegd voor C++20 Ranges
+        using value_type = typename htype::value_type;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const value_type*;
+        using const_pointer = const value_type*;
+        using reference = const value_type&;
+        using const_reference = const value_type&;
 
-        const_iterator(const iterator& it) {
-            kv_ = it.kv_;
-        }
+        // Maak constructoren constexpr
+        constexpr const_iterator() : kv_(nullptr) {}
+        constexpr const_iterator(const iterator& it) : kv_(it.kv_) {}
+        constexpr const_iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<int>(bucket)) {}
 
-        const_iterator (const htype* hash_map, size_type bucket) {
-            kv_ = hash_map->_pairs + (int)bucket;
-        }
-
-        const_iterator& operator++()
+        // Maak operatoren constexpr
+        constexpr const_iterator& operator++()
         {
-            kv_ ++;
+            kv_++;
             return *this;
         }
 
-        const_iterator operator++(int)
+        constexpr const_iterator operator++(int)
         {
-            auto cur = *this; kv_ ++;
+            const_iterator cur = *this;
+            kv_++;
             return cur;
         }
 
-        const_iterator& operator--()
+        constexpr const_iterator& operator--()
         {
-            kv_ --;
+            kv_--;
             return *this;
         }
 
-        const_iterator operator--(int)
+        constexpr const_iterator operator--(int)
         {
-            auto cur = *this; kv_ --;
+            const_iterator cur = *this;
+            kv_--;
             return cur;
         }
 
-        const_reference operator*() const { return *kv_; }
-        const_pointer operator->() const { return kv_; }
+        constexpr const_reference operator*() const { return *kv_; }
+        constexpr const_pointer operator->() const { return kv_; }
 
-        bool operator == (const iterator& rhs) const { return kv_ == rhs.kv_; }
-        bool operator != (const iterator& rhs) const { return kv_ != rhs.kv_; }
-        bool operator == (const const_iterator& rhs) const { return kv_ == rhs.kv_; }
-        bool operator != (const const_iterator& rhs) const { return kv_ != rhs.kv_; }
-    public:
+        // Maak vergelijking operatoren constexpr
+        constexpr bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
+        constexpr bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
+        constexpr bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
+        constexpr bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
+
+    private:
         const value_type* kv_;
     };
 
@@ -382,13 +392,13 @@ public:
     void pop_front() { erase(begin()); } //TODO. only erase first without move last
     void pop_back() { erase(last()); }
 
-    iterator begin() { return first(); }
-    const_iterator cbegin() const { return first(); }
-    const_iterator begin() const { return first(); }
+    constexpr iterator begin() { return first(); }
+    constexpr const_iterator cbegin() const { return first(); }
+    constexpr const_iterator begin() const { return first(); }
 
-    iterator end() { return {this, _num_filled}; }
-    const_iterator cend() const { return {this, _num_filled}; }
-    const_iterator end() const { return cend(); }
+    constexpr iterator end() { return { this, _num_filled }; }
+    constexpr const_iterator cend() const { return { this, _num_filled }; }
+    constexpr const_iterator end() const { return cend(); }
 
     const value_type* values() const { return _pairs; }
     const Index* index() const { return _index; }
@@ -1826,4 +1836,3 @@ private:
     size_type _etail;
 };
 } // namespace emhash
-
