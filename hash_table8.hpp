@@ -1,10 +1,10 @@
-// emhash8::HashMap for C++14/17
-// version 1.6.5
+// emhash8::HashMap for C++14/17/20
+// version 1.7.0
 // https://github.com/ktprime/emhash/blob/master/hash_table8.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2021-2024 Huang Yuanbing & bailuzhou AT 163.com
+// Copyright (c) 2021-2025 Huang Yuanbing & bailuzhou AT 163.com
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -40,6 +40,7 @@
 
 #undef  EMH_NEW
 #undef  EMH_EMPTY
+#undef  EMH_EQHASH 
 
 // likely/unlikely
 #if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
@@ -98,7 +99,6 @@ public:
     using key_equal = EqT;
 
     constexpr static size_type INACTIVE = 0-1u;
-    //constexpr uint32_t END      = 0-0x1u;
     constexpr static size_type EAD      = 2;
 
     struct Index
@@ -162,8 +162,9 @@ public:
         constexpr bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
         constexpr bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
 
-    private:
+    public:
         value_type* kv_;
+    private:
 
         // Vriend klasse om toegang te geven aan const_iterator
         friend class const_iterator;
@@ -224,7 +225,7 @@ public:
         constexpr bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
         constexpr bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
 
-    private:
+    public:
         const value_type* kv_;
     };
 

@@ -4,7 +4,7 @@
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2019-2024 Huang Yuanbing & bailuzhou AT 163.com
+// Copyright (c) 2021-2025 Huang Yuanbing & bailuzhou AT 163.com
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,7 @@
 #include <functional>
 #include <iterator>
 #include <algorithm>
+#include <memory>
 
 #ifdef EMH_KEY
     #undef  EMH_KEY
@@ -43,6 +44,7 @@
     #undef  EMH_NEW
     #undef  EMH_EMPTY
     #undef  EMH_PREVET
+    #undef  EMH_EQHASH 
 #endif
 
 // likely/unlikely
@@ -50,8 +52,8 @@
 #    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
 #    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
 #else
-#    define EMH_LIKELY(condition)   (condition)
-#    define EMH_UNLIKELY(condition) (condition)
+#    define EMH_LIKELY(condition)   condition
+#    define EMH_UNLIKELY(condition) condition
 #endif
 
 #define EMH_KEY(p,n)     p[n]
@@ -236,7 +238,7 @@ public:
         clone(rhs);
     }
 
-    HashSet(HashSet&& rhs)
+    HashSet(HashSet&& rhs)  noexcept
     {
         init(0);
         *this = std::move(rhs);
@@ -273,7 +275,7 @@ public:
         return *this;
     }
 
-    HashSet& operator=(HashSet&& rhs)
+    HashSet& operator=(HashSet&& rhs)  noexcept
     {
         if (this != &rhs) {
             swap(rhs);
@@ -344,8 +346,8 @@ public:
     }
 
     // -------------------------------------------------------------
-    inline iterator first() const { return {this, 0}; }
-    inline iterator last() const { return {this, _num_filled - 1}; }
+    iterator first() const { return {this, 0}; }
+    iterator last() const { return {this, _num_filled - 1}; }
 
     value_type& front() { return _pairs[0]; }
     const value_type& front() const { return _pairs[0]; }
@@ -386,7 +388,7 @@ public:
     constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
-#ifdef EMH_STATIS
+#if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
     {
@@ -458,7 +460,7 @@ public:
 
         steps[get_diss(bucket, next_bucket, slots)] ++;
         size_type ibucket_size = 2;
-        //find a new empty and linked it to tail
+        //find a empty and linked it to tail
         while (true) {
             const auto nbucket = EMH_BUCKET(_index, next_bucket);
             if (nbucket == next_bucket)
@@ -514,7 +516,7 @@ public:
 
     // ------------------------------------------------------------
     template<typename K=KeyT>
-    iterator find(const KeyT& key) noexcept
+    iterator find(const K& key) noexcept
     {
         return {this, find_filled_slot(key)};
     }
@@ -710,7 +712,7 @@ public:
     }
 
     template <class... Args>
-    inline size_type emplace_unique(Args&&... args)
+    size_type emplace_unique(Args&&... args)
     {
         return insert_unique(std::forward<Args>(args)...);
     }
@@ -967,7 +969,7 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need()
+    bool check_expand_need()
     {
         return reserve(_num_filled, false);
     }
@@ -1275,7 +1277,7 @@ one-way search strategy.
         auto offset = 2u;
 
 #ifndef EMH_QUADRATIC
-        constexpr auto linear_probe_length = 2 + EMH_CACHE_LINE_SIZE / 16;//2 4 6 8
+        constexpr auto linear_probe_length = 2 + 64 / 16;//2 4 6 8
         for (; offset < linear_probe_length; offset += 2) {
             auto bucket1 = (bucket + offset) & _mask;
             if (EMH_EMPTY(_index, bucket1) || EMH_EMPTY(_index, ++bucket1))
@@ -1366,25 +1368,14 @@ one-way search strategy.
         return (size_type)hash_key(EMH_KEY(_pairs, slot)) & _mask;
     }
 
-#ifdef EMH_INT_HASH
+#if EMH_INT_HASH
     static constexpr uint64_t KC = UINT64_C(11400714819323198485);
     static uint64_t hash64(uint64_t key)
     {
-#if __SIZEOF_INT128__
+#if __SIZEOF_INT128__ && EMH_INT_HASH == 1
         __uint128_t r = key; r *= KC;
         return (uint64_t)(r >> 64) + (uint64_t)r;
-#elif _WIN64
-        uint64_t high;
-        return _umul128(key, KC, &high) + high;
-#elif 1
-        auto low  =  key;
-        auto high = (key >> 32) | (key << 32);
-        auto mix  = (0x94d049bb133111ebull * low + 0xbf58476d1ce4e5b9ull * high);
-        return mix >> 32;
-#elif 1
-        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-        return (r >> 32) + r;
-#elif 1
+#elif EMH_INT_HASH == 2
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1393,7 +1384,21 @@ one-way search strategy.
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif 1
+#elif _WIN64 && EMH_INT_HASH == 1
+        uint64_t high;
+        return _umul128(key, KC, &high) + high;
+#elif EMH_INT_HASH == 3
+        auto ror  = (key >> 32) | (key << 32);
+        auto low  = key * 0xA24BAED4963EE407ull;
+        auto high = ror * 0x9FB21C651E98DF25ull;
+        auto mix  = low + high;
+        return mix;
+#elif EMH_INT_HASH == 1
+        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
+        return (r >> 32) + r;
+#elif EMH_WYHASH64
+        return wyhash64(key, KC);
+#else
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
@@ -1405,18 +1410,18 @@ one-way search strategy.
 
 #if EMH_WYHASH_HASH
     //#define WYHASH_CONDOM 1
-    static inline uint64_t wymix(uint64_t A, uint64_t B)
+    static uint64_t wymix(uint64_t A, uint64_t B)
     {
 #if defined(__SIZEOF_INT128__)
         __uint128_t r = A; r *= B;
-#if WYHASH_CONDOM
+#if WYHASH_CONDOM2
         A ^= (uint64_t)r; B ^= (uint64_t)(r >> 64);
 #else
         A = (uint64_t)r; B = (uint64_t)(r >> 64);
 #endif
 
 #elif defined(_MSC_VER) && defined(_M_X64)
-#if WYHASH_CONDOM
+#if WYHASH_CONDOM2
         uint64_t a, b;
         a = _umul128(A, B, &b);
         A ^= a; B ^= b;
@@ -1427,7 +1432,7 @@ one-way search strategy.
         uint64_t ha = A >> 32, hb = B >> 32, la = (uint32_t)A, lb = (uint32_t)B, hi, lo;
         uint64_t rh = ha * hb, rm0 = ha * lb, rm1 = hb * la, rl = la * lb, t = rl + (rm0 << 32), c = t < rl;
         lo = t + (rm1 << 32); c += lo < t; hi = rh + (rm0 >> 32) + (rm1 >> 32) + c;
-#if WYHASH_CONDOM
+#if WYHASH_CONDOM2
         A ^= lo; B ^= hi;
 #else
         A = lo; B = hi;
@@ -1448,7 +1453,7 @@ one-way search strategy.
         0x4b33a62ed433d4a3ull, 0x4d5a2da51de1aa47ull};
 public:
     //wyhash main function https://github.com/wangyi-fudan/wyhash
-    static uint64_t wyhashstr(const void *key, const size_t len)
+    static uint64_t wyhashstr(const char *key, const size_t len)
     {
         uint64_t a = 0, b = 0, seed = secret[0];
         const uint8_t *p = (const uint8_t*)key;
@@ -1484,15 +1489,14 @@ public:
     }
 #endif
 
+private:
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline uint64_t hash_key(const UType key) const
-    {
-#ifdef EMH_INT_HASH
-        return hash64(key);
+        inline uint64_t hash_key(const UType key) const
+        {
+#if EMH_INT_HASH
+            return hash64(key);
 #elif EMH_IDENTITY_HASH
-        return (key + (key >> (sizeof(UType) * 4)));
-#elif EMH_WYHASH64
-        return wyhash64(key, KC);
+            return key + (key >> 24);
 #else
         return _hasher(key);
 #endif
@@ -1503,22 +1507,16 @@ template<typename UType, typename std::enable_if<std::is_same<UType, std::string
     {
 #if EMH_WYHASH_HASH
         return wyhashstr(key.data(), key.size());
-#elif WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), 0);
 #else
-        return _hasher(key);
+            return _hasher(key);
 #endif
-    }
+        }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType& key) const
     {
-#ifdef EMH_INT_HASH
-        return _hasher(key) * KC;
-#else
-        return _hasher(key);
-#endif
-    }
+            return _hasher(key);
+        }
 
 private:
     Index*    _index;
