@@ -119,6 +119,7 @@ private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
     using PairT = std::pair<KeyT, ValueT>;
+    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load =  LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
     using size_t          = uint32_t;
@@ -842,7 +843,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 6;
+        size_t required_buckets = num_elems + num_elems / MXLOAD_FACTOR;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -950,10 +951,10 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        if (offset < 8)// || _num_buckets < 32 * simd_bytes)
+        if (offset < 7)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
-            next_bucket += _num_buckets / 16 + simd_bytes;
+            next_bucket += _num_buckets / 8 + simd_bytes;
 #else
         next_bucket += 3 * simd_bytes;
         if (next_bucket >= _num_buckets)
@@ -998,7 +999,10 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        reserve(_num_filled);
+        //reserve(_num_filled);
+        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        if (EMH_UNLIKELY(required_buckets >= _num_buckets))
+          rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);

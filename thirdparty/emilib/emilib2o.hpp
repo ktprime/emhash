@@ -43,6 +43,8 @@ namespace emilib2 {
     };
 
     constexpr static uint8_t EMPTY_OFFSET = 0;
+    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = MXLOAD_FACTOR/(MXLOAD_FACTOR + 1)
+
 #if EMH_OFFSET_STEP == 0
     constexpr static uint8_t OFFSET_STEP  = 4;
 #endif
@@ -54,6 +56,7 @@ namespace emilib2 {
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm_set1_epi8
+    #define SET1_EPI32     _mm_set1_epi32
     #define LOAD_UEPI8     _mm_loadu_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
@@ -65,6 +68,7 @@ namespace emilib2 {
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm256_set1_epi8
+    #define SET1_EPI32     _mm256_set1_epi32
     #define LOAD_UEPI8     _mm256_loadu_si256
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
@@ -83,7 +87,7 @@ namespace emilib2 {
     #define CMPGT_EPI8     _mm512_cmpgt_epi8
 #endif
 
-#if EMH_SSE2_ITERATOR == 0 || AVX2_EHASH   //use avx2 to find filled bucket to accerate iterator
+#if EMH_AVX_ITERATOR == 1 || AVX2_EHASH   //use avx2 to find filled bucket to accerate iterator
     #define EMH_ITERATOR_BITS 32
     const static auto simd2_delete = _mm256_set1_epi8(EDELETE);
     const static auto simd2_filled = _mm256_set1_epi8(EFILLED);
@@ -148,7 +152,7 @@ public:
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
-        main_bucket = size_t(key_hash & _mask);
+        main_bucket = size_t(key_hash) & _mask;
         return (int8_t)((size_t)(key_hash % 253) + EFILLED);
     }
 
@@ -156,7 +160,7 @@ public:
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
-        main_bucket = size_t(key_hash & _mask);
+        main_bucket = size_t(key_hash) & _mask;
 //        return (int8_t)((key * 0x9FB21C651E98DF25ull % 251) - 125);
         return (int8_t)((size_t)(key_hash % 253) + EFILLED);
     }
@@ -870,7 +874,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        size_t required_buckets = num_elems + num_elems / 6;
+        size_t required_buckets = num_elems + num_elems / MXLOAD_FACTOR;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -1009,8 +1013,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        next_bucket += offset < 6 ? simd_bytes * offset + 5 : _num_buckets / 15 + 1;
-        //next_bucket += simd_bytes * offset + 1;
+      next_bucket += offset < 5 ? (simd_bytes + 1) * offset: _num_buckets / 8 + 5;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;
@@ -1035,6 +1038,8 @@ private:
     {
         size_t main_bucket;
         const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
+        //const auto filled = SET1_EPI32(0x01010101u * (uint8_t)hash_key2(main_bucket, key));
+
         auto next_bucket = main_bucket;
         size_t offset = 0;
 
@@ -1090,12 +1095,17 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        reserve(_num_filled);
+        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        if (EMH_UNLIKELY(required_buckets >= _num_buckets))
+            rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
+
         prefetch_heap_block((char*)&_pairs[main_bucket]);
         const auto filled = SET1_EPI8(key_h2);
+        //const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
+
         auto next_bucket = main_bucket, offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;

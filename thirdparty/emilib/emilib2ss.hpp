@@ -987,10 +987,10 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-        if (offset < simd_bytes)// || _num_buckets < 32 * simd_bytes)
+        if (offset < 8)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
-            next_bucket += _num_buckets / 16 + simd_bytes;
+            next_bucket += _num_buckets / 8 + simd_bytes;
 #else
         next_bucket += 3 * simd_bytes;
         if (next_bucket >= _num_buckets)
@@ -1012,12 +1012,12 @@ private:
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
             if (maskf) {
                 prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
-            do {
-                const auto fbucket = next_bucket + CTZ(maskf);
-                const auto slot = bucket_to_slot(fbucket);
-                if (EMH_LIKELY(_eq(_pairs[slot].first, key)))
-                    return fbucket;
-                maskf &= maskf - 1;
+                do {
+                    const auto fbucket = next_bucket + CTZ(maskf);
+                    const auto slot = bucket_to_slot(fbucket);
+                    if (EMH_LIKELY(_eq(_pairs[slot].first, key)))
+                        return fbucket;
+                    maskf &= maskf - 1;
                 } while (maskf != 0);
             }
 
