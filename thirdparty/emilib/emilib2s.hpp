@@ -118,7 +118,7 @@ class HashMap
 private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
-    using PairT = std::pair<KeyT, ValueT>;
+    using PairT = std::pair<const KeyT, ValueT>;
     constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load =  LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
@@ -157,13 +157,13 @@ public:
     public:
         using iterator_category = std::forward_iterator_tag;
         using difference_type   = std::ptrdiff_t;
-        using value_type        = std::pair<KeyT, ValueT>;
+        using value_type        = PairT;
         using pointer           = value_type*;
         using reference         = value_type&;
 
         iterator() {}
-        iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
+       // iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
+        iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { _bmask = _from = (size_t)-1; }
 
         void init()
         {
@@ -189,12 +189,18 @@ public:
 
         iterator& operator++()
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_t)-1) init();
+#endif
             goto_next_element();
             return *this;
         }
 
         iterator operator++(int)
         {
+#ifndef EMH_ITER_SAFE
+            if (_from == (size_t)-1) init();
+#endif
             iterator old(*this);
             goto_next_element();
             return old;
@@ -236,14 +242,13 @@ public:
     public:
         using iterator_category = std::forward_iterator_tag;
         using difference_type   = std::ptrdiff_t;
-        using value_type        = const std::pair<KeyT, ValueT>;
+        using value_type        = const PairT;
         using pointer           = value_type*;
         using reference         = value_type&;
 
         explicit const_iterator(const iterator& it)
             : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
         const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        const_iterator(const htype* hash_map, size_t bucket, bool) : _map(hash_map), _bucket(bucket) { _bmask = _from = 0; }
 
         void init()
         {
@@ -414,15 +419,11 @@ public:
 
     iterator begin() noexcept
     {
-        if (_num_filled == 0)
-            return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
     const_iterator cbegin() const noexcept
     {
-        if (_num_filled == 0)
-            return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
@@ -433,12 +434,12 @@ public:
 
     iterator end() noexcept
     {
-        return {this, _num_buckets, false};
+        return {this, _num_buckets};
     }
 
     const_iterator cend() const noexcept
     {
-        return {this, _num_buckets, false};
+        return {this, _num_buckets};
     }
 
     const_iterator end() const noexcept
@@ -579,7 +580,7 @@ public:
         if (bempty) {
             new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
         }
-        return { {this, bucket, false}, bempty };
+        return { {this, bucket}, bempty };
     }
 
     std::pair<iterator, bool> do_insert(const value_type& value) noexcept
@@ -589,7 +590,7 @@ public:
         if (bempty) {
             new(_pairs + bucket) PairT(value); _num_filled++;
         }
-        return { {this, bucket, false}, bempty };
+        return { {this, bucket}, bempty };
     }
 
     std::pair<iterator, bool> do_insert(value_type&& value) noexcept
@@ -599,7 +600,7 @@ public:
         if (bempty) {
             new(_pairs + bucket) PairT(std::move(value)); _num_filled++;
         }
-        return { {this, bucket, false}, bempty };
+        return { {this, bucket}, bempty };
     }
 
     template <class... Args>
@@ -687,7 +688,7 @@ public:
             _pairs[bucket].second = std::forward<V>(val);
         }
 
-        return { {this, bucket, false}, bempty };
+        return { {this, bucket}, bempty };
     }
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv)
@@ -1093,6 +1094,8 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const noexcept
     {
+        if (_num_filled == 0)
+            return _num_buckets;
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = filled_mask(next_bucket);

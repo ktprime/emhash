@@ -111,7 +111,7 @@ class HashMap
 private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
-    using PairT = std::pair<KeyT, ValueT>;
+    using PairT = std::pair<const KeyT, ValueT>;
 
 public:
     using size_t          = uint32_t;
@@ -143,7 +143,7 @@ public:
         return (int8_t)((size_t)(key_hash % 253) + EFILLED);
     }
 
-#if 1
+#if 0
     #define bucket_to_slot(bucket) bucket
 #else
     static constexpr size_t bucket_to_slot(size_t bucket)
@@ -158,7 +158,7 @@ public:
     public:
         using iterator_category = std::forward_iterator_tag;
         using difference_type   = std::ptrdiff_t;
-        using value_type        = std::pair<KeyT, ValueT>;
+        using value_type        = PairT;
         using pointer           = value_type*;
         using reference         = value_type&;
 
@@ -237,7 +237,7 @@ public:
     public:
         using iterator_category = std::forward_iterator_tag;
         using difference_type   = std::ptrdiff_t;
-        using value_type        = const std::pair<KeyT, ValueT>;
+        using value_type        = const PairT;
         using pointer           = value_type*;
         using reference         = value_type&;
 
@@ -414,15 +414,11 @@ public:
 
     iterator begin() noexcept
     {
-        if (_num_filled == 0)
-            return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
     const_iterator cbegin() const noexcept
     {
-        if (_num_filled == 0)
-            return {this, _num_buckets, false};
         return {this, find_filled_slot(0)};
     }
 
@@ -1126,6 +1122,8 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const noexcept
     {
+        if (EMH_UNLIKELY (_num_filled == 0))
+             return _num_buckets;
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = filled_mask(next_bucket);
