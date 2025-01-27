@@ -37,7 +37,10 @@
 #include <iterator>
 #include <algorithm>
 #include <memory>
+
+#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
 #include <xmmintrin.h>
+#endif
 
 #undef  EMH_NEW
 #undef  EMH_EMPTY
@@ -1242,7 +1245,7 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if defined(__GNUC__) || defined(__linux__)
+#if defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);

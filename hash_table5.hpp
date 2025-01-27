@@ -42,7 +42,7 @@
     #include "wyhash.h"
 #endif
 
-#ifdef EMH_KEY
+#ifdef EMH_NEW
     #undef  EMH_KEY
     #undef  EMH_VAL
     #undef  EMH_PKV
