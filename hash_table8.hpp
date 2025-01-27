@@ -1,5 +1,5 @@
 // emhash8::HashMap for C++14/17/20
-// version 1.7.0
+// version 1.7.1
 // https://github.com/ktprime/emhash/blob/master/hash_table8.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -37,10 +37,11 @@
 #include <iterator>
 #include <algorithm>
 #include <memory>
+#include <xmmintrin.h>
 
 #undef  EMH_NEW
 #undef  EMH_EMPTY
-#undef  EMH_EQHASH 
+#undef  EMH_EQHASH
 
 // likely/unlikely
 #if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
@@ -68,22 +69,22 @@ struct DefaultPolicy {
 };
 
 template<typename KeyT, typename ValueT,
-         typename HashT = std::hash<KeyT>,
-         typename EqT = std::equal_to<KeyT>,
-         typename Allocator = std::allocator<std::pair<KeyT, ValueT>>, //never used
-         typename Policy = DefaultPolicy> //never used
+        typename HashT = std::hash<KeyT>,
+        typename EqT = std::equal_to<KeyT>,
+        typename Allocator = std::allocator<std::pair<KeyT, ValueT>>, //never used
+        typename Policy = DefaultPolicy> //never used
 class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif
     constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
-    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64; //debug only
+    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
 
 public:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
-    using value_type = std::pair<KeyT, ValueT>;
-    using key_type = KeyT;
+    using value_type = std::pair<KeyT, ValueT>; //TODO set to const KeyT
+    using key_type = const KeyT;
     using mapped_type = ValueT;
     //using dPolicy = Policy;
 
@@ -169,8 +170,6 @@ public:
         // Vriend klasse om toegang te geven aan const_iterator
         friend class const_iterator;
     };
-
-   
 
     class const_iterator
     {
@@ -385,6 +384,7 @@ public:
     iterator first() const { return {this, 0}; }
     iterator last() const { return {this, _num_filled - 1}; }
 
+    //no exception if empty
     value_type& front() { return _pairs[0]; }
     const value_type& front() const { return _pairs[0]; }
     value_type& back() { return _pairs[_num_filled - 1]; }
@@ -407,8 +407,6 @@ public:
     size_type size() const { return _num_filled; }
     bool empty() const { return _num_filled == 0; }
     size_type bucket_count() const { return _num_buckets; }
-
-    /// Returns average number of elements per bucket.
     float load_factor() const { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
 
     HashT& hash_function() const { return _hasher; }
@@ -440,7 +438,7 @@ public:
         return hash_main(bucket) + 1;
     }
 
-    //Returns the number of elements in bucket n.
+    //Returns the number of collision elements in pos bucket.
     size_type bucket_size(const size_type bucket) const
     {
         auto next_bucket = _index[bucket].next;
@@ -450,7 +448,6 @@ public:
         next_bucket = hash_main(bucket);
         size_type ibucket_size = 1;
 
-        //iterator each item in current main bucket
         while (true) {
             const auto nbucket = _index[next_bucket].next;
             if (nbucket == next_bucket) {
@@ -551,9 +548,10 @@ public:
     }
 #endif
 
+    //only useful for at fucntion if not find key then return zero
     void pack_zero(ValueT zero)
     {
-        _pairs[_num_filled] = {KeyT(), zero};
+        _pairs[_num_filled] = { KeyT(), zero };
     }
 
     // ------------------------------------------------------------
@@ -569,28 +567,27 @@ public:
         return {this, find_filled_slot(key)};
     }
 
+    //it key is not found, it will return value at end()
     template<typename K=KeyT>
-    ValueT& at(const K& key)
+    ValueT& at(const K& key) noexcept
     {
         const auto slot = find_filled_slot(key);
-        //throw
         return _pairs[slot].second;
     }
 
     template<typename K=KeyT>
-    const ValueT& at(const K& key) const
+    const ValueT& at(const K& key) const noexcept
     {
         const auto slot = find_filled_slot(key);
-        //throw
         return _pairs[slot].second;
     }
 
-    const ValueT& index(const uint32_t index) const
+    const ValueT& index(const uint32_t index) const noexcept
     {
         return _pairs[index].second;
     }
 
-    ValueT& index(const uint32_t index)
+    ValueT& index(const uint32_t index) noexcept
     {
         return _pairs[index].second;
     }
@@ -1203,7 +1200,6 @@ public:
             if (diff != 0)
                 return diff < 0;
             return hashl < hashr;
-//          return l.first < r.first;
         });
 #endif
 
@@ -1246,7 +1242,7 @@ private:
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
-#if __linux__
+#if defined(__GNUC__) || defined(__linux__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
@@ -1558,23 +1554,22 @@ private:
         return _index[next_bucket].next = find_empty_bucket(next_bucket, 2);
     }
 
-    /***
-      Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
-      Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing is the most cache friendly alternativeis typically used.
+/***
+    Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
+    Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing is the most cache friendly alternativeis typically used.
 
-      It's the core algorithm of this hash map with highly optimization/benchmark.
-      normally linear probing is inefficient with high load factor, it use a new 3-way linear
-      probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than
-      one-way search strategy.
+    It's the core algorithm of this hash map with highly optimization/benchmark.
+    normally linear probing is inefficient with high load factor, it use a new 3-way linear
+    probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than
+    one-way search strategy.
 
-      1. linear or quadratic probing a few cache line for less cache miss from input slot "bucket_from".
-      2. the first  search  slot from member variant "_last", init with 0
-      3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
-      */
-    // key is not in this mavalue. Find a place to put it.
+    1. linear or quadratic probing a few cache line for less cache miss from input slot "bucket_from".
+    2. the first  search slot from member variant "_last", init with 0 with linear probe
+    3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
+****/
+    // key is not in this slot. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept
     {
-        (void)csize;
 #if EMH_HIGH_LOAD
         if (_ehead)
             return pop_empty(_ehead);
@@ -1585,7 +1580,7 @@ private:
             return bucket;
 
 #ifdef EMH_QUADRATIC
-        constexpr size_type linear_probe_length = 2 * EMH_CACHE_LINE_SIZE / sizeof(Index);//16
+        constexpr size_type linear_probe_length = 2 + 2 * EMH_CACHE_LINE_SIZE / sizeof(Index);
         for (size_type offset = csize + 2, step = 4; offset <= linear_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(bucket) || EMH_EMPTY(++bucket))
@@ -1594,7 +1589,7 @@ private:
         }
 #else
         constexpr size_type quadratic_probe_length = 6u;
-        for (size_type offset = 4u, step = 3u; step < quadratic_probe_length; ) {
+        for (size_type offset = 1 + csize, step = 3u; step < quadratic_probe_length; ) {
             bucket = (bucket_from + offset) & _mask;
             if (EMH_EMPTY(bucket) || EMH_EMPTY(++bucket))
                 return bucket;
@@ -1602,9 +1597,7 @@ private:
         }
 #endif
 
-#if EMH_PREFETCH
-        __builtin_prefetch(static_cast<const void*>(_index + _last + 1), 0, EMH_PREFETCH);
-#endif
+        prefetch_heap_block((char*)&_index[_last]);
 
         for (;;) {
 #if EMH_PACK_TAIL
@@ -1797,8 +1790,6 @@ private:
         {
 #if EMH_INT_HASH
             return hash64(key);
-#elif EMH_IDENTITY_HASH
-            return key + (key >> 24);
 #else
             return _hasher(key);
 #endif
