@@ -845,7 +845,7 @@ public:
 
     void clear_data()
     {
-        if (is_triviall_destructable()) {
+        if (is_triviall_destructable() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -857,8 +857,8 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear() noexcept
     {
+        clear_data();
         if (_num_filled) {
-            clear_data();
             std::fill_n(_states, _num_buckets, State::EEMPTY);
             std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
         }
@@ -980,7 +980,7 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T1);
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
     }
@@ -1179,39 +1179,6 @@ private:
         return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete));
 #endif
     }
-
-#if EMH_PSL
-    //unlike robin hood, only move large offset once
-    size_t update_offset(size_t gbucket, size_t new_bucket, size_t offset) noexcept
-    {
-        const auto kdiff  = offset / 2;
-        const auto kprobe = offset - kdiff;
-        const auto kgroup = (new_bucket - kdiff * simd_bytes) & _mask;
-        for (int i = 0; i < 8 * simd_bytes; i++) {
-            const auto kbucket = (kgroup + i) & _mask;
-            if (_offset[kbucket] == 0)
-                continue;
-
-            size_t kmain_bucket;
-            hash_key2(kmain_bucket, _pairs[kbucket].first);
-            if (kmain_bucket != kbucket)
-                continue;
-
-            //move kbucket to new_bucket, update offset
-            set_states(new_bucket, _states[kbucket]);
-            new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
-            _pairs[kbucket].~PairT();
-
-            if (kdiff + 1 - i / simd_bytes > get_offset(kmain_bucket))
-                set_offset(kmain_bucket, kdiff + 1 - i / simd_bytes);
-            if (kprobe + i / simd_bytes >= get_offset(gbucket))
-                set_offset(gbucket, kprobe + 1 + i / simd_bytes);
-            return kbucket;
-        }
-
-        return -1;
-    }
-#endif
 
     size_t find_empty_slot(size_t main_bucket, size_t next_bucket, size_t offset) noexcept
     {

@@ -1094,7 +1094,7 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const noexcept
     {
-        if (_num_filled == 0)
+        if (EMH_UNLIKELY(_num_filled) == 0)
             return _num_buckets;
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {
