@@ -1,136 +1,163 @@
-# fast and memory efficient *open addressing c++ flat hash table/map*
- 
+# emhash - Fast and memory efficient _open addressing C++ flat hash table/map_
 
-    some feature is not enabled by default and it also can be used by set the compile marco but may loss tiny performance, some featue is conflicted each other or difficlut to be merged into only one head file and so it's distributed in different hash table file. Not all feature can be open in only one file(one hash map).
-
-third party bechmark from https://martin.ankerl.com/2022/08/27/hashmap-bench-01/ and https://jacksonallan.github.io/c_cpp_hash_tables_benchmark/
+> [!NOTE]
+> Some features are not enabled by default; they can be enabled through defining macros. Some features may conflict with each other or are difficult to distribute in one header file, so they are distributed in a different file. Not all features are available in one file.
 
 
-- **load factor** can be set **0.999** by set marco *EMHASH_HIGH_LOAD == somevalue* (in hash_table[5-8].hpp)
+_Third-party bechmarks from <https://martin.ankerl.com/2022/08/27/hashmap-bench-01/> and <https://jacksonallan.github.io/c_cpp_hash_tables_benchmark/>._
 
-- **head only** support by c++11/14/17/20, interface is highly compatible with std::unordered_map, some new functions added for performance.
-    - _erase : return void after erasion
-    - shrink_to_fit : shrink fit for saving memory
-    - insert_unqiue : insert unique key without finding
-    - try_find : return value
-    - set_get : once find/insert combined
 
-- **efficient** than other's hash map if key&value is not aligned (sizeof(key) % 8 != sizeof(value) % 8), hash_map<uint64_t, uint32_t> can save 1/3 memoery than hash_map<uint64_t, uint64_t>.
+- **Load factor** can be set to `0.999` by setting `EMHASH_HIGH_LOAD = <some value>` (in `hash_table[5-8].hpp`).
+- **Header only** support with C++11/14/17/20
+- Interface is highly compatible with `std::unordered_map`, with some new functions added for performance.
+    - `_erase`: return void after erasing
+    - `shrink_to_fit`: shrink to fit data for memory saving
+    - `insert_unique`: insert unique key without finding
+    - `try_find`: return value
+    - `set_get`: find/insert combined
+- **More efficient** than many hash map implementations when key/values are not aligned.
+    - When `sizeof(key) % 8 != sizeof(value) % 8`
+    - e.g., `hash_map<uint64_t, uint32_t>` can save 1/3 memory compared to `hash_map<uint64_t, uint64_t>`
+- **LRU mode**: when `EMHASH_LRU_SET` is set, some keys will be marked as frequently accessed; if they are not in the main bucket slot, it will be swapped into it and probed once.
+- **No tombstones**: performance will not deteriorate even with frequent insert/erase operations.
+- **Fine-tuned implementations**: 4 different implementations, each with a different focus.
+    - Some are focused on hot value optimization, some on cold (miss) optimization, some on insert/erase performance, etc.
+- **Fully tested** on Windows, Linux, and Mac on AMD, Intel, and ARM64 processors, using MSVC, clang, and gcc.
+- **Extensive optimizations for integer keys**
 
-- **lru** marco EMHASH_LRU_SET set. some keys is "frequceny accessed", if keys are not in **main bucket** slot, it'll be swaped with main bucket, and will be probed once.
+## Design
 
-- **no tombstones**. performance will **not deteriorate** even high frequceny of insertion & erasion.
+- **Single array & inline entries**: Each node/entry consists of a struct:
+  ```cpp
+  struct { Key key, size_t bucket, Value value };
+  ```
+  This design minimizes separate memory footprint.
+- **Main bucket mapping**: The primary bucket is always assigned to `key_hash(key) % size` and cannot be occupied (unlike cuckoo hashing). Many operations begin their search from this bucket.
+- **Smart collision resolution**: Collisions are resolved using a linked bucket approach, similar to separate chaining. This prevents severe performance degradation due to primary and secondary clustering.
+- **Three-way combined probing strategy** for searching empty slots:
+  - **Linear probing** scans 2-3 CPU cache lines.
+  - **Quadratic probing** kicks in after limited linear probing.
+  - **Bidirectional linear search** begins at both ends using the last found empty slot.
+- **Optimized linear probing** (in `hash_table5.hpp`):
+  Traditional linear probing becomes inefficient at high load factors. The new 3-way linear probing strategy significantly improves search performance. Even with a **load factor > 0.9**, benchmarks show it is **2-3 times faster** than conventional search strategies.
+- **Secondary/backup hashing function**:
+  If the input hash has a high collision rate, setting the `EMHASH_SAFE_HASH` macro enables a backup hashing function, defending against hash attacks (with a **10% performance trade-off**).
+- **Collision statistics dump**:
+  Analyze cache performance by dumping collision data, showing the number of probes required for successful/unsuccessful lookups.
+- **Efficient batch lookup**:
+  Uses x86 bit scan instructions (`ctz`) to scan **64 slots** at once.
+- **Customizable hash functions**:
+  Choose different hash algorithms by defining `EMHASH_FIBONACCI_HASH` or `EMHASH_IDENTITY_HASH` based on the use case.
+- **Optimized string hashing**:
+  Uses the third-party [wyhash](https://github.com/wangyi-fudan/wyhash) algorithm for string keys, which is significantly faster than `std::hash`.
 
-- **4 different** implementation, for example some case pay attention on finding hot, some focus on finding cold(miss), and others only care about insert or erase and so on.
 
-- **find hit** is fastest at present, fast inserting(**reserve**) and effficient erasion from 6 different benchmarks(4 of them in my bench dir) by my bench
+## Example Usage of emhash
 
-- fully tested on OS(Win, Linux, Mac) with compiler(msvs, clang, gcc) and cpu(AMD, Intel, ARM64).
-
-- many optimization on **integer** key.
-
-# emhash design
-
-- **one array&inline entries** node/entry contains a struct(Key key, size_t bucket, Value value) without separate footprint
-
-- **main bucket** equal to key_hash(key) % size, can not be occupyed(like cockoo hash) and many opertions serarch from it
-
-- **smart collision resolution**, collision node is linked (bucket) like separate channing.
-it's not suffered heavily performance loss by primary and secondary clustering.
-
-- **3-way combined** probing used to seach empty slot.
-   - linear probing search 2-3 cpu cachelines
-   - quadratic probing works after limited linear probing
-   - linear search both begin&end with last founded empty slot
-
-- a new linear probing is used (in hash_table5.hpp).
-    normaly linear probing is inefficient with high load factor, it use a new 3-way linear
-probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 timer fast than traditional seach strategy.
-
-- **second/backup hashing function** if the input hash is bad with a very high collision if the compile marco *EMHASH_SAFE_HASH* is set to defend hash attack(but 10% performance descrease)
-
-- dump hash **collision statics** to analyze cache performance, number of probes for look up of successful/unsuccessful can be showed from dump info.
-
-- finding **64 slots** once using x86 instruction bit scanf(ctz).
-
-- choose *different* hash algorithm by set compile marco *EMHASH_FIBONACCI_HASH* or *EMHASH_IDENTITY_HASH* depend on use case.
-
-- A thirdy party string hash algorithm is used for string key [wyhash](https://github.com/wangyi-fudan/wyhash), which is faster than std::hash implementation
-
-# example
-
+### Basic Usage
 ```cpp
-        // constructor
-        emhash5::HashMap<int, int> m1(4);
-        m1.reserve(100);
-        for (int i = 1; i < 100; i++)
-          m1.emplace_unique(i, i); //key must be unique, performance is better than emplace, operator[].
-       
-        auto no_value = m1.at(0); //no_value = 0; no exception throw!!!. only return zero for integer value.
+// Constructor
+emhash5::HashMap<int, int> m1(4);
+m1.reserve(100);
 
-        // list constructor
-        emhash5::HashMap<int, std::string> m2 = {
-            {1, "foo"},
-            {3, "bar"},
-            {2, "baz"},
-        };
-   
-        auto* pvalue = m2.try_get(1); //return nullptr if key is not exist
-        if (m2.try_set(4, "for"))   printf("set success");
-        if (!m2.try_set(1, "new"))  printf("set failed");        
-        string ovalue = m2.set_get("1", "new"); //ovalue = "foo" and m2[1] == "new"
+for (int i = 1; i < 100; i++)
+    m1.emplace_unique(i, i); // Key must be unique; better performance than emplace() or operator[].
 
-        for(auto& p: m2)
-           std::cout << " " << p.first << " => " << p.second << '\n';
-
-        // copy constructor
-        emhash5::HashMap<int, std::string> m3 = m2;
-        // move constructor
-        emhash5::HashMap<int, std::string> m4 = std::move(m2);
-        
-        //insert. insert_unique. emplace
-        m2.insert_unique(4, "four");
-        m2[4] = "four_again";
-        m2.emplace(std::make_pair(4, "four"));
-        m2.insert({{6, "six"}, {5, "five"}});
-
-        // range constructor
-        std::vector<std::pair<std::bitset<8>, int>> v = { {0x12, 1}, {0x01,-1} };
-        emhash5::HashMap<std::bitset<8>, double> m5(v.begin(), v.end());
-
-        //Option 1 for a constructor with a custom Key type
-        //Define the KeyHash and KeyEqual structs and use them in the template
-        emhash8::HashMap<Key, std::string, YourKeyHash, YourKeyEqual> m6 = {
-            { {"John", "Doe"}, "example"},
-            { {"Mary", "Sue"}, "another"}
-        };
-
-        //Option 2 for a constructor with a custom Key type
-        // Define a const == operator for the class/struct and specialize std::hash
-        // structure in the std namespace
-        emhash7::HashMap<Foo, std::string> m7 = {
-            { Foo(1), "One"}, { 2, "Two"}, { 3, "Three"}
-        };
-
-#if CXX20
-        struct Goo {int val; };
-        auto hash = [](const Goo &g){ return std::hash<int>{}(g.val); };
-        auto comp = [](const Goo &l, const Goo &r){ return l.val == r.val; };
-        emhash5::HashMap<Goo, double, decltype(hash), decltype(comp)> m8;
-#endif
-
-        emhash8::HashMap<int,char> m8 = {{1,'a'},{2,'b'}};
-        for(const auto [k, v] : m8}) 
-            printf("%d %c\n", k, v);
-
-        const auto* data = m8.values();//order by insert
-        for (int i = 0; i < m8.size(); i++)
-            printf("%d %c\n", data[i].first, data[i].second);
-
+auto no_value = m1.at(0); // Returns 0 if key is not found (no exception thrown).
 ```
 
-# only emhash can 
-   The following benchmark shows that emhash has amazing performance even insert & erase with a high load factor 0.999.
+### List Initialization
+```cpp
+emhash5::HashMap<int, std::string> m2 = {
+    {1, "foo"},
+    {3, "bar"},
+    {2, "baz"},
+};
+
+// Try-get method (returns nullptr if the key does not exist)
+auto* pvalue = m2.try_get(1);
+
+// Try-set method (sets the key only if it does not exist)
+if (m2.try_set(4, "for"))   printf("Set success\n");
+if (!m2.try_set(1, "new"))  printf("Set failed\n");
+
+// set_get method (returns old value while updating to new)
+std::string ovalue = m2.set_get(1, "new"); // ovalue = "foo", now m2[1] = "new"
+
+// Iterating through the map
+for (auto& p : m2)
+    std::cout << " " << p.first << " => " << p.second << '\n';
+```
+
+### Copy and Move Constructors
+```cpp
+// Copy constructor
+emhash5::HashMap<int, std::string> m3 = m2;
+
+// Move constructor
+emhash5::HashMap<int, std::string> m4 = std::move(m2);
+```
+
+### Insertion Methods
+```cpp
+m2.insert_unique(4, "four");   // Insert only if key doesn't exist
+m2[4] = "four_again";          // Overwrites existing value
+m2.emplace(std::make_pair(4, "four"));
+m2.insert({{6, "six"}, {5, "five"}});
+```
+
+### Range Constructor
+```cpp
+std::vector<std::pair<std::bitset<8>, int>> v = { {0x12, 1}, {0x01,-1} };
+emhash5::HashMap<std::bitset<8>, double> m5(v.begin(), v.end());
+```
+
+### Custom Key Type (Option 1: Using Hash and Equality Comparators)
+```cpp
+// Define KeyHash and KeyEqual structs and use them in the template
+emhash8::HashMap<Key, std::string, YourKeyHash, YourKeyEqual> m6 = {
+    { {"John", "Doe"}, "example"},
+    { {"Mary", "Sue"}, "another"}
+};
+```
+
+### Custom Key Type (Option 2: Specializing std::hash)
+```cpp
+// Define a const == operator in your class/struct and specialize std::hash
+emhash7::HashMap<Foo, std::string> m7 = {
+    { Foo(1), "One"}, { Foo(2), "Two"}, { Foo(3), "Three"}
+};
+```
+
+### C++20 Support (Using Lambda for Hashing and Comparison)
+```cpp
+#if CXX20
+struct Goo { int val; };
+auto hash = [](const Goo &g) { return std::hash<int>{}(g.val); };
+auto comp = [](const Goo &l, const Goo &r) { return l.val == r.val; };
+
+emhash5::HashMap<Goo, double, decltype(hash), decltype(comp)> m8;
+#endif
+```
+
+### Efficient Iteration
+```cpp
+emhash8::HashMap<int, char> m8 = {{1, 'a'}, {2, 'b'}};
+
+// Structured binding for iteration
+for (const auto [k, v] : m8)
+    printf("%d %c\n", k, v);
+
+// Accessing values in insertion order
+const auto* data = m8.values();
+for (int i = 0; i < m8.size(); i++)
+    printf("%d %c\n", data[i].first, data[i].second);
+```
+
+## _Exceptional_ Performance
+
+The benchmark results demonstrate that emhash delivers exceptional performance, even when performing insert and erase operations at an extremely high load factor of 0.999.
+
 ```cpp
 static void RunHighLoadFactor()
 {
@@ -169,98 +196,155 @@ static void RunHighLoadFactor()
   vsize = 4194304, load factor = 0.9990, insert/erase = 117/450 ms
   vsize = 8388608, load factor = 0.9990, insert/erase = 251/1009 ms
 ```
-### benchmark
 
-some of benchmark result is uploaded, I use other hash map (martinus, ska, phmap, dense_hash_map ...) source to compile and benchmark.
-[![Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)] and [![Bench High Load](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)]
+## Benchmark Results
 
-another html result with impressive curve [chartsAll.html](https://github.com/ktprime/emhash/blob/master/bench/tsl_bench/chartsAll.html)
-(download all js file in tls_bench dir)
-generated by [Tessil](https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html) benchmark code
+Some benchmark results have been uploaded, using various hash map implementations (`martinus`, `ska`, `phmap`, `dense_hash_map`, etc.) compiled and tested.
 
-txt file result [martin_bench.txt](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.txt) generated by code from
-[martin](https://github.com/martinus/map_benchmark)
+- **Benchmark Code:**
+  - [Bench All](https://github.com/ktprime/emhash/blob/master/bench/em_bench.cpp)
+  - [Bench High Load](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)
 
-the benchmark code is some tiny changed for injecting new hash map, the result is not final beacuse it depends on os, cpu, compiler and dataset input.
+- **Interactive Benchmark Results:**
+  - **[Charts with Performance Curves](https://github.com/ktprime/emhash/blob/master/bench/tsl_bench/chartsAll.html)**
+    *(Download all JavaScript files from the `tsl_bench` directory to view properly.)*
+    Generated using the [Tessil Benchmark Code](https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html).
 
-my result is benched on 3 linux server(amd, intel, arm64), win10 pc/Laptop and apple m1): low is best
-![](int64_t_int64_t.png)
-![](int64_t_int64_t_m1.png)
-![](int_string.png)
-![](string_string.png)
-![](Struct_int64_t.png)
-![](int64_t_Struct.png)
-![](int64_t.png)
+- **Raw Benchmark Data:**
+  - [martin_bench.txt](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.txt)
+    *(Generated using [martinus/map_benchmark](https://github.com/martinus/map_benchmark))*.
 
-# some bad
-- it's not a node-based hash map and can't keep the reference stable if insert/erase/rehash happens, use value pointer or choose the other node base hash map.
+The benchmark code has been slightly modified to accommodate additional hash maps. The results are **not absolute** as they depend on OS, CPU, compiler, and dataset input.
+
+### Tested Environments
+Benchmarks were performed on:
+- **3 Linux servers** (AMD, Intel, ARM64)
+- **Windows 10** PC & laptop
+- **Apple M1**
+
+#### Performance Comparison (Lower is Better)
+![int64_t_int64_t](int64_t_int64_t.png)
+![int64_t_int64_t_m1](int64_t_int64_t_m1.png)
+![int_string](int_string.png)
+![string_string](string_string.png)
+![Struct_int64_t](Struct_int64_t.png)
+![int64_t_Struct](int64_t_Struct.png)
+![int64_t](int64_t.png)
+
+---
+
+## Limitations & Known Issues
+
+### 1. Not a Node-Based Hash Map
+`emhash` does **not** maintain reference stability during insert/erase/rehash operations. If stability is required, use a pointer-based approach or choose a node-based hash map.
+
+**Incorrect usage example:**
+```cpp
+emhash7::HashMap<int, int> myhash(10);
+myhash[1] = 1;
+auto& myref = myhash[1]; // ❌ Reference is unstable
+
+auto old = myref;  // ❌ `myref` may become invalid after rehash
 ```
-    emhash7:HashMap<int,int> myhash(10);
-    myhash[1] = 1;
-    auto& myref = myhash[1];//**wrong used here**,  can not keep reference stable
-     ....
-    auto old = myref ;  // myref maybe be changed and not invalid.
 
-    emhash7:HashMap<int,int> myhash2;
-    for (int i = 0; i < 10000; i ++)
-        myhash2[rand()] = myhash2[rand()]; // it will be crashed because of rehash, call reserve before or use insert.
- ```
+**Potential crash scenario (rehash during insertion):**
+```cpp
+emhash7::HashMap<int, int> myhash2;
+for (int i = 0; i < 10000; i++)
+    myhash2[rand()] = myhash2[rand()]; // ❌ May crash due to rehashing
 
-- for very large key-value, use pointer instead of value if you care about memory usage with high frequency of insertion or erasion
-```
-  emhash7:HashMap<keyT,valueT> myhash; //value is very big, ex sizeof(value) 100 byte
-
-  emhash7:HashMap<keyT,*valueT> myhash2; //new valueT, or use std::shared_ptr<valueT>.
-
+// ✅ Use `reserve()` before inserting large amounts of data:
+myhash2.reserve(20000);
 ```
 
-- the only known bug as follow example, if erase key/iterator during iteration. one key will be iteraored twice or missed. and fix it can desearse performance 20% or even much more and no good way to fix.
+---
 
+### 2. Handling Large Key-Value Pairs
+For very large values (e.g., `sizeof(value) > 100 bytes`), **using pointers instead of direct values** can help reduce memory overhead.
+
+**Memory-intensive approach:**
+```cpp
+emhash7::HashMap<keyT, valueT> myhash; // `valueT` is large (e.g., 100 bytes)
 ```
-    emhash7:HashMap<int,int> myhash;
-    //dome some init ...
-    for (const auto& it : myhash)
-    {
-        if (some_key == it.first) {
-            myhash.erase(key);  //no any break
-       }
-       ...
-       do_some_more();
+
+**Optimized memory usage:**
+```cpp
+emhash7::HashMap<keyT, valueT*> myhash2; // Use pointer
+```
+or
+```cpp
+emhash7::HashMap<keyT, std::shared_ptr<valueT>> myhash3;
+```
+
+---
+
+### 3. Known Bug: Erasing During Iteration
+If a key/iterator is erased during iteration, one key may be iterated **twice or missed**. Fixing this issue reduces performance by **20% or more**, and there is currently no efficient fix.
+
+**Incorrect (may cause iteration issues):**
+```cpp
+emhash7::HashMap<int, int> myhash;
+for (const auto& it : myhash) {
+    if (some_key == it.first) {
+        myhash.erase(some_key); // ❌ No break after erase
     }
-    
-    //change upper code as follow
-    for (auto it = myhash.begin(); it != myhash.end(); it++)
-    {
-        if (some_key == it.first) {
-            it = myhash.erase(it);
-       }
-       ...
-       do_some_more();
+    do_some_more();
+}
+```
+
+**Corrected version (use iterator-based erase):**
+```cpp
+for (auto it = myhash.begin(); it != myhash.end();) {
+    if (some_key == it->first) {
+        it = myhash.erase(it); // ✅ Correct: assign back to iterator
+    } else {
+        ++it;
     }
-    
+    do_some_more();
+}
 ```
 
+**Another common mistake (invalid iterator use after erase):**
+```cpp
+emhash7::HashMap<int, int> myhash = {{1, 2}, {5, 2}};
+auto it = myhash.find(1);
+
+it = myhash.erase(it);  // ✅ Correct
+myhash.erase(it++);     // ❌ Error: `it` is already erased
 ```
-     emhash7:HashMap<int,int> myhash = {{1,2},{5,2},};
-     auto it = myhash.find(1);
-    
-     it = map.erase( it );
-     map.erase( it++ );// it's error code. use upper line
-```
 
-# Which one?
+---
 
-So what’s actually the best map to choose? it depends.  Here are some basic suggestion you can follow:
+## Which Hash Map Should You Choose?
+The best choice depends on your use case. Here are some general recommendations:
 
- 1. if key/value is complex/big(ex std::string or user defined struct), try to use emhash8
-because node's momory is continuous like std::vector, very fast iteration speed, search & insert is very fast and low memory usage,but it's some slow with deletion compared with emhash5-7.
+1. **For complex/big keys & values (e.g., `std::string` or user-defined structs)**
+   - **Use `emhash8`**
+   - Benefits:
+     - Memory layout is contiguous (like `std::vector`), resulting in **fast iteration speed**.
+     - **Fast search & insertion**, **low memory usage**.
+   - Drawback:
+     - Slightly slower deletion compared to `emhash5-7`.
 
- 2. as for insertion performance emhash7 is a good choice, it  can set a extreme high load factor(>0.90, 0.99 is also ok) for memory usage.
+2. **For insertion-heavy workloads**
+   - **Use `emhash7`**
+   - Benefits:
+     - Supports an **extremely high load factor** (`>0.90`, even `0.99`).
+     - **Efficient memory usage**.
 
- 3. emhash5/6 is optimized for find hit/erasion with integer keys, it also can be used as a small stack hashmap if set marco EMH_SMALL_SIZE.
+3. **For fast search & erasure with integer keys**
+   - **Use `emhash5/6`**
+   - Benefits:
+     - Optimized for **find-hit** and **erasure** with integer keys.
+     - Can be used as a **small stack hashmap** by defining `EMH_SMALL_SIZE`.
 
-The follow result is benchmarked on AMD 5800h cpu on windows 10/gcc 11.3(
-code https://github.com/ktprime/emhash/blob/master/bench/qbench.cpp)
+---
+
+## Benchmark Environment
+The following benchmarks were performed on an **AMD 5800H CPU (Windows 10, GCC 11.3)** using:
+[Benchmark Code](https://github.com/ktprime/emhash/blob/master/bench/qbench.cpp)
+
+---
 
 
 |10       hashmap|Insert|Fhit |Fmiss|Erase|Iter |LoadFactor|
@@ -333,5 +417,3 @@ code https://github.com/ktprime/emhash/blob/master/bench/qbench.cpp)
 |emhash7::HashMap|  62.7| 20.3| 22.4| 25.2| 0.68| 74.5     |
 |emhash6::HashMap|  61.5| 16.1| 18.0| 28.0| 0.67| 74.5     |
 |emhash5::HashMap|  65.1| 16.1| 18.8| 24.3| 2.72| 74.5     |
-
-
