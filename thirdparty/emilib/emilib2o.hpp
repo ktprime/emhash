@@ -857,8 +857,8 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear() noexcept
     {
-        clear_data();
         if (_num_filled) {
+            clear_data();
             std::fill_n(_states, _num_buckets, State::EEMPTY);
             std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
         }
