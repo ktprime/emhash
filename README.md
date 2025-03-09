@@ -143,10 +143,15 @@ emhash5::HashMap<Goo, double, decltype(hash), decltype(comp)> m8;
 ### Efficient Iteration
 ```cpp
 emhash8::HashMap<int, char> m8 = {{1, 'a'}, {2, 'b'}};
+emhash7::HashMap<int, char> m7 = {{1, 'a'}, {2, 'b'}};
 
 // Structured binding for iteration
 for (const auto [k, v] : m8)
     printf("%d %c\n", k, v);
+
+for (const auto [value, _, key] : m7)
+    printf("%d %c\n", key, value); //different from the other hash map
+
 
 // Accessing values in insertion order
 const auto* data = m8.values();
