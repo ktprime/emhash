@@ -26,12 +26,15 @@
 #undef EMH_UNLIKELY
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__) && _MSC_VER == 0
-    #define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
-    #define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+    #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+    #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+    #define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+    #define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-    #define EMH_LIKELY(condition)   condition
-    #define EMH_UNLIKELY(condition) condition
+    #define EMH_LIKELY(condition)   (condition)
+    #define EMH_UNLIKELY(condition) (condition)
 #endif
 
 namespace emilib2 {
@@ -47,7 +50,7 @@ namespace emilib2 {
     constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = MXLOAD_FACTOR/(MXLOAD_FACTOR + 1)
 
 #if EMH_OFFSET_STEP == 0
-    constexpr static uint8_t OFFSET_STEP  = 4;
+    constexpr static uint8_t OFFSET_STEP = 16;
 #endif
 
 #if AVX2_EHASH == 0
@@ -120,9 +123,9 @@ inline static uint32_t CTZ(size_t n)
         {_BitScanForward(&index, (uint32_t)(n >> 32)); index += 32; }
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    uint32_t index = __builtin_ctzll(n);
+    auto index = __builtin_ctzll((unsigned long long)n);
 #elif 1
-    uint32_t index = __builtin_ctzl(n);
+    auto index = __builtin_ctzl(n);
 #endif
 
     return (uint32_t)index;
@@ -154,7 +157,7 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash) & _mask;
-        return (int8_t)((size_t)(key_hash % MAPBITS) + EFILLED);
+        return (int8_t)((size_t)(key_hash % MAPBITS) + (size_t)EFILLED);
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -162,8 +165,7 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash) & _mask;
-//        return (int8_t)((key * 0x9FB21C651E98DF25ull % 251) - 125);
-        return (int8_t)((size_t)(key_hash % MAPBITS) + EFILLED);
+        return (int8_t)((size_t)(key_hash % MAPBITS) + (size_t)EFILLED);
     }
 
     class const_iterator;
@@ -887,15 +889,16 @@ public:
         for (int i = 0; i < off_groups; i++)
             off[_offset[i]]++;
 
-        size_t total = 0, sums = 0;
-        for (int i = 0; i < 256; i++) {
+        size_t total = 0, sums = 0, sumo = 0;
+        for (size_t i = 0; i < 256; i++) {
             if (off[i] != EMPTY_OFFSET) {
-                total += off[i];
-                sums  += (size_t)off[i] * (i + 1);
-                printf("\n%3d %8d %.5lf %.5lf", i, off[i], 1.0 * off[i] / off_groups, 100.0 * total / off_groups);
+                total += (size_t)off[i];
+                sums += (size_t)off[i] * (i + 1);
+                sumo += (size_t)off[i] * (i + 2);
+                printf("\n%3d %8d %.3lf %.3lf", i, off[i], 1.0 * off[i] / off_groups, 100.0 * total / off_groups);
             }
         }
-        printf(", lf = %.3f average probe sequence length PSL = %.5lf\n", load_factor(), 1.0 * sums / total);
+        printf(", 2o lf = %.3f average probe sequence length PSL = %.5lf:%.5lf\n", load_factor(), 1.0 * sums / total, 0.5 * sumo / total);
     }
 
     //#define EMH_STATIS 10'000'000
@@ -1011,7 +1014,8 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-      next_bucket += offset < 5 ? (simd_bytes + 1) * offset: _num_buckets / 8 + 5;
+      next_bucket += offset < 5 ? (simd_bytes + 1) * offset: _num_buckets / 11 + 5;
+//      next_bucket += (simd_bytes + 1) * offset + 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;
@@ -1045,9 +1049,9 @@ private:
         if (1)
         {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
-                prefetch_heap_block((char*)&_pairs[next_bucket]);
+                //prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
@@ -1056,7 +1060,7 @@ private:
                 } while (maskf != 0);
             }
 
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0)
                 return _num_buckets;
             else if (0 == get_offset(main_bucket))
@@ -1066,9 +1070,9 @@ private:
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
-                prefetch_heap_block((char*)&_pairs[next_bucket]);
+                //prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
@@ -1077,7 +1081,7 @@ private:
                 } while (maskf != 0);
             }
 #if 0
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0)
                 break;
 #endif
@@ -1112,7 +1116,7 @@ private:
 
         while (true) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf  = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf  = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             //1. find filled
             while (maskf != 0) {
@@ -1125,7 +1129,7 @@ private:
             }
 
             //2. find empty
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
                 auto ebucket = next_bucket + CTZ(maske);
                 if (EMH_UNLIKELY(hole != chole))
@@ -1136,7 +1140,7 @@ private:
 
             //3. find erased
             else if (hole == chole) {
-                const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
+                const auto maskd = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);
             }
@@ -1158,14 +1162,14 @@ private:
         return ebucket;
     }
 
-    inline uint32_t empty_delete(size_t gbucket) const noexcept
+    inline size_t empty_delete(size_t gbucket) const noexcept
     {
 #if 0//EMH_ITERATOR_BITS == 32
         const auto vec = _mm256_loadu_si256((__m256i const *)&_states[gbucket]);
         return _mm256_movemask_epi8(_mm256_cmpgt_epi8(simd2_filled, vec));
 #else
         const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
+        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
 #endif
     }
 

@@ -1,5 +1,5 @@
 // emhash8::HashMap for C++14/17/20
-// version 1.7.1
+// version 1.7.2
 // https://github.com/ktprime/emhash/blob/master/hash_table8.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -47,12 +47,15 @@
 #undef  EMH_EQHASH
 
 // likely/unlikely
-#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
-#    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
-#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+    #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+    #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+    #define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+    #define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-#    define EMH_LIKELY(condition)   condition
-#    define EMH_UNLIKELY(condition) condition
+    #define EMH_LIKELY(condition)   (condition)
+    #define EMH_UNLIKELY(condition) (condition)
 #endif
 
 #define EMH_EMPTY(n) (0 > (int)(_index[n].next))
@@ -337,6 +340,7 @@ public:
         clearkv();
         free(_pairs);
         free(_index);
+        _num_filled = 0;
         _index = nullptr;
         _pairs = nullptr;
     }
@@ -1005,7 +1009,7 @@ public:
             if (EMH_EMPTY(bucket)) {
                 if (prev != 0) {
                     EMH_PREVET(_index, bucket) = prev;
-                    _index[_prev].next = -bucket;
+                    _index[prev].next = -bucket;
                 }
                 else
                     _ehead = bucket;
@@ -1014,7 +1018,7 @@ public:
         }
 
         EMH_PREVET(_index, _ehead) = prev;
-        _index[_prev].next = 0-_ehead;
+        _index[prev].next = 0-_ehead;
         _ehead = 0-_index[_ehead].next;
     }
 
@@ -1022,7 +1026,7 @@ public:
     {
         auto prev = EMH_PREVET(_index, _ehead);
         while (prev != _ehead) {
-            _index[_prev].next = INACTIVE;
+            _index[prev].next = INACTIVE;
             prev = EMH_PREVET(_index, prev);
         }
         _index[_ehead].next = INACTIVE;
@@ -1246,7 +1250,7 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(__GNUC__) || defined(__clang__)
-        __builtin_prefetch(static_cast<const void*>(ctrl));
+//        __builtin_prefetch(static_cast<const void*>(ctrl));
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #endif

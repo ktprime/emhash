@@ -104,12 +104,15 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #endif
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
-#    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
-#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+    #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+    #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+    #define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+    #define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-#    define EMH_LIKELY(condition)   condition
-#    define EMH_UNLIKELY(condition) condition
+    #define EMH_LIKELY(condition)   (condition)
+    #define EMH_UNLIKELY(condition) (condition)
 #endif
 
 #ifndef EMH_BUCKET_INDEX
@@ -163,7 +166,7 @@ namespace emhash7 {
     static constexpr size_type INACTIVE = 0 - 0x1ull;
 #else
     typedef uint32_t size_type;
-    static constexpr size_type INACTIVE = -1u;
+    static constexpr size_type INACTIVE = 0xFFFFFFFF;
 #endif
 
 #ifndef EMH_MALIGN
@@ -778,7 +781,7 @@ public:
 
     size_type bucket_main() const
     {
-        auto main_size = 0;
+        size_type main_size = 0;
         for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
             if (EMH_BUCKET(_pairs, bucket) == bucket)
                 main_size ++;
@@ -1559,7 +1562,7 @@ private:
     template<typename K = KeyT>
     size_type find_filled_hash(const K& key, const size_t key_hash) const
     {
-        const auto bucket = key_hash & _mask;
+        const auto bucket = size_type(key_hash & _mask);
         if (EMH_EMPTY(bucket))
             return _num_buckets;
 
@@ -1581,7 +1584,7 @@ private:
     template<typename K = KeyT>
     size_type find_filled_bucket(const K& key) const
     {
-        const auto bucket = hash_key(key) & _mask;
+        const auto bucket = size_type(hash_key(key) & _mask);
         if (EMH_EMPTY(bucket))
             return _num_buckets;
 
@@ -1701,14 +1704,6 @@ private:
 #endif
 
         const auto qmask = _mask / SIZE_BIT;
-        if (0) {
-            const size_type step = (main_bucket - SIZE_BIT / 4) & qmask;
-            const auto bmask3 = *((size_t*)_bitmask + step);
-            if (bmask3 != 0)
-                return step * SIZE_BIT + CTZ(bmask3);
-        }
-
-        //auto next_bucket = (bucket_from + 0 * SIZE_BIT) & qmask;
         auto& last = EMH_BUCKET(_pairs, _num_buckets);
         for (; ; ) {
             last &= qmask;

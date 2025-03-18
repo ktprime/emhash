@@ -2117,7 +2117,7 @@ public:
         return 0 == mNumElements;
     }
 
-    float max_load_factor(float lf=0.88) const noexcept { // NOLINT(modernize-use-nodiscard)
+    float max_load_factor(float lf=0.88f) const noexcept { // NOLINT(modernize-use-nodiscard)
         ROBIN_HOOD_TRACE(this)
         return MaxLoadFactor100 / 100.0F;
     }

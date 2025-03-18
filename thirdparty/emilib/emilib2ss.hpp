@@ -27,12 +27,15 @@
 #undef bucket_to_slot
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__) && _MSC_VER == 0
-#    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
-#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+#define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+#define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-#    define EMH_LIKELY(condition)   condition
-#    define EMH_UNLIKELY(condition) condition
+#define EMH_LIKELY(condition)   (condition)
+#define EMH_UNLIKELY(condition) (condition)
 #endif
 
 namespace emilib {
@@ -72,7 +75,7 @@ constexpr static uint8_t slot_size  = simd_bytes - STATE_BITS;
 constexpr static uint8_t group_index = simd_bytes - 1;//> 0
 constexpr static uint32_t group_bmask = (1u << slot_size) - 1;
 
-inline static uint32_t CTZ(size_t n)
+inline static uint32_t CTZ(uint32_t n)
 {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
@@ -95,10 +98,8 @@ inline static uint32_t CTZ(size_t n)
     else
         {_BitScanForward(&index, (uint32_t)(n >> 32)); index += 32; }
     #endif
-#elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    uint32_t index = __builtin_ctzll(n);
 #elif 1
-    uint32_t index = __builtin_ctzl(n);
+    auto index = __builtin_ctzl((unsigned long)n);
 #endif
 
     return (uint32_t)index;
@@ -131,7 +132,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((size_t)(key_hash % 253) + EFILLED);
+        return (int8_t)((size_t)(key_hash % 253) + (size_t)EFILLED);
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -140,10 +141,10 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((size_t)(key_hash % 253) + EFILLED);
+        return (int8_t)((size_t)(key_hash % 253) + (size_t)EFILLED);
     }
 
-#if 0
+#if 1
     #define bucket_to_slot(bucket) bucket
 #else
     static constexpr size_t bucket_to_slot(size_t bucket)
@@ -472,58 +473,58 @@ public:
 
     // ------------------------------------------------------------
 
-    template<typename K>
+    template<typename K=KeyT>
     iterator find(const K& key) noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    template<typename K>
+    template<typename K=KeyT>
     const_iterator find(const K& key) const noexcept
     {
         return {this, find_filled_bucket(key)};
     }
 
-    template<typename K>
-    bool contains(const K& k) const noexcept
+    template<typename K=KeyT>
+    bool contains(const K& key) const noexcept
     {
-        return find_filled_bucket(k) != _num_buckets;
+        return find_filled_bucket(key) != _num_buckets;
     }
 
-    template<typename K>
-    size_t count(const K& k) const noexcept
+    template<typename K=KeyT>
+    size_t count(const K& key) const noexcept
     {
-        return find_filled_bucket(k) != _num_buckets;
+        return find_filled_bucket(key) != _num_buckets;
+    }
+
+    template<typename K = KeyT>
+    ValueT& at(const K& key)
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
+    }
+
+    template<typename K = KeyT>
+    const ValueT& at(const K& key) const
+    {
+        const auto bucket = find_filled_bucket(key);
+        return _pairs[bucket].second;
     }
 
 #if 0
-    template<typename Key = KeyT>
-    ValueT& at(const KeyT& key)
-    {
-        const auto bucket = find_filled_bucket(key);
-        return _pairs[bucket].second;
-    }
-
-    template<typename Key = KeyT>
-    const ValueT& at(const KeyT& key) const
-    {
-        const auto bucket = find_filled_bucket(key);
-        return _pairs[bucket].second;
-    }
-
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
-    ValueT* try_get(const K& k)
+    ValueT* try_get(const K& key)
     {
-        auto bucket = find_filled_bucket(k);
+        auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
     }
 
     /// Const version of the above
     template<typename K>
-    ValueT* try_get(const K& k) const
+    ValueT* try_get(const K& key) const
     {
-        auto bucket = find_filled_bucket(k);
+        auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
     }
 #endif
@@ -867,11 +868,11 @@ public:
             if (off[i] != 0) {
                 total += off[i];
                 sums  += (size_t)off[i] * (i + 1);
-                printf("\n%3d %8d %.5lf %3.lf%%",
+                printf("\n%3d %8d %.5lf %3.3lf%%",
                     i, off[i], 1.0 * off[i] / (_num_buckets / simd_bytes), 100.0 * total / (_num_buckets / simd_bytes));
             }
         }
-        printf(", load_factor = %.3f average probe group length PGL = %.4lf\n", load_factor(), 1.0 * sums / total);
+        printf(", 2ss load_factor = %.3f average probe group length PGL = %.4lf\n", load_factor(), 1.0 * sums / total);
     }
 
     /// Make room for this many elements
@@ -1005,7 +1006,7 @@ private:
 
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
+            auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
             if (maskf) {
                 prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
                 do {
@@ -1044,7 +1045,7 @@ private:
 
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
+            auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
 
             //1. find filled
             while (maskf != 0) {
@@ -1058,7 +1059,7 @@ private:
             }
 
             if (group_has_empty(next_bucket)) {
-                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)) & group_bmask;
+                const auto maske = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)) & group_bmask;
                 auto ebucket = next_bucket + CTZ(maske);
                 if (EMH_UNLIKELY(hole != chole))
                     ebucket = hole;
@@ -1068,13 +1069,13 @@ private:
 
             //3. find erased
             else if (hole == chole) {
-                const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete)) & group_bmask;
+                const auto maskd = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete)) & group_bmask;
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);
             }
 
             //4. next round
-            next_bucket = get_next_bucket(next_bucket, ++offset);
+            next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
             if (offset > group_probe(main_bucket))
                 break;
         }
@@ -1094,13 +1095,13 @@ private:
     inline size_t empty_delete(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
+        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
     }
 
     inline size_t filled_mask(size_t gbucket) const noexcept
     {
         const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete)) & group_bmask;
+        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete)) & group_bmask;
     }
 
     //gbucket--->kbucket--->next_bucket|  kick_bucket--->next_bucket--->gbucket
@@ -1114,7 +1115,7 @@ private:
                 set_group_probe(gbucket, offset);
                 return probe;
             }
-            next_bucket = get_next_bucket(next_bucket, ++offset);
+            next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
         }
 
         return 0;
@@ -1122,7 +1123,7 @@ private:
 
     size_t find_filled_slot(size_t next_bucket) const noexcept
     {
-        if (EMH_UNLIKELY (_num_filled == 0))
+        if (EMH_UNLIKELY(_num_filled) == 0)
              return _num_buckets;
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {

@@ -3804,7 +3804,7 @@ namespace fph {
 
             void UpdateBySlotNum(size_t element_num) {
                 size_t round_up_log2_slot_num = dynamic::detail::RoundUpLog2(element_num);
-                shift_bits_ = std::numeric_limits<size_t>::digits - round_up_log2_slot_num;
+                shift_bits_ = uint32_t(std::numeric_limits<size_t>::digits - round_up_log2_slot_num);
             }
 
         protected:

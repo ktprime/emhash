@@ -53,12 +53,15 @@
 #endif
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
-#    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
-#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+    #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+    #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+    #define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+    #define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-#    define EMH_LIKELY(condition)   condition
-#    define EMH_UNLIKELY(condition) condition
+    #define EMH_LIKELY(condition)   (condition)
+    #define EMH_UNLIKELY(condition) (condition)
 #endif
 
 #ifndef EMH_BUCKET_INDEX
@@ -96,7 +99,7 @@ namespace emhash5 {
     static constexpr size_type INACTIVE = 0 - 0x1ull;
 #elif EMH_SIZE_TYPE_16BIT == 0
     typedef int32_t size_type;
-    const constexpr size_type INACTIVE = 0xFFFFFFFF;
+    const constexpr size_type INACTIVE = int32_t(0xFFFFFFFF);
 #else
     typedef int16_t size_type;
     const constexpr size_type INACTIVE = 0xFFFF;
@@ -349,7 +352,7 @@ public:
 #endif
         _mlf = (uint32_t)((1 << 27) / EMH_DEFAULT_LOAD_FACTOR);
         max_load_factor(mlf);
-        rehash(bucket);
+        rehash((uint64_t)bucket);
     }
 
     HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) noexcept
@@ -403,7 +406,7 @@ public:
             free(_pairs);
             _pairs = nullptr;
 
-            rehash(rhs._num_filled + 2);
+            rehash((uint64_t)rhs._num_filled + 2);
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(it->first, it->second);
             return *this;
@@ -493,7 +496,7 @@ public:
         auto opairs  = rhs._pairs;
 
         if (is_copy_trivially())
-            memcpy((char*)_pairs, opairs, (_num_buckets + 2) * sizeof(PairT));
+            memcpy((char*)_pairs, opairs, ((size_t)_num_buckets + 2u) * sizeof(PairT));
         else {
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
@@ -597,7 +600,7 @@ public:
             _mlf = (uint32_t)((1 << 27) / mlf);
     }
 
-    constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
+    constexpr size_type max_size() const { return  size_type(1ull << (sizeof(size_type) * 8 - 1)); }
     constexpr size_type max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
@@ -1312,7 +1315,7 @@ public:
         if (is_triviall_destructable())
             clearkv();
         else if (_num_filled)
-            memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+            memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * (size_t)_num_buckets);
 #endif
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)
@@ -1330,7 +1333,7 @@ public:
             return;
 #endif
         if (load_factor() < min_factor) //safe guard
-            rehash(_num_filled + 1);
+            rehash((uint64_t)_num_filled + 1);
     }
 
     /// Make room for this many elements
@@ -1341,13 +1344,9 @@ public:
         if (EMH_LIKELY(required_buckets < (uint64_t)_mask))
             return false;
 #else
-        const auto required_buckets = (num_elems + num_elems * 1 / 9);
+        const auto required_buckets = (num_elems + num_elems * 1 / 8);
         if (EMH_LIKELY(required_buckets < (uint64_t)_mask))
             return false;
-
-        else if (_num_buckets < 16 && _num_filled < _num_buckets)
-            return false;
-
         else if (_num_buckets > EMH_HIGH_LOAD) {
             if (_ehead == 0) {
                 set_empty();
@@ -1356,6 +1355,8 @@ public:
                 return false;
             }
         }
+        else if (_num_buckets < 16 && _num_filled < _num_buckets)
+          return false;
 #endif
 
 #if EMH_STATIS
@@ -1417,8 +1418,8 @@ public:
         else
 #endif
         _pairs = (PairT*)alloc_bucket(num_buckets);
-        memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * num_buckets);
-        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2);
+        memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * (size_t)num_buckets);
+        memset((char*)(_pairs + num_buckets), 0, sizeof(PairT) * 2u);
 
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)
@@ -1427,7 +1428,7 @@ public:
 
         (void)old_buckets;
         if (0 && is_copy_trivially() && old_num_filled && num_buckets >= 2 * old_buckets) {
-            memcpy((char*)_pairs, old_pairs, old_buckets * sizeof(PairT));
+            memcpy((char*)_pairs, old_pairs, (uint32_t)old_buckets * sizeof(PairT));
             for (size_type src_bucket = 0; src_bucket < old_buckets; src_bucket++) {
                 if (EMH_EMPTY(_pairs, src_bucket))
                     continue;
@@ -1493,7 +1494,7 @@ private:
 #ifdef EMH_ALLOC
         auto* new_pairs = (PairT*)aligned_alloc(EMH_MALIGN, (2 + num_buckets) * sizeof(PairT));
 #else
-        auto* new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT));
+        auto* new_pairs = (PairT*)malloc((2 + (size_t)num_buckets) * sizeof(PairT));
 #endif
         return new_pairs;
     }
@@ -1535,8 +1536,8 @@ private:
     {
         const auto prev_bucket = EMH_PREVET(_pairs, bucket);
         const auto next_bucket = (size_type)(0-EMH_BUCKET(_pairs, bucket));
-//        assert(next_bucket > 0 && _ehead > 0);
-//        assert(next_bucket <= _mask && prev_bucket <= _mask);
+        assert(next_bucket > 0 && _ehead > 0);
+        assert(next_bucket <= _mask && prev_bucket <= _mask);
 
         EMH_PREVET(_pairs, next_bucket) = prev_bucket;
         EMH_BUCKET(_pairs, prev_bucket) = -next_bucket;
@@ -1546,7 +1547,7 @@ private:
     }
 
     //ehead->bucket->next
-    void push_empty(const int32_t bucket)
+    void push_empty(const size_type bucket)
     {
         const int next_bucket = 0-EMH_BUCKET(_pairs, _ehead);
         assert(next_bucket > 0);
@@ -1563,7 +1564,7 @@ private:
     // Can we fit another element?
     inline bool check_expand_need()
     {
-        return reserve(_num_filled);
+        return reserve((uint64_t)_num_filled);
     }
 
     void clear_bucket(size_type bucket, bool bclear = true) noexcept
@@ -1880,7 +1881,7 @@ one-way search strategy.
         //__builtin_prefetch(static_cast<const void*>(_pairs + bucket + 1), 0, 1);
 #endif
         constexpr auto linear_probe_length = 6;//2-3 cache line miss
-        for (size_type step = 2, slot = bucket + 1 + csize / 2; ; slot += step++) {
+        for (size_type step = 2, slot = bucket + 1 + (int)csize / 2; ; slot += step++) {
             if (step < linear_probe_length) {
                 auto bucket1 = slot & _mask;
                 if (EMH_EMPTY(_pairs, bucket1))
