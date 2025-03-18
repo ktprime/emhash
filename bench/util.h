@@ -142,11 +142,11 @@ int64_t getus()
 #elif __linux__
     struct timespec ts = {0, 0};
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000000ull + ts.tv_nsec / 1000;
+    return ts.tv_sec * 1000000ll + ts.tv_nsec / 1000;
 #elif __unix__
     struct timeval start;
     gettimeofday(&start, NULL);
-    return start.tv_sec * 1000000ull + start.tv_usec;
+    return start.tv_sec * 1000000ll + start.tv_usec;
 #else
     auto tp = std::chrono::steady_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::microseconds>(tp).count();
@@ -228,14 +228,14 @@ private:
 public:
     inline uint64_t operator()() {
         g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
-        return g_lehmer64_state >> 64;
+        return uint64_t(g_lehmer64_state >> 64);
     }
 
     // this is a bit biased, but for our use case that's not important.
     uint64_t operator()(uint64_t boundExcluded) noexcept {
-	(void) boundExcluded;
+        (void) boundExcluded;
         g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
-        return g_lehmer64_state >> 64;
+        return uint64_t(g_lehmer64_state >> 64);
     }
 };
 #endif
@@ -394,7 +394,7 @@ private:
 static inline uint64_t hashfib(uint64_t key)
 {
 #if __SIZEOF_INT128__
-    __uint128_t r =  (__int128)key * UINT64_C(11400714819323198485);
+    __uint128_t r =  (__uint128_t)key * UINT64_C(11400714819323198485);
     return (uint64_t)(r >> 64) ^ (uint64_t)r;
 #elif _WIN64
     uint64_t high;
@@ -465,7 +465,7 @@ static inline uint64_t udb_splitmix64(uint64_t x)
 static inline uint64_t intHashCRC32(uint64_t x)
 {
 #if __SSE4_2__ || _WIN32
-    return _mm_crc32_u64(-1ULL, x);
+    return _mm_crc32_u64((uint64_t)(0-1), x);
 #elif defined(__aarch64__)
     return __crc32cd(-1U, x);
 #else
@@ -616,7 +616,7 @@ struct WyRand
 };
 #endif
 
-static void cpuidInfo(int regs[4], int id, int ext)
+static void cpuidInfo(int regs[4], uint32_t id, int ext)
 {
 #if X86
 #if _MSC_VER >= 1600 //2010
@@ -727,7 +727,7 @@ static const std::array<char, 62> ALPHANUMERIC_CHARS = {
 
 static std::uniform_int_distribution<std::size_t> rd_uniform(0, ALPHANUMERIC_CHARS.size() - 1);
 
-static std::mt19937_64 generator(time(0));
+static std::mt19937_64 generator((unsigned long)time(0));
 
 #if TKey > 1
 static std::string get_random_alphanum_string(std::size_t size) {
@@ -780,12 +780,12 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 
 #if __cplusplus > 201402L || CXX17 || _MSC_VER > 1730
 #define CXX17 1
-#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
-#include "fph/meta_fph_table.h"
+//#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
+//#include "fph/meta_fph_table.h"
 #include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
 #endif
 
-#if __cplusplus > 201704L || CXX20 || _MSC_VER >= 1929
+#if __cplusplus > 201703L || CXX20 //|| _MSC_VER >= 1920
 #if QC_HASH
 #include "qchash/qc-hash.hpp" //https://github.com/daskie/qc-hash
 #endif

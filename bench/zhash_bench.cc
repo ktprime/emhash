@@ -105,7 +105,7 @@ std::vector<std::pair<K,V>> get_random(size_t count)
     zedland::hashmap<K,char> set;
     for (size_t i = 0; i < count; i++) {
         K key = r.get<K>();
-        while (set[key] == 1) key = r.get<K>();
+        while (set[key] == 1) const_cast<K&>(key) = r.get<K>();
         V val = r.get<V>();
         data.push_back(std::pair<K,V>(key, val));
         set[key] = 1;

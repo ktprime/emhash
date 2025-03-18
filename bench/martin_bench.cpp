@@ -21,11 +21,11 @@
 #if CK_HMAP
 #include "ck/Common/HashTable/HashMap.h"
 #endif
-
+#include "../hash_table8.hpp"
 #include "../hash_table5.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table6.hpp"
-#include "../hash_table8.hpp"
+#include "../hash_set8.hpp"
 
 //#include "../thirdparty/emhash/hash_table8v.hpp"
 //#include "../thirdparty/emhash/hash_table8v2.hpp"
@@ -33,7 +33,6 @@
 #ifdef HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
-
 //    #define EMH_QUADRATIC 1
 //    #define EMH_STATIS 123456
 //    #define AVX2_EHASH 1
@@ -48,6 +47,8 @@
 #include "martin/unordered_dense.h"
 #endif
 
+#include "FHashTable/fhash_table.h"
+
 #if ET
     #include "phmap/phmap.h"
     #include "tsl/robin_map.h"
@@ -61,7 +62,7 @@
 #include "folly/container/F14Map.h"
 #endif
 
-static const auto RND = getus();
+static const uint64_t RND =(uint64_t)getus();
 static float max_lf = 0.875f;
 
 static std::map<std::string_view, std::string_view> show_name =
@@ -83,6 +84,7 @@ static std::map<std::string_view, std::string_view> show_name =
     {"HashMapTable", "ck_hashmap"},
 #endif
 
+    {"fhash_table", "fht"},
 //    {"ankerl", "martin dense"},
 
 #if QC_HASH
@@ -126,7 +128,6 @@ static const char* find_hash(const std::string& map_name)
         if (map_name.find(kv.first) < 10)
             return kv.second.data();
     }
-
     return nullptr;
 }
 
@@ -188,7 +189,7 @@ class sfc64 {
             auto const tmp = m_a + m_b + m_counter++;
             m_a = m_b ^ (m_b >> right_shift);
             m_b = m_c + (m_c << left_shift);
-            m_c = rotl(m_c, rotation) + tmp;
+            m_c = rotl(m_c, (int)rotation) + tmp;
             return tmp;
         }
 
@@ -217,7 +218,7 @@ class sfc64 {
 
     private:
         template <typename T>
-            T rotl(T const x, int k) {
+            T rotl(T const x, uint32_t k) {
                 return (x << k) | (x >> (8 * sizeof(T) - k));
             }
 
@@ -251,7 +252,7 @@ static inline double now2sec()
     getrusage(RUSAGE_SELF, &rup);
     long sec  = rup.ru_utime.tv_sec  + rup.ru_stime.tv_sec;
     long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
-    return sec + usec / 1000000.0;
+    return (double)sec + (double)usec / 1000000.0;
 #elif __unix__
     struct timeval start;
     gettimeofday(&start, NULL);
@@ -280,11 +281,12 @@ static void bench_insert(MAP& map)
     for (int  i = 0; i < 3; i++) {
         auto nows = now2sec();
         {
+            auto RNDI = (uint64_t)RND + 15ull + (uint64_t)i;
             {
                 if (RND % 2 == 0)
                 map.reserve(maxn / 2);
                 auto ts = now2sec();
-                MRNG rng(RND + 15 + i);
+                MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn; ++n)
                     map[static_cast<int>(rng())];
                 printf("        (lf=%.2f) insert %.2f", map.load_factor(), now2sec() - ts);
@@ -292,7 +294,7 @@ static void bench_insert(MAP& map)
             }
             {
                 auto ts = now2sec();
-                MRNG rng(RND + 15 + i);
+                MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn * 9 / 10; ++n)
                     map.erase(static_cast<int>(rng()));
                 printf(", remove 90%% %.2f", now2sec() - ts);
@@ -301,7 +303,7 @@ static void bench_insert(MAP& map)
             }
             {
                 auto ts = now2sec();
-                MRNG rng(RND + 16 + i);
+                MRNG rng(RNDI + 1);
                 for (size_t n = 0; n < maxn; ++n)
                     map.emplace(static_cast<int>(rng()), 0);
                 printf(", reinsert %.2f", now2sec() - ts);
@@ -337,7 +339,7 @@ static void bench_AccidentallyQuadratic()
     //bench.beginMeasure("iterate");
     uint64_t sum = 0;
     for (auto const& kv : map) {
-        sum += kv.first + kv.second;
+        sum += (uint64_t)kv.first + (uint64_t)kv.second;
     }
     if (sum != UINT64_C(18446739465311920326))
         puts("error\n");
@@ -367,10 +369,10 @@ static void bench_InsertEraseBegin()
     size_t max_n = 100000;
     auto nows = now2sec();
 
-    for (int i = 0; i < 3; ++i) {
+    for (uint64_t i = 0; i < 3; ++i) {
         auto starts = now2sec();
         MAP map;
-        MRNG rng(987654321 + i * i * i);
+        MRNG rng(987654321ull + i * i * i);
 
         // benchmark randomly inserting & erasing begin
         for (size_t j = 0; j < max_n / 5; ++j)
@@ -399,11 +401,11 @@ static void bench_InsertEraseContinue()
     size_t max_n = 400000;
     auto nows = now2sec();
 
-    for (int i = 0; i < 3; ++i) {
+    for (uint64_t i = 0; i < 3; ++i) {
         auto starts = now2sec();
         MAP map;
         //map.reserve((std::size_t)(max_n * .));
-        MRNG rng(2345 + i * i * i);
+        MRNG rng(2345ull + i * i * i);
 
         // benchmark randomly inserting & erasing begin
         for (size_t j = 0; j < max_n / 3; ++j)
@@ -483,16 +485,18 @@ static void bench_randomInsertErase(MAP& map)
         return;
     printf("    %20s", map_name);
 
-    auto nows = now2sec(), erase1 = 0.;
+    auto nows = now2sec();
+	double erase1 = 0, erase2 = 0;
 
     if (1)
     {
         uint32_t min_n    = 1 << 20;
         uint32_t max_loop = min_n << 5;
         map.max_load_factor(max_lf);
-        for (int j = 0; j < 5; ++j) {
-            MRNG rng(RND + 6 + j);
-            MRNG rng2(RND + 6 + j);
+        for (uint64_t j = 0; j < 5; ++j) {
+            const uint64_t rndj = RND + 6 + j;
+            MRNG rng(rndj);
+            MRNG rng2(rndj);
             // each iteration, set 4 new random bits.
             // std::cout << (i + 1) << ". " << as_bits(bitMask) << std::endl;
             auto maxn = min_n * (50 + j * 9) / 100;
@@ -529,6 +533,7 @@ static void bench_randomInsertErase(MAP& map)
         rshuffle(bits.begin(), bits.end(), rng);
 #endif
 
+		nows = now2sec();
         uint64_t bitMask = 0;
         auto bitsIt = bits.begin();
         //size_t const expectedFinalSizes[] = {7, 127, 2084, 32722, 524149, 8367491};
@@ -547,9 +552,10 @@ static void bench_randomInsertErase(MAP& map)
 //            printf("    %02d bits  %2d M cycles time %.3f s map size %d loadf = %.2f\n",
 //                    int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts, (int)map2.size(), map2.load_factor());
         }
+        erase2 = now2sec() - nows;
     }
 
-    printf(" erase1 time = %.2f, total = %.2f s\n", erase1, now2sec() - nows);
+    printf(" erase time = %.2lf:%.2lf, total = %.2lf s\n", erase1, erase2, erase1 + erase2);
 }
 
 template<class MAP>
@@ -575,7 +581,7 @@ static void bench_CreateInsert()
         for (size_t j = 0; j < repeats; ++j) {
             for (size_t n = 0; n < count; ++n)
                 map[static_cast<int>(rng())];
-            res += map.size();
+            res += (size_t)map.size();
         }
     }
     erase1 = now2sec() - nows;
@@ -591,7 +597,7 @@ static void bench_CreateInsert()
         for (size_t j = 0; j < repeats; ++j) {
             for (size_t n = 0; n < count; ++n)
                 map[static_cast<int>(rng2())];
-            res += map.size();
+            res += (size_t)map.size();
             map.clear();
         }
     }
@@ -760,19 +766,19 @@ static size_t kcount(const std::vector<char> &poly, const std::string &oligo) {
     // For the first several nucleotides we only need to append them to key in
     // preparation for the insertion of complete oligonucleotides to map.
     for (size_t i = 0; i < oligo.size() - 1; ++i)
-        key = (key << 2 & mask) | poly[i];
+        key = (key << 2 & mask) | (uint64_t)poly[i];
 
     // Add all the complete oligonucleotides of oligo.size() to
     // map and update the count for each oligonucleotide.
     for (size_t i = oligo.size() - 1; i < poly.size(); ++i){
-        key= (key << 2 & mask) | poly[i];
+        key= (key << 2 & mask) | (uint64_t)poly[i];
         ++map[key];
     }
 
     // Generate the key for oligonucleotide.
     key = 0;
     for (size_t i = 0; i < oligo.size(); ++i) {
-        key = (key << 2) | CODE_FOR_NUCLEOTIDE(oligo[i]);
+        key = (key << 2) | (uint64_t)CODE_FOR_NUCLEOTIDE(oligo[i]);
     }
 
     if (oligo == "GGT")
@@ -786,7 +792,7 @@ static inline int fasta_next() {
     static constexpr int IM = 139968, IA = 3877, IC = 29573;
 
     state = (state * IA + IC) % IM;
-    float p = state * (1.0f / IM);
+    float p = (float)state * (1.0f / IM);
     return (p >= 0.3029549426680f) + (p >= 0.5009432431601f) + (p >= 0.6984905497992f);
 }
 
@@ -989,9 +995,9 @@ static void bench_copy(MAP&)
 
     auto nows = now2sec();
     MAP mapForCopy = mapSource;
-    for (size_t n = 0; n < KL; ++n) {
+    for (int n = 0; n < KL; ++n) {
         MAP m = mapForCopy;
-        result += m.size() + m[rememberKey];
+        result += (size_t)m.size() + (size_t)m[rememberKey];
         for (int i = 0; i < KN; i++) //with different load factor
             mapForCopy[rng()] = (int)rng();
     }
@@ -1001,9 +1007,9 @@ static void bench_copy(MAP&)
 
     mapForCopy = mapSource;
     MAP m;
-    for (size_t n = 0; n < KL; ++n) {
+    for (int n = 0; n < KL; ++n) {
         m = mapForCopy;
-        result += m.size() + m[rememberKey];
+        result += (size_t)m.size() + (size_t)m[rememberKey];
         for (int i = 0; i < KN; i++)
             mapForCopy[rng()] = (int)rng();
     }
@@ -1045,7 +1051,7 @@ static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t 
 #else
         map.emplace(str, 0);
         *strData32 = uint32_t(rng() & bitMask);
-        verifier += map.erase(str);
+        verifier += (size_t)map.erase(str);
 #endif
     }
 
@@ -1232,7 +1238,7 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
                     findCount = 0;
                     findRng.state(anotherUnrelatedRngInitialState);
                 }
-                num_found += map.count(findRng() & bitMask);
+                num_found += (size_t)map.count(findRng() & bitMask);
             }
         } while (i < numInserts);
     }
@@ -1242,7 +1248,7 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
             uint32_t(numSequential * 100 / NumTotal), (int)bitMask, now2sec() - ts, (int)num_found, map.load_factor());
     }
 
-    return map.size();
+    return (uint64_t)map.size();
 }
 
 template<class MAP>
@@ -1575,7 +1581,7 @@ static void runTest(int sflags, int eflags)
 #endif
         puts("\nbench_randomFind:");
 
-        MRNG rng(time(0));
+        MRNG rng((size_t)time(0));
         const size_t numInserts[] = {
             (size_t)rng() % 123 + 123,
             (size_t)rng() % 1234 + 1234,
@@ -1585,7 +1591,7 @@ static void runTest(int sflags, int eflags)
             (size_t)rng() % 12345678 + 12345678};
         constexpr size_t numFindsPerInsert[] = {800000, 50000, 5000, 200, 10, 2};
 
-        for (size_t i = 0; i < sizeof(numInserts) / sizeof(numInserts[0]); i++)
+        for (size_t i = 0; i < size_t(sizeof(numInserts) / sizeof(numInserts[0])); i++)
         {
 #if ET
             { tsl::robin_map <size_t, size_t, hash_func> rmap; bench_randomFind(rmap, numInserts[i], numFindsPerInsert[i]); }
@@ -1715,50 +1721,51 @@ static void runTest(int sflags, int eflags)
         puts("\nbench_randomInsertErase:");
 
 
-        { emilib3::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emilib2::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emilib::HashMap<uint64_t, uint64_t, hash_func>  emap; bench_randomInsertErase(emap); }
+        { emilib3::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+        { emilib2::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+        { emilib::HashMap<uint64_t, int, hash_func>  emap; bench_randomInsertErase(emap); }
 
 #if HAVE_BOOST
-        { boost::unordered_flat_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
+        { boost::unordered_flat_map <uint64_t, int, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
 #if CK_HMAP
-        { ck::HashMap <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
+        { ck::HashMap <uint64_t, int, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
 
 #if ABSL_HMAP
-        { absl::flat_hash_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
+        { absl::flat_hash_map <uint64_t, int, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
-        { emhash8::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emhash5::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emhash7::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        { emhash6::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
+        { emhash8::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+        { emhash5::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+        { emhash7::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+        { emhash6::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+
 #if QC_HASH
-        { qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hang
+        { qc::hash::RawMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); } //hang
 #if QC_HASH > 1
-        { fph::DynamicFphMap<uint64_t, uint64_t, fph::MixSeedHash<uint64_t>> emap; bench_randomInsertErase(emap); }
+        { fph::DynamicFphMap<uint64_t, int, fph::MixSeedHash<uint64_t>> emap; bench_randomInsertErase(emap); }
 #endif
 #endif
 
 #if ET
-        { tsl::robin_map <uint64_t, uint64_t, hash_func> rmap; bench_randomInsertErase(rmap); }
-        { robin_hood::unordered_map <uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
+        { tsl::robin_map <uint64_t, int, hash_func> rmap; bench_randomInsertErase(rmap); }
+        { robin_hood::unordered_map <uint64_t, int, hash_func> martin; bench_randomInsertErase(martin); }
 
 #if X86_64
-        { ska::flat_hash_map <uint64_t, uint64_t, hash_func> fmap; bench_randomInsertErase(fmap); }
+        { ska::flat_hash_map <uint64_t, int, hash_func> fmap; bench_randomInsertErase(fmap); }
         { hrd_m::hash_map <size_t, size_t, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
-        { phmap::flat_hash_map <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
+        { phmap::flat_hash_map <uint64_t, int, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
 #if FOLLY_F14
-        { folly::F14VectorMap <uint64_t, uint64_t, hash_func> hmap; bench_randomInsertErase(hmap); }
+        { folly::F14VectorMap <uint64_t, int, hash_func> hmap; bench_randomInsertErase(hmap); }
 #endif
 #if CXX17
-        { ankerl::unordered_dense::map<uint64_t, uint64_t, hash_func> martin; bench_randomInsertErase(martin); }
+        { ankerl::unordered_dense::map<uint64_t, int, hash_func> martin; bench_randomInsertErase(martin); }
 #endif
 #if CXX20
-        { jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); }
-        //{ rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap; bench_randomInsertErase(emap); } //hange
+        { jg::dense_hash_map<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+        //{ rigtorp::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); } //hange
 #endif
     }
 
@@ -2224,7 +2231,7 @@ static void runTest(int sflags, int eflags)
         {  bench_udb3<emhash5::HashMap<uint32_t, uint32_t, hash_func>>(); }
     }
 
-    printf("\ntotal time = %.2f s", now2sec() - start);
+    printf("\ntotal time = %.2f s\n", now2sec() - start);
 }
 
 static void checkSet(const std::string_view& map_name)
@@ -2253,9 +2260,59 @@ static const char* const cases[] = {
     "bench_udb3",
 };
 
+#if 0
+#include <iostream>
+#include <emmintrin.h>
+#include <chrono>
+
+#include <iostream>
+#include <vector>
+#include <immintrin.h>
+
+#include <immintrin.h>
+#include <algorithm>
+
+void test_mm_set1_epi8() {
+  int32_t sum1 = 1;
+
+  {
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000000000; ++i) {
+      __m128i vi = _mm_set1_epi8(char(i * i % 256));
+      sum1 += _mm_extract_epi32(vi, 1);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end - start;
+    std::cout << sum1 << " Time taken by _mm_set1_epi8: " << diff.count() << " s" << std::endl;
+  }
+  {
+    sum1 = 1;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000000000; ++i) {
+      __m128i vi = _mm_set1_epi16(short(i * i % 65536));
+      sum1 += _mm_extract_epi32(vi, 2);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end - start;
+    std::cout << sum1 << " Time taken by _mm_set1_epi8: " << diff.count() << " s" << std::endl;
+  }
+  {
+    auto start = std::chrono::high_resolution_clock::now();
+    int32_t sum2 = 1;
+    for (int i = 0; i < 1000000000; ++i) {
+      __m128i vi = _mm_set1_epi32((i*i % 256) * 0x01010101);
+      sum2 += _mm_extract_epi32(vi, 3);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end - start;
+    std::cout << sum2 << " Time taken by _mm_set1_epi32: " << diff.count() << " s" << std::endl;
+  }
+}
+#endif
+
 int main(int argc, char* argv[])
 {
-    srand((int)time(0));
+    srand((unsigned int)time(0));
     printInfo(nullptr);
 
     puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d]");
@@ -2270,7 +2327,7 @@ int main(int argc, char* argv[])
         for (int c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
             if (c > '4' && c <= '8') {
                 std::string map_name("emhash");
-                map_name += c;
+                map_name += (char)c;
                 checkSet(map_name);
             } else if (c == 'm') {
                 checkSet("robin_hood");
@@ -2320,7 +2377,7 @@ int main(int argc, char* argv[])
                 if (isdigit(argv[1][i + 1])) i++;
             }
             else if (c == 'l')
-              max_lf = atoi(&argv[1][++i]) / 10.0f;
+              max_lf = float(atoi(&argv[1][++i]) / 10.0);
         }
     }
 
@@ -2333,4 +2390,3 @@ int main(int argc, char* argv[])
     runTest(sflags, eflags);
     return 0;
 }
-

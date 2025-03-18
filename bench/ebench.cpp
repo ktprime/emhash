@@ -1,8 +1,8 @@
-#ifndef TKey
-    #define TKey              1
+#ifndef TTKey
+    #define TTKey              1
 #endif
-#ifndef TVal
-    #define TVal              0
+#ifndef TTVal
+    #define TTVal              0
 #endif
 
 #include "util.h"
@@ -97,7 +97,6 @@ std::map<std::string, std::string> maps =
 //#define EMH_STATIS            123456
 //#define EMH_SAFE_HASH       1
 //#define EMH_IDENTITY_HASH   1
-
 //#define EMH_LRU_SET         1
 //#define EMH_SAFE_PSL 1
 //#define EMH_HIGH_LOAD       234567
@@ -117,10 +116,11 @@ std::map<std::string, std::string> maps =
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
-#include "../hash_table5.hpp"
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table8.hpp"
+//#define EMH_HIGH_LOAD 12345
+#include "../hash_table5.hpp"
 
 //#include "../hash_table8v.hpp"
 //#include "../thirdparty/emhash/hash_table8v.hpp"
@@ -267,7 +267,7 @@ struct StuHasher
     }
 };
 
-#if TKey == 0
+#if TTKey == 0
 #ifndef SMK
     typedef unsigned int keyType;
     #define sKeyType    "int"
@@ -277,22 +277,22 @@ struct StuHasher
 #endif
     #define TO_KEY(i)   (keyType)i
     #define KEY_INT     1
-#elif TKey == 1
+#elif TTKey == 1
     typedef int64_t      keyType;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int64_t"
     #define KEY_INT     1
-#elif TKey == 2
+#elif TTKey == 2
     #define KEY_STR     1
     typedef std::string keyType;
     #define TO_KEY(i)   std::to_string(i)
     #define sKeyType    "string"
-#elif TKey == 3
+#elif TTKey == 3
     #define KEY_CLA    1
     typedef StructValue keyType;
     #define TO_KEY(i)   StructValue((int64_t)i)
     #define sKeyType    "Struct"
-#elif TKey == 4
+#elif TTKey == 4
     #define KEY_STR     1
     #define STR_VIEW    1
     typedef std::string_view keyType;
@@ -300,17 +300,22 @@ struct StuHasher
     #define sKeyType    "string_view"
 #endif
 
-#if TVal == 0
+#if TTVal == 0
     typedef int         valueType;
     #define TO_VAL(i)   i
     #define TO_SUM(i)   i
     #define sValueType  "int"
-#elif TVal == 1
+#elif TTVal == 1
     typedef int64_t     valueType;
     #define TO_VAL(i)   i
     #define TO_SUM(i)   i
     #define sValueType  "int64_t"
-#elif TVal == 2
+#elif TTVal == 21
+    typedef std::shared_ptr<int> valueType;
+    #define TO_VAL(i)   valueType{}
+    #define TO_SUM(i)   1
+    #define sValueType  "std::shared_ptr<int>"
+#elif TTVal == 2
     typedef std::string valueType;
     #define TO_VAL(i)   ""
     #define TO_SUM(i)   i.size()
@@ -717,7 +722,7 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
         auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
 #elif KEY_CLA
         int64_t v2(v.lScore + sum);
-#elif TKey != 4
+#elif TTKey != 4
         v += char(128 + (int)v[0]);
         auto &v2 = v;
 #else
@@ -740,7 +745,7 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 template<class hash_type>
 static void insert_backtrace(const std::string& hash_name, const std::vector<keyType>& vList)
 {
-#if KEY_INT && TVal < 2
+#if KEY_INT && TTVal < 2
     hash_type ht_hash;
     auto ts1 = getus(); size_t sum = 0;
 
@@ -859,7 +864,7 @@ static void insert_high_load(const std::string& hash_name, const std::vector<key
             auto v2 = v - i;
 #elif KEY_CLA
             auto v2 = v.lScore + (v.lScore / 11) + i;
-#elif TKey != 4
+#elif TTKey != 4
             auto v2 = v; v2[0] += '2';
 #else
             keyType v2(v.data(), v.size() - 1);
@@ -875,7 +880,7 @@ static void insert_high_load(const std::string& hash_name, const std::vector<key
         auto v2 = v + i;
 #elif KEY_CLA
         auto v2 = (v.lScore / 7) + 4 * v.lScore;
-#elif TKey != 4
+#elif TTKey != 4
         auto v2 = v; v2[0] += '1';
 #else
         keyType v2(v.data(), v.size() - 1);
@@ -891,9 +896,9 @@ static void insert_high_load(const std::string& hash_name, const std::vector<key
 template<class hash_type>
 static void insert_erase_high(const std::string& hash_name, size_t vSize)
 {
-#if TKey < 2
+#if TTKey < 2
     hash_type ht_hash;
-    auto max_lf = 0.90;
+    auto max_lf = 0.90f;
     ht_hash.max_load_factor(max_lf);
     auto mlf = max_lf - 0.001f;
     ht_hash.reserve(vSize);
@@ -932,7 +937,7 @@ static void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, s
     auto ts1 = getus();
     shuffle(vl.begin(), vl.end());
     for (auto& v : vl) {
-#if TKey != 4
+#if TTKey != 4
         v[1] += v.size() % 128;
         sum += ht_hash.count(v);
         v[1] -= v.size() % 128;
@@ -1023,7 +1028,7 @@ static void erase_50(hash_type& ht_hash, const std::string& hash_name, const std
         sum += ht_hash.erase(v);
 
     for (auto it = tmp.begin(); it != tmp.end(); ) {
-#if TKey < 2
+#if TTKey < 2
         if (it->first % 4 < 2) {
             it ++; continue;
         }
@@ -1105,7 +1110,7 @@ static int buildTestData(int size, std::vector<keyType>& randdata)
 
 #ifdef KEY_STR
     for (int i = 0; i < size; i++)
-#if TKey != 4
+#if TTKey != 4
         randdata.emplace_back(get_random_alphanum_string(srng() % STR_SIZE + 4));
 #else
         randdata.emplace_back(get_random_alphanum_string_view(srng() % STR_SIZE + 4));
@@ -1212,7 +1217,7 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
         next += nList.size() / 2 - v * v;
 #elif KEY_CLA
         next.lScore += nList.size() / 2 - v;
-#elif TKey != 4
+#elif TTKey != 4
         next[v % next.size()] += 1;
 #else
         next = next.substr(0, next.size() - 1);
@@ -1636,7 +1641,7 @@ int main(int argc, char* argv[])
     auto maxc = 500;
     int minn = (1000 * 100 * 8) / sizeof(keyType) + 12345;
     int maxn = 100*minn;
-    if (TKey < 3)
+    if (TTKey < 3)
         minn *= 2;
 
     const int type_size = (sizeof(keyType) + sizeof(valueType) + 4);
@@ -1671,7 +1676,7 @@ int main(int argc, char* argv[])
         for (int c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
             if (c >= '5' && c <= '9') {
                 std::string hash_name("emhash");
-                hash_name += c;
+                hash_name += char(c);
                 if (maps.find(hash_name) != maps.end())
                     maps.erase(hash_name);
                 else
