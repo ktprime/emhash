@@ -47,7 +47,7 @@
 #include "martin/unordered_dense.h"
 #endif
 
-#include "FHashTable/fhash_table.h"
+//#include "FHashTable/fhash_table.h"
 
 #if ET
     #include "phmap/phmap.h"
@@ -84,7 +84,7 @@ static std::map<std::string_view, std::string_view> show_name =
     {"HashMapTable", "ck_hashmap"},
 #endif
 
-    {"fhash_table", "fht"},
+//    {"fhash_table", "fht"},
 //    {"ankerl", "martin dense"},
 
 #if QC_HASH

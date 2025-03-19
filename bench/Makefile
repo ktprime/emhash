@@ -134,8 +134,8 @@ ifneq ($(QB),)
 	$(CXX) $(CXXFLAGS) -std=c++20 -I. qbench.cpp -o qbench
 endif
 
-#	$(CXX) $(CXXFLAGS) -Werror=conversion -Wno-sign-conversion -Wextra -Wpedantic -Wconversion martin_bench.cpp -o mbench
-	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) -Werror=conversion -Wno-sign-conversion -Wextra -Wpedantic -Wconversion martin_bench.cpp -o mbench
+#	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) hash_join.cpp -o join_hash
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi

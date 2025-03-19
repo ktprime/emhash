@@ -50,7 +50,7 @@ namespace emilib2 {
     constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = MXLOAD_FACTOR/(MXLOAD_FACTOR + 1)
 
 #if EMH_OFFSET_STEP == 0
-    constexpr static uint8_t OFFSET_STEP = 16;
+    constexpr static uint8_t OFFSET_STEP = 4;
 #endif
 
 #if AVX2_EHASH == 0
