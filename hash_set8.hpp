@@ -913,7 +913,7 @@ public:
 
         uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
-        assert(num_buckets < max_size());
+        assert(num_buckets < (uint64_t)max_size());
 
 #if EMH_REHASH_LOG
         auto last = _last;

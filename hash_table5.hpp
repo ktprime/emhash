@@ -1385,7 +1385,7 @@ public:
         //if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
-        assert(buckets < max_size() && buckets > _num_filled);
+        assert(buckets < (uint64_t)max_size() && buckets > (uint64_t)_num_filled);
 
         auto num_buckets = (size_type)buckets;
         auto old_num_filled  = _num_filled;
