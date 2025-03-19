@@ -96,8 +96,8 @@
 #endif
 
 
-#define EMH_MASK(n)       uint8_t(1 << (n % MASK_BIT))
-#define EMH_SET(n)  _bitmask[n / MASK_BIT] &= ~(EMH_MASK(n))
+#define EMH_MASK(n)  (uint8_t)(1 << (n % MASK_BIT))
+#define EMH_SET(n)  _bitmask[n / MASK_BIT] &= (uint8_t)~(EMH_MASK(n))
 #define EMH_CLS(n)  _bitmask[n / MASK_BIT] |= EMH_MASK(n)
 
 #if _WIN32
@@ -1304,7 +1304,7 @@ public:
         memset((char*)_bitmask, (int)0xFFFFFFFF, mask_byte);
         memset((char*)_bitmask + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8)
-            _bitmask[0] = (uint8_t)(1 << num_buckets) - 1;
+            _bitmask[0] = (uint8_t)((1 << num_buckets) - 1);
         //pack last position to bit 0
         /**************** -------------------------------- *************/
 

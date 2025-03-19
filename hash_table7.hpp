@@ -144,8 +144,8 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 #define EMH_MASK(n)       (1 << (n % MASK_BIT))
 #define EMH_SET(n)        _bitmask[n / MASK_BIT] &= (bit_type)(~(1 << (n % MASK_BIT)))
-#define EMH_CLS(n)        _bitmask[n / MASK_BIT] |= EMH_MASK(n)
-#define EMH_EMPTY(n)      _bitmask[n / MASK_BIT] & EMH_MASK(n)
+#define EMH_CLS(n)        _bitmask[n / MASK_BIT] |= (bit_type)EMH_MASK(n)
+#define EMH_EMPTY(n)      _bitmask[n / MASK_BIT] &  (bit_type)EMH_MASK(n)
 
 #if _WIN32
     #include <intrin.h>

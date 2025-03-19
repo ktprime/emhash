@@ -205,7 +205,7 @@ static inline unsigned long long pow_mod(unsigned long long a, unsigned long lon
 }
 unsigned sprp(unsigned long long n, unsigned long long a) {
     unsigned long long d=n-1;
-    unsigned char s=0;
+    unsigned int s=0;
     while (!(d & 0xff)) { d>>=8; s+=8; }
     if (!(d & 0xf)) { d>>=4; s+=4; }
     if (!(d & 0x3)) { d>>=2; s+=2; }
