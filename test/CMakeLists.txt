@@ -12,7 +12,7 @@ add_executable(emhash_test "main.cpp")
 target_compile_features(emhash_test PRIVATE cxx_std_17)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffunction-sections -fdata-sections -march=native -Wconversion")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffunction-sections -fdata-sections -march=native -Werror=conversion -Wno-sign-conversion -Wextra -Wpedantic -Wconversion")
 #    target_compile_options(emhash_test PRIVATE -Werror -Wall -Wextra -Wold-style-cast -DTSL_DEBUG -UNDEBUG)
 	target_compile_options(emhash_test PRIVATE -O3 -march=native -Wall -Wextra -DTSL_DEBUG -DNDEBUG)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")

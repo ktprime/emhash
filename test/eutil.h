@@ -206,7 +206,7 @@ class Lehmer64 {
 
     inline uint64_t operator()() {
         g_lehmer64_state *= UINT64_C(0xda942042e4dd58b5);
-        return g_lehmer64_state >> 64;
+        return uint64_t(g_lehmer64_state >> 64);
     }
         // this is a bit biased, but for our use case that's not important.
     uint64_t operator()(uint64_t boundExcluded) noexcept {

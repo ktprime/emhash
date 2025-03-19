@@ -964,16 +964,16 @@ static void TestHighLoadFactor(int id)
     std::mt19937_64 srngi(rand_key), srnge(rand_key);
 #endif
 
-    const auto max_lf   = 0.999f; //<= 0.9999f
+    const auto max_lf   = 0.999; //<= 0.9999f
     const auto vsize    = 1u << (20 + id % 6);//must be power of 2
-    MAP myhash(vsize, max_lf);
+    MAP myhash(vsize, (float)max_lf);
     //emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
     //emhash5::HashMap<int64_t, int> myhash(vsize, max_lf);
     //ankerl::unordered_dense::map<int64_t, int> myhash(vsize / 2); myhash.max_load_factor(max_lf);
 
     auto nowus = getus();
     for (size_t i = 0; i < size_t(vsize * max_lf); i++)
-        myhash.emplace(srngi(), i);
+        myhash.emplace(srngi(), 0);
     //assert(myhash.bucket_count() == vsize); //no rehash
 
     //while (myhash.load_factor() < max_lf - 1e-3) myhash.emplace(srngi(), 0);

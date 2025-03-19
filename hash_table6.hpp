@@ -51,6 +51,7 @@
     #undef  EMH_BUCKET
     #undef  EMH_EMPTY
     #undef  EMH_MASK
+    #undef  EMH_CLS	
 #endif
 
 // likely/unlikely

@@ -101,6 +101,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     #undef  EMH_BUCKET
     #undef  EMH_EMPTY
     #undef  EMH_MASK
+    #undef  EMH_CLS
 #endif
 
 // likely/unlikely
