@@ -378,8 +378,8 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const { return static_cast<float>(_num_filled) / (_mask + 1); }
 
-    HashT& hash_function() const { return _hasher; }
-    EqT& key_eq() const { return _eq; }
+    const HashT& hash_function() const { return _hasher; }
+    const EqT& key_eq() const { return _eq; }
 
     void max_load_factor(float mlf)
     {
