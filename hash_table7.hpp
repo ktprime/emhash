@@ -765,8 +765,8 @@ public:
     inline size_type bucket_count() const { return _num_buckets; }
     inline float load_factor() const { return ((float)_num_filled) / ((float)_mask + 1.0f); }
 
-    inline HashT& hash_function() const { return _hasher; }
-    inline EqT& key_eq() const { return _eq; }
+    inline const HashT& hash_function() const { return _hasher; }
+    inline const EqT& key_eq() const { return _eq; }
 
     inline void max_load_factor(float mlf)
     {

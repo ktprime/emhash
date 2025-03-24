@@ -420,7 +420,7 @@ public:
         return _hasher;
     }
 
-    EqT& key_eq() const
+    const EqT& key_eq() const
     {
         return _eq;
     }

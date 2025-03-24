@@ -490,12 +490,12 @@ public:
         return static_cast<float>(_num_filled) / (_num_buckets + 0.01f);
     }
 
-    HashT& hash_function()
+    const HashT& hash_function()
     {
         return _hasher;
     }
 
-    EqT& key_eq() const
+    const EqT& key_eq() const
     {
         return _eq;
     }
