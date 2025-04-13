@@ -1268,9 +1268,9 @@ public:
     static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1285,7 +1285,7 @@ public:
 
     void clearkv() noexcept
     {
-        if (is_triviall_destructable()) {
+        if (!is_triviall_destructable()) {
             for (size_type bucket = 0; _num_filled > 0; ++bucket) {
                 if (!EMH_EMPTY(_pairs, bucket))
                     clear_bucket(bucket, false);
@@ -1312,7 +1312,7 @@ public:
             clear_empty();
         clearkv();
 #else
-        if (is_triviall_destructable())
+        if (!is_triviall_destructable())
             clearkv();
         else if (_num_filled)
             memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * (size_t)_num_buckets);
@@ -1460,7 +1460,7 @@ public:
                 const auto bucket = find_unique_bucket(key);
                 new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
                 EMH_BUCKET(_pairs, bucket) = bucket;
-                if (is_triviall_destructable())
+                if (!is_triviall_destructable())
                     old_pairs[src_bucket].~PairT();
             }
         }
@@ -1569,7 +1569,7 @@ private:
 
     void clear_bucket(size_type bucket, bool bclear = true) noexcept
     {
-        if (is_triviall_destructable()) {
+        if (!is_triviall_destructable()) {
             //EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
             _pairs[bucket].~PairT();
         }

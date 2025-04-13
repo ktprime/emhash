@@ -997,8 +997,8 @@ int main(int argc, char* argv[])
 
     if (argc == 2) {
         TestApi();
-        benchIntRand(1e8+8);
-        benchStringHash(1e6+6, 8, 32);
+        benchIntRand(123456789);
+        benchStringHash(1234567, 8, 32);
     }
 
     size_t n = (int)1e7, loop = 12345678;

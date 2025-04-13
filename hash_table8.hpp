@@ -955,9 +955,9 @@ public:
     static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -972,7 +972,7 @@ public:
 
     void clearkv()
     {
-        if (is_triviall_destructable()) {
+        if (!is_triviall_destructable()) {
             while (_num_filled --)
                 _pairs[_num_filled].~value_type();
         }
@@ -1156,7 +1156,7 @@ public:
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++) {
                 new(new_pairs + slot) value_type(std::move(_pairs[slot]));
-                if (is_triviall_destructable())
+                if (!is_triviall_destructable())
                     _pairs[slot].~value_type();
             }
         }
@@ -1276,7 +1276,7 @@ private:
             _index[last_bucket].slot = slot | (_index[last_bucket].slot & ~_mask);
         }
 
-        if (is_triviall_destructable())
+        if (!is_triviall_destructable())
             _pairs[last_slot].~value_type();
 
         _etail = INACTIVE;
