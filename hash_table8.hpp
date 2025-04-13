@@ -1250,6 +1250,7 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(__GNUC__) || defined(__clang__)
+        (void)ctrl;
 //        __builtin_prefetch(static_cast<const void*>(ctrl));
 #elif _WIN32
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
