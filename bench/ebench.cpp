@@ -1,5 +1,5 @@
 #ifndef TTKey
-    #define TTKey              1
+    #define TTKey              0
 #endif
 #ifndef TTVal
     #define TTVal              0

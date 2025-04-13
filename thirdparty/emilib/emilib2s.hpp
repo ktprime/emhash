@@ -758,7 +758,7 @@ public:
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
-        if (is_triviall_destructable())
+        if (!is_triviall_destructable())
             _pairs[bucket].~PairT();
 #if 1
         const auto gbucket = bucket / simd_bytes * simd_bytes;
@@ -795,9 +795,9 @@ public:
     static constexpr bool is_triviall_destructable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -822,7 +822,7 @@ public:
 
     void clear_data()
     {
-        if (is_triviall_destructable()) {
+        if (!is_triviall_destructable()) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -904,7 +904,7 @@ public:
                 set_states(bucket, key_h2);
                 new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled ++;
-                if (is_triviall_destructable())
+                if (!is_triviall_destructable())
                 src_pair.~PairT();
             }
         }

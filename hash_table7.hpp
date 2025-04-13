@@ -1329,7 +1329,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (!!is_triviall_destructable() && _num_filled) {
+        if (is_triviall_destructable() && _num_filled) {
             memset(_bitmask, (int)0xFFFFFFFF, (_num_buckets + 7) / 8);
             if (_num_buckets < 8 * sizeof(_bitmask[0]))
                 _bitmask[0] =  (bit_type)((1 << _num_buckets) - 1);
