@@ -62,11 +62,11 @@ CXXFLAGS += -DRT=$(RT)
 endif
 
 ifneq ($(Key),)
-CXXFLAGS += -DTKey=$(Key)
+CXXFLAGS += -DTTKey=$(Key)
 endif
 
 ifneq ($(Val),)
-CXXFLAGS += -DTVal=$(Val)
+CXXFLAGS += -DTTVal=$(Val)
 endif
 
 ifneq ($(ET),)
