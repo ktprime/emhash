@@ -295,14 +295,14 @@ public:
 
     ~HashSet()
     {
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             clear();
 
         _num_filled = 0;
         free(_states);
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value);
@@ -318,7 +318,7 @@ public:
             return;
         }
 
-        if (is_triviall_destructable()) {
+        if (is_trivially_destructible()) {
             clear();
         }
 
@@ -327,7 +327,7 @@ public:
             reserve(other._num_buckets / 2);
         }
 
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             memcpy(_keys,  other._keys,  _num_buckets * sizeof(_keys[0]));
         } else {
             for (auto it = other.cbegin();  it != other.cend(); ++it)
@@ -595,7 +595,7 @@ public:
 
     void _erase(size_t bucket)
     {
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             _keys[bucket].~KeyT();
         auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
         if (state == State::EEMPTY) {
@@ -605,7 +605,7 @@ public:
         _num_filled -= 1;
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value);
@@ -617,7 +617,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable()) {
+        if (is_trivially_destructible()) {
             for (size_t bucket=0; _num_filled; ++bucket) {
                 if (_states[bucket] % 2 == State::EFILLED) {
                     _keys[bucket].~KeyT();

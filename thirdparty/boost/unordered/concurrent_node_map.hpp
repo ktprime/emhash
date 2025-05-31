@@ -197,6 +197,7 @@ namespace boost {
       {
       }
 
+      template <bool avoid_explicit_instantiation = true>
       concurrent_node_map(
         unordered_node_map<Key, T, Hash, Pred, Allocator>&& other)
           : table_(std::move(other.table_))

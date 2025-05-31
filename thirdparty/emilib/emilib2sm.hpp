@@ -375,7 +375,7 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             clear();
 
         _num_filled = 0;
@@ -390,7 +390,7 @@ public:
         }
 
         _hasher     = other._hasher;
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
             memcpy(_ps, other._ps, (_num_buckets / simd_bytes) * sizeof(Group_KVS) + simd_bytes);
@@ -726,14 +726,14 @@ public:
     void _erase(size_t bucket)
     {
         _num_filled -= 1;
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             EMH_PAIRS(bucket).~PairT();
 
         const auto gbucket = bucket - bucket % simd_bytes;
         EMH_STATE(bucket) = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -742,7 +742,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -754,7 +754,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable()) {
+        if (is_trivially_destructible()) {
             for (auto it = begin();  it.bucket() != _num_buckets; ++it) {
                 const auto bucket = it.bucket();
                 EMH_STATE(bucket) = State::EEMPTY;

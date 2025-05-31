@@ -3374,7 +3374,7 @@ class raw_hash_set {
 
   size_t bucket_count() const { return capacity(); }
   float load_factor() const {
-    return capacity() ? static_cast<double>(size()) / capacity() : 0.0;
+    return capacity() ? float(static_cast<double>(size()) / static_cast<double>(capacity())) : 0.0f;
   }
   float max_load_factor() const { return 1.0f; }
   void max_load_factor(float) {

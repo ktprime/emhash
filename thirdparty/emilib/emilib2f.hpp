@@ -357,7 +357,7 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             clear();
 
         _num_filled = 0;
@@ -373,7 +373,7 @@ public:
         }
 
         _hasher     = other._hasher;
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
@@ -688,7 +688,7 @@ public:
     void _erase(size_t bucket)
     {
         _num_filled -= 1;
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             _pairs[bucket].~PairT();
 
         const auto gbucket = bucket - bucket % simd_bytes;
@@ -700,7 +700,7 @@ public:
             _states[bucket] = _states[bucket] | State::EDELETE;
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -709,7 +709,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -721,7 +721,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable()) {
+        if (is_trivially_destructible()) {
             for (auto it = begin(); it.bucket() != _num_buckets; ++it) {
                 const auto bucket = it.bucket();
                 _states[bucket] = State::EEMPTY;

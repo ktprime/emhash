@@ -362,7 +362,7 @@ public:
         auto opairs  = rhs._pairs;
         memcpy((char*)_index, (char*)rhs._index, (_num_buckets + EAD) * sizeof(Index));
 
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             memcpy((char*)_pairs, (char*)opairs, _num_filled * sizeof(value_type));
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++)
@@ -952,7 +952,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -961,7 +961,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -972,7 +972,7 @@ public:
 
     void clearkv()
     {
-        if (!is_triviall_destructable()) {
+        if (!is_trivially_destructible()) {
             while (_num_filled --)
                 _pairs[_num_filled].~value_type();
         }
@@ -1150,13 +1150,13 @@ public:
     {
         free(_index);
         auto new_pairs = (value_type*)alloc_bucket((size_type)((double)num_buckets * max_load_factor()) + 4);
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             if (_pairs)
             memcpy((char*)new_pairs, (char*)_pairs, _num_filled * sizeof(value_type));
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++) {
                 new(new_pairs + slot) value_type(std::move(_pairs[slot]));
-                if (!is_triviall_destructable())
+                if (!is_trivially_destructible())
                     _pairs[slot].~value_type();
             }
         }
@@ -1277,7 +1277,7 @@ private:
             _index[last_bucket].slot = slot | (_index[last_bucket].slot & ~_mask);
         }
 
-        if (!is_triviall_destructable())
+        if (!is_trivially_destructible())
             _pairs[last_slot].~value_type();
 
         _etail = INACTIVE;

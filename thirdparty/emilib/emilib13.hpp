@@ -525,7 +525,7 @@ public:
 		return ++it;
 	}
 
-	static constexpr bool is_triviall_destructable()
+	static constexpr bool is_trivially_destructible()
 	{
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
 		return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -537,7 +537,7 @@ public:
 	/// Remove all elements, keeping full capacity.
 	void clear()
 	{
-		if (!is_triviall_destructable()) {
+		if (!is_trivially_destructible()) {
 			for (size_t bucket=0; _num_filled; ++bucket) {
 				if (is_filled(bucket)) {
 					_pairs[bucket].~PairT();

@@ -386,7 +386,7 @@ public:
             rehash(other._num_buckets);
         }
 
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             const auto pairs_size = (1 + bucket_to_slot(_num_buckets)) * sizeof(PairT);
             memcpy((char*)_pairs, other._pairs, pairs_size);
         } else {
@@ -756,7 +756,7 @@ public:
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
-        if (!is_triviall_destructable()) {
+        if (!is_trivially_destructible()) {
             const auto slot = bucket_to_slot(bucket);
             _pairs[slot].~PairT();
         }
@@ -791,7 +791,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -800,7 +800,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -823,7 +823,7 @@ public:
 
     void clear_data()
     {
-        if (!is_triviall_destructable()) {
+        if (!is_trivially_destructible()) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket_to_slot(bucket)].~PairT();
@@ -924,7 +924,7 @@ public:
                 const auto slot = bucket_to_slot(bucket);
                 new(_pairs + slot) PairT(std::move(src_pair));
                 _num_filled ++;
-                if (!is_triviall_destructable())
+                if (!is_trivially_destructible())
                     src_pair.~PairT();
             }
         }

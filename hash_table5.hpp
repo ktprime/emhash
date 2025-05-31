@@ -495,7 +495,7 @@ public:
 
         auto opairs  = rhs._pairs;
 
-        if (is_copy_trivially())
+        if (is_trivially_copyable())
             memcpy((char*)_pairs, opairs, ((size_t)_num_buckets + 2u) * sizeof(PairT));
         else {
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
@@ -515,7 +515,7 @@ public:
     {
 #if EMH_SMALL_SIZE
         if (_pairs == (PairT*)_small || rhs._pairs == (PairT*)rhs._small) {
-            if (is_copy_trivially()) {
+            if (is_trivially_copyable()) {
                 char tmp[(EMH_SMALL_SIZE + 2) * sizeof(PairT)];
                 memcpy(tmp,  _small, sizeof(tmp));
                 memcpy(_small, rhs._small, sizeof(tmp));
@@ -1265,7 +1265,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -1274,7 +1274,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -1285,7 +1285,7 @@ public:
 
     void clearkv() noexcept
     {
-        if (!is_triviall_destructable()) {
+        if (!is_trivially_destructible()) {
             for (size_type bucket = 0; _num_filled > 0; ++bucket) {
                 if (!EMH_EMPTY(_pairs, bucket))
                     clear_bucket(bucket, false);
@@ -1312,7 +1312,7 @@ public:
             clear_empty();
         clearkv();
 #else
-        if (!is_triviall_destructable())
+        if (!is_trivially_destructible())
             clearkv();
         else if (_num_filled)
             memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * (size_t)_num_buckets);
@@ -1427,7 +1427,7 @@ public:
 #endif
 
         (void)old_buckets;
-        if (0 && is_copy_trivially() && old_num_filled && num_buckets >= 2 * old_buckets) {
+        if (0 && is_trivially_copyable() && old_num_filled && num_buckets >= 2 * old_buckets) {
             memcpy((char*)_pairs, old_pairs, (uint32_t)old_buckets * sizeof(PairT));
             for (size_type src_bucket = 0; src_bucket < old_buckets; src_bucket++) {
                 if (EMH_EMPTY(_pairs, src_bucket))
@@ -1460,7 +1460,7 @@ public:
                 const auto bucket = find_unique_bucket(key);
                 new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
                 EMH_BUCKET(_pairs, bucket) = bucket;
-                if (!is_triviall_destructable())
+                if (!is_trivially_destructible())
                     old_pairs[src_bucket].~PairT();
             }
         }
@@ -1569,7 +1569,7 @@ private:
 
     void clear_bucket(size_type bucket, bool bclear = true) noexcept
     {
-        if (!is_triviall_destructable()) {
+        if (!is_trivially_destructible()) {
             //EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
             _pairs[bucket].~PairT();
         }

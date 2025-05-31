@@ -1,8 +1,8 @@
 #ifndef TTKey
-    #define TTKey              0
+    #define TTKey              2
 #endif
 #ifndef TTVal
-    #define TTVal              0
+    #define TTVal              2
 #endif
 
 #include "util.h"
@@ -414,7 +414,7 @@ static void dump_func(const std::string& func, const std::map<std::string, int64
     puts(func.data());
 
     auto mins = rscore_hash.begin()->first;
-    for (auto& v : rscore_hash) {
+    for (const auto& v : rscore_hash) {
         hash_score[v.second] += (int)((mins * 100) / (v.first + 1e-3));
 
         //hash_func_score[v.second][func] = (int)((mins * 100) / (v.first + 1));
@@ -843,7 +843,7 @@ template<class hash_type>
 static void insert_high_load(const std::string& hash_name, const std::vector<keyType>& vList)
 {
     size_t sum = 0;
-    size_t pow2 = 2u << ilog(vList.size(), 2);
+    size_t pow2 = 2ull << ilog(vList.size(), 2);
     hash_type tmp;
 
     const auto max_loadf = 0.99f;
@@ -997,7 +997,7 @@ static void find_hit_100(const hash_type& ht_hash, const std::string& hash_name,
     shuffle(vl.begin(), vl.end());
 
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto v : vl) {
+    for (const auto& v : vl) {
         sum += ht_hash.count(v);
 #if FL1
         if (sum % (1024 * 64) == 0) memset(l1_cache, 0, sizeof(l1_cache));
@@ -1255,9 +1255,9 @@ constexpr static auto base2 =      20000;
 static void reset_top3(std::map<std::string, int64_t>& top3, const std::multimap <int64_t, std::string>& once_score_hash)
 {
     auto it0 = once_score_hash.begin();
-    auto it1 = *(it0++);
-    auto it2 = *(it0++);
-    auto it3 = *(it0++);
+    auto& it1 = *(it0++);
+    auto& it2 = *(it0++);
+    auto& it3 = *(it0++);
 
     //the top 3 func map
     if (it1.first == it3.first) {

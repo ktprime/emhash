@@ -420,14 +420,14 @@ public:
 
     ~HashMap()
     {
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             clear();
 
         _num_filled = 0;
         free(_states);
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201103L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -444,7 +444,7 @@ public:
         }
 
         _hasher     = other._hasher;
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2);
             memcpy(_pairs,  other._pairs,  _num_buckets * sizeof(_pairs[0]));
@@ -782,7 +782,7 @@ public:
     void _erase(size_t bucket)
     {
         _num_filled -= 1;
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             _pairs[bucket].~PairT();
 
 //        _states[bucket] = State::EDELETE;
@@ -796,7 +796,7 @@ public:
 
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -808,7 +808,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable()) {
+        if (is_trivially_destructible()) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _states[it.bucket()] = State::EEMPTY;
                 (*it).~PairT();
@@ -926,7 +926,7 @@ public:
 #endif
                 _states[dst_bucket] = key2_hash(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
-                if (is_triviall_destructable())
+                if (is_trivially_destructible())
                     src_pair.~PairT();
                 old_states[src_bucket] = State::EDELETE;
                 _num_filled += 1;
@@ -955,7 +955,7 @@ public:
 #endif
                 _states[dst_bucket] = key2_hash(key_hash, src_pair.first);
                 new(_pairs + dst_bucket) PairT(std::move(src_pair));
-                if (is_triviall_destructable())
+                if (is_trivially_destructible())
                     src_pair.~PairT();
                 _num_filled += 1;
             }

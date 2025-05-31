@@ -363,7 +363,7 @@ public:
 
     ~HashMap() noexcept
     {
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             clear();
 
         _num_filled = 0;
@@ -376,7 +376,7 @@ public:
             clear();
             return;
         }
-        if (is_triviall_destructable()) {
+        if (is_trivially_destructible()) {
             clear();
         }
 
@@ -385,7 +385,7 @@ public:
             reserve(other._num_buckets / 2);
         }
 
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             memcpy(_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
         } else {
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
@@ -715,7 +715,7 @@ public:
     void do_erase(size_t bucket)
     {
         _num_filled -= 1;
-        if (is_triviall_destructable())
+        if (is_trivially_destructible())
             _pairs[bucket].~PairT();
         auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
         if (state == State::EEMPTY) {
@@ -747,7 +747,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -756,7 +756,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -768,7 +768,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable()) {
+        if (is_trivially_destructible()) {
             for (size_t bucket = 0; _num_filled; ++bucket) {
                 if (_states[bucket] % 2 == State::EFILLED) {
                     _pairs[bucket].~PairT();

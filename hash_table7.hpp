@@ -664,7 +664,7 @@ public:
 
     ~HashMap() noexcept
     {
-        if (!is_triviall_destructable() && _num_filled) {
+        if (!is_trivially_destructible() && _num_filled) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _num_filled --;
                 it->~value_pair();
@@ -687,7 +687,7 @@ public:
         _bitmask     = decltype(_bitmask)(_pairs + EPACK_SIZE + _num_buckets);
         auto* opairs = rhs._pairs;
 
-        if (is_copy_trivially())
+        if (is_trivially_copyable())
             memcpy((char*)_pairs, opairs, AllocSize(_num_buckets));
         else {
             memcpy((char*)(_pairs + _num_buckets), opairs + _num_buckets, EPACK_SIZE * sizeof(PairT) + (_num_buckets + 7) / 8 + BIT_PACK);
@@ -1299,7 +1299,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -1308,7 +1308,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -1319,7 +1319,7 @@ public:
 
     void clearkv()
     {
-        if (!is_triviall_destructable()) {
+        if (!is_trivially_destructible()) {
             auto it = cbegin(); it.init();
             for (; _num_filled; ++it)
                 clear_bucket(it.bucket());
@@ -1329,7 +1329,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_triviall_destructable() && _num_filled) {
+        if (is_trivially_destructible() && _num_filled) {
             memset(_bitmask, (int)0xFFFFFFFF, (_num_buckets + 7) / 8);
             if (_num_buckets < 8 * sizeof(_bitmask[0]))
                 _bitmask[0] =  (bit_type)((1 << _num_buckets) - 1);
@@ -1410,7 +1410,7 @@ public:
             auto& key = EMH_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
-            if (!is_triviall_destructable())
+            if (!is_trivially_destructible())
                 old_pairs[src_bucket].~PairT();
         }
 
@@ -1445,7 +1445,7 @@ private:
     {
         EMH_CLS(bucket);
         _num_filled--;
-        if (!is_triviall_destructable())
+        if (!is_trivially_destructible())
             _pairs[bucket].~PairT();
     }
 
@@ -1465,7 +1465,7 @@ private:
                 return bucket;
 
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (is_copy_trivially())
+            if (is_trivially_copyable())
                 EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
             else
                 EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
@@ -1544,7 +1544,7 @@ private:
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-                if (is_copy_trivially())
+                if (is_trivially_copyable())
                     EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket);
                 else
                     EMH_PKV(_pairs, bucket).swap(EMH_PKV(_pairs, next_bucket));
@@ -1615,7 +1615,7 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket, kbucket);
         const auto prev_bucket = find_prev_bucket(kmain, kbucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
-        if (!is_triviall_destructable())
+        if (!is_trivially_destructible())
             _pairs[kbucket].~PairT();
 
         if (next_bucket == kbucket)

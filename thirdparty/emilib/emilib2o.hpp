@@ -414,7 +414,7 @@ public:
             rehash(other._num_buckets);
         }
 
-        if (is_copy_trivially()) {
+        if (is_trivially_copyable()) {
             const auto pairs_size = (_num_buckets + 1) * sizeof(PairT);
             memcpy((char*)_pairs, other._pairs, pairs_size);
         } else {
@@ -781,7 +781,7 @@ public:
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
-        if (!is_triviall_destructable())
+        if (!is_trivially_destructible())
             _pairs[bucket].~PairT();
 #if EMH_PSL_LINEAR
         set_states(bucket, _states[bucket + 1] == State::EEMPTY ? State::EEMPTY : State::EDELETE);
@@ -827,7 +827,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -836,7 +836,7 @@ public:
 #endif
     }
 
-    static constexpr bool is_copy_trivially()
+    static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
@@ -847,7 +847,7 @@ public:
 
     void clear_data()
     {
-        if (!is_triviall_destructable() && _num_filled) {
+        if (!is_trivially_destructible() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -949,7 +949,7 @@ public:
             new(_pairs + num_buckets) PairT(KeyT(), ValueT());
             //size_t main_bucket;
             //_states[num_buckets] = hash_key2(main_bucket, _pairs[num_buckets].first) + 2; //iterator end tombstone:
-            if (old_buckets && !is_triviall_destructable())
+            if (old_buckets && !is_trivially_destructible())
                 old_pairs[old_buckets].~PairT();
         }
 
@@ -963,7 +963,7 @@ public:
                 set_states(bucket, key_h2);
                 new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled ++;
-                if (!is_triviall_destructable())
+                if (!is_trivially_destructible())
                     src_pair.~PairT();
             }
         }
