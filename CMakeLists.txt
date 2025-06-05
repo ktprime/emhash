@@ -28,7 +28,7 @@ if(WIN32)
     add_compile_options(/Ob2 /DNDEBUG /O2 /Ot /Oi /Oy /GL /arch:AVX)
 elseif(1)
 	set(CMAKE_CXX_FLAGS_DEBUG "-g fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
-    set(CMAKE_CXX_FLAGS "-flto -march=native  ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-flto=auto -march=native  ${CMAKE_CXX_FLAGS}")
 endif()
 
 add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)
