@@ -899,8 +899,17 @@ static void benchStringHash(int size, int str_min, int str_max)
         for (const auto& v : rndstring)
             sum += rapidhashMicro_withSeed(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
-        printf("rapid_hash   = %4d ms\n", (int)t_find);
+        printf("rapid_hash  = %4d ms\n", (int)t_find);
 #endif
+
+#if A5_HASH
+        start = getus();
+        for (const auto& v : rndstring)
+            sum += a5hash(v.data(), v.size(), rseed);
+        t_find = (getus() - start) / 1000; assert(sum);
+        printf("a5_hash     = %4d ms\n", (int)t_find);
+#endif
+
 
 #ifdef AHASH_AHASH_H
         start = getus();

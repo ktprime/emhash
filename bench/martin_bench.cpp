@@ -33,6 +33,11 @@
 #ifdef HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
+//https://github.com/gaujay/indivi_collection
+#ifdef HAVE_INDIVI
+# include "indivi/flat_umap.h"
+#endif
+
 //    #define EMH_QUADRATIC 1
 //    #define EMH_STATIS 123456
 //    #define AVX2_EHASH 1
@@ -62,10 +67,6 @@
 #include "folly/container/F14Map.h"
 #endif
 
-//https://github.com/gaujay/indivi_collection
-#ifdef HAVE_INDIVI
-# include "indivi/flat_umap.h"
-#endif
 
 
 static const uint64_t RND =(uint64_t)getus();

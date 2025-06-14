@@ -39,15 +39,19 @@
 
 #ifdef __has_include
     #if __has_include("wyhash.h")
-	    #include "wyhash.h"
+        #include "wyhash.h"
     #endif
     #if __has_include("komihash.h")
-		#include "komihash.h"
-		#define KOMI_HASH 1
+        #include "komihash.h"
+        #define KOMI_HASH 1
     #endif
     #if __has_include("rapidhash/rapidhash.h")
-		#include "rapidhash/rapidhash.h"
-		#define RAPID_HASH 1
+        #include "rapidhash/rapidhash.h"
+        #define RAPID_HASH 1
+    #endif
+    #if __has_include("a5hash.h")
+        #include "a5hash.h"
+        #define A5_HASH 1
     #endif
 #endif
 
