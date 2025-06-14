@@ -31,6 +31,9 @@ std::map<std::string, std::string> maps =
 #if HAVE_BOOST
     {"boostf",  "boost_flat"},
 #endif
+#ifdef HAVE_INDIVI
+    {"indivi", "indivi_umap" },
+#endif
 
     {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
@@ -114,6 +117,10 @@ std::map<std::string, std::string> maps =
 
 #ifdef HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
+#endif
+
+#ifdef HAVE_INDIVI
+# include "indivi/flat_umap.h"
 #endif
 
 #include "../hash_table6.hpp"
@@ -1453,6 +1460,9 @@ static int benchHashMap(int n)
 
 #if HAVE_BOOST
         {  benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
+#endif
+#if HAVE_INDIVI
+        {  benOneHash<indivi::flat_umap<keyType, valueType, ehash_func>>("indivi", vList); }
 #endif
 
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }

@@ -21,6 +21,7 @@ endif
 
 ifneq ($(BF),)
 CXXFLAGS += -DHAVE_BOOST=1
+CXXFLAGS += -DHAVE_INDIVI=1
 endif
 
 ifneq ($(MH),)

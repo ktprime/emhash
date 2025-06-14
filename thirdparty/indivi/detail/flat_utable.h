@@ -642,14 +642,14 @@ public:
   // Capacity
   bool empty() const noexcept { return mSize == 0u; }
   size_type size() const noexcept { return mSize; }
-  size_type max_size() const noexcept { return (size_type)(max_bucket_count() * max_load_factor()); }
+  size_type max_size() const noexcept { return (size_type)((double)max_bucket_count() * max_load_factor()); }
 
   // Bucket interface
   size_type bucket_count() const noexcept { return (mMaxSize > 16u) ? (mGMask + 1u) * 16 : mMaxSize; }
   size_type max_bucket_count() const noexcept { return (size_type)std::numeric_limits<difference_type>::max(); }
 
   // Hash policy
-  float load_factor() const noexcept { return mSize ? (float)mSize / bucket_count() : mSize; }
+  float load_factor() const noexcept { return mSize ? float((double)mSize / (double)bucket_count()) : (float)mSize; }
   float max_load_factor() const noexcept { return MAX_LOAD_FACTOR; }
   void max_load_factor(float) noexcept { /*for compatibility*/ }
 
@@ -1792,7 +1792,7 @@ private:
       newStorage.release();
 
       mGMask = newGMask;
-      mMaxSize = (mGMask != 0) ? (size_type)(newCapa * MAX_LOAD_FACTOR) : newCapa;
+      mMaxSize = (mGMask != 0) ? (size_type)((double)newCapa * MAX_LOAD_FACTOR) : newCapa;
     }
     else // first time
     {
@@ -1805,7 +1805,7 @@ private:
       newStorage.release();
 
       mGMask = newGMask;
-      mMaxSize = (mGMask != 0) ? (size_type)(newCapa * MAX_LOAD_FACTOR) : newCapa;
+      mMaxSize = (mGMask != 0) ? (size_type)((double)newCapa * MAX_LOAD_FACTOR) : newCapa;
     }
   }
 
@@ -1879,7 +1879,7 @@ private:
     newStorage.release();
 
     mGMask = newGMask;
-    mMaxSize = (mGMask != 0) ? (size_type)(newCapa * MAX_LOAD_FACTOR) : newCapa;
+    mMaxSize = (mGMask != 0) ? (size_type)((double)newCapa * MAX_LOAD_FACTOR) : newCapa;
     ++mSize;
 
     return loc;
