@@ -3,10 +3,12 @@
 
 #include <random>
 #include <cstdint>
-#include <map>
-#include <set>
+#include <cstdio>
 #include <ctime>
 #include <cassert>
+
+#include <map>
+#include <set>
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -16,7 +18,6 @@
 #include <fstream>
 #include <unordered_map>
 #include <unordered_set>
-#include <cstdio>
 
 #if STR_SIZE < 5
 #define STR_SIZE 15
@@ -36,18 +37,18 @@
 #endif
 
 #if __cplusplus > 201402L
-//   #define STR_VIEW  1
+   #define STR_VIEW  1
    #include <string_view>
 #endif
 
 #ifdef __has_include
-    #if __has_include("wyhash.h")
-    #include "wyhash.h"
-    #endif
-    #if __has_include("komihash.h")
-    #include "komihash.h"
-    #define KOMI_HESH 1
-    #endif
+  #if __has_include("wyhash.h")
+  #include "wyhash.h"
+  #endif
+  #if __has_include("komihash.h")
+  #include "komihash.h"
+  #define KOMI_HESH 1
+  #endif
 #endif
 
 #if __x86_64__ || __amd64__ || _M_X64
@@ -66,10 +67,10 @@
 #endif
 
 #if A_HASH
-#include "ahash/ahash.c"
-#include "ahash/random_state.c"
-#include "ahash-cxx/hasher.h"
-#include "ahash-cxx/ahash-cxx.h"
+  #include "ahash/ahash.c"
+  #include "ahash/random_state.c"
+  #include "ahash-cxx/hasher.h"
+  #include "ahash-cxx/ahash-cxx.h"
 #endif
 
 #if _WIN32 && _WIN64 == 0
@@ -456,10 +457,10 @@ static inline uint64_t udb_splitmix64(uint64_t x)
 }
 
 #if __SSE4_2__ || _WIN32
-#include <nmmintrin.h>
+  #include <nmmintrin.h>
 #elif defined(__aarch64__)
-#include <arm_acle.h>
-#include <arm_neon.h>
+  #include <arm_acle.h>
+  #include <arm_neon.h>
 #endif
 
 static inline uint64_t intHashCRC32(uint64_t x)

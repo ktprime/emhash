@@ -2,7 +2,7 @@
 #include <sstream>
 
 #ifndef _WIN32
-#include <sys/resource.h>
+  #include <sys/resource.h>
 #endif
 
 //#define EMH_ITER_SAFE 1
@@ -19,23 +19,25 @@
 //#define EMH_STATIS 1234567
 
 #if CK_HMAP
-#include "ck/Common/HashTable/HashMap.h"
+  #include "ck/Common/HashTable/HashMap.h"
 #endif
+
 #include "../hash_table8.hpp"
 #include "../hash_table5.hpp"
 #include "../hash_table7.hpp"
 #include "../hash_table6.hpp"
-#include "../hash_set8.hpp"
+//#include "../hash_set8.hpp"
 
 //#include "../thirdparty/emhash/hash_table8v.hpp"
 //#include "../thirdparty/emhash/hash_table8v2.hpp"
 
 #ifdef HAVE_BOOST
-#include <boost/unordered/unordered_flat_map.hpp>
+  #include <boost/unordered/unordered_flat_map.hpp>
 #endif
+
 //https://github.com/gaujay/indivi_collection
 #ifdef HAVE_INDIVI
-# include "indivi/flat_umap.h"
+  #include "indivi/flat_umap.h"
 #endif
 
 //    #define EMH_QUADRATIC 1
@@ -49,7 +51,7 @@
 #include "martin/robin_hood.h"
 
 #if CXX17
-#include "martin/unordered_dense.h"
+  #include "martin/unordered_dense.h"
 #endif
 
 //#include "FHashTable/fhash_table.h"
@@ -64,10 +66,8 @@
 #endif
 
 #if FOLLY_F14
-#include "folly/container/F14Map.h"
+  #include "folly/container/F14Map.h"
 #endif
-
-
 
 static const uint64_t RND =(uint64_t)getus();
 static float max_lf = 0.875f;
@@ -142,7 +142,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 1 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
@@ -158,87 +158,87 @@ static const char* find_hash(const std::string& map_name)
 // this is probably the fastest high quality 64bit random number generator that exists.
 // Implements Small Fast Counting v4 RNG from PractRand.
 class sfc64 {
-    public:
-        using result_type = uint64_t;
+public:
+  using result_type = uint64_t;
 
-        // no copy ctors so we don't accidentally get the same random again
-        sfc64(sfc64 const&) = delete;
-        sfc64& operator=(sfc64 const&) = delete;
+  // no copy ctors so we don't accidentally get the same random again
+  sfc64(sfc64 const&) = delete;
+  sfc64& operator=(sfc64 const&) = delete;
 
-        sfc64(sfc64&&) = default;
-        sfc64& operator=(sfc64&&) = default;
+  sfc64(sfc64&&) = default;
+  sfc64& operator=(sfc64&&) = default;
 
-        sfc64(std::array<uint64_t, 4> const& state)
-            : m_a(state[0])
-              , m_b(state[1])
-              , m_c(state[2])
-              , m_counter(state[3]) {}
+  sfc64(std::array<uint64_t, 4> const& state)
+      : m_a(state[0])
+        , m_b(state[1])
+        , m_c(state[2])
+        , m_counter(state[3]) {}
 
-        static constexpr uint64_t(min)() {
-            return (std::numeric_limits<uint64_t>::min)();
-        }
-        static constexpr uint64_t(max)() {
-            return (std::numeric_limits<uint64_t>::max)();
-        }
+  static constexpr uint64_t(min)() {
+      return (std::numeric_limits<uint64_t>::min)();
+  }
+  static constexpr uint64_t(max)() {
+      return (std::numeric_limits<uint64_t>::max)();
+  }
 
-        sfc64()
-            : sfc64(UINT64_C(0x853c49e6748fea9b)) {}
+  sfc64()
+      : sfc64(UINT64_C(0x853c49e6748fea9b)) {}
 
-        sfc64(uint64_t seed)
-            : m_a(seed), m_b(seed), m_c(seed), m_counter(1) {
-                for (int i = 0; i < 12; ++i) {
-                    operator()();
-                }
-            }
+  sfc64(uint64_t seed)
+      : m_a(seed), m_b(seed), m_c(seed), m_counter(1) {
+          for (int i = 0; i < 12; ++i) {
+              operator()();
+          }
+      }
 
-        void seed() {
-            *this = sfc64{std::random_device{}()};
-        }
+  void seed() {
+      *this = sfc64{std::random_device{}()};
+  }
 
-        uint64_t operator()() noexcept {
-            auto const tmp = m_a + m_b + m_counter++;
-            m_a = m_b ^ (m_b >> right_shift);
-            m_b = m_c + (m_c << left_shift);
-            m_c = rotl(m_c, (int)rotation) + tmp;
-            return tmp;
-        }
+  uint64_t operator()() noexcept {
+      auto const tmp = m_a + m_b + m_counter++;
+      m_a = m_b ^ (m_b >> right_shift);
+      m_b = m_c + (m_c << left_shift);
+      m_c = rotl(m_c, (int)rotation) + tmp;
+      return tmp;
+  }
 
-        // this is a bit biased, but for our use case that's not important.
-        uint64_t operator()(uint64_t boundExcluded) noexcept {
+  // this is a bit biased, but for our use case that's not important.
+  uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
-            return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
+      return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
 #elif _WIN32
-            uint64_t high;
-            uint64_t a = operator()();
-            _umul128(a, boundExcluded, &high);
-            return high;
+      uint64_t high;
+      uint64_t a = operator()();
+      _umul128(a, boundExcluded, &high);
+      return high;
 #endif
-        }
+  }
 
-        std::array<uint64_t, 4> state() const {
-            return {m_a, m_b, m_c, m_counter};
-        }
+  std::array<uint64_t, 4> state() const {
+      return {m_a, m_b, m_c, m_counter};
+  }
 
-        void state(std::array<uint64_t, 4> const& s) {
-            m_a = s[0];
-            m_b = s[1];
-            m_c = s[2];
-            m_counter = s[3];
-        }
+  void state(std::array<uint64_t, 4> const& s) {
+      m_a = s[0];
+      m_b = s[1];
+      m_c = s[2];
+      m_counter = s[3];
+  }
 
-    private:
-        template <typename T>
-            T rotl(T const x, uint32_t k) {
-                return (x << k) | (x >> (8 * sizeof(T) - k));
-            }
+private:
+  template <typename T>
+      T rotl(T const x, uint32_t k) {
+          return (x << k) | (x >> (8 * sizeof(T) - k));
+      }
 
-        static constexpr int rotation = 24;
-        static constexpr int right_shift = 11;
-        static constexpr int left_shift = 3;
-        uint64_t m_a;
-        uint64_t m_b;
-        uint64_t m_c;
-        uint64_t m_counter;
+  static constexpr int rotation = 24;
+  static constexpr int right_shift = 11;
+  static constexpr int left_shift = 3;
+  uint64_t m_a;
+  uint64_t m_b;
+  uint64_t m_c;
+  uint64_t m_counter;
 };
 
 static inline double now2sec()
@@ -273,10 +273,10 @@ static inline double now2sec()
 #endif
 }
 
-template<class MAP>
-static void bench_insert(MAP& map)
+template<typename HMAP>
+static void bench_insert(HMAP& hmap)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %s\n", map_name);
@@ -287,40 +287,40 @@ static void bench_insert(MAP& map)
     uint32_t maxn = 1000000 / 5;
 #endif
 
-    map.max_load_factor(max_lf);
+    hmap.max_load_factor(max_lf);
     for (int  i = 0; i < 3; i++) {
         auto nows = now2sec();
         {
             auto RNDI = (uint64_t)RND + 15ull + (uint64_t)i;
             {
                 if (RND % 2 == 0)
-                map.reserve(maxn / 2);
+                hmap.reserve(maxn / 2);
                 auto ts = now2sec();
                 MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn; ++n)
-                    map[static_cast<int>(rng())];
-                printf("        (lf=%.2f) insert %.2f", map.load_factor(), now2sec() - ts);
+                    hmap[static_cast<int>(rng())];
+                printf("        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
                 fflush(stdout);
             }
             {
                 auto ts = now2sec();
                 MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn * 9 / 10; ++n)
-                    map.erase(static_cast<int>(rng()));
+                    hmap.erase(static_cast<int>(rng()));
                 printf(", remove 90%% %.2f", now2sec() - ts);
                 fflush(stdout);
-                assert(map.size() == 0);
+                assert(hmap.size() == 0);
             }
             {
                 auto ts = now2sec();
                 MRNG rng(RNDI + 1);
                 for (size_t n = 0; n < maxn; ++n)
-                    map.emplace(static_cast<int>(rng()), 0);
+                    hmap.emplace(static_cast<int>(rng()), 0);
                 printf(", reinsert %.2f", now2sec() - ts);
             }
             {
                 auto ts = now2sec();
-                map.clear();
+                hmap.clear();
                 printf(", clear %.3f", now2sec() - ts);
             }
         }
@@ -329,10 +329,10 @@ static void bench_insert(MAP& map)
     }
 }
 
-template<class MAP, bool unique = false>
+template<typename HMAP, bool unique = false>
 static void bench_AccidentallyQuadratic()
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -340,15 +340,15 @@ static void bench_AccidentallyQuadratic()
     auto nows = now2sec();
     sfc64 rng(12345);
 
-    MAP map;
+    HMAP hmap;
     for (size_t n = 0; n < 10'000'000; ++n) {
-        map[static_cast<int>(rng())];
+        hmap[static_cast<int>(rng())];
     }
-    assert(9988513 == map.size());
+    assert(9988513 == hmap.size());
 
     //bench.beginMeasure("iterate");
     uint64_t sum = 0;
-    for (auto const& kv : map) {
+    for (auto const& kv : hmap) {
         sum += (uint64_t)kv.first + (uint64_t)kv.second;
     }
     if (sum != UINT64_C(18446739465311920326))
@@ -356,22 +356,22 @@ static void bench_AccidentallyQuadratic()
 
 #if CXX17
 //    bench.beginMeasure("iterate & copy");
-    MAP map2;
-    for (auto const& kv : map) {
+    HMAP map2;
+    for (auto const& kv : hmap) {
         if constexpr (unique)
             map2.insert_unique(kv.first, kv.second);
         else
             map2.emplace(kv.first, kv.second);
     }
-    assert(map.size() == map2.size());
+    assert(hmap.size() == map2.size());
 #endif
     printf(" time %.2f s\n", now2sec() - nows);
 }
 
-template<class MAP>
+template<typename HMAP>
 static void bench_InsertEraseBegin()
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %s", map_name);
@@ -381,29 +381,29 @@ static void bench_InsertEraseBegin()
 
     for (uint64_t i = 0; i < 3; ++i) {
         auto starts = now2sec();
-        MAP map;
+        HMAP hmap;
         MRNG rng(987654321ull + i * i * i);
 
         // benchmark randomly inserting & erasing begin
         for (size_t j = 0; j < max_n / 5; ++j)
-            map.emplace((int64_t)rng(), 0);
+            hmap.emplace((int64_t)rng(), 0);
 
         for (size_t j = 0; j < max_n; ++j) {
-            map.erase(map.begin());
-            map.emplace((int64_t)rng(), 0);
+            hmap.erase(hmap.begin());
+            hmap.emplace((int64_t)rng(), 0);
         }
 
-        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
+        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0), hmap.load_factor(), (int)hmap.size(), now2sec() - starts);
         max_n *= 5;
     }
 
     printf(" total (%.2f s)\n", now2sec() - nows);
 }
 
-template<class MAP>
+template<typename HMAP>
 static void bench_InsertEraseContinue()
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %s", map_name);
@@ -413,34 +413,34 @@ static void bench_InsertEraseContinue()
 
     for (uint64_t i = 0; i < 3; ++i) {
         auto starts = now2sec();
-        MAP map;
-        //map.reserve((std::size_t)(max_n * .));
+        HMAP hmap;
+        //hmap.reserve((std::size_t)(max_n * .));
         MRNG rng(2345ull + i * i * i);
 
         // benchmark randomly inserting & erasing begin
         for (size_t j = 0; j < max_n / 3; ++j)
-            map.emplace((int)rng(), 0);
+            hmap.emplace((int)rng(), 0);
 
-        auto key = map.begin()->first;
+        auto key = hmap.begin()->first;
         for (size_t j = max_n; j > 0; j--) {
-            auto it = map.find(key);
-            if (it == map.end()) {
-                it = map.begin();
+            auto it = hmap.find(key);
+            if (it == hmap.end()) {
+                it = hmap.begin();
                 key = it->first;
             }
 
-            if constexpr(std::is_void_v<decltype(map.erase(it))>) {
-                map.erase(it);
-                if (++it != map.end()) key = it->first;
+            if constexpr(std::is_void_v<decltype(hmap.erase(it))>) {
+                hmap.erase(it);
+                if (++it != hmap.end()) key = it->first;
             } else {
-                it = map.erase(it);
-                if (it != map.end()) key = it->first;
+                it = hmap.erase(it);
+                if (it != hmap.end()) key = it->first;
             }
 
-            map.emplace((int)rng(), 0);
+            hmap.emplace((int)rng(), 0);
         }
 
-        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0), map.load_factor(), (int)map.size(), now2sec() - starts);
+        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0), hmap.load_factor(), (int)hmap.size(), now2sec() - starts);
         max_n *= 7;
     }
 
@@ -487,10 +487,10 @@ static void iotas(ForwardIt first, ForwardIt last, T value)
     }
 }
 
-template<class MAP>
-static void bench_randomInsertErase(MAP& map)
+template<typename HMAP>
+static void bench_randomInsertErase(HMAP& hmap)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -502,7 +502,7 @@ static void bench_randomInsertErase(MAP& map)
     {
         uint32_t min_n    = 1 << 20;
         uint32_t max_loop = min_n << 5;
-        map.max_load_factor(max_lf);
+        hmap.max_load_factor(max_lf);
         for (uint64_t j = 0; j < 5; ++j) {
             const uint64_t rndj = RND + 6 + j;
             MRNG rng(rndj);
@@ -511,27 +511,27 @@ static void bench_randomInsertErase(MAP& map)
             // std::cout << (i + 1) << ". " << as_bits(bitMask) << std::endl;
             auto maxn = min_n * (50 + j * 9) / 100;
             for (size_t i = 0; i < maxn / 8; ++i) {
-                map.emplace(rng(), 0);
+                hmap.emplace(rng(), 0);
             }
 
             //auto ts = now2sec();
             maxn = max_loop * 10 / (10 + 4*j);
             // benchmark randomly inserting & erasing
             for (size_t i = 0; i < maxn; ++i) {
-                map.emplace(rng(), 0);
-                map.erase(rng2());
+                hmap.emplace(rng(), 0);
+                hmap.erase(rng2());
             }
-//            printf("    %8u %2d M cycles time %.3f s map size %8d loadf = %.2f\n",
-//                    maxn, int(min_n / 1000000), now2sec() - ts, (int)map.size(), map.load_factor());
+//            printf("    %8u %2d M cycles time %.3f s hmap size %8d loadf = %.2f\n",
+//                    maxn, int(min_n / 1000000), now2sec() - ts, (int)hmap.size(), hmap.load_factor());
             min_n *= 2;
-            map.clear();
+            hmap.clear();
         }
 
         erase1 = now2sec() - nows;
     }
 
     {
-        MAP map2;
+        HMAP map2;
         map2.max_load_factor(max_lf);
         std::vector<int> bits(64, 0);
         iotas(bits.begin(), bits.end(), 0);
@@ -559,7 +559,7 @@ static void bench_randomInsertErase(MAP& map)
                 map2.emplace(rng() & bitMask, 0);
                 map2.erase(rng() & bitMask);
             }
-//            printf("    %02d bits  %2d M cycles time %.3f s map size %d loadf = %.2f\n",
+//            printf("    %02d bits  %2d M cycles time %.3f s hmap size %d loadf = %.2f\n",
 //                    int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts, (int)map2.size(), map2.load_factor());
         }
         erase2 = now2sec() - nows;
@@ -568,10 +568,10 @@ static void bench_randomInsertErase(MAP& map)
     printf(" erase time = %.2lf:%.2lf, total = %.2lf s\n", erase1, erase2, erase1 + erase2);
 }
 
-template<class MAP>
+template<typename HMAP>
 static void bench_CreateInsert()
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -586,12 +586,12 @@ static void bench_CreateInsert()
         size_t count = counts[i];
         size_t repeats = counts.back() / count;
         size_t res = 0;
-        MAP map;
+        HMAP hmap;
 
         for (size_t j = 0; j < repeats; ++j) {
             for (size_t n = 0; n < count; ++n)
-                map[static_cast<int>(rng())];
-            res += (size_t)map.size();
+                hmap[static_cast<int>(rng())];
+            res += (size_t)hmap.size();
         }
     }
     erase1 = now2sec() - nows;
@@ -602,13 +602,13 @@ static void bench_CreateInsert()
         size_t count = counts[i];
         size_t repeats = counts.back() / count;
         size_t res = 0;
-        MAP map;
+        HMAP hmap;
 
         for (size_t j = 0; j < repeats; ++j) {
             for (size_t n = 0; n < count; ++n)
-                map[static_cast<int>(rng2())];
-            res += (size_t)map.size();
-            map.clear();
+                hmap[static_cast<int>(rng2())];
+            res += (size_t)hmap.size();
+            hmap.clear();
         }
     }
 
@@ -664,10 +664,10 @@ struct Hash32 {
 const static uint32_t x0 = (uint32_t)getus();
 const static bool is_del = (x0 % 2 == 0);
 
-template<class MAP>
+template<typename HMAP>
 static void bench_udb3()
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -676,7 +676,7 @@ static void bench_udb3()
     constexpr uint32_t n_cp = 11, N = 80000000, n0 = 10000000;
     constexpr uint32_t step = (N - n0) / (n_cp - 1);
 
-    MAP h;
+    HMAP h;
     uint64_t z = 0, x = x0;
     for (uint32_t j = 0, i = 0, n = n0; j < n_cp; ++j, n += step) {
         for (; i < n; ++i) {
@@ -695,10 +695,10 @@ static void bench_udb3()
     printf(" z[%d] = %d total time = %.2lf lf = %.2f\n", is_del, (int)z, now2sec() - nows, h.load_factor());
 }
 
-template<class MAP>
-static void bench_randomDistinct2(MAP& map)
+template<typename HMAP>
+static void bench_randomDistinct2(HMAP& hmap)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -711,50 +711,50 @@ static void bench_randomDistinct2(MAP& map)
     auto nows = now2sec();
     MRNG rng(RND + 786512);
 
-    map.max_load_factor(max_lf);
+    hmap.max_load_factor(max_lf);
     int checksum;
     {
         //auto ts = now2sec();
         checksum = 0;
         size_t const max_rng = n / 20;
         for (size_t i = 0; i < n; ++i) {
-            checksum += ++map[static_cast<int>(rng(max_rng))];
+            checksum += ++hmap[static_cast<int>(rng(max_rng))];
         }
-//        printf("     05%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
+//        printf("     05%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(), (int)hmap.size());
         assert(RND != 123 || 549985352 == checksum);
     }
 
     {
-        map.clear();
+        hmap.clear();
         //auto ts = now2sec();
         checksum = 0;
         size_t const max_rng = n / 4;
         for (size_t i = 0; i < n; ++i) {
-            checksum += ++map[static_cast<int>(rng(max_rng))];
+            checksum += ++hmap[static_cast<int>(rng(max_rng))];
         }
-//        printf("     25%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
+//        printf("     25%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(), (int)hmap.size());
         assert(RND != 123 || 149979034 == checksum);
     }
 
     {
-        map.clear();
+        hmap.clear();
         //auto ts = now2sec();
         size_t const max_rng = n / 2;
         for (size_t i = 0; i < n; ++i) {
-            checksum += ++map[static_cast<int>(rng(max_rng))];
+            checksum += ++hmap[static_cast<int>(rng(max_rng))];
         }
-//        printf("     50%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
+//        printf("     50%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(), (int)hmap.size());
         assert(RND != 123 || 249981806 == checksum);
     }
 
     {
-        map.clear();
+        hmap.clear();
         //auto ts = now2sec();
         checksum = 0;
         for (size_t i = 0; i < n; ++i) {
-            checksum += ++map[static_cast<int>(rng())];
+            checksum += ++hmap[static_cast<int>(rng())];
         }
-//        printf("    100%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, map.load_factor(), (int)map.size());
+//        printf("    100%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(), (int)hmap.size());
         assert(RND != 123 || 50291811 == checksum);
     }
     //#endif
@@ -764,25 +764,25 @@ static void bench_randomDistinct2(MAP& map)
 
 #define CODE_FOR_NUCLEOTIDE(nucleotide) (" \0 \1\3  \2"[nucleotide & 0x7])
 
-template<class Map>
+template<typename HMAP>
 static size_t kcount(const std::vector<char> &poly, const std::string &oligo) {
 
-    Map map;
-    //map.max_load_factor(0.5);
+    HMAP hmap;
+    //hmap.max_load_factor(0.5);
 
     uint64_t key = 0;
     const uint64_t mask = ((uint64_t)1 << 2 * oligo.size()) - 1;
 
     // For the first several nucleotides we only need to append them to key in
-    // preparation for the insertion of complete oligonucleotides to map.
+    // preparation for the insertion of complete oligonucleotides to hmap.
     for (size_t i = 0; i < oligo.size() - 1; ++i)
         key = (key << 2 & mask) | (uint64_t)poly[i];
 
     // Add all the complete oligonucleotides of oligo.size() to
-    // map and update the count for each oligonucleotide.
+    // hmap and update the count for each oligonucleotide.
     for (size_t i = oligo.size() - 1; i < poly.size(); ++i){
         key= (key << 2 & mask) | (uint64_t)poly[i];
-        ++map[key];
+        ++hmap[key];
     }
 
     // Generate the key for oligonucleotide.
@@ -792,9 +792,9 @@ static size_t kcount(const std::vector<char> &poly, const std::string &oligo) {
     }
 
     if (oligo == "GGT")
-        printf(" (lf=%.2f) ", map.load_factor());
+        printf(" (lf=%.2f) ", hmap.load_factor());
 
-    return map[key];
+    return hmap[key];
 }
 
 static int state = 42;
@@ -806,16 +806,16 @@ static inline int fasta_next() {
     return (p >= 0.3029549426680f) + (p >= 0.5009432431601f) + (p >= 0.6984905497992f);
 }
 
-template<class MAP>
+template<typename HMAP>
 static void bench_knucleotide() {
     static constexpr size_t n = 25000000;
 
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
 
-    MAP map;
+    HMAP hmap;
     state = 42;
     for (size_t i = 0; i < n * 3; ++i)
         (void)fasta_next();
@@ -827,11 +827,11 @@ static void bench_knucleotide() {
 
     auto nows = now2sec();
     size_t ans = 0;
-    ans += kcount<MAP>(poly, "GGTATTTTAATTTATAGT");
-    ans += kcount<MAP>(poly, "GGTATTTTAATT");
-    ans += kcount<MAP>(poly, "GGTATT");
-    ans += kcount<MAP>(poly, "GGTA");
-    ans += kcount<MAP>(poly, "GGT");
+    ans += kcount<HMAP>(poly, "GGTATTTTAATTTATAGT");
+    ans += kcount<HMAP>(poly, "GGTATTTTAATT");
+    ans += kcount<HMAP>(poly, "GGTATT");
+    ans += kcount<HMAP>(poly, "GGTA");
+    ans += kcount<HMAP>(poly, "GGT");
     printf(" ans = %d time = %.2f s\n", (int)ans, now2sec() - nows);
 }
 
@@ -881,8 +881,8 @@ public:
 };
 
 #include "has_member.hpp"
-template <typename M>
-static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation, M& map1, std::vector<vec2> state) {
+template <typename HMAP>
+static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation, HMAP& map1, std::vector<vec2> state) {
 
     (void)name;
     (void)finalPopulation;
@@ -924,35 +924,35 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
     assert(finalPopulation ==count);
 }
 
-template<class MAP>
+template<typename HMAP>
 static void bench_GameOfLife()
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
 
-    MAP map;
+    HMAP hmap;
     auto stastabilizing = now2sec();
     {
         // https://conwaylife.com/wiki/R-pentomino
-        game_of_life( "R-pentomino", 1103, 116, map, {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {1, 2}});
+        game_of_life( "R-pentomino", 1103, 116, hmap, {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {1, 2}});
 
         // https://conwaylife.com/wiki/Acorn
-        game_of_life( "Acorn", 5206, 633, map, {{1, 0}, {3, 1}, {0, 2}, {1, 2}, {4, 2}, {5, 2}, {6, 2}});
+        game_of_life( "Acorn", 5206, 633, hmap, {{1, 0}, {3, 1}, {0, 2}, {1, 2}, {4, 2}, {5, 2}, {6, 2}});
 
         // https://conwaylife.com/wiki/Jaydot
-        game_of_life( "Jaydot", 6929, 1124, map, {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 3}, {1, 4}, {2, 4}, {0, 5}});
+        game_of_life( "Jaydot", 6929, 1124, hmap, {{1, 0}, {2, 0}, {0, 1}, {1, 1}, {2, 1}, {1, 3}, {1, 4}, {2, 4}, {0, 5}});
 
         // https://conwaylife.com/wiki/Bunnies
-        game_of_life( "Bunnies", 17332, 1744, map, {{0, 0}, {6, 0}, {2, 1}, {6, 1}, {2, 2}, {5, 2}, {7, 2}, {1, 3}, {3, 3}});
+        game_of_life( "Bunnies", 17332, 1744, hmap, {{0, 0}, {6, 0}, {2, 1}, {6, 1}, {2, 2}, {5, 2}, {7, 2}, {1, 3}, {3, 3}});
 
         printf(" stastabilizing = %.2f", now2sec() - stastabilizing);
     }
 
     auto grow = now2sec();
     {
-        auto map1 = map;
+        auto map1 = hmap;
         // https://conwaylife.com/wiki/Gotts_dots
         game_of_life( "Gotts dots", 2000, 4599, map1,
         {
@@ -979,10 +979,10 @@ static void bench_GameOfLife()
     printf(", grow = %.2f (total %.2f) s\n", now2sec() - grow, now2sec() - stastabilizing);
 }
 
-template<class MAP>
-static void bench_copy(MAP&)
+template<typename HMAP>
+static void bench_copy(HMAP&)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -992,7 +992,7 @@ static void bench_copy(MAP&)
 
     constexpr int KN = 1000;
     constexpr int KL = 1000;
-    MAP mapSource(1'000);
+    HMAP mapSource(1'000);
     mapSource.max_load_factor(max_lf);
     uint64_t rememberKey = 0;
     for (size_t i = 0; i < 200'000; ++i) {
@@ -1004,9 +1004,9 @@ static void bench_copy(MAP&)
     }
 
     auto nows = now2sec();
-    MAP mapForCopy = mapSource;
+    HMAP mapForCopy = mapSource;
     for (int n = 0; n < KL; ++n) {
-        MAP m = mapForCopy;
+        HMAP m = mapForCopy;
         result += (size_t)m.size() + (size_t)m[rememberKey];
         for (int i = 0; i < KN; i++) //with different load factor
             mapForCopy[rng()] = (int)rng();
@@ -1016,7 +1016,7 @@ static void bench_copy(MAP&)
     printf(" copy = %.2f", copyt - nows);
 
     mapForCopy = mapSource;
-    MAP m;
+    HMAP m;
     for (int n = 0; n < KL; ++n) {
         m = mapForCopy;
         result += (size_t)m.size() + (size_t)m[rememberKey];
@@ -1027,10 +1027,10 @@ static void bench_copy(MAP&)
     printf(", assign time = %.2f s, result = %zu\n", now2sec() - copyt, result);
 }
 
-template<class MAP>
+template<typename HMAP>
 static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask)
 {
-    //printf("%s map = %s\n", __FUNCTION__, typeid(MAP).name());
+    //printf("%s hmap = %s\n", __FUNCTION__, typeid(HMAP).name());
     MRNG rng(RND + 4);
 
     // time measured part
@@ -1043,33 +1043,33 @@ static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t 
     auto const idx32 = (string_length / 4) - 1;
     auto const strData32 = reinterpret_cast<uint32_t*>(&str[0]) + idx32;
 
-    MAP map;
-    map.max_load_factor(max_lf);
+    HMAP hmap;
+    hmap.max_load_factor(max_lf);
 
 //    auto ts = now2sec();
     for (size_t i = 0; i < max_n; ++i) {
         *strData32 = uint32_t(rng() & bitMask);
 #if 0
         // create an entry.
-        map[str] = 0;
+        hmap[str] = 0;
         *strData32 = rng() & bitMask;
-        auto it = map.find(str);
-        if (it != map.end()) {
+        auto it = hmap.find(str);
+        if (it != hmap.end()) {
             ++verifier;
-            map.erase(it);
+            hmap.erase(it);
         }
 #else
-        map.emplace(str, 0);
+        hmap.emplace(str, 0);
         *strData32 = uint32_t(rng() & bitMask);
-        verifier += (size_t)map.erase(str);
+        verifier += (size_t)hmap.erase(str);
 #endif
     }
 
-//    printf("%4zd bytes time = %.2f, loadf = %.2f %d\n", string_length, now2sec() - ts, map.load_factor(), (int)map.size());
+//    printf("%4zd bytes time = %.2f, loadf = %.2f %d\n", string_length, now2sec() - ts, hmap.load_factor(), (int)hmap.size());
     return verifier;
 }
 
-template<class MAP>
+template<typename HMAP>
 static uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t numInserts, size_t numFindsPerInsert)
 {
     size_t constexpr NumTotal = 4;
@@ -1100,8 +1100,8 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
     auto const strData32 = reinterpret_cast<uint32_t*>(&str[0]) + idx32;
 
     auto ts = now2sec();
-    MAP map;
-    map.max_load_factor(max_lf);
+    HMAP hmap;
+    hmap.max_load_factor(max_lf);
     {
         size_t i = 0;
         size_t findCount = 0;
@@ -1116,7 +1116,7 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
                 } else {
                     *strData32 = uint32_t(val);
                 }
-                map[str] = 1;
+                hmap[str] = 1;
                 ++i;
             }
 
@@ -1127,8 +1127,8 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
                     findRng.state(anotherUnrelatedRngInitialState);
                 }
                 *strData32 = (uint32_t)findRng();
-                auto it = map.find(str);
-                if (it != map.end()) {
+                auto it = hmap.find(str);
+                if (it != hmap.end()) {
 #ifndef CK_HMAP
                     num_found += it->second;
 #else
@@ -1139,16 +1139,16 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
         } while (i < numInserts);
     }
 
-    if (map.size() > 12)
-    printf("        %s time = %.2f s %8d loadf = %.2f\n",
-            title.c_str(), now2sec() - ts, (int)num_found, map.load_factor());
+    if (hmap.size() > 12)
+      printf("        %s time = %.2f s %8d loadf = %.2f\n",
+            title.c_str(), now2sec() - ts, (int)num_found, hmap.load_factor());
     return num_found;
 }
 
-template<class MAP>
-static void bench_randomFindString(MAP&)
+template<typename HMAP>
+static void bench_randomFindString(HMAP&)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %8s\n", map_name);
@@ -1160,11 +1160,11 @@ static void bench_randomFindString(MAP&)
         static constexpr size_t numInserts = 1000000 / 2;
         static constexpr size_t numFindsPerInsert = 200 / 2;
 
-        randomFindInternalString<MAP>(4, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(3, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(2, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(1, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(0, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(4, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(3, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(2, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(1, 13, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(0, 13, numInserts, numFindsPerInsert);
         now1 = now2sec();
     }
 
@@ -1172,37 +1172,37 @@ static void bench_randomFindString(MAP&)
         static constexpr size_t numInserts = 100000;
         static constexpr size_t numFindsPerInsert = 1000;
 
-        randomFindInternalString<MAP>(4, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(3, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(2, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(1, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<MAP>(0, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(4, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(3, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(2, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(1, 100, numInserts, numFindsPerInsert);
+        randomFindInternalString<HMAP>(0, 100, numInserts, numFindsPerInsert);
         now2 = now2sec();
     }
     printf("total time = %.2f + %.2f = %.2f s\n", now1 - nows, now2 - now1, now2 - nows);
 }
 
-template<class MAP>
-static void bench_randomEraseString(MAP&)
+template<typename HMAP>
+static void bench_randomEraseString(HMAP&)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
 
     auto nows = now2sec();
-    { runInsertEraseString<MAP>(20000000, 7, 0xfffff); }
-    { runInsertEraseString<MAP>(20000000, 8, 0xfffff); }
-    { runInsertEraseString<MAP>(20000000, 13, 0xfffff); }
-    { runInsertEraseString<MAP>(10000000, 24, 0xfffff); }
-    { runInsertEraseString<MAP>(12000000, 100, 0x4ffff); }
-    { runInsertEraseString<MAP>(8000000,  200, 0x3ffff); }
-    { runInsertEraseString<MAP>(6000000,  1000,0x7ffff); }
+    { runInsertEraseString<HMAP>(20000000, 7, 0xfffff); }
+    { runInsertEraseString<HMAP>(20000000, 8, 0xfffff); }
+    { runInsertEraseString<HMAP>(20000000, 13, 0xfffff); }
+    { runInsertEraseString<HMAP>(10000000, 24, 0xfffff); }
+    { runInsertEraseString<HMAP>(12000000, 100, 0x4ffff); }
+    { runInsertEraseString<HMAP>(8000000,  200, 0x3ffff); }
+    { runInsertEraseString<HMAP>(6000000,  1000,0x7ffff); }
 
     printf(" total time = %.2f s\n", now2sec() - nows);
 }
 
-template<class MAP>
+template<typename HMAP>
 static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t numInserts, const size_t numFindsPerInsert) {
     size_t constexpr NumTotal = 4;
     size_t const numSequential = NumTotal - numRandom;
@@ -1212,8 +1212,8 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
     sfc64 rng(RND + 2);
 
     size_t num_found = 0;
-    MAP map;
-    map.max_load_factor(max_lf);
+    HMAP hmap;
+    hmap.max_load_factor(max_lf);
     std::array<bool, NumTotal> insertRandom = {false};
     for (size_t i = 0; i < numRandom; ++i) {
         insertRandom[i] = true;
@@ -1235,9 +1235,9 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
             for (bool isRandomToInsert : insertRandom) {
                 const auto val = anotherUnrelatedRng();
                 if (isRandomToInsert) {
-                    map[rng() & bitMask] = static_cast<size_t>(1);
+                    hmap[rng() & bitMask] = static_cast<size_t>(1);
                 } else {
-                    map[val & bitMask] = static_cast<size_t>(1);
+                    hmap[val & bitMask] = static_cast<size_t>(1);
                 }
             }
             i += insertRandom.size();
@@ -1248,23 +1248,23 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
                     findCount = 0;
                     findRng.state(anotherUnrelatedRngInitialState);
                 }
-                num_found += (size_t)map.count(findRng() & bitMask);
+                num_found += (size_t)hmap.count(findRng() & bitMask);
             }
         } while (i < numInserts);
     }
 
-    if (map.size() == 0) {
+    if (hmap.size() == 0) {
         printf("    %3u%% %016x time = %.2f s, %8d loadf = %.2f\n",
-            uint32_t(numSequential * 100 / NumTotal), (int)bitMask, now2sec() - ts, (int)num_found, map.load_factor());
+            uint32_t(numSequential * 100 / NumTotal), (int)bitMask, now2sec() - ts, (int)num_found, hmap.load_factor());
     }
 
-    return (uint64_t)map.size();
+    return (uint64_t)hmap.size();
 }
 
-template<class MAP>
-static void bench_IterateIntegers(MAP& map)
+template<typename HMAP>
+static void bench_IterateIntegers(HMAP& hmap)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -1276,8 +1276,8 @@ static void bench_IterateIntegers(MAP& map)
     {
         MRNG rng(123);
         for (size_t n = 0; n < num_iters; ++n) {
-            map[rng()] = n;
-            for (const auto & keyVal : map)
+            hmap[rng()] = n;
+            for (const auto & keyVal : hmap)
 #ifndef CK_HMAP
                 result += keyVal.second;
 #else
@@ -1291,8 +1291,8 @@ static void bench_IterateIntegers(MAP& map)
     {
         MRNG rng(123);
         for (size_t n = 0; n < num_iters; ++n) {
-            map.erase(rng());
-            for (auto const& keyVal : map)
+            hmap.erase(rng());
+            for (auto const& keyVal : hmap)
 #ifndef CK_HMAP
                 result += keyVal.second;
 #else
@@ -1304,10 +1304,10 @@ static void bench_IterateIntegers(MAP& map)
     printf(", add/removing time = %.2f, %.2f|%d\n", (ts1 - ts), now2sec() - ts1, (int)result);
 }
 
-template<class MAP>
-static void bench_randomFind(MAP&, size_t numInserts, size_t numFindsPerInsert)
+template<typename HMAP>
+static void bench_randomFind(HMAP&, size_t numInserts, size_t numFindsPerInsert)
 {
-    auto map_name = find_hash(typeid(MAP).name());
+    auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
     printf("    %20s", map_name);
@@ -1319,12 +1319,12 @@ static void bench_randomFind(MAP&, size_t numInserts, size_t numFindsPerInsert)
     auto ts = now2sec();
     uint64_t sum = 0;
 
-    sum += randomFindInternal<MAP>(4, lower32bit, numInserts, numFindsPerInsert);
-    sum += randomFindInternal<MAP>(3, upper32bit, numInserts, numFindsPerInsert);
-    sum += randomFindInternal<MAP>(2, mediu32bit, numInserts, numFindsPerInsert);
+    sum += randomFindInternal<HMAP>(4, lower32bit, numInserts, numFindsPerInsert);
+    sum += randomFindInternal<HMAP>(3, upper32bit, numInserts, numFindsPerInsert);
+    sum += randomFindInternal<HMAP>(2, mediu32bit, numInserts, numFindsPerInsert);
 
-    sum += randomFindInternal<MAP>(1, upper32bit, numInserts, numFindsPerInsert);
-    sum += randomFindInternal<MAP>(0, lower32bit, numInserts, numFindsPerInsert);
+    sum += randomFindInternal<HMAP>(1, upper32bit, numInserts, numFindsPerInsert);
+    sum += randomFindInternal<HMAP>(0, lower32bit, numInserts, numFindsPerInsert);
 
     if (sum != 123)
     printf(" nums = %zd total time = %.2f s\n", numInserts, now2sec() - ts);
@@ -2049,7 +2049,7 @@ static void runTest(int sflags, int eflags)
 #endif
 
 #if HAVE_INDIVI
-        { bench_AccidentallyQuadratic<indivi::flat_umap <int, int, hash_func>>(); }
+        {  bench_AccidentallyQuadratic<indivi::flat_umap <int, int, hash_func>>(); }
 #endif
 
 
@@ -2168,7 +2168,7 @@ static void runTest(int sflags, int eflags)
         {  bench_InsertEraseBegin<boost::unordered_flat_map <int64_t, int, hash_func>>(); }
 #endif
 #if HAVE_INDIVI
-        { bench_InsertEraseBegin<indivi::flat_umap <int64_t, int, hash_func>>(); }
+        {  bench_InsertEraseBegin<indivi::flat_umap <int64_t, int, hash_func>>(); }
 #endif
 
 #if ABSL_HMAP
@@ -2226,7 +2226,7 @@ static void runTest(int sflags, int eflags)
         {  bench_CreateInsert<boost::unordered_flat_map <int, int, hash_func>>(); }
 #endif
 #if HAVE_INDIVI
-        { bench_CreateInsert<indivi::flat_umap <int, int, hash_func>>(); }
+        {  bench_CreateInsert<indivi::flat_umap <int, int, hash_func>>(); }
 #endif
 #if ABSL_HMAP
         {  bench_CreateInsert<absl::flat_hash_map <int, int, hash_func>>(); }
@@ -2284,7 +2284,7 @@ static void runTest(int sflags, int eflags)
         {  bench_udb3<boost::unordered_flat_map <uint32_t, uint32_t, hash_func>>(); }
 #endif
 #if HAVE_INDIVI
-        { bench_udb3<indivi::flat_umap <uint32_t, uint32_t, hash_func>>(); }
+        {  bench_udb3<indivi::flat_umap <uint32_t, uint32_t, hash_func>>(); }
 #endif
 
 
@@ -2435,6 +2435,8 @@ int main(int argc, char* argv[])
                 checkSet("HashMapTable");
                 checkSet("HashMapCell");
             }
+            else if (c == 'i')
+                checkSet("indivi");
 #if QC_HASH
             else if (c == 'q')
                 checkSet("qc");
@@ -2466,5 +2468,6 @@ int main(int argc, char* argv[])
     puts("-------------------------------------------------------------------------");
 
     runTest(sflags, eflags);
+    puts("---------------------------- all pass -----------------------------------");
     return 0;
 }
