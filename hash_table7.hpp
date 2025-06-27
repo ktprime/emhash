@@ -1697,7 +1697,7 @@ private:
             return bucket_from + CTZ(bmask);
 #else
         const auto boset  = bucket_from % 8;
-        auto* const align = (uint8_t*)_bitmask + bucket_from / 8; (void)bucket_from;
+        auto* const align = (uint8_t*)_bitmask + bucket_from / 8; (void)main_bucket;
         const size_t bmask  = (*(size_t*)(align) >> boset);// & 0xF0F0F0F0FF0FF0FFull;//
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
