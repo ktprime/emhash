@@ -1,8 +1,8 @@
 #ifndef TTKey
-    #define TTKey              2
+    #define TTKey              1
 #endif
 #ifndef TTVal
-    #define TTVal              2
+    #define TTVal              0
 #endif
 
 #include "util.h"
@@ -82,7 +82,7 @@ std::map<std::string, std::string> maps =
 
 //rand data 3ype
 #ifndef RT
-    #define RT 1 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 3 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP     1
@@ -1597,7 +1597,7 @@ static void testHashInt(int loops = 500000009)
       sum += intHashCRC32(i + r);
     printf("intHashCRC32= %4d ms [%ld]\n\n", (int)(getus() - ts) / 1000, sum);
 
-#if 1
+#if 0
     constexpr int buff_size = 1024*1024;
     constexpr int pack_size = 64;
     auto buffer = new char[buff_size * pack_size];
