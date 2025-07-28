@@ -344,7 +344,7 @@ private:
     if (it != end()) {
       return it->second;
     }
-    throw std::out_of_range("HashMap::at");
+    //throw std::out_of_range("HashMap::at");
   }
 
   template <typename K> const mapped_type &at_impl(const K &key) const {

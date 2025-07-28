@@ -549,13 +549,7 @@ public:
   flat_utable(InputIt first, InputIt last, size_type bucket_count = 0, const Hash& hash = Hash(), const key_equal& equal = key_equal())
     : flat_utable(bucket_count, hash, equal)
   {
-    try {
       insert(first, last);
-    }
-    catch (...) {
-      destroy();
-      throw;
-    }
   }
 
   flat_utable(const std::initializer_list<value_type>& init, size_type bucket_count = 0, const Hash& hash = Hash(), const key_equal& equal = key_equal())
@@ -696,7 +690,7 @@ public:
 
     Location loc = find_impl(hash, gIndex, key);
     if (!loc.value)
-      throw std::out_of_range("flat_utable::at");
+      //throw std::out_of_range("flat_utable::at");
   
     return loc.value->second;
   }
@@ -707,7 +701,7 @@ public:
 
     Location loc = find_impl(hash, gIndex, key);
     if (!loc.value)
-      throw std::out_of_range("flat_utable::at");
+      //throw std::out_of_range("flat_utable::at");
   
     return loc.value->second;
   }
@@ -1648,25 +1642,10 @@ private:
     else
     {
       size_type ctr_count = 0u;
-      try
-      {
         other.uc_for_each([&](const item_type* otValue) {
           ::new (mValues.data + (otValue - other.mValues.data)) item_type(*otValue);
           ++ctr_count;
         });
-      }
-      catch (...)
-      {
-        if (ctr_count)
-        {
-          other.uc_each_while([&](const item_type* otValue) {
-            item_type* pValue = mValues.data + (otValue - other.mValues.data);
-            pValue->~item_type();
-            return --ctr_count;
-          });
-        }
-        throw;
-      }
       INDIVI_UTABLE_ASSERT(ctr_count == other.mSize);
 
       std::memcpy(mGroups.data, other.mGroups.data, sizeof(MetaGroup) * (mGMask + 1u));
@@ -1681,8 +1660,7 @@ private:
       return;
 
     reserve(other.mSize);
-    try
-    {
+    
       if (mMaxSize == other.mMaxSize) // same bucket count
       {
         fast_copy(other);
@@ -1694,44 +1672,14 @@ private:
           ++mSize;
         });
       }
-    }
-    catch (...)
-    {
-      destroy();
-      throw;
-    }
   }
 
   void move_to(MetaGroup* newGroups, item_type* newValues, size_type newGMask)
   {
-    try
-    {
       uc_for_each([&](item_type* pValue) {
         insert_unique(newGroups, newValues, newGMask, std::move(*pValue));
         pValue->~item_type();
       });
-    }
-    catch (...)
-    {
-      // destroy constructed
-      item_type* pValue = newValues;
-      MetaGroup* pGroup = newGroups;
-      MetaGroup* last = pGroup + newGMask + 1;
-      for (; pGroup != last; ++pGroup, pValue += 16)
-      {
-        int idx = 0;
-        int sets = pGroup->match_set();
-        while (sets)
-        {
-          if (sets & 0x01)
-            pValue[idx].~item_type();
-
-          sets >>= 1;
-          ++idx;
-        }
-      }
-      throw;
-    }
   }
 
   struct NewStorage // exception-safe helper

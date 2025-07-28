@@ -50,7 +50,7 @@ namespace emilib2 {
     constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = MXLOAD_FACTOR/(MXLOAD_FACTOR + 1)
 
 #if EMH_OFFSET_STEP == 0
-    constexpr static uint8_t OFFSET_STEP = 4;
+    constexpr static uint8_t OFFSET_STEP = 8;
 #endif
 
 #if AVX2_EHASH == 0
@@ -1046,12 +1046,11 @@ private:
         auto next_bucket = main_bucket;
         size_t offset = 0;
 
-        if (1)
-        {
+        if (1) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
-                //prefetch_heap_block((char*)&_pairs[next_bucket]);
+                prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
@@ -1072,7 +1071,7 @@ private:
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
-                //prefetch_heap_block((char*)&_pairs[next_bucket]);
+                prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))

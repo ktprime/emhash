@@ -910,7 +910,6 @@ static void benchStringHash(int size, int str_min, int str_max)
         printf("a5_hash     = %4d ms\n", (int)t_find);
 #endif
 
-
 #ifdef AHASH_AHASH_H
         start = getus();
         for (const auto& v : rndstring)

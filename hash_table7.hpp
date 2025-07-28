@@ -150,9 +150,6 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 #if _WIN32
     #include <intrin.h>
-#if _WIN64
-    #pragma intrinsic(_umul128)
-#endif
 #endif
 
 namespace emhash7 {

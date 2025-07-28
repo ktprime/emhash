@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#define EMH_INT_HASH 1
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
@@ -45,10 +46,18 @@
   #if __has_include("wyhash.h")
   #include "wyhash.h"
   #endif
-  #if __has_include("komihash.h")
-  #include "komihash.h"
-  #define KOMI_HESH 1
-  #endif
+    #if __has_include("komihash.h")
+        #include "komihash.h"
+        #define KOMI_HASH 1
+    #endif
+    #if __has_include("rapidhash/rapidhash.h")
+        #include "rapidhash/rapidhash.h"
+        #define RAPID_HASH 1
+    #endif
+    #if __has_include("a5hash.h")
+        #include "a5hash.h"
+        #define A5_HASH 1
+    #endif
 #endif
 
 #if __x86_64__ || __amd64__ || _M_X64
@@ -555,7 +564,7 @@ struct KomiHasher
 {
     std::size_t operator()(const std::string& str) const
     {
-        return komihash(str.data(), str.size(), str.size());
+        return komihash(str.data(), str.size(), 0);
     }
 };
 #endif

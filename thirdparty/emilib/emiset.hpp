@@ -437,7 +437,7 @@ public:
 		if (!new_states || !new_keys) {
 			free(new_states);
 			free(new_keys);
-			throw std::bad_alloc();
+			//throw std::bad_alloc();
 		}
 
 		// auto old_num_filled  = _num_filled;

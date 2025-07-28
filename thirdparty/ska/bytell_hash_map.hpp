@@ -216,16 +216,8 @@ public:
         : ByteAlloc(alloc), Hasher(other), Equal(other), _max_load_factor(other._max_load_factor)
     {
         rehash_for_other_container(other);
-        try
-        {
-            insert(other.begin(), other.end());
-        }
-        catch(...)
-        {
-            clear();
-            deallocate_data(entries, num_slots_minus_one);
-            throw;
-        }
+        insert(other.begin(), other.end());
+
     }
     sherwood_v8_table(sherwood_v8_table && other) noexcept
         : ByteAlloc(std::move(other)), Hasher(std::move(other)), Equal(std::move(other))
@@ -1122,15 +1114,13 @@ public:
     V & at(const K & key)
     {
         auto found = this->find(key);
-        if (found == this->end())
-            throw std::out_of_range("Argument passed to at() was not in the map.");
+        //if (found == this->end())
+        //    throw std::out_of_range("Argument passed to at() was not in the map.");
         return found->second;
     }
     const V & at(const K & key) const
     {
         auto found = this->find(key);
-        if (found == this->end())
-            throw std::out_of_range("Argument passed to at() was not in the map.");
         return found->second;
     }
 

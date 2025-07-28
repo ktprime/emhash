@@ -103,9 +103,6 @@
 
 #if _WIN32
     #include <intrin.h>
-#if _WIN64
-    #pragma intrinsic(_umul128)
-#endif
 #endif
 
 namespace emhash6 {
