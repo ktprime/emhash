@@ -19,7 +19,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#define EMH_INT_HASH 1
 #if STR_SIZE < 5
 #define STR_SIZE 15
 #endif
