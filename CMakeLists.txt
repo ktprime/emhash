@@ -51,7 +51,7 @@ install(EXPORT emhash-targets
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/emhash
 )
 
-configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
+configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/emhashConfig.cmake"
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/emhash
 )
