@@ -40,7 +40,9 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 install(TARGETS emhash
-        EXPORT emhash-targets)
+    EXPORT emhash-targets
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
 
 install(EXPORT emhash-targets
         FILE emhashTargets.cmake
