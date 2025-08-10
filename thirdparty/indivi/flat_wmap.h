@@ -1,40 +1,40 @@
 /**
- * Copyright 2024 Guillaume AUJAY. All rights reserved.
+ * Copyright 2025 Guillaume AUJAY. All rights reserved.
  * Distributed under the Apache License Version 2.0
  */
 
-#ifndef INDIVI_FLAT_UMAP_H
-#define INDIVI_FLAT_UMAP_H
+#ifndef INDIVI_FLAT_WMAP_H
+#define INDIVI_FLAT_WMAP_H
 
 #include "indivi/hash.h"
-#include "indivi/detail/flat_utable.h"
+#include "indivi/detail/flat_wtable.h"
 
 #include <functional> // for std::equal_to
 
 namespace indivi
 {
 /*
- * Flat_umap is a fast associative container that stores unordered unique key-value pairs.
+ * Flat_wmap is a fast associative container that stores (unaligned) unordered unique key-value pairs.
  * Similar to `std::unordered_map` but using an open-addressing schema,
  * with a dynamically allocated, consolidated array of values and metadata (capacity grows based on power of 2).
  * It is optimized for small sizes (starting at 2, container sizeof is 48 Bytes on 64-bits).
  *
- * Each entry uses 2 additional bytes of metadata (to store hash fragments, overflow counters and distances from original buckets).
- * Avoiding the need for a tombstone mechanism or rehashing on iterator erase (with a good hash function).
- * By grouping buckets, it also relies on SIMD operations for speed (SSE2 or NEON are mandatory).
+ * Each entry uses 1 additional byte of metadata (to store hash fragments or empty/tombstone markers).
+ * While trying to greatly minimize tombstone usage on erase.
+ * It doesn't group buckets but still relies on SIMD operations for speed (SSE2 or NEON are mandatory).
  *
  * Come with an optimized 64-bits hash function by default (see `hash.h`).
- * Use a fixed max load factor of 0.875.
+ * Use a fixed max load factor of 0.8 (a bit lower, to keep find-miss fast on high loads).
  * Iterators are invalidated on usual open-addressing operations (except the end iterator), but never on erase.
  * Search, insertion, and removal of elements have average constant time 𝓞(1) complexity.
- * Best for general purpose scenarios, including erasure and iteration.
+ * Best for find hit/miss scenarios, a bit slower for re-inserting and iterating.
  */
 template<
   class Key,
   class T,
   class Hash = indivi::hash<Key>,
   class KeyEqual = std::equal_to<Key> >
-class flat_umap
+class flat_wmap
 {
 public:
   using key_type = Key;
@@ -54,10 +54,10 @@ private:
   using nc_mapped_type = typename std::remove_const<T>::type;
   using item_type = std::pair<nc_key_type, nc_mapped_type>;
   using init_type = item_type;
-  using flat_utable = detail::flat_utable<key_type, mapped_type, value_type, item_type, size_type, hasher, key_equal>;
+  using flat_wtable = detail::flat_wtable<key_type, mapped_type, value_type, item_type, size_type, hasher, key_equal>;
 
   // Members
-  flat_utable mTable;
+  flat_wtable mTable;
 
   size_type group_capa() const noexcept { return mTable.group_capa(); }
   Hash& hash() noexcept { return mTable.hash(); }
@@ -66,49 +66,49 @@ private:
   const KeyEqual& equal() const noexcept { return mTable.equal(); }
 
 public:
-  using iterator = typename flat_utable::iterator;
-  using const_iterator = typename flat_utable::const_iterator;
+  using iterator = typename flat_wtable::iterator;
+  using const_iterator = typename flat_wtable::const_iterator;
 
   // Ctr/Dtr
-  flat_umap() : flat_umap(0)
+  flat_wmap() : flat_wmap(0)
   {}
 
-  explicit flat_umap(size_type bucket_count, const Hash& hash = Hash(), const key_equal& equal = key_equal())
+  explicit flat_wmap(size_type bucket_count, const Hash& hash = Hash(), const key_equal& equal = key_equal())
     : mTable(bucket_count, hash, equal)
   {}
 
   template< class InputIt >
-  flat_umap(InputIt first, InputIt last, size_type bucket_count = 0, const Hash& hash = Hash(), const key_equal& equal = key_equal())
+  flat_wmap(InputIt first, InputIt last, size_type bucket_count = 0, const Hash& hash = Hash(), const key_equal& equal = key_equal())
     : mTable(first, last, bucket_count, hash, equal)
   {}
 
-  flat_umap(std::initializer_list<value_type> init, size_type bucket_count = 0, const Hash& hash = Hash(), const key_equal& equal = key_equal())
+  flat_wmap(std::initializer_list<value_type> init, size_type bucket_count = 0, const Hash& hash = Hash(), const key_equal& equal = key_equal())
     : mTable(init.begin(), init.end(), bucket_count, hash, equal)
   {}
 
-  flat_umap(const flat_umap& other)
+  flat_wmap(const flat_wmap& other)
     : mTable(other.mTable)
   {}
 
-  flat_umap(flat_umap&& other)
-    noexcept(std::is_nothrow_move_constructible<flat_utable>::value)
+  flat_wmap(flat_wmap&& other)
+    noexcept(std::is_nothrow_move_constructible<flat_wtable>::value)
     : mTable(std::move(other.mTable))
   {}
 
-  ~flat_umap() = default;
+  ~flat_wmap() = default;
 
   // Assignment
-  flat_umap& operator=(const flat_umap& other)
+  flat_wmap& operator=(const flat_wmap& other)
   {
     mTable = other.mTable;
     return *this;
   }
-  flat_umap& operator=(flat_umap&& other) noexcept(std::is_nothrow_move_assignable<flat_utable>::value)
+  flat_wmap& operator=(flat_wmap&& other) noexcept(std::is_nothrow_move_assignable<flat_wtable>::value)
   {
     mTable = std::move(other.mTable);
     return *this;
   }
-  flat_umap& operator=(std::initializer_list<value_type> ilist)
+  flat_wmap& operator=(std::initializer_list<value_type> ilist)
   {
     clear();
     insert(ilist.begin(), ilist.end());
@@ -199,28 +199,28 @@ public:
 
   size_type erase(const Key& key) { return mTable.erase(key); }
 
-  void swap(flat_umap& other) noexcept(noexcept(mTable.swap(other.mTable))) { mTable.swap(other.mTable); }
+  void swap(flat_wmap& other) noexcept(noexcept(mTable.swap(other.mTable))) { mTable.swap(other.mTable); }
 
   // Non-member
-  friend void swap(flat_umap& lhs, flat_umap& rhs) noexcept(noexcept(lhs.swap(rhs))) { lhs.swap(rhs); }
+  friend void swap(flat_wmap& lhs, flat_wmap& rhs) noexcept(noexcept(lhs.swap(rhs))) { lhs.swap(rhs); }
 
-  friend bool operator==(const flat_umap& lhs, const flat_umap& rhs) { return lhs.mTable.equal(rhs.mTable); }
+  friend bool operator==(const flat_wmap& lhs, const flat_wmap& rhs) { return lhs.mTable.equal(rhs.mTable); }
 
-  friend bool operator!=(const flat_umap& lhs, const flat_umap& rhs) { return !(lhs.mTable.equal(rhs.mTable)); }
+  friend bool operator!=(const flat_wmap& lhs, const flat_wmap& rhs) { return !(lhs.mTable.equal(rhs.mTable)); }
 
   template< class Pred >
-  friend size_type erase_if(flat_umap& map, Pred pred) { return map.mTable.erase_if(pred); }
+  friend size_type erase_if(flat_wmap& map, Pred pred) { return map.mTable.erase_if(pred); }
 
-#ifdef INDIVI_FLAT_U_DEBUG
+#ifdef INDIVI_FLAT_W_DEBUG
   bool is_cleared() const noexcept { return mTable.is_cleared(); }
 #endif
-#ifdef INDIVI_FLAT_U_STATS
-  typename flat_utable::GroupStats get_group_stats() const noexcept { return mTable.get_group_stats(); }
-  typename flat_utable::FindStats get_find_stats() const noexcept { return mTable.get_find_stats(); }
+#ifdef INDIVI_FLAT_W_STATS
+  typename flat_wtable::GroupStats get_group_stats() const noexcept { return mTable.get_group_stats(); }
+  typename flat_wtable::FindStats get_find_stats() const noexcept { return mTable.get_find_stats(); }
   void reset_find_stats() noexcept { return mTable.reset_find_stats(); }
 #endif
 };
 
 } // namespace indivi
 
-#endif // INDIVI_FLAT_UMAP_H
+#endif // INDIVI_FLAT_WMAP_H

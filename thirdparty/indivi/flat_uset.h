@@ -13,19 +13,21 @@
 
 namespace indivi
 {
-/* 
+/*
  * Flat_uset is a fast associative container that stores unordered unique keys.
  * Similar to `std::unordered_set` but using an open-addressing schema,
  * with a dynamically allocated, consolidated array of values and metadata (capacity grows based on power of 2).
- * It is optimized for small sizes (starting at 2, container sizeof is 40 Bytes on 64-bits).
+ * It is optimized for small sizes (starting at 2, container sizeof is 48 Bytes on 64-bits).
  *
  * Each entry uses 2 additional bytes of metadata (to store hash fragments, overflow counters and distances from original buckets).
- * Avoiding the need for a tombstone mechanism or rehashing on iterator erase (*with a good hash function).
+ * Avoiding the need for a tombstone mechanism or rehashing on iterator erase (with a good hash function).
  * By grouping buckets, it also relies on SIMD operations for speed (SSE2 or NEON are mandatory).
  *
  * Come with an optimized 64-bits hash function by default (see `hash.h`).
+ * Use a fixed max load factor of 0.875.
  * Iterators are invalidated on usual open-addressing operations (except the end iterator), but never on erase.
  * Search, insertion, and removal of elements have average constant time 𝓞(1) complexity.
+ * Best for general purpose scenarios, including erasure and iteration.
  */
 template<
   class Key,

@@ -11,8 +11,8 @@
 #ifndef INDIVI_HASH_H
 #define INDIVI_HASH_H
 
-#include "detail/indivi_defines.h"
-#include "detail/indivi_utils.h"
+#include "indivi/detail/indivi_defines.h"
+#include "indivi/detail/indivi_utils.h"
 
 #include <memory>
 #include <string>
@@ -169,6 +169,32 @@ namespace wyhash
 
 } // namespace wyhash
 
+// Abstraction for optional hash mixer
+struct no_mix
+{
+  template< typename H, typename V >
+  static inline std::size_t mix(const H& hasher, const V& v)
+  {
+    return hasher(v);
+  }
+};
+
+struct bit_mix
+{
+  template< typename H, typename V >
+  static inline std::size_t mix(const H& hasher, const V& v)
+  {
+    std::size_t hash = hasher(v);
+  #ifdef INDIVI_ARCH_64
+    constexpr uint64_t phi = UINT64_C(0x9E3779B97F4A7C15);
+    return wyhash::mix(hash, phi);
+  #else // 32-bits assumed
+    // from https://arxiv.org/abs/2001.05304
+    constexpr uint32_t multiplier = UINT32_C(0xE817FB2D);
+    return wyhash::mix32(hash, multiplier);
+  #endif
+  }
+};
 
 // Detect if Hash has avalanching trait
 // i.e. if 'Hash::is_avalanching' type is present
