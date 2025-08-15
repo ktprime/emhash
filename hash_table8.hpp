@@ -1146,10 +1146,11 @@ public:
         return true;
     }
 
-    void rebuild(size_type num_buckets) noexcept
+    void rebuild(size_type num_buckets, size_type required_buckets) noexcept
     {
         free(_index);
-        auto new_pairs = (value_type*)alloc_bucket((size_type)((double)num_buckets * max_load_factor()) + 4);
+        const auto need_size = std::max((size_type)((double)num_buckets * max_load_factor()) + 4, required_buckets + 2);
+        auto new_pairs = (value_type*)alloc_bucket(need_size);
         if (is_trivially_copyable()) {
             if (_pairs)
             memcpy((char*)new_pairs, (char*)_pairs, _num_filled * sizeof(value_type));
@@ -1198,7 +1199,7 @@ public:
 #endif
         _num_buckets = num_buckets;
 
-        rebuild(num_buckets);
+        rebuild(num_buckets, required_buckets);
 
 #ifdef EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {
