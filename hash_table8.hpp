@@ -88,7 +88,7 @@ class HashMap
     constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
 
 public:
-    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT, Allocator, Policy>; //TODO:Allocator is not implemented
     using value_type = std::pair<KeyT, ValueT>; //TODO set to const KeyT
     using key_type = const KeyT;
     using mapped_type = ValueT;
