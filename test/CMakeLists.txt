@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 project(emhash_test)
 if (CMAKE_BUILD_TYPE)
 else()
@@ -19,7 +19,8 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     target_compile_options(emhash_test PRIVATE /bigobj /WX /W3 /DTSL_DEBUG /NDEBUG)
 endif()
 
-#include_directories(${PROJECT_SOURCE_DIR}/..)
+include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/..)
 include_directories(${PROJECT_SOURCE_DIR}/../thirdparty/)
 
 # Boost::unit_test_framework

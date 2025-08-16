@@ -483,7 +483,7 @@ public:
     }
     catch (...) {
       destroy();
-      throw;
+      //throw;
     }
   }
 
@@ -631,8 +631,8 @@ public:
     size_type gIndex = hash_position(hash, mShift);
 
     Location loc = find_impl(hash, gIndex, key);
-    if (!loc.value)
-      throw std::out_of_range("flat_wtable::at");
+    //if (!loc.value)
+      //throw std::out_of_range("flat_wtable::at");
   
     return loc.value->second;
   }
@@ -642,8 +642,8 @@ public:
     size_type gIndex = hash_position(hash, mShift);
 
     Location loc = find_impl(hash, gIndex, key);
-    if (!loc.value)
-      throw std::out_of_range("flat_wtable::at");
+    //if (!loc.value)
+    //  throw std::out_of_range("flat_wtable::at");
   
     return loc.value->second;
   }
@@ -1514,7 +1514,7 @@ private:
             return --ctr_count;
           });
         }
-        throw;
+        //throw;
       }
       INDIVI_WTABLE_ASSERT(ctr_count == other.mSize);
 
@@ -1548,7 +1548,7 @@ private:
     catch (...)
     {
       destroy();
-      throw;
+      //throw;
     }
   }
 
@@ -1581,7 +1581,7 @@ private:
           ++idx;
         }
       }
-      throw;
+      //throw;
     }
   }
 

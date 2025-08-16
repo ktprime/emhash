@@ -1199,7 +1199,7 @@ public:
 #endif
         _num_buckets = num_buckets;
 
-        rebuild(num_buckets, required_buckets);
+        rebuild(num_buckets, (size_type)required_buckets);
 
 #ifdef EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {

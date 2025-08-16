@@ -41,13 +41,15 @@ namespace emilib2 {
 
     enum State : int8_t
     {
-        EFILLED  = -126, EDELETE = -127, EEMPTY = -128,
+        EFILLED = -126,
+        EDELETE = -127,
+        EEMPTY = -128,
         SENTINEL = 127,
     };
 
     constexpr static uint8_t MAPBITS = 253;
     constexpr static uint8_t EMPTY_OFFSET = 0;
-    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = MXLOAD_FACTOR/(MXLOAD_FACTOR + 1)
+    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load factor = MXLOAD_FACTOR/(MXLOAD_FACTOR + 1)
 
 #if EMH_OFFSET_STEP == 0
     constexpr static uint8_t OFFSET_STEP = 8;
@@ -99,38 +101,6 @@ namespace emilib2 {
     #define EMH_ITERATOR_BITS 16
 #endif
 
-inline static uint32_t CTZ(size_t n)
-{
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-
-#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    n = __builtin_bswap64(n);
-#else
-    static uint32_t endianness = 0x12345678;
-    const auto is_big = *(const char *)&endianness == 0x12;
-    if (is_big)
-    n = __builtin_bswap64(n);
-#endif
-
-#if _WIN32
-    unsigned long index;
-    #if defined(_WIN64)
-        _BitScanForward64(&index, n);
-    #else
-    if ((uint32_t)n)
-        _BitScanForward(&index, (uint32_t)n);
-    else
-        {_BitScanForward(&index, (uint32_t)(n >> 32)); index += 32; }
-    #endif
-#elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    auto index = __builtin_ctzll((unsigned long long)n);
-#elif 1
-    auto index = __builtin_ctzl(n);
-#endif
-
-    return (uint32_t)index;
-}
-
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap
@@ -166,6 +136,38 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash) & _mask;
         return (int8_t)((size_t)(key_hash % MAPBITS) + (size_t)EFILLED);
+    }
+
+    inline static uint32_t CTZ(size_t n)
+    {
+#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+
+#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+        n = __builtin_bswap64(n);
+#else
+        static uint32_t endianness = 0x12345678;
+        const auto is_big = *(const char*)&endianness == 0x12;
+        if (is_big)
+            n = __builtin_bswap64(n);
+#endif
+
+#if _WIN32
+        unsigned long index;
+#if defined(_WIN64)
+        _BitScanForward(&index, n);
+#else
+        if ((uint32_t)n)
+            _BitScanForward(&index, (uint32_t)n);
+        else
+            _BitScanForward(&index, (uint32_t)(n >> 32)), index += 32;
+#endif
+#elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
+//        auto index = __builtin_ctzll((unsigned long long)n);
+//#elif 1
+        auto index = __builtin_ctzl(n);
+#endif
+
+        return (uint32_t)index;
     }
 
     class const_iterator;
@@ -371,7 +373,7 @@ public:
     template<class InputIt>
     HashMap(InputIt first, InputIt last, size_t bucket_count = 4) noexcept
     {
-        reserve(std::distance(first, last) + bucket_count);
+        reserve((size_t)std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
@@ -656,7 +658,7 @@ public:
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
-        reserve(endc - beginc + _num_filled);
+        reserve(size_t(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
     }
@@ -677,7 +679,7 @@ public:
 
     void insert(std::initializer_list<value_type> ilist) noexcept
     {
-        reserve(ilist.size() + _num_filled);
+        reserve((size_t)ilist.size() + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
             do_insert(*it);
     }
@@ -982,7 +984,7 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-        _mm_prefetch((const char*)ctrl, _MM_HINT_T1);
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -1014,8 +1016,8 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
 #if EMH_PSL_LINEAR == 0
-      next_bucket += offset < 5 ? (simd_bytes + 1) * offset: _num_buckets / 11 + 5;
-//      next_bucket += (simd_bytes + 1) * offset + 1;
+//      next_bucket += offset < 5 ? (simd_bytes + 1) * offset: _num_buckets / 11 + 5;
+      next_bucket += (simd_bytes + 1) * offset + 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;
@@ -1055,8 +1057,7 @@ private:
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
-                    maskf &= maskf - 1;
-                } while (maskf != 0);
+                } while (maskf &= maskf - 1);
             }
 
             const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
@@ -1076,8 +1077,7 @@ private:
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
-                    maskf &= maskf - 1;
-                } while (maskf != 0);
+                } while (maskf &= maskf - 1);
             }
 #if 0
             const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
@@ -1113,7 +1113,7 @@ private:
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
 
-        while (true) {
+        do {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf  = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
@@ -1146,9 +1146,7 @@ private:
 
             //4. next round
             next_bucket = get_next_bucket(next_bucket, ++offset);
-            if (offset > get_offset(main_bucket))
-                break;
-        }
+        } while (offset <= get_offset(main_bucket));
 
         if (hole != chole) {
             //set_offset(main_bucket, offset - 1);

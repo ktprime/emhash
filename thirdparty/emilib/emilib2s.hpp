@@ -120,7 +120,7 @@ private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
     using PairT = std::pair<const KeyT, ValueT>;
-    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load =  LOAD_FACTOR / (LOAD_FACTOR + 1)
+    constexpr static uint8_t MXLOAD_FACTOR = 5; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
     using size_t          = uint32_t;
@@ -347,7 +347,7 @@ public:
     template<class InputIt>
     HashMap(InputIt first, InputIt last, size_t bucket_count = 4) noexcept
     {
-        reserve(std::distance(first, last) + bucket_count);
+        reserve((size_t)std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
@@ -633,7 +633,7 @@ public:
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
-        reserve(endc - beginc + _num_filled);
+        reserve(size_t(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
     }
@@ -654,7 +654,7 @@ public:
 
     void insert(std::initializer_list<value_type> ilist) noexcept
     {
-        reserve(ilist.size() + _num_filled);
+        reserve(size_t(ilist.size()) + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
             do_insert(*it);
     }
@@ -666,7 +666,7 @@ public:
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-        const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
+        const auto bucket = find_empty_slot(main_bucket, 0);
 
         set_states(bucket, key_h2);
         new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
@@ -804,6 +804,7 @@ public:
     static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
+        //is_trivially_copy_constructible
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -947,7 +948,7 @@ private:
         _states[ebucket] = key_h2;
     }
 
-    inline void set_offset(int32_t offset)
+    inline void set_offset(size_t offset)
     {
         _max_probe_length = offset;
     }
@@ -990,7 +991,7 @@ private:
 
             if (group_mask(next_bucket) == State::EEMPTY)
                 break;
-            if (EMH_UNLIKELY(++offset > _max_probe_length))
+            if (EMH_UNLIKELY(int(++offset) > _max_probe_length))
                 break;
             next_bucket = get_next_bucket(next_bucket, (size_t)offset);
         }
@@ -1012,7 +1013,7 @@ private:
         const auto key_h2 = hash_key2(main_bucket, key);
         prefetch_heap_block((char*)&_pairs[main_bucket]);
         const auto filled = SET1_EPI8(key_h2);
-        auto next_bucket = main_bucket; int offset = 0u;
+        auto next_bucket = main_bucket; size_t offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
 
@@ -1049,7 +1050,7 @@ private:
 
             //4. next round
             next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
-            if (EMH_UNLIKELY(offset > _max_probe_length))
+            if (EMH_UNLIKELY((int)offset > _max_probe_length))
                 break;
         }
 
@@ -1077,14 +1078,14 @@ private:
         return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete));
     }
 
-    size_t find_empty_slot(size_t next_bucket, int offset) noexcept
+    size_t find_empty_slot(size_t next_bucket, size_t offset) noexcept
     {
         while (true) {
             const auto maske = empty_delete(next_bucket);
             if (maske != 0) {
                 const auto ebucket = CTZ(maske) + next_bucket;
                 prefetch_heap_block((char*)&_pairs[ebucket]);
-                if (offset > _max_probe_length)
+                if ((int)offset > _max_probe_length)
                     set_offset(offset);
                 return ebucket;
             }

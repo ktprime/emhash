@@ -141,7 +141,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 }
 
 #if 0
-#define ehmap  emilib2::HashMap
+#define ehmap  emilib3::HashMap
 #else
 #define ehmap  emhash8::HashMap
 #endif
@@ -609,7 +609,7 @@ static void TestApi()
     {
         ehmap<uint64_t, uint32_t> emi;
         emi.reserve(1000);
-        int key = rand();
+        uint64_t key = rand();
         emi.insert({key, 0}); emi.emplace(key, 1);
         auto it = emi.try_emplace(key, 0); assert(!it.second);
         it = emi.try_emplace(key + 1, 1); assert(it.second);

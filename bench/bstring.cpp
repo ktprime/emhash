@@ -5,6 +5,8 @@
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #ifdef ABSL_HMAP
 # include "absl/container/node_hash_map.h"
 # include "absl/container/flat_hash_map.h"
@@ -303,20 +305,22 @@ template<class K, class V> using std_unordered_map =
 template<class K, class V> using boost_unordered_flat_map =
     boost::unordered_flat_map<K, V, BstrHasher, std::equal_to<K>>;
 
-template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using emhash_map8 = emhash8::HashMap<K, V, BstrHasher>;
+template<class K, class V> using emhash_map7 = emhash7::HashMap<K, V, BstrHasher>;
+template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BstrHasher>;
 
-template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using martin_dense = ankerl::unordered_dense::map<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using emilib1_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using emilib3_map = emilib::HashMap<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, BstrHasher>;
+template<class K, class V> using martin_dense = ankerl::unordered_dense::map<K, V, BstrHasher>;
+template<class K, class V> using emilib1_map = emilib::HashMap<K, V, BstrHasher>;
+template<class K, class V> using emilib2_map = emilib2::HashMap<K, V, BstrHasher>;
+template<class K, class V> using emilib3_map = emilib3::HashMap<K, V, BstrHasher>;
+template<class K, class V> using indivi_umap = indivi::flat_umap<K, V, BstrHasher>;
+template<class K, class V> using indivi_wmap = indivi::flat_wmap<K, V, BstrHasher>;
 
 #ifdef ABSL_HMAP
 
-template<class K, class V> using absl_node_hash_map = absl::node_hash_map<K, V, BstrHasher, std::equal_to<K>>;
-template<class K, class V> using absl_flat_hash_map = absl::flat_hash_map<K, V, BstrHasher, std::equal_to<K>>;
+template<class K, class V> using absl_node_hash_map = absl::node_hash_map<K, V, BstrHasher>;
+template<class K, class V> using absl_flat_hash_map = absl::flat_hash_map<K, V, BstrHasher>;
 
 #endif
 
@@ -439,6 +443,8 @@ int main(int argc, const char* argv[])
     test<emilib1_map> ("emilib1_map" );
     test<emilib3_map> ("emilib3_map" );
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+    test<indivi_umap>("indivi_umap");
+    test<indivi_wmap>("indivi_wmap");
     test<emilib2_map> ("emilib2_map" );
 
     test<emhash_map5>( "emhash5::hash_map" );

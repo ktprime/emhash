@@ -5,6 +5,8 @@
     #define TTVal              0
 #endif
 
+#define  HAVE_INDIVI 1
+
 #include "util.h"
 
 #if __GNUC__ > 4 && __linux__
@@ -32,7 +34,8 @@ std::map<std::string, std::string> maps =
     {"boostf",  "boost_flat"},
 #endif
 #ifdef HAVE_INDIVI
-    {"indivi", "indivi_umap" },
+    {"indiviu", "indivi_umap" },
+    {"indiviw", "indivi_wmap" },
 #endif
 
     {"emhash5", "emhash5"},
@@ -121,6 +124,7 @@ std::map<std::string, std::string> maps =
 
 #ifdef HAVE_INDIVI
 # include "indivi/flat_umap.h"
+# include "indivi/flat_wmap.h"
 #endif
 
 #include "../hash_table6.hpp"
@@ -1462,7 +1466,8 @@ static int benchHashMap(int n)
         {  benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
 #endif
 #if HAVE_INDIVI
-        {  benOneHash<indivi::flat_umap<keyType, valueType, ehash_func>>("indivi", vList); }
+        {  benOneHash<indivi::flat_umap<keyType, valueType, ehash_func>>("indiviu", vList); }
+        {  benOneHash<indivi::flat_wmap<keyType, valueType, ehash_func>>("indiviw", vList); }
 #endif
 
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }

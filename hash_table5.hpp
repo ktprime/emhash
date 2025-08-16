@@ -388,7 +388,7 @@ public:
     template<class InputIt>
     HashMap(InputIt first, InputIt last, size_type bucket_count=4) noexcept
     {
-        init(std::distance(first, last) + bucket_count);
+        init((size_type)std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             emplace(*first);
     }

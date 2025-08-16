@@ -1,6 +1,8 @@
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #define _SILENCE_CXX20_CISO646_REMOVED_WARNING
 #include <boost/unordered/unordered_flat_map.hpp>
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #include "util.h"
 
 #include "tsl/robin_map.h"
@@ -13,8 +15,6 @@
 #include "hash_table5.hpp"
 #include "hash_table8.hpp"
 #include "emilib/emilib2s.hpp"
-
-//#define EMH_STATIS 1234567
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib2ss.hpp"
 #include <iomanip>
@@ -168,11 +168,12 @@ template<template<class...> class Map>  void test_block(char const* label)
 #endif
 }
 
-template<class K, class V> using boost_unordered_flat_map =
-    boost::unordered_flat_map<K, V, BintHasher>;
+template<class K, class V> using boost_unordered_flat_map = boost::unordered_flat_map<K, V, BintHasher>;
 
-template<class K, class V> using std_unordered_map =
-    std::unordered_map<K, V, BintHasher>;
+template<class K, class V> using invidi_umap = indivi::flat_umap<K, V, BintHasher>;
+template<class K, class V> using invidi_wmap = indivi::flat_wmap<K, V, BintHasher>;
+
+template<class K, class V> using std_unordered_map = std::unordered_map<K, V, BintHasher>;
 
 template<class K, class V> using emhash_map5 = emhash5::HashMap<K, V, BintHasher>;
 template<class K, class V> using emhash_map6 = emhash6::HashMap<K, V, BintHasher>;
@@ -215,64 +216,53 @@ int main(int argc, const char* argv[])
 
     assert(K > 0 && N > 0 && R > 0);
     init_indices(N, N*K, R);
-#if 1
-//    test_block<martin_flat> ("martin_flat" );
 
 #if CK_HMAP
-//    test_loops<ck_hashmap>( "ck::hashmap" );
-//    test_block<ck_hashmap>( "ck::hashmap" );
+//    test_loops<ck_hashmap>( "ck::hashmap");
+//    test_block<ck_hashmap>( "ck::hashmap");
 #endif
-#endif
 
-    test_loops<rig_hashmap>( "rigtorp::hashmap" );
-    test_block<rig_hashmap>( "rigtorp::hashmap" );
+    test_loops<rig_hashmap>("rigtorp::hashmap"); test_block<rig_hashmap>("rigtorp::hashmap");
 
-    test_loops<boost_unordered_flat_map>( "boost::flat_hashmap" );
-    test_block<boost_unordered_flat_map>("boost::flat_hashmap");
+    test_loops<boost_unordered_flat_map>("boost::flat_hashmap"); test_block<boost_unordered_flat_map>("boost::flat_hashmap");
 
-    test_loops<emilib_map1>("emilib_map1");
-    test_block<emilib_map1>("emilib_map1");
+    test_loops<invidi_umap>("invidi::umap"); test_block<invidi_umap>("indivi::umap");
+    test_loops<invidi_wmap>("invidi::wmap"); test_block<invidi_wmap>("indivi::wmap");
+
+
+    test_loops<emilib_map1>("emilib_map1"); test_block<emilib_map1>("emilib_map1");
 
 #if 1
-    test_loops<emilib_map2> ("emilib_map2" );
-    test_block<emilib_map2> ("emilib_map2" );
+    test_loops<emilib_map2> ("emilib_map2"); test_block<emilib_map2> ("emilib_map2");
 
-    test_loops<emilib_map3>("emilib_map3");
-    test_block<emilib_map3>("emilib_map3");
+    test_loops<emilib_map3>("emilib_map3"); test_block<emilib_map3>("emilib_map3");
 
-    test_loops<emhash_map5> ("emhash_map5" );
-    test_block<emhash_map5>("emhash_map5");
+    test_loops<emhash_map5> ("emhash_map5"); test_block<emhash_map5>("emhash_map5");
 
-    test_loops<emhash_map6>("emhash_map6");
-    test_block<emhash_map6>("emhash_map6");
+    test_loops<emhash_map6>("emhash_map6"); test_block<emhash_map6>("emhash_map6");
 
 
-    test_loops<emhash_map8>("emhash_map8");
-    test_block<emhash_map8>("emhash_map8");
+    test_loops<emhash_map8>("emhash_map8"); test_block<emhash_map8>("emhash_map8");
 
-    test_loops<emhash_map7>("emhash_map7");
-    test_block<emhash_map7>("emhash_map7");
+    test_loops<emhash_map7>("emhash_map7"); test_block<emhash_map7>("emhash_map7");
 
 #if ABSL_HMAP
-    test_loops<absl_flat_hash_map>("absl::flat_hash_map" );
-    test_block<absl_flat_hash_map>("absl::flat_hash_map" );
+    test_loops<absl_flat_hash_map>("absl::flat_hash_map"); test_block<absl_flat_hash_map>("absl::flat_hash_map");
 #endif
-    test_loops<phmap_flat> ("phmap_flat" );
-    test_block<phmap_flat> ("phmap_flat" );
+    test_loops<phmap_flat> ("phmap_flat"); test_block<phmap_flat> ("phmap_flat");
 
-    test_loops<std_unordered_map> ("std::unordered_map" );
-    test_block<std_unordered_map> ("std::unordered_map" );
+    test_loops<std_unordered_map> ("std::unordered_map"); test_block<std_unordered_map> ("std::unordered_map");
 
 #ifdef CXX20
-    test_loops<jg_densemap> ("jg_densemap" );
-    test_block<jg_densemap>("jg_densemap");
+    test_loops<jg_densemap> ("jg_densemap"); test_block<jg_densemap>("jg_densemap");
 #endif
 
-    test_loops<martin_dense>("martin_dense" );
-    test_block<martin_dense>("martin_dense");
+    test_loops<martin_dense>("martin_dense"); test_block<martin_dense>("martin_dense");
 
-    test_loops<martin_flat> ("martin_flat" );
-    test_loops<tsl_robin_map> ("tsl_robin_map" );
+    test_loops<martin_flat> ("martin_flat"); 
+	//test_block<martin_flat> ("martin_flat");
+
+    test_loops<tsl_robin_map> ("tsl_robin_map");
     test_block<tsl_robin_map>("tsl_robin_map");
 #endif
 

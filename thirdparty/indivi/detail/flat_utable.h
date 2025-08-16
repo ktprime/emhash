@@ -503,7 +503,6 @@ public:
     }
     catch (...) {
       destroy();
-      throw;
     }
   }
 
@@ -650,8 +649,6 @@ public:
     size_type gIndex = hash_position(hash, mShift, mGMask);
 
     Location loc = find_impl(hash, gIndex, key);
-    if (!loc.value)
-      throw std::out_of_range("flat_utable::at");
   
     return loc.value->second;
   }
@@ -661,8 +658,6 @@ public:
     size_type gIndex = hash_position(hash, mShift, mGMask);
 
     Location loc = find_impl(hash, gIndex, key);
-    if (!loc.value)
-      throw std::out_of_range("flat_utable::at");
   
     return loc.value->second;
   }
@@ -1593,7 +1588,6 @@ private:
             return --ctr_count;
           });
         }
-        throw;
       }
       INDIVI_UTABLE_ASSERT(ctr_count == other.mSize);
 
@@ -1626,7 +1620,6 @@ private:
     catch (...)
     {
       destroy();
-      throw;
     }
   }
 
@@ -1658,7 +1651,6 @@ private:
           ++idx;
         }
       }
-      throw;
     }
   }
 

@@ -16,6 +16,9 @@
 #include "emilib/emilib2s.hpp"
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib2ss.hpp"
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
+
 #include <iomanip>
 #include <chrono>
 
@@ -321,6 +324,8 @@ template<class K, class V> using martin_flat = robin_hood::unordered_map<K, V, B
 template<class K, class V> using emilib_map1 = emilib::HashMap<K, V, BintHasher>;
 template<class K, class V> using emilib_map2 = emilib2::HashMap<K, V, BintHasher>;
 template<class K, class V> using emilib_map3 = emilib3::HashMap<K, V, BintHasher>;
+template<class K, class V> using indivi_umap = indivi::flat_umap<K, V, BintHasher>;
+template<class K, class V> using indivi_wmap = indivi::flat_wmap<K, V, BintHasher>;
 
 #ifdef CXX20
 template<class K, class V> using jg_densemap = jg::dense_hash_map<K, V, BintHasher>;
@@ -348,6 +353,8 @@ int main(int argc, const char* argv[])
     test<emhash_map5> ("emhash_map5" );
     test<emhash_map6>("emhash_map6");
     test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+    test<indivi_umap>( "indivi_umap" );
+    test<indivi_wmap>( "indivi_wmap" );
     test<emilib_map1> ("emilib_map1" );
     test<emilib_map2> ("emilib_map2" );
     test<emilib_map3> ("emilib_map3" );
