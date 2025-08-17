@@ -13,9 +13,6 @@
 
 #ifdef _WIN32
 #  include <intrin.h>
-#ifndef __clang__
-//#  include <zmmintrin.h>
-#endif
 #elif __x86_64__
 #  include <x86intrin.h>
 #else
@@ -97,14 +94,8 @@ inline static uint32_t CTZ(uint32_t n)
 
 #if _WIN32
     unsigned long index;
-    #if defined(_WIN64)
-        _BitScanForward64(&index, n);
-    #else
-    if ((uint32_t)n)
-        _BitScanForward(&index, (uint32_t)n);
-    else
-        {_BitScanForward(&index, (uint32_t)(n >> 32)); index += 32; }
-    #endif
+    _BitScanForward(&index, n);
+//    _BitScanForward64(&index, n);
 #elif 1
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
@@ -120,7 +111,7 @@ private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
     using PairT = std::pair<const KeyT, ValueT>;
-    constexpr static uint8_t MXLOAD_FACTOR = 5; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
+    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
     using size_t          = uint32_t;
@@ -149,7 +140,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((size_t)(key_hash % 253) + (size_t)EFILLED);
+        return (int8_t)(key_hash % 253) + EFILLED;
     }
 
     class const_iterator;
@@ -339,7 +330,7 @@ public:
 
     HashMap(std::initializer_list<value_type> il) noexcept
     {
-        reserve((size_t)il.size());
+        rehash((size_t)il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
@@ -347,7 +338,7 @@ public:
     template<class InputIt>
     HashMap(InputIt first, InputIt last, size_t bucket_count = 4) noexcept
     {
-        reserve((size_t)std::distance(first, last) + bucket_count);
+        rehash((size_t)std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
@@ -502,14 +493,14 @@ public:
         return find_filled_bucket(key) != _num_buckets;
     }
 
-    template<typename K = KeyT>
+    template<typename K=KeyT>
     ValueT& at(const K& key)
     {
         const auto bucket = find_filled_bucket(key);
         return _pairs[bucket].second;
     }
 
-    template<typename K = KeyT>
+    template<typename K=KeyT>
     const ValueT& at(const K& key) const
     {
         const auto bucket = find_filled_bucket(key);
@@ -633,7 +624,7 @@ public:
     template <typename Iter>
     void insert(Iter beginc, Iter endc)
     {
-        reserve(size_t(endc - beginc) + _num_filled);
+        rehash(size_t(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
     }
@@ -654,7 +645,7 @@ public:
 
     void insert(std::initializer_list<value_type> ilist) noexcept
     {
-        reserve(size_t(ilist.size()) + _num_filled);
+        rehash(size_t(ilist.size()) + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
             do_insert(*it);
     }
@@ -818,7 +809,7 @@ public:
         //set filled tombstone
         std::fill_n(_states + _num_buckets, simd_bytes, State::SENTINEL);
         _num_filled = 0;
-        _max_probe_length = -1;
+        _max_probe_length = 0;
     }
 
     void clear_data()
@@ -972,11 +963,11 @@ private:
     template<typename K>
     size_t find_filled_bucket(const K& key) const noexcept
     {
-        size_t main_bucket; int offset = 0;
+        size_t main_bucket; size_t offset = 0;
         const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
 
-        while (true) {
+        do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
@@ -985,18 +976,17 @@ private:
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
-                    maskf &= maskf - 1;
-                } while (maskf != 0);
+                } while (maskf &= maskf - 1);
             }
 
             if (group_mask(next_bucket) == State::EEMPTY)
-                break;
-            if (EMH_UNLIKELY(int(++offset) > _max_probe_length))
-                break;
-            next_bucket = get_next_bucket(next_bucket, (size_t)offset);
-        }
+                return _num_buckets;
+            if (offset >= _max_probe_length)
+                return _num_buckets;
+            next_bucket = get_next_bucket(next_bucket, ++offset);
+        } while (true);
 
-        return _num_buckets;
+        return 0;
     }
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
@@ -1017,7 +1007,7 @@ private:
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
 
-        while (true) {
+        do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
@@ -1049,10 +1039,9 @@ private:
             }
 
             //4. next round
-            next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
-            if (EMH_UNLIKELY((int)offset > _max_probe_length))
-                break;
-        }
+            next_bucket = get_next_bucket(next_bucket, ++offset);
+
+        } while (EMH_UNLIKELY(offset <= _max_probe_length));
 
         if (hole != chole) {
             set_states(hole, key_h2);
@@ -1085,7 +1074,7 @@ private:
             if (maske != 0) {
                 const auto ebucket = CTZ(maske) + next_bucket;
                 prefetch_heap_block((char*)&_pairs[ebucket]);
-                if ((int)offset > _max_probe_length)
+                if (offset > _max_probe_length)
                     set_offset(offset);
                 return ebucket;
             }
@@ -1118,7 +1107,7 @@ private:
     size_t  _num_buckets      = 0;
     size_t  _mask             = 0; // _num_buckets minus one
     size_t  _num_filled       = 0;
-    int     _max_probe_length = -1; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
+    size_t  _max_probe_length = 0; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };
 
 }
