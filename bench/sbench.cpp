@@ -38,6 +38,7 @@ std::map<std::string, std::string> maps =
 
 //    {"emiset", "emiset"},
     {"emiset2", "emiset2"},
+    {"emiset2s","emiset2s"},
     {"absl", "absl_flat"},
 
 #if ET
@@ -129,6 +130,7 @@ std::map<std::string, std::string> maps =
 
 #include "emilib/emiset.hpp"
 #include "emilib/emiset2.hpp"
+#include "emilib/emiset2s.hpp"
 
 #if ET
 #if X86_64
@@ -1168,6 +1170,7 @@ static int benchHashSet(int n)
         {  benOneHash<emhash8::HashSet <keyType,  ehash_func>>("emhash8", vList); }
         {  benOneHash<emilib::HashSet  <keyType,  ehash_func>>("emiset", vList); }
         {  benOneHash<emilib2::HashSet <keyType,  ehash_func>>("emiset2", vList); }
+        {  benOneHash<emilib3::HashSet <keyType,  ehash_func>>("emiset2s", vList); }
         {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
