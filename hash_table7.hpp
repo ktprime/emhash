@@ -772,8 +772,8 @@ public:
     }
 
     inline constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    inline constexpr uint64_t max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
-    inline constexpr uint64_t max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
     size_type bucket_main() const
     {

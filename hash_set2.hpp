@@ -1,5 +1,5 @@
 // emhash8::HashSet for C++11
-// version 1.3.2
+// version 1.3.3
 // https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -426,15 +426,8 @@ public:
             _loadlf = (1 << 27) / value;
     }
 
-    constexpr size_type max_size() const
-    {
-        return (1u << 31) / sizeof(PairT);
-    }
-
-    constexpr size_type max_bucket_count() const
-    {
-        return (1u << 31) / sizeof(PairT);
-    }
+    constexpr size_type max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
+    constexpr size_type max_bucket_count() const { return max_size(); }
 
 #ifndef TEST_TIMER_FEATURE
     int64_t fast_search(int64_t key, size_type buckets) const
@@ -957,9 +950,9 @@ public:
 
 private:
 
-    size_type calculate_bucket(size_type required_buckets)
+    uint64_t calculate_bucket(uint64_t required_buckets)
     {
-        size_type num_buckets = 4;
+        uint64_t num_buckets = 4;
         if (_num_filled > (1 << 16))
             num_buckets = _num_buckets >> 2;
         while (num_buckets < required_buckets)
@@ -967,12 +960,17 @@ private:
         return num_buckets;
     }
 
-    void rehash(size_type required_buckets)
+    void rehash(uint64_t required_buckets)
     {
         if (required_buckets < _num_filled)
             return;
 
-        auto num_buckets = calculate_bucket(required_buckets);
+        uint64_t buckets = _num_filled > 65536 ? (1u << 16) : 8u;
+        while (buckets < required_buckets) { buckets *= 2; }
+        if (buckets > (uint64_t)max_size() || buckets < _num_filled)
+            std::abort(); //throw std::length_error("too large size");
+
+        const auto num_buckets = (uint32_t)buckets;
         if (num_buckets == _num_buckets && _mask != 0)
             return;
 

@@ -1,5 +1,4 @@
-#pragma once
-// version 1.4.3
+// version 1.4.4
 // https://github.com/ktprime/ktprime/blob/master/hash_set4.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -23,6 +22,8 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
+
+#pragma once
 
 #include <cstring>
 #include <string>
@@ -511,15 +512,8 @@ public:
             _loadlf = (uint32_t)((1 << 27) / value);
     }
 
-    constexpr size_type max_size() const
-    {
-        return (1u << 31) / sizeof(PairT);
-    }
-
-    constexpr size_type max_bucket_count() const
-    {
-        return (1u << 31) / sizeof(PairT);
-    }
+    constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
     size_type bucket_main() const
     {
@@ -930,7 +924,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-        const auto required_buckets = (uint32_t)(num_elems * _loadlf >> 27);
+        const uint64_t required_buckets = num_elems * _loadlf >> 27;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -939,13 +933,18 @@ public:
     }
 
 private:
-    void rehash(uint32_t required_buckets)
+    void rehash(uint64_t required_buckets)
     {
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > 65536 ? (1u << 16) : 8u;
-        while (num_buckets < required_buckets) { num_buckets *= 2; }
+        uint64_t buckets = _num_filled > 65536 ? (1u << 16) : 8u;
+        while (buckets < required_buckets) { buckets *= 2; }
+		
+        if (buckets > max_size() || buckets < _num_filled)
+            std::abort(); //throw std::length_error("too large size");
+        
+        const auto num_buckets = (uint32_t)buckets;
 
         _mask        = num_buckets - 1;
 #if EMH_HIGH_LOAD

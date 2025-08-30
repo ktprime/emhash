@@ -428,8 +428,8 @@ public:
     }
 
     constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -1174,16 +1174,17 @@ public:
         if (required_buckets < _num_filled)
             return;
 
-        auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
-        while (num_buckets < required_buckets) { num_buckets *= 2; }
-
-        if (num_buckets > (uint64_t)max_size())
+        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
+        while (buckets < required_buckets) { buckets *= 2; }
+        if (buckets > (uint64_t)max_size() || buckets < _num_filled)
             std::abort(); //throw std::length_error("too large size");
 
 #if EMH_SAVE_MEM
-        if (sizeof(KeyT) < sizeof(size_type) && num_buckets >= (1ul << (2 * 8)))
-            num_buckets = 2ul << (sizeof(KeyT) * 8);
+        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
+            buckets = 2ul << (sizeof(KeyT) * 8);
 #endif
+
+        auto num_buckets = (size_type)buckets;
 
 #if EMH_REHASH_LOG
         auto last = _last;

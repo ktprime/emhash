@@ -600,7 +600,7 @@ public:
             _mlf = (uint32_t)((1 << 27) / mlf);
     }
 
-    constexpr uint64_t max_size() const { return  1ull << (sizeof(size_type) * 8 - 1); }
+    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
@@ -1385,7 +1385,6 @@ public:
         //if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
-        assert(buckets < (uint64_t)max_size() && buckets > (uint64_t)_num_filled);
         if (buckets > max_size() || buckets < _num_filled)
             std::abort();//TODO: throwOverflowError
 

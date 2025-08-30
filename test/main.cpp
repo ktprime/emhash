@@ -685,7 +685,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
     WyRand srng(time(0));
     const auto step = n % 2 + 1;
     for (size_t i = 1; i < n * step; i += step) {
-        auto ki = TO_KEY(i);
+        auto ki = (keyType)TO_KEY(i);
         ehash8[ki] = unhash[ki] = ehash[ki] = (int)srng();
     }
 
@@ -702,7 +702,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 
         const uint32_t type = uint32_t(srng() % 100);
         auto rid  = srng();// n ++;
-        auto id   = TO_KEY(rid);
+        auto id   = (keyType)TO_KEY(rid);
         if (type <= 40 || ehash8.size() < 1000) {
           auto cnid = ehash8.count(id);
           assert(cnid == unhash.count(id));
@@ -1090,7 +1090,7 @@ void test_iterators() {
     }
 //    map.reserve(1u << 30);
     const auto size = (1 << 30) * sizeof(uint64_t);
-    std::cout << (size >> 30) << "test_iterators passed\n";
+    std::cout << "test_iterators passed\n";
 }
 
 // 测试边界情况

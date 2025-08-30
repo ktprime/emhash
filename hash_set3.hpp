@@ -1,5 +1,5 @@
 // emhash7::HashSet for C++11
-// version 1.2.0
+// version 1.2.2
 // https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -436,15 +436,8 @@ public:
             _loadlf = (uint32_t)((1 << 13) / value);
     }
 
-    constexpr size_type max_size() const
-    {
-        return (1 << 30) / sizeof(PairT);
-    }
-
-    constexpr size_type max_bucket_count() const
-    {
-        return (1 << 30) / sizeof(PairT);
-    }
+    constexpr uint64_t max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
     //Returns the bucket number where the element with key k is located.
     size_type bucket(const KeyT& key) const
@@ -858,7 +851,7 @@ public:
     }
 
     /// Make room for this many elements
-    bool reserve(uint32_t num_elems)
+    bool reserve(uint64_t num_elems)
     {
         //auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
         const auto required_buckets = num_elems * 10 / 8 + 2;
@@ -870,14 +863,17 @@ public:
     }
 
     /// Make room for this many elements
-    void rehash(uint32_t required_buckets)
+    void rehash(uint64_t required_buckets)
     {
         if (required_buckets < _num_colls)
             return ;
 
-        uint32_t num_buckets = _num_colls > 1 << 16 ? 1 << 16 : 8;
-        while (num_buckets < required_buckets) { num_buckets *= 2; }
+        uint64_t buckets = _num_colls > 65536 ? (1u << 16) : 8u;
+        while (buckets < required_buckets) { buckets *= 2; }
+        if (buckets > (uint64_t)max_size() || buckets < _num_colls)
+            std::abort(); //throw std::length_error("too large size");
 
+        const auto num_buckets = (uint32_t)buckets;
         const auto main_bucket = num_buckets;
         auto new_pairs = (PairT*)malloc((1 + num_buckets + main_bucket) * sizeof(PairT));
         auto old_pairs = _pairs;

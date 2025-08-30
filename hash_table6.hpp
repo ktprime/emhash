@@ -683,8 +683,8 @@ public:
     }
 
     constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return 1ull << ((sizeof(size_type) * 8) - 1); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const { return 1ull << (sizeof(_mask) * 8 - 1); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -1252,7 +1252,8 @@ public:
         //if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
-        assert(buckets < (uint64_t)max_size() && buckets > (uint64_t)_num_filled);
+        if (buckets > max_size() || buckets < _num_filled)
+            std::abort();//TODO: throwOverflowError
         //assert(num_buckets == (2 << CTZ(required_buckets)));
 #endif
 

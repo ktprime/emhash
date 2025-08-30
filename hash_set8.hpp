@@ -388,8 +388,8 @@ public:
     }
 
     constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    constexpr size_type max_size() const { return (1ull << (sizeof(size_type) * 8 - 2)); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -852,7 +852,7 @@ public:
 
     static Index* alloc_index(size_type num_buckets)
     {
-        auto new_index = (char*)malloc((EAD + num_buckets) * sizeof(Index));
+        auto new_index = (char*)malloc((EAD + (uint64_t)num_buckets) * sizeof(Index));
         return (Index *)(new_index);
     }
 
@@ -911,10 +911,10 @@ public:
         if (required_buckets < _num_filled)
             return;
 
-        uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
-        while (num_buckets < required_buckets) { num_buckets *= 2; }
+        uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
+        while (buckets < required_buckets) { buckets *= 2; }
 
-        if (num_buckets > (uint64_t)max_size())
+        if (buckets > max_size() || buckets < _num_filled)
             std::abort(); //throw std::length_error("too large size");
 
 #if EMH_REHASH_LOG
@@ -922,6 +922,7 @@ public:
         size_type collision = 0;
 #endif
 
+        const auto num_buckets = (size_type)buckets;
         _last = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;

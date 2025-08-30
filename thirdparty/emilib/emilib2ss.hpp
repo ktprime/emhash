@@ -467,6 +467,9 @@ public:
         return 7.0f / 8;
     }
 
+    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
+
     // ------------------------------------------------------------
 
     template<typename K=KeyT>
