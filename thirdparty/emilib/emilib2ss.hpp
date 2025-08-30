@@ -962,7 +962,7 @@ private:
         return offset;
     }
 
-    inline void set_group_probe(size_t gbucket, int group_offset)
+    inline void set_group_probe(size_t gbucket, int group_offset) noexcept
     {
 #if EMH_SAFE_PSL
         _states[gbucket + group_index] = group_offset <= 128 ? group_offset : 128 + group_offset / 128;
@@ -971,13 +971,13 @@ private:
 #endif
     }
 
-    inline void set_states(size_t ebucket, int8_t key_h2)
+    inline void set_states(size_t ebucket, int8_t key_h2) noexcept
     {
         //assert(_states[ebucket] < EFILLED && key_h2 <= EFILLED);
         _states[ebucket] = key_h2;
     }
 
-    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
+    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept
     {
 #if EMH_PSL_LINEAR == 0
         if (offset < 8)// || _num_buckets < 32 * simd_bytes)
@@ -1015,13 +1015,13 @@ private:
             }
 
             if ((int)++offset > group_probe(main_bucket))
-                break;
+                return _num_buckets;
 //            if (group_has_empty(next_bucket))
 //                break;
             next_bucket = get_next_bucket(next_bucket, offset);
         }
 
-        return _num_buckets;
+        return 0;
     }
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
@@ -1029,7 +1029,9 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        reserve(_num_filled);
+        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        if (EMH_LIKELY(required_buckets >= _num_buckets))
+            rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
@@ -1039,7 +1041,7 @@ private:
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
 
-        while (true) {
+        do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
 
@@ -1054,27 +1056,21 @@ private:
                 maskf &= maskf - 1;
             }
 
-            if (group_has_empty(next_bucket)) {
-                const auto maske = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)) & group_bmask;
-                auto ebucket = next_bucket + CTZ(maske);
-                if (EMH_UNLIKELY(hole != chole))
-                    ebucket = hole;
-                set_states(ebucket, key_h2);
-                return ebucket;
-            }
-
-            //3. find erased
-            else if (hole == chole) {
-                const auto maskd = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete)) & group_bmask;
-                if (maskd != 0)
+            if (hole == chole) {
+                //2. find empty/deleted
+                const auto maskd = (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)) & group_bmask;
+                if (group_has_empty(next_bucket)) {
                     hole = next_bucket + CTZ(maskd);
+                    set_states(hole, key_h2);
+                    return hole;
+                }
+                else if (maskd != 0) {
+                    hole = next_bucket + CTZ(maskd);
+                }
             }
-
-            //4. next round
+            //3. next round
             next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
-            if (offset > group_probe(main_bucket))
-                break;
-        }
+        }  while (offset <= group_probe(main_bucket));
 
         if (hole != chole) {
             set_states(hole, key_h2);
@@ -1108,7 +1104,7 @@ private:
             if (maske != 0) {
                 const auto probe = CTZ(maske) + next_bucket;
                 prefetch_heap_block((char*)&_pairs[probe]);
-                set_group_probe(gbucket, offset);
+                set_group_probe(gbucket, offset);//bugs for unique
                 return probe;
             }
             next_bucket = get_next_bucket(next_bucket, (size_t)++offset);

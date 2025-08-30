@@ -772,8 +772,8 @@ public:
     }
 
     inline constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
-    inline constexpr size_type max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
-    inline constexpr size_type max_bucket_count() const { return max_size(); }
+    inline constexpr uint64_t max_size() const { return 1ull << (sizeof(size_type) * 8 - 1); }
+    inline constexpr uint64_t max_bucket_count() const { return max_size(); }
 
     size_type bucket_main() const
     {
@@ -1375,8 +1375,8 @@ public:
         //if (sizeof(KeyT) < sizeof(size_type) && buckets > (1ul << (sizeof(uint16_t) * 8)))
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
-        assert(buckets < (uint64_t)max_size() && buckets > (uint64_t)_num_filled);
-        //TODO: throwOverflowError
+        if (buckets > max_size() || buckets < _num_filled)
+            std::abort();//TODO: throwOverflowError
 
         auto num_buckets = (size_type)buckets;
         auto old_num_filled = _num_filled;

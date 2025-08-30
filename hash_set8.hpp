@@ -1,5 +1,5 @@
 // emhash8::HashSet for C++11/14/17
-// version 1.6.3
+// version 1.6.5
 // https://github.com/ktprime/emhash/blob/master/hash_set8.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -44,7 +44,7 @@
     #undef  EMH_NEW
     #undef  EMH_EMPTY
     #undef  EMH_PREVET
-    #undef  EMH_EQHASH 
+    #undef  EMH_EQHASH
 #endif
 
 // likely/unlikely
@@ -324,7 +324,7 @@ public:
         _mask        = rhs._mask;
 
         auto opairs  = rhs._pairs;
-        memcpy((char*)_index, (char*)rhs._index, (_num_buckets + EAD) * sizeof(Index));
+        memcpy((char*)_index, (char*)rhs._index, ((size_t)_num_buckets + EAD) * sizeof(Index));
 
         if (is_trivially_copyable()) {
             if (opairs)
@@ -913,7 +913,9 @@ public:
 
         uint32_t num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
-        assert(num_buckets < (uint64_t)max_size());
+
+        if (num_buckets > (uint64_t)max_size())
+            std::abort(); //throw std::length_error("too large size");
 
 #if EMH_REHASH_LOG
         auto last = _last;

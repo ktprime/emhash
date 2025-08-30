@@ -1,5 +1,5 @@
 // emhash8::HashMap for C++14/17/20
-// version 1.7.2
+// version 1.7.4
 // https://github.com/ktprime/emhash/blob/master/hash_table8.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -99,13 +99,13 @@ public:
 #elif EMH_SIZE_TYPE == 0
     using size_type = uint32_t;
 #else
-    using size_type = size_t;
+    using size_type = uint64_t;
 #endif
 
     using hasher = HashT;
     using key_equal = EqT;
 
-    constexpr static size_type INACTIVE = 0-1u;
+    constexpr static size_type INACTIVE = size_type(-1);
     constexpr static size_type EAD      = 2;
 
     struct Index
@@ -1070,7 +1070,7 @@ public:
         if (EMH_LIKELY(required_buckets < _mask)) // && !force
             return false;
 
-#elif EMH_HIGH_LOAD
+#else
         const auto required_buckets = num_elems + num_elems * 1 / 9;
         if (EMH_LIKELY(required_buckets < _mask))
             return false;
@@ -1108,7 +1108,7 @@ public:
 
     static Index* alloc_index(size_type num_buckets)
     {
-        auto new_index = (char*)malloc((uint64_t)(EAD + num_buckets) * sizeof(Index));
+        auto new_index = (char*)malloc((EAD + (uint64_t)num_buckets) * sizeof(Index));
         return (Index *)(new_index);
     }
 
@@ -1174,9 +1174,12 @@ public:
         if (required_buckets < _num_filled)
             return;
 
-        assert(required_buckets < (uint64_t)max_size());
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
+
+        if (num_buckets > (uint64_t)max_size())
+            std::abort(); //throw std::length_error("too large size");
+
 #if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && num_buckets >= (1ul << (2 * 8)))
             num_buckets = 2ul << (sizeof(KeyT) * 8);

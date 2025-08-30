@@ -34,7 +34,7 @@ std::map<std::string, std::string> maps =
     {"boostf",  "boost_flat"},
 #endif
 #ifdef HAVE_INDIVI
-    {"indiviu", "indivi_umap" },
+//    {"indiviu", "indivi_umap" },
     {"indiviw", "indivi_wmap" },
 #endif
 
@@ -1216,8 +1216,9 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     insert_no_reserve <hash_type>(hash_name, oList);
     insert_reserve<hash_type>(hash, hash_name, oList);
     insert_hit<hash_type>(hash, hash_name, oList);
-    //insert_accident<hash_type>(hash, hash_name, oList);
 
+    //insert_accident<hash_type>(hash, hash_name, oList);
+    hlf = hash.load_factor();
     find_hit_100<hash_type>(hash, hash_name, oList);
 
     //modify half dataset from start
@@ -1643,7 +1644,7 @@ int main(int argc, char* argv[])
 #endif
     auto start = getus();
 //    test_lru(100'000'000);
-    testHashInt(int(1e8));
+//    testHashInt(int(1e8));
 
 #ifdef A_HASH
     printf("ahash_version = %s\n", ahash_version());

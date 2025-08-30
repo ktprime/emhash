@@ -700,7 +700,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
         assert(ehash.size() == unhash.size());
         assert(ehash8.size() == unhash.size());
 
-        const uint32_t type = int(srng() % 100);
+        const uint32_t type = uint32_t(srng() % 100);
         auto rid  = srng();// n ++;
         auto id   = TO_KEY(rid);
         if (type <= 40 || ehash8.size() < 1000) {
@@ -799,7 +799,7 @@ static void benchIntRand(int loops = 100000009)
         ts = getus();
         Sfc4 srng(rseed);
         for (int i = 1; i < loops; i++)
-            sum += srng();
+            sum += (long)srng();
         printf("Sfc4       = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
 
@@ -807,14 +807,14 @@ static void benchIntRand(int loops = 100000009)
         ts = getus();
         RomuDuoJr srng(rseed);
         for (int i = 1; i < loops; i++)
-            sum += srng();
+            sum += (long)srng();
         printf("RomuDuoJr  = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
     {
         ts = getus();
         Orbit srng(rseed);
         for (int i = 1; i < loops; i++)
-            sum += srng();
+            sum += (long)srng();
         printf("Orbit      = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
 
@@ -823,7 +823,7 @@ static void benchIntRand(int loops = 100000009)
         ts = getus();
         Lehmer64 srng(rseed);
         for (int i = 1; i < loops; i++)
-            sum += srng();
+            sum += (long)srng();
         printf("Lehmer64   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
 #endif
@@ -832,7 +832,7 @@ static void benchIntRand(int loops = 100000009)
         ts = getus();
         std::mt19937_64 srng(rseed);
         for (int i = 1; i < loops; i++)
-            sum += srng();
+            sum += (long)srng();
         printf("mt19937_64 = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
 
@@ -841,7 +841,7 @@ static void benchIntRand(int loops = 100000009)
         ts = getus();
         WyRand srng(rseed);
         for (int i = 1; i < loops; i++)
-            sum += srng();
+            sum += (long)srng();
         printf("wyrand     = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
     }
 #endif
@@ -874,14 +874,14 @@ static void benchStringHash(int size, int str_min, int str_max)
 
         start = getus();
         for (const auto& v : rndstring)
-            sum = std::hash<std::string>()(v);
+            sum += (long)std::hash<std::string>()(v);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("std hash    = %4d ms\n", (int)t_find);
 
 #ifdef WYHASH_LITTLE_ENDIAN
         start = getus();
         for (const auto& v : rndstring)
-            sum += wyhash(v.data(), v.size(), rseed);
+            sum += (long)wyhash(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("wyhash      = %4d ms\n", (int)t_find);
 #endif
@@ -889,7 +889,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 #if KOMI_HASH
         start = getus();
         for (const auto& v : rndstring)
-            sum += komihash(v.data(), v.size(), rseed);
+            sum += (long)komihash(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("komi_hash   = %4d ms\n", (int)t_find);
 #endif
@@ -897,7 +897,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 #if RAPID_HASH
         start = getus();
         for (const auto& v : rndstring)
-            sum += rapidhashMicro_withSeed(v.data(), v.size(), rseed);
+            sum += (long)rapidhashMicro_withSeed(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("rapid_hash  = %4d ms\n", (int)t_find);
 #endif
@@ -905,7 +905,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 #if A5_HASH
         start = getus();
         for (const auto& v : rndstring)
-            sum += a5hash(v.data(), v.size(), rseed);
+            sum += (long)a5hash(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("a5_hash     = %4d ms\n", (int)t_find);
 #endif
@@ -913,7 +913,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 #ifdef AHASH_AHASH_H
         start = getus();
         for (const auto& v : rndstring)
-            sum += ahash64(v.data(), v.size(), rseed);
+            sum += (long)ahash64(v.data(), v.size(), rseed);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("ahash       = %4d ms\n", (int)t_find);
 
@@ -921,7 +921,7 @@ static void benchStringHash(int size, int str_min, int str_max)
         for (const auto& v : rndstring) {
             ahash::Hasher hasher{rseed};
             hasher.consume(v.data(), v.size());
-            sum += hasher.finalize();
+            sum += (long)hasher.finalize();
         }
         t_find = (getus() - start) / 1000; assert(sum);
         printf("acxxhash    = %4d ms\n", (int)t_find);
@@ -930,7 +930,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 #if ROBIN_HOOD_VERSION_MAJOR
         start = getus();
         for (const auto& v : rndstring)
-            sum += robin_hood::hash_bytes(v.data(), v.size());
+            sum += (long)robin_hood::hash_bytes(v.data(), v.size());
         t_find = (getus() - start) / 1000; assert(sum);
         printf("martius hash= %4d ms\n", (int)t_find);
 #endif
@@ -938,21 +938,21 @@ static void benchStringHash(int size, int str_min, int str_max)
 #if 0
         start = getus(); sum += 0;
         for (const auto& v : rndstring)
-            sum += emhash8::HashMap<int,int>::wyhashstr (v.data(), v.size());
+            sum += (long)emhash8::HashMap<int,int>::wyhashstr (v.data(), v.size());
         t_find = (getus() - start) / 1000; assert(sum);
         printf("emhash8 hash= %4d ms\n", (int)t_find);
 #endif
 
         start = getus(); sum += 0;
         for (const auto& v : rndstring)
-          sum += ankerl::unordered_dense::detail::wyhash::hash(v.data(), v.size());
+          sum += (long)ankerl::unordered_dense::detail::wyhash::hash(v.data(), v.size());
         t_find = (getus() - start) / 1000; assert(sum);
         printf("ankerl hash = %4d ms\n", (int)t_find);
 
 #ifdef ABSL_HASH
         start = getus();
         for (const auto& v : rndstring)
-            sum += absl::Hash<std::string>()(v);
+            sum += (long)absl::Hash<std::string>()(v);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("absl hash   = %4d ms\n", (int)t_find);
 #endif
@@ -960,7 +960,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 #ifdef PHMAP_VERSION_MAJOR
         start = getus();
         for (const auto& v : rndstring)
-            sum += phmap::Hash<std::string>()(v);
+            sum += (long)phmap::Hash<std::string>()(v);
         t_find = (getus() - start) / 1000; assert(sum);
         printf("phmap hash  = %4d ms\n", (int)t_find);
 #endif
@@ -1000,16 +1000,238 @@ static void TestHighLoadFactor(int id)
         myhash[srngi()] = 1;
     }
     const auto erase_time = getus() - nowus;
-    printf("vsize = %d, load factor = %.4f, insert/erase = %ld/%ld ms\n",
-        vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
+    printf("vsize = %u, load factor = %.4f, insert/erase = %ld/%ld ms\n",
+        vsize, myhash.load_factor(), long(insert_time / 1000), long(erase_time / 1000));
     //assert(myhash.bucket_count() == vsize); //no rehash
     //assert(myhash.load_factor() >= max_lf - 0.001);
 }
+
+
+// 测试基本插入和查找功能
+void test_basic_operations() {
+    emhash8::HashMap<int, std::string> map;
+
+    // 测试插入
+    auto [it1, success1] = map.insert({1, "one"});
+    assert(success1);
+    assert(it1->second == "one");
+
+    map[2] = "two";  // 使用operator[]插入
+    assert(map.size() == 2);
+
+    // 测试查找
+    auto it = map.find(1);
+    assert(it != map.end());
+    assert(it->second == "one");
+
+    assert(map.find(3) == map.end());  // 查找不存在的键
+    assert(map.contains(2));
+    assert(!map.contains(3));
+
+    // 测试修改值
+    map[1] = "first";
+    assert(map.at(1) == "first");
+
+    std::cout << "test_basic_operations passed\n";
+}
+
+// 测试删除功能
+void test_erase_operations() {
+    emhash8::HashMap<std::string, int> map;
+    map.insert({"a", 1});
+    map.insert({"b", 2});
+    map.insert({"c", 3});
+    assert(map.size() == 3);
+
+    // 按键删除
+    size_t erased = map.erase("b");
+    assert(erased == 1);
+    assert(map.size() == 2);
+    assert(!map.contains("b"));
+
+    // 按迭代器删除
+    auto it = map.find("a");
+    it = map.erase(it);
+    assert(map.size() == 1);
+    assert(it->first == "c");  // 迭代器应指向删除后的下一个元素
+
+    // 清空容器
+    map.clear();
+    assert(map.empty());
+    assert(map.size() == 0);
+
+    std::cout << "test_erase_operations passed\n";
+}
+
+// 测试迭代器功能
+void test_iterators() {
+    emhash8::HashMap<int, int> map;
+    for (int i = 0; i < 5; ++i) {
+        map[i] = i * 10;
+    }
+
+    // 测试正向迭代器
+    int count = 0;
+    for (const auto& pair : map) {
+        assert(pair.second == pair.first * 10);
+        count++;
+    }
+    assert(count == 5);
+
+    // 测试迭代器范围
+    auto begin = map.begin();
+    auto end = map.end();
+    assert(std::distance(begin, end) == 5);
+
+    // 测试const迭代器
+    const auto& const_map = map;
+    for (auto it = const_map.cbegin(); it != const_map.cend(); ++it) {
+        assert(it->second == it->first * 10);
+    }
+//    map.reserve(1u << 30);
+    const auto size = (1 << 30) * sizeof(uint64_t);
+    std::cout << (size >> 30) << "test_iterators passed\n";
+}
+
+// 测试边界情况
+void test_edge_cases() {
+    // 空容器测试
+    emhash8::HashMap<int, int> empty_map;
+    assert(empty_map.empty());
+    assert(empty_map.find(0) == empty_map.end());
+    assert(empty_map.erase(0) == 0);
+
+    // 单元素容器
+    emhash8::HashMap<int, int> single_map;
+    single_map.insert({0, 0});
+    assert(single_map.size() == 1);
+    assert(single_map.begin() != single_map.end());
+    assert(std::next(single_map.begin()) == single_map.end());
+
+    // 重复插入测试
+    auto [it, success] = single_map.insert({0, 100});
+    assert(!success);  // 插入重复键应失败
+    assert(it->second == 0);  // 值应保持不变
+
+    std::cout << "test_edge_cases passed\n";
+}
+
+// 测试复制和移动语义
+void test_copy_move() {
+    emhash8::HashMap<int, std::string> original;
+    original[1] = "one";
+    original[2] = "two";
+
+    // 测试复制构造
+    emhash8::HashMap<int, std::string> copy(original);
+    assert(copy.size() == original.size());
+    assert(copy.at(1) == original.at(1));
+
+    // 测试复制赋值
+    emhash8::HashMap<int, std::string> copy_assign;
+    copy_assign = original;
+    assert(copy_assign.contains(2));
+    assert(copy_assign.at(2) == "two");
+
+    // 测试移动构造
+    emhash8::HashMap<int, std::string> moved(std::move(original));
+    assert(moved.size() == 2);
+    assert(original.empty());  // 原容器应被清空
+
+    // 测试移动赋值
+    emhash8::HashMap<int, std::string> move_assign;
+    move_assign = std::move(moved);
+    assert(move_assign.size() == 2);
+    assert(moved.empty());
+
+    std::cout << "test_copy_move passed\n";
+}
+
+// 测试rehash和reserve
+void test_rehash_reserve() {
+    emhash8::HashMap<int, int> map;
+    map.reserve(100);  // 预分配空间
+    assert(map.bucket_count() >= 100);  // 桶数量应至少为100
+
+    // 插入元素后测试rehash
+    for (int i = 0; i < 50; ++i) {
+        map[i] = i;
+    }
+    size_t old_buckets = map.bucket_count();
+    map.rehash(200);  // 强制重哈希到200个桶
+    assert(map.bucket_count() >= 200);
+    assert(map.size() == 50);  // 重哈希后元素数量不变
+
+    // 验证元素仍可访问
+    assert(map.at(42) == 42);
+
+    std::cout << "test_rehash_reserve passed\n";
+}
+
+// 测试自定义哈希函数和相等性比较器
+struct CustomHash {
+    size_t operator()(int x) const {
+        return x * 1234567;  // 简单自定义哈希
+    }
+};
+
+struct CustomEq {
+    bool operator()(int a, int b) const {
+        return a == b;  // 自定义相等性比较（与默认相同）
+    }
+};
+
+void test_custom_hash_eq() {
+    emhash8::HashMap<int, std::string, CustomHash, CustomEq> map;
+    map.insert({1, "one"});
+    map.insert({2, "two"});
+
+    assert(map.find(1) != map.end());
+    assert(map.find(2)->second == "two");
+
+    std::cout << "test_custom_hash_eq passed\n";
+}
+
+// 测试合并功能
+void test_merge() {
+    emhash8::HashMap<int, std::string> map1, map2;
+    map1[1] = "one";
+    map1[2] = "two";
+    map2[2] = "dos";
+    map2[3] = "tres";
+
+    map1.merge(map2);
+    // map1应包含1,2,3；map2应保留2（因为map1中已有2）
+    assert(map1.size() == 3);
+    assert(map1.at(2) == "two");  // 保留原map1的值
+    assert(map1.at(3) == "tres");
+    assert(map2.size() == 1);  // map2中仅保留未合并的2
+    assert(map2.at(2) == "dos");
+
+    std::cout << "test_merge passed\n";
+}
+
+int test_hash8()
+{
+    test_basic_operations();
+    test_erase_operations();
+    test_iterators();
+    test_edge_cases();
+    test_copy_move();
+    test_rehash_reserve();
+    test_custom_hash_eq();
+    test_merge();
+
+    std::cout << "All tests passed!\n";
+    return 0;
+}
+
 
 int main(int argc, char* argv[])
 {
     printInfo(nullptr);
     srand((unsigned)time(nullptr));
+    test_hash8();
 
     if (argc == 2) {
         TestApi();

@@ -478,12 +478,9 @@ public:
   flat_wtable(InputIt first, InputIt last, size_type bucket_count = 0, const Hash& hash = Hash(), const key_equal& equal = key_equal())
     : flat_wtable(bucket_count, hash, equal)
   {
-    try {
+    //try 
+    {
       insert(first, last);
-    }
-    catch (...) {
-      destroy();
-      //throw;
     }
   }
 
@@ -1497,24 +1494,12 @@ private:
     else
     {
       size_type ctr_count = 0u;
-      try
+      //try
       {
         other.uc_for_each([&](const item_type* otValue) {
           ::new (mValues.data + (otValue - other.mValues.data)) item_type(*otValue);
           ++ctr_count;
         });
-      }
-      catch (...)
-      {
-        if (ctr_count)
-        {
-          other.uc_each_while([&](const item_type* otValue) {
-            item_type* pValue = mValues.data + (otValue - other.mValues.data);
-            pValue->~item_type();
-            return --ctr_count;
-          });
-        }
-        //throw;
       }
       INDIVI_WTABLE_ASSERT(ctr_count == other.mSize);
 
@@ -1531,7 +1516,6 @@ private:
       return;
 
     reserve(other.mSize);
-    try
     {
       if (mMaxSize == other.mMaxSize) // same bucket count
       {
@@ -1545,43 +1529,16 @@ private:
         });
       }
     }
-    catch (...)
-    {
-      destroy();
-      //throw;
-    }
   }
 
   void move_to(uint8_t* newGroups, item_type* newValues, size_type newShift, size_type newGMask)
   {
-    try
+    //try
     {
       uc_for_each([&](item_type* pValue) {
         insert_unique(newGroups, newValues, newShift, newGMask, std::move(*pValue));
         pValue->~item_type();
       });
-    }
-    catch (...)
-    {
-      // destroy constructed
-      item_type* pValue = newValues;
-      uint8_t* pGroup = newGroups;
-      uint8_t* last = pGroup + newGMask + 1;
-      unsigned int setsMask = gmask_to_setsmask(mGMask);
-      for (; pGroup != last; pGroup += 16, pValue += 16)
-      {
-        int idx = 0;
-        int sets = MetaWGroup::match_set(pGroup) & setsMask;
-        while (sets)
-        {
-          if (sets & 0x01)
-            pValue[idx].~item_type();
-
-          sets >>= 1;
-          ++idx;
-        }
-      }
-      //throw;
     }
   }
 

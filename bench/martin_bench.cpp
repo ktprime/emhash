@@ -2186,7 +2186,7 @@ static void runTest(int sflags, int eflags)
         {  bench_InsertEraseBegin<boost::unordered_flat_map <int64_t, int, hash_func>>(); }
 #endif
 #if HAVE_INDIVI
-        {  bench_InsertEraseBegin<indivi::flat_umap <int64_t, int, hash_func>>(); }
+//        {  bench_InsertEraseBegin<indivi::flat_umap <int64_t, int, hash_func>>(); }
         {  bench_InsertEraseBegin<indivi::flat_wmap <int64_t, int, hash_func>>(); }
 #endif
 

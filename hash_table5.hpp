@@ -600,8 +600,8 @@ public:
             _mlf = (uint32_t)((1 << 27) / mlf);
     }
 
-    constexpr size_type max_size() const { return  size_type(1ull << (sizeof(size_type) * 8 - 1)); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const { return  1ull << (sizeof(size_type) * 8 - 1); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     //Returns the bucket number where the element with key k is located.
@@ -1386,6 +1386,8 @@ public:
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
         assert(buckets < (uint64_t)max_size() && buckets > (uint64_t)_num_filled);
+        if (buckets > max_size() || buckets < _num_filled)
+            std::abort();//TODO: throwOverflowError
 
         auto num_buckets = (size_type)buckets;
         auto old_num_filled  = _num_filled;
