@@ -1,4 +1,4 @@
-# emhash - Fast and memory efficient _open addressing C++ flat hash table/map_
+# emhash - Fast and memory efficient open addressing C++ flat hash table & hash map
 
 > [!NOTE]
 > Some features are not enabled by default; they can be enabled through defining macros. Some features may conflict with each other or are difficult to distribute in one header file, so they are distributed in a different file. Not all features are available in one file.
@@ -422,3 +422,4 @@ The following benchmarks were performed on an **AMD 5800H CPU (Windows 10, GCC 1
 |emhash7::HashMap|  62.7| 20.3| 22.4| 25.2| 0.68| 74.5     |
 |emhash6::HashMap|  61.5| 16.1| 18.0| 28.0| 0.67| 74.5     |
 |emhash5::HashMap|  65.1| 16.1| 18.8| 24.3| 2.72| 74.5     |
+
