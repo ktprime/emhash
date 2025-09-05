@@ -1,10 +1,10 @@
 // emhash7::HashSet for C++11
-// version 1.2.2
+// version 1.2.3
 // https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2019-2022 Huang Yuanbing & bailuzhou AT 163.com
+// Copyright (c) 2019-2025 Huang Yuanbing & bailuzhou AT 163.com
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -66,15 +66,15 @@
 
 //#define next_coll_bucket(bucket)  ((bucket + 1) & _main_mask + _bucket)
 #if 0
-    #define hash_main_bucket(key)     (uint32_t)((_hasher(key) & (_mains_buckets - 1)) + _colls_buckets)
+    #define hash_main_bucket(key)     (size_type)((_hasher(key) & (_mains_buckets - 1)) + _colls_buckets)
     #define next_coll_bucket(bucket)  (bucket) & _main_mask
     #define hash_coll_bucket(key)     (hash_inter(key) & _main_mask)
 #elif EMH_HASH
-    #define hash_main_bucket(key)     (uint32_t)(_hasher(key) & _main_mask)
+    #define hash_main_bucket(key)     (size_type)(_hasher(key) & _main_mask)
     #define hash_coll_bucket(key)     ((hash_inter(key) & _coll_mask) + _mains_buckets)
     #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
 #else
-    #define hash_main_bucket(key)     (uint32_t)(hash_inter(key) & _main_mask)
+    #define hash_main_bucket(key)     (size_type)(hash_inter(key) & _main_mask)
     #define hash_coll_bucket(key)     ((_hasher(key) & _coll_mask) + _mains_buckets)
     #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
 #endif
@@ -91,30 +91,35 @@ namespace emhash7 {
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashSet
 {
-    constexpr static uint32_t INACTIVE = 0xFFFFFFFF;
-
-private:
-    typedef  HashSet<KeyT, HashT, EqT> htype;
-    typedef  std::pair<KeyT, uint32_t> PairT;
-
 public:
-    typedef size_t   size_type;
+#if EMH_64BIT
+    typedef uint64_t size_type;
+#else
+    typedef uint32_t size_type;
+#endif
+
     typedef KeyT     key_type;
     typedef KeyT     value_type;
-    typedef KeyT&    reference;
+    typedef KeyT& reference;
     typedef const KeyT& const_reference;
+    constexpr static size_type INACTIVE = (size_type)(-1);
 
+private:
+    typedef HashSet<KeyT, HashT, EqT> htype;
+    typedef std::pair<KeyT, size_type> PairT;
+
+public:
     class iterator
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
+        typedef size_type                  difference_type;
         typedef KeyT                      value_type;
         typedef value_type*               pointer;
         typedef value_type&               reference;
 
         iterator() { }
-        iterator(htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) { }
+        iterator(htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) { }
 
         iterator& operator++()
         {
@@ -164,7 +169,7 @@ public:
 
     public:
         htype* _set;
-        uint32_t  _bucket;
+        size_type  _bucket;
     };
 
     class const_iterator
@@ -178,7 +183,7 @@ public:
 
         const_iterator() { }
         const_iterator(iterator proto) : _set(proto._set), _bucket(proto._bucket) {  }
-        const_iterator(const htype* hash_set, uint32_t bucket) : _set(hash_set), _bucket(bucket) {  }
+        const_iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) {  }
 
         const_iterator& operator++()
         {
@@ -228,7 +233,7 @@ public:
 
     public:
         const htype* _set;
-        uint32_t  _bucket;
+        size_type  _bucket;
     };
 
     // ------------------------------------------------------------------------
@@ -247,7 +252,7 @@ public:
         max_load_factor(0.9f);
     }
 
-    HashSet(uint32_t bucket = 4)
+    HashSet(size_type bucket = 4)
     {
         init();
         reserve(bucket);
@@ -276,7 +281,7 @@ public:
             memcpy(_pairs, other._pairs, _total_buckets * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
-            for (uint32_t bucket = 0; bucket < _total_buckets; bucket++) {
+            for (size_type bucket = 0; bucket < _total_buckets; bucket++) {
                 auto next_bucket = EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(old_pairs, bucket);
                 if (next_bucket != INACTIVE)
                     new(_pairs + bucket) PairT(old_pairs[bucket]);
@@ -292,10 +297,10 @@ public:
         *this = std::move(other);
     }
 
-    HashSet(std::initializer_list<key_type> il, int n = 8)
+    HashSet(std::initializer_list<key_type> il, size_type n = 8)
     {
         init();
-        reserve((uint32_t)il.size());
+        reserve((size_type)il.size());
         for (auto begin = il.begin(); begin != il.end(); ++begin)
             insert(*begin);
     }
@@ -355,7 +360,7 @@ public:
 
     iterator begin()
     {
-        uint32_t bucket = 0;
+        size_type bucket = 0;
         while (EMH_BUCKET(_pairs, bucket) == INACTIVE || (bucket < _mains_buckets && EMH_BUCKET(_pairs, bucket) % 2 == 0)) {
             ++bucket;
         }
@@ -364,7 +369,7 @@ public:
 
     const_iterator cbegin() const
     {
-        uint32_t bucket = 0;
+        size_type bucket = 0;
         while (EMH_BUCKET(_pairs, bucket) == INACTIVE || (bucket < _mains_buckets && EMH_BUCKET(_pairs, bucket) % 2 == 0)) {
             ++bucket;
         }
@@ -436,7 +441,7 @@ public:
             _loadlf = (uint32_t)((1 << 13) / value);
     }
 
-    constexpr uint64_t max_size() const { return (1ull << (sizeof(size_type) * 8 - 1)); }
+    constexpr uint64_t max_size() const { return (1ull << (sizeof(_total_buckets) * 8 - 1)); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
 
     //Returns the bucket number where the element with key k is located.
@@ -453,7 +458,7 @@ public:
     }
 
 #ifdef EMH_STATIS
-    size_type get_main_bucket(const uint32_t bucket) const
+    size_type get_main_bucket(const size_type bucket) const
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
@@ -464,7 +469,7 @@ public:
         return main_bucket;
     }
 
-    int get_cache_info(uint32_t bucket, uint32_t next_bucket) const
+    int get_cache_info(size_type bucket, size_type next_bucket) const
     {
         auto pbucket = reinterpret_cast<size_t>(&_pairs[bucket]);
         auto pnext   = reinterpret_cast<size_t>(&_pairs[next_bucket]);
@@ -476,7 +481,7 @@ public:
         return 127;
     }
 
-    int get_bucket_info(const uint32_t bucket, uint32_t steps[], const uint32_t slots) const
+    int get_bucket_info(const size_type bucket, size_type steps[], const size_type slots) const
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
@@ -603,7 +608,7 @@ public:
         }
     }
 
-    void new_key(const KeyT& key, uint32_t bucket, uint32_t main_bucket)
+    void new_key(const KeyT& key, size_type bucket, size_type main_bucket)
     {
         auto& bucket_size = EMH_BUCKET(_pairs, main_bucket);
         if (bucket < _mains_buckets) {
@@ -617,7 +622,7 @@ public:
         }
     }
 
-    void del_key(uint32_t bucket, const KeyT& key)
+    void del_key(size_type bucket, const KeyT& key)
     {
         const auto main_bucket = hash_main_bucket(key);
         auto& bucket_size = EMH_BUCKET(_pairs, main_bucket);
@@ -626,20 +631,20 @@ public:
         bucket_size -= 2;
         _num_colls -= 1;
 
-        if ((int)bucket_size == 0)
+        if (bucket_size == 0)
             bucket_size = INACTIVE;
         _pairs[bucket].~PairT();
         EMH_BUCKET(_pairs, bucket) = INACTIVE;
     }
 
-    void del_main(uint32_t main_bucket, uint32_t& bucket_size)
+    void del_main(size_type main_bucket, size_type& bucket_size)
     {
         //assert (bucket_size % 2 > 0 && bucket_size != INACTIVE);
         //assert (main_bucket < _mains_buckets);
         bucket_size -= 1;
         _num_mains -= 1;
 
-        if ((int)bucket_size == 0)
+        if (bucket_size == 0)
             bucket_size = INACTIVE;
         _pairs[main_bucket].~PairT();
     }
@@ -670,7 +675,7 @@ public:
 
     void insert(std::initializer_list<value_type> ilist)
     {
-        reserve((uint32_t)ilist.size() + _num_colls);
+        reserve((size_type)ilist.size() + _num_colls);
         for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
             insert(*begin);
         }
@@ -706,7 +711,7 @@ public:
     }
 
     /// Same as above, but contains(key) MUST be false
-    uint32_t insert_unique(const KeyT& key)
+    size_type insert_unique(const KeyT& key)
     {
         check_expand_need();
         assert(false);
@@ -739,7 +744,7 @@ public:
     }
 
     //for private:
-    uint32_t try_insert_mainbucket(const KeyT& key)
+    size_type try_insert_mainbucket(const KeyT& key)
     {
         const auto main_bucket = hash_main_bucket(key);
         auto& bucket_size = EMH_BUCKET(_pairs, main_bucket);
@@ -821,7 +826,7 @@ public:
 
     void clearkv()
     {
-        for (uint32_t bucket = _mains_buckets; bucket < _total_buckets && _num_colls > 0; ++bucket) {
+        for (size_type bucket = _mains_buckets; bucket < _total_buckets && _num_colls > 0; ++bucket) {
             auto& next_bucket = EMH_BUCKET(_pairs, bucket);
             if (next_bucket != INACTIVE) {
                 _pairs[bucket].~PairT(); _num_colls -= 1;
@@ -829,7 +834,7 @@ public:
             }
         }
 
-        for (uint32_t bucket = 0; bucket < _mains_buckets && _num_mains > 0; ++bucket) {
+        for (size_type bucket = 0; bucket < _mains_buckets && _num_mains > 0; ++bucket) {
             auto& next_bucket = EMH_BUCKET(_pairs, bucket);
             if (next_bucket != INACTIVE && next_bucket % 2 > 0) {
                 _pairs[bucket].~PairT(); _num_mains -= 1;
@@ -853,7 +858,7 @@ public:
     /// Make room for this many elements
     bool reserve(uint64_t num_elems)
     {
-        //auto required_buckets = (uint32_t)(((uint64_t)num_elems * _loadlf) >> 13);
+        //auto required_buckets = (size_type)(((uint64_t)num_elems * _loadlf) >> 13);
         const auto required_buckets = num_elems * 10 / 8 + 2;
         if (EMH_LIKELY(required_buckets < _colls_buckets))
             return false;
@@ -870,12 +875,12 @@ public:
 
         uint64_t buckets = _num_colls > 65536 ? (1u << 16) : 8u;
         while (buckets < required_buckets) { buckets *= 2; }
-        if (buckets > (uint64_t)max_size() || buckets < _num_colls)
+        if (buckets >= max_size() || buckets < _num_colls)
             std::abort(); //throw std::length_error("too large size");
 
-        const auto num_buckets = (uint32_t)buckets;
+        const auto num_buckets = (size_type)buckets;
         const auto main_bucket = num_buckets;
-        auto new_pairs = (PairT*)malloc((1 + num_buckets + main_bucket) * sizeof(PairT));
+        auto new_pairs = (PairT*)malloc((1ull + num_buckets + main_bucket) * sizeof(PairT));
         auto old_pairs = _pairs;
 
         const auto old_num_mains   = _num_mains;
@@ -897,14 +902,14 @@ public:
         if (sizeof(PairT) <= EMH_CACHE_LINE_SIZE / 2)
             memset(_pairs, INACTIVE, _total_buckets * sizeof(_pairs[0]));
         else {
-            for (uint32_t bucket = 0; bucket < _total_buckets; bucket++)
+            for (size_type bucket = 0; bucket < _total_buckets; bucket++)
                 EMH_BUCKET(_pairs, bucket) = INACTIVE;
         }
         EMH_BUCKET(_pairs, _total_buckets) = 1;
 
-        uint32_t collision = 0;
+        size_type collision = 0;
         //set all main bucket first
-        for (uint32_t src_bucket = 0; src_bucket < old_total_buckets; src_bucket++) {
+        for (size_type src_bucket = 0; src_bucket < old_total_buckets; src_bucket++) {
             auto bucket_size = EMH_BUCKET(old_pairs, src_bucket);
             if (bucket_size == INACTIVE || (bucket_size % 2 == 0 && bucket_size < old_main_buckets))
                 continue;
@@ -944,7 +949,7 @@ public:
 
         _num_colls += collision;
         //reset all collisions bucket
-        for (uint32_t colls = 0; colls < collision; colls++) {
+        for (size_type colls = 0; colls < collision; colls++) {
             const auto src_bucket = EMH_BUCKET(old_pairs, colls);
             const auto main_bucket = hash_coll_bucket(EMH_KEY(old_pairs, src_bucket));
             auto& old_pair = old_pairs[src_bucket];
@@ -967,7 +972,7 @@ public:
             sprintf(buff, "    _num_colls/main_factor/coll_factor/K/pack/collision = %u/%.2lf%%/%.2lf%%/%s/%zd/%.2lf%%",
                     _num_colls, old_num_mains * 100.0 / old_main_buckets, 100.0 * _num_colls / _colls_buckets, typeid(KeyT).name(), sizeof(_pairs[0]), _num_colls * 100.0 / size());
 #ifdef EMH_LOG
-            static uint32_t ihashs = 0;
+            static size_type ihashs = 0;
             EMH_LOG() << "|rhash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
@@ -979,7 +984,7 @@ public:
 
         auto diff = old_num_colls + old_num_mains - _num_colls - _num_mains;
         if (diff != 0) {
-            printf("%d %d | %d %d diff = %d\n", old_num_colls, old_num_mains, _num_colls, _num_mains, (int)diff);
+            printf("%d %d | %d %d diff = %ld\n", old_num_colls, old_num_mains, _num_colls, _num_mains, (size_type)diff);
             assert(diff == 0);
         }
     }
@@ -991,7 +996,7 @@ private:
         return reserve(_num_colls);
     }
 
-    uint32_t erase_key(const KeyT& key)
+    size_type erase_key(const KeyT& key)
     {
         const auto bucket = hash_coll_bucket(key);
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1029,7 +1034,7 @@ private:
         return INACTIVE;
     }
 
-    uint32_t erase_bucket(const uint32_t bucket)
+    size_type erase_bucket(const size_type bucket)
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto main_bucket = hash_coll_bucket(EMH_KEY(_pairs, bucket));
@@ -1051,7 +1056,7 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
-    uint32_t find_colls_bucket(const KeyT& key) const
+    size_type find_colls_bucket(const KeyT& key) const
     {
         const auto main_bucket = hash_main_bucket(key);
         const auto bucket_size = EMH_BUCKET(_pairs, main_bucket);
@@ -1088,7 +1093,7 @@ private:
         return _total_buckets;
     }
 
-    uint32_t reset_coll_bucket(const uint32_t main_bucket, const uint32_t bucket)
+    size_type reset_coll_bucket(const size_type main_bucket, const size_type bucket)
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto new_bucket  = find_empty_bucket(next_bucket);
@@ -1107,7 +1112,7 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    uint32_t find_or_allocate(const KeyT& key)
+    size_type find_or_allocate(const KeyT& key)
     {
         const auto bucket = hash_coll_bucket(key);
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
@@ -1145,7 +1150,7 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    uint32_t find_empty_bucket(uint32_t bucket_from) const
+    size_type find_empty_bucket(size_type bucket_from) const
     {
         const auto bucket = ++bucket_from;
         if (EMH_BUCKET(_pairs, bucket) == INACTIVE)
@@ -1174,7 +1179,7 @@ private:
             }
         }
 #else
-        for (uint32_t slot = 1, step = 2; ; slot += ++step) {
+        for (size_type slot = 1, step = 2; ; slot += ++step) {
             auto bucket = next_coll_bucket(bucket_from + slot);
             if (EMH_BUCKET(_pairs, bucket) == INACTIVE || EMH_BUCKET(_pairs, ++bucket) == INACTIVE)
                 return bucket;
@@ -1192,7 +1197,7 @@ private:
 #endif
     }
 
-    uint32_t find_last_bucket(uint32_t main_bucket) const
+    size_type find_last_bucket(size_type main_bucket) const
     {
         auto next_bucket = EMH_BUCKET(_pairs, main_bucket);
         if (next_bucket == main_bucket)
@@ -1206,7 +1211,7 @@ private:
         }
     }
 
-    uint32_t find_prev_bucket(uint32_t main_bucket, const uint32_t bucket) const
+    size_type find_prev_bucket(size_type main_bucket, const size_type bucket) const
     {
         auto next_bucket = EMH_BUCKET(_pairs, main_bucket);
         if (next_bucket == bucket)
@@ -1220,7 +1225,7 @@ private:
         }
     }
 
-    uint32_t find_unique_bucket(const KeyT& key)
+    size_type find_unique_bucket(const KeyT& key)
     {
         assert(false);
         const auto bucket = hash_coll_bucket(key);
@@ -1271,7 +1276,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline uint32_t hash_inter(const UType key) const
+    inline size_type hash_inter(const UType key) const
     {
 #ifndef EMH_INT_HASH
         return hash64(key);
@@ -1283,7 +1288,7 @@ private:
     }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline uint32_t hash_inter(const UType& key) const
+    inline size_type hash_inter(const UType& key) const
     {
 #ifndef EMH_INT_HASH
         return (_hasher(key) * 11400714819323198485ull);
@@ -1298,15 +1303,15 @@ private:
     HashT     _hasher;
     EqT       _eq;
     uint32_t  _loadlf;
-    uint32_t  _main_mask;
-    uint32_t  _coll_mask;
+    size_type  _main_mask;
+    size_type  _coll_mask;
 
-    uint32_t  _colls_buckets;
-    uint32_t  _mains_buckets;
-    uint32_t  _total_buckets;
+    size_type  _colls_buckets;
+    size_type  _mains_buckets;
+    size_type  _total_buckets;
 
-    uint32_t  _num_colls;
-    uint32_t  _num_mains;
+    size_type  _num_colls;
+    size_type  _num_mains;
     PairT*    _pairs;
 };
 } // namespace emhash
