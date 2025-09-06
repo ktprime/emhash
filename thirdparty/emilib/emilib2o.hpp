@@ -132,7 +132,7 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash) & _mask;
-        return (int8_t)(key_hash % MAPBITS) + EFILLED;
+        return (int8_t)((size_t)key_hash % MAPBITS) + EFILLED;
     }
 
     inline static uint32_t CTZ(size_t n)

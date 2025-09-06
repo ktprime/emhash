@@ -1,5 +1,4 @@
-// emhash8::HashSet for C++11/14/17
-// version 1.6.5
+// version 1.6.8
 // https://github.com/ktprime/emhash/blob/master/hash_set8.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -69,7 +68,7 @@
 
 #define EMH_KEYMASK(key, mask)  ((size_type)(key >> 0) & ~mask)
 #define EMH_EQHASH(n, key_hash) (EMH_KEYMASK(key_hash, _mask) == (_index[n].slot & ~_mask))
-#define EMH_NEW(key, bucket, key_hash) new(_pairs + _num_filled) value_type(key); _index[bucket] = {bucket, _num_filled++ | EMH_KEYMASK(key_hash, _mask)}
+#define EMH_NEW(key, bucket, key_hash) new(_pairs + _num_filled) value_type(key); _index[bucket] = {bucket, size_type(_num_filled++ | EMH_KEYMASK(key_hash, _mask))}
 
 #define EMH_EMPTY(i, n) (0 > (int)i[n].bucket)
 
@@ -91,12 +90,12 @@ public:
     using value_type = KeyT;
     using key_type  = KeyT;
 
-#ifdef EMH_SMALL_TYPE
-    using size_type = uint16_t;
-#elif EMH_SIZE_TYPE == 0
-    using size_type = uint32_t;
+#if EMH_SIZE_TYPE_BIT == 64
+    typedef uint64_t size_type;
+#elif EMH_SIZE_TYPE_BIT == 16
+    typedef uint16_t size_type;
 #else
-    using size_type = size_t;
+    typedef uint32_t size_type;
 #endif
 
     using hasher = HashT;
@@ -582,7 +581,7 @@ public:
             EMH_NEW(value, bucket, key_hash);
         }
 
-        const auto slot = EMH_SLOT(_index, bucket);
+        const size_type slot = EMH_SLOT(_index, bucket);
         return { {this, slot}, empty };
     }
 
@@ -595,7 +594,7 @@ public:
             EMH_NEW(std::forward<KeyT>(value), bucket, key_hash);
         }
 
-        const auto slot = EMH_SLOT(_index, bucket);
+        const size_type slot = EMH_SLOT(_index, bucket);
         return { {this, slot}, empty };
     }
 
@@ -609,7 +608,7 @@ public:
             EMH_NEW(std::forward<K>(key), bucket, key_hash);
         }
 
-        const auto slot = EMH_SLOT(_index, bucket);
+        const size_type slot = EMH_SLOT(_index, bucket);
         return { {this, slot}, empty };
     }
 
@@ -624,7 +623,7 @@ public:
             EMH_NEW(std::forward<K>(key), bucket, key_hash);
         }
 
-        const auto slot = EMH_SLOT(_index, bucket);
+        const size_type slot = EMH_SLOT(_index, bucket);
         return { {this, slot}, empty };
     }
 
@@ -881,7 +880,7 @@ public:
             const auto bucket = size_type(key_hash & _mask);
             auto& next_bucket = EMH_BUCKET(_index, bucket);
             if ((int)next_bucket < 0)
-                EMH_INDEX(_index, bucket) = {1, slot | EMH_KEYMASK(key_hash, _mask)};
+                EMH_INDEX(_index, bucket) = {1, size_type(slot | EMH_KEYMASK(key_hash, _mask))};
             else {
                 EMH_HSLOT(_index, bucket) |= EMH_KEYMASK(key_hash, _mask);
                 next_bucket ++;
@@ -950,7 +949,7 @@ public:
             const auto& key = EMH_KEY(_pairs, slot);
             const auto key_hash = hash_key(key);
             const auto bucket = find_unique_bucket(key_hash);
-            EMH_INDEX(_index, bucket) = {bucket, slot | EMH_KEYMASK(key_hash, _mask)};
+            EMH_INDEX(_index, bucket) = {bucket, size_type(slot | EMH_KEYMASK(key_hash, _mask))};
 
 #if EMH_REHASH_LOG
             if (bucket != hash_main(bucket))
@@ -1001,7 +1000,7 @@ private:
         if (is_trivially_destructible())
             _pairs[last_slot].~value_type();
 
-        EMH_INDEX(_index, ebucket) = {INACTIVE, END};
+        EMH_INDEX(_index, ebucket) = {(size_type)INACTIVE, (size_type)END};
     }
 
     size_type erase_bucket(const size_type bucket, const size_type main_bucket)
@@ -1175,8 +1174,10 @@ private:
 
     //kick out bucket and find empty to occpuy
     //it will break the orgin link and relnik again.
-    //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
-    //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
+    //before: main_bucket --> prev_bucket --> bucket --> next_bucket
+    //atfer : main_bucket --> prev_bucket (bucket kickout) new_bucket(bucket moved) --> next_bucket
+    //                          \|/                            /|\
+    //                          -|------------------------------|
     size_type kickout_bucket(const size_type kmain, const size_type bucket)
     {
         const auto next_bucket = EMH_BUCKET(_index, bucket);
@@ -1514,15 +1515,15 @@ template<typename UType, typename std::enable_if<std::is_same<UType, std::string
 #if EMH_WYHASH_HASH
         return wyhashstr(key.data(), key.size());
 #else
-            return _hasher(key);
+        return _hasher(key);
 #endif
-        }
+    }
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType& key) const
     {
-            return _hasher(key);
-        }
+        return _hasher(key);
+    }
 
 private:
     Index*    _index;

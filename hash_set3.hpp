@@ -1,6 +1,5 @@
-// emhash7::HashSet for C++11
-// version 1.2.3
-// https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
+// version 1.2.4
+// https://github.com/ktprime/ktprime/blob/master/hash_set3.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -56,12 +55,15 @@
 #endif
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
-#    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
-#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+#define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+#define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-#    define EMH_LIKELY(condition) condition
-#    define EMH_UNLIKELY(condition) condition
+#define EMH_LIKELY(condition)   (condition)
+#define EMH_UNLIKELY(condition) (condition)
 #endif
 
 //#define next_coll_bucket(bucket)  ((bucket + 1) & _main_mask + _bucket)
@@ -92,8 +94,10 @@ template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::e
 class HashSet
 {
 public:
-#if EMH_64BIT
+#if EMH_SIZE_TYPE_BIT == 64
     typedef uint64_t size_type;
+#elif EMH_SIZE_TYPE_BIT == 16
+    typedef uint16_t size_type;
 #else
     typedef uint32_t size_type;
 #endif
@@ -848,7 +852,7 @@ public:
     void clear()
     {
         if (size() > _mains_buckets / 2 && std::is_trivially_destructible<KeyT>::value)
-            memset(_pairs, INACTIVE,  sizeof(_pairs[0]) * _total_buckets);
+            memset(_pairs, (uint32_t)(-1),  sizeof(_pairs[0]) * _total_buckets);
         else
             clearkv();
 
@@ -863,7 +867,7 @@ public:
         if (EMH_LIKELY(required_buckets < _colls_buckets))
             return false;
 
-        rehash(required_buckets + 2);
+        rehash(required_buckets);
         return true;
     }
 
@@ -880,7 +884,7 @@ public:
 
         const auto num_buckets = (size_type)buckets;
         const auto main_bucket = num_buckets;
-        auto new_pairs = (PairT*)malloc((1ull + num_buckets + main_bucket) * sizeof(PairT));
+        auto new_pairs = (PairT*)malloc((2ull + num_buckets + main_bucket) * sizeof(PairT));
         auto old_pairs = _pairs;
 
         const auto old_num_mains   = _num_mains;
@@ -900,7 +904,7 @@ public:
         _num_colls   = 0;
 
         if (sizeof(PairT) <= EMH_CACHE_LINE_SIZE / 2)
-            memset(_pairs, INACTIVE, _total_buckets * sizeof(_pairs[0]));
+            memset(_pairs, (uint32_t)(-1u), _total_buckets * sizeof(_pairs[0]));
         else {
             for (size_type bucket = 0; bucket < _total_buckets; bucket++)
                 EMH_BUCKET(_pairs, bucket) = INACTIVE;

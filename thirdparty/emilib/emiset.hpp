@@ -1,8 +1,27 @@
-// By Emil Ernerfeldt 2014-2016
-// LICENSE:
-//   This software is dual-licensed to the public domain and under the following
-//   license: you are granted a perpetual, irrevocable license to copy, modify,
-//   publish, and distribute this file as you see fit.
+// version 1.0.2
+// https://github.com/ktprime/emhash/blob/master/thirdparty/emilib/emiset.hpp
+//
+// Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2021-2025 Huang Yuanbing & bailuzhou AT 163.com
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE
 
 #pragma once
 
@@ -91,9 +110,6 @@ public:
 				_bucket++;
 			} while (_bucket < _set->_num_buckets && _set->_states[_bucket] != State::FILLED);
 		}
-
-	//private:
-	//	friend class htype;
 	public:
 		htype* _set;
 		size_t  _bucket;
@@ -468,8 +484,6 @@ public:
 			}
 		}
 
-		// DCHECK_EQ_F(old_num_filled, _num_filled);
-
 		free(old_states);
 		free(old_keys);
 	}
@@ -525,8 +539,6 @@ private:
 		}
 
 		// No key found - but maybe a hole for it
-		//DCHECK_EQ_F(offset, _max_probe_length+1);
-
 		if (hole != (size_t)-1) {
 			return hole;
 		}

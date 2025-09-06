@@ -962,7 +962,7 @@ public:
         return { {this, bucket}, bempty };
     }
 
-    template<typename K, typename V>
+    template<typename K = KeyT, typename V>
     std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept
     {
         const auto bucket = find_or_allocate(key);
@@ -973,7 +973,7 @@ public:
         return { {this, bucket}, bempty };
     }
 
-    template<typename K, typename V>
+    template<typename K = KeyT, typename V>
     std::pair<iterator, bool> do_assign(K&& key, V&& val) noexcept
     {
         check_expand_need();

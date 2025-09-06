@@ -1,8 +1,28 @@
-// By Emil Ernerfeldt 2014-2017
 // LICENSE:
-//   This software is dual-licensed to the public domain and under the following
-//   license: you are granted a perpetual, irrevocable license to copy, modify,
-//   publish, and distribute this file as you see fit.
+// version 1.0.1
+// https://github.com/ktprime/emhash/blob/master/thirdparty/emilib/emiset2.hpp
+//
+// Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2021-2025 Huang Yuanbing & bailuzhou AT 163.com
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE
 
 #pragma once
 
@@ -24,12 +44,15 @@
 #endif
 
 // likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
-#    define EMH_LIKELY(condition)   __builtin_expect(condition, 1)
-#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+#define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+#define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-#    define EMH_LIKELY(condition)   condition
-#    define EMH_UNLIKELY(condition) condition
+#define EMH_LIKELY(condition)   (condition)
+#define EMH_UNLIKELY(condition) (condition)
 #endif
 
 namespace emilib2 {
@@ -109,7 +132,14 @@ private:
     using htype = HashSet<KeyT, HashT, EqT>;
 
 public:
-    using size_t          = uint32_t;
+#if EMH_SIZE_TYPE_BIT == 64
+    using size_t = uint64_t;
+#elif EMH_SIZE_TYPE_BIT == 16
+    using size_t = uint16_t;
+#else
+    using size_t = uint32_t;
+#endif
+
     using value_type      = KeyT;
     using reference       = KeyT&;
     using const_reference = const KeyT&;
@@ -410,6 +440,9 @@ public:
         return 7/8.0f;
     }
 
+    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
+
     // ------------------------------------------------------------
 
     template<typename KeyLike>
@@ -459,7 +492,7 @@ public:
     std::pair<iterator, bool> insert(const KeyT& key)
     {
         check_expand_need();
-
+        assert(_num_buckets);
         const auto key_hash = _hasher(key);
         const auto bucket = find_or_allocate(key, key_hash);
 
@@ -637,9 +670,9 @@ public:
         rehash(_num_filled);
     }
 
-    bool reserve(size_t num_elems)
+    bool reserve(uint64_t num_elems)
     {
-        size_t required_buckets = num_elems + num_elems / 8;
+        uint64_t required_buckets = uint64_t(num_elems) + num_elems / 8;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -648,14 +681,17 @@ public:
     }
 
     /// Make room for this many elements
-    void rehash(size_t num_elems)
+    void rehash(uint64_t num_elems)
     {
-        const size_t required_buckets = num_elems;
+        const uint64_t required_buckets = num_elems;
         if (EMH_UNLIKELY(required_buckets < _num_filled))
             return;
 
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4;
         while (num_buckets < required_buckets) { num_buckets *= 2; }
+
+        if (num_buckets > max_size() || num_buckets < _num_filled)
+            std::abort(); //throw std::length_error("too large size");
 
         auto status_size = (simd_bytes + num_buckets) * sizeof(uint8_t);
         status_size += (8 - status_size % 8) % 8;
@@ -788,7 +824,7 @@ private:
             //2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske != 0) {
-                const auto ebucket = hole == -1 ? next_bucket + CTZ(maske) : hole;
+                const auto ebucket = hole == (size_t)-1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
@@ -796,7 +832,7 @@ private:
             }
 
             //3. find erased
-            if (hole == -1) {
+            if (hole == (size_t)-1) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);

@@ -1772,9 +1772,9 @@ static void runTest(int sflags, int eflags)
         puts("\nbench_randomInsertErase:");
 
 
-        { emilib3::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
         { emilib2::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
-        { emilib::HashMap<uint64_t, int, hash_func>  emap; bench_randomInsertErase(emap); }
+        { emilib3::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
+        { emilib:: HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); }
 
 #if HAVE_BOOST
         { boost::unordered_flat_map <uint64_t, int, hash_func> hmap; bench_randomInsertErase(hmap); }

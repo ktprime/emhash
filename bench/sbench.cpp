@@ -24,8 +24,8 @@ std::map<std::string, std::string> maps =
     {"btree", "btree_set"},
     {"qchash", "qc-hash"},
 
-//    {"emhash7", "emhash7"},
-//    {"emhash2", "emhash2"},
+    {"emhash7", "emhash7"},
+    {"emhash2", "emhash2"},
     {"emhash9", "emhash9"},
 #if HAVE_BOOST
     {"boostf",  "boost_flat"},
@@ -57,7 +57,7 @@ std::map<std::string, std::string> maps =
 
 //rand data type
 #ifndef RT
-    #define RT 3  //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 1 //1 wyrand 2 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define PHMAP_HASH          1
@@ -121,9 +121,8 @@ std::map<std::string, std::string> maps =
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
 
 
-#if HOOD_HASH
     #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
-#endif
+//#endif
 #if PHMAP_HASH
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
 #endif
@@ -1167,11 +1166,11 @@ static int benchHashSet(int n)
         {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
 #endif
 
+        {  benOneHash<emhash7::HashSet <keyType, ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash8::HashSet <keyType,  ehash_func>>("emhash8", vList); }
         {  benOneHash<emilib::HashSet  <keyType,  ehash_func>>("emiset", vList); }
         {  benOneHash<emilib2::HashSet <keyType,  ehash_func>>("emiset2", vList); }
         {  benOneHash<emilib3::HashSet <keyType,  ehash_func>>("emiset2s", vList); }
-        {  benOneHash<emhash7::HashSet <keyType,  ehash_func>>("emhash7", vList); }
         {  benOneHash<emhash2::HashSet <keyType,  ehash_func>>("emhash2", vList); }
         {  benOneHash<emhash9::HashSet <keyType,  ehash_func>>("emhash9", vList); }
 
@@ -1240,7 +1239,7 @@ static void high_load()
     }
 }
 
-int main(int argc, char* argv[])
+int main2(int argc, char* argv[])
 {
     auto start = getus();
     srand((unsigned)time(0));
@@ -1363,3 +1362,102 @@ int main(int argc, char* argv[])
     return 0;
 }
 
+#include <iostream>
+#include <vector>
+
+#include <chrono>
+
+//#include "hash_set3.hpp"
+
+// fmix64 from MurmurHash3
+struct murmur_finalizer {
+    size_t operator()(uint64_t key) const {
+
+        key ^= (key >> 33);
+        key *= 0xff51afd7ed558ccd;
+        key ^= (key >> 33);
+        key *= 0xc4ceb9fe1a85ec53;
+        key ^= (key >> 33);
+
+        return key;
+    }
+};
+
+int main() {
+    using clock = std::chrono::steady_clock;
+    using ehash_func = robin_hood::hash<uint64_t>;
+    // ankerl::unordered_dense::hash<uint64_t>;
+#if 0
+    emhash7::HashSet<uint64_t, ehash_func> current_uniques, old_uniques;
+#elif 1
+    emilib3::HashSet<uint64_t, ehash_func> current_uniques, old_uniques;
+#else
+    boost::unordered_flat_set<uint64_t, ehash_func> current_uniques, old_uniques;
+#endif
+
+
+    WyRand random(0); // Set a fixed seed for reproducibility.
+
+    std::vector<uint64_t> unique_elements_counts(1, 0);
+
+    constexpr int BRANCH_FACTOR = 1000;
+
+    for (int j = 0; j < BRANCH_FACTOR; ++j) {
+        uint64_t longrand = random();
+        current_uniques.insert(longrand);
+    }
+
+    for (int i = 0; i < 5; ++i) {
+        size_t last_uniques_size = *unique_elements_counts.rbegin();
+
+        std::swap(old_uniques, current_uniques);
+        current_uniques.clear();
+
+        // Prepare the progress indicator
+
+        auto start_time = clock::now();
+        auto last_update_time = start_time;
+
+        size_t old_elements_to_process = last_uniques_size;
+        size_t old_elements_processed = 0;
+
+        // and reserve some elements.
+
+        current_uniques.reserve(last_uniques_size * 2);
+
+        for (const uint64_t old_element : old_uniques) {
+            for (int j = 0; j < BRANCH_FACTOR; ++j) {
+                uint64_t longrand = random();
+                current_uniques.insert(longrand);
+            }
+
+            // Everything below relates to the progress indicator and
+            // can be removed; the program will still crash.
+
+            ++old_elements_processed;
+            if ((old_elements_processed & 16383) == 0) {
+                auto update_time = clock::now();
+                double elapsed_since_last =
+                    std::chrono::duration<double>(
+                        update_time - start_time).count();
+
+                // Don't show progress reports more often than evey half second.
+                if (elapsed_since_last < 0.5) { continue; }
+
+                last_update_time = clock::now();
+                double elapsed_seconds = std::chrono::duration<double>(
+                    last_update_time - start_time).count();
+                double iters_per_s = old_elements_processed / elapsed_seconds;
+
+                std::cout << "progress: " << old_elements_processed / (double)old_elements_to_process << "\t";
+                std::cout << "k = " << i << ", ";
+                std::cout << "it/s = " << iters_per_s << "\t";
+                std::cout << "seconds left: " << (old_elements_to_process - old_elements_processed) / iters_per_s << std::endl;
+            }
+        }
+
+        size_t num_uniques = current_uniques.size();
+        std::cout << i << "\t" << num_uniques << std::endl;
+        unique_elements_counts.push_back(num_uniques);
+    }
+}

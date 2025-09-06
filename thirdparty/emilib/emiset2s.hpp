@@ -1,7 +1,28 @@
 // LICENSE:
-//   This software is dual-licensed to the public domain and under the following
-//   license: you are granted a perpetual, irrevocable license to copy, modify,
-//   publish, and distribute this file as you see fit.
+// version 1.0.1
+// https://github.com/ktprime/emhash/blob/master/thirdparty/emilib/emiset2s.hpp
+//
+// Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2021-2025 Huang Yuanbing & bailuzhou AT 163.com
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE
 
 #pragma once
 
@@ -109,12 +130,18 @@ class HashSet
 {
 private:
     using htype = HashSet<KeyT, HashT, EqT>;
-
     using PairT = const KeyT;
     constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
-
 public:
-    using size_t          = uint32_t;
+
+#if EMH_SIZE_TYPE_BIT == 64
+    using size_t = uint64_t;
+#elif EMH_SIZE_TYPE_BIT == 16
+    using size_t = uint16_t;
+#else
+    using size_t = uint32_t;
+#endif
+
     using value_type      = PairT;
     using reference       = PairT&;
     using const_reference = const PairT&;
@@ -138,7 +165,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)(key_hash % 253) + EFILLED;
+        return (int8_t)((uint64_t)key % 253) + EFILLED;
     }
 
     class const_iterator;
@@ -546,22 +573,13 @@ public:
         return { {this, bucket}, bempty };
     }
 
-    std::pair<iterator, bool> do_insert(const value_type& value) noexcept
+    template<typename K>
+    std::pair<iterator, bool> do_insert(const K& value) noexcept
     {
         bool bempty = true;
         const auto bucket = find_or_allocate(value, bempty);
         if (bempty) {
             new(_pairs + bucket) PairT(value); _num_filled++;
-        }
-        return { {this, bucket}, bempty };
-    }
-
-    std::pair<iterator, bool> do_insert(value_type&& value) noexcept
-    {
-        bool bempty = true;
-        const auto bucket = find_or_allocate(value, bempty);
-        if (bempty) {
-            new(_pairs + bucket) PairT(std::move(value)); _num_filled++;
         }
         return { {this, bucket}, bempty };
     }
@@ -572,12 +590,14 @@ public:
         return do_insert(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> insert(value_type&& value) noexcept
+    template<typename K>
+    std::pair<iterator, bool> insert(K && value) noexcept
     {
         return do_insert(std::move(value));
     }
 
-    std::pair<iterator, bool> insert(const value_type& value) noexcept
+    template<typename K>
+    std::pair<iterator, bool> insert(const K& value) noexcept
     {
         return do_insert(value);
     }
@@ -810,8 +830,8 @@ public:
         auto collision = 0;
 #endif
 
-        //for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
-        for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
+        for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
+        //for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
             if (old_states[src_bucket] >= State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 size_t main_bucket;
@@ -894,7 +914,7 @@ private:
 
         do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
@@ -934,7 +954,7 @@ private:
 
         do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             //1. find filled
             while (maskf != 0) {
@@ -948,7 +968,7 @@ private:
 
             if (hole == chole) {
                 //2. find empty
-                const auto maskd = (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
+                const auto maskd = (uint32_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
                 if (group_mask(next_bucket) == State::EEMPTY) {
                     hole = next_bucket + CTZ(maskd);
                     set_states(hole, key_h2);
@@ -1028,7 +1048,7 @@ private:
     size_t  _num_buckets      = 0;
     size_t  _mask             = 0; // _num_buckets minus one
     size_t  _num_filled       = 0;
-    size_t  _max_probe_length = 0; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
+    uint32_t _max_probe_length = 0; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };
 
 }

@@ -1108,7 +1108,7 @@ public:
 
     static Index* alloc_index(size_type num_buckets)
     {
-        auto new_index = (char*)malloc((EAD + (uint64_t)num_buckets) * sizeof(Index));
+        auto new_index = malloc((EAD + (uint64_t)num_buckets) * sizeof(Index));
         return (Index *)(new_index);
     }
 
@@ -1472,9 +1472,11 @@ private:
 #endif
 
     //kick out bucket and find empty to occpuy
-    //it will break the origin link and relink again.
-    //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
-    //after : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
+    //it will break the orgin link and relnik again.
+    //before: main_bucket --> prev_bucket --> bucket --> next_bucket(maybe none exist)
+    //atfer : main_bucket --> prev_bucket   (kickout)    next_bucket <-- new_bucket(bucket)
+    //                          \|/                                        /|\
+    //                          -|------------------------------------------|
     size_type kickout_bucket(const size_type kmain, const size_type bucket) noexcept
     {
         const auto next_bucket = _index[bucket].next;

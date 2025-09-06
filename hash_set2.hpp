@@ -1,6 +1,5 @@
-// emhash8::HashSet for C++11
 // version 1.3.3
-// https://github.com/ktprime/ktprime/blob/master/hash_set.hpp
+// https://github.com/ktprime/ktprime/blob/master/hash_set2.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -63,12 +62,15 @@
 #endif
 
 // likely/unlikely
-#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
-#    define EMH_LIKELY(condition) __builtin_expect(condition, 1)
-#    define EMH_UNLIKELY(condition) __builtin_expect(condition, 0)
+#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
+#define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
+#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
+#define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
 #else
-#    define EMH_LIKELY(condition) condition
-#    define EMH_UNLIKELY(condition) condition
+#define EMH_LIKELY(condition)   (condition)
+#define EMH_UNLIKELY(condition) (condition)
 #endif
 
 #define EMH_ENTRY(key, bucket) new(_pairs + bucket) PairT(key, bucket), _num_filled ++
@@ -82,14 +84,15 @@ class HashSet
 {
 public:
     //if constexpr (sizeof(KeyT) <= 4 && std::is_integral<KeyT>::value)
-#ifndef EMH_SIZE_TYPE_64BIT
-        typedef uint32_t size_type;
-        static constexpr size_type INACTIVE = 0-1u;
+#if EMH_SIZE_TYPE_BIT == 64
+    typedef uint64_t size_type;
+#elif EMH_SIZE_TYPE_BIT == 16
+    typedef uint16_t size_type;
 #else
-        typedef uint64_t size_type;
-        static constexpr size_type INACTIVE = 0-1ull;
+    typedef uint32_t size_type;
 #endif
 
+    static constexpr size_type INACTIVE = size_type(0 - 1ull);
     typedef HashSet<KeyT, HashT, EqT> htype;
     typedef std::pair<KeyT, size_type> PairT;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
@@ -426,8 +429,8 @@ public:
             _loadlf = (1 << 27) / value;
     }
 
-    constexpr size_type max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
-    constexpr size_type max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
 #ifndef TEST_TIMER_FEATURE
     int64_t fast_search(int64_t key, size_type buckets) const
@@ -892,6 +895,8 @@ public:
     {
         iterator it(this, cit._bucket);
         const auto bucket = erase_bucket(it._bucket);
+        if (_num_filled == 0)
+            return end();
         //move last bucket to current
 
         //erase from main bucket, return main bucket as next
@@ -916,7 +921,7 @@ public:
     void clear()
     {
         if (_num_filled > _num_buckets / 4 && std::is_trivially_destructible<KeyT>::value)
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+            memset(_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * _num_buckets);
         else
             clearkv();
 
@@ -967,7 +972,7 @@ private:
 
         uint64_t buckets = _num_filled > 65536 ? (1u << 16) : 8u;
         while (buckets < required_buckets) { buckets *= 2; }
-        if (buckets > (uint64_t)max_size() || buckets < _num_filled)
+        if (buckets > max_size() || buckets < _num_filled)
             std::abort(); //throw std::length_error("too large size");
 
         const auto num_buckets = (uint32_t)buckets;
@@ -991,7 +996,7 @@ private:
         _last_colls  = num_buckets - 1;
 
         if (bInCacheLine) {
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
+            memset(_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * num_buckets);
         } else {
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 _pairs[bucket].second = INACTIVE;

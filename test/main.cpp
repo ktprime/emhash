@@ -1171,7 +1171,7 @@ void test_rehash_reserve() {
 // 测试自定义哈希函数和相等性比较器
 struct CustomHash {
     size_t operator()(int x) const {
-        return x * 1234567;  // 简单自定义哈希
+        return (size_t)x * 1234567;  // 简单自定义哈希
     }
 };
 
