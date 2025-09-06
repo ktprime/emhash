@@ -322,7 +322,7 @@ public:
         _loadlf      = other._loadlf;
 
         if (std::is_trivially_copyable<KeyT>::value) {
-            memcpy(_pairs, other._pairs, _num_buckets * sizeof(PairT));
+            memcpy((void*)_pairs, other._pairs, _num_buckets * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
@@ -921,7 +921,7 @@ public:
     void clear()
     {
         if (_num_filled > _num_buckets / 4 && std::is_trivially_destructible<KeyT>::value)
-            memset(_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * _num_buckets);
+            memset((void*)_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * _num_buckets);
         else
             clearkv();
 
@@ -987,7 +987,7 @@ private:
         //assert(num_buckets > _num_filled);
         auto new_pairs = (PairT*)alloc_bucket(num_buckets);
         auto old_num_filled  = _num_filled;
-        auto old_num_buckets = _num_buckets;
+        //auto old_num_buckets = _num_buckets;
         auto old_pairs = _pairs;
 
         _num_filled  = 0;
@@ -996,12 +996,12 @@ private:
         _last_colls  = num_buckets - 1;
 
         if (bInCacheLine) {
-            memset(_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * num_buckets);
+            memset((void*)_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * num_buckets);
         } else {
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 _pairs[bucket].second = INACTIVE;
         }
-        memset(_pairs + num_buckets, 0, sizeof(_pairs[0]) * 2);
+        memset((void*)(_pairs + num_buckets), 0, sizeof(_pairs[0]) * 2);
 
         //set all main bucket first
         for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {

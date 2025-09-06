@@ -1,4 +1,3 @@
-// emhash8::HashMap for C++14/17/20
 // version 1.7.4
 // https://github.com/ktprime/emhash/blob/master/hash_table8.hpp
 //

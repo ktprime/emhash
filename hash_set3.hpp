@@ -285,7 +285,7 @@ public:
         _num_mains     = other._num_mains;
 
         if (std::is_trivially_copyable<KeyT>::value) {
-            memcpy(_pairs, other._pairs, _total_buckets * sizeof(PairT));
+            memcpy((void*)_pairs, other._pairs, _total_buckets * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
             for (size_type bucket = 0; bucket < _total_buckets; bucket++) {
@@ -859,7 +859,7 @@ public:
     void clear()
     {
         if (size() > _mains_buckets / 2 && std::is_trivially_destructible<KeyT>::value)
-            memset(_pairs, (uint32_t)(-1),  sizeof(_pairs[0]) * _total_buckets);
+            memset((void*)_pairs, (uint32_t)(-1),  sizeof(_pairs[0]) * _total_buckets);
         else
             clearkv();
 
@@ -911,7 +911,7 @@ public:
         _num_colls   = 0;
 
         if (sizeof(PairT) <= EMH_CACHE_LINE_SIZE / 2)
-            memset(_pairs, (uint32_t)(-1u), _total_buckets * sizeof(_pairs[0]));
+            memset((void*)_pairs, (uint32_t)(-1u), _total_buckets * sizeof(_pairs[0]));
         else {
             for (size_type bucket = 0; bucket < _total_buckets; bucket++)
                 EMH_BUCKET(_pairs, bucket) = INACTIVE;

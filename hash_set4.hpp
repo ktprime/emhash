@@ -405,7 +405,7 @@ public:
 #else
         if (std::is_pod<KeyT>::value)
 #endif
-            memcpy(_pairs, opairs, _num_buckets * sizeof(PairT));
+            memcpy((void*)_pairs, opairs, _num_buckets * sizeof(PairT));
         else {
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = _pairs[bucket].second = opairs[bucket].second;
@@ -413,7 +413,7 @@ public:
                     new(_pairs + bucket) PairT(opairs[bucket]);
             }
         }
-        memcpy(_pairs + _num_buckets, opairs + _num_buckets, 2 * sizeof(PairT) + _num_buckets / 8 + sizeof(size_t));
+        memcpy((void*)(_pairs + _num_buckets), opairs + _num_buckets, 2 * sizeof(PairT) + _num_buckets / 8 + sizeof(size_t));
     }
 
     inline void swap(HashSet& other)
@@ -915,7 +915,7 @@ public:
         if (isno_triviall_destructable())
             clearkv();
         else {
-            memset(_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+            memset((void*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
             memset(_bitmask, INACTIVE, _num_buckets / 8);
         }
         _last = 0;
@@ -969,11 +969,11 @@ private:
         _last        = 0;
 
         if (bInCacheLine)
-            memset(new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
+            memset((void*)new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
         else
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 new_pairs[bucket].second = INACTIVE;
-        memset(new_pairs + num_buckets, 0, sizeof(PairT) * 2);
+        memset((void*)(new_pairs + num_buckets), 0, sizeof(PairT) * 2);
 
         //set bit mask
         _bitmask     = decltype(_bitmask)(new_pairs + 2 + num_buckets);
