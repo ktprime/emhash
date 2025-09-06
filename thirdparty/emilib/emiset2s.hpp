@@ -590,14 +590,12 @@ public:
         return do_insert(std::forward<Args>(args)...);
     }
 
-    template<typename K>
-    std::pair<iterator, bool> insert(K && value) noexcept
+    std::pair<iterator, bool> insert(KeyT && value) noexcept
     {
         return do_insert(std::move(value));
     }
 
-    template<typename K>
-    std::pair<iterator, bool> insert(const K& value) noexcept
+    std::pair<iterator, bool> insert(const KeyT& value) noexcept
     {
         return do_insert(value);
     }

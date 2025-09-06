@@ -601,18 +601,17 @@ public:
         return { {this, slot}, empty };
     }
 
-    template<typename K>
-    std::pair<iterator, bool> insert(const K& p)
+
+    std::pair<iterator, bool> insert(KeyT&& value) noexcept
     {
         check_expand_need();
-        return do_insert(p);
+        return do_insert(std::move(value));
     }
 
-    template<typename K>
-    std::pair<iterator, bool> insert(K && p)
+    std::pair<iterator, bool> insert(const KeyT& value) noexcept
     {
         check_expand_need();
-        return do_insert(std::move(p));
+        return do_insert(value);
     }
 
     void insert(std::initializer_list<value_type> ilist)
