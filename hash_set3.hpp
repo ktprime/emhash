@@ -96,17 +96,20 @@ class HashSet
 public:
 #if EMH_SIZE_TYPE_BIT == 64
     typedef uint64_t size_type;
+    constexpr static size_type INACTIVE = (size_type)(0 - 1ull);
 #elif EMH_SIZE_TYPE_BIT == 16
     typedef uint16_t size_type;
+    constexpr static size_type INACTIVE = (size_type)(0 - 1ul);
 #else
     typedef uint32_t size_type;
+    constexpr static size_type INACTIVE = (size_type)(0 - 1ull);
 #endif
 
     typedef KeyT     key_type;
     typedef KeyT     value_type;
     typedef KeyT& reference;
     typedef const KeyT& const_reference;
-    constexpr static size_type INACTIVE = (size_type)(0-1u);
+
 
 private:
     typedef HashSet<KeyT, HashT, EqT> htype;
@@ -816,12 +819,16 @@ public:
         if (it._bucket < _mains_buckets) {
             auto& bucket_size = EMH_BUCKET(_pairs, it._bucket);
             del_main(it._bucket, bucket_size);
+            if (empty())
+                return end();
             return ++it;
         }
 
         //assert(it->first == EMH_KEY(_pairs, it._bucket));
         const auto bucket = erase_bucket(it._bucket);
         del_key(bucket, EMH_KEY(_pairs, bucket));
+        if (empty())
+            return end();
         //erase from main bucket, return main bucket as next
         if (bucket == it._bucket)
             ++it;
