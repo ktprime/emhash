@@ -106,7 +106,7 @@ public:
     typedef KeyT     value_type;
     typedef KeyT& reference;
     typedef const KeyT& const_reference;
-    constexpr static size_type INACTIVE = (size_type)(-1);
+    constexpr static size_type INACTIVE = (size_type)(0-1u);
 
 private:
     typedef HashSet<KeyT, HashT, EqT> htype;
@@ -692,7 +692,7 @@ public:
         Iter citend = begin;
         reserve(end - begin + _num_colls);
         for (; begin != end; ++begin) {
-            if (try_insert_mainbucket(*begin) == INACTIVE) {
+            if (try_insert_mainbucket(*begin) == (size_type)INACTIVE) {
                 std::swap(*begin, *citend++);
             }
         }
@@ -985,12 +985,13 @@ public:
 #endif
 
         free(old_pairs);
-
+#if _DEBUG
         auto diff = old_num_colls + old_num_mains - _num_colls - _num_mains;
         if (diff != 0) {
-            printf("%d %d | %d %d diff = %ld\n", old_num_colls, old_num_mains, _num_colls, _num_mains, (size_type)diff);
+            printf("%d %d | %d %d diff = %ld\n", old_num_colls, old_num_mains, _num_colls, _num_mains, (long)diff);
             assert(diff == 0);
         }
+#endif
     }
 
 private:

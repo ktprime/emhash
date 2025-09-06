@@ -733,7 +733,7 @@ public:
         Iter citend = begin;
         reserve(end - begin + _num_filled);
         for (; begin != end; ++begin) {
-            if (try_insert_mainbucket(*begin) == INACTIVE) {
+            if (try_insert_mainbucket(*begin) == (size_type)INACTIVE) {
                 std::swap(*begin, *citend++);
             }
         }
@@ -862,7 +862,7 @@ public:
     size_type erase(const KeyT& key)
     {
         const auto bucket = erase_key(key);
-        if (bucket == INACTIVE)
+        if (bucket == (size_type)INACTIVE)
             return 0;
 
         clear_bucket(bucket);

@@ -165,7 +165,7 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((uint64_t)key % 253) + EFILLED;
+        return (int8_t)((size_t)key_hash % 253) + EFILLED;
     }
 
     class const_iterator;

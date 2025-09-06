@@ -93,7 +93,7 @@ public:
 #if EMH_SIZE_TYPE_BIT == 64
     typedef uint64_t size_type;
 #elif EMH_SIZE_TYPE_BIT == 16
-    typedef uint16_t size_type;
+    typedef int16_t size_type;
 #else
     typedef uint32_t size_type;
 #endif
@@ -572,32 +572,6 @@ public:
     }
 
     // -----------------------------------------------------
-    std::pair<iterator, bool> do_insert(const value_type& value)
-    {
-        const auto key_hash = hash_key(value);
-        const auto bucket = find_or_allocate(value, key_hash);
-        const auto empty  = EMH_EMPTY(_index, bucket);
-        if (empty) {
-            EMH_NEW(value, bucket, key_hash);
-        }
-
-        const size_type slot = EMH_SLOT(_index, bucket);
-        return { {this, slot}, empty };
-    }
-
-    std::pair<iterator, bool> do_insert(value_type&& value)
-    {
-        const auto key_hash = hash_key(value);
-        const auto bucket = find_or_allocate(value, key_hash);
-        const auto empty  = EMH_EMPTY(_index, bucket);
-        if (empty) {
-            EMH_NEW(std::forward<KeyT>(value), bucket, key_hash);
-        }
-
-        const size_type slot = EMH_SLOT(_index, bucket);
-        return { {this, slot}, empty };
-    }
-
     template<typename K>
     std::pair<iterator, bool> do_insert(K&& key)
     {
@@ -627,13 +601,15 @@ public:
         return { {this, slot}, empty };
     }
 
-    std::pair<iterator, bool> insert(const value_type& p)
+    template<typename K>
+    std::pair<iterator, bool> insert(const K& p)
     {
         check_expand_need();
         return do_insert(p);
     }
 
-    std::pair<iterator, bool> insert(value_type && p)
+    template<typename K>
+    std::pair<iterator, bool> insert(K && p)
     {
         check_expand_need();
         return do_insert(std::move(p));
@@ -855,7 +831,7 @@ public:
         return (Index *)(new_index);
     }
 
-    bool reserve(size_type required_buckets)
+    bool reserve(uint64_t required_buckets)
     {
         if (_num_filled != required_buckets)
             return reserve(required_buckets, true);
@@ -889,7 +865,7 @@ public:
         return true;
     }
 
-    void rebuild(size_type num_buckets)
+    void rebuild(uint64_t num_buckets)
     {
         auto new_pairs = (value_type*)alloc_bucket(num_buckets * max_load_factor() + 4);
         if (is_trivially_copyable()) {
@@ -913,7 +889,7 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (buckets < required_buckets) { buckets *= 2; }
 
-        if (buckets > max_size() || buckets < _num_filled)
+        if (buckets >= max_size() || (size_type)buckets < _num_filled)
             std::abort(); //throw std::length_error("too large size");
 
 #if EMH_REHASH_LOG
@@ -1203,7 +1179,8 @@ private:
 ** put new key in its main position; otherwise (colliding bucket is in its main
 ** position), new key goes to an empty position.
 */
-    size_type find_or_allocate(const KeyT& key, uint64_t key_hash)
+    template<typename K=KeyT>
+    size_type find_or_allocate(const K& key, uint64_t key_hash)
     {
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = EMH_BUCKET(_index, bucket);
