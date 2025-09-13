@@ -894,11 +894,14 @@ public:
         auto new_pairs = (PairT*)malloc((2ull + num_buckets + main_bucket) * sizeof(PairT));
         auto old_pairs = _pairs;
 
+#if EMH_REHASH_LOG
         const auto old_num_mains   = _num_mains;
         const auto old_num_colls   = _num_colls;
+        const auto old_colls_buckets = _colls_buckets;
+#endif
+
         const auto old_main_buckets  = _mains_buckets;
         const auto old_total_buckets = _total_buckets;
-        const auto old_colls_buckets = _colls_buckets;
 
         _colls_buckets  = num_buckets;
         _mains_buckets  = main_bucket;
@@ -976,6 +979,8 @@ public:
             EMH_BUCKET(_pairs, new_bucket) = new_bucket;
         }
 
+        free(old_pairs);
+
 #if EMH_REHASH_LOG
         if (_num_colls > 100000) {
             auto mbucket = size() - collision;
@@ -991,8 +996,7 @@ public:
         }
 #endif
 
-        free(old_pairs);
-#if _DEBUG
+#if EMH_REHASH_LOG
         auto diff = old_num_colls + old_num_mains - _num_colls - _num_mains;
         if (diff != 0) {
             printf("%d %d | %d %d diff = %ld\n", old_num_colls, old_num_mains, _num_colls, _num_mains, (long)diff);

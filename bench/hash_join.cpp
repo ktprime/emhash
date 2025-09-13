@@ -143,7 +143,7 @@ template<template<class...> class Map>  void test_block(char const* label)
     const auto high_bit = msb32(block_size);
 
     size_t ans = 0;
-    std::array<std::array<KeyType, VCACHE_SIZE>, HASH_MAPS_SIZE> vblocks = { 0 };
+    std::array<std::array<KeyType, VCACHE_SIZE>, HASH_MAPS_SIZE> vblocks = {};
 
     for (const auto v2:indices2) {
         const auto vhash = BintHasher()(v2);

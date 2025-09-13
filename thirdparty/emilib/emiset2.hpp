@@ -116,9 +116,9 @@ inline static uint32_t CTZ(uint64_t n)
         {_BitScanForward(&index, n >> 32); index += 32; }
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    uint32_t index = __builtin_ctzll(n);
+    auto index = __builtin_ctzll(n);
 #elif 1
-    uint32_t index = __builtin_ctzl(n);
+    auto index = __builtin_ctzl(n);
 #endif
 
     return (uint32_t)index;
@@ -700,7 +700,7 @@ public:
         auto new_keys  = (KeyT*)(new_states + status_size);
 
         auto old_num_filled  = _num_filled;
-        auto old_num_buckets = _num_buckets;
+        //auto old_num_buckets = _num_buckets;
         auto old_states      = _states;
         auto old_keys        = _keys;
         auto max_probe_length = _max_probe_length;
@@ -801,7 +801,7 @@ private:
     size_t find_or_allocate(const KeyLike& key, uint64_t key_hash)
     {
         size_t hole = (size_t)-1;
-        const char keymask = KEYHASH_MASK(key_hash);
+        const char keymask = (char)KEYHASH_MASK(key_hash);
         const auto filled = SET1_EPI8(keymask);
         const auto bucket = (size_t)(key_hash & _mask);
         const auto round  = bucket + _max_probe_length;

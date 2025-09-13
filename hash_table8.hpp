@@ -84,11 +84,14 @@ class HashMap
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif
     constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
+#ifndef EMH_CACHE_LINE_SIZE
     constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
+#endif
 
 public:
     using htype = HashMap<KeyT, ValueT, HashT, EqT, Allocator, Policy>; //TODO:Allocator is not implemented
     using value_type = std::pair<KeyT, ValueT>; //TODO set to const KeyT
+//    using value_type = std::pair<const KeyT, ValueT>; //TODO set to const KeyT
     using key_type = const KeyT;
     using mapped_type = ValueT;
     //using dPolicy = Policy;
@@ -113,125 +116,83 @@ public:
         size_type slot;
     };
 
-    class const_iterator; // Forward declaration
-
-    class iterator
+    template <bool IsConst, typename HashMapType>
+    class hashmap_iterator
     {
     public:
         using iterator_category = std::bidirectional_iterator_tag;
-        using iterator_concept = std::bidirectional_iterator_tag; // added for C++20 Ranges
         using difference_type = std::ptrdiff_t;
-        using value_type = typename htype::value_type;
-        using pointer = value_type*;
-        using reference = value_type&;
-        using const_pointer = const value_type*;
-        using const_reference = const value_type&;
+        using value_type = typename HashMapType::value_type;
+        using reference = std::conditional_t<IsConst, const value_type&, value_type&>;
+        using pointer = std::conditional_t<IsConst, const value_type*, value_type*>;
+        using hash_map_type = std::conditional_t<IsConst, const HashMapType, HashMapType>;
 
-        // Maak constructoren constexpr
-        constexpr iterator() : kv_(nullptr) {}
-        constexpr iterator(const const_iterator& cit) : kv_(cit.kv_) {}
-        constexpr iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<int>(bucket)) {}
+        constexpr hashmap_iterator() noexcept : kv_(nullptr) {}
+        constexpr hashmap_iterator(pointer kv) noexcept : kv_(kv) {}
+        constexpr hashmap_iterator(hash_map_type* hash_map, size_type bucket) noexcept
+            : kv_(hash_map->_pairs + bucket) {}
 
-        // Maak operatoren constexpr
-        constexpr iterator& operator++()
+        template <bool OtherIsConst = IsConst, std::enable_if_t<!OtherIsConst, int> = 0>
+        constexpr operator hashmap_iterator<true, HashMapType>() const noexcept {
+            return hashmap_iterator<true, HashMapType>(kv_);
+        }
+
+        constexpr hashmap_iterator& operator++() noexcept
         {
-            kv_++;
+            ++kv_;
             return *this;
         }
 
-        constexpr iterator operator++(int)
+        constexpr hashmap_iterator operator++(int) noexcept
         {
-            iterator cur = *this;
-            kv_++;
-            return cur;
+            auto copy = *this;
+            ++(*this);
+            return copy;
         }
 
-        constexpr iterator& operator--()
+        constexpr hashmap_iterator& operator--() noexcept
         {
-            kv_--;
+            --kv_;
             return *this;
         }
 
-        constexpr iterator operator--(int)
+        constexpr hashmap_iterator operator--(int) noexcept
         {
-            iterator cur = *this;
-            kv_--;
-            return cur;
+            auto copy = *this;
+            --(*this);
+            return copy;
         }
 
-        constexpr reference operator*() const { return *kv_; }
-        constexpr pointer operator->() const { return kv_; }
+        constexpr hashmap_iterator operator+(difference_type diff) const noexcept
+        {
+            auto copy = *this;
+            copy.kv_ += diff;
+            return copy;
+        }
 
-        // Maak vergelijking operatoren constexpr
-        constexpr bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
-        constexpr bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
-        constexpr bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
-        constexpr bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
+        constexpr reference operator*() const noexcept { return *kv_; }
+        constexpr pointer operator->() const noexcept { return kv_; }
 
-    public:
-        value_type* kv_;
+        template <bool OtherIsConst>
+        constexpr bool operator==(const hashmap_iterator<OtherIsConst, HashMapType>& rhs) const noexcept
+        {
+            return kv_ == rhs.kv_;
+        }
+
+        template <bool OtherIsConst>
+        constexpr bool operator!=(const hashmap_iterator<OtherIsConst, HashMapType>& rhs) const noexcept
+        {
+            return !(*this == rhs);
+        }
+
     private:
-
-        // Vriend klasse om toegang te geven aan const_iterator
-        friend class const_iterator;
+        pointer kv_;
+        template <bool, typename> friend class hashmap_iterator;
+        friend HashMapType;
     };
 
-    class const_iterator
-    {
-    public:
-        using iterator_category = std::bidirectional_iterator_tag;
-        using iterator_concept = std::bidirectional_iterator_tag; // Toegevoegd voor C++20 Ranges
-        using value_type = typename htype::value_type;
-        using difference_type = std::ptrdiff_t;
-        using pointer = const value_type*;
-        using const_pointer = const value_type*;
-        using reference = const value_type&;
-        using const_reference = const value_type&;
-
-        // Maak constructoren constexpr
-        constexpr const_iterator() : kv_(nullptr) {}
-        constexpr const_iterator(const iterator& it) : kv_(it.kv_) {}
-        constexpr const_iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<int>(bucket)) {}
-
-        // Maak operatoren constexpr
-        constexpr const_iterator& operator++()
-        {
-            kv_++;
-            return *this;
-        }
-
-        constexpr const_iterator operator++(int)
-        {
-            const_iterator cur = *this;
-            kv_++;
-            return cur;
-        }
-
-        constexpr const_iterator& operator--()
-        {
-            kv_--;
-            return *this;
-        }
-
-        constexpr const_iterator operator--(int)
-        {
-            const_iterator cur = *this;
-            kv_--;
-            return cur;
-        }
-
-        constexpr const_reference operator*() const { return *kv_; }
-        constexpr const_pointer operator->() const { return kv_; }
-
-        // Maak vergelijking operatoren constexpr
-        constexpr bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
-        constexpr bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
-        constexpr bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
-        constexpr bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
-
-    public:
-        const value_type* kv_;
-    };
+    using iterator = hashmap_iterator<false, htype>;
+    using const_iterator = hashmap_iterator<true, htype>;
 
     void init(size_type bucket, float mlf = EMH_DEFAULT_LOAD_FACTOR)
     {
@@ -387,8 +348,10 @@ public:
     }
 
     // -------------------------------------------------------------
-    iterator first() const { return {this, 0}; }
-    iterator last() const { return {this, _num_filled - 1}; }
+    iterator first() { return iterator{this, 0}; }
+    iterator last()  { return iterator{this, _num_filled - 1}; }
+    const_iterator first() const { return const_iterator{ this, 0 }; }
+    const_iterator last() const { return const_iterator{ this, _num_filled - 1 }; }
 
     //no exception if empty
     value_type& front() { return _pairs[0]; }
@@ -846,8 +809,15 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& val) { return do_assign(key, std::forward<ValueT>(val)); }
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) { return do_assign(std::move(key), std::forward<ValueT>(val)); }
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& val) 
+    { 
+        return do_assign(key, std::forward<ValueT>(val)); 
+    }
+
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) 
+    { 
+        return do_assign(std::move(key), std::forward<ValueT>(val)); 
+    }
 
     /// Return the old value or ValueT() if it didn't exist.
     ValueT set_get(const KeyT& key, const ValueT& val)
@@ -1276,8 +1246,15 @@ private:
         if (EMH_LIKELY(slot != last_slot)) {
             const auto last_bucket = (_etail == INACTIVE || ebucket == _etail)
                 ? slot_to_bucket(last_slot) : _etail;
-
+#if 1
             _pairs[slot] = std::move(_pairs[last_slot]);
+#else
+            auto& target = _pairs[slot]; 
+            if (!is_trivially_destructible())
+                target.~value_type();           
+            new (&target) value_type(std::move(_pairs[last_slot]));
+#endif
+
             _index[last_bucket].slot = slot | (_index[last_bucket].slot & ~_mask);
         }
 

@@ -1385,7 +1385,7 @@ public:
         //if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
-        if (buckets > max_size() || buckets < _num_filled)
+        if (buckets > max_size() || buckets < (uint64_t)_num_filled)
             std::abort();//TODO: throwOverflowError
 
         auto num_buckets = (size_type)buckets;

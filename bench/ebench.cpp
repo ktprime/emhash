@@ -1,11 +1,11 @@
 #ifndef TTKey
-    #define TTKey              1
+    #define TTKey              0
 #endif
 #ifndef TTVal
     #define TTVal              0
 #endif
 
-#define  HAVE_INDIVI 1
+//#define  HAVE_INDIVI 1
 
 #include "util.h"
 
@@ -26,13 +26,10 @@ std::map<std::string, std::string> maps =
 //    {"fmap", "flat_map"},
 //    {"btree", "btree_map"},
 
-
-//    {"emhash2", "emhash2"},
-//    {"emhash3", "emhash3"},
-//    {"emhash4", "emhash4"},
 #if HAVE_BOOST
     {"boostf",  "boost_flat"},
 #endif
+
 #ifdef HAVE_INDIVI
 //    {"indiviu", "indivi_umap" },
     {"indiviw", "indivi_wmap" },
@@ -50,14 +47,11 @@ std::map<std::string, std::string> maps =
 
 //    {"lru_time", "lru_time"},
 //    {"lru_size", "lru_size"},
-
-    {"emilib2", "emilib2"},
     {"emilib1", "emilib1"},
+    {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
 //    {"simd_hash", "simd_hash"},
-//    {"emilib4", "emilib4"},
-//    {"emilib3", "emilib3"},
-//    {"ktprime", "ktprime"},
+
 #ifdef ABSL_HMAP
     {"abslf", "absl_flat"},
 #endif
@@ -85,15 +79,23 @@ std::map<std::string, std::string> maps =
 
 //rand data 3ype
 #ifndef RT
-    #define RT 3 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2 //1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 //#define CUCKOO_HASHMAP     1
-//#define EM3                1
 //#define PHMAP_HASH         1
 //#define WY_HASH            1
 
 //#define FL1                1
+
+#ifdef HAVE_BOOST
+#include <boost/unordered/unordered_flat_map.hpp>
+#endif
+
+#ifdef HAVE_INDIVI
+# include "indivi/flat_umap.h"
+# include "indivi/flat_wmap.h"
+#endif
 
 //feature of emhash
 //#define EMH_INT_HASH        1
@@ -111,21 +113,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_ALIGN64         1
 //#define EMH_FIND_HIT        1
 //#define EMH_SMALL_SIZE        12345
-//#define EMH_SMALL_SIZE   8
-#ifdef EM3
-#include "emhash/hash_table2.hpp"
-#include "emhash/hash_table3.hpp"
-#include "emhash/hash_table4.hpp"
-#endif
-
-#ifdef HAVE_BOOST
-#include <boost/unordered/unordered_flat_map.hpp>
-#endif
-
-#ifdef HAVE_INDIVI
-# include "indivi/flat_umap.h"
-# include "indivi/flat_wmap.h"
-#endif
+//#define EMH_SMALL_SIZE      8
 
 #include "../hash_table6.hpp"
 #include "../hash_table7.hpp"
@@ -133,55 +121,9 @@ std::map<std::string, std::string> maps =
 //#define EMH_HIGH_LOAD 12345
 #include "../hash_table5.hpp"
 
-//#include "../hash_table8v.hpp"
-//#include "../thirdparty/emhash/hash_table8v.hpp"
-//#include "../thirdparty/emhash/hash_table8v2.hpp"
-
-//https://jishuin.proginn.com/p/763bfbd338d0
-//https://en.wikipedia.org/wiki/Hash_table
-//https://zhuanlan.zhihu.com/p/363213858
-//https://www.zhihu.com/question/46156495
-//http://www.brendangregg.com/index.html
-
-//https://eourcs.github.io/LockFreeCuckooHash2
-//https://lemire.me/blog/2018/08/15/fast-strongly-universal-64-bit-hashing-everywhere/
-////some others
-//https://sites.google.com/view/patchmap/overview
-//https://github.com/ilyapopov/car-race
-//https://hpjansson.org/blag/2018/07/24/a-hash-table-re-hash/
-//https://www.reddit.com/r/cpp/comments/auwbmg/hashmap_benchmarks_what_should_i_add/
-//https://www.youtube.com/watch?v=M2fKMP47slQ
-//https://yq.aliyun.com/articles/563053
-
-//https://engineering.fb.com/developer-tools/f14/
-//https://github.com/facebook/folly/blob/master/folly/container/F14.md
-
-//https://martin.ankerl.com/2019/04/01/hashmap-benchmarks-01-overview/
-//https://martin.ankerl.com/2016/09/21/very-fast-hashmap-in-c-part-3/
-
-//https://attractivechaos.wordpress.com/2018/01/13/revisiting-hash-table-performance/
-//https://attractivechaos.wordpress.com/2019/12/28/deletion-from-hash-tables-without-tombstones/#comment-9548
-//https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html
-//https://probablydance.com/2017/02/26/i-wrote-the-fastest-hashtable/
-//https://andre.arko.net/2017/08/24/robin-hood-hashing/
-//http://www.ilikebigbits.com/2016_08_28_hash_table.html
-//http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
-//https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
-//https://bigdata.uni-saarland.de/publications/p249-richter.pdf
-//https://gankra.github.io/blah/hashbrown-tldr/ swiss
-//https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
-//https://jguegant.github.io/blogs/tech/dense-hash-map.html
-
-//https://martin.ankerl.com/2022/08/27/hashmap-bench-01/
-//https://bannalia.blogspot.com/2022/11/inside-boostunorderedflatmap.html
-
-//https://thenumb.at/Hashtables/#open-addressing-vs-separate-chaining
-//https://www.youtube.com/watch?v=IMnbytvHCjM
-//
-//https://www.cnblogs.com/dengn/p/16146722.html#MatrixOne%E6%95%B0%E6%8D%AE%E5%BA%93%E6%98%AF%E4%BB%80%E4%B9%88?
-//https://www.mdpi.com/2076-3417/10/6/1915
-//https://clickhouse.com/blog/clickhouse-fully-supports-joins-hash-joins-part2
-
+#include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
+#include "emilib/emilib2ss.hpp"
 
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
@@ -198,17 +140,12 @@ std::map<std::string, std::string> maps =
 
 #if CXX17
 #include "martin/unordered_dense.h"
-#endif
-
 #include "martin/robin_hood.h"
+#endif
 
 #if PHMAP_HASH
     #include "phmap/phmap.h"
 #endif
-
-    #include "emilib/emilib2o.hpp"
-    #include "emilib/emilib2s.hpp"
-    #include "emilib/emilib2ss.hpp"
 
 #if ET
 #if X86_64 && CXX17
@@ -224,7 +161,6 @@ std::map<std::string, std::string> maps =
 #endif
     #include "phmap/phmap.h"
 #endif
-
 
 #ifndef PACK
 #define PACK 128
@@ -289,7 +225,7 @@ struct StuHasher
     #define TO_KEY(i)   (keyType)i
     #define KEY_INT     1
 #elif TTKey == 1
-    typedef int64_t      keyType;
+    typedef int8_t      keyType;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int64_t"
     #define KEY_INT     1
@@ -588,7 +524,7 @@ static void insert_erase(const std::string& hash_name, const std::vector<keyType
             ht_hash.erase(vList[i - vsmall]);
     }
 
-    if (vList.size() % 3 == 0)
+    if (vList.size() % 2 == 0)
         ht_hash.clear();
 
 #if CXX17 && SMAP == 0
@@ -627,7 +563,7 @@ static void insert_no_reserve(const std::string& hash_name, const std::vector<ke
     for (const auto& v : vList)
         sum += ht_hash.emplace(v, TO_VAL(0)).second;
 #else
-    WyRand srng(vList.size() / 101);
+    WyRand srng(vList.size());
     for (int i = (int)vList.size(); i > 0; i--)
         sum += ht_hash.emplace((keyType)srng(), TO_VAL(0)).second;
 #endif
@@ -640,7 +576,7 @@ static void insert_reserve(hash_type& ht_hash, const std::string& hash_name, con
 {
     auto ts1 = getus(); size_t sum = 0;
 #ifndef SMAP
-    ht_hash.max_load_factor(0.80f);
+    //ht_hash.max_load_factor(0.80f);
     ht_hash.reserve(vList.size());
 #endif
 
@@ -658,7 +594,6 @@ static void insert_hit(hash_type& ht_hash, const std::string& hash_name, const s
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
-
 
 template<class hash_type>
 static void insert_accident(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
@@ -681,7 +616,7 @@ static void multi_small_ife(const std::string& hash_name, const std::vector<keyT
 
     if (test_case % 2) {
         const auto hash_size = vList.size() / 10003 + 4;
-        const auto data_size = 1000;
+        const int data_size = 1000;
         WyRand srng(hash_size);
         auto mh = new hash_type[hash_size];
 
@@ -711,10 +646,11 @@ static void multi_small_ife(const std::string& hash_name, const std::vector<keyT
         uint32_t small_size = 10 + vList.size() % 10000;
         WyRand srng(small_size);
         for (int i = (int)vList.size(); i > 0; i--) {
-            const keyType v2 = srng() % small_size;
-            sum += hashm.emplace(v2, TO_VAL(0)).second;
-            sum += hashm.erase(v2 - 1);
-            sum += hashm.count(v2 + 1);
+            const keyType v2 = srng() % small_size - 10;
+            if (!hashm.emplace(v2, TO_VAL(0)).second)
+                sum += hashm.erase(v2);
+            sum += hashm.erase(v2 - 10);
+            sum += hashm.count(v2 + 10);
         }
     }
 
@@ -727,6 +663,10 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 {
     auto ts1 = getus(); size_t sum = 1;
     hash_type tmp(ht_hash);
+    for (const auto& v : vList)
+    {
+        tmp.emplace(v, TO_VAL(0));
+    }
 
     for (auto & v : vList) {
 #if KEY_INT
@@ -743,7 +683,10 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 #ifndef SMAP
         sum += tmp.count(v2);
         auto it = tmp.emplace(std::move(v2), TO_VAL(0)).first;
-        tmp.erase(it);
+        if (sum % 2)
+            tmp.erase(it);
+        else
+            tmp.erase(v2);
 #else
         tmp[v2] = TO_VAL(0);
         auto it = tmp.find(v2);
@@ -819,7 +762,8 @@ static void insert_erase_continue(const std::string& hash_name, const std::vecto
         else {
             it = ht_hash.erase(it);
         }
-        if (it != ht_hash.end()) key = it->first;
+        if (it != ht_hash.end())
+            key = it->first;
         ht_hash.emplace(vList[i], TO_VAL(0));
     }
 #endif
@@ -838,7 +782,7 @@ static void insert_cache_size(const std::string& hash_name, const std::vector<ke
     {
         sum += tmp.emplace(v, TO_VAL(0)).second;
         //sum += tmp.count(v);
-        if (tmp.size() > lsize) {
+        if ((uint32_t)tmp.size() > lsize) {
             if (lsize % 3 == 0)
                 tmp.clear();
             else if (lsize % 3 == 1)
@@ -1432,13 +1376,6 @@ static int benchHashMap(int n)
         {  benOneHash<phmap::btree_map<keyType, valueType> >("btree", vList); }
 #endif
 
-#ifdef EM3
-        {  benOneHash<emhash2::HashMap <keyType, valueType, ehash_func>>("emhash2", vList); }
-        {  benOneHash<emhash4::HashMap <keyType, valueType, ehash_func>>("emhash4", vList); }
-        {  benOneHash<emhash3::HashMap <keyType, valueType, ehash_func>>("emhash3", vList); }
-#endif
-
-
 #if FOLLY
         {  benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
         {  benOneHash<folly::F14VectorMap<keyType, valueType, ehash_func>>("f14_vector", vList); }
@@ -1463,15 +1400,15 @@ static int benchHashMap(int n)
         {  benOneHash<fph::DynamicFphMap<keyType, valueType, fph::MixSeedHash<keyType>>>("fph", vList); }
 #endif
 
-#if HAVE_BOOST
-        {  benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
-#endif
 #if HAVE_INDIVI
         {  benOneHash<indivi::flat_umap<keyType, valueType, ehash_func>>("indiviu", vList); }
         {  benOneHash<indivi::flat_wmap<keyType, valueType, ehash_func>>("indiviw", vList); }
 #endif
 
         {  benOneHash<emhash5::HashMap <keyType, valueType, ehash_func>>("emhash5", vList); }
+#if HAVE_BOOST
+        { benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
+#endif
 
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
@@ -1690,7 +1627,7 @@ int main(int argc, char* argv[])
             test_extra = 1 - test_extra;
         else if (cmd == 'd') {
         for (int c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
-            if (c >= '5' && c <= '9') {
+            if (c >= '2' && c <= '9') {
                 std::string hash_name("emhash");
                 hash_name += char(c);
                 if (maps.find(hash_name) != maps.end())
@@ -1733,6 +1670,10 @@ int main(int argc, char* argv[])
             else if (c == 'l') {
                 maps.emplace("lru_size", "lru_size");
                 maps.emplace("lru_time", "lru_time");
+            }
+            else if (c == 'i') {
+                maps.emplace("indiviw", "indiviw_map");
+                maps.emplace("indiviu", "indiviu_map");
             }
             else if (c == 'k')
                 maps.emplace("ktprime", "ktprime");
@@ -1791,3 +1732,48 @@ int main(int argc, char* argv[])
     printf("total time = %.3lf s", (getus() - start) / 1000000.0);
     return 0;
 }
+
+//https://jishuin.proginn.com/p/763bfbd338d0
+//https://en.wikipedia.org/wiki/Hash_table
+//https://zhuanlan.zhihu.com/p/363213858
+//https://www.zhihu.com/question/46156495
+//http://www.brendangregg.com/index.html
+
+//https://eourcs.github.io/LockFreeCuckooHash2
+//https://lemire.me/blog/2018/08/15/fast-strongly-universal-64-bit-hashing-everywhere/
+////some others
+//https://sites.google.com/view/patchmap/overview
+//https://github.com/ilyapopov/car-race
+//https://hpjansson.org/blag/2018/07/24/a-hash-table-re-hash/
+//https://www.reddit.com/r/cpp/comments/auwbmg/hashmap_benchmarks_what_should_i_add/
+//https://www.youtube.com/watch?v=M2fKMP47slQ
+//https://yq.aliyun.com/articles/563053
+
+//https://engineering.fb.com/developer-tools/f14/
+//https://github.com/facebook/folly/blob/master/folly/container/F14.md
+
+//https://martin.ankerl.com/2019/04/01/hashmap-benchmarks-01-overview/
+//https://martin.ankerl.com/2016/09/21/very-fast-hashmap-in-c-part-3/
+
+//https://attractivechaos.wordpress.com/2018/01/13/revisiting-hash-table-performance/
+//https://attractivechaos.wordpress.com/2019/12/28/deletion-from-hash-tables-without-tombstones/#comment-9548
+//https://tessil.github.io/2016/08/29/benchmark-hopscotch-map.html
+//https://probablydance.com/2017/02/26/i-wrote-the-fastest-hashtable/
+//https://andre.arko.net/2017/08/24/robin-hood-hashing/
+//http://www.ilikebigbits.com/2016_08_28_hash_table.html
+//http://www.idryman.org/blog/2017/05/03/writing-a-damn-fast-hash-table-with-tiny-memory-footprints/
+//https://jasonlue.github.io/algo/2019/08/27/clustered-hashing-basic-operations.html
+//https://bigdata.uni-saarland.de/publications/p249-richter.pdf
+//https://gankra.github.io/blah/hashbrown-tldr/ swiss
+//https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
+//https://jguegant.github.io/blogs/tech/dense-hash-map.html
+
+//https://martin.ankerl.com/2022/08/27/hashmap-bench-01/
+//https://bannalia.blogspot.com/2022/11/inside-boostunorderedflatmap.html
+
+//https://thenumb.at/Hashtables/#open-addressing-vs-separate-chaining
+//https://www.youtube.com/watch?v=IMnbytvHCjM
+//
+//https://www.cnblogs.com/dengn/p/16146722.html#MatrixOne%E6%95%B0%E6%8D%AE%E5%BA%93%E6%98%AF%E4%BB%80%E4%B9%88?
+//https://www.mdpi.com/2076-3417/10/6/1915
+//https://clickhouse.com/blog/clickhouse-fully-supports-joins-hash-joins-part2

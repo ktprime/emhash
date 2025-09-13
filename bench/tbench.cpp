@@ -75,7 +75,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
         double duration = 0;
         {
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
-            auto sum = 0;
+            size_t sum = 0;
             for (auto num : v)
                 sum += h.emplace(num, 0).second;
 
@@ -88,7 +88,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
         {
             duration = 0;
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
-            auto sum = 0;
+            size_t sum = 0;
             for (auto num : v)
                 sum += h.count(num);
 
@@ -102,7 +102,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
         {
             duration = 0;
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
-            auto sum = 0;
+            size_t sum = 0;
             for (auto num : v)
                 sum += h.count(num + 1);
 
@@ -116,7 +116,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
         {
             duration = 0;
             auto start = chrono::steady_clock::now();
-            auto sum = 0;
+            size_t sum = 0;
             for (auto num : v)
                 sum += num & 1;
 
@@ -129,7 +129,7 @@ template <typename HashTableType> void hash_table_test(const char* map)
         {
             duration = 0;
             shuffle(v.begin(), v.end()); auto start = chrono::steady_clock::now();
-            auto sum = 0;
+            size_t sum = 0;
             for (auto num : v)
                 sum += h.erase(num);
 

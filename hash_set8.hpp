@@ -67,7 +67,7 @@
 
 namespace emhash8 {
 
-struct DefaultPolicy {
+struct DefaultPolicy8 {
     static constexpr float load_factor = 0.80f;
     static constexpr float min_load_factor = 0.20f;
     static constexpr size_t cacheline_size = 64U;
@@ -77,14 +77,16 @@ template<typename KeyT,
         typename HashT = std::hash<KeyT>,
         typename EqT = std::equal_to<KeyT>,
         typename Allocator = std::allocator<KeyT>, //never used
-        typename Policy = DefaultPolicy> //never used
+        typename Policy = DefaultPolicy8> //never used
 class HashSet
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif
     constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
-//    constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
+#ifndef EMH_CACHE_LINE_SIZE
+    constexpr static uint32_t EMH_CACHE_LINE_SIZE = 64;
+#endif
 
 public:
     using htype = HashSet<KeyT, HashT, EqT, Allocator, Policy>; //TODO:Allocator is not implemented
@@ -673,19 +675,29 @@ public:
     {
         reserve(std::distance(begin, end) + _num_filled, false);
         for (; begin != end; ++begin) {
-            insert_unique(*begin);
+            do_unique(*begin);
         }
     }
 #endif
 
+    template<typename K>
+    size_type do_unique(K&& key)
+    {
+        check_expand_need();
+        const auto key_hash = hash_key(key);
+        auto bucket = find_unique_bucket(key_hash);
+        EMH_NEW(std::forward<K>(key), bucket, key_hash);
+        return bucket;
+    }
+
     size_type insert_unique(value_type&& value)
     {
-        return insert_unique(std::move(value));
+        return do_unique(std::move(value));
     }
 
     size_type insert_unique(const value_type& value)
     {
-        return insert_unique(value);
+        return do_unique(value);
     }
 
     template <class... Args>

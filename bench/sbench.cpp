@@ -1,7 +1,9 @@
 #ifndef TTKey
     #define TTKey           1
 #endif
+
 //#define SMK 1
+#define  HAVE_INDIVI 1
 
 #include "util.h"
 #include <algorithm>
@@ -32,10 +34,15 @@ std::map<std::string, std::string> maps =
 #if HAVE_BOOST
     {"boostf",  "boost_flat"},
 #endif
+ #ifdef HAVE_INDIVI
+    {"indiviu", "indivi_uset"},
+    {"indiviw", "indivi_wset"},
+ #endif
+
     {"emhash8", "emhash8"},
     {"emhash6", "emhash6"},
 //    {"martind", "martin_dense"},
-    {"ck_hash", "sk_hset"},
+    {"ck_hash", "ck_hset"},
 
     {"gp_hash", "gp_hash"},
 
@@ -86,13 +93,18 @@ std::map<std::string, std::string> maps =
 #include "hash_set2.hpp"
 #include "hash_set3.hpp"
 #include "hash_set4.hpp"
-#include "hash_set81.hpp"
 #include "hash_set8.hpp"
 
-
 #ifdef HAVE_BOOST
-#include <boost/unordered/unordered_flat_set.hpp>
+    #include <boost/unordered/unordered_flat_set.hpp>
 #endif
+
+#ifdef HAVE_INDIVI
+    # include "indivi/flat_uset.h"
+    # include "indivi/flat_wset.h"
+#endif
+
+
 //https://www.zhihu.com/question/46156495
 //https://eourcs.github.io/LockFreeCuckooHash/
 //https://lemire.me/blog/2018/08/15/fast-strongly-universal-64-bit-hashing-everywhere/
@@ -125,7 +137,7 @@ std::map<std::string, std::string> maps =
 //https://leventov.medium.com/hash-table-tradeoffs-cpu-memory-and-variability-22dc944e6b9a
 
 
-    #include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
+#include "martin/robin_hood.h"    //https://github.com/martin/robin-hood-hashing/blob/master/src/include/robin_hood.h
 //#endif
 #if PHMAP_HASH
     #include "phmap/phmap.h"          //https://github.com/greg7mdp/parallel-hashmap/tree/master/parallel_hashmap
@@ -448,10 +460,10 @@ template<class hash_type>
 static void hash_iter(const hash_type& ht_hash, const std::string& hash_name)
 {
     auto ts1 = getus(); size_t sum = 0;
-    for (const auto& v : ht_hash)
+    for (const auto& _ : ht_hash)
         sum += sum;
 
-    for (auto& v : ht_hash)
+    for (auto& _ : ht_hash)
         sum += 2;
 
     for (auto it = ht_hash.begin(); it != ht_hash.end(); it++)
@@ -501,7 +513,7 @@ static void insert_erase(const std::string& hash_name, const std::vector<keyType
             ht_hash.erase(vList[i - vsmall]);
     }
 
-    if (vList.size() % 3 == 0)
+    if (vList.size() % 2 == 0)
         ht_hash.clear();
     const auto vmedium = vList.size() / 100;
     for (size_t i = 0; i < vList.size(); i++) {
@@ -591,9 +603,15 @@ static void multi_small_ife(const std::string& hash_name, const std::vector<keyT
 template<class hash_type>
 static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList)
 {
-    auto ts1 = getus(); size_t sum = 1;
+    size_t sum = vList.size();
     hash_type tmp(ht_hash);
 
+    for (const auto& v : vList)
+    {
+        tmp.emplace(v);
+    }
+
+    auto ts1 = getus();
     for (auto & v : vList) {
 #if KEY_INT
         auto v2 = keyType(v % 2 == 0 ? v + sum : v - sum);
@@ -609,9 +627,12 @@ static void insert_find_erase(const hash_type& ht_hash, const std::string& hash_
 #if QC_HASH == 0
         sum += tmp.count(v2);
 #endif
-        tmp.erase(v2);
+        if (sum % 2)
+            tmp.erase(it.first);
+        else
+            tmp.erase(v2);
     }
-    check_func_result(hash_name, __FUNCTION__, sum, ts1, 3);
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
 template<class hash_type>
@@ -699,7 +720,7 @@ static uint8_t l1_cache[64 * 1024];
 template<class hash_type>
 static void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
-    auto n = ht_hash.size();
+    //auto n = ht_hash.size();
 
 #if KEY_STR
 #if TTKey != 4
@@ -1168,16 +1189,23 @@ static int benchHashSet(int n)
 #if ABSL_HMAP
         {  benOneHash<absl::flat_hash_set <keyType, ehash_func>>("absl", vList); }
 #endif
-        {  benOneHash<emhash2::HashSet <keyType, ehash_func>>("emhash2", vList); }
-
-        {  benOneHash<emhash8::HashSet <keyType, ehash_func>>("emhash8", vList); }
-        {  benOneHash<emhash6::HashSet <keyType, ehash_func>>("emhash6", vList); }
-        {  benOneHash<emhash7::HashSet <keyType, ehash_func>>("emhash7", vList); }
-        {  benOneHash<emilib ::HashSet <keyType, ehash_func>>("emiset", vList); }
-        {  benOneHash<emilib2::HashSet <keyType, ehash_func>>("emiset2", vList); }
 #if HAVE_BOOST
         { benOneHash<boost::unordered_flat_set<keyType, ehash_func>>("boostf", vList); }
 #endif
+        {  benOneHash<emhash2::HashSet <keyType, ehash_func>>("emhash2", vList); }
+
+        {  benOneHash<emhash8::HashSet <keyType, ehash_func>>("emhash8", vList); }
+//        {  benOneHash<emhash6::HashSet <keyType, ehash_func>>("emhash6", vList); }
+        {  benOneHash<emhash7::HashSet <keyType, ehash_func>>("emhash7", vList); }
+        {  benOneHash<emilib ::HashSet <keyType, ehash_func>>("emiset", vList); }
+        {  benOneHash<emilib2::HashSet <keyType, ehash_func>>("emiset2", vList); }
+
+
+#if HAVE_INDIVI
+        {  benOneHash<indivi::flat_uset<keyType, ehash_func>>("indiviu", vList); }
+        {  benOneHash<indivi::flat_wset<keyType, ehash_func>>("indiviw", vList); }
+#endif
+
         {  benOneHash<emilib3::HashSet <keyType, ehash_func>>("emiset2s", vList); }
         {  benOneHash<emhash9::HashSet <keyType, ehash_func>>("emhash9", vList); }
 
@@ -1200,7 +1228,7 @@ static void high_load()
     size_t maxSize = 1U << 28;
     size_t numReps = 100;
 
-    std::random_device rd;
+    //std::random_device rd;
     auto dis = std::uniform_int_distribution<uint32_t>{0, (1U << 31) - 1};
 
     for (size_t rep = 0; rep < numReps; ++rep) {
@@ -1290,7 +1318,7 @@ int test7()
 
         current_uniques.reserve(last_uniques_size * 2);
 
-        for (const auto old_element : old_uniques) {
+        for (const auto _ : old_uniques) {
             for (int j = 0; j < BRANCH_FACTOR; ++j) {
                 uint64_t longrand = random();
                 current_uniques.insert(longrand);
@@ -1394,6 +1422,10 @@ int main(int argc, char* argv[])
                     maps.erase("absl");
                 else if (c == 'e') {
                     maps.erase("emiset");
+                }
+                else if (c == 'i') {
+                    maps.erase("indiviw");
+                    maps.erase("indiviu");
                 }
                 else if (c == 'b') {
                     maps.emplace("btree", "btree_set");

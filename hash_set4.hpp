@@ -44,6 +44,9 @@
     #include "wyhash.h"
 #endif
 
+#undef EMH_LIKELY
+#undef EMH_UNLIKELY
+
 // likely/unlikely
 #if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
 #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
@@ -85,15 +88,15 @@ static uint32_t CTZ(size_t n)
     unsigned long index;
     _BitScanForward64(&index, n);
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    uint32_t index = __builtin_ctzll(n);
+    int32_t index = __builtin_ctzll(n);
 #elif 1
-    uint32_t index = __builtin_ctzl(n);
+    int32_t index = __builtin_ctzl(n);
 #else
     #if defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    uint32_t index;
+    int32_t index;
     __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
     #else
-    uint32_t index;
+    int32_t index;
     __asm__("bsf %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
     #endif
 #endif
@@ -523,7 +526,7 @@ public:
 
     size_type bucket_main() const
     {
-        auto bucket_size = 0;
+        size_type bucket_size = 0;
         for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
             if (_pairs[bucket].second == bucket)
                 bucket_size ++;

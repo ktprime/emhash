@@ -61,6 +61,9 @@
     #undef EMH_ENTRY
 #endif
 
+#undef EMH_LIKELY
+#undef EMH_UNLIKELY
+
 // likely/unlikely
 #if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
 #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
@@ -462,7 +465,7 @@ public:
     int64_t near_bucket(int64_t key, size_type buckets) const
     {
         auto bfrom = get_main_bucket(key);
-        if (bfrom == -1)
+        if (bfrom == INACTIVE)
             bfrom = key;
 
         while (buckets--) {
@@ -533,16 +536,16 @@ public:
         const auto bucket = key & _mask;
         const auto next_bucket = _pairs[bucket].second;
         if (next_bucket == INACTIVE)
-            return -1;
+            return INACTIVE;
 
         const auto& node = _pairs[bucket].first;
         //check current bucket_key is in main bucket or not
         const auto main_bucket = hash_bucket(node);
         //assert(main_bucket == hash_bucket(_pairs[next_bucket].first));
         if (main_bucket != bucket)
-            return -1;
+            return INACTIVE;
         else if (next_bucket == main_bucket && node->expire != key)
-            return -1;
+            return INACTIVE;
 
         return main_bucket;
     }
