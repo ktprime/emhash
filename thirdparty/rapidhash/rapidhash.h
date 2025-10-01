@@ -2,7 +2,7 @@
  * rapidhash V3 - Very fast, high quality, platform-independent hashing algorithm.
  *
  * Based on 'wyhash', by Wang Yi <godspeed_china@yeah.net>
- * 
+ *
  * Copyright (C) 2025 Nicolas De Carli
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -38,11 +38,11 @@
  #   pragma intrinsic(_umul128)
  # endif
  #endif
- 
+
  /*
   *  C/C++ macros.
   */
- 
+
  #ifdef _MSC_VER
  # define RAPIDHASH_ALWAYS_INLINE __forceinline
  #elif defined(__GNUC__)
@@ -50,7 +50,7 @@
  #else
  # define RAPIDHASH_ALWAYS_INLINE inline
  #endif
- 
+
  #ifdef __cplusplus
  # define RAPIDHASH_NOEXCEPT noexcept
  # define RAPIDHASH_CONSTEXPR constexpr
@@ -76,7 +76,7 @@
   *  Improves large input speed, but increases code size and worsens small input speed.
   *
   *  RAPIDHASH_COMPACT: Normal behavior.
-  *  RAPIDHASH_UNROLLED: 
+  *  RAPIDHASH_UNROLLED:
   *
   */
   #ifndef RAPIDHASH_UNROLLED
@@ -84,7 +84,7 @@
   #elif defined(RAPIDHASH_COMPACT)
   # error "cannot define RAPIDHASH_COMPACT and RAPIDHASH_UNROLLED simultaneously."
   #endif
- 
+
  /*
   *  Protection macro, alters behaviour of rapid_mum multiplication function.
   *
@@ -96,7 +96,7 @@
  #elif defined(RAPIDHASH_FAST)
  # error "cannot define RAPIDHASH_PROTECTED and RAPIDHASH_FAST simultaneously."
  #endif
- 
+
  /*
   *  Likely and unlikely macros.
   */
@@ -107,7 +107,7 @@
  # define _likely_(x) (x)
  # define _unlikely_(x) (x)
  #endif
- 
+
  /*
   *  Endianness macros.
   */
@@ -121,7 +121,7 @@
  #   define RAPIDHASH_LITTLE_ENDIAN
  # endif
  #endif
- 
+
  /*
   *  Default secret parameters.
   */
@@ -134,7 +134,7 @@
      0xe7037ed1a0b428dbull,
      0x90ed1765281c388cull,
      0xaaaaaaaaaaaaaaaaull};
- 
+
  /*
   *  64*64 -> 128bit multiply function.
   *
@@ -183,8 +183,8 @@
  #else
    uint64_t ha=*A>>32, hb=*B>>32, la=(uint32_t)*A, lb=(uint32_t)*B;
    uint64_t rh=ha*hb, rm0=ha*lb, rm1=hb*la, rl=la*lb, t=rl+(rm0<<32), c=t<rl;
-   uint64_t lo=t+(rm1<<32); 
-   c+=lo<t; 
+   uint64_t lo=t+(rm1<<32);
+   c+=lo<t;
    uint64_t hi=rh+(rm0>>32)+(rm1>>32)+c;
    #ifdef RAPIDHASH_PROTECTED
    *A^=lo;  *B^=hi;
@@ -193,7 +193,7 @@
    #endif
  #endif
  }
- 
+
  /*
   *  Multiply and xor mix function.
   *
@@ -204,7 +204,7 @@
   *  Returns 64-bit xor between high and low 64 bits of C.
   */
   RAPIDHASH_INLINE_CONSTEXPR uint64_t rapid_mix(uint64_t A, uint64_t B) RAPIDHASH_NOEXCEPT { rapid_mum(&A,&B); return A^B; }
- 
+
  /*
   *  Read functions.
   */
@@ -227,7 +227,7 @@
    return (((v >> 24) & 0xff)| ((v >>  8) & 0xff00)| ((v <<  8) & 0xff0000)| ((v << 24) & 0xff000000));
  }
  #endif
- 
+
  /*
   *  rapidhash main function.
   *
@@ -261,11 +261,11 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhash_internal(const void *key, size_t l
     } else
       a = b = 0;
   } else {
-    uint64_t see1 = seed, see2 = seed;
-    uint64_t see3 = seed, see4 = seed;
-    uint64_t see5 = seed, see6 = seed;
+    if (len > 112) {
+      uint64_t see1 = seed, see2 = seed;
+      uint64_t see3 = seed, see4 = seed;
+      uint64_t see5 = seed, see6 = seed;
 #ifdef RAPIDHASH_COMPACT
-    if (i > 112) {
       do {
         seed = rapid_mix(rapid_read64(p) ^ secret[0], rapid_read64(p + 8) ^ seed);
         see1 = rapid_mix(rapid_read64(p + 16) ^ secret[1], rapid_read64(p + 24) ^ see1);
@@ -277,6 +277,37 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhash_internal(const void *key, size_t l
         p += 112;
         i -= 112;
       } while(i > 112);
+#else
+      while (i > 224) {
+        seed = rapid_mix(rapid_read64(p) ^ secret[0], rapid_read64(p + 8) ^ seed);
+        see1 = rapid_mix(rapid_read64(p + 16) ^ secret[1], rapid_read64(p + 24) ^ see1);
+        see2 = rapid_mix(rapid_read64(p + 32) ^ secret[2], rapid_read64(p + 40) ^ see2);
+        see3 = rapid_mix(rapid_read64(p + 48) ^ secret[3], rapid_read64(p + 56) ^ see3);
+        see4 = rapid_mix(rapid_read64(p + 64) ^ secret[4], rapid_read64(p + 72) ^ see4);
+        see5 = rapid_mix(rapid_read64(p + 80) ^ secret[5], rapid_read64(p + 88) ^ see5);
+        see6 = rapid_mix(rapid_read64(p + 96) ^ secret[6], rapid_read64(p + 104) ^ see6);
+        seed = rapid_mix(rapid_read64(p + 112) ^ secret[0], rapid_read64(p + 120) ^ seed);
+        see1 = rapid_mix(rapid_read64(p + 128) ^ secret[1], rapid_read64(p + 136) ^ see1);
+        see2 = rapid_mix(rapid_read64(p + 144) ^ secret[2], rapid_read64(p + 152) ^ see2);
+        see3 = rapid_mix(rapid_read64(p + 160) ^ secret[3], rapid_read64(p + 168) ^ see3);
+        see4 = rapid_mix(rapid_read64(p + 176) ^ secret[4], rapid_read64(p + 184) ^ see4);
+        see5 = rapid_mix(rapid_read64(p + 192) ^ secret[5], rapid_read64(p + 200) ^ see5);
+        see6 = rapid_mix(rapid_read64(p + 208) ^ secret[6], rapid_read64(p + 216) ^ see6);
+        p += 224;
+        i -= 224;
+      }
+      if (i > 112) {
+        seed = rapid_mix(rapid_read64(p) ^ secret[0], rapid_read64(p + 8) ^ seed);
+        see1 = rapid_mix(rapid_read64(p + 16) ^ secret[1], rapid_read64(p + 24) ^ see1);
+        see2 = rapid_mix(rapid_read64(p + 32) ^ secret[2], rapid_read64(p + 40) ^ see2);
+        see3 = rapid_mix(rapid_read64(p + 48) ^ secret[3], rapid_read64(p + 56) ^ see3);
+        see4 = rapid_mix(rapid_read64(p + 64) ^ secret[4], rapid_read64(p + 72) ^ see4);
+        see5 = rapid_mix(rapid_read64(p + 80) ^ secret[5], rapid_read64(p + 88) ^ see5);
+        see6 = rapid_mix(rapid_read64(p + 96) ^ secret[6], rapid_read64(p + 104) ^ see6);
+        p += 112;
+        i -= 112;
+      }
+#endif
       seed ^= see1;
       see2 ^= see3;
       see4 ^= see5;
@@ -284,45 +315,6 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhash_internal(const void *key, size_t l
       see2 ^= see4;
       seed ^= see2;
     }
-#else 
-    if (i > 224) {
-      do {
-          seed = rapid_mix(rapid_read64(p) ^ secret[0], rapid_read64(p + 8) ^ seed);
-          see1 = rapid_mix(rapid_read64(p + 16) ^ secret[1], rapid_read64(p + 24) ^ see1);
-          see2 = rapid_mix(rapid_read64(p + 32) ^ secret[2], rapid_read64(p + 40) ^ see2);
-          see3 = rapid_mix(rapid_read64(p + 48) ^ secret[3], rapid_read64(p + 56) ^ see3);
-          see4 = rapid_mix(rapid_read64(p + 64) ^ secret[4], rapid_read64(p + 72) ^ see4);
-          see5 = rapid_mix(rapid_read64(p + 80) ^ secret[5], rapid_read64(p + 88) ^ see5);
-          see6 = rapid_mix(rapid_read64(p + 96) ^ secret[6], rapid_read64(p + 104) ^ see6);
-          seed = rapid_mix(rapid_read64(p + 112) ^ secret[0], rapid_read64(p + 120) ^ seed);
-          see1 = rapid_mix(rapid_read64(p + 128) ^ secret[1], rapid_read64(p + 136) ^ see1);
-          see2 = rapid_mix(rapid_read64(p + 144) ^ secret[2], rapid_read64(p + 152) ^ see2);
-          see3 = rapid_mix(rapid_read64(p + 160) ^ secret[3], rapid_read64(p + 168) ^ see3);
-          see4 = rapid_mix(rapid_read64(p + 176) ^ secret[4], rapid_read64(p + 184) ^ see4);
-          see5 = rapid_mix(rapid_read64(p + 192) ^ secret[5], rapid_read64(p + 200) ^ see5);
-          see6 = rapid_mix(rapid_read64(p + 208) ^ secret[6], rapid_read64(p + 216) ^ see6);
-          p += 224;
-          i -= 224;
-      } while (i > 224);
-    }
-    if (i > 112) {
-      seed = rapid_mix(rapid_read64(p) ^ secret[0], rapid_read64(p + 8) ^ seed);
-      see1 = rapid_mix(rapid_read64(p + 16) ^ secret[1], rapid_read64(p + 24) ^ see1);
-      see2 = rapid_mix(rapid_read64(p + 32) ^ secret[2], rapid_read64(p + 40) ^ see2);
-      see3 = rapid_mix(rapid_read64(p + 48) ^ secret[3], rapid_read64(p + 56) ^ see3);
-      see4 = rapid_mix(rapid_read64(p + 64) ^ secret[4], rapid_read64(p + 72) ^ see4);
-      see5 = rapid_mix(rapid_read64(p + 80) ^ secret[5], rapid_read64(p + 88) ^ see5);
-      see6 = rapid_mix(rapid_read64(p + 96) ^ secret[6], rapid_read64(p + 104) ^ see6);
-      p += 112;
-      i -= 112;
-    }
-    seed ^= see1;
-    see2 ^= see3;
-    see4 ^= see5;
-    seed ^= see6;
-    see2 ^= see4;
-    seed ^= see2;
-#endif
     if (i > 16) {
       seed = rapid_mix(rapid_read64(p) ^ secret[2], rapid_read64(p + 8) ^ seed);
       if (i > 32) {
@@ -477,7 +469,7 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhash_internal(const void *key, size_t l
     rapid_mum(&a, &b);
     return rapid_mix(a ^ secret[7], b ^ secret[1] ^ i);
   }
- 
+
 /*
  *  rapidhash seeded hash function.
  *
@@ -492,7 +484,7 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhash_internal(const void *key, size_t l
 RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhash_withSeed(const void *key, size_t len, uint64_t seed) RAPIDHASH_NOEXCEPT {
   return rapidhash_internal(key, len, seed, rapid_secret);
 }
- 
+
 /*
  *  rapidhash general purpose hash function.
  *
@@ -525,7 +517,7 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhash(const void *key, size_t len) RAPID
  RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhashMicro_withSeed(const void *key, size_t len, uint64_t seed) RAPIDHASH_NOEXCEPT {
   return rapidhashMicro_internal(key, len, seed, rapid_secret);
 }
- 
+
 /*
  *  rapidhashMicro hash function.
  *
@@ -554,7 +546,7 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhashMicro(const void *key, size_t len) 
  RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhashNano_withSeed(const void *key, size_t len, uint64_t seed) RAPIDHASH_NOEXCEPT {
   return rapidhashNano_internal(key, len, seed, rapid_secret);
 }
- 
+
 /*
  *  rapidhashNano hash function.
  *
@@ -572,3 +564,4 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhashMicro(const void *key, size_t len) 
 RAPIDHASH_INLINE_CONSTEXPR uint64_t rapidhashNano(const void *key, size_t len) RAPIDHASH_NOEXCEPT {
   return rapidhashNano_withSeed(key, len, 0);
 }
+

@@ -1,0 +1,10 @@
+BasedOnStyle: LLVM
+
+ColumnLimit: 140
+PointerAlignment: Left
+BreakBeforeBraces: Allman
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
+IndentWidth: 4
+TabWidth: 4
+IndentPPDirectives: BeforeHash

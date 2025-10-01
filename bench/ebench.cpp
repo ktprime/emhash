@@ -225,7 +225,7 @@ struct StuHasher
     #define TO_KEY(i)   (keyType)i
     #define KEY_INT     1
 #elif TTKey == 1
-    typedef int8_t      keyType;
+    typedef int64_t      keyType;
     #define TO_KEY(i)   (keyType)i
     #define sKeyType    "int64_t"
     #define KEY_INT     1

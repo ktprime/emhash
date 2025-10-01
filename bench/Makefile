@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS =-O3 -DNDEBUG=1 -march=native -I.. -I../thirdparty
+CXXFLAGS =-O3 -DNDEBUG=1 -Wextra -Wno-unused-parameter -march=native -I.. -I../thirdparty
 #-march=armv8.6-a -fpermissive
 #-I/usr/local/include
 
@@ -124,7 +124,7 @@ ifneq ($(CK),)
 CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
-CXXFLAGS += -flto=auto # -static clang libc++ -static-libstdc++?
+CXXFLAGS += -flto=auto # -static -static-libstdc++?
 
 ifneq ($(PSL),)
 CXXFLAGS += -DPSL= (PSL)
@@ -136,8 +136,8 @@ ifneq ($(QB),)
 endif
 
 #	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
-	$(CXX) $(CXXFLAGS) ebench.cpp -o ebench
-	$(CXX) $(CXXFLAGS) sbench.cpp -o sb
+	$(CXX) $(CXXFLAGS) -fno-rtti ebench.cpp -o ebench
+	$(CXX) $(CXXFLAGS) -fno-rtti sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) hash_join.cpp -o join_hash
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
