@@ -545,7 +545,7 @@ public:
         _pairs = nullptr;
         _bitmask = nullptr;
         _num_buckets = _num_filled = 0;
-        _mlf = (uint32_t)((1 << 27) / EMH_DEFAULT_LOAD_FACTOR);
+        _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
         max_load_factor(mlf);
         rehash(bucket);
     }
@@ -771,7 +771,7 @@ public:
             _mlf = (uint32_t)((1 << 28) / mlf);
     }
 
-    inline constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
+    inline constexpr float max_load_factor() const { return (1 << 28) / (float)_mlf; }
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
 

@@ -12,6 +12,8 @@
 
 #if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #endif
 //#define EMH_INT_HASH 1
 
@@ -561,6 +563,8 @@ int main(int argc, char* argv[])
 
 #if HAVE_BOOST
     run_table <boost::unordered_flat_map<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <indivi::flat_umap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
+    run_table <indivi::flat_wmap<test_key_t, test_val_t, hash_t>>     (insert_keys, insert_vals, query_keys, remove_keys);
 #endif
 
     run_table <emhash6::HashMap<test_key_t, test_val_t, hash_t>>(insert_keys, insert_vals, query_keys, remove_keys);

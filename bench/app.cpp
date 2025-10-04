@@ -7,6 +7,8 @@
 #endif
 #if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #endif
 
 #include "ska/flat_hash_map.hpp"
@@ -150,7 +152,7 @@ void benchmarkSet(const Samples& ulongArray,
 
     Set x = benchmarkSet_insert<Set, false>(ulongArray, runCount);
 
-    int allHit = 0;
+    size_t allHit = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
@@ -160,7 +162,7 @@ void benchmarkSet(const Samples& ulongArray,
     }
     showResults("find", durs, ulongArray.size(), allHit == ulongArray.size() * runCount);
 
-    int allErase = 0;
+    size_t allErase = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
@@ -205,7 +207,7 @@ void benchmarkMap(const Samples& ulongArray, const size_t runCount)
     }
     showResults("insert", durs, ulongArray.size(), true);
 
-    int allHit = 0;
+    size_t allHit = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
@@ -215,7 +217,7 @@ void benchmarkMap(const Samples& ulongArray, const size_t runCount)
     }
     showResults("find", durs, ulongArray.size(), allHit == ulongArray.size() * runCount);
 
-    int allErase = 0;
+    size_t allErase = 0;
     for (size_t runIx = 0; runIx != runCount; ++runIx)
     {
         const auto beg = Clock::now();
@@ -333,6 +335,8 @@ int main(__attribute__((unused)) int argc,
     benchmarkMap<emilib3::HashMap<Sample, Sample, hash_t>>(ulongArray, runCount);
 #if HAVE_BOOST
     benchmarkMap<boost::unordered_flat_map<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<indivi::flat_umap<Sample, Sample, hash_t>>(ulongArray, runCount);
+    benchmarkMap<indivi::flat_wmap<Sample, Sample, hash_t>>(ulongArray, runCount);
 #endif
 
     cout << "\n# Ordered Maps:" << endl;

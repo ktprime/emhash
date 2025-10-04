@@ -9,6 +9,8 @@
 
 #if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #endif
 
 #if QC_HASH
@@ -328,12 +330,14 @@ int main(int argc, char **argv)
 
 #if HAVE_BOOST
     bench_map<boost::unordered_flat_map<size_t,size_t>>("boost::flat_hash_map",count);
+    bench_map<indivi::flat_umap<size_t,size_t>>("indivi::flat_umap",count);
+    bench_map<indivi::flat_wmap<size_t,size_t>>("indivi::flat_wmap",count);
 #endif
 
     bench_map<emhash5::HashMap<size_t,size_t>>("emhash5::HashMap",count);
     bench_map<emhash7::HashMap<size_t,size_t>>("emhash7::HashMap",count);
     bench_map<emilib2::HashMap<size_t,size_t>>("emilib2::HashMap",count);
-    bench_map<emilib3::HashMap<size_t,size_t>>("emilib2::HashMap",count);
+    bench_map<emilib3::HashMap<size_t,size_t>>("emilib3::HashMap",count);
     //bench_map<robin_hood::unordered_node_map<size_t,size_t>>("martin::node_hash",count);
     bench_map<phmap::flat_hash_map<size_t,size_t>>("phmap::flat_hash_hash",count);
     bench_map<phmap::node_hash_map<size_t,size_t>>("phmap::node_hash_hash",count);
@@ -345,7 +349,7 @@ int main(int argc, char **argv)
 #endif
 
     bench_map<rigtorp::HashMap<size_t,size_t>>("rigtorp::HashMap",count);
-    bench_map<emhash8::HashMap<size_t,size_t>>("emhash8::HashMap",count);
+//    bench_map<emhash8::HashMap<size_t,size_t>>("emhash8::HashMap",count);
 
 #if QC_HASH
     bench_map<qc::hash::RawMap<size_t,size_t>>("qc::hash::RawMap",count);

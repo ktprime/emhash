@@ -585,6 +585,40 @@ static void insert_reserve(hash_type& ht_hash, const std::string& hash_name, con
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
+#if TTKey < 2
+template <typename HMAP, typename Key, typename Value>
+auto has_insert_unique(int)
+-> decltype(
+    std::declval<HMAP>().insert_unique(std::declval<Key>(), std::declval<Value>()),
+    std::true_type{}
+    );
+
+template <typename HMAP, typename Key, typename Value>
+std::false_type has_insert_unique(...) {
+    return std::false_type{};
+}
+
+template <typename HMAP, typename Key, typename Value>
+constexpr bool has_insert_unique_v = decltype(has_insert_unique<HMAP, Key, Value>(0))::value;
+
+template<class hash_type>
+static void insert_unique(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
+{
+    auto ts1 = getus(); size_t sum = 0;
+#ifndef SMAP
+    ht_hash.reserve(vList.size());
+#endif
+    ht_hash.clear();
+    for (const auto& v : vList)
+        if constexpr (has_insert_unique_v<hash_type, int, int>)
+            sum += ht_hash.insert_unique(v, TO_VAL(0));
+        else
+            sum += ht_hash.emplace(v, TO_VAL(0)).second;
+    check_func_result(hash_name, __FUNCTION__, 0, ts1);
+    ht_hash.clear();
+}
+#endif
+
 template<class hash_type>
 static void insert_hit(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList)
 {
@@ -863,7 +897,7 @@ static void insert_erase_high(const std::string& hash_name, size_t vSize)
         ht_hash.emplace((keyType)srng(), TO_VAL(0));
     }
 
-    while (ht_hash.load_factor() < mlf && ht_hash.size() < 2 * vSize) {
+    while (ht_hash.load_factor() < mlf && (size_t)ht_hash.size() < 2 * vSize) {
         ht_hash.emplace((keyType)srng(), TO_VAL(0));
     }
 
@@ -1158,6 +1192,7 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     insert_cache_size <hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
 
     insert_no_reserve <hash_type>(hash_name, oList);
+    //insert_unique<hash_type>(hash, hash_name, oList);
     insert_reserve<hash_type>(hash, hash_name, oList);
     insert_hit<hash_type>(hash, hash_name, oList);
 
@@ -1627,8 +1662,16 @@ int main(int argc, char* argv[])
             test_extra = 1 - test_extra;
         else if (cmd == 'd') {
         for (int c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
-            if (c >= '2' && c <= '9') {
+            if (c >= '5' && c <= '9') {
                 std::string hash_name("emhash");
+                hash_name += char(c);
+                if (maps.find(hash_name) != maps.end())
+                    maps.erase(hash_name);
+                else
+                    maps[hash_name] = hash_name;
+            }
+            if (c >= '1' && c <= '3') {
+                std::string hash_name("emilib");
                 hash_name += char(c);
                 if (maps.find(hash_name) != maps.end())
                     maps.erase(hash_name);
@@ -1661,12 +1704,6 @@ int main(int argc, char* argv[])
                 maps.emplace("qchash",  "qc-hash");
             else if (c == 'f')
                 maps.emplace("fph", "fph-table");
-
-            else if (c >= '1' && c <= '3') {
-                const std::string emistr = std::string("emilib") + char(c);
-                if (maps.find(emistr) != maps.end()) maps.erase(emistr);
-                else maps.emplace(emistr, emistr);
-            }
             else if (c == 'l') {
                 maps.emplace("lru_size", "lru_size");
                 maps.emplace("lru_time", "lru_time");
@@ -1675,8 +1712,6 @@ int main(int argc, char* argv[])
                 maps.emplace("indiviw", "indiviw_map");
                 maps.emplace("indiviu", "indiviu_map");
             }
-            else if (c == 'k')
-                maps.emplace("ktprime", "ktprime");
             else if (c == 'b') {
                 maps.emplace("btree", "btree_map");
                 maps.emplace("stl_map", "stl_map");

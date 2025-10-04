@@ -19,6 +19,8 @@
 #endif
 #if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #endif
 
 #include <algorithm>
@@ -248,11 +250,12 @@ int main(int argc, const char* argv[])
 
 #if HAVE_BOOST
     hash_table_test<boost::unordered_flat_map<ktype, vtype, QintHasher>>("boost::hflat");
+    hash_table_test<indivi::flat_umap<ktype, vtype, QintHasher>>("indivi::umap");
+    hash_table_test<indivi::flat_wmap<ktype, vtype, QintHasher>>("indivi::wmap");
 #endif
 
     hash_table_test<emilib::HashMap<ktype, vtype, QintHasher>>("emilib1");
     hash_table_test<emilib2::HashMap<ktype, vtype, QintHasher>>("emilib2");
-    hash_table_test<emilib3::HashMap<ktype, vtype, QintHasher>>("emilib3");
 
 #if ABSL_HMAP
     hash_table_test<absl::flat_hash_map<ktype, vtype, QintHasher>>("absl_flat");

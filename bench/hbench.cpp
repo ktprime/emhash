@@ -18,6 +18,8 @@
 
 #if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #endif
 
 #ifdef _WIN32
@@ -375,6 +377,8 @@ int main()
     { emilib2::HashMap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nemilib2::HashMap"); }
 #if HAVE_BOOST
     { boost::unordered_flat_map<uint64_t, Value, hash_t> m8; ret -= test(m8, "\nboost::unordered_flat_map"); }
+    { indivi::flat_umap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\ninvidi::flat_umap"); }
+    { indivi::flat_wmap<uint64_t, Value, hash_t> m8; ret -= test(m8, "\ninvidi::flat_wmap"); }
 #endif
     { robin_hood::unordered_node_map<uint64_t, Value, hash_t> m4; ret -= test(m4, "\nrobin_hood::unordered_node_map"); }
 //    { emhash4::HashMap<uint64_t, Value, hash_t> m7; ret -= test(m7, "\nemhash4::HashMap"); }

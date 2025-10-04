@@ -43,12 +43,6 @@
 
 #define ABSL_RAW_LOG(severity, ...)                                            \
   do {                                                                         \
-    constexpr const char* absl_raw_log_internal_basename =                     \
-        ::absl::raw_log_internal::Basename(__FILE__, sizeof(__FILE__) - 1);    \
-    ::absl::raw_log_internal::RawLog(ABSL_RAW_LOG_INTERNAL_##severity,         \
-                                     absl_raw_log_internal_basename, __LINE__, \
-                                     __VA_ARGS__);                             \
-    ABSL_RAW_LOG_INTERNAL_MAYBE_UNREACHABLE_##severity;                        \
   } while (0)
 
 // Similar to CHECK(condition) << message, but for low-level modules:
@@ -74,20 +68,10 @@
 // StrCat if you need to build a richer message.
 #define ABSL_INTERNAL_LOG(severity, message)                              \
   do {                                                                    \
-    constexpr const char* absl_raw_log_internal_filename = __FILE__;      \
-    ::absl::raw_log_internal::internal_log_function(                      \
-        ABSL_RAW_LOG_INTERNAL_##severity, absl_raw_log_internal_filename, \
-        __LINE__, message);                                               \
-    ABSL_RAW_LOG_INTERNAL_MAYBE_UNREACHABLE_##severity;                   \
   } while (0)
 
 #define ABSL_INTERNAL_CHECK(condition, message)                    \
   do {                                                             \
-    if (ABSL_PREDICT_FALSE(!(condition))) {                        \
-      std::string death_message = "Check " #condition " failed: "; \
-      death_message += std::string(message);                       \
-      ABSL_INTERNAL_LOG(FATAL, death_message);                     \
-    }                                                              \
   } while (0)
 
 #ifndef NDEBUG

@@ -19,12 +19,10 @@
 #include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
 
-#include "emhash/hash_table2.hpp"
-#include "emhash/hash_table3.hpp"
-#include "emhash/hash_table4.hpp"
 #include "hash_table6.hpp"
 #include "hash_table5.hpp"
 #include "hash_table7.hpp"
+#include "hash_table8.hpp"
 
 #include "phmap/phmap.h"
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
@@ -82,7 +80,7 @@ void bench(char const* title)
     // Iter
     start = my_clock::now();
     {
-        for (size_t i = 0; i < trials; ++i) {
+        for (int i = 0; i < trials; ++i) {
             for (auto const& keyVal : map)
             {
                 result += keyVal.second;
@@ -123,14 +121,11 @@ int main(int argc, char* argv[])
     bench<absl::flat_hash_map<int, k_value>>("absl::flat_hash_map");
 #endif
 
-    bench<emhash2::HashMap<int, k_value>>("emhash2::hashMap");
-    bench<emhash3::HashMap<int, k_value>>("emhash3::hashMap");
-    bench<emhash4::HashMap<int, k_value>>("emhash4::hashMap");
-
     bench<emhash5::HashMap<int, k_value>>("emhash5::hashMap");
     bench<emhash6::HashMap<int, k_value>>("emhash6::hashMap");
     bench<emhash6::HashMap<int, k_value, robin_hood::hash<int> >>("emhash6::hashMap");
     bench<emhash7::HashMap<int, k_value>>("emhash7::hashMap");
+    bench<emhash8::HashMap<int, k_value>>("emhash8::hashMap");
 
     bench<tsl::robin_map<int, k_value>>("tsl::robin_map");
     bench<tsl::hopscotch_map<int, k_value>>("tsl::hops_map");
