@@ -1309,8 +1309,8 @@ void test_merge() {
 void test_unique()
 {
 	int maxn = 1234567;
-	//emilib3::HashMap<int, bool> map1(maxn / 2);
-	emhash7::HashMap<int, bool> map1(maxn / 2);
+	emilib3::HashMap<int, bool> map1(maxn / 2);
+	//emhash7::HashMap<int, bool> map1(maxn / 2);
 
 	//loop for 10 times
 	for (int loop = 0; loop < 10; loop++) {

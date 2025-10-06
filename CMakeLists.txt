@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.16)
 
 project(emhash)
 
@@ -84,8 +84,8 @@ if(WITH_BENCHMARKS)
     add_executable(bi ${PROJECT_SOURCE_DIR}/bench/buint64.cpp)
     add_executable(fbench ${PROJECT_SOURCE_DIR}/bench/fbench.cpp)
     add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hbench.cpp)
-    add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/zhash_bench.cc)
-    add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hash_join2.cpp)
+    add_executable(zbench ${PROJECT_SOURCE_DIR}/bench/zhash_bench.cc)
+    add_executable(jbench ${PROJECT_SOURCE_DIR}/bench/hash_join2.cpp)
     #add_executable(qbench ${PROJECT_SOURCE_DIR}/bench/qbench.cpp)
     #add_executable(sibench ${PROJECT_SOURCE_DIR}/bench/simple_bench.cpp)
 

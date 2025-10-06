@@ -464,29 +464,29 @@ public:
         return cend();
     }
 
-    size_t size() const
+    size_t size() const noexcept
     {
         return _num_filled;
     }
 
-    bool empty() const
+    bool empty() const noexcept
     {
         return _num_filled == 0;
     }
 
     // Returns the number of buckets.
-    size_t bucket_count() const
+    size_t bucket_count() const noexcept
     {
         return _num_buckets;
     }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const
+    float load_factor() const noexcept
     {
         return float(_num_filled) / float(_num_buckets);
     }
 
-    float max_load_factor(float lf = 7.0f / 8)
+    float max_load_factor(float lf = 7.0f / 8) noexcept
     {
         (void)lf;
         return (float)MXLOAD_FACTOR / (MXLOAD_FACTOR + 1);
@@ -537,17 +537,17 @@ public:
 
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
-    ValueT* try_get(const K& k) noexcept
+    ValueT* try_get(const K& key) noexcept
     {
-        auto bucket = find_filled_bucket(k);
+        auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
     }
 
     /// Const version of the above
     template<typename K>
-    ValueT* try_get(const K& k) const noexcept
+    ValueT* try_get(const K& key) const noexcept
     {
-        auto bucket = find_filled_bucket(k);
+        auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
     }
 
@@ -679,8 +679,23 @@ public:
     template<typename K, typename V>
     size_t insert_unique(K&& key, V&& val) noexcept
     {
-        check_expand_need();
+        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        if (EMH_UNLIKELY(required_buckets >= _num_buckets))
+            rehash(required_buckets + 2);
 
+        size_t main_bucket;
+        const auto key_h2 = hash_key2(main_bucket, key);
+        prefetch_heap_block((char*)&_pairs[main_bucket]);
+        const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
+
+        set_states(bucket, key_h2);
+        new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
+        return bucket;
+    }
+
+    template<typename K, typename V>
+    size_t insert_unique2(K&& key, V&& val) noexcept
+    {
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
@@ -692,14 +707,14 @@ public:
 
     template <class M>
     std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) noexcept
-    { 
-        return do_assign(key, std::forward<M>(val)); 
+    {
+        return do_assign(key, std::forward<M>(val));
     }
 
     template <class M>
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) noexcept
-    { 
-        return do_assign(std::move(key), std::forward<M>(val)); 
+    {
+        return do_assign(std::move(key), std::forward<M>(val));
     }
 
     template<typename K, typename V>
@@ -1176,7 +1191,7 @@ private:
 
     size_t find_empty_slot(size_t main_bucket, size_t next_bucket, size_t offset) noexcept
     {
-        while (true) {
+        do {
             const auto maske = empty_delete(next_bucket);
             if (maske != 0) {
                 const auto ebucket = CTZ(maske) + next_bucket;
@@ -1186,7 +1201,7 @@ private:
                 return ebucket;
             }
             next_bucket = get_next_bucket(next_bucket, ++offset);
-        }
+        } while (true);
 
         return 0;
     }

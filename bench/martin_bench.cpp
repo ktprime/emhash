@@ -83,7 +83,7 @@ static std::map<std::string_view, std::string_view> show_name =
    {"emhash7", "emhash7"},
 //   {"emhash8", "emhash8"},
 //   {"emhash5", "emhash5"},
-//     {"emhash6", "emhash6"},
+     {"emhash6", "emhash6"},
 
    {"emilib",  "emilib1"},
    {"emilib2", "emilib2"},
@@ -92,7 +92,10 @@ static std::map<std::string_view, std::string_view> show_name =
 #if HAVE_BOOST
     {"boost",  "boost flat"},
 #endif
-    {"Excalibur", "excalibur"}
+
+#if HAVE_EXCALIBUR
+    {"Excalibur", "excalibur"},
+#endif
 
 #if HAVE_INDIVI
     {"flat_u", "indivi_umap" },
@@ -286,6 +289,21 @@ static inline double now2sec()
 #endif
 }
 
+template <typename HMAP, typename Key, typename Value>
+auto has_insert_unique(int)
+-> decltype(
+    std::declval<HMAP>().insert_unique(std::declval<Key>(), std::declval<Value>()),
+    std::true_type{}
+    );
+
+template <typename HMAP, typename Key, typename Value>
+std::false_type has_insert_unique(...) {
+    return std::false_type{};
+}
+
+template <typename HMAP, typename Key, typename Value>
+constexpr bool has_insert_unique_v = decltype(has_insert_unique<HMAP, Key, Value>(0))::value;
+
 template<typename HMAP>
 static void bench_insert(HMAP& hmap)
 {
@@ -311,7 +329,11 @@ static void bench_insert(HMAP& hmap)
                 auto ts = now2sec();
                 MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn; ++n)
-                    hmap[static_cast<int>(rng())];
+                    if constexpr (has_insert_unique_v<HMAP, int, int>)
+                        hmap.insert_unique(static_cast<int>(rng()), 0);
+                    else
+                        hmap[static_cast<int>(rng())];
+
                 printf("        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
                 fflush(stdout);
             }
@@ -328,7 +350,10 @@ static void bench_insert(HMAP& hmap)
                 auto ts = now2sec();
                 MRNG rng(RNDI + 1);
                 for (size_t n = 0; n < maxn; ++n)
-                    hmap.emplace(static_cast<int>(rng()), 0);
+                    if constexpr (has_insert_unique_v<HMAP, int, int>)
+                        hmap.insert_unique(static_cast<int>(rng()), 0);
+                    else
+                        hmap.emplace(static_cast<int>(rng()), 0);
                 printf(", reinsert %.2f", now2sec() - ts);
             }
             {
@@ -2100,10 +2125,10 @@ static void runTest(int sflags, int eflags)
 
         puts("\nbench_AccidentallyQuadratic (10M int insert.copy.iterator):");
 
-        {  bench_AccidentallyQuadratic<emhash6::HashMap<int, int, hash_func>, false>(); }
-        {  bench_AccidentallyQuadratic<emhash7::HashMap<int, int, hash_func>, false>(); }
-        {  bench_AccidentallyQuadratic<emhash5::HashMap<int, int, hash_func>, false>(); }
-        {  bench_AccidentallyQuadratic<emhash8::HashMap<int, int, hash_func>, false>(); }
+        {  bench_AccidentallyQuadratic<emhash6::HashMap<int, int, hash_func>, true>(); }
+        {  bench_AccidentallyQuadratic<emhash7::HashMap<int, int, hash_func>, true>(); }
+        {  bench_AccidentallyQuadratic<emhash5::HashMap<int, int, hash_func>, true>(); }
+        {  bench_AccidentallyQuadratic<emhash8::HashMap<int, int, hash_func>, true>(); }
 
 #if QC_HASH
         {  bench_AccidentallyQuadratic<qc::hash::RawMap<int, int, hash_func>>(); }

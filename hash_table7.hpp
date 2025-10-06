@@ -1314,6 +1314,17 @@ public:
 #endif
     }
 
+    static void prefetch_heap_block(char* ctrl)
+    {
+        // Prefetch the heap-allocated memory region to resolve potential TLB
+        // misses.  This is intended to overlap with execution of calculating the hash for a key.
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(static_cast<const void*>(ctrl));
+#endif
+    }
+
     void clearkv()
     {
         if (!is_trivially_destructible()) {
@@ -1563,6 +1574,8 @@ private:
         if (EMH_EMPTY(bucket))
             return _num_buckets;
 
+        //prefetch_heap_block((char*)&_pairs[bucket]);
+
         auto next_bucket = bucket;
         while (true) {
             if (_eq(key, EMH_KEY(_pairs, next_bucket)))
@@ -1585,6 +1598,7 @@ private:
         if (EMH_EMPTY(bucket))
             return _num_buckets;
 
+        //prefetch_heap_block((char*)&_pairs[bucket]);
         auto next_bucket = bucket;
 //        else if (bucket != (hash_key(bucket_key) & _mask))
 //            return _num_buckets;

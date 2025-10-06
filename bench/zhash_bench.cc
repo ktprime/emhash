@@ -201,21 +201,21 @@ void bench_map(const char* name, size_t count)
 
     auto data = get_random<typename Map::key_type,typename Map::mapped_type>(count);
     auto t1 = system_clock::now();
-    for (auto &ent : data) {
+    for (const auto &ent : data) {
         ht.emplace(ent.first, ent.second);
     }
     auto t2 = system_clock::now();
     ht.clear();
     auto t3 = system_clock::now();
-    for (auto &ent : data) {
+    for (const auto &ent : data) {
         ht.emplace(ent.first, ent.second);
     }
     auto t4 = system_clock::now();
-    for (auto &ent : data) {
+    for (const auto &ent : data) {
         assert(ht.find(ent.first)->second == ent.second);
     }
     auto t5 = system_clock::now();
-    for (auto &ent : data) {
+    for (const auto &ent : data) {
         ht.erase(ent.first);
     }
     auto t6 = system_clock::now();
@@ -357,4 +357,3 @@ int main(int argc, char **argv)
 #endif
     return 0;
 }
-

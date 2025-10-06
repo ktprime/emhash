@@ -124,7 +124,7 @@ ifneq ($(CK),)
 CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
 endif
 
-CXXFLAGS += -flto=auto # -static -static-libstdc++?
+CXXFLAGS += -flto=auto  -Wall # -static -static-libstdc++?
 
 ifneq ($(PSL),)
 CXXFLAGS += -DPSL= (PSL)
@@ -136,12 +136,12 @@ ifneq ($(QB),)
 endif
 
 #	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) -fno-rtti ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) -fno-rtti sbench.cpp -o sb
-	$(CXX) $(CXXFLAGS) hash_join.cpp -o join_hash
-	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
-	$(CXX) $(CXXFLAGS) buint64.cpp -o bi
-	$(CXX) $(CXXFLAGS) bstring.cpp -o bs
+	$(CXX) $(CXXFLAGS) -fno-rtti hash_join.cpp -o join_hash
+	$(CXX) $(CXXFLAGS) -fno-rtti buint64.cpp -o bi
+	$(CXX) $(CXXFLAGS) -fno-rtti bstring.cpp -o bs
 	$(CXX) $(CXXFLAGS) word_count.cpp -o wc
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench

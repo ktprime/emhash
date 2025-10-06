@@ -420,7 +420,7 @@ public:
 	/// Remove all elements, keeping full capacity.
 	void clear()
 	{
-		for (size_t bucket = 0; bucket < _num_buckets; ++bucket) {
+		for (int bucket = 0; bucket < _num_buckets; ++bucket) {
 			if (_states[bucket] == State::FILLED) {
 				_states[bucket] = State::INACTIVE;
 				_keys[bucket].~KeyT();

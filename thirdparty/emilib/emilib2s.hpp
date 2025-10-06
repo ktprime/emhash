@@ -12,11 +12,11 @@
 #include <cassert>
 
 #ifdef _WIN32
-#  include <intrin.h>
+    #include <intrin.h>
 #elif __x86_64__
-#  include <x86intrin.h>
+    #include <x86intrin.h>
 #else
-# include "sse2neon.h"
+    #include "sse2neon.h"
 #endif
 
 #undef EMH_LIKELY
@@ -38,7 +38,9 @@ namespace emilib3 {
 
     enum State : int8_t
     {
-        EFILLED  = -126, EDELETE = -127, EEMPTY = -128,
+        EFILLED = -126,
+        EDELETE = -127,
+        EEMPTY = -128,
         SENTINEL = 127,
         GROUP_INDEX = 15,//> 0
     };
@@ -510,7 +512,6 @@ public:
         return _pairs[bucket].second;
     }
 
-#if 0
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
     ValueT* try_get(const K& key) noexcept
@@ -526,7 +527,6 @@ public:
         auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
     }
-#endif
 
     template<typename Con>
     bool operator == (const Con& rhs) const noexcept
@@ -543,7 +543,7 @@ public:
     }
 
     template<typename Con>
-    bool operator != (const Con& rhs) const { return !(*this == rhs); }
+    bool operator != (const Con& rhs) const noexcept { return !(*this == rhs); }
 
     void merge(HashMap& rhs) noexcept
     {
@@ -656,8 +656,23 @@ public:
     template<typename K, typename V>
     size_t insert_unique(K&& key, V&& val) noexcept
     {
-        check_expand_need();
+        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        if (EMH_UNLIKELY(required_buckets >= _num_buckets))
+            rehash(required_buckets + 2);
 
+        size_t main_bucket;
+        const auto key_h2 = hash_key2(main_bucket, key);
+        prefetch_heap_block((char*)&_pairs[main_bucket]);
+        const auto bucket = find_empty_slot(main_bucket, 0);
+
+        set_states(bucket, key_h2);
+        new(_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val)); _num_filled++;
+        return bucket;
+    }
+
+    template<typename K, typename V>
+    size_t insert_unique2(K&& key, V&& val) noexcept
+    {
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto bucket = find_empty_slot(main_bucket, 0);
@@ -668,9 +683,16 @@ public:
     }
 
     template <class M>
-    std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) noexcept { return do_assign(key, std::forward<M>(val)); }
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) noexcept
+    {
+        return do_assign(key, std::forward<M>(val));
+    }
+
     template <class M>
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) noexcept { return do_assign(std::move(key), std::forward<M>(val)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) noexcept
+    {
+        return do_assign(std::move(key), std::forward<M>(val));
+    }
 
     template<typename K, typename V>
     std::pair<iterator, bool> do_assign(K&& key, V&& val) noexcept
@@ -697,8 +719,9 @@ public:
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bempty) {
             new(_pairs + bucket) PairT(key,val); _num_filled++;
-        } else
+        } else {
             oldv = _pairs[bucket].second;
+        }
         return bempty;
     }
 
@@ -798,7 +821,6 @@ public:
     static constexpr bool is_trivially_copyable()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        //is_trivially_copy_constructible
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
         return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
@@ -930,7 +952,7 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
     }
@@ -1000,7 +1022,14 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        //reserve(_num_filled);
+#if 0
+        auto findit = find_filled_bucket(key);
+        if (findit != _num_buckets) {
+            bnew = false;
+            return findit;
+        }
+#endif
+
         size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
         if (EMH_UNLIKELY(required_buckets >= _num_buckets))
           rehash(required_buckets + 2);
@@ -1015,8 +1044,8 @@ private:
 
         do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
+#if 1
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
-
             //1. find filled
             while (maskf != 0) {
                 const auto fbucket = next_bucket + CTZ(maskf);
@@ -1026,6 +1055,7 @@ private:
                 }
                 maskf &= maskf - 1;
             }
+#endif
 
             if (hole == chole) {
                 //2. find empty
@@ -1071,7 +1101,7 @@ private:
 
     size_t find_empty_slot(size_t next_bucket, size_t offset) noexcept
     {
-        while (true) {
+        do {
             const auto maske = empty_delete(next_bucket);
             if (maske != 0) {
                 const auto ebucket = CTZ(maske) + next_bucket;
@@ -1081,7 +1111,7 @@ private:
                 return ebucket;
             }
             next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
-        }
+        } while (true);
 
         return 0;
     }

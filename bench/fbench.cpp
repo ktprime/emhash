@@ -186,7 +186,7 @@ static int64_t inline now2ns()
     return getus() * 1000;
 }
 
-inline static uint32_t
+inline static bool
 rnd_above_perc(int r) {
     return rnd() % RAND_MAX > r;
 }
@@ -204,7 +204,7 @@ static void
 init_query_keys(std::vector<test_key_t> & insert_keys, std::vector<test_key_t> & query_keys) {
     query_keys.clear();
     uint32_t query_fail = QUERY_FAILURE_RATE * RAND_MAX;
-    for (uint32_t i = 0; i < TEST_LEN * QUERY_RATE; i++) {
+    for (uint32_t i = 0; i < (uint32_t)TEST_LEN * QUERY_RATE; i++) {
         if (rnd_above_perc(query_fail)) {
             query_keys.push_back(insert_keys[rnd() % TEST_LEN]);
         }
@@ -446,7 +446,7 @@ int run_udb2(const char* str)
     const auto step = (max - n) / m;
 
     auto now = now2ns();
-    for (int i = 0; i <= m; ++i, n += step) {
+    for (uint32_t i = 0; i <= m; ++i, n += step) {
         const uint32_t x0 = i + 1;
         auto t = now2ns();
         auto lf = test_int<ht>(n, x0);
