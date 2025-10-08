@@ -12,14 +12,11 @@
 #include <cassert>
 
 #ifdef _WIN32
-#  include <intrin.h>
-#ifndef __clang__
-//#  include <zmmintrin.h>
-#endif
+    #include <intrin.h>
 #elif __x86_64__
-#  include <x86intrin.h>
+    #include <x86intrin.h>
 #else
-# include "sse2neon.h"
+    #include "sse2neon.h"
 #endif
 
 #undef EMH_LIKELY

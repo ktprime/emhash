@@ -51,6 +51,7 @@ namespace emilib3 {
     const static auto simd_filled = _mm_set1_epi8(EFILLED);
 
     #define SET1_EPI8      _mm_set1_epi8
+    #define SET1_EPI32     _mm_set1_epi32
     #define LOAD_EPI8      _mm_load_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
@@ -97,7 +98,6 @@ inline static uint32_t CTZ(uint32_t n)
 #if _WIN32
     unsigned long index;
     _BitScanForward(&index, n);
-//    _BitScanForward64(&index, n);
 #elif 1
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
@@ -992,7 +992,9 @@ private:
     size_t find_filled_bucket(const K& key) const noexcept
     {
         size_t main_bucket; size_t offset = 0;
-        const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
+        const auto key_h2 = hash_key2(main_bucket, key);
+        const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
+//        const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
 
         do {
@@ -1014,7 +1016,7 @@ private:
             next_bucket = get_next_bucket(next_bucket, ++offset);
         } while (true);
 
-        return 0;
+        return _num_buckets;
     }
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
@@ -1037,7 +1039,8 @@ private:
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
         prefetch_heap_block((char*)&_pairs[main_bucket]);
-        const auto filled = SET1_EPI8(key_h2);
+        //const auto filled = SET1_EPI8(key_h2);
+        const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
         auto next_bucket = main_bucket; size_t offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;

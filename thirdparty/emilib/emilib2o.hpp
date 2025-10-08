@@ -387,7 +387,8 @@ public:
     {
         clear_data();
         _num_filled = 0;
-        _pairs[_num_buckets].~PairT();
+        if (!is_trivially_destructible())
+            _pairs[_num_buckets].~PairT();
         free(_pairs);
     }
 
