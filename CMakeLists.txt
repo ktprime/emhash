@@ -73,7 +73,7 @@ if(WITH_BENCHMARKS)
         set(CMAKE_CXX_FLAGS_RELEASE "/WX- /Ob1 /Ot /Oi /Oy /GL /GS- /arch:AVX ${CMAKE_CXX_FLAGS}")
         add_compile_options(/Ob2 /DNDEBUG /O2 /Ot /Oi /Oy /GS- /GL /arch:AVX)
     elseif(1)
-      set(CMAKE_CXX_FLAGS_DEBUG "-g fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
+      set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
         set(CMAKE_CXX_FLAGS "-flto=auto -DNDEBUG -march=native  ${CMAKE_CXX_FLAGS}")
     endif()
 
