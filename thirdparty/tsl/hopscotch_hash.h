@@ -43,10 +43,6 @@
 
 #include "hopscotch_growth_policy.h"
 
-#if (defined(__GNUC__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 9))
-#define TSL_HH_NO_RANGE_ERASE_WITH_CONST_ITERATOR
-#endif
-
 namespace tsl {
 namespace detail_hopscotch_hash {
 
@@ -309,22 +305,14 @@ class hopscotch_bucket : public hopscotch_bucket_hash<StoreHash> {
 
   value_type& value() noexcept {
     tsl_hh_assert(!empty());
-#if defined(__cplusplus) && __cplusplus >= 201703L
     return *std::launder(
         reinterpret_cast<value_type*>(std::addressof(m_value)));
-#else
-    return *reinterpret_cast<value_type*>(std::addressof(m_value));
-#endif
   }
 
   const value_type& value() const noexcept {
     tsl_hh_assert(!empty());
-#if defined(__cplusplus) && __cplusplus >= 201703L
     return *std::launder(
         reinterpret_cast<const value_type*>(std::addressof(m_value)));
-#else
-    return *reinterpret_cast<const value_type*>(std::addressof(m_value));
-#endif
   }
 
   template <typename... Args>
@@ -596,6 +584,19 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
   template <
       class OC = OverflowContainer,
       typename std::enable_if<!has_key_compare<OC>::value>::type* = nullptr>
+  hopscotch_hash() noexcept(
+      hopscotch_hash::DEFAULT_INIT_BUCKETS_SIZE == 0 &&
+      std::is_nothrow_default_constructible<Hash>::value &&
+      std::is_nothrow_default_constructible<KeyEqual>::value &&
+      std::is_nothrow_default_constructible<Allocator>::value &&
+      (std::is_nothrow_constructible<GrowthPolicy, std::size_t&>::value ||
+       hh::is_noexcept_on_zero_init<GrowthPolicy>::value))
+      : hopscotch_hash(DEFAULT_INIT_BUCKETS_SIZE, Hash(), KeyEqual(),
+                       Allocator(), DEFAULT_MAX_LOAD_FACTOR) {}
+
+  template <
+      class OC = OverflowContainer,
+      typename std::enable_if<!has_key_compare<OC>::value>::type* = nullptr>
   hopscotch_hash(size_type bucket_count, const Hash& hash,
                  const KeyEqual& equal, const Allocator& alloc,
                  float max_load_factor)
@@ -629,6 +630,20 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
                   "value_type must be either copy constructible or nothrow "
                   "move constructible.");
   }
+
+  template <
+      class OC = OverflowContainer,
+      typename std::enable_if<has_key_compare<OC>::value>::type* = nullptr>
+  hopscotch_hash() noexcept(
+      hopscotch_hash::DEFAULT_INIT_BUCKETS_SIZE == 0 &&
+      std::is_nothrow_default_constructible<Hash>::value &&
+      std::is_nothrow_default_constructible<KeyEqual>::value &&
+      std::is_nothrow_default_constructible<Allocator>::value &&
+      (std::is_nothrow_constructible<GrowthPolicy, std::size_t&>::value ||
+       hh::is_noexcept_on_zero_init<GrowthPolicy>::value))
+      : hopscotch_hash(DEFAULT_INIT_BUCKETS_SIZE, Hash(), KeyEqual(),
+                       Allocator(), DEFAULT_MAX_LOAD_FACTOR,
+                       typename OC::key_compare()) {}
 
   template <
       class OC = OverflowContainer,
@@ -730,7 +745,8 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
     return *this;
   }
 
-  hopscotch_hash& operator=(hopscotch_hash&& other) {
+  hopscotch_hash& operator=(hopscotch_hash&& other) noexcept(
+      noexcept(other.swap(*this))) {
     other.swap(*this);
     other.clear();
 
@@ -805,7 +821,7 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
   template <class P, typename std::enable_if<std::is_constructible<
                          value_type, P&&>::value>::type* = nullptr>
   std::pair<iterator, bool> insert(P&& value) {
-    return insert_impl(value_type(std::forward<P>(value)));
+    return insert_impl(std::forward<P>(value));
   }
 
   std::pair<iterator, bool> insert(value_type&& value) {
@@ -824,7 +840,12 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
   template <class P, typename std::enable_if<std::is_constructible<
                          value_type, P&&>::value>::type* = nullptr>
   iterator insert(const_iterator hint, P&& value) {
-    return emplace_hint(hint, std::forward<P>(value));
+    if (hint != cend() &&
+        compare_keys(KeySelect()(*hint), KeySelect()(value))) {
+      return mutable_iterator(hint);
+    }
+
+    return insert(std::forward<P>(value)).first;
   }
 
   iterator insert(const_iterator hint, value_type&& value) {
@@ -870,6 +891,11 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
     return insert_or_assign_impl(std::move(k), std::forward<M>(obj));
   }
 
+  template <class K, class M>
+  std::pair<iterator, bool> insert_or_assign(K&& k, M&& obj) {
+    return insert_or_assign_impl(std::forward<K>(k), std::forward<M>(obj));
+  }
+
   template <class M>
   iterator insert_or_assign(const_iterator hint, const key_type& k, M&& obj) {
     if (hint != cend() && compare_keys(KeySelect()(*hint), k)) {
@@ -894,6 +920,18 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
     return insert_or_assign(std::move(k), std::forward<M>(obj)).first;
   }
 
+  template <class K, class M>
+  iterator insert_or_assign(const_iterator hint, K&& k, M&& obj) {
+    if (hint != cend() && compare_keys(KeySelect()(*hint), k)) {
+      auto it = mutable_iterator(hint);
+      it.value() = std::forward<M>(obj);
+
+      return it;
+    }
+
+    return insert_or_assign(std::forward<K>(k), std::forward<M>(obj)).first;
+  }
+
   template <class... Args>
   std::pair<iterator, bool> emplace(Args&&... args) {
     return insert(value_type(std::forward<Args>(args)...));
@@ -914,6 +952,11 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
     return try_emplace_impl(std::move(k), std::forward<Args>(args)...);
   }
 
+  template <class K, class... Args>
+  std::pair<iterator, bool> try_emplace(K&& k, Args&&... args) {
+    return try_emplace_impl(std::forward<K>(k), std::forward<Args>(args)...);
+  }
+
   template <class... Args>
   iterator try_emplace(const_iterator hint, const key_type& k, Args&&... args) {
     if (hint != cend() && compare_keys(KeySelect()(*hint), k)) {
@@ -930,6 +973,15 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
     }
 
     return try_emplace(std::move(k), std::forward<Args>(args)...).first;
+  }
+
+  template <class K, class... Args>
+  iterator try_emplace(const_iterator hint, K&& k, Args&&... args) {
+    if (hint != cend() && compare_keys(KeySelect()(*hint), k)) {
+      return mutable_iterator(hint);
+    }
+
+    return try_emplace(std::forward<K>(k), std::forward<Args>(args)...).first;
   }
 
   /**
@@ -999,7 +1051,11 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
     return 0;
   }
 
-  void swap(hopscotch_hash& other) {
+  void swap(hopscotch_hash& other) noexcept(
+      std::is_nothrow_swappable<Hash>::value&& std::is_nothrow_swappable<
+          KeyEqual>::value&& std::is_nothrow_swappable<GrowthPolicy>::value&&
+          std::is_nothrow_swappable<buckets_container_type>::value&&
+              std::is_nothrow_swappable<overflow_container_type>::value) {
     using std::swap;
 
     swap(static_cast<Hash&>(*this), static_cast<Hash&>(other));
@@ -1344,25 +1400,14 @@ class hopscotch_hash : private Hash, private KeyEqual, private GrowthPolicy {
     new_map.swap(*this);
   }
 
-#ifdef TSL_HH_NO_RANGE_ERASE_WITH_CONST_ITERATOR
-  iterator_overflow mutable_overflow_iterator(const_iterator_overflow it) {
-    return std::next(m_overflow_elements.begin(),
-                     std::distance(m_overflow_elements.cbegin(), it));
-  }
-#else
   iterator_overflow mutable_overflow_iterator(const_iterator_overflow it) {
     return m_overflow_elements.erase(it, it);
   }
-#endif
 
   // iterator is in overflow list
   iterator_overflow erase_from_overflow(const_iterator_overflow pos,
                                         std::size_t ibucket_for_hash) {
-#ifdef TSL_HH_NO_RANGE_ERASE_WITH_CONST_ITERATOR
-    auto it_next = m_overflow_elements.erase(mutable_overflow_iterator(pos));
-#else
     auto it_next = m_overflow_elements.erase(pos);
-#endif
     m_nb_elements--;
 
     // Check if we can remove the overflow flag

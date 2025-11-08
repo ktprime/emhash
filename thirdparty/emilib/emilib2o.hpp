@@ -1,7 +1,27 @@
 // LICENSE:
-//   This software is dual-licensed to the public domain and under the following
-//   license: you are granted a perpetual, irrevocable license to copy, modify,
-//   publish, and distribute this file as you see fit.
+// version 1.0.3
+// https://github.com/ktprime/emhash/blob/master/thirdparty/emilib/emiset2s.hpp
+//
+// Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2021-2025 Huang Yuanbing & bailuzhou AT 163.com
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 
 #pragma once
 
@@ -38,15 +58,20 @@ namespace emilib2 {
 
     enum State : int8_t
     {
-        EFILLED = -126,
-        EDELETE = -127,
-        EEMPTY = -128,
-        SENTINEL = 127,
+        EEMPTY  = -128,
+        EDELETE = EEMPTY + 1,
+        ESENTINEL = EEMPTY + 2,
+        EFILLED = EEMPTY + 3,
     };
 
-    constexpr static uint8_t MAPBITS = 253;
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.84f;
+#endif
+    constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
+    constexpr static float EMH_MAX_LOAD_FACTOR = 0.999f;
+
+    constexpr static uint8_t MAP_BITS = 253;
     constexpr static uint8_t EMPTY_OFFSET = 0;
-    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load factor = MXLOAD_FACTOR/(MXLOAD_FACTOR + 1)
 
 #if EMH_OFFSET_STEP == 0
     constexpr static uint8_t OFFSET_STEP = 8;
@@ -55,7 +80,7 @@ namespace emilib2 {
 #if AVX2_EHASH == 0
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm_set1_epi8(EDELETE);
-    const static auto simd_filled = _mm_set1_epi8(EFILLED);
+    const static auto simd_sentinel = _mm_set1_epi8(ESENTINEL);
 
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
@@ -68,7 +93,7 @@ namespace emilib2 {
 #elif SSE2_EMHASH == 0
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm256_set1_epi8(EDELETE);
-    const static auto simd_filled = _mm256_set1_epi8(EFILLED);
+    const static auto simd_sentinel = _mm256_set1_epi8(ESENTINEL);
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm256_set1_epi8
@@ -81,7 +106,6 @@ namespace emilib2 {
 #elif AVX512_EHASH
     const static auto simd_empty  = _mm512_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm512_set1_epi8(EDELETE);
-    const static auto simd_filled = _mm512_set1_epi8(EFILLED);
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm512_set1_epi8
@@ -98,6 +122,18 @@ namespace emilib2 {
 #else
     #define EMH_ITERATOR_BITS 16
 #endif
+
+ inline static uint32_t CTZ(size_t n)
+ {
+#if _WIN32
+    unsigned long index;
+    _BitScanForward(&index, n);
+#else
+    auto index = __builtin_ctzl((unsigned long)n);
+#endif
+
+    return (uint32_t)index;
+}
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -125,7 +161,7 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash) & _mask;
-        return (int8_t)((size_t)(key_hash % MAPBITS) + (size_t)EFILLED);
+        return (int8_t)(size_t)(key_hash % MAP_BITS) + EFILLED;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -133,31 +169,9 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash) & _mask;
-        return (int8_t)((size_t)key_hash % MAPBITS) + EFILLED;
+        return (int8_t)((size_t)key_hash % MAP_BITS) + EFILLED;
     }
 
-    inline static uint32_t CTZ(size_t n)
-    {
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-
-#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-        n = __builtin_bswap64(n);
-#else
-        static uint32_t endianness = 0x12345678;
-        const auto is_big = *(const char*)&endianness == 0x12;
-        if (is_big)
-            n = __builtin_bswap64(n);
-#endif
-
-#if _WIN32
-        unsigned long index;
-        _BitScanForward(&index, n);
-#else
-        auto index = __builtin_ctzl(n);
-#endif
-
-        return (uint32_t)index;
-    }
 
     class const_iterator;
     class iterator
@@ -332,8 +346,9 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap(size_t n = 4) noexcept
+    HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) noexcept
     {
+        _mlf = (uint32_t)((1 << 28) / lf);
         rehash(n);
     }
 
@@ -405,14 +420,14 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            const auto pairs_size = (_num_buckets + 1) * sizeof(PairT);
-            memcpy((char*)_pairs, other._pairs, pairs_size);
+            memcpy((char*)_pairs, other._pairs, (_num_buckets + 1) * sizeof(PairT));
         } else {
             for (auto it = other.cbegin(); it.bucket() <= _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
         }
 
         _num_filled = other._num_filled;
+        _mlf        = other._mlf;
         const auto state_size = simd_bytes + _num_buckets;
         memcpy(_states, other._states, state_size * sizeof(_states[0]));
         memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]) / OFFSET_STEP + 1);
@@ -428,6 +443,7 @@ public:
         std::swap(_num_filled,  other._num_filled);
         std::swap(_offset,      other._offset);
         std::swap(_mask,        other._mask);
+        std::swap(_mlf,         other._mlf);
     }
 
     // -------------------------------------------------------------
@@ -484,10 +500,12 @@ public:
         return float(_num_filled) / float(_num_buckets);
     }
 
-    float max_load_factor(float lf = 7.0f / 8) noexcept
+    inline constexpr float max_load_factor() const { return EMH_MAX_LOAD_FACTOR; }
+    inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }
+    inline constexpr void max_load_factor(float mlf) noexcept
     {
-        (void)lf;
-        return (float)MXLOAD_FACTOR / (MXLOAD_FACTOR + 1);
+        if (mlf <= max_load_factor() && mlf > min_load_factor())
+            _mlf = (uint32_t)((1 << 28) / mlf);
     }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
@@ -675,7 +693,7 @@ public:
     template<typename K, typename V>
     size_t insert_unique(K&& key, V&& val) noexcept
     {
-        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
         if (EMH_UNLIKELY(required_buckets >= _num_buckets))
             rehash(required_buckets + 2);
 
@@ -859,6 +877,13 @@ public:
 #endif
     }
 
+    void clear_meta() noexcept
+    {
+         std::fill_n(_states, _num_buckets, State::EEMPTY);
+         std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
+        _num_filled = 0;
+    }
+
     void clear_data() noexcept
     {
         if (!is_trivially_destructible() && _num_filled) {
@@ -875,10 +900,8 @@ public:
     {
         if (_num_filled) {
             clear_data();
-            std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
+            clear_meta();
         }
-        _num_filled = 0;
     }
 
     void shrink_to_fit() noexcept
@@ -888,7 +911,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        uint64_t required_buckets = num_elems + num_elems / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -956,7 +979,7 @@ public:
         //init empty
         std::fill_n(_states, num_buckets, State::EEMPTY);
         //set last simd_bytes sentinel/tombstone
-        std::fill_n(_states + num_buckets, simd_bytes, State::SENTINEL);
+        std::fill_n(_states + num_buckets, simd_bytes, State::ESENTINEL);
         //fill offset to 0
         std::fill_n(_offset, num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
 
@@ -999,6 +1022,8 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(_MSC_VER)
+        _mm_prefetch((const char*)ctrl);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -1016,6 +1041,7 @@ private:
     inline void set_offset(size_t main_bucket, uint32_t off) noexcept
     {
 #if EMH_SAFE_PSL
+        assert(off / 128 < 128);
         _offset[main_bucket / OFFSET_STEP] = off <= 128 ? off : 128 + off / 128;
 #else
         _offset[main_bucket / OFFSET_STEP] = (uint8_t)off;
@@ -1029,9 +1055,10 @@ private:
 
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const
     {
-#if EMH_PSL_LINEAR == 0
-      next_bucket += offset < 5 ? simd_bytes * offset: _num_buckets / 11 + 1;
-//      next_bucket += simd_bytes * offset;
+#if EMH_SAFE_PSL
+        next_bucket += simd_bytes * offset;
+#elif EMH_PSL_LINEAR == 0
+        next_bucket += offset < 5 ? simd_bytes * offset: _num_buckets / 11 + 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;
@@ -1102,16 +1129,14 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
         if (EMH_UNLIKELY(required_buckets >= _num_buckets))
             rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-
         prefetch_heap_block((char*)&_pairs[main_bucket]);
         const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
-
         auto next_bucket = main_bucket, offset = 0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
@@ -1164,7 +1189,7 @@ private:
         return _mm256_movemask_epi8(_mm256_cmpgt_epi8(simd2_filled, vec));
 #else
         const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
-        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
+        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_sentinel, vec));
 #endif
     }
 
@@ -1215,8 +1240,9 @@ private:
     uint8_t*_offset           = nullptr;
     PairT*  _pairs            = nullptr;
     size_t  _num_buckets      = 0;
-    size_t  _mask             = 0; // _num_buckets minus one
+    size_t  _mask             = 0;
     size_t  _num_filled       = 0;
+    uint32_t _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
 };
 
 } // namespace emilib

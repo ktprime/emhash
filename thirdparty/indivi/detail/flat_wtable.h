@@ -284,7 +284,7 @@ private:
   using storage_type = typename std::aligned_storage<sizeof(item_type), alignof(item_type)>::type;
   using mixer = typename std::conditional<hash_is_avalanching<Hash>::value, no_mix, bit_mix>::type;
 
-  static constexpr float MAX_LOAD_FACTOR{ 0.8f };
+  static constexpr float MAX_LOAD_FACTOR{ 0.875f };
   static constexpr unsigned int MIN_CAPA{ 2u };
   static constexpr size_type EMPTY_SHIFT{ sizeof(size_type) * CHAR_BIT - 1u };
 
@@ -1151,8 +1151,7 @@ private:
         #ifdef INDIVI_FLAT_W_STATS
           ++cmpCount;
         #endif
-          int idx = first_bit_index(matchs);
-          size_type valIdx = (index + idx) & mGMask;
+          size_type valIdx = (index + first_bit_index(matchs)) & mGMask;
           if (equal()(key, get_key(mValues.data[valIdx]))) // found
           {
           #ifdef INDIVI_FLAT_W_STATS
@@ -1164,9 +1163,8 @@ private:
           #endif
             return { mValues.data + valIdx, valIdx };
           }
-          matchs &= matchs - 1; // remove match
         }
-        while (matchs);
+        while (matchs &= matchs - 1);
       }
       // not found
       if (MetaWGroup::match_empty(hfrags))
@@ -1190,7 +1188,7 @@ private:
       index &= mGMask;
     #endif
     }
-    while (index <= mGMask); // non-infinite loop helps optimization
+    while (true); // non-infinite loop helps optimization
 
     return { nullptr, 0 };
   }

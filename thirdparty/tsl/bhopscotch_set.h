@@ -70,6 +70,12 @@ class bhopscotch_set {
     const key_type& operator()(const Key& key) const { return key; }
 
     key_type& operator()(Key& key) { return key; }
+
+    template <class K, typename std::enable_if<std::is_constructible<
+                           key_type, const K&>::value>::type* = nullptr>
+    const K& operator()(const K& key) const {
+      return key;
+    }
   };
 
   using overflow_container_type = std::set<Key, Compare, Allocator>;
@@ -96,7 +102,8 @@ class bhopscotch_set {
   /*
    * Constructors
    */
-  bhopscotch_set() : bhopscotch_set(ht::DEFAULT_INIT_BUCKETS_SIZE) {}
+  bhopscotch_set() noexcept(std::is_nothrow_default_constructible<ht>::value)
+      : m_ht() {}
 
   explicit bhopscotch_set(size_type bucket_count, const Hash& hash = Hash(),
                           const KeyEqual& equal = KeyEqual(),
@@ -195,11 +202,36 @@ class bhopscotch_set {
     return m_ht.insert(std::move(value));
   }
 
+  /**
+   * This overload only participates in the overload resolution if the typedef
+   * KeyEqual::is_transparent and Compare::is_transparent exist. If so, K must
+   * be hashable and comparable to Key.
+   */
+  template <
+      class K, class KE = KeyEqual, class CP = Compare,
+      typename std::enable_if<has_is_transparent<KE>::value &&
+                              has_is_transparent<CP>::value>::type* = nullptr>
+  std::pair<iterator, bool> insert(K&& key) {
+    return m_ht.insert(std::forward<K>(key));
+  }
+
   iterator insert(const_iterator hint, const value_type& value) {
     return m_ht.insert(hint, value);
   }
   iterator insert(const_iterator hint, value_type&& value) {
     return m_ht.insert(hint, std::move(value));
+  }
+  /**
+   * This overload only participates in the overload resolution if the typedef
+   * KeyEqual::is_transparent and Compare::is_transparent exist. If so, K must
+   * be hashable and comparable to Key.
+   */
+  template <
+      class K, class KE = KeyEqual, class CP = Compare,
+      typename std::enable_if<has_is_transparent<KE>::value &&
+                              has_is_transparent<CP>::value>::type* = nullptr>
+  iterator insert(const_iterator hint, K&& value) {
+    return m_ht.insert(hint, std::forward<K>(value));
   }
 
   template <class InputIt>
@@ -278,7 +310,9 @@ class bhopscotch_set {
     return m_ht.erase(key, precalculated_hash);
   }
 
-  void swap(bhopscotch_set& other) { other.m_ht.swap(m_ht); }
+  void swap(bhopscotch_set& other) noexcept(noexcept(other.m_ht.swap(m_ht))) {
+    other.m_ht.swap(m_ht);
+  }
 
   /*
    * Lookup
@@ -566,7 +600,10 @@ class bhopscotch_set {
     return !operator==(lhs, rhs);
   }
 
-  friend void swap(bhopscotch_set& lhs, bhopscotch_set& rhs) { lhs.swap(rhs); }
+  friend void swap(bhopscotch_set& lhs,
+                   bhopscotch_set& rhs) noexcept(noexcept(lhs.swap(rhs))) {
+    lhs.swap(rhs);
+  }
 
  private:
   ht m_ht;

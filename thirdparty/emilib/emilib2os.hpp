@@ -122,7 +122,7 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash) & _mask;
-        return (int8_t)((size_t)(key_hash % MAPBITS) + (size_t)EFILLED);
+        return (int8_t)(size_t)(key_hash % MAPBITS) + EFILLED;
     }
 
     template<typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -135,17 +135,6 @@ public:
 
     inline static uint32_t CTZ(size_t n)
     {
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-
-#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-        n = __builtin_bswap64(n);
-#else
-        static uint32_t endianness = 0x12345678;
-        const auto is_big = *(const char*)&endianness == 0x12;
-        if (is_big)
-            n = __builtin_bswap64(n);
-#endif
-
 #if _WIN32
         unsigned long index;
         _BitScanForward(&index, n);
@@ -402,8 +391,7 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            const auto pairs_size = (_num_buckets + 1) * sizeof(PairT);
-            memcpy((char*)_pairs, other._pairs, pairs_size);
+            memcpy((char*)_pairs, other._pairs, (_num_buckets + 1) * sizeof(PairT));
         } else {
             for (auto it = other.cbegin(); it.bucket() <= _num_buckets; ++it)
                 new(_pairs + it.bucket()) PairT(*it);
@@ -852,6 +840,13 @@ public:
 #endif
     }
 
+    void clear_meta() noexcept
+    {
+        std::fill_n(_states, _num_buckets, State::EEMPTY);
+        for (size_t src_bucket = group_index; src_bucket < _num_buckets; src_bucket += simd_bytes)
+            _states[src_bucket] = 0;
+    }
+
     void clear_data() noexcept
     {
         if (!is_trivially_destructible() && _num_filled) {
@@ -868,11 +863,8 @@ public:
     {
         if (_num_filled) {
             clear_data();
-            std::fill_n(_states, _num_buckets, State::EEMPTY);
-            for (size_t src_bucket = group_index; src_bucket < _num_buckets; src_bucket += simd_bytes)
-                _states[src_bucket] = 0;
+            clear_meta();
         }
-        _num_filled = 0;
     }
 
     void shrink_to_fit() noexcept
@@ -882,7 +874,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        uint64_t required_buckets = num_elems + num_elems / MXLOAD_FACTOR;
+        uint64_t required_buckets = (uint64_t)num_elems + num_elems / MXLOAD_FACTOR;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -992,6 +984,8 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(_MSC_VER)
+        _mm_prefetch((const char*)ctrl);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif

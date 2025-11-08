@@ -39,11 +39,11 @@ namespace emilib {
 
 enum State : int8_t
 {
-    EFILLED  = -126,
-    EDELETE = -127,
     EEMPTY = -128,
-    SENTINEL = 127,
-    STATE_BITS  = 1,
+    EDELETE = EEMPTY + 1,
+    EFILLED = EDELETE + 1,
+    ESENTINEL = 127,
+    STATE_BITS = 1,
 };
 
 #ifndef AVX2_EHASH
@@ -52,6 +52,7 @@ enum State : int8_t
     const static auto simd_filled = _mm_set1_epi8(EFILLED);
 
     #define SET1_EPI8      _mm_set1_epi8
+    #define SET1_EPI32     _mm_set1_epi32
     #define LOAD_EPI8      _mm_load_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
@@ -76,17 +77,6 @@ constexpr static uint32_t group_bmask = (1u << slot_size) - 1;
 
 inline static uint32_t CTZ(uint32_t n)
 {
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-
-#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    n = __builtin_bswap64(n);
-#else
-    static uint32_t endianness = 0x12345678;
-    const auto is_big = *(const char *)&endianness == 0x12;
-    if (is_big)
-    n = __builtin_bswap64(n);
-#endif
-
 #if _WIN32
     unsigned long index;
     _BitScanForward(&index, n);
@@ -140,7 +130,7 @@ public:
 #if 1
     #define bucket_to_slot(bucket) bucket
 #else
-    static constexpr size_t bucket_to_slot(size_t bucket)
+    static inline constexpr size_t bucket_to_slot(size_t bucket)
     {
         return bucket / simd_bytes * slot_size + bucket % simd_bytes;
     }
@@ -436,32 +426,32 @@ public:
         return cend();
     }
 
-    size_t size() const
+    size_t size() const noexcept
     {
         return _num_filled;
     }
 
-    bool empty() const
+    bool empty() const noexcept
     {
         return _num_filled == 0;
     }
 
     // Returns the number of buckets.
-    size_t bucket_count() const
+    size_t bucket_count() const noexcept
     {
         return _num_buckets;
     }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const
+    float load_factor() const noexcept
     {
         return static_cast<float>(_num_filled) / (float)bucket_to_slot(_num_buckets);
     }
 
-    float max_load_factor(float lf = 7.0f / 8)
+    float max_load_factor(float lf = 7.0f / 8) noexcept
     {
         (void)lf;
-        return 7.0f / 8;
+        return (float)MXLOAD_FACTOR / (MXLOAD_FACTOR + 1);
     }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
@@ -494,14 +484,14 @@ public:
     }
 
     template<typename K=KeyT>
-    ValueT& at(const K& key)
+    ValueT& at(const K& key) noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return _pairs[bucket].second;
     }
 
     template<typename K=KeyT>
-    const ValueT& at(const K& key) const
+    const ValueT& at(const K& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
         return _pairs[bucket].second;
@@ -510,7 +500,7 @@ public:
 #if 0
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
-    ValueT* try_get(const K& key)
+    ValueT* try_get(const K& key) noexcept
     {
         auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
@@ -518,7 +508,7 @@ public:
 
     /// Const version of the above
     template<typename K>
-    ValueT* try_get(const K& key) const
+    ValueT* try_get(const K& key) const noexcept
     {
         auto bucket = find_filled_bucket(key);
         return &_pairs[bucket].second;
@@ -526,7 +516,7 @@ public:
 #endif
 
     template<typename Con>
-    bool operator == (const Con& rhs) const
+    bool operator == (const Con& rhs) const noexcept
     {
         if (size() != rhs.size())
             return false;
@@ -540,9 +530,9 @@ public:
     }
 
     template<typename Con>
-    bool operator != (const Con& rhs) const { return !(*this == rhs); }
+    bool operator != (const Con& rhs) const noexcept { return !(*this == rhs); }
 
-    void merge(HashMap& rhs)
+    void merge(HashMap& rhs) noexcept
     {
         if (empty()) {
             *this = std::move(rhs);
@@ -624,7 +614,7 @@ public:
 #endif
 
     template <typename Iter>
-    void insert(Iter beginc, Iter endc)
+    void insert(Iter beginc, Iter endc) noexcept
     {
         rehash(size_t(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
@@ -632,14 +622,14 @@ public:
     }
 
     template<class... Args>
-    std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
+    std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) noexcept
     {
         //check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
-    std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
+    std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) noexcept
     {
         //check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
@@ -697,8 +687,9 @@ public:
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bempty) {
             new(_pairs + slot) PairT(key,val); _num_filled++;
-        } else
+        } else {
             oldv = _pairs[slot].second;
+        }
         return bempty;
     }
 
@@ -711,6 +702,7 @@ public:
         if (bempty) {
             new(_pairs + slot) PairT(key, std::move(ValueT())); _num_filled++;
         }
+
         return _pairs[slot].second;
     }
 
@@ -722,6 +714,7 @@ public:
         if (bempty) {
             new(_pairs + slot) PairT(std::move(key), std::move(ValueT())); _num_filled++;
         }
+
         return _pairs[slot].second;
     }
 
@@ -776,7 +769,7 @@ public:
     }
 
     template<typename Pred>
-    size_t erase_if(Pred pred)
+    size_t erase_if(Pred pred) noexcept
     {
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last; ) {
@@ -805,19 +798,19 @@ public:
 #endif
     }
 
-    void clear_meta()
+    void clear_meta() noexcept
     {
         //init empty tombstone
         std::fill_n(_states, _num_buckets, State::EEMPTY);
         //set filled tombstone
-        std::fill_n(_states + _num_buckets, simd_bytes, State::SENTINEL);
+        std::fill_n(_states + _num_buckets, simd_bytes, State::ESENTINEL);
         assert(_num_buckets >= simd_bytes);
         for (size_t src_bucket = group_index; src_bucket < _num_buckets; src_bucket += simd_bytes)
             _states[src_bucket] = _states[src_bucket - STATE_BITS + 1] = 0;
         _num_filled = 0;
     }
 
-    void clear_data()
+    void clear_data() noexcept
     {
         if (!is_trivially_destructible()) {
             for (auto it = begin(); _num_filled; ++it) {
@@ -930,18 +923,18 @@ public:
 
 private:
     // Can we fit another element?
-    void check_expand_need()
+    inline void check_expand_need()
     {
         reserve(_num_filled);
     }
 
-    static void prefetch_heap_block(char* ctrl)
+    inline static void prefetch_heap_block(char* ctrl)
     {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
     }
@@ -980,7 +973,7 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept
     {
 #if EMH_PSL_LINEAR == 0
-        if (offset < 8)// || _num_buckets < 32 * simd_bytes)
+        if (offset < 7)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
             next_bucket += _num_buckets / 8 + simd_bytes;
@@ -1010,14 +1003,11 @@ private:
                     const auto slot = bucket_to_slot(fbucket);
                     if (EMH_LIKELY(_eq(_pairs[slot].first, key)))
                         return fbucket;
-                    maskf &= maskf - 1;
-                } while (maskf != 0);
+                } while (maskf &= maskf - 1);
             }
 
             if ((int)++offset > group_probe(main_bucket))
                 return _num_buckets;
-//            if (group_has_empty(next_bucket))
-//                break;
             next_bucket = get_next_bucket(next_bucket, offset);
         }
 
@@ -1033,13 +1023,14 @@ private:
         if (EMH_LIKELY(required_buckets >= _num_buckets))
             rehash(required_buckets + 2);
 
+        constexpr size_t chole = (size_t)-1;
         size_t main_bucket;
+        size_t hole = chole, offset = 0u;
+
         const auto key_h2 = hash_key2(main_bucket, key);
         prefetch_heap_block((char*)&_pairs[bucket_to_slot(main_bucket)]);
         const auto filled = SET1_EPI8(key_h2);
-        auto next_bucket = main_bucket; int offset = 0u;
-        constexpr size_t chole = (size_t)-1;
-        size_t hole = chole;
+        auto next_bucket = main_bucket;
 
         do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -1069,7 +1060,7 @@ private:
                 }
             }
             //3. next round
-            next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
+            next_bucket = get_next_bucket(next_bucket, ++offset);
         }  while (offset <= group_probe(main_bucket));
 
         if (hole != chole) {
@@ -1079,8 +1070,7 @@ private:
 
         const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
         set_states(ebucket, key_h2);
-        //if (EMH_UNLIKELY(reserve(_num_filled + 1)))
-        //    return find_filled_bucket(key);
+
         return ebucket;
     }
 

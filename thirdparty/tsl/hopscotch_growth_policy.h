@@ -242,7 +242,7 @@ namespace detail {
 #define TSL_HH_NB_PRIMES 23
 #endif
 
-static constexpr const std::array<std::size_t, TSL_HH_NB_PRIMES> PRIMES = {{
+inline constexpr std::array<std::size_t, TSL_HH_NB_PRIMES> PRIMES = {{
     1u,
     5u,
     17u,
@@ -308,8 +308,7 @@ static constexpr std::size_t mod(std::size_t hash) {
 // MOD_PRIME[iprime](hash) returns hash % PRIMES[iprime]. This table allows for
 // faster modulo as the compiler can optimize the modulo code better with a
 // constant known at the compilation.
-static constexpr const std::array<std::size_t (*)(std::size_t),
-                                  TSL_HH_NB_PRIMES>
+inline constexpr std::array<std::size_t (*)(std::size_t), TSL_HH_NB_PRIMES>
     MOD_PRIME = {{
         &mod<0>,  &mod<1>,  &mod<2>,  &mod<3>,  &mod<4>,  &mod<5>,
         &mod<6>,  &mod<7>,  &mod<8>,  &mod<9>,  &mod<10>, &mod<11>,
@@ -398,6 +397,21 @@ class prime_growth_policy {
                     detail::PRIMES.size(),
                 "The type of m_iprime is not big enough.");
 };
+
+/**
+ * SFINAE helper to detect growth policies which can be noexcept-initialized
+ * with a zero min bucket count.
+ */
+template <typename>
+struct is_noexcept_on_zero_init : std::false_type {};
+template <std::size_t GrowthFactor>
+struct is_noexcept_on_zero_init<power_of_two_growth_policy<GrowthFactor>>
+    : std::true_type {};
+template <class GrowthFactor>
+struct is_noexcept_on_zero_init<mod_growth_policy<GrowthFactor>>
+    : std::true_type {};
+template <>
+struct is_noexcept_on_zero_init<prime_growth_policy> : std::true_type {};
 
 }  // namespace hh
 }  // namespace tsl

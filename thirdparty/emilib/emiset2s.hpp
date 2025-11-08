@@ -1,5 +1,5 @@
 // LICENSE:
-// version 1.0.1
+// version 1.1.0
 // https://github.com/ktprime/emhash/blob/master/thirdparty/emilib/emiset2s.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -33,11 +33,11 @@
 #include <cassert>
 
 #ifdef _WIN32
-#  include <intrin.h>
+    #include <intrin.h>
 #elif __x86_64__
-#  include <x86intrin.h>
+    #include <x86intrin.h>
 #else
-# include "sse2neon.h"
+    #include "sse2neon.h"
 #endif
 
 #undef EMH_LIKELY
@@ -63,6 +63,11 @@ namespace emilib3 {
         SENTINEL = 127,
         GROUP_INDEX = 15,//> 0
     };
+
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+#endif
+    constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
@@ -430,6 +435,7 @@ public:
         std::swap(_num_filled,       other._num_filled);
         std::swap(_max_probe_length, other._max_probe_length);
         std::swap(_mask,             other._mask);
+        std::swap(_mlf,         other._mlf);
     }
 
     // -------------------------------------------------------------
@@ -486,10 +492,12 @@ public:
         return float(_num_filled) / float(_num_buckets);
     }
 
-    float max_load_factor(float lf = 7.0f / 8) noexcept
+    inline constexpr float max_load_factor() const { return (1 << 28) / (float)_mlf; }
+    inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }
+    inline void max_load_factor(float mlf) noexcept
     {
-        (void)lf;
-        return (float)MXLOAD_FACTOR / (MXLOAD_FACTOR + 1);
+        if (mlf <= 0.99f && mlf > EMH_MIN_LOAD_FACTOR)
+            _mlf = (uint32_t)((1 << 28) / mlf);
     }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
@@ -1044,9 +1052,10 @@ private:
     int8_t* _states           = nullptr;
     KeyT*   _pairs            = nullptr;
     size_t  _num_buckets      = 0;
-    size_t  _mask             = 0; // _num_buckets minus one
+    size_t  _mask             = 0;
     size_t  _num_filled       = 0;
-    uint32_t _max_probe_length = 0; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
+    uint32_t _max_probe_length = 0;
+    uint32_t _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
 };
 
 }

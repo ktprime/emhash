@@ -1,7 +1,27 @@
 // LICENSE:
-//   This software is dual-licensed to the public domain and under the following
-//   license: you are granted a perpetual, irrevocable license to copy, modify,
-//   publish, and distribute this file as you see fit.
+// version 1.0.3
+// https://github.com/ktprime/emhash/blob/master/thirdparty/emilib/emiset2s.hpp
+//
+// Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2021-2025 Huang Yuanbing & bailuzhou AT 163.com
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 
 #pragma once
 
@@ -38,12 +58,18 @@ namespace emilib3 {
 
     enum State : int8_t
     {
-        EFILLED = -126,
-        EDELETE = -127,
         EEMPTY = -128,
-        SENTINEL = 127,
+        EDELETE = EEMPTY + 1,
+        EFILLED = EDELETE + 1,
+        SENTINEL= 127,
         GROUP_INDEX = 15,//> 0
     };
+
+#ifndef EMH_DEFAULT_LOAD_FACTOR
+    constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
+#endif
+    constexpr static float EMH_MAX_LOAD_FACTOR = 0.999f;
+    constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
 
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
@@ -84,21 +110,10 @@ constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
 inline static uint32_t CTZ(uint32_t n)
 {
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-
-#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    n = __builtin_bswap64(n);
-#else
-    static uint32_t endianness = 0x12345678;
-    const auto is_big = *(const char *)&endianness == 0x12;
-    if (is_big)
-    n = __builtin_bswap64(n);
-#endif
-
 #if _WIN32
     unsigned long index;
     _BitScanForward(&index, n);
-#elif 1
+#else
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
 
@@ -113,7 +128,6 @@ private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT>;
 
     using PairT = std::pair<const KeyT, ValueT>;
-    constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
     using size_t          = uint32_t;
@@ -126,6 +140,37 @@ public:
     using key_type        = KeyT;
     using hasher          = HashT;
     using key_equal       = EqT;
+
+    static constexpr uint8_t hash_253_map[] = {
+    0x3F, 0xD6, 0x61, 0x0C, 0xA8, 0x23, 0x97, 0x47, 0x02, 0xC5,
+    0x6D, 0xE6, 0x30, 0xB5, 0x12, 0x7A, 0xCE, 0x27, 0xA9, 0x4A,
+    0xF7, 0x69, 0xDF, 0x40, 0x96, 0x0A, 0xBE, 0x1B, 0xAD, 0x6E,
+    0xD5, 0x39, 0x9D, 0x10, 0x58, 0xEC, 0x4E, 0xFD, 0x1F, 0x7E,
+    0x92, 0x33, 0xB2, 0x18, 0xA1, 0x6C, 0xE5, 0x42, 0x9C, 0x2A,
+    0xBC, 0x61, 0xF4, 0x53, 0xCB, 0x0E, 0xB0, 0x72, 0xDD, 0x36,
+    0x9F, 0x4F, 0x00, 0x90, 0x21, 0xFA, 0x45, 0xA3, 0x13, 0xDB,
+    0x5C, 0xC1, 0x66, 0xE6, 0x31, 0xB4, 0x04, 0x78, 0xCF, 0x28,
+    0xA8, 0x4B, 0xF8, 0x6A, 0xE0, 0x40, 0x97, 0x0B, 0xBD, 0x1C,
+    0xA4, 0x6F, 0xD6, 0x3A, 0x9E, 0x11, 0x59, 0xED, 0x4F, 0xFE,
+    0x20, 0x7C, 0x91, 0x34, 0xB1, 0x19, 0xA2, 0x6D, 0xE3, 0x3F,
+    0x96, 0x2B, 0xBF, 0x62, 0xF5, 0x54, 0xCA, 0x0F, 0xAC, 0x73,
+    0xDE, 0x7F, 0x3B, 0xD3, 0x56, 0xE1, 0x48, 0xFB, 0x1D, 0x76,
+    0xC0, 0x3D, 0x9C, 0x15, 0x5D, 0xE8, 0x37, 0xB8, 0xF6, 0x67,
+    0xEF, 0x4C, 0xC2, 0x0A, 0xA7, 0x2E, 0x95, 0x17, 0xD8, 0x05,
+    0x64, 0xE9, 0x09, 0xBE, 0x1E, 0xAF, 0x70, 0xDC, 0x35, 0x9E,
+    0x50, 0x03, 0x8F, 0x20, 0xF9, 0x44, 0x9A, 0x12, 0xDC, 0x5B,
+    0xC2, 0x65, 0xE9, 0x30, 0xB5, 0x03, 0x77, 0xCE, 0x27, 0xA9,
+    0x4A, 0xF7, 0x69, 0xDF, 0x40, 0x96, 0x0A, 0xBE, 0x1B, 0xAD,
+    0x6E, 0xD5, 0x39, 0x9D, 0x10, 0x58, 0xEC, 0x4E, 0xFD, 0x1F,
+    0x7E, 0x92, 0x33, 0xB2, 0x18, 0xA1, 0x6C, 0xE5, 0x42, 0x9C,
+    0x2A, 0xBC, 0x60, 0xF4, 0x52, 0xCB, 0x0D, 0xB0, 0x71, 0xDD,
+    0x37, 0x9F, 0x4E, 0xFF, 0x90, 0x22, 0xF9, 0x45, 0xA3, 0x12,
+    0xDB, 0x5D, 0xC0, 0x67, 0xEB, 0x2F, 0xB4, 0x05, 0x79, 0xC0,
+    0x29, 0xA9, 0x4C, 0xF7, 0x6B, 0xE0, 0x41, 0x98, 0x0C, 0xBE,
+    0x1D, 0xA7, 0x70, 0xD4, 0x3A, 0x7F
+    };
+
+    static_assert(sizeof(hash_253_map) == 256, "map error");
 
     template<typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
@@ -140,9 +185,16 @@ public:
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const
     {
         const auto key_hash = _hasher(key);
+
+#if __SIZEOF_INT128__ && 0
+        __uint128_t r = key_hash;
+        r *= UINT64_C(0x9E3779B97F4A7C15);
+        key_hash = static_cast<uint64_t>(r) ^ static_cast<uint64_t>(r >> 64U);
+#endif
         main_bucket = size_t(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)(key_hash % 253) + EFILLED;
+        //return hash_253_map[(uint8_t)key_hash];//(int8_t)(key_hash % 253) + EFILLED;
+        return (int8_t)((size_t)(key_hash % 253) + (size_t)EFILLED);
     }
 
     class const_iterator;
@@ -212,7 +264,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (_bmask) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -291,7 +343,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (_bmask) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -312,8 +364,9 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap(size_t n = 4) noexcept
+    HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) noexcept
     {
+        _mlf = (uint32_t)((1 << 28) / lf);
         rehash(n);
     }
 
@@ -390,10 +443,10 @@ public:
                 new(_pairs + it.bucket()) PairT(*it);
         }
 
-        //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
         _max_probe_length = other._max_probe_length;
-        const auto state_size = (simd_bytes + _num_buckets) * sizeof(State);
+        _mlf              = other._mlf;
+        const auto state_size = (simd_bytes + _num_buckets) * sizeof(_states[0]);
         memcpy(_states, other._states, state_size);
     }
 
@@ -407,6 +460,7 @@ public:
         std::swap(_num_filled,       other._num_filled);
         std::swap(_max_probe_length, other._max_probe_length);
         std::swap(_mask,             other._mask);
+        std::swap(_mlf,              other._mlf);
     }
 
     // -------------------------------------------------------------
@@ -463,10 +517,12 @@ public:
         return float(_num_filled) / float(_num_buckets);
     }
 
-    float max_load_factor(float lf = 7.0f / 8) noexcept
+    inline constexpr float max_load_factor() const { return EMH_MAX_LOAD_FACTOR; }
+    inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }
+    inline constexpr void max_load_factor(float mlf) noexcept
     {
-        (void)lf;
-        return (float)MXLOAD_FACTOR / (MXLOAD_FACTOR + 1);
+        if (mlf <= max_load_factor() && mlf > min_load_factor())
+            _mlf = (uint32_t)((1 << 28) / mlf);
     }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
@@ -512,7 +568,6 @@ public:
         return _pairs[bucket].second;
     }
 
-    /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
     ValueT* try_get(const K& key) noexcept
     {
@@ -520,7 +575,6 @@ public:
         return &_pairs[bucket].second;
     }
 
-    /// Const version of the above
     template<typename K>
     ValueT* try_get(const K& key) const noexcept
     {
@@ -635,14 +689,12 @@ public:
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) noexcept
     {
-        //check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) noexcept
     {
-        //check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
@@ -656,7 +708,7 @@ public:
     template<typename K, typename V>
     size_t insert_unique(K&& key, V&& val) noexcept
     {
-        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
         if (EMH_UNLIKELY(required_buckets >= _num_buckets))
             rehash(required_buckets + 2);
 
@@ -712,8 +764,6 @@ public:
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv) noexcept
     {
-        //check_expand_need();
-
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */
@@ -839,7 +889,7 @@ public:
 
     void clear_data() noexcept
     {
-        if (!is_trivially_destructible()) {
+        if (!is_trivially_destructible() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -864,7 +914,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        uint64_t required_buckets = (uint64_t)num_elems + num_elems / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -952,6 +1002,8 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(_MSC_VER)
+        _mm_prefetch((const char*)ctrl);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -1032,14 +1084,13 @@ private:
         }
 #endif
 
-        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
         if (EMH_UNLIKELY(required_buckets >= _num_buckets))
           rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
         prefetch_heap_block((char*)&_pairs[main_bucket]);
-        //const auto filled = SET1_EPI8(key_h2);
         const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
         auto next_bucket = main_bucket; size_t offset = 0u;
         constexpr size_t chole = (size_t)-1;
@@ -1126,7 +1177,7 @@ private:
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = filled_mask(next_bucket);
-            if (maske != 0)
+            if (maske)
                 return next_bucket + CTZ(maske);
             next_bucket += simd_bytes;
         }
@@ -1140,9 +1191,10 @@ private:
     int8_t* _states           = nullptr;
     PairT*  _pairs            = nullptr;
     size_t  _num_buckets      = 0;
-    size_t  _mask             = 0; // _num_buckets minus one
+    size_t  _mask             = 0;
     size_t  _num_filled       = 0;
-    size_t  _max_probe_length = 0; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
+    size_t  _max_probe_length = 0;
+    uint32_t _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
 };
 
 }
