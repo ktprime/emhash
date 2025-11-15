@@ -94,29 +94,9 @@ constexpr static uint8_t stat_bytes = sizeof(uint64_t) / sizeof(uint8_t);
 
 inline static uint32_t CTZ(uint64_t n)
 {
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-
-#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    n = __builtin_bswap64(n);
-#else
-    static uint32_t endianness = 0x12345678;
-    const auto is_big = *(const char *)&endianness == 0x12;
-    if (is_big)
-    n = __builtin_bswap64(n);
-#endif
-
 #if _WIN32
     unsigned long index;
-    #if defined(_WIN64)
     _BitScanForward64(&index, n);
-    #else
-    if ((uint32_t)n)
-        _BitScanForward(&index, (uint32_t)n);
-    else
-        {_BitScanForward(&index, n >> 32); index += 32; }
-    #endif
-#elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    auto index = __builtin_ctzll(n);
 #elif 1
     auto index = __builtin_ctzl(n);
 #endif
@@ -914,7 +894,7 @@ private:
     uint8_t*_states           = nullptr;
     KeyT*   _keys             = nullptr;
     size_t  _num_buckets      =  0;
-    size_t  _mask             =  0; // _num_buckets minus one
+    size_t  _mask             =  0;
     size_t  _num_filled       =  0;
     int     _max_probe_length = -1; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };

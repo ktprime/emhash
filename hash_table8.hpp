@@ -202,7 +202,7 @@ public:
         _index = nullptr;
         _mask  = _num_buckets = 0;
         _num_filled = 0;
-        _mlf = (uint32_t)((1 << 27) / EMH_DEFAULT_LOAD_FACTOR);
+        _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
         max_load_factor(mlf);
         rehash(bucket);
     }
@@ -385,13 +385,13 @@ public:
 
     void max_load_factor(float mlf)
     {
-        if (mlf < 0.992 && mlf > EMH_MIN_LOAD_FACTOR) {
-            _mlf = (uint32_t)((1 << 27) / mlf);
-            if (_num_buckets > 0) rehash(_num_buckets);
+        if (mlf <= 0.999 && mlf > EMH_MIN_LOAD_FACTOR) {
+            _mlf = (uint32_t)((1 << 28) / mlf);
+            //if (_num_buckets > 0) rehash(_num_buckets);
         }
     }
 
-    constexpr float max_load_factor() const { return (1 << 27) / (float)_mlf; }
+    constexpr float max_load_factor() const { return (1 << 28) / (float)_mlf; }
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
 
@@ -729,19 +729,19 @@ public:
         return do_insert(std::move(p));
     }
 
-    void insert(std::initializer_list<value_type> ilist)
-    {
-        reserve(ilist.size() + _num_filled, false);
-        for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
-    }
-
     template <typename Iter>
     void insert(Iter first, Iter last)
     {
         reserve(std::distance(first, last) + _num_filled, false);
         for (; first != last; ++first)
             do_insert(first->first, first->second);
+    }
+
+    void insert(std::initializer_list<value_type> ilist)
+    {
+        reserve(ilist.size() + _num_filled, false);
+        for (auto it = ilist.begin(); it != ilist.end(); ++it)
+            do_insert(*it);
     }
 
 #if 0
@@ -1037,10 +1037,9 @@ public:
     {
         (void)force;
 #if EMH_HIGH_LOAD == 0
-        const auto required_buckets = num_elems * _mlf >> 27;
-        if (EMH_LIKELY(required_buckets < _mask)) // && !force
+        const auto required_buckets = num_elems * _mlf >> 28;
+        if (EMH_LIKELY(required_buckets < _num_buckets)) // && !force
             return false;
-
 #else
         const auto required_buckets = num_elems + num_elems * 1 / 9;
         if (EMH_LIKELY(required_buckets < _mask))
@@ -1823,3 +1822,4 @@ private:
     size_type _etail;
 };
 } // namespace emhash
+

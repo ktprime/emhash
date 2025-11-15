@@ -498,7 +498,6 @@ public:
     }
 
 #if 0
-    /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
     ValueT* try_get(const K& key) noexcept
     {
@@ -506,7 +505,6 @@ public:
         return &_pairs[bucket].second;
     }
 
-    /// Const version of the above
     template<typename K>
     ValueT* try_get(const K& key) const noexcept
     {
@@ -624,14 +622,12 @@ public:
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) noexcept
     {
-        //check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) noexcept
     {
-        //check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
@@ -758,7 +754,7 @@ public:
  #endif
     }
 
-    iterator erase(const_iterator first, const_iterator last)
+    iterator erase(const_iterator first, const_iterator last) noexcept
     {
         auto iend = cend();
         auto next = first;
@@ -800,7 +796,6 @@ public:
 
     void clear_meta() noexcept
     {
-        //init empty tombstone
         std::fill_n(_states, _num_buckets, State::EEMPTY);
         //set filled tombstone
         std::fill_n(_states + _num_buckets, simd_bytes, State::ESENTINEL);
@@ -812,7 +807,7 @@ public:
 
     void clear_data() noexcept
     {
-        if (!is_trivially_destructible()) {
+        if (!is_trivially_destructible() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket_to_slot(bucket)].~PairT();
@@ -828,10 +823,9 @@ public:
             clear_data();
             clear_meta();
         }
-        _num_filled = 0;
     }
 
-    void shrink_to_fit()
+    void shrink_to_fit() noexcept
     {
         rehash(_num_filled + 1);
     }
@@ -934,6 +928,8 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(_MSC_VER)
+        _mm_prefetch((const char*)ctrl);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -1110,7 +1106,7 @@ private:
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = filled_mask(next_bucket);
-            if (maske != 0)
+            if (maske)
                 return next_bucket + CTZ(maske);
             next_bucket += simd_bytes;
         }
@@ -1128,4 +1124,4 @@ private:
     size_t  _num_filled       = 0;
 };
 
-} // namespace emilib
+}

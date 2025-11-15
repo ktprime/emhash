@@ -22,6 +22,7 @@
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE
 
 #pragma once
 
@@ -67,8 +68,8 @@ namespace emilib2 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.84f;
 #endif
-    constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
     constexpr static float EMH_MAX_LOAD_FACTOR = 0.999f;
+    constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
 
     constexpr static uint8_t MAP_BITS = 253;
     constexpr static uint8_t EMPTY_OFFSET = 0;
@@ -102,7 +103,6 @@ namespace emilib2 {
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
     #define CMPGT_EPI8     _mm256_cmpgt_epi8
-
 #elif AVX512_EHASH
     const static auto simd_empty  = _mm512_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm512_set1_epi8(EDELETE);
@@ -672,14 +672,12 @@ public:
     template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) noexcept
     {
-        //check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) noexcept
     {
-        //check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
@@ -749,8 +747,6 @@ public:
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv) noexcept
     {
-        //check_expand_need();
-
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */

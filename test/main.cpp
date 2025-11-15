@@ -1,3 +1,4 @@
+//#define  EMH_SAFE_PSL 1
 #ifndef _WIN32
 //#define BOOST_TEST_MODULE hash_map_tests
 //#include <boost/test/unit_test.hpp>
@@ -640,13 +641,13 @@ static void TestApi()
 		std::cout << "After adding elements, numbers.empty(): " << numbers.empty() << '\n';
 
 		ehmap<std::string, std::string>
-			m1 { {"Î³", "gamma"}, {"Î²", "beta"}, {"Î±", "alpha"}, {"Î³", "gamma"}, },
-			   m2 { {"Îµ", "epsilon"}, {"Î´", "delta"}, {"Îµ", "epsilon"} };
+			m1 { {"¦Ã", "gamma"}, {"¦Â", "beta"}, {"¦Á", "alpha"}, {"¦Ã", "gamma"}, },
+			   m2 { {"¦Å", "epsilon"}, {"¦Ä", "delta"}, {"¦Å", "epsilon"} };
 
 		const auto& ref = *(m1.begin());
 		const auto iter = std::next(m1.cbegin());
 
-		std::cout << "â”€â”€â”€â”€â”€â”€â”€â”€ before swap â”€â”€â”€â”€â”€â”€â”€â”€\n"
+		std::cout << "©¤©¤©¤©¤©¤©¤©¤©¤ before swap ©¤©¤©¤©¤©¤©¤©¤©¤\n"
 			<< "m1: " << m1 << "m2: " << m2 << "ref: {" << ref.first << "," << ref.second << "}"
 			<< "\niter: " << "{" << iter->first << ", " << iter->second << "}" << '\n';
 
@@ -654,7 +655,7 @@ static void TestApi()
 
 		//crash on gcc ?
 #if 0
-		std::cout << "â”€â”€â”€â”€â”€â”€â”€â”€ after swap â”€â”€â”€â”€â”€â”€â”€â”€\n"
+		std::cout << "©¤©¤©¤©¤©¤©¤©¤©¤ after swap ©¤©¤©¤©¤©¤©¤©¤©¤\n"
 			<< "m1: " << m1 << "m2: " << m2 << "ref: {" << ref.second << "}"
 			<< "\niter: " << "{" << iter->second << "}" << '\n';
 #endif
@@ -1065,7 +1066,7 @@ static void benchStringHash(int size, int str_min, int str_max)
 }
 
 template<typename MAP>
-static void TestHighLoadFactor(int id)
+static void TestHighLoadFactor(int id, double max_lf = 0.9988)
 {
 	std::random_device rd;
 	const auto rand_key = rd() + getus();
@@ -1075,7 +1076,9 @@ static void TestHighLoadFactor(int id)
 	std::mt19937_64 srngi(rand_key), srnge(rand_key);
 #endif
 
-	const auto max_lf   = 0.999; //<= 0.9999f
+	for (size_t i = 0; i < 1000; i++)
+        assert(srnge() == srngi());
+
 	const auto vsize    = 1u << (20 + id % 6);//must be power of 2
 	MAP myhash(vsize, (float)max_lf);
 	//emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
@@ -1083,54 +1086,57 @@ static void TestHighLoadFactor(int id)
 	//ankerl::unordered_dense::map<int64_t, int> myhash(vsize / 2); myhash.max_load_factor(max_lf);
 
 	auto nowus = getus();
-	for (size_t i = 0; i < size_t(vsize * max_lf); i++)
+    const auto total = size_t(vsize * max_lf);
+	for (size_t i = 0; i < total; i++)
 		myhash.emplace(srngi(), 0);
-	//assert(myhash.bucket_count() == vsize); //no rehash
+	assert(myhash.bucket_count() == vsize); //no rehash
+    assert(myhash.size() + 10 >= total);    //some dumplicate keys
 
-	//while (myhash.load_factor() < max_lf - 1e-3) myhash.emplace(srngi(), 0);
 	const auto insert_time = getus() - nowus; nowus = getus();
 	//erase & insert at a fixed load factor
-	for (size_t i = 0; i < vsize; i++) {
-		myhash.erase(srnge()); //erase a exist old key
-		myhash[srngi()] = 1;
+	for (size_t i = 0; i < total; i++) {
+        const auto key = srnge();
+		myhash.erase(key); //erase a exist old key
+		myhash[key] = 1;   //reinsert old key
 	}
+	assert(myhash.size() + 10 >= total);
+	assert(myhash.bucket_count() == vsize);
 	const auto erase_time = getus() - nowus;
 	printf("vsize = %u, load factor = %.4f, insert/erase = %ld/%ld ms\n",
 			vsize, myhash.load_factor(), long(insert_time / 1000), long(erase_time / 1000));
-	//assert(myhash.bucket_count() == vsize); //no rehash
 	//assert(myhash.load_factor() >= max_lf - 0.001);
 }
 
 
-// æµ‹è¯•åŸºæœ¬æ’å…¥å’ŒæŸ¥æ‰¾åŠŸèƒ½
+// ²âÊÔ»ù±¾²åÈëºÍ²éÕÒ¹¦ÄÜ
 void test_basic_operations() {
 	emhash8::HashMap<int, std::string> map;
 
-	// æµ‹è¯•æ’å…¥
+	// ²âÊÔ²åÈë
 	auto [it1, success1] = map.insert({1, "one"});
 	assert(success1);
 	assert(it1->second == "one");
 
-	map[2] = "two"; // ä½¿ç”¨operator[]æ’å…¥
+	map[2] = "two"; // Ê¹ÓÃoperator[]²åÈë
 	assert(map.size() == 2);
 
-	// æµ‹è¯•æŸ¥æ‰¾
+	// ²âÊÔ²éÕÒ
 	auto it = map.find(1);
 	assert(it != map.end());
 	assert(it->second == "one");
 
-	assert(map.find(3) == map.end()); // æŸ¥æ‰¾ä¸å­˜åœ¨çš„é”®
+	assert(map.find(3) == map.end()); // ²éÕÒ²»´æÔÚµÄ¼ü
 	assert(map.contains(2));
 	assert(!map.contains(3));
 
-	// æµ‹è¯•ä¿®æ”¹å€¼
+	// ²âÊÔĞŞ¸ÄÖµ
 	map[1] = "first";
 	assert(map.at(1) == "first");
 
 	std::cout << "test_basic_operations passed\n";
 }
 
-// æµ‹è¯•åˆ é™¤åŠŸèƒ½
+// ²âÊÔÉ¾³ı¹¦ÄÜ
 void test_erase_operations() {
 	emhash8::HashMap<std::string, int> map;
 	map.insert({"a", 1});
@@ -1138,19 +1144,19 @@ void test_erase_operations() {
 	map.insert({"c", 3});
 	assert(map.size() == 3);
 
-	// æŒ‰é”®åˆ é™¤
+	// °´¼üÉ¾³ı
 	size_t erased = map.erase("b");
 	assert(erased == 1);
 	assert(map.size() == 2);
 	assert(!map.contains("b"));
 
-	// æŒ‰è¿­ä»£å™¨åˆ é™¤
+	// °´µü´úÆ÷É¾³ı
 	auto it = map.find("a");
 	it = map.erase(it);
 	assert(map.size() == 1);
-	assert(it->first == "c"); // è¿­ä»£å™¨åº”æŒ‡å‘åˆ é™¤åçš„ä¸‹ä¸€ä¸ªå…ƒç´ 
+	assert(it->first == "c"); // µü´úÆ÷Ó¦Ö¸ÏòÉ¾³ıºóµÄÏÂÒ»¸öÔªËØ
 
-	// æ¸…ç©ºå®¹å™¨
+	// Çå¿ÕÈİÆ÷
 	map.clear();
 	assert(map.empty());
 	assert(map.size() == 0);
@@ -1158,14 +1164,14 @@ void test_erase_operations() {
 	std::cout << "test_erase_operations passed\n";
 }
 
-// æµ‹è¯•è¿­ä»£å™¨åŠŸèƒ½
+// ²âÊÔµü´úÆ÷¹¦ÄÜ
 void test_iterators() {
 	emhash8::HashMap<int, int> map;
 	for (int i = 0; i < 5; ++i) {
 		map[i] = i * 10;
 	}
 
-	// æµ‹è¯•æ­£å‘è¿­ä»£å™¨
+	// ²âÊÔÕıÏòµü´úÆ÷
 	int count = 0;
 	for (const auto& pair : map) {
 		assert(pair.second == pair.first * 10);
@@ -1173,12 +1179,12 @@ void test_iterators() {
 	}
 	assert(count == 5);
 
-	// æµ‹è¯•è¿­ä»£å™¨èŒƒå›´
+	// ²âÊÔµü´úÆ÷·¶Î§
 	auto begin = map.begin();
 	auto end = map.end();
 	assert(std::distance(begin, end) == 5);
 
-	// æµ‹è¯•constè¿­ä»£å™¨
+	// ²âÊÔconstµü´úÆ÷
 	const auto& const_map = map;
 	for (auto it = const_map.cbegin(); it != const_map.cend(); ++it) {
 		assert(it->second == it->first * 10);
@@ -1188,52 +1194,52 @@ void test_iterators() {
 	std::cout << "test_iterators passed\n";
 }
 
-// æµ‹è¯•è¾¹ç•Œæƒ…å†µ
+// ²âÊÔ±ß½çÇé¿ö
 void test_edge_cases() {
-	// ç©ºå®¹å™¨æµ‹è¯•
+	// ¿ÕÈİÆ÷²âÊÔ
 	emhash8::HashMap<int, int> empty_map;
 	assert(empty_map.empty());
 	assert(empty_map.find(0) == empty_map.end());
 	assert(empty_map.erase(0) == 0);
 
-	// å•å…ƒç´ å®¹å™¨
+	// µ¥ÔªËØÈİÆ÷
 	emhash8::HashMap<int, int> single_map;
 	single_map.insert({0, 0});
 	assert(single_map.size() == 1);
 	assert(single_map.begin() != single_map.end());
 	assert(std::next(single_map.begin()) == single_map.end());
 
-	// é‡å¤æ’å…¥æµ‹è¯•
+	// ÖØ¸´²åÈë²âÊÔ
 	auto [it, success] = single_map.insert({0, 100});
-	assert(!success);  // æ’å…¥é‡å¤é”®åº”å¤±è´¥
-	assert(it->second == 0);  // å€¼åº”ä¿æŒä¸å˜
+	assert(!success);  // ²åÈëÖØ¸´¼üÓ¦Ê§°Ü
+	assert(it->second == 0);  // ÖµÓ¦±£³Ö²»±ä
 
 	std::cout << "test_edge_cases passed\n";
 }
 
-// æµ‹è¯•å¤åˆ¶å’Œç§»åŠ¨è¯­ä¹‰
+// ²âÊÔ¸´ÖÆºÍÒÆ¶¯ÓïÒå
 void test_copy_move() {
 	emhash8::HashMap<int, std::string> original;
 	original[1] = "one";
 	original[2] = "two";
 
-	// æµ‹è¯•å¤åˆ¶æ„é€ 
+	// ²âÊÔ¸´ÖÆ¹¹Ôì
 	emhash8::HashMap<int, std::string> copy(original);
 	assert(copy.size() == original.size());
 	assert(copy.at(1) == original.at(1));
 
-	// æµ‹è¯•å¤åˆ¶èµ‹å€¼
+	// ²âÊÔ¸´ÖÆ¸³Öµ
 	emhash8::HashMap<int, std::string> copy_assign;
 	copy_assign = original;
 	assert(copy_assign.contains(2));
 	assert(copy_assign.at(2) == "two");
 
-	// æµ‹è¯•ç§»åŠ¨æ„é€ 
+	// ²âÊÔÒÆ¶¯¹¹Ôì
 	emhash8::HashMap<int, std::string> moved(std::move(original));
 	assert(moved.size() == 2);
-	assert(original.empty());  // åŸå®¹å™¨åº”è¢«æ¸…ç©º
+	assert(original.empty());  // Ô­ÈİÆ÷Ó¦±»Çå¿Õ
 
-	// æµ‹è¯•ç§»åŠ¨èµ‹å€¼
+	// ²âÊÔÒÆ¶¯¸³Öµ
 	emhash8::HashMap<int, std::string> move_assign;
 	move_assign = std::move(moved);
 	assert(move_assign.size() == 2);
@@ -1242,37 +1248,37 @@ void test_copy_move() {
 	std::cout << "test_copy_move passed\n";
 }
 
-// æµ‹è¯•rehashå’Œreserve
+// ²âÊÔrehashºÍreserve
 void test_rehash_reserve() {
 	emhash8::HashMap<int, int> map;
-	map.reserve(100);  // é¢„åˆ†é…ç©ºé—´
-	assert(map.bucket_count() >= 100);  // æ¡¶æ•°é‡åº”è‡³å°‘ä¸º100
+	map.reserve(100);  // Ô¤·ÖÅä¿Õ¼ä
+	assert(map.bucket_count() >= 100);  // Í°ÊıÁ¿Ó¦ÖÁÉÙÎª100
 
-	// æ’å…¥å…ƒç´ åæµ‹è¯•rehash
+	// ²åÈëÔªËØºó²âÊÔrehash
 	for (int i = 0; i < 50; ++i) {
 		map[i] = i;
 	}
 	size_t old_buckets = map.bucket_count();
-	map.rehash(200);  // å¼ºåˆ¶é‡å“ˆå¸Œåˆ°200ä¸ªæ¡¶
+	map.rehash(200);  // Ç¿ÖÆÖØ¹şÏ£µ½200¸öÍ°
 	assert(map.bucket_count() >= 200);
-	assert(map.size() == 50);  // é‡å“ˆå¸Œåå…ƒç´ æ•°é‡ä¸å˜
+	assert(map.size() == 50);  // ÖØ¹şÏ£ºóÔªËØÊıÁ¿²»±ä
 
-	// éªŒè¯å…ƒç´ ä»å¯è®¿é—®
+	// ÑéÖ¤ÔªËØÈÔ¿É·ÃÎÊ
 	assert(map.at(42) == 42);
 
 	std::cout << "test_rehash_reserve passed\n";
 }
 
-// æµ‹è¯•è‡ªå®šä¹‰å“ˆå¸Œå‡½æ•°å’Œç›¸ç­‰æ€§æ¯”è¾ƒå™¨
+// ²âÊÔ×Ô¶¨Òå¹şÏ£º¯ÊıºÍÏàµÈĞÔ±È½ÏÆ÷
 struct CustomHash {
 	size_t operator()(int x) const {
-		return (size_t)x * 1234567;  // ç®€å•è‡ªå®šä¹‰å“ˆå¸Œ
+		return (size_t)x * 1234567;  // ¼òµ¥×Ô¶¨Òå¹şÏ£
 	}
 };
 
 struct CustomEq {
 	bool operator()(int a, int b) const {
-		return a == b;  // è‡ªå®šä¹‰ç›¸ç­‰æ€§æ¯”è¾ƒï¼ˆä¸é»˜è®¤ç›¸åŒï¼‰
+		return a == b;  // ×Ô¶¨ÒåÏàµÈĞÔ±È½Ï£¨ÓëÄ¬ÈÏÏàÍ¬£©
 	}
 };
 
@@ -1287,7 +1293,7 @@ void test_custom_hash_eq() {
 	std::cout << "test_custom_hash_eq passed\n";
 }
 
-// æµ‹è¯•åˆå¹¶åŠŸèƒ½
+// ²âÊÔºÏ²¢¹¦ÄÜ
 void test_merge() {
 	emhash8::HashMap<int, std::string> map1, map2;
 	map1[1] = "one";
@@ -1296,11 +1302,11 @@ void test_merge() {
 	map2[3] = "tres";
 
 	map1.merge(map2);
-	// map1åº”åŒ…å«1,2,3ï¼›map2åº”ä¿ç•™2ï¼ˆå› ä¸ºmap1ä¸­å·²æœ‰2ï¼‰
+	// map1Ó¦°üº¬1,2,3£»map2Ó¦±£Áô2£¨ÒòÎªmap1ÖĞÒÑÓĞ2£©
 	assert(map1.size() == 3);
-	assert(map1.at(2) == "two");  // ä¿ç•™åŸmap1çš„å€¼
+	assert(map1.at(2) == "two");  // ±£ÁôÔ­map1µÄÖµ
 	assert(map1.at(3) == "tres");
-	assert(map2.size() == 1);  // map2ä¸­ä»…ä¿ç•™æœªåˆå¹¶çš„2
+	assert(map2.size() == 1);  // map2ÖĞ½ö±£ÁôÎ´ºÏ²¢µÄ2
 	assert(map2.at(2) == "dos");
 
 	std::cout << "test_merge passed\n";
@@ -1382,9 +1388,21 @@ int test_hash8()
 	return 0;
 }
 
-
 int main(int argc, char* argv[])
 {
+	for (int i = 0; i < 6; i++) {
+		//TestHighLoadFactor<emilib3::HashMap<uint64_t, int>>(i);
+#if EMH_SAFE_PSL
+		TestHighLoadFactor<emilib2::HashMap<uint64_t, int>>(i);
+		TestHighLoadFactor<emilib2::HashMap<uint64_t, int>>(i, 0.5);
+#endif
+		TestHighLoadFactor<emhash7::HashMap<uint64_t, int>>(i);
+		TestHighLoadFactor<emhash7::HashMap<uint64_t, int>>(i, 0.5);
+		TestHighLoadFactor<emhash8::HashMap<uint64_t, int>>(i);
+		TestHighLoadFactor<emhash8::HashMap<uint64_t, int>>(i, 0.5);
+		printf("\n");
+	}
+
 	DO_TEST<emilib2::HashMap<int, ComplexValue>>();
 	DO_TEST<emilib3::HashMap<int, ComplexValue>>();
 
@@ -1408,10 +1426,6 @@ int main(int argc, char* argv[])
 	RandTest(n, (int)loop);
 #endif
 
-	for (int i = 0; i < 6; i++) {
-		TestHighLoadFactor<emhash7::HashMap<uint64_t, int>>(i);
-		TestHighLoadFactor<emhash8::HashMap<uint64_t, int>>(i);
-	}
-
 	return 0;
 }
+

@@ -55,7 +55,7 @@ std::map<std::string, std::string> maps =
 #ifdef ABSL_HMAP
     {"abslf", "absl_flat"},
 #endif
-    {"martind", "martin_dense"},
+//    {"martind", "martin_dense"},
 //    {"f14_value", "f14_value"},
 
 #if 0
@@ -121,9 +121,9 @@ std::map<std::string, std::string> maps =
 //#define EMH_HIGH_LOAD 12345
 #include "../hash_table5.hpp"
 
+#include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib2s.hpp"
-#include "emilib/emilib2ss.hpp"
 
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
@@ -541,7 +541,7 @@ static void insert_erase(const std::string& hash_name, const std::vector<keyType
 #endif
 
     //load_factor = 0.75
-    ht_hash.max_load_factor(0.80f);
+    //ht_hash.max_load_factor(0.80f);
     const auto vsize = (1u << ilog(vList.size() / 8, 2)) * 75 / 100;
     ht_hash.reserve(vsize / 2);
     for (size_t i = 0; i < vList.size(); i++) {
@@ -582,6 +582,7 @@ static void insert_reserve(hash_type& ht_hash, const std::string& hash_name, con
 
     for (const auto& v : vList)
         sum += ht_hash.emplace(v, TO_VAL(0)).second;
+    hlf = ht_hash.load_factor();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -889,7 +890,6 @@ static void insert_erase_high(const std::string& hash_name, size_t vSize)
     hash_type ht_hash;
     auto max_lf = 0.90f;
     ht_hash.max_load_factor(max_lf);
-    auto mlf = max_lf - 0.001f;
     ht_hash.reserve(vSize);
 
     WyRand srng(vSize);
@@ -897,6 +897,7 @@ static void insert_erase_high(const std::string& hash_name, size_t vSize)
         ht_hash.emplace((keyType)srng(), TO_VAL(0));
     }
 
+    auto mlf = max_lf - 0.001f;
     while (ht_hash.load_factor() < mlf && (size_t)ht_hash.size() < 2 * vSize) {
         ht_hash.emplace((keyType)srng(), TO_VAL(0));
     }
@@ -944,7 +945,7 @@ static void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, s
     }
 #endif
 
-    hlf = ht_hash.load_factor();
+    //hlf = ht_hash.load_factor();
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -1181,6 +1182,8 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
     const uint32_t l3_size = (16 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
     func_index = 0;
+    insert_reserve<hash_type>(hash, hash_name, oList);
+
 #if 1
     multi_small_ife <hash_type>(hash_name, oList);
 
@@ -1193,11 +1196,9 @@ static void benOneHash(const std::string& hash_name, const std::vector<keyType>&
 
     insert_no_reserve <hash_type>(hash_name, oList);
     //insert_unique<hash_type>(hash, hash_name, oList);
-    insert_reserve<hash_type>(hash, hash_name, oList);
     insert_hit<hash_type>(hash, hash_name, oList);
 
     //insert_accident<hash_type>(hash, hash_name, oList);
-    hlf = hash.load_factor();
     find_hit_100<hash_type>(hash, hash_name, oList);
 
     //modify half dataset from start
@@ -1444,10 +1445,9 @@ static int benchHashMap(int n)
 #if HAVE_BOOST
         { benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
 #endif
-
+        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
         {  benOneHash<emilib3::HashMap      <keyType, valueType, ehash_func>>("emilib3", vList); }
         {  benOneHash<emilib::HashMap       <keyType, valueType, ehash_func>>("emilib1", vList); }
-        {  benOneHash<emilib2::HashMap      <keyType, valueType, ehash_func>>("emilib2", vList); }
 
 #if ABSL_HMAP
         {  benOneHash<absl::flat_hash_map <keyType, valueType, ehash_func>>("abslf", vList); }
@@ -1751,10 +1751,8 @@ int main(int argc, char* argv[])
         }
 
         auto pow2 = 2 << ilog(n, 2);
-        hlf = 1.0f * n / pow2;
         if (load_factor > 0.2 && load_factor < 1) {
             n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
-            hlf = 1.0f * n / pow2;
         }
         if (n < 1e5 || n > 2e9)
             n = minn + srng() % minn;

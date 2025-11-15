@@ -1910,9 +1910,5 @@ private:
 //template <class Key, class Val> using ehmap7 = emhash7::HashMap<Key, Val, std::hash<Key>, std::equal_to<Key>>;
 #endif
 
-//TODO
-//2. improve rehash and find miss performance(reduce peak memory)
-//3. dump or Serialization interface
-//4. node hash map support
-//5. load_factor > 1.0 && add grow ration
-//... https://godbolt.org/
+//1. improve rehash and find miss performance(reduce peak memory)
+//2. load_factor > 1.0 && add grow ration

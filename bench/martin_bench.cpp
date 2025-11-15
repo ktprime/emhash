@@ -1,3 +1,4 @@
+//#define FIB_HASH 7
 #include "util.h"
 #include <sstream>
 
@@ -21,20 +22,18 @@
   #include "ck/Common/HashTable/HashMap.h"
 #endif
 
-#include "../hash_table8.hpp"
-#include "../hash_table5.hpp"
-#include "../hash_table7.hpp"
-#include "../hash_table6.hpp"
-//#include "../hash_set8.hpp"
 
-//#include "../thirdparty/emhash/hash_table8v.hpp"
-//#include "../thirdparty/emhash/hash_table8v2.hpp"
+#include "../hash_table5.hpp"
+#include "../hash_table6.hpp"
+#include "../hash_table7.hpp"
+#include "../hash_table8.hpp"
 
 #if HAVE_BOOST
   #include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
 //#define HAVE_EXCALIBUR 1
+//#define HAVE_INDIVI 1
 #if HAVE_EXCALIBUR
 //https://github.com/SergeyMakeev/ExcaliburHash
 #include "ExcaliburHash/ExcaliburHash.h"
@@ -50,8 +49,8 @@
 //    #define EMH_STATIS 123456
 //    #define AVX2_EHASH 1
 //    #define EMH_PSL_LINEAR 1
-#include "emilib/emilib2o.hpp"
 #include "emilib/emilib2ss.hpp"
+#include "emilib/emilib2o.hpp"
 #include "emilib/emilib2s.hpp"
 
 #include "martin/robin_hood.h"
@@ -76,18 +75,18 @@
 #endif
 
 static const uint64_t RND =(uint64_t)getus();
-static float max_lf = 0.875f;
+static float max_lf = 7.0f/8;
 
 static std::map<std::string_view, std::string_view> show_name =
 {
-   {"emhash7", "emhash7"},
+    {"emhash7", "emhash7"},
 //   {"emhash8", "emhash8"},
 //   {"emhash5", "emhash5"},
-     {"emhash6", "emhash6"},
+    {"emhash6", "emhash6"},
 
-   {"emilib",  "emilib1"},
-   {"emilib2", "emilib2"},
-   {"emilib3", "emilib3"},
+    {"emilib",  "emilib1"},
+    {"emilib2", "emilib2"},
+    {"emilib3", "emilib3"},
 
 #if HAVE_BOOST
     {"boost",  "boost flat"},
@@ -248,13 +247,13 @@ private:
           return (x << k) | (x >> (8 * sizeof(T) - k));
       }
 
-  static constexpr int rotation = 24;
-  static constexpr int right_shift = 11;
-  static constexpr int left_shift = 3;
-  uint64_t m_a;
-  uint64_t m_b;
-  uint64_t m_c;
-  uint64_t m_counter;
+    static constexpr int rotation = 24;
+    static constexpr int right_shift = 11;
+    static constexpr int left_shift = 3;
+    uint64_t m_a;
+    uint64_t m_b;
+    uint64_t m_c;
+    uint64_t m_counter;
 };
 
 static inline double now2sec()
@@ -855,7 +854,7 @@ static void bench_knucleotide() {
     printf("    %20s", map_name);
 
     HMAP hmap;
-    state = 42;
+    state = RND;
     for (size_t i = 0; i < n * 3; ++i)
         (void)fasta_next();
 

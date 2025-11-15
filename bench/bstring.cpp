@@ -66,7 +66,7 @@ static std::string make_index( unsigned x )
 static std::string make_random_index( unsigned x )
 {
     char buffer[ 64 ];
-    std::snprintf( buffer, sizeof(buffer), "pfx_%0*d_%u_sfx", x % 8 + 1, 0, x );
+    std::snprintf( buffer, sizeof(buffer), "pfx_%0*d_%u_sfx", x % 10 + 0, x % 4, x);
 
     return buffer;
 }
@@ -74,15 +74,15 @@ static std::string make_random_index( unsigned x )
 static void init_indices()
 {
     indices1.reserve( N*2+1 );
-    indices1.push_back( make_index( 0 ) );
+    indices1.emplace_back( make_index( 0 ) );
 
     for( unsigned i = 1; i <= N*2; ++i )
     {
-        indices1.push_back( make_index( i ) );
+        indices1.emplace_back( make_index( i ) );
     }
 
     indices2.reserve( N*2+1 );
-    indices2.push_back( make_index( 0 ) );
+    indices2.emplace_back( make_index( 0 ) );
 
     {
         //boost::detail::splitmix64 rng;
@@ -90,7 +90,7 @@ static void init_indices()
 
         for( unsigned i = 1; i <= N*2; ++i )
         {
-            indices2.push_back( make_random_index( static_cast<std::uint32_t>( rng() ) ) );
+            indices2.emplace_back( make_random_index( static_cast<std::uint32_t>( rng() ) ) );
         }
     }
 }
@@ -248,10 +248,10 @@ struct record
 static std::vector<record> times;
 
 #if STD_VIEW || 1
-#include <string_view>
-using keyType = std::string_view;
+    #include <string_view>
+    using keyType = std::string_view;
 #else
-using keyType = std::string;
+    using keyType = std::string;
 #endif
 
 template<template<class...> class Map> BOOST_NOINLINE void test( char const* label )
@@ -442,7 +442,7 @@ int main(int argc, const char* argv[])
 
     test<emilib1_map> ("emilib1_map" );
     test<emilib3_map> ("emilib3_map" );
-    test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+    test<boost_unordered_flat_map>( "boost::flat_hmap" );
     test<indivi_umap>("indivi_umap");
     test<indivi_wmap>("indivi_wmap");
     test<emilib2_map> ("emilib2_map" );
@@ -496,7 +496,7 @@ int main(int argc, const char* argv[])
 
 #endif
 
-    test<std_unordered_map>( "std::unordered_map" );
+    //test<std_unordered_map>( "std::unordered_map" );
 
     std::cout << "---\n\n";
 
@@ -505,4 +505,3 @@ int main(int argc, const char* argv[])
         std::cout << std::setw( 35 ) << ( x.label_ + ": " ) << std::setw( 5 ) << x.time_ << " ms, " << std::setw( 9 ) << x.bytes_ << " bytes in " << x.count_ << " allocations\n";
     }
 }
-

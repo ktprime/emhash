@@ -59,7 +59,9 @@ namespace emilib3 {
 
     enum State : int8_t
     {
-        EFILLED  = -126, EDELETE = -127, EEMPTY = -128,
+        EFILLED  = -126,
+        EDELETE = -127,
+        EEMPTY = -128,
         SENTINEL = 127,
         GROUP_INDEX = 15,//> 0
     };
@@ -67,6 +69,7 @@ namespace emilib3 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif
+    constexpr static float EMH_MAX_LOAD_FACTOR = 0.999f;
     constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
 
 #ifndef AVX2_EHASH
@@ -75,6 +78,7 @@ namespace emilib3 {
     const static auto simd_filled = _mm_set1_epi8(EFILLED);
 
     #define SET1_EPI8      _mm_set1_epi8
+    #define SET1_EPI32     _mm_set1_epi32
     #define LOAD_EPI8      _mm_load_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
@@ -107,22 +111,10 @@ constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
 inline static uint32_t CTZ(uint32_t n)
 {
-#if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-
-#elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    n = __builtin_bswap64(n);
-#else
-    static uint32_t endianness = 0x12345678;
-    const auto is_big = *(const char *)&endianness == 0x12;
-    if (is_big)
-    n = __builtin_bswap64(n);
-#endif
-
 #if _WIN32
     unsigned long index;
     _BitScanForward(&index, n);
-//    _BitScanForward64(&index, n);
-#elif 1
+#else
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
 
@@ -240,7 +232,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (_bmask) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -319,7 +311,7 @@ public:
         void goto_next_element()
         {
             _bmask &= _bmask - 1;
-            if (_bmask != 0) {
+            if (_bmask) {
                 _bucket = _from + CTZ(_bmask);
                 return;
             }
@@ -340,8 +332,9 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashSet(size_t n = 4) noexcept
+    HashSet(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) noexcept
     {
+        _mlf = (uint32_t)((1 << 28) / lf);
         rehash(n);
     }
 
@@ -418,10 +411,10 @@ public:
                 new(_pairs + it.bucket()) PairT(*it);
         }
 
-        //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
         _max_probe_length = other._max_probe_length;
-        const auto state_size = (simd_bytes + _num_buckets) * sizeof(State);
+        _mlf              = other._mlf;
+        const auto state_size = (simd_bytes + _num_buckets) * sizeof(_states[0]);
         memcpy(_states, other._states, state_size);
     }
 
@@ -492,11 +485,11 @@ public:
         return float(_num_filled) / float(_num_buckets);
     }
 
-    inline constexpr float max_load_factor() const { return (1 << 28) / (float)_mlf; }
+    inline constexpr float max_load_factor() const { return EMH_MAX_LOAD_FACTOR; }
     inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }
-    inline void max_load_factor(float mlf) noexcept
+    inline constexpr void max_load_factor(float mlf) noexcept
     {
-        if (mlf <= 0.99f && mlf > EMH_MIN_LOAD_FACTOR)
+        if (mlf <= max_load_factor() && mlf > min_load_factor())
             _mlf = (uint32_t)((1 << 28) / mlf);
     }
 
@@ -709,10 +702,10 @@ public:
 #endif
     }
 
-    iterator erase(const_iterator begin, const_iterator last) noexcept
+    iterator erase(const_iterator first, const_iterator last) noexcept
     {
         auto iend = cend();
-        auto next = begin;
+        auto next = first;
         for (; next != last && next != iend; )
             erase(next++);
 
@@ -762,7 +755,7 @@ public:
 
     void clear_data() noexcept
     {
-        if (!is_trivially_destructible()) {
+        if (!is_trivially_destructible() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -787,7 +780,7 @@ public:
 
     bool reserve(size_t num_elems) noexcept
     {
-        uint64_t required_buckets = (uint64_t)num_elems + num_elems / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -875,7 +868,9 @@ private:
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
-#elif defined(__GNUC__)
+#elif defined(_MSC_VER)
+        _mm_prefetch((const char*)ctrl);
+#elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
     }
@@ -937,7 +932,7 @@ private:
             next_bucket = get_next_bucket(next_bucket, ++offset);
         } while (true);
 
-        return 0;
+        return _num_buckets;
     }
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
@@ -945,8 +940,7 @@ private:
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
-        //reserve(_num_filled);
-        size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
+        const auto required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
         if (EMH_UNLIKELY(required_buckets >= _num_buckets))
           rehash(required_buckets + 2);
 
@@ -1016,7 +1010,7 @@ private:
 
     size_t find_empty_slot(size_t next_bucket, size_t offset) noexcept
     {
-        while (true) {
+        do {
             const auto maske = empty_delete(next_bucket);
             if (maske != 0) {
                 const auto ebucket = CTZ(maske) + next_bucket;
@@ -1026,7 +1020,7 @@ private:
                 return ebucket;
             }
             next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
-        }
+        } while (true);
 
         return 0;
     }
@@ -1038,7 +1032,7 @@ private:
         //next_bucket -= next_bucket % simd_bytes;
         while (true) {
             const auto maske = filled_mask(next_bucket);
-            if (maske != 0)
+            if (maske)
                 return next_bucket + CTZ(maske);
             next_bucket += simd_bytes;
         }
@@ -1054,7 +1048,7 @@ private:
     size_t  _num_buckets      = 0;
     size_t  _mask             = 0;
     size_t  _num_filled       = 0;
-    uint32_t _max_probe_length = 0;
+    size_t  _max_probe_length = 0;
     uint32_t _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
 };
 
