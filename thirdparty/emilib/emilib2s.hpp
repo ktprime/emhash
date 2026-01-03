@@ -852,8 +852,7 @@ public:
         std::fill_n(_states, _num_buckets, State::EEMPTY);
         //set filled tombstone
         std::fill_n(_states + _num_buckets, simd_bytes, State::SENTINEL);
-        _num_filled = 0;
-        _max_probe_length = 0;
+        _num_filled = _max_probe_length = 0;
     }
 
     void clear_data() noexcept

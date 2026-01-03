@@ -1021,10 +1021,10 @@ private:
 
         constexpr size_t chole = (size_t)-1;
         size_t main_bucket;
-        size_t hole = chole, offset = 0u;
+        size_t hole = chole, offset = (size_t)0u;
 
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_heap_block((char*)&_pairs[bucket_to_slot(main_bucket)]);
+        //prefetch_heap_block((char*)&_pairs[bucket_to_slot(main_bucket)]);
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket;
 
@@ -1057,7 +1057,7 @@ private:
             }
             //3. next round
             next_bucket = get_next_bucket(next_bucket, ++offset);
-        }  while (offset <= group_probe(main_bucket));
+        }  while (offset <= (size_t)group_probe(main_bucket));
 
         if (hole != chole) {
             set_states(hole, key_h2);

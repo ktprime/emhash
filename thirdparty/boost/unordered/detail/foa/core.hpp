@@ -1,6 +1,6 @@
 /* Common base for Boost.Unordered open-addressing tables.
  *
- * Copyright 2022-2024 Joaquin M Lopez Munoz.
+ * Copyright 2022-2025 Joaquin M Lopez Munoz.
  * Copyright 2023 Christian Mazakas.
  * Copyright 2024 Braden Ganetsky.
  * Distributed under the Boost Software License, Version 1.0.
@@ -923,6 +923,8 @@ inline unsigned int unchecked_countr_zero(int x)
   unsigned long r;
   _BitScanForward(&r,(unsigned long)x);
   return (unsigned int)r;
+#elif defined(BOOST_GCC)||defined(BOOST_CLANG)
+  return (unsigned int)__builtin_ctz((unsigned int)x);
 #else
   BOOST_UNORDERED_ASSUME(x!=0);
   return (unsigned int)boost::core::countr_zero((unsigned int)x);

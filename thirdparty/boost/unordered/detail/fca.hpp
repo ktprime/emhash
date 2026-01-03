@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2024 Joaquin M Lopez Munoz.
+// Copyright (C) 2022-2025 Joaquin M Lopez Munoz.
 // Copyright (C) 2022 Christian Mazakas
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying

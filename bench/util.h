@@ -471,7 +471,7 @@ static inline uint64_t udb_splitmix64(uint64_t x)
   #include <arm_neon.h>
 #endif
 
-static inline uint64_t intHashCRC32(uint64_t x)
+static inline uint64_t hashCRC32(uint64_t x)
 {
 #if __SSE4_2__ || _WIN32
     return _mm_crc32_u64((uint64_t)(0-1), x);
@@ -501,15 +501,15 @@ struct Int64Hasher
 #elif FIB_HASH == 6
         return squirrel3(key);
 #elif FIB_HASH == 7
-        return intHashCRC32(key);
+        return hashCRC32(key);
+#elif FIB_HASH == 8
+        return wyhash64(key, KC);
 #elif FIB_HASH == 9
         return udb_splitmix64(key);
 #elif FIB_HASH > 10000
         return key % FIB_HASH; //bad hash
 #elif FIB_HASH > 100
         return key * FIB_HASH; //bad hash
-#elif FIB_HASH == 8
-        return wyhash64(key, KC);
 #else //staffort_mix13
         auto x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);

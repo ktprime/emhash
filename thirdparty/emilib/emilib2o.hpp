@@ -74,8 +74,8 @@ namespace emilib2 {
     constexpr static uint8_t MAP_BITS = 253;
     constexpr static uint8_t EMPTY_OFFSET = 0;
 
-#if EMH_OFFSET_STEP == 0
-    constexpr static uint8_t OFFSET_STEP = 8;
+#if EMH_OFFSET_STEP <= 0
+    constexpr static uint8_t EMH_OFFSET_STEP = 4;
 #endif
 
 #if AVX2_EHASH == 0
@@ -430,7 +430,7 @@ public:
         _mlf        = other._mlf;
         const auto state_size = simd_bytes + _num_buckets;
         memcpy(_states, other._states, state_size * sizeof(_states[0]));
-        memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]) / OFFSET_STEP + 1);
+        memcpy(_offset, other._offset, _num_buckets * sizeof(_offset[0]) / EMH_OFFSET_STEP + 1);
     }
 
     void swap(HashMap& other) noexcept
@@ -828,7 +828,7 @@ public:
 #elif 0
         if (EMH_UNLIKELY(_num_filled == 0)) {
             std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
+            std::fill_n(_offset, _num_buckets / EMH_OFFSET_STEP + 1, EMPTY_OFFSET);
         }
 #endif
     }
@@ -876,7 +876,9 @@ public:
     void clear_meta() noexcept
     {
          std::fill_n(_states, _num_buckets, State::EEMPTY);
-         std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
+         //set last simd_bytes sentinel/tombstone
+         std::fill_n(_states + _num_buckets, simd_bytes, State::ESENTINEL);
+         std::fill_n(_offset, _num_buckets / EMH_OFFSET_STEP + 1, EMPTY_OFFSET);
         _num_filled = 0;
     }
 
@@ -918,7 +920,7 @@ public:
     void dump_statics() const
     {
         int off[256] = {0};
-        const auto off_groups = _num_buckets / OFFSET_STEP + 1;
+        const auto off_groups = _num_buckets / EMH_OFFSET_STEP + 1;
         for (int i = 0; i < off_groups; i++)
             off[_offset[i]]++;
 
@@ -956,7 +958,7 @@ public:
             std::abort(); //throw std::length_error("too large size");
 
         const auto num_buckets = (size_t)buckets;
-        const auto* new_data = (char*)malloc(pairs_size + state_size * sizeof(_states[0]) + (state_size / OFFSET_STEP) * sizeof(_offset[0]));
+        const auto* new_data = (char*)malloc(pairs_size + state_size * sizeof(_states[0]) + (state_size / EMH_OFFSET_STEP) * sizeof(_offset[0]));
         auto old_states      = _states;
 
         auto* new_pairs = (decltype(_pairs)) new_data;
@@ -967,17 +969,11 @@ public:
         auto old_pairs       = _pairs;
         auto old_buckets     = _num_buckets;
 
-        _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
         _pairs       = new_pairs;
 
-        //init empty
-        std::fill_n(_states, num_buckets, State::EEMPTY);
-        //set last simd_bytes sentinel/tombstone
-        std::fill_n(_states + num_buckets, simd_bytes, State::ESENTINEL);
-        //fill offset to 0
-        std::fill_n(_offset, num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
+        clear_meta();
 
         {
             //TODO: set last packet tombstone. not equal key h2
@@ -1028,19 +1024,19 @@ private:
     inline uint32_t get_offset(size_t main_bucket) const noexcept
     {
 #if EMH_SAFE_PSL
-        if (EMH_UNLIKELY(_offset[main_bucket / OFFSET_STEP] > 128))
-            return (_offset[main_bucket / OFFSET_STEP] - 127) * 128;
+        if (EMH_UNLIKELY(_offset[main_bucket / EMH_OFFSET_STEP] > 128))
+            return (_offset[main_bucket / EMH_OFFSET_STEP] - 127) * 128;
 #endif
-        return _offset[main_bucket / OFFSET_STEP];
+        return _offset[main_bucket / EMH_OFFSET_STEP];
     }
 
     inline void set_offset(size_t main_bucket, uint32_t off) noexcept
     {
 #if EMH_SAFE_PSL
         assert(off / 128 < 128);
-        _offset[main_bucket / OFFSET_STEP] = off <= 128 ? off : 128 + off / 128;
+        _offset[main_bucket / EMH_OFFSET_STEP] = off <= 128 ? off : 128 + off / 128;
 #else
-        _offset[main_bucket / OFFSET_STEP] = (uint8_t)off;
+        _offset[main_bucket / EMH_OFFSET_STEP] = (uint8_t)off;
 #endif
     }
 
@@ -1133,7 +1129,7 @@ private:
         const auto key_h2 = hash_key2(main_bucket, key);
         prefetch_heap_block((char*)&_pairs[main_bucket]);
         const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
-        auto next_bucket = main_bucket, offset = 0u;
+        auto next_bucket = main_bucket, offset = (size_t)0u;
         constexpr size_t chole = (size_t)-1;
         size_t hole = chole;
 

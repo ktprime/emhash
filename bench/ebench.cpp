@@ -1,5 +1,5 @@
 #ifndef TTKey
-    #define TTKey              0
+    #define TTKey              1
 #endif
 #ifndef TTVal
     #define TTVal              0
@@ -1572,7 +1572,7 @@ static void testHashInt(int loops = 500000009)
 
     ts = getus(); sum = r;
     for (int i = 0; i < loops; i++)
-      sum += intHashCRC32(i + r);
+      sum += hashCRC32(i + r);
     printf("intHashCRC32= %4d ms [%ld]\n\n", (int)(getus() - ts) / 1000, sum);
 
 #if 0
