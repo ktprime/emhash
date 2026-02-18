@@ -157,7 +157,7 @@ static const char* find_hash(const std::string& map_name)
 }
 
 #ifndef RT
-    #define RT 3 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
+    #define RT 2 //2 wyrand 1 sfc64 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
 #if RT == 1
