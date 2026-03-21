@@ -37,6 +37,7 @@
 #include <functional>
 #include <iterator>
 #include <algorithm>
+#include <memory>
 
 #if EMH_WY_HASH
     #include "wyhash.h"
@@ -216,7 +217,7 @@ struct entry {
 };
 
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
@@ -225,7 +226,7 @@ class HashMap
     constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
 
 public:
-    typedef HashMap<KeyT, ValueT, HashT, EqT> htype;
+    typedef HashMap<KeyT, ValueT, HashT, EqT, AllocT> htype;
     typedef std::pair<KeyT, ValueT>           value_type;
 
 #if EMH_BUCKET_INDEX == 0
@@ -244,6 +245,7 @@ public:
     typedef ValueT mapped_type;
     typedef HashT  hasher;
     typedef EqT    key_equal;
+    typedef AllocT allocator_type;
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
@@ -361,6 +363,7 @@ public:
     }
 
     HashMap(const HashMap& rhs) noexcept
+        : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc))
     {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             _pairs = alloc_bucket(rhs._num_buckets);
@@ -373,6 +376,7 @@ public:
     }
 
     HashMap(HashMap&& rhs) noexcept
+        : _alloc(std::move(rhs._alloc))
     {
         init(0);
         *this = std::move(rhs);
@@ -393,17 +397,31 @@ public:
             emplace(*first);
     }
 
+    explicit HashMap(const AllocT& alloc) noexcept
+        : _alloc(PairAlloc(alloc))
+    {
+        init(2, EMH_DEFAULT_LOAD_FACTOR);
+    }
+
+    HashMap(size_type bucket, float mlf, const AllocT& alloc) noexcept
+        : _alloc(PairAlloc(alloc))
+    {
+        init(bucket, mlf);
+    }
+
     HashMap& operator=(const HashMap& rhs) noexcept
     {
         if (this == &rhs)
             return *this;
+        if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
+            _alloc = rhs._alloc;
 
         if (rhs.load_factor() < EMH_MIN_LOAD_FACTOR) {
             clear();
 #if EMH_SMALL_SIZE
             if (_pairs != (PairT*)_small)
 #endif
-            free(_pairs);
+            dealloc_bucket(_pairs, _num_buckets);
             _pairs = nullptr;
 
             rehash((uint64_t)rhs._num_filled + 2);
@@ -417,7 +435,7 @@ public:
 #if EMH_SMALL_SIZE
             if (_pairs != (PairT*)_small)
 #endif
-            free(_pairs);
+            dealloc_bucket(_pairs, _num_buckets);
             _pairs = alloc_bucket(rhs._num_buckets);
         }
 
@@ -437,7 +455,7 @@ public:
                 return *this;
             if (rhs._num_buckets > _num_buckets) {
                 if (_pairs != (PairT*)_small) {
-                    free(_pairs); _pairs = (PairT*)_small;
+                    dealloc_bucket(_pairs, _num_buckets); _pairs = (PairT*)_small;
                 }
                 if (rhs._num_buckets > EMH_SMALL_SIZE)
                 _pairs = alloc_bucket(rhs._num_buckets);
@@ -475,7 +493,7 @@ public:
 #if EMH_SMALL_SIZE
         if (_pairs != (PairT*)_small)
 #endif
-        free(_pairs);
+        dealloc_bucket(_pairs, _num_buckets);
         _pairs = nullptr;
     }
 
@@ -529,6 +547,7 @@ public:
         }
 #endif
         //      std::swap(_eq, rhs._eq);
+        std::swap(_alloc, rhs._alloc);
         std::swap(_hasher, rhs._hasher);
         std::swap(_pairs, rhs._pairs);
         std::swap(_num_buckets, rhs._num_buckets);
@@ -591,6 +610,7 @@ public:
 
     HashT hash_function() const noexcept { return static_cast<const HashT&>(_hasher); }
     EqT key_eq() const noexcept { return static_cast<const EqT&>(_eq); }
+    allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
 
     float load_factor() const noexcept { return static_cast<float>(_num_filled) / (float)_num_buckets; }
     float max_load_factor() const noexcept { return (1 << 27) / (float)_mlf; }
@@ -1483,21 +1503,20 @@ public:
 #if EMH_SMALL_SIZE
         if (old_pairs != (PairT*)_small)
 #endif
-        free(old_pairs);
+        dealloc_bucket(old_pairs, old_buckets);
         assert(old_num_filled == _num_filled);
     }
 
 private:
 
-    static PairT* alloc_bucket(size_type num_buckets)
+    PairT* alloc_bucket(size_type num_buckets)
     {
-        //TODO: call realloc
-#ifdef EMH_ALLOC
-        auto* new_pairs = (PairT*)aligned_alloc(EMH_MALIGN, (2 + num_buckets) * sizeof(PairT));
-#else
-        auto* new_pairs = (PairT*)malloc((2 + (size_t)num_buckets) * sizeof(PairT));
-#endif
-        return new_pairs;
+        return PairAllocTraits::allocate(_alloc, 2 + (size_t)num_buckets);
+    }
+
+    void dealloc_bucket(PairT* pairs, size_type num_buckets)
+    {
+        if (pairs) PairAllocTraits::deallocate(_alloc, pairs, 2 + (size_t)num_buckets);
     }
 
 #if EMH_HIGH_LOAD
@@ -2034,6 +2053,9 @@ one-way search strategy.
         return (size_type)_hasher(key);
     }
 
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
+
 private:
     PairT*    _pairs;
 #if EMH_SMALL_SIZE
@@ -2042,6 +2064,7 @@ private:
 
     HashT     _hasher;
     EqT       _eq;
+    PairAlloc _alloc;
     uint32_t  _mlf;
     size_type _mask;
     size_type _num_buckets;

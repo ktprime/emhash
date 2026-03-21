@@ -78,8 +78,8 @@ struct DefaultPolicy8 {
 template<typename KeyT,
         typename HashT = std::hash<KeyT>,
         typename EqT = std::equal_to<KeyT>,
-        typename Allocator = std::allocator<KeyT>, //never used
-        typename Policy = DefaultPolicy8> //never used
+        typename AllocT = std::allocator<KeyT>,
+        typename Policy = DefaultPolicy8>
 class HashSet
 {
 #ifndef EMH_DEFAULT_LOAD_FACTOR
@@ -91,7 +91,7 @@ class HashSet
 #endif
 
 public:
-    using htype = HashSet<KeyT, HashT, EqT, Allocator, Policy>; //TODO:Allocator is not implemented
+    using htype = HashSet<KeyT, HashT, EqT, AllocT, Policy>;
     using value_type = KeyT; //TODO set to const KeyT
     using key_type = const KeyT;
     //using dPolicy = Policy;
@@ -106,6 +106,7 @@ public:
 
     using hasher = HashT;
     using key_equal = EqT;
+    using allocator_type = AllocT;
 
     constexpr static size_type INACTIVE = size_type(-1);
     constexpr static size_type EAD      = 2;
@@ -242,6 +243,7 @@ public:
         _index = nullptr;
         _mask  = _num_buckets = 0;
         _num_filled = 0;
+        _pairs_capacity = 0;
         _mlf = (uint32_t)((1 << 27) / EMH_DEFAULT_LOAD_FACTOR);
         max_load_factor(mlf);
         rehash(bucket);
@@ -253,9 +255,12 @@ public:
     }
 
     HashSet(const HashSet& rhs)
+        : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator))
+        , _index_allocator(IndexAllocTraits::select_on_container_copy_construction(rhs._index_allocator))
     {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs = alloc_bucket((size_type)((float)rhs._num_buckets * rhs.max_load_factor()) + 4);
+            _pairs_capacity = (size_type)((float)rhs._num_buckets * rhs.max_load_factor()) + 4;
+            _pairs = alloc_bucket(_pairs_capacity);
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
         } else {
@@ -266,6 +271,8 @@ public:
     }
 
     HashSet(HashSet&& rhs) noexcept
+        : _pair_allocator(std::move(rhs._pair_allocator))
+        , _index_allocator(std::move(rhs._index_allocator))
     {
         init(0);
         *this = std::move(rhs);
@@ -286,13 +293,56 @@ public:
             emplace(*begin);
     }
 
+    explicit HashSet(const allocator_type& alloc)
+        : _pair_allocator(alloc)
+        , _index_allocator(alloc)
+    {
+        init(2);
+    }
+
+    HashSet(size_type bucket, float mlf, const allocator_type& alloc)
+        : _pair_allocator(alloc)
+        , _index_allocator(alloc)
+    {
+        init(bucket, mlf);
+    }
+
+    HashSet(const HashSet& rhs, const allocator_type& alloc)
+        : _pair_allocator(alloc)
+        , _index_allocator(alloc)
+    {
+        if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
+            _pairs_capacity = (size_type)((float)rhs._num_buckets * rhs.max_load_factor()) + 4;
+            _pairs = alloc_bucket(_pairs_capacity);
+            _index = alloc_index(rhs._num_buckets);
+            clone(rhs);
+        } else {
+            init(rhs._num_filled + 2, rhs.max_load_factor());
+            for (auto it = rhs.begin(); it != rhs.end(); ++it)
+                insert_unique(*it);
+        }
+    }
+
+    HashSet(HashSet&& rhs, const allocator_type& alloc) noexcept
+        : _pair_allocator(alloc)
+        , _index_allocator(alloc)
+    {
+        init(0);
+        *this = std::move(rhs);
+    }
+
     HashSet& operator=(const HashSet& rhs)
     {
         if (this == &rhs)
             return *this;
 
+        if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value) {
+            _pair_allocator = rhs._pair_allocator;
+            _index_allocator = rhs._index_allocator;
+        }
+
         if (rhs.load_factor() < EMH_MIN_LOAD_FACTOR) {
-            clear(); free(_pairs); _pairs = nullptr;
+            clear(); dealloc_bucket(_pairs, _pairs_capacity); _pairs = nullptr; _pairs_capacity = 0;
             rehash(rhs._num_filled + 2);
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(*it);
@@ -302,9 +352,10 @@ public:
         clearkv();
 
         if (_num_buckets != rhs._num_buckets) {
-            free(_pairs); free(_index);
+            dealloc_bucket(_pairs, _pairs_capacity); dealloc_index(_index, _num_buckets);
             _index = alloc_index(rhs._num_buckets);
-            _pairs = alloc_bucket((size_type)((float)rhs._num_buckets * rhs.max_load_factor()) + 4);
+            _pairs_capacity = (size_type)((float)rhs._num_buckets * rhs.max_load_factor()) + 4;
+            _pairs = alloc_bucket(_pairs_capacity);
         }
 
         clone(rhs);
@@ -340,8 +391,8 @@ public:
     ~HashSet() noexcept
     {
         clearkv();
-        free(_pairs);
-        free(_index);
+        dealloc_bucket(_pairs, _pairs_capacity);
+        dealloc_index(_index, _num_buckets);
         _num_filled = 0;
         _index = nullptr;
         _pairs = nullptr;
@@ -353,6 +404,7 @@ public:
 //        _eq          = rhs._eq;
         _num_buckets = rhs._num_buckets;
         _num_filled  = rhs._num_filled;
+        _pairs_capacity = rhs._pairs_capacity;
         _mlf         = rhs._mlf;
         _last        = rhs._last;
         _mask        = rhs._mask;
@@ -380,6 +432,7 @@ public:
         std::swap(_index, rhs._index);
         std::swap(_num_buckets, rhs._num_buckets);
         std::swap(_num_filled, rhs._num_filled);
+        std::swap(_pairs_capacity, rhs._pairs_capacity);
         std::swap(_mask, rhs._mask);
         std::swap(_mlf, rhs._mlf);
         std::swap(_last, rhs._last);
@@ -387,6 +440,8 @@ public:
         std::swap(_ehead, rhs._ehead);
 #endif
         std::swap(_etail, rhs._etail);
+        std::swap(_pair_allocator, rhs._pair_allocator);
+        std::swap(_index_allocator, rhs._index_allocator);
     }
 
     // -------------------------------------------------------------
@@ -420,6 +475,7 @@ public:
 
     const HashT& hash_function() const { return _hasher; }
     const EqT& key_eq() const { return _eq; }
+    allocator_type get_allocator() const { return allocator_type(_pair_allocator); }
 
     void max_load_factor(float mlf)
     {
@@ -939,20 +995,26 @@ public:
         return true;
     }
 
-    static value_type* alloc_bucket(size_type num_buckets)
+    value_type* alloc_bucket(size_type num_buckets)
     {
-#ifdef EMH_ALLOC
-        auto new_pairs = aligned_alloc(32, (uint64_t)num_buckets * sizeof(value_type));
-#else
-        auto new_pairs = malloc((uint64_t)num_buckets * sizeof(value_type));
-#endif
-        return (value_type *)(new_pairs);
+        return PairAllocTraits::allocate(_pair_allocator, num_buckets);
     }
 
-    static Index* alloc_index(size_type num_buckets)
+    void dealloc_bucket(value_type* ptr, size_type num_buckets)
     {
-        auto new_index = malloc((EAD + (uint64_t)num_buckets) * sizeof(Index));
-        return (Index *)(new_index);
+        if (ptr)
+            PairAllocTraits::deallocate(_pair_allocator, ptr, num_buckets);
+    }
+
+    Index* alloc_index(size_type num_buckets)
+    {
+        return IndexAllocTraits::allocate(_index_allocator, num_buckets + EAD);
+    }
+
+    void dealloc_index(Index* ptr, size_type num_buckets)
+    {
+        if (ptr)
+            IndexAllocTraits::deallocate(_index_allocator, ptr, num_buckets + EAD);
     }
 
     bool reserve(size_type required_buckets) noexcept
@@ -989,11 +1051,11 @@ public:
         return true;
     }
 
-    void rebuild(size_type num_buckets, size_type required_buckets) noexcept
+    void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) noexcept
     {
-        free(_index);
+        dealloc_index(_index, old_num_buckets);
         const auto need_size = std::max((size_type)((double)num_buckets * max_load_factor()) + 4, required_buckets + 2);
-        auto new_pairs = (value_type*)alloc_bucket(need_size);
+        auto new_pairs = alloc_bucket(need_size);
         if (is_trivially_copyable()) {
             if (_pairs)
             memcpy((char*)new_pairs, (char*)_pairs, _num_filled * sizeof(value_type));
@@ -1004,9 +1066,10 @@ public:
                     _pairs[slot].~value_type();
             }
         }
-        free(_pairs);
+        dealloc_bucket(_pairs, _pairs_capacity);
         _pairs = new_pairs;
-        _index = (Index*)alloc_index (num_buckets);
+        _pairs_capacity = need_size;
+        _index = alloc_index(num_buckets);
 
         memset((char*)_index, (int)INACTIVE, sizeof(_index[0]) * num_buckets);
         memset((char*)(_index + num_buckets), 0, sizeof(_index[0]) * EAD);
@@ -1044,9 +1107,10 @@ public:
         _last = _mask;
         num_buckets += num_buckets * EMH_PACK_TAIL / 100; //add more 5-10%
 #endif
+        auto old_num_buckets = _num_buckets;
         _num_buckets = num_buckets;
 
-        rebuild(num_buckets, (size_type)required_buckets);
+        rebuild(num_buckets, (size_type)required_buckets, old_num_buckets);
 
 #ifdef EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {
@@ -1672,6 +1736,11 @@ private:
         }
 
 private:
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<value_type>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
+    using IndexAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<Index>;
+    using IndexAllocTraits = std::allocator_traits<IndexAlloc>;
+
     Index*    _index;
     value_type*_pairs;
 
@@ -1686,5 +1755,8 @@ private:
     size_type _ehead;
 #endif
     size_type _etail;
+    size_type _pairs_capacity;
+    PairAlloc _pair_allocator;
+    IndexAlloc _index_allocator;
 };
 } // namespace emhash
