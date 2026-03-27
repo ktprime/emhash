@@ -35,6 +35,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <memory>
 
 #ifdef __has_include
     #if __has_include("wyhash.h")
@@ -105,7 +106,7 @@ static uint32_t CTZ(size_t n)
 }
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
-template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<KeyT>>
 class HashSet
 {
 public:
@@ -117,8 +118,11 @@ public:
     typedef uint32_t size_type;
 #endif
 
-    typedef HashSet<KeyT, HashT, EqT> htype;
+    typedef HashSet<KeyT, HashT, EqT, AllocT> htype;
+    typedef AllocT allocator_type;
     typedef std::pair<KeyT, uint32_t> PairT;
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
     static constexpr uint32_t INACTIVE = (uint32_t)(0 - 1);
 
@@ -316,6 +320,29 @@ public:
 
     // ------------------------------------------------------------------------
 
+    static size_type alloc_count(size_type num_buckets)
+    {
+        const auto num_byte = num_buckets / 8;
+        const auto total_bytes = (2 + num_buckets) * sizeof(PairT) + num_byte + sizeof(size_t);
+        return (size_type)((total_bytes + sizeof(PairT) - 1) / sizeof(PairT));
+    }
+
+    PairT* alloc_bucket(size_type num_buckets)
+    {
+        return PairAllocTraits::allocate(_alloc, alloc_count(num_buckets));
+    }
+
+    void dealloc_bucket(PairT* pairs, size_type num_buckets)
+    {
+        if (pairs)
+            PairAllocTraits::deallocate(_alloc, pairs, alloc_count(num_buckets));
+    }
+
+    allocator_type get_allocator() const
+    {
+        return allocator_type(_alloc);
+    }
+
     void init(size_type bucket, float load_factor = 0.95f)
     {
         _num_buckets = 0;
@@ -332,13 +359,46 @@ public:
         init(bucket, load_factor);
     }
 
-    HashSet(const HashSet& other)
+    explicit HashSet(const allocator_type& alloc)
+        : _alloc(alloc)
     {
-        _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(size_t));
+        init(4, 0.95f);
+    }
+
+    HashSet(size_type bucket, float load_factor, const allocator_type& alloc)
+        : _alloc(alloc)
+    {
+        init(bucket, load_factor);
+    }
+
+    HashSet(const HashSet& other)
+        : _alloc(PairAllocTraits::select_on_container_copy_construction(other._alloc))
+    {
+        _pairs = alloc_bucket(other._num_buckets);
+        clone(other);
+    }
+
+    HashSet(const HashSet& other, const allocator_type& alloc)
+        : _alloc(alloc)
+    {
+        _pairs = alloc_bucket(other._num_buckets);
         clone(other);
     }
 
     HashSet(HashSet&& other)
+        : _alloc(std::move(other._alloc))
+    {
+#ifdef EMH_MOVE_EMPTY
+        _pairs = nullptr;
+        _num_buckets = _num_filled = 0;
+#else
+        init(4, 0.95f);
+#endif
+        swap(other);
+    }
+
+    HashSet(HashSet&& other, const allocator_type& alloc)
+        : _alloc(alloc)
     {
 #ifdef EMH_MOVE_EMPTY
         _pairs = nullptr;
@@ -366,8 +426,13 @@ public:
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
-            free(_pairs);
-            _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT) + other._num_buckets / 8 + sizeof(size_t));
+            dealloc_bucket(_pairs, _num_buckets);
+            if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
+                _alloc = other._alloc;
+            _pairs = alloc_bucket(other._num_buckets);
+        } else {
+            if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
+                _alloc = other._alloc;
         }
 
         clone(other);
@@ -388,7 +453,7 @@ public:
         if (isno_triviall_destructable())
             clearkv();
 
-        free(_pairs);
+        dealloc_bucket(_pairs, _num_buckets);
     }
 
     void clone(const HashSet& other)
@@ -423,6 +488,7 @@ public:
     {
         std::swap(_hasher, other._hasher);
 //      std::swap(_eq, other._eq);
+        std::swap(_alloc, other._alloc);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -962,10 +1028,11 @@ private:
 #endif
 
         const auto num_byte = num_buckets / 8;
-        auto new_pairs = (PairT*)malloc((2 + num_buckets) * sizeof(PairT) + num_byte + sizeof(size_t));
+        auto new_pairs = alloc_bucket(num_buckets);
         //TODO: throwOverflowError
         auto old_num_filled  = _num_filled;
         auto old_pairs = _pairs;
+        auto old_num_buckets = _num_buckets;
 
         _num_filled  = 0;
         _num_buckets = num_buckets;
@@ -1010,7 +1077,7 @@ private:
         }
 #endif
 
-        free(old_pairs);
+        dealloc_bucket(old_pairs, old_num_buckets);
         assert(old_num_filled == _num_filled);
     }
 
@@ -1368,6 +1435,7 @@ private:
     uint8_t*  _bitmask;
     HashT     _hasher;
     EqT       _eq;
+    PairAlloc _alloc;
     uint32_t   _loadlf;
     size_type  _last;
     size_type  _num_buckets;
@@ -1377,6 +1445,6 @@ private:
 };
 } // namespace emhash
 #if __cplusplus >= 201103L
-template <class Key, typename Hash = std::hash<Key>> using em_hash_set = emhash9::HashSet<Key, Hash>;
+template <class Key, typename Hash = std::hash<Key>, typename Alloc = std::allocator<Key>> using em_hash_set = emhash9::HashSet<Key, Hash, std::equal_to<Key>, Alloc>;
 #endif
 

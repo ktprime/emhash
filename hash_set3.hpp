@@ -47,6 +47,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <memory>
 
 #ifdef  EMH_KEY
     #undef  EMH_BUCKET
@@ -90,7 +91,7 @@
 
 namespace emhash7 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
-template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<KeyT>>
 class HashSet
 {
 public:
@@ -109,11 +110,15 @@ public:
     typedef KeyT     value_type;
     typedef KeyT& reference;
     typedef const KeyT& const_reference;
+    typedef AllocT   allocator_type;
 
 
 private:
-    typedef HashSet<KeyT, HashT, EqT> htype;
+    typedef HashSet<KeyT, HashT, EqT, AllocT> htype;
     typedef std::pair<KeyT, size_type> PairT;
+
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
 
 public:
     class iterator
@@ -245,6 +250,17 @@ public:
 
     // ------------------------------------------------------------------------
 
+    PairT* alloc_bucket(size_type num_buckets)
+    {
+        return PairAllocTraits::allocate(_alloc, num_buckets);
+    }
+
+    void dealloc_bucket(PairT* ptr, size_type num_buckets)
+    {
+        if (ptr)
+            PairAllocTraits::deallocate(_alloc, ptr, num_buckets);
+    }
+
     void init()
     {
         _colls_buckets = 0;
@@ -259,15 +275,38 @@ public:
         max_load_factor(0.9f);
     }
 
-    HashSet(size_type bucket = 4)
+    allocator_type get_allocator() const
+    {
+        return allocator_type(_alloc);
+    }
+
+    HashSet(size_type bucket = 4, const HashT& hash = HashT(), const EqT& eq = EqT(), const AllocT& alloc = AllocT())
+        : _alloc(alloc)
     {
         init();
+        _hasher = hash;
+        _eq = eq;
         reserve(bucket);
     }
 
-    HashSet(const HashSet& other)
+    explicit HashSet(const AllocT& alloc)
+        : _alloc(alloc)
     {
-        _pairs = (PairT*)malloc((1 + other._total_buckets) * sizeof(PairT));
+        init();
+        reserve(4);
+    }
+
+    HashSet(const HashSet& other)
+        : _alloc(PairAllocTraits::select_on_container_copy_construction(other._alloc))
+    {
+        _pairs = alloc_bucket(2 + other._total_buckets);
+        clone(other);
+    }
+
+    HashSet(const HashSet& other, const AllocT& alloc)
+        : _alloc(alloc)
+    {
+        _pairs = alloc_bucket(2 + other._total_buckets);
         clone(other);
     }
 
@@ -298,15 +337,27 @@ public:
     }
 
     HashSet(HashSet&& other)
+        : _alloc(std::move(other._alloc))
     {
         init();
         reserve(1);
         *this = std::move(other);
     }
 
-    HashSet(std::initializer_list<key_type> il, size_type n = 8)
+    HashSet(HashSet&& other, const AllocT& alloc)
+        : _alloc(alloc)
     {
         init();
+        reserve(1);
+        *this = std::move(other);
+    }
+
+    HashSet(std::initializer_list<key_type> il, size_type n = 8, const HashT& hash = HashT(), const EqT& eq = EqT(), const AllocT& alloc = AllocT())
+        : _alloc(alloc)
+    {
+        init();
+        _hasher = hash;
+        _eq = eq;
         reserve((size_type)il.size());
         for (auto begin = il.begin(); begin != il.end(); ++begin)
             insert(*begin);
@@ -321,8 +372,13 @@ public:
             clearkv();
 
         if (_total_buckets != other._total_buckets) {
-            free(_pairs);
-            _pairs = (PairT*)malloc((1 + other._total_buckets) * sizeof(PairT));
+            dealloc_bucket(_pairs, 2 + _total_buckets);
+            if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
+                _alloc = other._alloc;
+            _pairs = alloc_bucket(2 + other._total_buckets);
+        } else {
+            if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
+                _alloc = other._alloc;
         }
 
         clone(other);
@@ -343,7 +399,7 @@ public:
         if (!std::is_trivially_destructible<KeyT>::value)
             clearkv();
 
-        free(_pairs);
+        dealloc_bucket(_pairs, _total_buckets > 0 ? 2 + _total_buckets : 0);
     }
 
     void swap(HashSet& other)
@@ -361,6 +417,7 @@ public:
         std::swap(_num_colls, other._num_colls);
         std::swap(_num_mains, other._num_mains);
         std::swap(_pairs, other._pairs);
+        std::swap(_alloc, other._alloc);
     }
 
     // -------------------------------------------------------------
@@ -891,7 +948,7 @@ public:
 
         const auto num_buckets = (size_type)buckets;
         const auto main_bucket = num_buckets;
-        auto new_pairs = (PairT*)malloc((2ull + num_buckets + main_bucket) * sizeof(PairT));
+        auto new_pairs = alloc_bucket((size_type)(2ull + num_buckets + main_bucket));
         auto old_pairs = _pairs;
 
 #if EMH_REHASH_LOG
@@ -979,7 +1036,7 @@ public:
             EMH_BUCKET(_pairs, new_bucket) = new_bucket;
         }
 
-        free(old_pairs);
+        dealloc_bucket(old_pairs, old_total_buckets > 0 ? 2 + old_total_buckets : 0);
 
 #if EMH_REHASH_LOG
         if (_num_colls > 100000) {
@@ -1329,6 +1386,7 @@ private:
     size_type  _num_colls;
     size_type  _num_mains;
     PairT*    _pairs;
+    PairAlloc _alloc;
 };
 } // namespace emhash
 #if __cplusplus > 199711
