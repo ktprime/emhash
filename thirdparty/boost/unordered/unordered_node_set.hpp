@@ -1,5 +1,6 @@
 // Copyright (C) 2022-2023 Christian Mazakas
 // Copyright (C) 2024-2025 Joaquin M Lopez Munoz
+// Copyright (C) 2026 Braden Ganetsky
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
@@ -187,9 +188,10 @@ namespace boost {
       {
       }
 
-      template <bool avoid_explicit_instantiation = true>
+      template <typename Key2,
+        typename std::enable_if<std::is_same<Key, Key2>::value, int>::type = 0>
       unordered_node_set(
-        concurrent_node_set<Key, Hash, KeyEqual, Allocator>&& other)
+        concurrent_node_set<Key2, Hash, KeyEqual, Allocator>&& other)
           : table_(std::move(other.table_))
       {
       }

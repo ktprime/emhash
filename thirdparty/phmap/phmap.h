@@ -555,7 +555,7 @@ inline bool IsValidCapacity(size_t n) { return ((n + 1) & n) == 0 && n > 0; }
 //   FULL -> DELETED
 // --------------------------------------------------------------------------
 inline void ConvertDeletedToEmptyAndFullToDeleted(
-    ctrl_t* ctrl, size_t capacity) 
+    ctrl_t* PHMAP_RESTRICT ctrl, size_t capacity) 
 {
     assert(ctrl[capacity] == kSentinel);
     assert(IsValidCapacity(capacity));
@@ -1245,6 +1245,7 @@ public:
     ~raw_hash_set() { destroy_slots(); }
 
     iterator begin() {
+        if (empty()) return end();
         auto it = iterator_at(0);
         it.skip_empty_or_deleted();
         return it;
@@ -1857,7 +1858,7 @@ private:
     friend struct phmap::priv::hashtable_debug_internal::HashtableDebugAccess;
 
     template <class K = key_type>
-    bool find_impl(const key_arg<K>& key, size_t hashval, size_t& offset) {
+    bool find_impl(const key_arg<K>& PHMAP_RESTRICT key, size_t hashval, size_t& PHMAP_RESTRICT offset) {
         PHMAP_IF_CONSTEXPR (!std_alloc_t::value) {
             // ctrl_ could be nullptr
             if (!ctrl_)
@@ -2034,7 +2035,7 @@ private:
                             std::is_same<typename Policy::is_flat, std::false_type>::value)) {
             // node map, or not trivially destructible... we  need to iterate and destroy values one by one
             // std::cout << "either this is a node map or " << type_name<typename PolicyTraits::value_type>()  << " is not trivially_destructible\n";
-            for (size_t i = 0; i != capacity_; ++i) {
+            for (size_t i = 0, cnt = capacity_; i != cnt; ++i) {
                 if (IsFull(ctrl_[i])) {
                     PolicyTraits::destroy(&alloc_ref(), slots_ + i);
                 }
@@ -2153,7 +2154,7 @@ private:
         }
     }
 
-    bool has_element(const value_type& elem, size_t hashval) const {
+    bool has_element(const value_type& PHMAP_RESTRICT elem, size_t hashval) const {
         PHMAP_IF_CONSTEXPR (!std_alloc_t::value) {
             // ctrl_ could be nullptr
             if (!ctrl_)
@@ -2220,7 +2221,7 @@ private:
 
 protected:
     template <class K>
-    size_t _find_key(const K& key, size_t hashval) {
+    size_t _find_key(const K& PHMAP_RESTRICT key, size_t hashval) {
         PHMAP_IF_CONSTEXPR (!std_alloc_t::value) {
             // ctrl_ could be nullptr
             if (!ctrl_)
@@ -3159,8 +3160,8 @@ public:
         Inner& inner    = sets_[subidx(hashval)];
         auto&  set      = inner.set_;
         UniqueLock m(inner);
-        typename EmbeddedSet::template InsertSlotWithHash<true> f { inner, std::move(*slot), hashval };
-        return make_rv(PolicyTraits::apply(f, elem));
+        typename EmbeddedSet::template InsertSlotWithHash<true> f { inner.set_, std::move(*slot), hashval };
+        return make_rv(&inner, PolicyTraits::apply(std::move(f), elem));
     }
 
     template <class... Args>
@@ -3227,15 +3228,15 @@ public:
     std::pair<iterator, bool> emplace(Args&&... args) {
         typename phmap::aligned_storage<sizeof(slot_type), alignof(slot_type)>::type raw;
         slot_type* slot = reinterpret_cast<slot_type*>(&raw);
-        size_t hashval  = this->hash(PolicyTraits::key(slot));
-
         PolicyTraits::construct(&alloc_ref(), slot, std::forward<Args>(args)...);
+
         const auto& elem = PolicyTraits::element(slot);
+        size_t hashval   = this->hash(PolicyTraits::key(slot));
         Inner& inner     = sets_[subidx(hashval)];
         auto&  set       = inner.set_;
         UniqueLock m(inner);
-        typename EmbeddedSet::template InsertSlotWithHash<true> f { inner, std::move(*slot), hashval };
-        return make_rv(PolicyTraits::apply(f, elem));
+        typename EmbeddedSet::template InsertSlotWithHash<true> f { inner.set_, std::move(*slot), hashval };
+        return make_rv(&inner, PolicyTraits::apply(std::move(f), elem));
     }
 
     template <class... Args>
@@ -3559,7 +3560,8 @@ public:
         class K = key_type,
         typename std::enable_if<!std::is_same<K, iterator>::value, int>::type = 0>
     node_type extract(const key_arg<K>& key) {
-        auto it = find(key);
+        UniqueLock m;
+        auto it = this->template find<K, UniqueLock>(key, this->hash(key), m);
         return it == end() ? node_type() : extract(const_iterator{it});
     }
 
