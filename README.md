@@ -84,95 +84,10 @@ emhash7::HashMap<int64_t, int> myhash(1 << 20, 0.999f);
 #### How it works
 
 ```cpp
-// Extreme high load factor benchmark for emhash
-// Tests insert + erase stability at 0.999 load factor
-// Compile: g++ -O3 -march=native -I.. -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 highload_bench.cpp -o highload_bench
+// Compile: g++ -O3 -march=native -I.. -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 highload_bench.cpp
 
-#include "util.h"
-#include "../hash_table7.hpp"
-#include "../hash_table5.hpp"
-#include "../hash_table6.hpp"
-#include "../hash_table8.hpp"
+#include "hash_table7.hpp"
 
-template<typename HashT>
-static void RunHighLoadFactorT(const char* name)
-{
-    std::random_device rd;
-    const auto rand_key = rd();
-    WyRand srngi(rand_key), srnge(rand_key);
-
-    const auto max_lf   = 0.999f;
-    const auto vsize    = 1u << 20; // 1M buckets
-    HashT myhash(vsize, max_lf);
-
-    auto nowus = getus();
-    for (size_t i = 0; i < size_t(vsize * max_lf); i++)
-        myhash.emplace(srngi(), (int)i);
-    const auto insert_time = getus() - nowus;
-
-    // verify no rehash
-    if (myhash.bucket_count() != vsize)
-        printf("%s: WARNING rehash occurred! bucket_count=%d vs vsize=%d\n", name, (int)myhash.bucket_count(), vsize);
-
-    nowus = getus();
-    //erase & insert at a fixed load factor
-    for (size_t i = 0; i < vsize; i++) {
-        myhash.erase(srnge()); //erase an old key
-        myhash[srngi()] = 1;   //insert a new key
-    }
-    const auto erase_time = getus() - nowus;
-    printf("%-16s vsize=%d, LF=%.4f, insert=%ldms, erase+insert=%ldms\n",
-        name, vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
-}
-
-// Benchmark find hit/miss at extreme high load factor
-template<typename HashT>
-static void RunHighLoadFindT(const char* name)
-{
-    std::random_device rd;
-    const auto rand_key = rd();
-    WyRand srngi(rand_key), srngf(rand_key + 1);
-
-    const auto max_lf = 0.999f;
-    const auto vsize  = 1u << 20;
-
-    HashT myhash(vsize, max_lf);
-
-    //fill to max_lf
-    std::vector<int64_t> keys;
-    keys.reserve(vsize);
-    for (size_t i = 0; i < size_t(vsize * max_lf); i++) {
-        auto k = srngi();
-        keys.push_back(k);
-        myhash.emplace(k, (int)i);
-    }
-
-    //find hit
-    auto nowus = getus();
-    volatile size_t sum = 0;
-    for (auto& k : keys)
-        sum += myhash.count(k);
-    const auto fhit_time = getus() - nowus;
-
-    //find miss
-    nowus = getus();
-    volatile size_t miss_sum = 0;
-    for (size_t i = 0; i < keys.size(); i++)
-        miss_sum += myhash.count(srngf());
-    const auto fmiss_time = getus() - nowus;
-
-    //iterate
-    nowus = getus();
-    volatile size_t iter_sum = 0;
-    for (auto& p : myhash)
-        iter_sum += p.second;
-    const auto iter_time = getus() - nowus;
-
-    printf("%-16s LF=%.4f, fhit=%ldms, fmiss=%ldms, iter=%ldms\n",
-        name, myhash.load_factor(), fhit_time / 1000, fmiss_time / 1000, iter_time / 1000);
-}
-
-// Original RunHighLoadFactor from old codebase
 static void RunHighLoadFactor()
 {
     std::random_device rd;
@@ -195,34 +110,17 @@ static void RunHighLoadFactor()
         myhash[srngi()] = 1;   //insert a new key
     }
     const auto erase_time = getus() - nowus;
-    printf("emhash7: vsize = %d, load factor = %.4f, insert/erase = %ld/%ld ms\n",
+    printf("vsize = %d, load factor = %.4f, insert/erase = %ld/%ld ms\n",
         vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
     assert(myhash.load_factor() >= max_lf - 0.001);
 }
-
-int main()
-{
-    printf("=== Extreme High Load Factor (0.999) Benchmark ===\n\n");
-
-    printf("--- Insert + Erase at LF=0.999 (1M buckets) ---\n");
-    RunHighLoadFactorT<emhash7::HashMap<int64_t, int>>("emhash7");
-    RunHighLoadFactorT<emhash6::HashMap<int64_t, int>>("emhash6");
-    RunHighLoadFactorT<emhash5::HashMap<int64_t, int>>("emhash5");
-    RunHighLoadFactorT<emhash8::HashMap<int64_t, int>>("emhash8");
-
-    printf("\n--- Find Hit/Miss/Iter at LF=0.999 ---\n");
-    RunHighLoadFindT<emhash7::HashMap<int64_t, int>>("emhash7");
-    RunHighLoadFindT<emhash6::HashMap<int64_t, int>>("emhash6");
-    RunHighLoadFindT<emhash5::HashMap<int64_t, int>>("emhash5");
-
-    printf("\n--- Original RunHighLoadFactor (random scale) ---\n");
-    RunHighLoadFactor();
-
-    return 0;
-}
 ```
 
+Full benchmark code with multi-version comparison: [bench/highload_bench.cpp](https://github.com/ktprime/emhash/blob/master/bench/highload_bench.cpp)
+
 #### Real benchmark results (1M buckets, LF=0.999, compiled with `-DEMH_HIGH_LOAD=123456`)
+
+Test Environment: AMD 5800H / Windows 10 / GCC 11.3
 
 | hashmap          | Insert(ms) | Erase+Insert(ms) | LF    |
 |------------------|------------|------------------|------|
@@ -245,8 +143,19 @@ int main()
 
 ### 1. Include Header
 
+emhash is **header-only** — just copy one `.hpp` file to your project:
+
+```bash
+# Option A: Copy directly (simplest, no build system needed)
+cp hash_table7.hpp /your/project/
+
+# Option B: Clone and include
+git clone https://github.com/ktprime/emhash.git
+# Then add -I/path/to/emhash to your compiler flags
+```
+
 ```cpp
-#include "hash_table7.hpp"  // Or other versions hash_table[5-8].hpp
+#include "hash_table7.hpp"  // Or hash_table[5-8].hpp
 ```
 
 ### 2. Basic Usage
@@ -376,33 +285,46 @@ for (const auto& [key, value] : map) { }
 
 ## Design Principles
 
+### Collision Resolution (varies by version)
+
+| Version | Strategy | High LF Support |
+|---------|----------|----------------|
+| **emhash5** | Three-way hybrid: linear probing → quadratic probing → bidirectional search | With `EMH_HIGH_LOAD` |
+| **emhash6** | Linked-bucket with separate bitmask for fast empty-bucket search | With `EMH_HIGH_LOAD` |
+| **emhash7** | Linked-bucket with separate bitmask, no tombstones | Native (0.80-0.999) |
+| **emhash8** | Separate index + dense pairs array, linked-bucket chains | With `EMH_HIGH_LOAD` |
+
+> In `hash_table5.hpp`, the optimized three-way linear probing strategy is still **2-3x faster** than traditional strategies even at load factors **> 0.9**.
+
 ### Memory Layout
 
-emhash adopts a **single array inline storage** design with compact node structure:
+**emhash5/6/7** — Single inline array with embedded bucket linkage:
 
 ```cpp
 struct Entry {
     Key key;           // Key
-    size_t bucket;     // Bucket index/state info
+    size_t bucket;     // Bucket chain linkage / state info
     Value value;       // Value
 };
+// _pairs[bucket] stores key, value, and chain pointer in one struct
+// emhash6/7 additionally use a separate _bitmask for fast empty-bucket search
 ```
 
-This design minimizes memory allocation frequency and ensures data is stored contiguously in memory, maximizing CPU cache utilization.
+**emhash8** — Split index + dense pairs (like `std::vector`):
+
+```cpp
+struct Index { size_t next, slot; };  // Per-bucket chain linkage
+Index*    _index;   // bucket → slot mapping
+value_type* _pairs; // dense, compact key-value array (no metadata)
+// _pairs is always packed: _pairs[0].._pairs[_num_filled-1]
+// This enables extremely fast iteration (just scan _pairs sequentially)
+```
 
 ### Primary Bucket Mapping
 
 - Primary bucket is always assigned to `key_hash(key) % size` and **cannot be occupied**
 - All operations start searching from the primary bucket
 - Avoids circular displacement issues in cuckoo hashing
-
-### Three-Way Hybrid Probing Strategy
-
-1. **Linear Probing**: Scans 2-3 CPU cache lines (fastest path)
-2. **Quadratic Probing**: Kicks in after linear probing, balancing performance and cache
-3. **Bidirectional Linear Search**: Searches from both ends simultaneously, utilizing last found empty slot
-
-> In `hash_table5.hpp`, the optimized three-way linear probing strategy is still **2-3x faster** than traditional strategies even at load factors **> 0.9**.
 
 ### Backup Hash Function
 
@@ -414,18 +336,39 @@ Enable backup hash function by defining `EMH_SAFE_HASH` macro to defend against 
 
 emhash provides 4 different implementations, each with different focus:
 
-| Implementation | Best Scenario | Characteristics |
-|----------------|---------------|-----------------|
-| **emhash5** | Fast lookup and erase with integer keys | Optimized for find-hit and erase, supports small stack hash table (`EMH_SMALL_SIZE`) |
-| **emhash6** | Lookup and erase with integer keys | Similar to emhash5, different memory layout optimization |
-| **emhash7** | High load factor, insert-intensive | Supports extremely high load factor (0.90-0.99), efficient memory usage |
-| **emhash8** | Complex keys/values (strings, structs) | Contiguous memory layout (like `std::vector`), extremely fast iteration, fast search and insert |
+| Implementation | Layout | Collision Strategy | Default LF | Best Scenario |
+|----------------|--------|--------------------|------------|---------------|
+| **emhash5** | Inline `_pairs[]` | Three-way hybrid probing | 0.80 | Fast lookup/erase with integer keys, SBO support |
+| **emhash6** | Inline `_pairs[]` + `_bitmask` | Linked-bucket | 0.80 | Lookup/erase with integer keys, fast empty scan |
+| **emhash7** | Inline `_pairs[]` + `_bitmask` | Linked-bucket, no tombstones | 0.80 | High load factor (0.80-0.999), insert-intensive |
+| **emhash8** | Separate `_index[]` + dense `_pairs[]` | Linked-bucket | 0.80 | Complex keys/values, extremely fast iteration |
 
 ### Selection Guide
 
 - **Complex/large keys/values** (e.g., `std::string`, custom structs) → **emhash8**
-- **Insert-intensive workloads** → **emhash7**
+- **Insert-intensive workloads** or need high load factor → **emhash7**
 - **Fast search and erase with integer keys** → **emhash5/6**
+- **Small maps that should avoid heap allocation** → **emhash5** with `EMH_SMALL_SIZE`
+
+### HashSet
+
+emhash also provides `HashSet` implementations:
+
+```cpp
+#include "hash_set3.hpp"   // Based on emhash7, namespace emhash7
+#include "hash_set81.hpp"  // Based on emhash8, namespace emhash8
+
+emhash7::HashSet<int> set1;
+emhash8::HashSet<int> set2;
+```
+
+### Custom Allocator
+
+All `HashMap` versions support custom allocators (emhash5/6/7/8):
+
+```cpp
+emhash7::HashMap<Key, Val, Hash, Eq, MyAllocator> mymap;
+```
 
 ---
 
@@ -463,17 +406,42 @@ cmake --build . --config Release
 
 | Macro | Description |
 |-------|-------------|
-| `EMH_HIGH_LOAD=<value>` | Enable high load factor support |
+| `EMH_HIGH_LOAD=<value>` | Enable high load factor support. Must be a positive integer (e.g. `123456`), not 0. Enables empty-bucket chain (`_ehead`) for LF up to 0.999 |
 | `EMH_WY_HASH=1` | Use wyhash algorithm (faster for string keys) |
-| `EMH_SAFE_HASH=1` | Enable backup hash function (hash attack protection) |
+| `EMH_SAFE_HASH=1` | Enable backup hash function (hash attack protection, ~10% cost) |
 | `EMH_LRU_SET=1` | Enable LRU cache mode |
 | `EMH_STATIS=1` | Enable collision statistics output |
 | `EMH_FIBONACCI_HASH=1` | Use Fibonacci hashing |
 | `EMH_IDENTITY_HASH=1` | Use identity hashing (integer key optimization) |
+| `EMH_SMALL_SIZE=<N>` | Small Buffer Optimization for emhash5: inline storage for ≤N buckets, no heap alloc (emhash5 only, N≥2) |
+| `EMH_PACK_TAIL=<1-100>` | Add extra tail buckets (N% of total) for faster probing near table end (emhash5/8) |
+| `EMH_ITER_SAFE=1` | Eager iterator initialization, safer if container modified during iteration (emhash6/7) |
+| `EMH_ALIGN64=1` | Use 64-bit aligned bitmask access for faster empty-bucket scan (emhash6) |
 
 ---
 
 ## Usage Notes
+
+### 0. Thread Safety
+
+emhash is **not thread-safe**. Concurrent access from multiple threads requires external synchronization:
+
+```cpp
+// ❌ Wrong: concurrent access without synchronization
+// Thread 1: map[key] = val;
+// Thread 2: map.find(key);
+
+// ✅ Correct: use mutex for concurrent access
+std::mutex mtx;
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    map[key] = val;
+}
+
+// ✅ Correct: concurrent read-only access is safe
+// Multiple threads can call find()/contains()/count() simultaneously
+// as long as no thread is modifying the map
+```
 
 ### 1. Non-Node-Based Hash Table
 

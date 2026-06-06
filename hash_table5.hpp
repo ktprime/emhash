@@ -246,6 +246,9 @@ public:
     typedef HashT  hasher;
     typedef EqT    key_equal;
     typedef AllocT allocator_type;
+#if EMH_HIGH_LOAD
+    static_assert(sizeof(KeyT) >= sizeof(size_type), "EMH_HIGH_LOAD requires sizeof(KeyT) >= sizeof(size_type). Use a larger key type or disable EMH_HIGH_LOAD.");
+#endif
     typedef PairT&       reference;
     typedef const PairT& const_reference;
 
@@ -1535,6 +1538,7 @@ private:
             }
         }
 
+        if (prev == 0) { _ehead = 0; return; } //no empty bucket
         EMH_PREVET(_pairs, _ehead) = prev;
         EMH_BUCKET(_pairs, prev) = 0-_ehead;
         _ehead = 0-EMH_BUCKET(_pairs, _ehead);

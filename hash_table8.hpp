@@ -1044,6 +1044,7 @@ public:
             }
         }
 
+        if (prev == 0) { _ehead = 0; return; } //no empty bucket
         EMH_PREVET(_index, _ehead) = prev;
         _index[prev].next = 0-_ehead;
         _ehead = 0-_index[_ehead].next;
