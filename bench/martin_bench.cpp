@@ -1,10 +1,126 @@
 //#define FIB_HASH 7
 #include "util.h"
 #include <sstream>
+#include <fstream>
+#include <numeric>
+#include <algorithm>
 
 #ifndef _WIN32
   #include <sys/resource.h>
 #endif
+
+// ============================================================================
+// Benchmark Configuration and Output Support
+// ============================================================================
+
+// Output format options
+enum class OutputFormat {
+    Text,   // Default printf output
+    CSV,    // CSV format for analysis
+    JSON    // JSON format for visualization
+};
+
+// Benchmark configuration structure
+struct BenchConfig {
+    size_t warmup_iterations = 1000;      // Warmup iterations before timing
+    int benchmark_iterations = 1;         // Number of benchmark runs (for averaging)
+    float max_load_factor = 7.0f / 8;     // Default max load factor
+    bool enable_reserve = true;           // Whether to reserve before insert
+    OutputFormat output_format = OutputFormat::Text;
+    std::string output_file = "";         // Output file path (empty = stdout)
+};
+
+// Benchmark result structure
+struct BenchResult {
+    std::string test_name;
+    std::string hash_map_name;
+    double time_sec;
+    double time_stddev = 0.0;             // Standard deviation (if multiple runs)
+    size_t operations = 0;
+    double throughput = 0.0;              // Operations per second
+    float load_factor = 0.0f;
+    size_t map_size = 0;
+};
+
+// Global configuration
+static BenchConfig g_config;
+static std::vector<BenchResult> g_results;
+
+// Output formatter
+class ResultOutput {
+public:
+    static void output_text(const BenchResult& r) {
+        if (r.time_stddev > 0) {
+            printf("    %20s: %.3f s (stddev=%.3f) ops=%zu throughput=%.2f M/s\n",
+                   r.hash_map_name.c_str(), r.time_sec, r.time_stddev,
+                   r.operations, r.throughput / 1000000.0);
+        } else {
+            printf("    %20s: %.3f s ops=%zu throughput=%.2f M/s\n",
+                   r.hash_map_name.c_str(), r.time_sec,
+                   r.operations, r.throughput / 1000000.0);
+        }
+    }
+
+    static void output_csv_header() {
+        printf("Test,HashMap,Time,StdDev,Operations,Throughput,LoadFactor,MapSize\n");
+    }
+
+    static void output_csv(const BenchResult& r) {
+        printf("%s,%s,%.6f,%.6f,%zu,%.2f,%.2f,%zu\n",
+               r.test_name.c_str(), r.hash_map_name.c_str(),
+               r.time_sec, r.time_stddev, r.operations,
+               r.throughput, r.load_factor, r.map_size);
+    }
+
+    static void output_json_header() {
+        printf("[\n");
+    }
+
+    static void output_json(const BenchResult& r, bool is_last) {
+        printf("  {\n");
+        printf("    \"test\": \"%s\",\n", r.test_name.c_str());
+        printf("    \"hashmap\": \"%s\",\n", r.hash_map_name.c_str());
+        printf("    \"time\": %.6f,\n", r.time_sec);
+        printf("    \"stddev\": %.6f,\n", r.time_stddev);
+        printf("    \"operations\": %zu,\n", r.operations);
+        printf("    \"throughput\": %.2f,\n", r.throughput);
+        printf("    \"load_factor\": %.2f,\n", r.load_factor);
+        printf("    \"map_size\": %zu\n", r.map_size);
+        printf("  }%s\n", is_last ? "" : ",");
+    }
+
+    static void output_json_footer() {
+        printf("]\n");
+    }
+
+    static void output_all(const std::vector<BenchResult>& results, OutputFormat format) {
+        if (format == OutputFormat::CSV) {
+            output_csv_header();
+            for (const auto& r : results) {
+                output_csv(r);
+            }
+        } else if (format == OutputFormat::JSON) {
+            output_json_header();
+            for (size_t i = 0; i < results.size(); ++i) {
+                output_json(results[i], i == results.size() - 1);
+            }
+            output_json_footer();
+        } else {
+            for (const auto& r : results) {
+                output_text(r);
+            }
+        }
+    }
+};
+
+// Warmup helper function
+template<typename HMAP, typename RNG>
+static void do_warmup(HMAP& hmap, RNG& rng, size_t iterations) {
+    for (size_t i = 0; i < iterations; ++i) {
+        hmap[static_cast<int>(rng())] = 0;
+    }
+    hmap.clear();
+}
 
 //#define EMH_ITER_SAFE 1
 //#include "wyhash.h"
@@ -317,14 +433,21 @@ static void bench_insert(HMAP& hmap)
     uint32_t maxn = 1000000 / 5;
 #endif
 
-    hmap.max_load_factor(max_lf);
-    for (int  i = 0; i < 3; i++) {
+    hmap.max_load_factor(g_config.max_load_factor);
+    for (int i = 0; i < 3; i++) {
         auto nows = now2sec();
         {
             auto RNDI = (uint64_t)RND + 15ull + (uint64_t)i;
+            
+            // Warmup phase - warm up cache before actual benchmark
+            if (g_config.warmup_iterations > 0) {
+                MRNG warmup_rng(RNDI + 1000);
+                do_warmup(hmap, warmup_rng, g_config.warmup_iterations);
+            }
+            
             {
-                if (RND % 2 == 0)
-                hmap.reserve(maxn / 2);
+                if (g_config.enable_reserve && RND % 2 == 0)
+                    hmap.reserve(maxn / 2);
                 auto ts = now2sec();
                 MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn; ++n)
@@ -335,6 +458,19 @@ static void bench_insert(HMAP& hmap)
 
                 printf("        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
                 fflush(stdout);
+                
+                // Record result for CSV/JSON output
+                if (g_config.output_format != OutputFormat::Text) {
+                    BenchResult r;
+                    r.test_name = "insert";
+                    r.hash_map_name = map_name;
+                    r.time_sec = now2sec() - ts;
+                    r.operations = maxn;
+                    r.throughput = maxn / r.time_sec;
+                    r.load_factor = hmap.load_factor();
+                    r.map_size = hmap.size();
+                    g_results.push_back(r);
+                }
             }
             {
                 auto ts = now2sec();
@@ -344,6 +480,17 @@ static void bench_insert(HMAP& hmap)
                 printf(", remove 90%% %.2f", now2sec() - ts);
                 fflush(stdout);
                 assert(hmap.size() == 0);
+                
+                // Record result
+                if (g_config.output_format != OutputFormat::Text) {
+                    BenchResult r;
+                    r.test_name = "erase_90pct";
+                    r.hash_map_name = map_name;
+                    r.time_sec = now2sec() - ts;
+                    r.operations = maxn * 9 / 10;
+                    r.throughput = r.operations / r.time_sec;
+                    g_results.push_back(r);
+                }
             }
             {
                 auto ts = now2sec();
@@ -354,6 +501,19 @@ static void bench_insert(HMAP& hmap)
                     else
                         hmap.emplace(static_cast<int>(rng()), 0);
                 printf(", reinsert %.2f", now2sec() - ts);
+                
+                // Record result
+                if (g_config.output_format != OutputFormat::Text) {
+                    BenchResult r;
+                    r.test_name = "reinsert";
+                    r.hash_map_name = map_name;
+                    r.time_sec = now2sec() - ts;
+                    r.operations = maxn;
+                    r.throughput = maxn / r.time_sec;
+                    r.load_factor = hmap.load_factor();
+                    r.map_size = hmap.size();
+                    g_results.push_back(r);
+                }
             }
             {
                 auto ts = now2sec();
@@ -1309,6 +1469,19 @@ static void bench_IterateIntegers(HMAP& hmap)
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
+    
+    // Warmup phase
+    if (g_config.warmup_iterations > 0) {
+        MRNG warmup_rng(999);
+        for (size_t n = 0; n < g_config.warmup_iterations / 10; ++n) {
+            hmap[warmup_rng()] = n;
+            for (const auto& keyVal : hmap)
+                result += 1;
+        }
+        hmap.clear();
+        result = 0;
+    }
+    
     auto ts = now2sec();
 
     {
@@ -1340,6 +1513,17 @@ static void bench_IterateIntegers(HMAP& hmap)
     }
     assert(result == 62498750000000ull + 20833333325000ull);
     printf(", add/removing time = %.2f, %.2f|%d\n", (ts1 - ts), now2sec() - ts1, (int)result);
+    
+    // Record result for CSV/JSON output
+    if (g_config.output_format != OutputFormat::Text) {
+        BenchResult r;
+        r.test_name = "IterateIntegers";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - ts;
+        r.operations = num_iters * 2;
+        r.throughput = r.operations / r.time_sec;
+        g_results.push_back(r);
+    }
 }
 
 template<typename HMAP>
@@ -1354,6 +1538,16 @@ static void bench_randomFind(HMAP&, size_t numInserts, size_t numFindsPerInsert)
     static constexpr auto upper32bit = UINT64_C(0xFFFFFFFF00000000);
     static constexpr auto mediu32bit = UINT64_C(0x0000FFFFFFFF0000);
 
+    // Warmup phase - warm up cache before actual benchmark
+    if (g_config.warmup_iterations > 0) {
+        HMAP warmup_map;
+        MRNG warmup_rng(RND + 1000);
+        for (size_t i = 0; i < g_config.warmup_iterations; ++i) {
+            warmup_map[warmup_rng()] = i;
+            warmup_map.find(warmup_rng());
+        }
+    }
+    
     auto ts = now2sec();
     uint64_t sum = 0;
 
@@ -1364,8 +1558,20 @@ static void bench_randomFind(HMAP&, size_t numInserts, size_t numFindsPerInsert)
     sum += randomFindInternal<HMAP>(1, upper32bit, numInserts, numFindsPerInsert);
     sum += randomFindInternal<HMAP>(0, lower32bit, numInserts, numFindsPerInsert);
 
+    auto elapsed = now2sec() - ts;
     if (sum != 123)
-    printf(" nums = %zd total time = %.2f s\n", numInserts, now2sec() - ts);
+    printf(" nums = %zd total time = %.2f s\n", numInserts, elapsed);
+    
+    // Record result for CSV/JSON output
+    if (g_config.output_format != OutputFormat::Text) {
+        BenchResult r;
+        r.test_name = "randomFind";
+        r.hash_map_name = map_name;
+        r.time_sec = elapsed;
+        r.operations = numInserts * numFindsPerInsert * 5;
+        r.throughput = r.operations / r.time_sec;
+        g_results.push_back(r);
+    }
 }
 
 static void runTest(int sflags, int eflags)
@@ -2511,7 +2717,7 @@ int main(int argc, char* argv[])
     srand((unsigned int)time(0));
     printInfo(nullptr);
 
-    puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d]");
+    puts("usage: ./mbench [2-9mptseabrjqf]b[d]e[d] [--warmup=N] [--iter=N] [--format=csv|json|text] [--output=FILE] [--lf=N] [--no-reserve]");
     puts("all test case:");
     for (int i = 0; i < int(sizeof(cases) / sizeof(cases[0])); i++)
         printf("    %2d %s\n", i + 1, cases[i]);
@@ -2519,73 +2725,151 @@ int main(int argc, char* argv[])
 
     int sflags = 1, eflags = 20;
     if (argc > 1) {
-        //printf("cmd agrs = %s\n", argv[1]);
-        for (int c = argv[1][0], i = 0; c != '\0'; c = argv[1][++i]) {
-            if (c > '4' && c <= '8') {
-                std::string map_name("emhash");
-                map_name += (char)c;
-                checkSet(map_name);
-            } else if (c == 'm') {
-                checkSet("robin_hood");
-                checkSet("ankerl");
+        // Parse command line arguments
+        for (int arg_idx = 1; arg_idx < argc; arg_idx++) {
+            const char* arg = argv[arg_idx];
+            
+            // Parse long options (--warmup, --iter, --format, etc.)
+            if (arg[0] == '-' && arg[1] == '-') {
+                std::string opt(arg);
+                if (opt.find("--warmup=") == 0) {
+                    g_config.warmup_iterations = std::stoul(opt.substr(9));
+                } else if (opt.find("--iter=") == 0) {
+                    g_config.benchmark_iterations = std::stoi(opt.substr(7));
+                } else if (opt.find("--format=") == 0) {
+                    std::string fmt = opt.substr(9);
+                    if (fmt == "csv") g_config.output_format = OutputFormat::CSV;
+                    else if (fmt == "json") g_config.output_format = OutputFormat::JSON;
+                    else g_config.output_format = OutputFormat::Text;
+                } else if (opt.find("--output=") == 0) {
+                    g_config.output_file = opt.substr(9);
+                } else if (opt.find("--lf=") == 0) {
+                    g_config.max_load_factor = std::stof(opt.substr(5)) / 10.0f;
+                } else if (opt == "--no-reserve") {
+                    g_config.enable_reserve = false;
+                } else if (opt == "--no-warmup") {
+                    g_config.warmup_iterations = 0;
+                }
+                continue;
             }
-            else if (c == 'p')
-                checkSet("phmap");
-            else if (c == 'a')
-                checkSet("absl");
-            else if (c == 't')
-                checkSet("robin_map");
-            else if (c == 's')
-                checkSet("ska");
-            else if (c == 'h')
-                checkSet("hrd_m");
-            else if (c == '1')
-                checkSet("emilib");
-            else if (c == '2')
-                checkSet("emilib2");
-            else if (c == '3')
-                checkSet("emilib3");
-            else if (c == 'j')
-                checkSet("jg");
-            else if (c == 'r')
-                checkSet("rigtorp");
-            else if (c == 'k') {
-                checkSet("HashMapTable");
-                checkSet("HashMapCell");
-            }
-            else if (c == 'i')
-                checkSet("indivi");
+            
+            // Parse short options (legacy format)
+            for (int c = arg[0], i = 0; c != '\0'; c = arg[++i]) {
+                if (c > '4' && c <= '8') {
+                    std::string map_name("emhash");
+                    map_name += (char)c;
+                    checkSet(map_name);
+                } else if (c == 'm') {
+                    checkSet("robin_hood");
+                    checkSet("ankerl");
+                }
+                else if (c == 'p')
+                    checkSet("phmap");
+                else if (c == 'a')
+                    checkSet("absl");
+                else if (c == 't')
+                    checkSet("robin_map");
+                else if (c == 's')
+                    checkSet("ska");
+                else if (c == 'h')
+                    checkSet("hrd_m");
+                else if (c == '1')
+                    checkSet("emilib");
+                else if (c == '2')
+                    checkSet("emilib2");
+                else if (c == '3')
+                    checkSet("emilib3");
+                else if (c == 'j')
+                    checkSet("jg");
+                else if (c == 'r')
+                    checkSet("rigtorp");
+                else if (c == 'k') {
+                    checkSet("HashMapTable");
+                    checkSet("HashMapCell");
+                }
+                else if (c == 'i')
+                    checkSet("indivi");
 #if QC_HASH
-            else if (c == 'q')
-                checkSet("qc");
-            else if (c == 'f')
-                checkSet("fph");
+                else if (c == 'q')
+                    checkSet("qc");
+                else if (c == 'f')
+                    checkSet("fph");
 #endif
-            else if (c == 'b') {
-                 if (isdigit(argv[1][i + 1]))
-                    sflags = atoi(&argv[1][++i]);
+                else if (c == 'b') {
+                     if (isdigit(arg[i + 1]))
+                        sflags = atoi(&arg[++i]);
 #if HAVE_BOOST
-                else
-                    checkSet("boost");
+                    else
+                        checkSet("boost");
 #endif
-                if (isdigit(argv[1][i + 1])) i++;
+                    if (isdigit(arg[i + 1])) i++;
+                }
+                else if (c == 'e') {
+                    eflags = atoi(&arg[++i]);
+                    if (isdigit(arg[i + 1])) i++;
+                }
+                else if (c == 'l')
+                  g_config.max_load_factor = float(atoi(&arg[++i]) / 10.0);
             }
-            else if (c == 'e') {
-                eflags = atoi(&argv[1][++i]);
-                if (isdigit(argv[1][i + 1])) i++;
-            }
-            else if (c == 'l')
-              max_lf = float(atoi(&argv[1][++i]) / 10.0);
         }
     }
 
-    printf("test with max_load_factor = %.3f:rnd=%d\n", max_lf, (int)RND);
+    // Sync legacy max_lf with g_config
+    max_lf = g_config.max_load_factor;
+    
+    printf("test with config: max_load_factor=%.3f, warmup=%zu, iterations=%d, format=%s, reserve=%s\n",
+           g_config.max_load_factor, g_config.warmup_iterations, g_config.benchmark_iterations,
+           g_config.output_format == OutputFormat::CSV ? "csv" : 
+           g_config.output_format == OutputFormat::JSON ? "json" : "text",
+           g_config.enable_reserve ? "yes" : "no");
+    printf("random seed: %d\n", (int)RND);
     puts("all test hashmap:");
     for (const auto& m : show_name)
         printf("%10s %20s\n", m.first.data(), m.second.data());
     puts("-------------------------------------------------------------------------");
 
     runTest(sflags, eflags);
+    
+    // Output results in specified format
+    if (g_config.output_format != OutputFormat::Text && !g_results.empty()) {
+        puts("\n=== Benchmark Results ===");
+        ResultOutput::output_all(g_results, g_config.output_format);
+    }
+    
+    // Write to file if specified
+    if (!g_config.output_file.empty() && !g_results.empty()) {
+        std::ofstream fout(g_config.output_file);
+        if (fout.is_open()) {
+            if (g_config.output_format == OutputFormat::CSV) {
+                fout << "Test,HashMap,Time,StdDev,Operations,Throughput,LoadFactor,MapSize\n";
+                for (const auto& r : g_results) {
+                    fout << r.test_name << "," << r.hash_map_name << ","
+                         << r.time_sec << "," << r.time_stddev << ","
+                         << r.operations << "," << r.throughput << ","
+                         << r.load_factor << "," << r.map_size << "\n";
+                }
+            } else if (g_config.output_format == OutputFormat::JSON) {
+                fout << "[\n";
+                for (size_t i = 0; i < g_results.size(); ++i) {
+                    const auto& r = g_results[i];
+                    fout << "  {\n";
+                    fout << "    \"test\": \"" << r.test_name << "\",\n";
+                    fout << "    \"hashmap\": \"" << r.hash_map_name << "\",\n";
+                    fout << "    \"time\": " << r.time_sec << ",\n";
+                    fout << "    \"stddev\": " << r.time_stddev << ",\n";
+                    fout << "    \"operations\": " << r.operations << ",\n";
+                    fout << "    \"throughput\": " << r.throughput << ",\n";
+                    fout << "    \"load_factor\": " << r.load_factor << ",\n";
+                    fout << "    \"map_size\": " << r.map_size << "\n";
+                    fout << "  }" << (i == g_results.size() - 1 ? "" : ",") << "\n";
+                }
+                fout << "]\n";
+            }
+            fout.close();
+            printf("Results written to: %s\n", g_config.output_file.c_str());
+        }
+    }
+    
     puts("---------------------------- all pass -----------------------------------");
     return 0;
 }

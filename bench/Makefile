@@ -136,6 +136,7 @@ ifneq ($(QB),)
 endif
 
 #	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) comprehensive_bench.cpp -o cbench
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) -fno-rtti ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) -fno-rtti sbench.cpp -o sb
@@ -160,11 +161,13 @@ eb:
 	./ebench
 mb:
 	./mbench
+cb:
+	./cbench
 qb:
 	./qbench
 ww:
 	./wc
 
 clean:
-	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench wc bi bs
+	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench wc bi bs cbench
 

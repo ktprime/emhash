@@ -78,7 +78,6 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 #include <cstring>
 #include <string>
-#include <cmath>
 #include <cstdlib>
 #include <type_traits>
 #include <cassert>
