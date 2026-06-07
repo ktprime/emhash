@@ -1028,6 +1028,9 @@ public:
     }
 
 #if EMH_HIGH_LOAD
+    #ifdef EMH_PREVET
+    #undef EMH_PREVET
+    #endif
     #define EMH_PREVET(i, n) i[n].slot
     void set_empty()
     {
@@ -1290,8 +1293,7 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(__GNUC__) || defined(__clang__)
-        (void)ctrl;
-//        __builtin_prefetch(static_cast<const void*>(ctrl));
+        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32 && defined(_M_ARM64)
         __prefetch((const char*)ctrl);
 #elif _WIN32
@@ -1382,12 +1384,13 @@ private:
     size_type find_filled_bucket(const KeyT& key, uint64_t key_hash) const noexcept
     {
         const auto bucket = size_type(key_hash & _mask);
-        auto next_bucket  = _index[bucket].next;
+        const auto& idx = _index[bucket];
+        auto next_bucket  = idx.next;
         if (EMH_UNLIKELY((int)next_bucket < 0))
             return INACTIVE;
 
-        const auto slot = _index[bucket].slot & _mask;
-        //prefetch_heap_block((char*)&_pairs[slot]);
+        const auto slot = idx.slot & _mask;
+        prefetch_heap_block((char*)&_pairs[slot]);
         if (EMH_EQHASH(bucket, key_hash)) {
             if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
                 return bucket;
@@ -1417,12 +1420,13 @@ private:
     {
         const auto key_hash = hash_key(key);
         const auto bucket = size_type(key_hash & _mask);
-        auto next_bucket = _index[bucket].next;
+        const auto& idx = _index[bucket];
+        auto next_bucket = idx.next;
         if ((int)next_bucket < 0)
             return _num_filled;
 
-        const auto slot = _index[bucket].slot & _mask;
-        //prefetch_heap_block((char*)&_pairs[slot]);
+        const auto slot = idx.slot & _mask;
+        prefetch_heap_block((char*)&_pairs[slot]);
         if (EMH_EQHASH(bucket, key_hash)) {
             if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
                 return slot;
@@ -1547,7 +1551,8 @@ private:
     size_type find_or_allocate(const K& key, uint64_t key_hash) noexcept
     {
         const auto bucket = size_type(key_hash & _mask);
-        auto next_bucket = _index[bucket].next;
+        const auto& idx = _index[bucket];
+        auto next_bucket = idx.next;
         prefetch_heap_block((char*)&_pairs[bucket]);
         if ((int)next_bucket < 0) {
 #if EMH_HIGH_LOAD
@@ -1557,7 +1562,7 @@ private:
             return bucket;
         }
 
-        const auto slot = _index[bucket].slot & _mask;
+        const auto slot = idx.slot & _mask;
         if (EMH_EQHASH(bucket, key_hash))
             if (EMH_LIKELY(_eq(key, _pairs[slot].first)))
                 return bucket;

@@ -76,6 +76,9 @@
     #define EMH_PKV(p,n)     p[n].second
     #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(bucket, value_type(key, val)); _num_filled ++
 #elif EMH_BUCKET_INDEX == 2
+    #ifdef EMH_PREVET
+    #undef EMH_PREVET
+    #endif
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
     #define EMH_BUCKET(p,n)  p[n].second
@@ -83,6 +86,9 @@
     #define EMH_PKV(p,n)     p[n].first
     #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(value_type(key, val), bucket); _num_filled ++
 #else
+    #ifdef EMH_PREVET
+    #undef EMH_PREVET
+    #endif
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n)  p[n].bucket
@@ -541,6 +547,34 @@ public:
                 memcpy(tmp,  _small, sizeof(tmp));
                 memcpy(_small, rhs._small, sizeof(tmp));
                 memcpy(rhs._small, tmp,  sizeof(tmp)); //copy once if only one small map
+
+                // _small is embedded in each object, so _pairs must always point to its own _small
+                // When both use _small: keep each pointing to its own _small (data already swapped by memcpy)
+                // When only one uses _small: transfer heap pointer to the other, point the other to its own _small
+                if (_pairs == (PairT*)_small && rhs._pairs == (PairT*)rhs._small) {
+                    // both use _small, nothing to do
+                } else if (_pairs == (PairT*)_small) {
+                    // this uses _small, rhs uses heap
+                    _pairs = rhs._pairs;              // this gets the heap pointer
+                    rhs._pairs = (PairT*)rhs._small;  // rhs points to its own _small
+                } else {
+                    // rhs uses _small, this uses heap
+                    rhs._pairs = _pairs;              // rhs gets the heap pointer
+                    _pairs = (PairT*)_small;          // this points to its own _small
+                }
+
+                std::swap(_alloc, rhs._alloc);
+                std::swap(_hasher, rhs._hasher);
+                std::swap(_num_buckets, rhs._num_buckets);
+                std::swap(_num_filled, rhs._num_filled);
+                std::swap(_mask, rhs._mask);
+                std::swap(_mlf, rhs._mlf);
+                std::swap(_last, rhs._last);
+                std::swap(_first, rhs._first);
+#if EMH_HIGH_LOAD
+                std::swap(_ehead, rhs._ehead);
+#endif
+                return;
             } else {
                 HashMap tmp(*this);
                 *this = rhs;
@@ -1345,7 +1379,8 @@ public:
         reset_bucket(hash_main(0));
 #endif
 
-        _last = _num_filled = 0;
+        _last = _num_buckets / 4;
+        _num_filled = 0;
         _first = _num_buckets;
     }
 
@@ -1713,6 +1748,15 @@ private:
     size_type find_filled_key(const K& key) const noexcept
     {
         const auto main_bucket = key_to_bucket(key);
+#if EMH_FIND_HIT
+        if constexpr (std::is_integral<KeyT>::value) {
+            auto next_bucket = EMH_BUCKET(_pairs, main_bucket);
+            if (_eq(key, EMH_KEY(_pairs, main_bucket)))
+                return main_bucket;
+            if ((size_type)next_bucket < 0)
+                return _num_buckets;
+        }
+#endif
         return find_hash_bucket(key, main_bucket);
     }
 
@@ -1722,24 +1766,10 @@ private:
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
 
-#if EMH_FIND_HIT == 0
         if ((size_type)next_bucket < 0)
             return _num_buckets;
         else if (_eq(key, EMH_KEY(_pairs, bucket)))
             return bucket;
-#else
-        if constexpr (std::is_integral<KeyT>::value) {
-            if (_eq(key, EMH_KEY(_pairs, bucket)))
-                return bucket;
-            else if ((size_type)next_bucket < 0)
-                return _num_buckets;
-        } else {
-            if ((size_type)next_bucket < 0)
-                return _num_buckets;
-            else if (_eq(key, EMH_KEY(_pairs, bucket)))
-                return bucket;
-        }
-#endif
 
         if (next_bucket == bucket)
             return _num_buckets;
@@ -1747,12 +1777,16 @@ private:
 //            return _num_buckets;
 
         while (true) {
+            const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (_eq(key, EMH_KEY(_pairs, next_bucket)))
                 return next_bucket;
 
-            const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
                 return _num_buckets;
+
+#if !defined(_MSC_VER) && defined(__GNUC__)
+            __builtin_prefetch(&_pairs[nbucket], 0, 1);
+#endif
             next_bucket = nbucket;
         }
 
@@ -1780,6 +1814,30 @@ private:
     }
 
 /*
+** Common helper: check if bucket is empty or needs kickout.
+** Returns bucket if ready to use, or INACTIVE if further processing needed.
+*/
+    template<typename K=KeyT>
+    size_type find_or_kickout(const K& key, size_type bucket) noexcept
+    {
+        (void)key;
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
+        if ((size_type)next_bucket < 0) {
+#if EMH_HIGH_LOAD
+            if (next_bucket != INACTIVE)
+                pop_empty(bucket);
+#endif
+            return bucket;
+        }
+
+        const auto kmain = hash_main(bucket);
+        if (EMH_UNLIKELY(kmain != bucket))
+            return kickout_bucket(kmain, bucket);
+
+        return INACTIVE;
+    }
+
+/*
 ** inserts a new key into a hash table; first, check whether key's main
 ** bucket/position is free. If not, check whether colliding node/bucket is in its main
 ** position or not: if it is not, move colliding bucket to an empty place and
@@ -1790,21 +1848,14 @@ private:
     size_type find_or_allocate(const K& key) noexcept
     {
         const auto bucket = key_to_bucket(key);
-        const auto& bucket_key = EMH_KEY(_pairs, bucket);
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0) {
-#if EMH_HIGH_LOAD
-            if (next_bucket != INACTIVE)
-                pop_empty(bucket);
-#endif
-            return bucket;
-        } else if (_eq(key, bucket_key))
-            return bucket;
+        auto result = find_or_kickout(key, bucket);
+        if (result != INACTIVE)
+            return result;
 
-        //check current bucket_key is in main bucket or not
-        const auto kmain = key_to_bucket(bucket_key);
-        if (kmain != bucket)
-            return kickout_bucket(kmain, bucket);
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
+        const auto& bucket_key = EMH_KEY(_pairs, bucket);
+        if (_eq(key, bucket_key))
+            return bucket;
         else if (next_bucket == bucket)
             return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket, 1);
 
@@ -1814,6 +1865,7 @@ private:
 #endif
         //find next linked bucket and check key
         while (true) {
+            const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, prev_bucket));
@@ -1828,9 +1880,12 @@ private:
 #endif
 
             csize += 1;
-            const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)
                 break;
+
+#if !defined(_MSC_VER) && defined(__GNUC__)
+            __builtin_prefetch(&_pairs[nbucket], 0, 1);
+#endif
             next_bucket = nbucket;
         }
 
@@ -1843,20 +1898,12 @@ private:
     size_type find_unique_bucket(const K& key) noexcept
     {
         const auto bucket = key_to_bucket(key);
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0) {
-#if EMH_HIGH_LOAD
-            if (next_bucket != INACTIVE)
-                pop_empty(bucket);
-#endif
-            return bucket;
-        }
+        auto result = find_or_kickout(key, bucket);
+        if (result != INACTIVE)
+            return result;
 
-        //check current bucket_key is in main bucket or not
-        const auto kmain = hash_main(bucket);
-        if (EMH_UNLIKELY(kmain != bucket))
-            return kickout_bucket(kmain, bucket);
-        else if (EMH_UNLIKELY(next_bucket != bucket))
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
+        if (EMH_UNLIKELY(next_bucket != bucket))
             next_bucket = find_last_bucket(next_bucket);
 
         //find a new empty and link it to tail
@@ -1897,43 +1944,47 @@ one-way search strategy.
             return pop_empty(_ehead);
 #endif
 
+        (void)csize;
         auto bucket = bucket_from;
         if (EMH_EMPTY(_pairs, ++bucket) || EMH_EMPTY(_pairs, ++bucket))
             return bucket;
 
-#ifndef _MSC_VER
-        //__builtin_prefetch(static_cast<const void*>(_pairs + bucket + 1), 0, 1);
-#endif
-        constexpr auto linear_probe_length = 6;//2-3 cache line miss
-        for (size_type step = 2, slot = bucket + 1 + (int)csize / 2; ; slot += step++) {
-            if (step < linear_probe_length) {
-                auto bucket1 = slot & _mask;
-                if (EMH_EMPTY(_pairs, bucket1))
-                    return bucket1;
+        // Bidirectional local probing: search outward in both directions.
+        // This keeps kicked-out chain members close to their chain head,
+        // dramatically reducing cache misses during chain traversal.
+        constexpr size_type max_local_probes = 10; // ±8 from bucket_from after +1/+2
+        for (size_type step = 2; step < max_local_probes; step++) {
+            auto forward = (bucket_from + step + 1) & _mask;
+            if (EMH_EMPTY(_pairs, forward))
+                return forward;
 
-                bucket1 += 1 + (step % 2);
-                if (EMH_EMPTY(_pairs, bucket1))
-                    return bucket1;
-            } else {
+            auto backward = (bucket_from - (step - 1)) & _mask;
+            if (EMH_EMPTY(_pairs, backward))
+                return backward;
+        }
+
+        // Fallback: global roaming when local area is saturated
+        while (true) {
 #if EMH_PACK_TAIL
-                if (EMH_EMPTY(_pairs, _last++))
-                    return _last++ - 1;
+            _last &= _mask;
+            auto slot = _last++;
+            if (EMH_EMPTY(_pairs, slot))
+                return slot;
 
-                if (EMH_UNLIKELY(_last >= _num_buckets))
-                    _last = 0;
+            if (EMH_UNLIKELY(_last >= _num_buckets))
+                _last = 0;
 
-                auto medium = (_mask / 4 + _last) & _mask;
-                if (EMH_EMPTY(_pairs, medium))
-                    return medium;
+            auto medium = (_mask / 4 + _last) & _mask;
+            if (EMH_EMPTY(_pairs, medium))
+                return medium;
 #else
-                if (EMH_EMPTY(_pairs, ++_last))
-                    return _last++;
-                _last &= _mask;
-                auto medium = (_num_buckets / 2 + _last) & _mask;
-                if (EMH_EMPTY(_pairs, medium))// && EMH_EMPTY(_pairs, ++medium))
-                    return _last = medium;
+            if (EMH_EMPTY(_pairs, ++_last))
+                return _last++;
+            _last &= _mask;
+            auto medium = (_num_buckets / 2 + _last) & _mask;
+            if (EMH_EMPTY(_pairs, medium))// && EMH_EMPTY(_pairs, ++medium))
+                return _last = medium;
 #endif
-            }
         }
     }
 
