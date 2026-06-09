@@ -1158,26 +1158,12 @@ public:
         _ehead = 0;
 #endif
 
-#if EMH_SORT
-        std::sort(_pairs, _pairs + _num_filled, [this](const value_type & l, const value_type & r) {
-            const auto hashl = (size_type)hash_key(l.first) & _mask, hashr = (size_type)hash_key(r.first) & _mask;
-            return hashl < hashr;
-            //return l.first < r.first;
-        });
-#endif
-
         memset((char*)_index, (int)INACTIVE, sizeof(_index[0]) * _num_buckets);
-        for (size_type slot = 0; slot < _num_filled; slot++) {
+        for (size_type slot = 0; slot < _num_filled; ++slot) {
             const auto& key = _pairs[slot].first;
             const auto key_hash = hash_key(key);
-            const auto bucket = size_type(key_hash & _mask);
-            auto& next_bucket = _index[bucket].next;
-            if ((int)next_bucket < 0)
-                _index[bucket] = {1, slot | ((size_type)(key_hash) & ~_mask)};
-            else {
-                _index[bucket].slot |= (size_type)(key_hash) & ~_mask;
-                next_bucket ++;
-            }
+            const auto bucket = find_unique_bucket(key_hash);
+            _index[bucket] = { bucket, slot | ((size_type)(key_hash) & ~_mask) };
         }
         return true;
     }
@@ -1311,21 +1297,21 @@ private:
     void erase_slot(const size_type sbucket, const size_type main_bucket) noexcept
     {
         const auto slot = _index[sbucket].slot & _mask;
-        const auto ebucket = erase_bucket(sbucket, main_bucket);
-        const auto last_slot = --_num_filled;
-        if (EMH_LIKELY(slot != last_slot)) {
-            const auto last_bucket = (_etail == INACTIVE || ebucket == _etail)
-                ? slot_to_bucket(last_slot) : _etail;
-#if 1
-            _pairs[slot] = std::move(_pairs[last_slot]);
-#else
-            auto& target = _pairs[slot]; 
-            if (!is_trivially_destructible())
-                target.~value_type();           
-            new (&target) value_type(std::move(_pairs[last_slot]));
-#endif
+        const auto last_slot = _num_filled - 1;
+        // Find last_slot's bucket BEFORE erase_bucket modifies the chain
+        const auto last_bucket = (slot == last_slot) ? sbucket : slot_to_bucket(last_slot);
 
-            _index[last_bucket].slot = slot | (_index[last_bucket].slot & ~_mask);
+        const auto ebucket = erase_bucket(sbucket, main_bucket);
+        --_num_filled;
+        if (EMH_LIKELY(slot != last_slot)) {
+            // When sbucket == main_bucket, erase_bucket promotes next_bucket to
+            // main_bucket. If last_bucket was next_bucket (== ebucket), the data
+            // is now at main_bucket, so update main_bucket instead.
+            const auto update_bucket = (last_bucket == ebucket && sbucket == main_bucket)
+                ? main_bucket : last_bucket;
+
+            _pairs[slot] = std::move(_pairs[last_slot]);
+            _index[update_bucket].slot = slot | (_index[update_bucket].slot & ~_mask);
         }
 
         if (!is_trivially_destructible())
