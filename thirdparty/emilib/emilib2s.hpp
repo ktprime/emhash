@@ -28,6 +28,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
 #include <iterator>
 #include <utility>
 #include <cassert>
@@ -996,14 +997,15 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept
     {
 #if EMH_PSL_LINEAR == 0
-        if (offset < 7)// || _num_buckets < 32 * simd_bytes)
+        if (offset < 7)
             next_bucket += simd_bytes * offset;
-        else
-            next_bucket += _num_buckets / 8 + simd_bytes;
+        else {
+            // Fixed step with odd group stride: GCD(step/16, num_groups)=1 guarantees full coverage
+            // (step/simd_bytes)|1 ensures odd, coprime with any power-of-2 num_groups
+            next_bucket += (((_num_buckets / 8 + simd_bytes) / simd_bytes) | 1) * simd_bytes;
+        }
 #else
-        next_bucket += 3 * simd_bytes;
-        if (next_bucket >= _num_buckets)
-            next_bucket += simd_bytes;
+        next_bucket += simd_bytes;
 #endif
         return next_bucket & _mask;
     }

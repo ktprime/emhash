@@ -28,6 +28,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
 #include <iterator>
 #include <utility>
 #include <cassert>
@@ -1050,7 +1051,13 @@ private:
 #if EMH_SAFE_PSL
         next_bucket += simd_bytes * offset;
 #elif EMH_PSL_LINEAR == 0
-        next_bucket += offset < 5 ? simd_bytes * offset: _num_buckets / 11 + 1;
+        if (offset < 5)
+            next_bucket += simd_bytes * offset;
+        else {
+            // Odd step: GCD(step, _num_buckets)=1 guarantees full coverage
+            // |1 ensures odd, coprime with any power-of-2 _num_buckets
+            next_bucket += (_num_buckets / 11 + 1) | 1;
+        }
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;

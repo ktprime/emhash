@@ -7,6 +7,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
 #include <iterator>
 #include <utility>
 #include <cassert>
@@ -966,17 +967,20 @@ private:
         _states[ebucket] = key_h2;
     }
 
+    // Dual-probe: combined probe sequence that switches to secondary step after primary
+    // This ensures find_filled_bucket and find_or_allocate use the same sequence
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept
     {
 #if EMH_PSL_LINEAR == 0
-        if (offset < 7)// || _num_buckets < 32 * simd_bytes)
+        if (offset < 7)
             next_bucket += simd_bytes * offset;
-        else
-            next_bucket += _num_buckets / 8 + simd_bytes;
+        else {
+            // Fixed step with odd group stride: GCD(step/16, num_groups)=1 guarantees full coverage
+            // (step/simd_bytes)|1 ensures odd, coprime with any power-of-2 num_groups
+            next_bucket += (((_num_buckets / 8 + simd_bytes) / simd_bytes) | 1) * simd_bytes;
+        }
 #else
-        next_bucket += 3 * simd_bytes;
-        if (next_bucket >= _num_buckets)
-            next_bucket += simd_bytes;
+        next_bucket += simd_bytes;
 #endif
         return next_bucket & _mask;
     }
@@ -1012,6 +1016,7 @@ private:
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
+    // Uses dual-probe via get_next_bucket (switches step at offset 7 and 14)
     template<typename K>
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
@@ -1024,7 +1029,6 @@ private:
         size_t hole = chole, offset = (size_t)0u;
 
         const auto key_h2 = hash_key2(main_bucket, key);
-        //prefetch_heap_block((char*)&_pairs[bucket_to_slot(main_bucket)]);
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket;
 
@@ -1090,7 +1094,7 @@ private:
             if (maske != 0) {
                 const auto probe = CTZ(maske) + next_bucket;
                 prefetch_heap_block((char*)&_pairs[probe]);
-                set_group_probe(gbucket, offset);//bugs for unique
+                set_group_probe(gbucket, offset);
                 return probe;
             }
             next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
