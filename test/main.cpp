@@ -239,7 +239,7 @@ inline Os& operator<<(Os& os, Container const& cont)
 #if 0
 #define ehmap  emilib3::HashMap
 #else
-#define ehmap  emhash8::HashMap
+#define ehmap  emhash5::HashMap
 #endif
 #define ehmap5 emhash5::HashMap
 #define ehmap6 emhash6::HashMap
@@ -775,7 +775,7 @@ static int RandTest(size_t n, int max_loops = 1234567)
 	ehmap6<keyType, int, BintHasher> unhash;
 #else
 	//emilib3::HashMap <keyType, int, BintHasher> ehash;
-	ehmap7<keyType, int, BintHasher> unhash;
+	ehmap6<keyType, int, BintHasher> unhash;
 #endif
 
 	WyRand srng(time(0));

@@ -504,6 +504,13 @@ emhash has been validated by multiple well-known third-party benchmarks:
 - [Comprehensive Benchmark](https://github.com/ktprime/emhash/blob/master/bench/ebench.cpp)
 - [High Load Test](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)
 
+### Performance Charts
+
+Historical performance charts are available in `docs/images/`:
+- `int64_t*.png` - Integer key benchmarks
+- `string*.png` - String key benchmarks
+- `int_string.png` - Mixed key/value type benchmarks
+
 ### Interactive Performance Charts
 
 Download all files in the `bench/tsl_bench/` directory and open `chartsAll.html` in a browser to view interactive performance curves.

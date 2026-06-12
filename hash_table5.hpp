@@ -97,7 +97,7 @@
     #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(key, val, bucket); _num_filled ++; if (bucket < _first) _first = bucket
 #endif
 
-#define EMH_EMPTY(p, b) (0 > (size_type)EMH_BUCKET(p, b))
+#define EMH_EMPTY(p, b) (0 > (int64_t)EMH_BUCKET(p, b))
 
 namespace emhash5 {
 
@@ -666,7 +666,7 @@ public:
     {
         const auto bucket = key_to_bucket(key);
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return 0;
         else if (bucket == next_bucket)
             return bucket + 1;
@@ -678,7 +678,7 @@ public:
     size_type bucket_size(const size_type bucket) const
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return 0;
 
         next_bucket = hash_main(bucket);
@@ -699,7 +699,7 @@ public:
     size_type get_main_bucket(const uint32_t bucket) const
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return INACTIVE;
 
         return hash_main(bucket);
@@ -721,7 +721,7 @@ public:
     int get_bucket_info(const uint32_t bucket, uint32_t steps[], const uint32_t slots) const
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return -1;
 
         const auto main_bucket = hash_main(bucket);
@@ -1653,7 +1653,7 @@ private:
     {
         const auto bucket = key_to_bucket(key);
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (EMH_UNLIKELY((size_type)next_bucket < 0))
+        if (EMH_UNLIKELY((int64_t)next_bucket < 0))
             return INACTIVE;
 
         const auto equalk = _eq(key, EMH_KEY(_pairs, bucket));
@@ -1753,7 +1753,7 @@ private:
             auto next_bucket = EMH_BUCKET(_pairs, main_bucket);
             if (_eq(key, EMH_KEY(_pairs, main_bucket)))
                 return main_bucket;
-            if ((size_type)next_bucket < 0)
+            if ((int64_t)next_bucket < 0)
                 return _num_buckets;
         }
 #endif
@@ -1766,7 +1766,7 @@ private:
     {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
 
-        if ((size_type)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return _num_buckets;
         else if (_eq(key, EMH_KEY(_pairs, bucket)))
             return bucket;
@@ -1822,7 +1822,7 @@ private:
     {
         (void)key;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0) {
+        if ((int64_t)next_bucket < 0) {
 #if EMH_HIGH_LOAD
             if (next_bucket != INACTIVE)
                 pop_empty(bucket);
@@ -1914,7 +1914,7 @@ private:
     {
         (void)old_bucket;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if ((size_type)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return bucket;
 
         next_bucket = find_last_bucket(next_bucket);

@@ -1,0 +1,116 @@
+# Vim swap files
+*.swp
+*.swo
+*.un~
+
+# Build artifacts
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+*.out
+*.app
+
+# Binary executables (no extension)
+bench/analyze_crash
+bench/analyze_crash_asan
+bench/analyze_crash_deep
+bench/app
+bench/bi
+bench/bs
+bench/cbench
+bench/ebench
+bench/ecov.exe
+bench/fbench
+bench/fuzz_reproduce_asan
+bench/join_hash
+bench/join_hash2
+bench/mbench
+bench/mcov.exe
+bench/reproduce_crash
+bench/reproduce_crash_asan
+bench/sb
+bench/simbench
+bench/sbench
+bench/tbench
+bench/wc
+bench/zbench
+bench/stress_fix
+bench/quick_test8_fixed
+bench/quick_test8_gcc
+bench/highload_test_fixed
+bench/test_hidden_bugs8_fixed
+bench/test_hidden_bugs8_gcc
+bench/highload_bench.exe
+bench/highload_test.exe
+bench/smallsize_test.exe
+bench/test_hidden_bugs8.exe
+bench/cbench.exe
+bench/ebench.exe
+bench/join_hash.exe
+bench/mbench.exe
+
+# Test binaries
+test/test_bug
+test/test_debug
+test/test_extreme
+test/test_extreme_gcc
+test/test_extreme_run.exe
+test/test_find_hit_bug
+test/test_find_hit_bug2
+test/test_find_hit_bug3
+test/test_find_hit_ok
+test/test_probe_bug_run.exe
+test/emhash_test
+
+# Build directories
+build/
+build_test/
+vsbuild/
+test/vsbuild/
+test/CMakeFiles/
+bench/bin/
+.cache/
+
+# IDE/Editor files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.sln.docstates
+
+# CMake cache
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+Directory.build.props
+
+# Temporary files
+*.bak
+*.TMP
+*.tmp
+*.log
+*.gcno
+*.gcda
+
+# Output files
+hash_attack_output.txt
+out7.txt
+
+# Third-party benchmark directories (not part of emhash)
+bench/STC/
+bench/SimpleHashTest/
+bench/c_cpp_hash_tables_benchmark-shims/
+bench/hash-table-shootout/
+bench/hashbench/
+bench/hashmap-benchmark/
+bench/hashtable-bench/
+bench/kudb3/
+bench/mem-meta-kv-benchmark/
+bench/udb3/
+bench/llvm.sh

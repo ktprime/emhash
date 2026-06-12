@@ -111,7 +111,7 @@ std::map<std::string, std::string> maps =
 //#define EMH_PACK_TAIL         8
 //#define EMH_ITER_SAFE       1
 //#define EMH_ALIGN64         1
-//#define EMH_FIND_HIT        1
+#define EMH_FIND_HIT        1
 //#define EMH_SMALL_SIZE        12345
 //#define EMH_SMALL_SIZE      8
 
@@ -1609,11 +1609,36 @@ static int test_lru(int n)
     return 0;
 }
 
+int TestFindHit()
+{
+    // key = -1 即 INACTIVE 值 (0xFFFFFFFF)
+    int32_t bad_key = (int32_t)0xFFFFFFFF; // -1
+
+    emhash5::HashMap<int32_t, int32_t> map(16);
+
+    // 用 find(key, hash) 指定 hash 映射到非 sanitized 的空桶
+    // hash=0 → main_bucket=0，该桶未被 reset_bucket 修复
+    auto it = map.find(bad_key, 0);
+
+    if (it != map.end()) {
+        printf("BUG: find(%d, hash=0) returned a result in an EMPTY map!\n", bad_key);
+        printf("     bucket=%d, key=%d, value=%d\n", (int)it.bucket(), it->first, it->second);
+        return 1;
+    }
+    else {
+        printf("OK: no false positive\n");
+        return 0;
+    }
+}
+
 int main(int argc, char* argv[])
 {
 #if WYHASH_LITTLE_ENDIAN && STR_VIEW
     //find_test();
 #endif
+
+    TestFindHit();
+
     auto start = getus();
 //    test_lru(100'000'000);
 //    testHashInt(int(1e8));

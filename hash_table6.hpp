@@ -76,7 +76,7 @@
     #define EMH_VAL(p,n)     p[n].second.second
     #define EMH_BUCKET(p,n)  p[n].first / 2
     #define EMH_ADDR(p,n)    p[n].first
-    #define EMH_EMPTY(p,n)   ((int)p[n].first < 0)
+    #define EMH_EMPTY(p,n)   ((int64_t)p[n].first < 0)
     #define EMH_PKV(p,n)     p[n].second
     #define EMH_NEW(key, val, bucket, next) new(_pairs + bucket) PairT(next, value_type(key, val)), _num_filled ++; EMH_SET(bucket)
 #elif EMH_BUCKET_INDEX == 2
@@ -84,7 +84,7 @@
     #define EMH_VAL(p,n)     p[n].first.second
     #define EMH_BUCKET(p,n)  p[n].second / 2
     #define EMH_ADDR(p,n)    p[n].second
-    #define EMH_EMPTY(p,n)   ((int)p[n].second < 0)
+    #define EMH_EMPTY(p,n)   ((int64_t)p[n].second < 0)
     #define EMH_PKV(p,n)     p[n].first
     #define EMH_NEW(key, val, bucket, next) new(_pairs + bucket) PairT(value_type(key, val), next), _num_filled ++; EMH_SET(bucket)
 #else
@@ -92,7 +92,7 @@
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n)  p[n].bucket / 2
     #define EMH_ADDR(p,n)    p[n].bucket
-    #define EMH_EMPTY(p,n)   (0 > (int)p[n].bucket)
+    #define EMH_EMPTY(p,n)   (0 > (int64_t)p[n].bucket)
     #define EMH_PKV(p,n)     p[n]
     #define EMH_NEW(key, val, bucket, next) new(_pairs + bucket) PairT(key, val, next), _num_filled ++; EMH_SET(bucket)
 #endif
@@ -709,7 +709,7 @@ public:
     {
         const auto bucket = hash_key(key) & _mask;
         const auto next_bucket = EMH_ADDR(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return 0;
         else if (bucket == next_bucket * 2)
             return bucket + 1;
@@ -721,7 +721,7 @@ public:
     size_type bucket_size(const size_type bucket) const
     {
         auto next_bucket = EMH_ADDR(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return 0;
 
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
@@ -763,7 +763,7 @@ public:
     int get_bucket_info(const size_type bucket, size_type steps[], const size_type slots) const
     {
         auto next_bucket = EMH_ADDR(_pairs, bucket);
-        if ((int)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return -1;
 
         const auto main_bucket = hash_main(bucket);
@@ -1607,12 +1607,12 @@ private:
         const auto bucket = hash_key(key) & _mask;
         auto next_bucket = EMH_ADDR(_pairs, bucket);
 #if EMH_SAFE_HASH
-        if ((int)next_bucket < 0)
+        if ((int64_t)next_bucket < 0)
             return _num_main ++, bucket * 2;
         else if (_eq(key, EMH_KEY(_pairs, bucket)))
             return bucket * 2;
 #else
-        if ((int)next_bucket < 0 || _eq(key, EMH_KEY(_pairs, bucket)))
+        if ((int64_t)next_bucket < 0 || _eq(key, EMH_KEY(_pairs, bucket)))
             return bucket * 2;
 #endif
 
@@ -1724,7 +1724,7 @@ private:
     {
         const auto bucket = size_type(hash_key(key) & _mask);
         const auto next_bucket = EMH_ADDR(_pairs, bucket);
-        if ((int)next_bucket < 0) {
+        if ((int64_t)next_bucket < 0) {
 #if EMH_SAFE_HASH
             _num_main ++;
 #endif
