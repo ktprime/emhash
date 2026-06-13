@@ -87,7 +87,7 @@ bench/bin/
 # CMake cache
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+/Makefile
 Directory.build.props
 
 # Temporary files

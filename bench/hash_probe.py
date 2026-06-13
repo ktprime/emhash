@@ -50,13 +50,11 @@ def poisson(lf):
 # 准备数据
 x = np.array([0.1,0.5,0.6,0.75,0.8,0.91,0.998])
 x = np.arange(0,99,2) / 100.0
-#print(x)
-all = [poisson(lf) for lf in x]
-#print('all = ', all)
-find_miss = [e[0] for e in all]
-coll = [e[1] for e in all]
-main = [e[2] for e in all]
-insert = [e[3] for e in all]
+results = [poisson(lf) for lf in x]
+find_miss = [e[0] for e in results]
+coll = [e[1] for e in results]
+main = [e[2] for e in results]
+insert = [e[3] for e in results]
 insert = [(1 + 1/math.pow(10,1 - e)) / 2 for e in x]
 #ff = 0.80
 #print(ff, collsion(ff), poisson(ff))

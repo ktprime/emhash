@@ -10,7 +10,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 TESTS_DIR="$ROOT_DIR"
 
 CXX="g++"
-CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR"
+CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.. -I$ROOT_DIR/../thirdparty"
 ASAN_FLAGS="-fsanitize=address,undefined"
 
 # 颜色输出

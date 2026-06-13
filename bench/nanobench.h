@@ -2973,7 +2973,7 @@ double Result::minimum(Measure m) const noexcept {
         return 0.0;
     }
 
-    // here its save to assume that at least one element is there
+    // here it's safe to assume that at least one element is there
     return *std::min_element(data.begin(), data.end());
 }
 
@@ -2983,7 +2983,7 @@ double Result::maximum(Measure m) const noexcept {
         return 0.0;
     }
 
-    // here its save to assume that at least one element is there
+    // here it's safe to assume that at least one element is there
     return *std::max_element(data.begin(), data.end());
 }
 

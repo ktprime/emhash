@@ -402,6 +402,40 @@ cmake --build . --config Release
 ./bench/mbench
 ```
 
+### Quick Test Suite (tests_new)
+
+The `tests_new/` directory provides a unified test suite covering all implementations:
+
+```bash
+cd tests_new
+
+# Quick validation tests (~10 seconds, 247,268 assertions)
+g++ -std=c++17 -O2 -I.. -I../thirdparty verify/test_all_maps.cpp -o test_verify && ./test_verify
+
+# Stress tests (~30 seconds)
+g++ -std=c++17 -O2 -I.. -I../thirdparty stress/stress_all_maps.cpp -o test_stress && ./test_stress
+
+# Hash attack tests (~2 minutes, requires EMH_SAFE_PSL)
+g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty attack/hash_attack_all.cpp -o test_attack && ./test_attack
+
+# Debug tests (~10 seconds)
+g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o test_debug && ./test_debug
+
+# Run all quick tests (~20 seconds)
+g++ -std=c++17 -O2 -I.. -I../thirdparty verify/test_all_maps.cpp -o t1 && ./t1 && \
+g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o t2 && ./t2 && \
+echo "=== ALL QUICK TESTS PASSED ==="
+```
+
+| Test File | Coverage | Assertions | Time |
+|-----------|----------|------------|------|
+| `verify/test_all_maps.cpp` | emhash5-8 + emilib2ss/2o/2s | 247,268 | ~5s |
+| `stress/stress_all_maps.cpp` | 7 maps x 5 items x 1000 trials | 35,000 trials | ~30s |
+| `attack/hash_attack_all.cpp` | 7 maps x 3 hash attacks | correctness+performance | ~2min |
+| `debug/debug_all_maps.cpp` | 7 maps x 10 debug tests | 70 tests | ~10s |
+
+> **Note**: Hash attack tests require `-DEMH_SAFE_PSL` flag for emilib implementations to handle extreme collisions.
+
 ### Compile Options
 
 | Macro | Description |
@@ -409,6 +443,7 @@ cmake --build . --config Release
 | `EMH_HIGH_LOAD=<value>` | Enable high load factor support. Must be a positive integer (e.g. `123456`), not 0. Enables empty-bucket chain (`_ehead`) for LF up to 0.999 |
 | `EMH_WY_HASH=1` | Use wyhash algorithm (faster for string keys) |
 | `EMH_SAFE_HASH=1` | Enable backup hash function (hash attack protection, ~10% cost) |
+| `EMH_SAFE_PSL=1` | Enable safe PSL limit for emilib implementations (required for hash attack tests) |
 | `EMH_LRU_SET=1` | Enable LRU cache mode |
 | `EMH_STATIS=1` | Enable collision statistics output |
 | `EMH_FIBONACCI_HASH=1` | Use Fibonacci hashing |

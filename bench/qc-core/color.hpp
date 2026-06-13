@@ -110,7 +110,7 @@ namespace qc::color
 
             if (hsl.y > T(0.0)) {
                 // Hue
-                // TODO: Test if this is acually faster than the two `% 3`s
+                // TODO: Test if this is actually faster than the two `% 3`s
                 const T overflowRgb[5]{srgb.x, srgb.y, srgb.z, srgb.x, srgb.y};
                 hsl.x = T(maxI * 2 + 6);
                 hsl.x += (overflowRgb[maxI + 1] - overflowRgb[maxI + 2]) / compRange;

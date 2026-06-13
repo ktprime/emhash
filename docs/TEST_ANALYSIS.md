@@ -111,7 +111,7 @@ This document organizes all test code in `fuzz/`, `test/`, and `bench/` director
 | `stress_fix.cpp` | Stress | emhash8 | Stress test: reserve(1) + random operations, verifies crash fix |
 | `fuzz_reproduce.cpp` | Debug | emhash8 | Reproduce fuzzer-discovered crash sequence |
 | `reproduce_crash.cpp` | Debug | emhash8 | Reproduce specific crash: reserve(1) + 0x68686868 key |
-| `analyze_crash*.cpp` | Debug | Crash analysis | Helper tools for crash root cause analysis |
+| `analyze_crash.cpp`, `analyze_crash_deep.cpp` | Debug | Crash analysis | Helper tools for crash root cause analysis |
 
 ### 3.3 Hash Attack Tests
 
@@ -126,7 +126,7 @@ This document organizes all test code in `fuzz/`, `test/`, and `bench/` director
 |------|------|--------|-------------|
 | `ebench.cpp` | Perf | All versions | Basic benchmark: insert/find/erase/iterate |
 | `hbench.cpp` | Perf | All versions | Hash table benchmark |
-| `mbench.cpp` | Perf | All versions | Martin benchmark format |
+| `tbench.cpp` | Perf | All versions | Threading benchmark |
 | `martin_bench.cpp` | Perf | All versions | Martin Ankerl format benchmark |
 | `highload_bench.cpp` | Perf | All versions | High load benchmark |
 | `bench_find_hit.cpp` | Perf | Find hit rate | Find hit rate benchmark |
@@ -148,38 +148,60 @@ This document organizes all test code in `fuzz/`, `test/`, and `bench/` director
 
 ```bash
 # Quick build validation tests
-./build_tests.sh quick
+./tests_new/scripts/build_tests.sh quick
 
 # Build stress tests (with ASan)
-./build_tests.sh stress
+./tests_new/scripts/build_tests.sh stress
+
+# Build hash attack tests
+./tests_new/scripts/build_tests.sh attack
 
 # Build all tests
-./build_tests.sh all
+./tests_new/scripts/build_tests.sh all
 
 # Build and run quick tests
-./build_tests.sh run
+./tests_new/scripts/build_tests.sh run
 
 # Build with clang (fuzzer requires)
-./build_tests.sh fuzz clang
+./tests_new/scripts/build_tests.sh fuzz clang
 
 # Clean
-./build_tests.sh clean
+./tests_new/scripts/build_tests.sh clean
 ```
 
 ### Windows PowerShell Environment
 
 ```powershell
 # Quick build
-.\build_tests.ps1 quick
+.\tests_new\scripts\build_tests.ps1 quick
 
 # Stress tests
-.\build_tests.ps1 stress
+.\tests_new\scripts\build_tests.ps1 stress
 
 # Build and run
-.\build_tests.ps1 run
+.\tests_new\scripts\build_tests.ps1 run
 
 # Clean
-.\build_tests.ps1 clean
+.\tests_new\scripts\build_tests.ps1 clean
+```
+
+### Using Makefile
+
+```bash
+# Build and run all quick tests
+cd tests_new && make quick
+
+# Build specific test
+cd tests_new && make test_verify
+```
+
+### Using CMake
+
+```bash
+cd tests_new
+mkdir build && cd build
+cmake ..
+cmake --build . --target quick_test
 ```
 
 ---
