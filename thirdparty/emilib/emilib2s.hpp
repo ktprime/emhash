@@ -1002,7 +1002,7 @@ private:
         else {
             // Fixed step with odd group stride: GCD(step/16, num_groups)=1 guarantees full coverage
             // (step/simd_bytes)|1 ensures odd, coprime with any power-of-2 num_groups
-            next_bucket += (((_num_buckets / 8 + simd_bytes) / simd_bytes) | 1) * simd_bytes;
+            next_bucket += (_num_buckets / (8 * simd_bytes) | 1) * simd_bytes;
         }
 #else
         next_bucket += simd_bytes;

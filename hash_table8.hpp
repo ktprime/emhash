@@ -59,7 +59,7 @@
     #define EMH_UNLIKELY(condition) (condition)
 #endif
 
-#define EMH_EMPTY(n) (0 > (int64_t)(_index[n].next))
+#define EMH_EMPTY(n) (0 > (int)(_index[n].next))
 #define EMH_EQHASH(n, key_hash) (((size_type)(key_hash) & ~_mask) == (_index[n].slot & ~_mask))
 //#define EMH_EQHASH(n, key_hash) ((size_type)(key_hash - _index[n].slot) & ~_mask) == 0
 #define EMH_NEW(key, val, bucket, key_hash) \
@@ -465,7 +465,7 @@ public:
     {
         const auto bucket = hash_bucket(key);
         const auto next_bucket = _index[bucket].next;
-        if ((int64_t)next_bucket < 0)
+        if ((int)next_bucket < 0)
             return 0;
         else if (bucket == next_bucket)
             return bucket + 1;
@@ -477,7 +477,7 @@ public:
     size_type bucket_size(const size_type bucket) const
     {
         auto next_bucket = _index[bucket].next;
-        if ((int64_t)next_bucket < 0)
+        if ((int)next_bucket < 0)
             return 0;
 
         next_bucket = hash_main(bucket);
@@ -497,7 +497,7 @@ public:
     size_type get_main_bucket(const size_type bucket) const
     {
         auto next_bucket = _index[bucket].next;
-        if ((int64_t)next_bucket < 0)
+        if ((int)next_bucket < 0)
             return INACTIVE;
 
         return hash_main(bucket);
@@ -518,7 +518,7 @@ public:
     int get_bucket_info(const size_type bucket, size_type steps[], const size_type slots) const
     {
         auto next_bucket = _index[bucket].next;
-        if ((int64_t)next_bucket < 0)
+        if ((int)next_bucket < 0)
             return -1;
 
         const auto main_bucket = hash_main(bucket);
@@ -1380,7 +1380,7 @@ private:
         const auto bucket = size_type(key_hash & _mask);
         const auto& idx = _index[bucket];
         auto next_bucket  = idx.next;
-        if (EMH_UNLIKELY((int64_t)next_bucket < 0))
+        if (EMH_UNLIKELY((int)next_bucket < 0))
             return INACTIVE;
 
         const auto slot = idx.slot & _mask;
@@ -1416,7 +1416,7 @@ private:
         const auto bucket = size_type(key_hash & _mask);
         const auto& idx = _index[bucket];
         auto next_bucket = idx.next;
-        if ((int64_t)next_bucket < 0)
+        if ((int)next_bucket < 0)
             return _num_filled;
 
         const auto slot = idx.slot & _mask;
@@ -1450,7 +1450,7 @@ private:
         const auto key_hash = hash_key(key);
         const auto bucket = size_type(key_hash & _mask);
         const auto next_bucket = _index[bucket].next;
-        if ((int64_t)next_bucket < 0)
+        if ((int)next_bucket < 0)
             return END;
 
         auto slot = _index[bucket].slot & _mask;
@@ -1548,7 +1548,7 @@ private:
         const auto& idx = _index[bucket];
         auto next_bucket = idx.next;
         prefetch_heap_block((char*)&_pairs[bucket]);
-        if ((int64_t)next_bucket < 0) {
+        if ((int)next_bucket < 0) {
 #if EMH_HIGH_LOAD
             if (next_bucket != INACTIVE)
                 pop_empty(bucket);
@@ -1594,7 +1594,7 @@ private:
     {
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = _index[bucket].next;
-        if ((int64_t)next_bucket < 0) {
+        if ((int)next_bucket < 0) {
 #if EMH_HIGH_LOAD
             if (next_bucket != INACTIVE)
                 pop_empty(bucket);

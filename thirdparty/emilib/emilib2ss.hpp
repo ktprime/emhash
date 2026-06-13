@@ -124,7 +124,7 @@ public:
     {
         const auto key_hash = _hasher(key);
         main_bucket = size_t(key_hash & _mask);
-        main_bucket -= main_bucket % simd_bytes;
+        main_bucket -= main_bucket & (simd_bytes - 1); // align to group boundary (simd_bytes is power of 2)
         return (int8_t)((size_t)(key_hash % 253) + (size_t)EFILLED);
     }
 
@@ -977,7 +977,7 @@ private:
         else {
             // Fixed step with odd group stride: GCD(step/16, num_groups)=1 guarantees full coverage
             // (step/simd_bytes)|1 ensures odd, coprime with any power-of-2 num_groups
-            next_bucket += (((_num_buckets / 8 + simd_bytes) / simd_bytes) | 1) * simd_bytes;
+            next_bucket += ((_num_buckets / 8 / simd_bytes) | 1) * simd_bytes;
         }
 #else
         next_bucket += simd_bytes;
@@ -992,6 +992,7 @@ private:
         size_t main_bucket, offset = 0;
         const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
+        const int max_offset = group_probe(main_bucket);
 
         while (true) {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -1006,7 +1007,7 @@ private:
                 } while (maskf &= maskf - 1);
             }
 
-            if ((int)++offset > group_probe(main_bucket))
+            if ((int)++offset > max_offset)
                 return _num_buckets;
             next_bucket = get_next_bucket(next_bucket, offset);
         }
@@ -1021,7 +1022,7 @@ private:
     size_t find_or_allocate(const K& key, bool& bnew) noexcept
     {
         size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
-        if (EMH_LIKELY(required_buckets >= _num_buckets))
+        if (EMH_UNLIKELY(required_buckets >= _num_buckets))
             rehash(required_buckets + 2);
 
         constexpr size_t chole = (size_t)-1;
@@ -1031,6 +1032,7 @@ private:
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket;
+        const int max_offset = group_probe(main_bucket);
 
         do {
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
@@ -1061,7 +1063,7 @@ private:
             }
             //3. next round
             next_bucket = get_next_bucket(next_bucket, ++offset);
-        }  while (offset <= (size_t)group_probe(main_bucket));
+        }  while (offset <= (size_t)max_offset);
 
         if (hole != chole) {
             set_states(hole, key_h2);
