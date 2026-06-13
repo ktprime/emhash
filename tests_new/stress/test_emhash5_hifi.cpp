@@ -1,6 +1,6 @@
 // High-intensity stress test for emhash5
 // #define EMH_FIND_HIT 1
-#include "../hash_table5.hpp"
+#include "../../hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
@@ -19,8 +19,8 @@ static int64_t total_ops = 0;
 } while(0)
 
 #define CHECK_EQ(a, b, msg) do { \
-    if ((a) != (b)) { total_fail++; printf("  FAIL: %s (got %lld expected %lld)\n", \
-        msg, (long long)(a), (long long)(b)); } \
+    if ((size_t)(a) != (size_t)(b)) { total_fail++; printf("  FAIL: %s (got %lld expected %lld)\n", \
+        msg, (long long)(size_t)(a), (long long)(size_t)(b)); } \
 } while(0)
 
 static double now_ms()
@@ -72,7 +72,7 @@ static void test_large_random_1m()
             int64_t k = keyd(rng);
             auto r1 = m.erase(k);
             auto r2 = ref.erase(k);
-            if (r1 != r2) {
+            if ((size_t)r1 != r2) {
                 printf("  FAIL at i=%d: erase return mismatch key=%lld\n", i, (long long)k);
                 total_fail++;
                 return;
@@ -84,10 +84,10 @@ static void test_large_random_1m()
 
     CHECK_EQ(m.size(), ref.size(), "final size");
     printf("  size=%zu, %.0f ops/ms (%.1f Mops total)\n",
-        m.size(), N / (t1 - t0), (double)total_ops / 1e6);
+        (size_t)m.size(), N / (t1 - t0), (double)total_ops / 1e6);
 
     // Full verify
-    printf("  full verifying %zu elements...\n", m.size());
+    printf("  full verifying %zu elements...\n", (size_t)m.size());
     for (auto& [k, v] : ref) {
         auto it = m.find(k);
         if (it == m.end() || it->second != v) {
@@ -164,7 +164,7 @@ static void test_rehash_under_load()
         ref[i] = i;
     }
     CHECK_EQ(m.size(), 100000, "after 100K insert");
-    printf("  bucket_count=%zu LF=%.2f\n", m.bucket_count(), m.load_factor());
+    printf("  bucket_count=%zu LF=%.2f\n", (size_t)m.bucket_count(), m.load_factor());
 
     // Erase 80K
     for (int i = 0; i < 80000; i++) {
@@ -172,7 +172,7 @@ static void test_rehash_under_load()
         ref.erase(i);
     }
     CHECK_EQ(m.size(), 20000, "after 80K erase");
-    printf("  bucket_count=%zu LF=%.4f\n", m.bucket_count(), m.load_factor());
+    printf("  bucket_count=%zu LF=%.4f\n", (size_t)m.bucket_count(), m.load_factor());
 
     // Verify remaining
     int v_count = 0;
@@ -245,7 +245,7 @@ static void test_bucket_growth()
     }
     CHECK_EQ(m.size(), 200000, "final size");
     printf("  final bucket_count=%zu LF=%.3f\n\n",
-        m.bucket_count(), m.load_factor());
+        (size_t)m.bucket_count(), m.load_factor());
 }
 
 // Test 7: Copy/move heavy
@@ -347,7 +347,7 @@ static void test_inactive_heavy()
 
     // Mass find(-1) with different hashes
     int fps = 0;
-    for (size_t b = 0; b < m2.bucket_count(); b++) {
+    for (size_t b = 0; b < (size_t)m2.bucket_count(); b++) {
         if (m2.find(-1, b) != m2.end()) fps++;
     }
     CHECK_EQ(fps, 0, "no false positives");
@@ -362,7 +362,7 @@ static void test_extreme_high_load()
     emhash5::HashMap<int, int> m(1024, 0.99f);
     for (int i = 0; i < 1000; i++) m[i] = i;
     CHECK_EQ(m.size(), 1000, "high load size");
-    printf("  bucket_count=%zu LF=%.3f\n", m.bucket_count(), m.load_factor());
+    printf("  bucket_count=%zu LF=%.3f\n", (size_t)m.bucket_count(), m.load_factor());
 
     for (int i = 0; i < 1000; i++) {
         if (m[i] != i) {

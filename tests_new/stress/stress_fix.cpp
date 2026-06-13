@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <random>
-#include "../hash_table8.hpp"
+#include "../../hash_table8.hpp"
 
 int main() {
     printf("=== Stress test: reserve(1) + random operations ===\n");

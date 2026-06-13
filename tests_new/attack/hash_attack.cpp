@@ -6,7 +6,7 @@
 //
 // Build: g++ -O2 -std=c++17 -o hash_attack hash_attack.cpp
 //
-#include "../hash_table5.hpp"
+#include "../../hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -54,7 +54,7 @@ static int test_attack_correctness_const()
         ref[i] = i;
     }
     int fail = 0;
-    if (m.size() != (size_t)N) { printf("  FAIL: size %zu != %d\n", m.size(), N); fail++; }
+    if (m.size() != (size_t)N) { printf("  FAIL: size %zu != %d\n", (size_t)m.size(), N); fail++; }
 
     // Find all
     for (int i = 0; i < N; i++) {
@@ -146,7 +146,7 @@ static double bench_insert_const(int N, const char* name)
     for (int i = 0; i < N; i++) m[i] = i;
     auto t1 = now_ms();
     printf("  %-30s insert N=%-7d → %.1f ms (%.0f ops/ms), bucket_count=%zu, LF=%.2f\n",
-        name, N, t1 - t0, N / (t1 - t0), m.bucket_count(), m.load_factor());
+        name, N, t1 - t0, N / (t1 - t0), (size_t)m.bucket_count(), m.load_factor());
     return t1 - t0;
 }
 
@@ -158,8 +158,8 @@ static double bench_find_const(int N, const char* name)
     auto t0 = now_ms();
     volatile int sink = 0;
     for (int round = 0; round < 10; round++)
-        for (int i = 0; i < N; i++)
-            sink += m.find(i) != m.end() ? 1 : 0;
+        for (int i = 0; i < N; i++) sink += m[i];
+    (void)sink;
     auto t1 = now_ms();
     double ops = (double)N * 10;
     printf("  %-30s find   N=%-7d → %.1f ms (%.0f ops/ms)\n",
@@ -266,7 +266,7 @@ int main()
         for (int i = 0; i < 100000; i++) m[i] = i;
         auto t1 = now_ms();
         printf("  insert N=100K: %.1f ms (%.0f ops/ms), bucket_count=%zu, LF=%.2f\n",
-            t1 - t0, 100000.0 / (t1 - t0), m.bucket_count(), m.load_factor());
+            t1 - t0, 100000.0 / (t1 - t0), (size_t)m.bucket_count(), m.load_factor());
     }
 
     printf("\n################################################################\n");

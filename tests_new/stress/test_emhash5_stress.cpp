@@ -1,5 +1,5 @@
 // Stress test for emhash5
-#include "../hash_table5.hpp"
+#include "../../hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
@@ -40,14 +40,14 @@ int main()
                 int64_t k = keyd(rng);
                 auto r1 = m.erase(k);
                 auto r2 = ref.erase(k);
-                CHECK(r1 == r2, "erase return mismatch");
+                CHECK((size_t)r1 == r2, "erase return mismatch");
             }
 
             // Verify size every 100 rounds
             if (round % 100 == 99) {
-                if (m.size() != ref.size()) {
+                if ((size_t)m.size() != ref.size()) {
                     printf("  FAIL at round %d: size=%zu ref=%zu\n",
-                        round, m.size(), ref.size());
+                        round, (size_t)m.size(), ref.size());
                     return 1;
                 }
                 // Verify all keys
@@ -61,8 +61,8 @@ int main()
                 }
             }
         }
-        CHECK(m.size() == ref.size(), "final size");
-        printf("  size=%zu OK\n", m.size());
+        CHECK((size_t)m.size() == ref.size(), "final size");
+        printf("  size=%zu OK\n", (size_t)m.size());
     }
 
     // Test with -1 keys (INACTIVE)

@@ -122,11 +122,6 @@ int main(int argc, char** argv) {
                     printf("  FIND em=%d ref=%d\n", em_it != em.end(), ref_it != ref.end());
                     break;
                 }
-                case OP_ACCESS: {
-                    em[op.key] = op.value;
-                    ref[op.key] = op.value;
-                    break;
-                }
                 case OP_ITERATE: {
                     std::unordered_map<int, int> em_collect;
                     for (auto it = em.begin(); it != em.end(); ++it)
@@ -150,7 +145,7 @@ int main(int argc, char** argv) {
                     break;
                 }
                 case OP_COUNT: {
-                    printf("  COUNT em=%zu ref=%zu\n", em.count(op.key), ref.count(op.key));
+                    printf("  COUNT em=%zu ref=%zu\n", (size_t)em.count(op.key), ref.count(op.key));
                     break;
                 }
                 case OP_CONTAINS: {
@@ -166,7 +161,7 @@ int main(int argc, char** argv) {
             }
 
             if (em.size() != ref.size()) {
-                printf("SIZE MISMATCH! em=%zu ref=%zu after op[%zu]\n", em.size(), ref.size(), i);
+                printf("SIZE MISMATCH! em=%zu ref=%zu after op[%zu]\n", (size_t)em.size(), ref.size(), i);
                 abort();
             }
         }

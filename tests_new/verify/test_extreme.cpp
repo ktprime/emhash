@@ -1,13 +1,13 @@
 /**
- * EMH_FIND_HIT bug 修复的极端测试
+ * EMH_FIND_HIT bug fix extreme tests
  *
- * 覆盖：各种整型 key、INACTIVE 边界值、各种操作后的残留检查
+ * Coverage: various integer key types, INACTIVE boundary values, residue checks after various operations
  *
- * 编译: g++ -std=c++17 -O2 -o test_extreme test/test_extreme.cpp
+ * Compile: g++ -std=c++17 -O2 -o test_extreme test/test_extreme.cpp
  */
 
 #define EMH_FIND_HIT 1
-#include "../hash_table5.hpp"
+#include "../../hash_table5.hpp"
 
 #include <cstdio>
 #include <cstdint>
@@ -24,12 +24,12 @@ static int total = 0, passed = 0;
     else { printf("  FAIL [%d]: %s\n", total, msg); } \
 } while(0)
 
-// 前向声明
+// Forward declaration
 template<typename Map, typename KeyT>
 void fp_check(Map& map, KeyT inactive, const char* msg);
 
 // ============================================================
-// 通用测试模板：对任意整型 KeyT
+// Generic test template: for any integer KeyT
 // ============================================================
 template<typename KeyT>
 void test_int_type(const char* name)
@@ -39,7 +39,7 @@ void test_int_type(const char* name)
     using Map = emhash5::HashMap<KeyT, KeyT>;
     const KeyT inactive = (KeyT)emhash5::INACTIVE;
 
-    // 1. 空 map: find(key) 对各种边界 key
+    // 1. Empty map: find(key) for various boundary keys
     {
         Map map(16);
         CHECK(map.find(inactive) == map.end(), "empty find(INACTIVE)");
@@ -47,26 +47,26 @@ void test_int_type(const char* name)
         CHECK(!map.contains(inactive), "empty contains(INACTIVE)");
     }
 
-    // 2. 空 map: find(key, hash) 遍历所有桶
+    // 2. Empty map: find(key, hash) iterate all buckets
     {
         Map map(16);
         fp_check(map, inactive, "empty find(INACTIVE,hash) no false positives");
     }
 
-    // 3. 插入 INACTIVE key 后正常查找
+    // 3. Insert INACTIVE key then normal find
     {
         Map map(16);
         map.insert_unique(inactive, KeyT(99));
         auto it = map.find(inactive);
         CHECK(it != map.end() && it->second == KeyT(99), "find inserted INACTIVE key");
 
-        // 删除后再查找
+        // Find after erase
         map.erase(inactive);
         CHECK(map.find(inactive) == map.end(), "find INACTIVE after erase");
         fp_check(map, inactive, "find(INACTIVE,hash) after erase");
     }
 
-    // 4. 插入大量数据后 clear，检查残留
+    // 4. Insert large data then clear, check residue
     {
         Map map(16);
         for (KeyT i = 0; i < KeyT(200); i++)
@@ -76,7 +76,7 @@ void test_int_type(const char* name)
         fp_check(map, inactive, "find(INACTIVE,hash) after clear");
     }
 
-    // 5. rehash 后检查
+    // 5. Check after rehash
     {
         Map map(4);
         for (KeyT i = 0; i < KeyT(200); i++)
@@ -85,7 +85,7 @@ void test_int_type(const char* name)
         fp_check(map, inactive, "find(INACTIVE,hash) after rehash");
     }
 
-    // 6. 插入-删除-插入 循环，制造大量空洞
+    // 6. Insert-delete-insert loop, create many holes
     {
         Map map(32);
         for (int round = 0; round < 5; round++) {
@@ -98,7 +98,7 @@ void test_int_type(const char* name)
         fp_check(map, inactive, "find(INACTIVE,hash) after churn");
     }
 
-    // 7. swap 后检查
+    // 7. Check after swap
     {
         Map map1(16), map2(64);
         for (KeyT i = 0; i < KeyT(50); i++) map1[i] = i;
@@ -108,7 +108,7 @@ void test_int_type(const char* name)
         CHECK(map2.find(inactive) == map2.end(), "find INACTIVE after swap (map2)");
     }
 
-    // 8. reserve 后检查
+    // 8. Check after reserve
     {
         Map map;
         map.reserve(1000);
@@ -116,7 +116,7 @@ void test_int_type(const char* name)
         fp_check(map, inactive, "find(INACTIVE,hash) after reserve");
     }
 
-    // 9. shrink_to_fit 后检查
+    // 9. Check after shrink_to_fit
     {
         Map map(128);
         for (KeyT i = 0; i < KeyT(10); i++) map[i] = i;
@@ -124,7 +124,7 @@ void test_int_type(const char* name)
         CHECK(map.find(inactive) == map.end(), "find INACTIVE after shrink_to_fit");
     }
 
-    // 10. key == INACTIVE-1 (哨兵值 -2)
+    // 10. key == INACTIVE-1 (sentinel value -2)
     {
         Map map(16);
         KeyT sentinel = KeyT(KeyT(0) - 2);
@@ -140,14 +140,14 @@ template<typename Map, typename KeyT>
 void fp_check(Map& map, KeyT inactive, const char* msg)
 {
     int fp = 0;
-    for (size_t b = 0; b < map.bucket_count(); b++) {
+    for (size_t b = 0; b < (size_t)map.bucket_count(); b++) {
         if (map.find(inactive, b) != map.end()) fp++;
     }
     CHECK(fp == 0, msg);
 }
 
 // ============================================================
-// 非整型 key (string) 不应受影响
+// Non-integer key (string) should not be affected
 // ============================================================
 void test_string_key()
 {
@@ -166,7 +166,7 @@ void test_string_key()
 }
 
 // ============================================================
-// 极端容量测试
+// Extreme capacity tests
 // ============================================================
 void test_extreme_sizes()
 {
@@ -174,17 +174,17 @@ void test_extreme_sizes()
     using Map = emhash5::HashMap<int32_t, int32_t>;
     const int32_t inactive = (int32_t)emhash5::INACTIVE;
 
-    // 极小容量
+    // Minimal capacity
     {
         Map map(1);
         CHECK(map.find(inactive) == map.end(), "size=1 find INACTIVE");
     }
 
-    // 大容量空 map
+    // Large capacity empty map
     {
         Map map(1 << 20); // 1M buckets
         CHECK(map.find(inactive) == map.end(), "1M buckets find INACTIVE");
-        // 只抽查几个 hash 值
+        // Spot check a few hash values
         bool ok = true;
         for (size_t h = 0; h < 100; h++) {
             if (map.find(inactive, h) != map.end()) { ok = false; break; }
@@ -194,7 +194,7 @@ void test_extreme_sizes()
 }
 
 // ============================================================
-// 并发操作序列：交替 insert/erase 制造最大空洞
+// Concurrent operation sequence: alternating insert/erase to create maximum holes
 // ============================================================
 void test_alternating_ops()
 {
@@ -212,14 +212,14 @@ void test_alternating_ops()
     CHECK(map.find(inactive) == map.end(), "find INACTIVE after alternating ops");
 
     int fp = 0;
-    for (size_t b = 0; b < map.bucket_count(); b++) {
+    for (size_t b = 0; b < (size_t)map.bucket_count(); b++) {
         if (map.find(inactive, b) != map.end()) fp++;
     }
     CHECK(fp == 0, "find(INACTIVE,hash) after alternating ops");
 }
 
 // ============================================================
-// INACTIVE 附近的 key 值边界测试
+// INACTIVE boundary key value tests
 // ============================================================
 void test_inactive_boundary()
 {
@@ -244,7 +244,7 @@ void test_inactive_boundary()
     }
     CHECK(all_found, "all boundary keys found correctly");
 
-    // 逐个删除再验证
+    // Erase one by one then verify
     for (auto k : keys) {
         map.erase(k);
         if (map.find(k) != map.end()) {
@@ -254,9 +254,9 @@ void test_inactive_boundary()
     }
     CHECK(true, "all boundary keys erased correctly");
 
-    // 删除后 find(key, hash) 不应误报
+    // After erase, find(key, hash) should not have false positives
     int fp = 0;
-    for (size_t b = 0; b < map.bucket_count(); b++) {
+    for (size_t b = 0; b < (size_t)map.bucket_count(); b++) {
         for (auto k : keys) {
             if (map.find(k, b) != map.end()) fp++;
         }

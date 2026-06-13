@@ -13,11 +13,11 @@
 #include <utility>
 #include <algorithm>
 
-#include "../hash_table5.hpp"
-#include "../hash_table6.hpp"
-#include "../hash_table7.hpp"
-#include "../hash_table8.hpp"
-#include "../hash_set8.hpp"
+#include "../../hash_table5.hpp"
+#include "../../hash_table6.hpp"
+#include "../../hash_table7.hpp"
+#include "../../hash_table8.hpp"
+#include "../../hash_set8.hpp"
 
 // ============================================================================
 // Operation parsing

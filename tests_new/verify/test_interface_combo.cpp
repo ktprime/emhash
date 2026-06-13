@@ -370,7 +370,7 @@ bool test_string_key()
 
     // Iteration
     int count = 0;
-    for (auto& p : map3) count++;
+    for (auto& p : map3) { (void)p; count++; }
     TEST_ASSERT(count == (int)map3.size(), "string iteration");
 
     // Reserve/rehash/clear

@@ -3,7 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cassert>
-#include "../hash_table8.hpp"
+#include "../../hash_table8.hpp"
 
 int main() {
     printf("=== Test 1: Insert 0x68686868 key (has high bit pattern issue) ===\n");

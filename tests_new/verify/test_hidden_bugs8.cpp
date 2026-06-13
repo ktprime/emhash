@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 #include <chrono>
-#include "../hash_table8.hpp"
+#include "../../hash_table8.hpp"
 
 // =============================================================================
 // Test 1: Hash high-bit collision causing false positive match (EMH_EQHASH bug)
@@ -180,6 +180,7 @@ int test_etail_staleness() {
     // Erase first element - this sets _etail = INACTIVE
     auto it = m.begin();
     int first_key = it->first;
+    (void)first_key;
     m.erase(it);
     
     // Now the last element's bucket should be tracked
@@ -256,6 +257,7 @@ int test_key_mutation() {
     if (it != m.end()) {
         // This compiles because KeyT is not const!
         int old_key = it->first;
+        (void)old_key;
         const_cast<int&>(it->first) = 999;
         
         // Now the table is corrupted: key 999 is in bucket for key 5

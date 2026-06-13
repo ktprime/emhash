@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
                     break;
                 }
                 case OP_COUNT: {
-                    printf("  COUNT em=%zu ref=%zu\n", em.count(op.key), ref.count(op.key));
+                    printf("  COUNT em=%zu ref=%zu\n", (size_t)em.count(op.key), ref.count(op.key));
                     break;
                 }
                 case OP_CONTAINS: {

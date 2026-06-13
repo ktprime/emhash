@@ -1,13 +1,14 @@
-// Comprehensive fuzzing test for all emhash versions (5, 6, 7, 8) and hash sets
-// Compile with: clang++ -fsanitize=fuzzer,address -std=c++17 -g fuzz_emhash_all.cpp -o fuzz_all
+// Comprehensive fuzzing test for all 3 emilib implementations
+// Compile with: clang++ -fsanitize=fuzzer,address -std=c++17 -g fuzz_emilib_all.cpp -o fuzz_emilib_all
 //
 // Run:
-//   ./fuzz_all -max_total_time=60 -print_final_stats=1
-//   ./fuzz_all corpus/ -max_total_time=300
+//   ./fuzz_emilib_all -max_total_time=60 -print_final_stats=1
+//   ./fuzz_emilib_all corpus/ -max_total_time=300
 //
 // This fuzzer tests:
-//   - emhash5::HashMap, emhash6::HashMap, emhash7::HashMap, emhash8::HashMap
-//   - emhash8::HashSet
+//   - emilib::HashMap (emilib2ss)
+//   - emilib2::HashMap (emilib2o)
+//   - emilib3::HashMap (emilib2s)
 //   - Custom hash collision patterns
 //   - High load factor scenarios
 //   - String key types
@@ -18,16 +19,13 @@
 #include <cstring>
 #include <vector>
 #include <unordered_map>
-#include <unordered_set>
 #include <string>
 #include <cassert>
 #include <utility>
 
-#include "../../hash_table5.hpp"
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
-#include "../../hash_set8.hpp"
+#include "../../thirdparty/emilib/emilib2ss.hpp"
+#include "../../thirdparty/emilib/emilib2o.hpp"
+#include "../../thirdparty/emilib/emilib2s.hpp"
 
 // ============================================================================
 // Custom hasher for controlled collision patterns
@@ -56,6 +54,20 @@ struct FuzzHasher {
         h *= 0xff51afd7ed558ccdull;
         h ^= h >> 33;
         return static_cast<size_t>(h);
+    }
+};
+
+// ============================================================================
+// Collision hasher - all keys hash to same bucket
+// ============================================================================
+struct CollisionHasher {
+    size_t operator()(int x) const {
+        // All keys hash to 0 - extreme collision test
+        return 0;
+    }
+
+    size_t operator()(const std::string& s) const {
+        return 0;
     }
 };
 
@@ -99,13 +111,10 @@ static std::vector<Op> parse_input(const uint8_t* data, size_t size) {
 
 // ============================================================================
 // Helper: run operations on a generic HashMap and compare with reference
-// Note: emhash5/6/7 constructors take (bucket, mlf), emhash8 takes (bucket, mlf) too.
-// The hasher is a template parameter but not a constructor argument for emhash5/6/7.
-// We use the default constructor for all versions.
 // ============================================================================
 template<typename HashMapT>
 static void fuzz_hashmap(const std::vector<Op>& ops) {
-    HashMapT em(2, 0.8f);
+    HashMapT em;
     std::unordered_map<int, int> ref;
 
     for (const auto& op : ops) {
@@ -160,7 +169,6 @@ static void fuzz_hashmap(const std::vector<Op>& ops) {
                 break;
             }
             case OP_INSERT_OR_ASSIGN: {
-                // insert_or_assign requires ValueT&& for emhash6/7/8
                 int v = op.value;
                 em.insert_or_assign(op.key, std::move(v));
                 ref[op.key] = op.value;
@@ -204,105 +212,6 @@ static void fuzz_hashmap(const std::vector<Op>& ops) {
     for (auto it = em.begin(); it != em.end(); ++it) {
         assert(ref.count(it->first) == 1);
         assert(ref[it->first] == it->second);
-    }
-}
-
-// ============================================================================
-// Helper: run operations on HashSet and compare with reference
-// ============================================================================
-template<typename HashSetT>
-static void fuzz_hashset(const std::vector<Op>& ops) {
-    HashSetT em(2);
-    std::unordered_set<int> ref;
-
-    for (const auto& op : ops) {
-        switch (op.code) {
-            case OP_INSERT: {
-                auto em_r = em.insert(op.key);
-                auto ref_r = ref.insert(op.key);
-                assert(em_r.second == ref_r.second);
-                break;
-            }
-            case OP_ERASE: {
-                size_t em_r = em.erase(op.key);
-                size_t ref_r = ref.erase(op.key);
-                assert(em_r == ref_r);
-                break;
-            }
-            case OP_FIND: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                bool em_found = (em_it != em.end());
-                bool ref_found = (ref_it != ref.end());
-                assert(em_found == ref_found);
-                break;
-            }
-            case OP_ACCESS: {
-                em.insert(op.key);
-                ref.insert(op.key);
-                break;
-            }
-            case OP_ITERATE: {
-                std::unordered_set<int> em_collect;
-                for (auto it = em.begin(); it != em.end(); ++it) {
-                    em_collect.insert(*it);
-                }
-                assert(em_collect == ref);
-                break;
-            }
-            case OP_CLEAR: {
-                em.clear();
-                ref.clear();
-                break;
-            }
-            case OP_RESERVE: {
-                size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
-                if (cap < 1000000) {
-                    em.reserve(cap);
-                    ref.reserve(cap);
-                }
-                break;
-            }
-            case OP_INSERT_OR_ASSIGN: {
-                em.insert(op.key);
-                ref.insert(op.key);
-                break;
-            }
-            case OP_ERASE_ITERATOR: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
-                }
-                break;
-            }
-            case OP_COUNT: {
-                assert(em.count(op.key) == ref.count(op.key));
-                break;
-            }
-            case OP_CONTAINS: {
-                bool em_has = em.contains(op.key);
-                bool ref_has = (ref.find(op.key) != ref.end());
-                assert(em_has == ref_has);
-                break;
-            }
-            case OP_EMPLACE: {
-                auto em_r = em.emplace(op.key);
-                auto ref_r = ref.emplace(op.key);
-                assert(em_r.second == ref_r.second);
-                break;
-            }
-        }
-        assert(em.size() == ref.size());
-    }
-
-    // Final verification
-    for (const auto& k : ref) {
-        assert(em.contains(k));
-    }
-    for (auto it = em.begin(); it != em.end(); ++it) {
-        assert(ref.count(*it) == 1);
     }
 }
 
@@ -370,7 +279,7 @@ static void fuzz_string_hashmap(const uint8_t* data, size_t size) {
 // ============================================================================
 template<typename HashMapT>
 static void fuzz_high_load(const std::vector<Op>& ops) {
-    HashMapT em(4, 0.95f); // high load factor
+    HashMapT em;
     std::unordered_map<int, int> ref;
 
     // Only insert and find, to stress the high load path
@@ -410,11 +319,54 @@ static void fuzz_high_load(const std::vector<Op>& ops) {
 }
 
 // ============================================================================
-// Helper: fuzz with custom hash (emhash8 only, which supports hasher in template)
-// Uses insert() (not insert_unique) since keys may duplicate
+// Helper: collision pattern test - all keys hash to same bucket
 // ============================================================================
-static void fuzz_emhash8_custom_hash(const std::vector<Op>& ops, uint64_t seed) {
-    emhash8::HashMap<int, int, FuzzHasher> em(2, 0.8f);
+template<typename HashMapT>
+static void fuzz_collision_pattern(const std::vector<Op>& ops) {
+    HashMapT em;
+    std::unordered_map<int, int> ref;
+
+    for (const auto& op : ops) {
+        switch (op.code % 4) {
+            case 0: { // insert
+                em.insert({op.key, op.value});
+                ref.insert({op.key, op.value});
+                break;
+            }
+            case 1: { // erase
+                em.erase(op.key);
+                ref.erase(op.key);
+                break;
+            }
+            case 2: { // find
+                auto em_it = em.find(op.key);
+                auto ref_it = ref.find(op.key);
+                assert((em_it != em.end()) == (ref_it != ref.end()));
+                break;
+            }
+            case 3: { // operator[]
+                em[op.key] = op.value;
+                ref[op.key] = op.value;
+                break;
+            }
+        }
+        assert(em.size() == ref.size());
+    }
+
+    // Verify all elements
+    for (const auto& kv : ref) {
+        auto it = em.find(kv.first);
+        assert(it != em.end());
+        assert(it->second == kv.second);
+    }
+}
+
+// ============================================================================
+// Helper: fuzz with custom hash
+// ============================================================================
+template<typename HashMapT>
+static void fuzz_custom_hash(const std::vector<Op>& ops, uint64_t seed) {
+    HashMapT em;
     std::unordered_map<int, int> ref;
 
     for (const auto& op : ops) {
@@ -509,7 +461,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     if (size < 10) return 0;
 
     // First byte selects which test to run
-    uint8_t test_selector = data[0] % 9;
+    uint8_t test_selector = data[0] % 15;
 
     const uint8_t* op_data = data + 1;
     size_t op_size = size - 1;
@@ -519,32 +471,55 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     if (ops.size() > 500) ops.resize(500);
 
     switch (test_selector) {
-        case 0: // emhash5::HashMap
-            fuzz_hashmap<emhash5::HashMap<int, int>>(ops);
+        // emilib::HashMap (emilib2ss) tests
+        case 0: // Basic operations
+            fuzz_hashmap<emilib::HashMap<int, int>>(ops);
             break;
-        case 1: // emhash6::HashMap
-            fuzz_hashmap<emhash6::HashMap<int, int>>(ops);
+        case 1: // String key test
+            fuzz_string_hashmap<emilib::HashMap<std::string, int>>(op_data, op_size);
             break;
-        case 2: // emhash7::HashMap
-            fuzz_hashmap<emhash7::HashMap<int, int>>(ops);
+        case 2: // High load factor test
+            fuzz_high_load<emilib::HashMap<int, int>>(ops);
             break;
-        case 3: // emhash8::HashMap
-            fuzz_hashmap<emhash8::HashMap<int, int>>(ops);
+        case 3: // Custom hash test
+            fuzz_custom_hash<emilib::HashMap<int, int, FuzzHasher>>(ops, 0xDEADBEEF);
             break;
-        case 4: // emhash8::HashSet
-            fuzz_hashset<emhash8::HashSet<int>>(ops);
+        case 4: // Collision pattern test
+            fuzz_collision_pattern<emilib::HashMap<int, int, CollisionHasher>>(ops);
             break;
-        case 5: // String key test for emhash8
-            fuzz_string_hashmap<emhash8::HashMap<std::string, int>>(op_data, op_size);
+
+        // emilib2::HashMap (emilib2o) tests
+        case 5: // Basic operations
+            fuzz_hashmap<emilib2::HashMap<int, int>>(ops);
             break;
-        case 6: // High load factor test for emhash5
-            fuzz_high_load<emhash5::HashMap<int, int>>(ops);
+        case 6: // String key test
+            fuzz_string_hashmap<emilib2::HashMap<std::string, int>>(op_data, op_size);
             break;
-        case 7: // High load factor test for emhash8
-            fuzz_high_load<emhash8::HashMap<int, int>>(ops);
+        case 7: // High load factor test
+            fuzz_high_load<emilib2::HashMap<int, int>>(ops);
             break;
-        case 8: // emhash8 with custom hash (collision patterns)
-            fuzz_emhash8_custom_hash(ops, 0xDEADBEEF);
+        case 8: // Custom hash test
+            fuzz_custom_hash<emilib2::HashMap<int, int, FuzzHasher>>(ops, 0xDEADBEEF);
+            break;
+        case 9: // Collision pattern test
+            fuzz_collision_pattern<emilib2::HashMap<int, int, CollisionHasher>>(ops);
+            break;
+
+        // emilib3::HashMap (emilib2s) tests
+        case 10: // Basic operations
+            fuzz_hashmap<emilib3::HashMap<int, int>>(ops);
+            break;
+        case 11: // String key test
+            fuzz_string_hashmap<emilib3::HashMap<std::string, int>>(op_data, op_size);
+            break;
+        case 12: // High load factor test
+            fuzz_high_load<emilib3::HashMap<int, int>>(ops);
+            break;
+        case 13: // Custom hash test
+            fuzz_custom_hash<emilib3::HashMap<int, int, FuzzHasher>>(ops, 0xDEADBEEF);
+            break;
+        case 14: // Collision pattern test
+            fuzz_collision_pattern<emilib3::HashMap<int, int, CollisionHasher>>(ops);
             break;
     }
 

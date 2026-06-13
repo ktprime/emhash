@@ -11,7 +11,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cassert>
-#include "../hash_table8.hpp"
+#include "../../hash_table8.hpp"
 
 // We interpret fuzz input as a sequence of operations
 // Each operation: [op_code(1 byte), key(4 bytes), value(4 bytes)]
@@ -119,7 +119,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                 break;
             }
             case OP_INSERT_OR_ASSIGN: {
-                auto em_r = em.insert_or_assign(op.key, op.value);
+                auto em_r = em.insert_or_assign(op.key, int(op.value));
                 auto ref_it = ref.find(op.key);
                 bool ref_inserted = (ref_it == ref.end());
                 ref[op.key] = op.value;

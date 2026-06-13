@@ -2,7 +2,7 @@
 // emhash7 uses Swiss Table style with 8-bit metadata
 // Compare its robustness under hash attack
 //
-#include "../hash_table7.hpp"
+#include "../../hash_table7.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -36,7 +36,7 @@ static double now_ms() {
 // ---------------------------------------------------------------------------
 static int test_attack_correctness_const()
 {
-    printf("=== Correctness: constant hash (all keys 鈫?bucket 0) ===\n");
+    printf("=== Correctness: constant hash (all keys -> bucket 0) ===\n");
     emhash7::HashMap<int, int, const_hasher> m(8);
     std::unordered_map<int, int, const_hasher> ref(8);
 
@@ -46,7 +46,7 @@ static int test_attack_correctness_const()
         ref[i] = i;
     }
     int fail = 0;
-    if (m.size() != (size_t)N) { printf("  FAIL: size %zu != %d\n", m.size(), N); fail++; }
+    if (m.size() != (size_t)N) { printf("  FAIL: size %zu != %d\n", (size_t)m.size(), N); fail++; }
 
     for (int i = 0; i < N; i++) {
         auto it = m.find(i);
@@ -88,7 +88,7 @@ static int test_attack_correctness_const()
 
 static int test_attack_correctness_range4()
 {
-    printf("\n=== Correctness: range-4 hash (keys 鈫?4 buckets) ===\n");
+    printf("\n=== Correctness: range-4 hash (keys -> 4 buckets) ===\n");
     emhash7::HashMap<int, int, range4_hasher> m(8);
     std::unordered_map<int, int, range4_hasher> ref(8);
 
@@ -142,7 +142,7 @@ static double bench_insert(int N, const char* name)
     auto t0 = now_ms();
     for (int i = 0; i < N; i++) m[i] = i;
     auto t1 = now_ms();
-    printf("  %-30s insert N=%-7d 鈫?%.1f ms (%.0f ops/ms)\n",
+    printf("  %-30s insert N=%-7d -> %.1f ms (%.0f ops/ms)\n",
         name, N, t1 - t0, N / (t1 - t0));
     return t1 - t0;
 }
@@ -157,9 +157,10 @@ static double bench_find(int N, const char* name)
     for (int round = 0; round < 10; round++)
         for (int i = 0; i < N; i++)
             sink += m.find(i) != m.end() ? 1 : 0;
+    (void)sink;
     auto t1 = now_ms();
     double ops = (double)N * 10;
-    printf("  %-30s find   N=%-7d 鈫?%.1f ms (%.0f ops/ms)\n",
+    printf("  %-30s find   N=%-7d -> %.1f ms (%.0f ops/ms)\n",
         name, N, t1 - t0, ops / (t1 - t0));
     return t1 - t0;
 }
@@ -172,7 +173,7 @@ static double bench_erase(int N, const char* name)
     auto t0 = now_ms();
     for (int i = 0; i < N; i++) m.erase(i);
     auto t1 = now_ms();
-    printf("  %-30s erase  N=%-7d 鈫?%.1f ms (%.0f ops/ms)\n",
+    printf("  %-30s erase  N=%-7d -> %.1f ms (%.0f ops/ms)\n",
         name, N, t1 - t0, N / (t1 - t0));
     return t1 - t0;
 }
@@ -195,7 +196,7 @@ static double bench_mixed(int N, const char* name)
         else m.erase(k);
     }
     auto t1 = now_ms();
-    printf("  %-30s mixed  N=%-7d 鈫?%.1f ms (%.0f ops/ms)\n",
+    printf("  %-30s mixed  N=%-7d -> %.1f ms (%.0f ops/ms)\n",
         name, N, t1 - t0, N / (t1 - t0));
     return t1 - t0;
 }

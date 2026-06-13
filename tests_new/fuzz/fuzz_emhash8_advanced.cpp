@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <cassert>
 #include <set>
-#include "../hash_table8.hpp"
+#include "../../hash_table8.hpp"
 
 // Custom hasher that allows controlled collisions
 struct FuzzHasher {
@@ -76,13 +76,15 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         uint8_t cmd = op.code % 12;
         
         switch (cmd) {
-            case 0: {  // insert_unique
-                auto em_r = em.insert_unique(op.key, op.value);
+            case 0: {  // insert (not insert_unique - that requires user to guarantee uniqueness)
+                auto em_r = em.insert({op.key, op.value});
                 auto ref_r = ref.insert({op.key, op.value});
-                // insert_unique should always insert (no overwrite)
-                if (!ref_r.second) {
-                    // Key exists, emhash8 may return existing bucket
-                } else {
+                // insert should match reference behavior
+                if (em_r.second != ref_r.second) {
+                    // Key exists in one but not the other - this is a real bug
+                    assert(em_r.second == ref_r.second);
+                }
+                if (ref_r.second) {
                     inserted_keys.push_back(op.key);
                 }
                 break;

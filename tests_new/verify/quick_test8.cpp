@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cassert>
 #include <unordered_map>
-#include "../hash_table8.hpp"
+#include "../../hash_table8.hpp"
 
 struct ConstHasher { size_t operator()(int x) const { return 0; } };
 struct R4Hasher   { size_t operator()(int x) const { return x & 3; } };

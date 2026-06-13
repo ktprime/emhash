@@ -6,8 +6,8 @@
 
 #define EMH_HIGH_LOAD 1234567
 
-#include "../hash_table5.hpp"
-#include "../hash_table8.hpp"
+#include "../../hash_table5.hpp"
+#include "../../hash_table8.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
@@ -34,8 +34,8 @@ static int test_bucket0_erase()
         refmap[i] = i;
     }
 
-    printf("After fill: size=%zu, buckets=%zu, LF=%.4f\n",
-        myhash.size(), myhash.bucket_count(), myhash.load_factor());
+    printf("After fill: size=%d, buckets=%d, LF=%.4f\n",
+        (int)myhash.size(), (int)myhash.bucket_count(), myhash.load_factor());
 
     // Erase all elements and verify the map is consistent
     auto orig_size = myhash.size();
@@ -45,7 +45,7 @@ static int test_bucket0_erase()
         it = myhash.erase(it);
         erased++;
     }
-    printf("Erased %zu elements (orig size=%zu)\n", erased, orig_size);
+    printf("Erased %zu elements (orig size=%d)\n", erased, (int)orig_size);
     assert(myhash.size() == 0);
     assert(refmap.size() == 0);
 
@@ -60,7 +60,7 @@ static int test_bucket0_erase()
         assert(myhash[i] == i * 10);
         assert(refmap[i] == i * 10);
     }
-    assert(myhash.size() == refmap.size());
+    assert((size_t)myhash.size() == refmap.size());
     printf("Bucket 0 erase test PASSED\n\n");
     return 0;
 }
@@ -81,8 +81,8 @@ static int test_bucket0_push_empty()
         keys.push_back(i);
     }
 
-    printf("After fill: size=%zu, buckets=%zu, LF=%.4f\n",
-        myhash.size(), myhash.bucket_count(), myhash.load_factor());
+    printf("After fill: size=%d, buckets=%d, LF=%.4f\n",
+        (int)myhash.size(), (int)myhash.bucket_count(), myhash.load_factor());
 
     // Verify all elements against refmap
     for (auto k : keys) {
@@ -99,9 +99,9 @@ static int test_bucket0_push_empty()
         refmap.erase(i);
     }
 
-    printf("After erase: size=%zu, LF=%.4f\n",
-        myhash.size(), myhash.load_factor());
-    assert(myhash.size() == refmap.size());
+    printf("After erase: size=%d, LF=%.4f\n",
+        (int)myhash.size(), myhash.load_factor());
+    assert((size_t)myhash.size() == refmap.size());
 
     // Reinsert
     for (int i = 0; i < 130000; i++) {
@@ -130,8 +130,8 @@ static int test_bucket0_push_empty()
         verified++;
     }
 
-    assert(myhash.size() == refmap.size());
-    printf("Verified %d elements, size=%zu (ref=%zu)\n", verified, myhash.size(), refmap.size());
+    assert((size_t)myhash.size() == refmap.size());
+    printf("Verified %d elements, size=%d (ref=%zu)\n", verified, (int)myhash.size(), refmap.size());
     printf("Bug 2 push_empty test PASSED\n\n");
     return 0;
 }
@@ -161,9 +161,9 @@ static int test_high_load_stress()
     }
 
     assert(myhash.bucket_count() == vsize); // no rehash
-    assert(myhash.size() == refmap.size());
-    printf("Insert done: size=%zu, buckets=%zu, LF=%.4f\n",
-        myhash.size(), myhash.bucket_count(), myhash.load_factor());
+    assert((size_t)myhash.size() == refmap.size());
+    printf("Insert done: size=%d, buckets=%d, LF=%.4f\n",
+        (int)myhash.size(), (int)myhash.bucket_count(), myhash.load_factor());
 
     // Erase + insert cycle
     std::mt19937_64 rng2(seed);
@@ -176,9 +176,9 @@ static int test_high_load_stress()
         refmap[new_k] = 1;
     }
 
-    printf("After erase+insert: size=%zu (ref=%zu), LF=%.4f\n",
-        myhash.size(), refmap.size(), myhash.load_factor());
-    assert(myhash.size() == refmap.size());
+    printf("After erase+insert: size=%d (ref=%zu), LF=%.4f\n",
+        (int)myhash.size(), refmap.size(), myhash.load_factor());
+    assert((size_t)myhash.size() == refmap.size());
 
     // Verify load factor is still high
     assert(myhash.load_factor() >= max_lf - 0.01);
@@ -189,7 +189,7 @@ static int test_high_load_stress()
         (void)p;
         count++;
     }
-    assert(count == myhash.size());
+    assert(count == (size_t)myhash.size());
 
     // Spot check: verify random keys match refmap
     for (auto& [k, v] : refmap) {
@@ -252,8 +252,8 @@ static int test_lf_oscillation()
         refmap[i] = i;
     }
 
-    printf("Initial fill: size=%zu, LF=%.4f\n", myhash.size(), myhash.load_factor());
-    assert(myhash.size() == refmap.size());
+    printf("Initial fill: size=%d, LF=%.4f\n", (int)myhash.size(), myhash.load_factor());
+    assert((size_t)myhash.size() == refmap.size());
 
     // Oscillate around 0.8 LF threshold:
     //   erase enough to drop below 0.8 → clear_empty() tears down chain
@@ -282,9 +282,9 @@ static int test_lf_oscillation()
         // Verify consistency every 100 rounds
         if (round % 100 == 0) {
             // Check size matches
-            if (myhash.size() != refmap.size()) {
-                printf("ERROR at round %d: size=%zu != refsize=%zu\n",
-                    round, myhash.size(), refmap.size());
+            if ((size_t)myhash.size() != refmap.size()) {
+                printf("ERROR at round %d: size=%d != refsize=%zu\n",
+                    round, (int)myhash.size(), refmap.size());
                 return 1;
             }
 
@@ -294,9 +294,9 @@ static int test_lf_oscillation()
                 (void)p;
                 count++;
             }
-            if (count != myhash.size()) {
-                printf("ERROR at round %d: iter count=%zu != size=%zu\n",
-                    round, count, myhash.size());
+            if (count != (size_t)myhash.size()) {
+                printf("ERROR at round %d: iter count=%zu != size=%d\n",
+                    round, count, (int)myhash.size());
                 return 1;
             }
 
@@ -312,8 +312,8 @@ static int test_lf_oscillation()
                 if (++checked >= 100) break;
             }
 
-            printf("  Round %4d: LF=%.4f, size=%zu [OK]\n",
-                round, myhash.load_factor(), myhash.size());
+            printf("  Round %4d: LF=%.4f, size=%d [OK]\n",
+                round, myhash.load_factor(), (int)myhash.size());
         }
     }
 
@@ -325,16 +325,16 @@ static int test_lf_oscillation()
             return 1;
         }
     }
-    assert(myhash.size() == refmap.size());
+    assert((size_t)myhash.size() == refmap.size());
 
     size_t final_count = 0;
     for (auto& p : myhash) {
         (void)p;
         final_count++;
     }
-    assert(final_count == myhash.size());
+    assert(final_count == (size_t)myhash.size());
 
-    printf("LF oscillation test PASSED (%d oscillations, final buckets=%zu)\n\n", oscillations, myhash.bucket_count());
+    printf("LF oscillation test PASSED (%d oscillations, final buckets=%d)\n\n", oscillations, (int)myhash.bucket_count());
     return 0;
 }
 
@@ -353,8 +353,8 @@ static int test_lf_oscillation_emhash8()
         refmap[i] = i;
     }
 
-    printf("Initial fill: size=%zu, LF=%.4f\n", myhash.size(), myhash.load_factor());
-    assert(myhash.size() == refmap.size());
+    printf("Initial fill: size=%d, LF=%.4f\n", (int)myhash.size(), myhash.load_factor());
+    assert((size_t)myhash.size() == refmap.size());
 
     const int erase_count = int(vsize * 0.10);
     const int oscillations = 1000;
@@ -375,9 +375,9 @@ static int test_lf_oscillation_emhash8()
         }
 
         if (round % 100 == 0) {
-            if (myhash.size() != refmap.size()) {
-                printf("ERROR at round %d: size=%zu != refsize=%zu\n",
-                    round, myhash.size(), refmap.size());
+            if ((size_t)myhash.size() != refmap.size()) {
+                printf("ERROR at round %d: size=%d != refsize=%zu\n",
+                    round, (int)myhash.size(), refmap.size());
                 return 1;
             }
 
@@ -386,9 +386,9 @@ static int test_lf_oscillation_emhash8()
                 (void)p;
                 count++;
             }
-            if (count != myhash.size()) {
-                printf("ERROR at round %d: iter count=%zu != size=%zu\n",
-                    round, count, myhash.size());
+            if (count != (size_t)myhash.size()) {
+                printf("ERROR at round %d: iter count=%zu != size=%d\n",
+                    round, count, (int)myhash.size());
                 return 1;
             }
 
@@ -403,8 +403,8 @@ static int test_lf_oscillation_emhash8()
                 if (++checked >= 100) break;
             }
 
-            printf("  Round %4d: size=%zu, LF=%.4f [OK]\n",
-                round, myhash.size(), myhash.load_factor());
+            printf("  Round %4d: size=%d, LF=%.4f [OK]\n",
+                round, (int)myhash.size(), myhash.load_factor());
         }
     }
 
@@ -416,16 +416,16 @@ static int test_lf_oscillation_emhash8()
             return 1;
         }
     }
-    assert(myhash.size() == refmap.size());
+    assert((size_t)myhash.size() == refmap.size());
 
     size_t final_count = 0;
     for (auto& p : myhash) {
         (void)p;
         final_count++;
     }
-    assert(final_count == myhash.size());
+    assert(final_count == (size_t)myhash.size());
 
-    printf("LF oscillation test PASSED (%d oscillations, final buckets=%zu)\n\n", oscillations, myhash.bucket_count());
+    printf("LF oscillation test PASSED (%d oscillations, final buckets=%d)\n\n", oscillations, (int)myhash.bucket_count());
     return 0;
 }
 

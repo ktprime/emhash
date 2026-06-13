@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
                 break;
             }
             case OP_COUNT: {
-                fprintf(stderr, "  COUNT key=%d em=%zu ref=%zu\n", op.key, em.count(op.key), ref.count(op.key));
+                fprintf(stderr, "  COUNT key=%d em=%zu ref=%zu\n", op.key, (size_t)em.count(op.key), ref.count(op.key));
                 break;
             }
             case OP_CONTAINS: {

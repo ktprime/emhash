@@ -4,7 +4,7 @@
 #include <vector>
 #include <fstream>
 #include <cassert>
-#include "../hash_table8.hpp"
+#include "../../hash_table8.hpp"
 
 int main() {
     std::ifstream f("../fuzz/crash-1909d956d6d9d6a7fa8a4145a9532469e499d0cc", std::ios::binary);

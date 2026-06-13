@@ -1,5 +1,5 @@
 // Comprehensive emhash5 verification
-#include "../hash_table5.hpp"
+#include "../../hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cassert>
@@ -25,7 +25,7 @@ static void test_basic()
         m[k] = k;
         ref[k] = k;
     }
-    CHECK(m.size() == ref.size(), "size mismatch");
+    CHECK((size_t)m.size() == ref.size(), "size mismatch");
     for (auto& [k, v] : ref) {
         CHECK(m[k] == v, "value mismatch");
     }
@@ -50,16 +50,16 @@ static void test_erase_random()
         m[k] = k;
         ref[k] = k;
     }
-    CHECK(m.size() == ref.size(), "after insert size");
+    CHECK((size_t)m.size() == ref.size(), "after insert size");
 
     // Erase 2000
     for (int i = 0; i < 2000; i++) {
         int k = dist(rng);
         auto r1 = m.erase(k);
         auto r2 = ref.erase(k);
-        CHECK(r1 == r2, "erase return mismatch");
+        CHECK((size_t)r1 == r2, "erase return mismatch");
     }
-    CHECK(m.size() == ref.size(), "after erase size");
+    CHECK((size_t)m.size() == ref.size(), "after erase size");
 
     // Verify
     for (auto& [k, v] : ref) {
@@ -84,7 +84,7 @@ static void test_rehash_cycle()
             m[i + round * 10000] = i;
             ref[i + round * 10000] = i;
         }
-        if (m.size() != ref.size()) {
+        if ((size_t)m.size() != ref.size()) {
             printf("  FAIL: size at round %d\n", round);
             total_fail++;
             return;
@@ -286,7 +286,7 @@ static void test_find_key_hash_bug()
 
     // find(-1, b) for various b
     int fps = 0;
-    for (size_t b = 0; b < m.bucket_count(); b++) {
+    for (size_t b = 0; b < (size_t)m.bucket_count(); b++) {
         auto it = m.find(-1, b);
         if (it != m.end()) fps++;
     }
