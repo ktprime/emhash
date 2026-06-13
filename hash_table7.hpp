@@ -315,6 +315,11 @@ struct entry {
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap
 {
+    static_assert(std::is_copy_constructible<KeyT>::value || std::is_move_constructible<KeyT>::value,
+                  "KeyT must be copy-constructible or move-constructible");
+    static_assert(std::is_copy_constructible<ValueT>::value || std::is_move_constructible<ValueT>::value,
+                  "ValueT must be copy-constructible or move-constructible");
+
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif

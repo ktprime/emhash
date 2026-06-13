@@ -66,6 +66,27 @@ test/test_find_hit_bug3
 test/test_find_hit_ok
 test/test_probe_bug_run.exe
 test/emhash_test
+test58
+test_emilib2o
+
+# tests_new binaries and crash dumps
+tests_new/verify/bin/
+tests_new/debug/bin/
+tests_new/fuzz/fuzz_emhash8
+tests_new/fuzz/fuzz_emhash8_advanced
+tests_new/fuzz/fuzz_emhash8_advanced_fixed
+tests_new/fuzz/fuzz_emhash_all
+tests_new/fuzz/fuzz_emilib_all
+tests_new/fuzz/fuzz_nocoll_asan
+tests_new/fuzz/reproduce_bug
+tests_new/crash-*
+
+# Root-level build/test binaries
+bench_emilib2o_opt
+bench_emilib2o_orig
+bench_emilib2ss_clang
+bench_emilib2ss_gcc
+mbench
 
 # Build directories
 build/
