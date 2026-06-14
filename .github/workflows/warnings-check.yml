@@ -17,7 +17,7 @@ jobs:
         standard: [c++17, c++20]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
