@@ -924,14 +924,14 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& val) 
-    { 
-        return do_assign(key, std::forward<ValueT>(val)); 
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, ValueT&& val)
+    {
+        return do_assign(key, std::forward<ValueT>(val));
     }
 
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) 
-    { 
-        return do_assign(std::move(key), std::forward<ValueT>(val)); 
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val)
+    {
+        return do_assign(std::move(key), std::forward<ValueT>(val));
     }
 
     /// Return the old value or ValueT() if it didn't exist.

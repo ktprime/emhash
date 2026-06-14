@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 import numpy as np
 import math
 
@@ -34,7 +34,7 @@ import math
 # miss = f(k) * (k + 1)
 def poisson(lf):
 	miss = powk = np.exp(-lf)
-	main, coll = powk, 0 
+	main, coll = powk, 0
 	for k in range(1,100):
 #		if lf == 0.75:
 #			print(k, powk)

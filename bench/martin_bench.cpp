@@ -438,13 +438,13 @@ static void bench_insert(HMAP& hmap)
         auto nows = now2sec();
         {
             auto RNDI = (uint64_t)RND + 15ull + (uint64_t)i;
-            
+
             // Warmup phase - warm up cache before actual benchmark
             if (g_config.warmup_iterations > 0) {
                 MRNG warmup_rng(RNDI + 1000);
                 do_warmup(hmap, warmup_rng, g_config.warmup_iterations);
             }
-            
+
             {
                 if (g_config.enable_reserve && RND % 2 == 0)
                     hmap.reserve(maxn / 2);
@@ -458,7 +458,7 @@ static void bench_insert(HMAP& hmap)
 
                 printf("        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
                 fflush(stdout);
-                
+
                 // Record result for CSV/JSON output
                 if (g_config.output_format != OutputFormat::Text) {
                     BenchResult r;
@@ -480,7 +480,7 @@ static void bench_insert(HMAP& hmap)
                 printf(", remove 90%% %.2f", now2sec() - ts);
                 fflush(stdout);
                 assert(hmap.size() == 0);
-                
+
                 // Record result
                 if (g_config.output_format != OutputFormat::Text) {
                     BenchResult r;
@@ -501,7 +501,7 @@ static void bench_insert(HMAP& hmap)
                     else
                         hmap.emplace(static_cast<int>(rng()), 0);
                 printf(", reinsert %.2f", now2sec() - ts);
-                
+
                 // Record result
                 if (g_config.output_format != OutputFormat::Text) {
                     BenchResult r;
@@ -1469,7 +1469,7 @@ static void bench_IterateIntegers(HMAP& hmap)
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
-    
+
     // Warmup phase
     if (g_config.warmup_iterations > 0) {
         MRNG warmup_rng(999);
@@ -1481,7 +1481,7 @@ static void bench_IterateIntegers(HMAP& hmap)
         hmap.clear();
         result = 0;
     }
-    
+
     auto ts = now2sec();
 
     {
@@ -1513,7 +1513,7 @@ static void bench_IterateIntegers(HMAP& hmap)
     }
     assert(result == 62498750000000ull + 20833333325000ull);
     printf(", add/removing time = %.2f, %.2f|%d\n", (ts1 - ts), now2sec() - ts1, (int)result);
-    
+
     // Record result for CSV/JSON output
     if (g_config.output_format != OutputFormat::Text) {
         BenchResult r;
@@ -1547,7 +1547,7 @@ static void bench_randomFind(HMAP&, size_t numInserts, size_t numFindsPerInsert)
             warmup_map.find(warmup_rng());
         }
     }
-    
+
     auto ts = now2sec();
     uint64_t sum = 0;
 
@@ -1561,7 +1561,7 @@ static void bench_randomFind(HMAP&, size_t numInserts, size_t numFindsPerInsert)
     auto elapsed = now2sec() - ts;
     if (sum != 123)
     printf(" nums = %zd total time = %.2f s\n", numInserts, elapsed);
-    
+
     // Record result for CSV/JSON output
     if (g_config.output_format != OutputFormat::Text) {
         BenchResult r;
@@ -2728,7 +2728,7 @@ int main(int argc, char* argv[])
         // Parse command line arguments
         for (int arg_idx = 1; arg_idx < argc; arg_idx++) {
             const char* arg = argv[arg_idx];
-            
+
             // Parse long options (--warmup, --iter, --format, etc.)
             if (arg[0] == '-' && arg[1] == '-') {
                 std::string opt(arg);
@@ -2752,7 +2752,7 @@ int main(int argc, char* argv[])
                 }
                 continue;
             }
-            
+
             // Parse short options (legacy format)
             for (int c = arg[0], i = 0; c != '\0'; c = arg[++i]) {
                 if (c > '4' && c <= '8') {
@@ -2816,10 +2816,10 @@ int main(int argc, char* argv[])
 
     // Sync legacy max_lf with g_config
     max_lf = g_config.max_load_factor;
-    
+
     printf("test with config: max_load_factor=%.3f, warmup=%zu, iterations=%d, format=%s, reserve=%s\n",
            g_config.max_load_factor, g_config.warmup_iterations, g_config.benchmark_iterations,
-           g_config.output_format == OutputFormat::CSV ? "csv" : 
+           g_config.output_format == OutputFormat::CSV ? "csv" :
            g_config.output_format == OutputFormat::JSON ? "json" : "text",
            g_config.enable_reserve ? "yes" : "no");
     printf("random seed: %d\n", (int)RND);
@@ -2829,13 +2829,13 @@ int main(int argc, char* argv[])
     puts("-------------------------------------------------------------------------");
 
     runTest(sflags, eflags);
-    
+
     // Output results in specified format
     if (g_config.output_format != OutputFormat::Text && !g_results.empty()) {
         puts("\n=== Benchmark Results ===");
         ResultOutput::output_all(g_results, g_config.output_format);
     }
-    
+
     // Write to file if specified
     if (!g_config.output_file.empty() && !g_results.empty()) {
         std::ofstream fout(g_config.output_file);
@@ -2869,7 +2869,7 @@ int main(int argc, char* argv[])
             printf("Results written to: %s\n", g_config.output_file.c_str());
         }
     }
-    
+
     puts("---------------------------- all pass -----------------------------------");
     return 0;
 }

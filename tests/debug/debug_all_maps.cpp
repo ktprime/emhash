@@ -83,53 +83,53 @@ struct BadHasher {
 template<typename HashMap>
 bool test_basic_operations(const char* name) {
     TEST_START(name);
-    
+
     HashMap m;
     std::unordered_map<int, int> ref;
-    
+
     // Insert some values
     for (int i = 0; i < 100; i++) {
         m[i] = i * 10;
         ref[i] = i * 10;
     }
-    
+
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch: %zu vs %zu", (size_t)m.size(), ref.size());
-    
+
     // Find all inserted keys
     for (int i = 0; i < 100; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it != m.end(), "key %d not found", i);
         TEST_ASSERT(it->second == i * 10, "wrong value for key %d: %d vs %d", i, it->second, i * 10);
     }
-    
+
     // Keys not inserted should not be found
     for (int i = 1000; i < 1100; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it == m.end(), "key %d should not be found", i);
     }
-    
+
     // Erase half the keys
     for (int i = 0; i < 50; i++) {
         size_t erased = m.erase(i);
         size_t ref_erased = ref.erase(i);
         TEST_ASSERT(erased == ref_erased, "erase count mismatch for key %d: %zu vs %zu", i, erased, ref_erased);
     }
-    
+
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch after erase: %zu vs %zu", (size_t)m.size(), ref.size());
-    
+
     // Verify erased keys are gone
     for (int i = 0; i < 50; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it == m.end(), "erased key %d still found", i);
     }
-    
+
     // Verify remaining keys still work
     for (int i = 50; i < 100; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it != m.end(), "remaining key %d not found", i);
         TEST_ASSERT(it->second == i * 10, "wrong value for remaining key %d", i);
     }
-    
+
     TEST_PASS();
 }
 
@@ -140,16 +140,16 @@ bool test_basic_operations(const char* name) {
 template<typename HashMap>
 bool test_erase_correctness(const char* name) {
     TEST_START(name);
-    
+
     HashMap m;
     std::unordered_map<int, int> ref;
-    
+
     // Insert keys with specific pattern
     for (int i = 0; i < 200; i++) {
         m[i * 3] = i;  // Keys: 0, 3, 6, 9, ...
         ref[i * 3] = i;
     }
-    
+
     // Erase every other key
     for (int i = 0; i < 200; i += 2) {
         int key = i * 3;
@@ -157,9 +157,9 @@ bool test_erase_correctness(const char* name) {
         TEST_ASSERT(cnt == 1, "erase returned %zu for key %d", cnt, key);
         ref.erase(key);
     }
-    
+
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch: %zu vs %zu", (size_t)m.size(), ref.size());
-    
+
     // Verify all erased keys are gone
     for (int i = 0; i < 200; i += 2) {
         int key = i * 3;
@@ -167,7 +167,7 @@ bool test_erase_correctness(const char* name) {
         TEST_ASSERT(it == m.end(), "erased key %d still found", key);
         TEST_ASSERT(m.count(key) == 0, "count() != 0 for erased key %d", key);
     }
-    
+
     // Verify remaining keys still work
     for (int i = 1; i < 200; i += 2) {
         int key = i * 3;
@@ -175,22 +175,22 @@ bool test_erase_correctness(const char* name) {
         TEST_ASSERT(it != m.end(), "remaining key %d not found", key);
         TEST_ASSERT(it->second == i, "wrong value for key %d", key);
     }
-    
+
     // Insert some new keys that may reuse erased slots
     for (int i = 0; i < 50; i++) {
         m[i * 7] = i * 100;  // New keys: 0, 7, 14, ...
         ref[i * 7] = i * 100;
     }
-    
+
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch after reinsert: %zu vs %zu", (size_t)m.size(), ref.size());
-    
+
     // Verify all keys
     for (const auto& [k, v] : ref) {
         auto it = m.find(k);
         TEST_ASSERT(it != m.end(), "key %d not found after reinsert", k);
         TEST_ASSERT(it->second == v, "wrong value for key %d: %d vs %d", k, it->second, v);
     }
-    
+
     TEST_PASS();
 }
 
@@ -201,47 +201,47 @@ bool test_erase_correctness(const char* name) {
 template<typename HashMap>
 bool test_find_after_rehash(const char* name) {
     TEST_START(name);
-    
+
     HashMap m;
     std::unordered_map<int, int> ref;
-    
+
     // Insert many keys to trigger rehash
     for (int i = 0; i < 1000; i++) {
         m[i] = i * i;
         ref[i] = i * i;
     }
-    
+
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch: %zu vs %zu", (size_t)m.size(), ref.size());
-    
+
     // Reserve to force rehash
     m.reserve(5000);
-    
+
     // All keys should still be findable
     for (int i = 0; i < 1000; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it != m.end(), "key %d not found after reserve", i);
         TEST_ASSERT(it->second == i * i, "wrong value for key %d after reserve", i);
     }
-    
+
     // Erase some keys
     for (int i = 0; i < 500; i++) {
         m.erase(i);
         ref.erase(i);
     }
-    
+
     // Insert more to trigger another rehash
     for (int i = 2000; i < 3000; i++) {
         m[i] = i;
         ref[i] = i;
     }
-    
+
     // Verify all remaining keys
     for (const auto& [k, v] : ref) {
         auto it = m.find(k);
         TEST_ASSERT(it != m.end(), "key %d not found after rehash", k);
         TEST_ASSERT(it->second == v, "wrong value for key %d", k);
     }
-    
+
     TEST_PASS();
 }
 
@@ -252,45 +252,45 @@ bool test_find_after_rehash(const char* name) {
 template<typename HashMap>
 bool test_collision_handling(const char* name) {
     TEST_START(name);
-    
+
     // Use const hasher to force all keys to collide
     HashMap m(4);  // Start with small capacity
     std::unordered_map<int, int> ref;
-    
+
     // Insert keys - all will collide
     for (int i = 0; i < 50; i++) {
         m[i] = i * 10;
         ref[i] = i * 10;
     }
-    
+
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch: %zu vs %zu", (size_t)m.size(), ref.size());
-    
+
     // All keys should be findable despite collision
     for (int i = 0; i < 50; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it != m.end(), "collided key %d not found", i);
         TEST_ASSERT(it->second == i * 10, "wrong value for collided key %d", i);
     }
-    
+
     // Erase some collided keys
     for (int i = 0; i < 25; i++) {
         size_t cnt = m.erase(i);
         TEST_ASSERT(cnt == 1, "erase returned %zu for key %d", cnt, i);
     }
-    
+
     // Remaining keys should still work
     for (int i = 25; i < 50; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it != m.end(), "remaining collided key %d not found", i);
         TEST_ASSERT(it->second == i * 10, "wrong value for remaining key %d", i);
     }
-    
+
     // Erased keys should not be found
     for (int i = 0; i < 25; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it == m.end(), "erased collided key %d still found", i);
     }
-    
+
     TEST_PASS();
 }
 
@@ -303,20 +303,20 @@ template<typename T, typename = void>
 struct erase_returns_iterator : std::false_type {};
 
 template<typename T>
-struct erase_returns_iterator<T, std::void_t<decltype(std::declval<T>().erase(std::declval<typename T::iterator>()))>> 
+struct erase_returns_iterator<T, std::void_t<decltype(std::declval<T>().erase(std::declval<typename T::iterator>()))>>
     : std::is_same<decltype(std::declval<T>().erase(std::declval<typename T::iterator>())), typename T::iterator> {};
 
 template<typename HashMap>
 bool test_iterator_after_erase(const char* name) {
     TEST_START(name);
-    
+
     HashMap m;
-    
+
     // Insert keys
     for (int i = 0; i < 100; i++) {
         m[i] = i;
     }
-    
+
     // Iterate and erase - handle both returning iterator and void
     int erase_count = 0;
     if constexpr (erase_returns_iterator<HashMap>::value) {
@@ -344,12 +344,12 @@ bool test_iterator_after_erase(const char* name) {
             erase_count++;
         }
     }
-    
+
     // Verify erased keys are gone
     for (int i = 0; i < 100; i += 3) {
         TEST_ASSERT(m.find(i) == m.end(), "key %d should be erased", i);
     }
-    
+
     // Verify remaining keys
     for (int i = 1; i < 100; i++) {
         if (i % 3 != 0) {
@@ -358,7 +358,7 @@ bool test_iterator_after_erase(const char* name) {
             TEST_ASSERT(it->second == i, "wrong value for key %d", i);
         }
     }
-    
+
     TEST_PASS();
 }
 
@@ -369,7 +369,7 @@ bool test_iterator_after_erase(const char* name) {
 template<typename HashMap>
 bool test_edge_cases(const char* name) {
     TEST_START(name);
-    
+
     // Empty map operations
     {
         HashMap m;
@@ -378,11 +378,11 @@ bool test_edge_cases(const char* name) {
         TEST_ASSERT(m.find(0) == m.end(), "find on empty map should return end");
         TEST_ASSERT(m.count(0) == 0, "count on empty map should return 0");
         TEST_ASSERT(m.erase(0) == 0, "erase on empty map should return 0");
-        
+
         auto it = m.begin();
         TEST_ASSERT(it == m.end(), "begin on empty map should equal end");
     }
-    
+
     // Single element
     {
         HashMap m;
@@ -392,13 +392,13 @@ bool test_edge_cases(const char* name) {
         TEST_ASSERT(m.find(1) != m.end(), "key 1 should be found");
         TEST_ASSERT(m.find(1)->second == 100, "value should be 100");
         TEST_ASSERT(m.count(1) == 1, "count should be 1");
-        
+
         // Erase single element
         TEST_ASSERT(m.erase(1) == 1, "erase should return 1");
         TEST_ASSERT(m.empty(), "map should be empty after erase");
         TEST_ASSERT(m.find(1) == m.end(), "key should not be found after erase");
     }
-    
+
     // Clear and reuse
     {
         HashMap m;
@@ -408,7 +408,7 @@ bool test_edge_cases(const char* name) {
         m.clear();
         TEST_ASSERT(m.empty(), "map should be empty after clear");
         TEST_ASSERT(m.size() == 0, "size should be 0 after clear");
-        
+
         // Reuse after clear
         for (int i = 0; i < 50; i++) {
             m[i * 2] = i * 3;
@@ -419,7 +419,7 @@ bool test_edge_cases(const char* name) {
             TEST_ASSERT(it != m.end() && it->second == i * 3, "wrong value after reuse");
         }
     }
-    
+
     // Reserve on empty map
     {
         HashMap m;
@@ -430,7 +430,7 @@ bool test_edge_cases(const char* name) {
         }
         TEST_ASSERT(m.size() == 500, "size should be 500");
     }
-    
+
     TEST_PASS();
 }
 
@@ -441,19 +441,19 @@ bool test_edge_cases(const char* name) {
 template<typename HashMap>
 bool test_stress_random(const char* name) {
     TEST_START(name);
-    
+
     HashMap m;
     std::unordered_map<int, int> ref;
-    
+
     std::mt19937 rng(12345);  // Fixed seed for reproducibility
     std::uniform_int_distribution<int> key_dist(0, 999);
     std::uniform_int_distribution<int> op_dist(0, 9);
-    
+
     for (int op = 0; op < 10000; op++) {
         int key = key_dist(rng);
         int val = key * 10;
         int op_type = op_dist(rng);
-        
+
         switch (op_type) {
             case 0:  // insert via []
                 m[key] = val;
@@ -500,12 +500,12 @@ bool test_stress_random(const char* name) {
                 ref[key] = val;
                 break;
         }
-        
+
         // Check size consistency
         if ((size_t)m.size() != ref.size()) {
             fprintf(stderr, "SIZE MISMATCH at op %d: map=%zu ref=%zu\n", op, (size_t)m.size(), ref.size());
             fprintf(stderr, "Last operation: op_type=%d key=%d\n", op_type, key);
-            
+
             // Print map contents for debugging
             fprintf(stderr, "Map contents:\n");
             for (auto it = m.begin(); it != m.end(); ++it) {
@@ -514,14 +514,14 @@ bool test_stress_random(const char* name) {
             TEST_ASSERT(false, "size mismatch");
         }
     }
-    
+
     // Final verification
     for (const auto& [k, v] : ref) {
         auto it = m.find(k);
         TEST_ASSERT(it != m.end(), "final: key %d not found", k);
         TEST_ASSERT(it->second == v, "final: wrong value for key %d", k);
     }
-    
+
     TEST_PASS();
 }
 
@@ -532,56 +532,56 @@ bool test_stress_random(const char* name) {
 template<typename HashMap>
 bool test_chain_after_erase(const char* name) {
     TEST_START(name);
-    
+
     HashMap m;
     std::unordered_map<int, int> ref;
-    
+
     // Insert keys in a pattern that creates chains
     for (int i = 0; i < 500; i++) {
         m[i] = i;
         ref[i] = i;
     }
-    
+
     // Erase keys in various patterns
     // Pattern 1: Erase every 3rd key
     for (int i = 0; i < 500; i += 3) {
         m.erase(i);
         ref.erase(i);
     }
-    
+
     // Verify remaining keys
     for (const auto& [k, v] : ref) {
         auto it = m.find(k);
         TEST_ASSERT(it != m.end(), "key %d not found after pattern 1 erase", k);
         TEST_ASSERT(it->second == v, "wrong value for key %d", k);
     }
-    
+
     // Pattern 2: Erase consecutive ranges
     for (int i = 100; i < 200; i++) {
         m.erase(i);
         ref.erase(i);
     }
-    
+
     // Verify again
     for (const auto& [k, v] : ref) {
         auto it = m.find(k);
         TEST_ASSERT(it != m.end(), "key %d not found after pattern 2 erase", k);
         TEST_ASSERT(it->second == v, "wrong value for key %d", k);
     }
-    
+
     // Pattern 3: Erase from the end
     for (int i = 400; i < 500; i++) {
         m.erase(i);
         ref.erase(i);
     }
-    
+
     // Final verification
     for (const auto& [k, v] : ref) {
         auto it = m.find(k);
         TEST_ASSERT(it != m.end(), "key %d not found after pattern 3 erase", k);
         TEST_ASSERT(it->second == v, "wrong value for key %d", k);
     }
-    
+
     // Verify erased keys are truly gone
     for (int i = 0; i < 500; i += 3) {
         TEST_ASSERT(m.find(i) == m.end(), "erased key %d still found", i);
@@ -592,7 +592,7 @@ bool test_chain_after_erase(const char* name) {
     for (int i = 400; i < 500; i++) {
         TEST_ASSERT(m.find(i) == m.end(), "erased key %d still found", i);
     }
-    
+
     TEST_PASS();
 }
 
@@ -603,38 +603,38 @@ bool test_chain_after_erase(const char* name) {
 template<typename HashMap>
 bool test_high_load_factor(const char* name) {
     TEST_START(name);
-    
+
     HashMap m;
     std::unordered_map<int, int> ref;
-    
+
     // Insert until very high load factor
     for (int i = 0; i < 10000; i++) {
         m[i] = i * i;
         ref[i] = i * i;
     }
-    
+
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch: %zu vs %zu", (size_t)m.size(), ref.size());
-    
+
     // Find all keys
     for (int i = 0; i < 10000; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it != m.end(), "key %d not found at high load", i);
         TEST_ASSERT(it->second == i * i, "wrong value for key %d", i);
     }
-    
+
     // Erase half
     for (int i = 0; i < 5000; i++) {
         m.erase(i);
         ref.erase(i);
     }
-    
+
     // Verify remaining
     for (int i = 5000; i < 10000; i++) {
         auto it = m.find(i);
         TEST_ASSERT(it != m.end(), "key %d not found after erase", i);
         TEST_ASSERT(it->second == i * i, "wrong value for key %d", i);
     }
-    
+
     TEST_PASS();
 }
 
@@ -645,13 +645,13 @@ bool test_high_load_factor(const char* name) {
 template<typename HashMap>
 bool test_copy_move(const char* name) {
     TEST_START(name);
-    
+
     // Create and fill original
     HashMap m1;
     for (int i = 0; i < 100; i++) {
         m1[i] = i * 10;
     }
-    
+
     // Copy constructor
     HashMap m2(m1);
     TEST_ASSERT(m2.size() == m1.size(), "copy size mismatch");
@@ -660,12 +660,12 @@ bool test_copy_move(const char* name) {
         TEST_ASSERT(it != m2.end(), "key %d not found in copy", i);
         TEST_ASSERT(it->second == i * 10, "wrong value in copy for key %d", i);
     }
-    
+
     // Modify copy, original should be unchanged
     m2[0] = 999;
     TEST_ASSERT(m1.find(0)->second == 0, "original modified by copy");
     TEST_ASSERT(m2.find(0)->second == 999, "copy not modified");
-    
+
     // Move constructor
     HashMap m3(std::move(m1));
     TEST_ASSERT(m3.size() == 100, "moved map has wrong size");
@@ -674,7 +674,7 @@ bool test_copy_move(const char* name) {
         TEST_ASSERT(it != m3.end(), "key %d not found in moved map", i);
         TEST_ASSERT(it->second == i * 10, "wrong value in moved map for key %d", i);
     }
-    
+
     // Copy assignment
     HashMap m4;
     m4 = m3;
@@ -683,12 +683,12 @@ bool test_copy_move(const char* name) {
         auto it = m4.find(i);
         TEST_ASSERT(it != m4.end(), "key %d not found in copy assigned map", i);
     }
-    
+
     // Move assignment
     HashMap m5;
     m5 = std::move(m3);
     TEST_ASSERT(m5.size() == 100, "move assigned map has wrong size");
-    
+
     TEST_PASS();
 }
 
@@ -702,7 +702,7 @@ void run_all_tests(const char* map_name) {
     printf("============================================================\n");
     printf("Testing: %s\n", map_name);
     printf("============================================================\n");
-    
+
     test_basic_operations<HashMap>(map_name);
     test_erase_correctness<HashMap>(map_name);
     test_find_after_rehash<HashMap>(map_name);
@@ -723,28 +723,28 @@ int main() {
     printf("========================================\n");
     printf("Debug Test for All Hash Map Implementations\n");
     printf("========================================\n");
-    
+
     // Test emhash5
     run_all_tests<emhash5::HashMap<int, int>>("emhash5::HashMap");
-    
+
     // Test emhash6
     run_all_tests<emhash6::HashMap<int, int>>("emhash6::HashMap");
-    
+
     // Test emhash7
     run_all_tests<emhash7::HashMap<int, int>>("emhash7::HashMap");
-    
+
     // Test emhash8
     run_all_tests<emhash8::HashMap<int, int>>("emhash8::HashMap");
-    
+
     // Test emilib (from emilib2ss.hpp)
     run_all_tests<emilib::HashMap<int, int>>("emilib::HashMap (emilib2ss)");
-    
+
     // Test emilib2 (from emilib2o.hpp)
     run_all_tests<emilib2::HashMap<int, int>>("emilib2::HashMap (emilib2o)");
-    
+
     // Test emilib3 (from emilib2s.hpp)
     run_all_tests<emilib3::HashMap<int, int>>("emilib3::HashMap (emilib2s)");
-    
+
     // Summary
     printf("\n");
     printf("========================================\n");
@@ -752,12 +752,12 @@ int main() {
     printf("========================================\n");
     printf("Tests passed: %d\n", g_tests_passed);
     printf("Tests failed: %d\n", g_tests_failed);
-    
+
     if (g_tests_failed > 0) {
         printf("\n*** SOME TESTS FAILED ***\n");
         return 1;
     }
-    
+
     printf("\n*** ALL TESTS PASSED ***\n");
     return 0;
 }

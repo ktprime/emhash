@@ -105,7 +105,7 @@ template<class Map> BOOST_NOINLINE void test_insert( Map& map, std::chrono::stea
 template<class Map> BOOST_NOINLINE void test_lookup( Map& map, std::chrono::steady_clock::time_point & t1 )
 {
     std::uint32_t s;
-    
+
     s = 0;
 
     for( int j = 0; j < K; ++j )

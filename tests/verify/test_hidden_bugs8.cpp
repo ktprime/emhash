@@ -30,18 +30,18 @@ struct CollisionHasher {
 
 int test_hash_collision() {
     printf("\n=== Test 1: Hash high-bit collision ===\n");
-    
+
     // Use a hasher that returns constant hash for all keys
     // This forces maximum collision and tests EMH_EQHASH correctness
     struct ConstHash { size_t operator()(int) const { return 0xABCD1234; } };
-    
+
     emhash8::HashMap<int, int, ConstHash> m;
-    
+
     // Insert many keys with same hash
     for (int i = 0; i < 100; i++) {
         m.insert_unique(i, i * 10);
     }
-    
+
     // Verify all keys are correctly retrievable
     bool pass = true;
     for (int i = 0; i < 100; i++) {
@@ -51,7 +51,7 @@ int test_hash_collision() {
             pass = false;
         }
     }
-    
+
     // Verify no false positives - keys not inserted should not be found
     for (int i = 1000; i < 1100; i++) {
         if (m.find(i) != m.end()) {
@@ -59,7 +59,7 @@ int test_hash_collision() {
             pass = false;
         }
     }
-    
+
     // Test kickout with collision: insert key that causes kickout
     // then verify chain integrity
     m.clear();
@@ -73,7 +73,7 @@ int test_hash_collision() {
             pass = false;
         }
     }
-    
+
     printf("%s\n", pass ? "PASS" : "FAIL");
     return pass ? 0 : 1;
 }
@@ -87,7 +87,7 @@ int test_hash_collision() {
 
 int test_kickout_chain_integrity() {
     printf("\n=== Test 2: kickout_bucket chain integrity ===\n");
-    
+
     // Custom hasher to force controlled collisions
     struct ControlledHash {
         size_t operator()(int x) const {
@@ -96,22 +96,22 @@ int test_kickout_chain_integrity() {
             return (size_t)(x * 7);  // Linear, many will collide for small table
         }
     };
-    
+
     emhash8::HashMap<int, int, ControlledHash> m;
-    
+
     // Pre-reserve to control table size
     m.reserve(16);
-    
+
     // Insert keys that will definitely collide and trigger kickout
     std::vector<int> keys;
     for (int i = 0; i < 64; i++) {
         keys.push_back(i * 16);  // Spread values but hash may collide
     }
-    
+
     for (int k : keys) {
         m.insert_unique(k, k * 2);
     }
-    
+
     // Verify all keys accessible
     bool pass = true;
     for (int k : keys) {
@@ -124,12 +124,12 @@ int test_kickout_chain_integrity() {
             pass = false;
         }
     }
-    
+
     // Now erase some keys from middle of chains and verify integrity
     for (size_t i = keys.size() / 4; i < keys.size() / 2; i++) {
         m.erase(keys[i]);
     }
-    
+
     // Verify remaining keys still accessible
     for (size_t i = 0; i < keys.size(); i++) {
         if (i >= keys.size() / 4 && i < keys.size() / 2) {
@@ -149,7 +149,7 @@ int test_kickout_chain_integrity() {
             }
         }
     }
-    
+
     printf("%s\n", pass ? "PASS" : "FAIL");
     return pass ? 0 : 1;
 }
@@ -164,43 +164,43 @@ int test_kickout_chain_integrity() {
 
 int test_etail_staleness() {
     printf("\n=== Test 3: _etail staleness ===\n");
-    
+
     struct ConstHash { size_t operator()(int) const { return 0; } };
     emhash8::HashMap<int, int, ConstHash> m;
-    
+
     // Insert multiple keys with same hash (all collide in bucket 0)
     for (int i = 0; i < 20; i++) {
         m.insert_unique(i, i * 100);
     }
-    
+
     // Erase from the main bucket repeatedly
     // This should trigger _etail updates and potentially staleness
     bool pass = true;
-    
+
     // Erase first element - this sets _etail = INACTIVE
     auto it = m.begin();
     int first_key = it->first;
     (void)first_key;
     m.erase(it);
-    
+
     // Now the last element's bucket should be tracked
     // Insert more to trigger _etail usage
     for (int i = 100; i < 110; i++) {
         m.insert_unique(i, i);
     }
-    
+
     // Erase the last inserted element using iterator
     // This is where _etail optimization kicks in
     auto last_it = m.last();
     int last_key = last_it->first;
     m.erase(last_it);
-    
+
     // Verify the erased key is gone
     if (m.find(last_key) != m.end()) {
         printf("FAIL: last erased key %d still found\n", last_key);
         pass = false;
     }
-    
+
     // Verify all remaining keys accessible
     for (auto it2 = m.begin(); it2 != m.end(); ++it2) {
         auto found = m.find(it2->first);
@@ -209,7 +209,7 @@ int test_etail_staleness() {
             pass = false;
         }
     }
-    
+
     // Stress test: alternating erase and insert
     for (int round = 0; round < 10; round++) {
         // Erase half
@@ -218,12 +218,12 @@ int test_etail_staleness() {
             if (it3->first % 2 == 0) to_erase.push_back(it3->first);
         }
         for (int k : to_erase) m.erase(k);
-        
+
         // Insert new
         for (int i = 200 + round * 10; i < 200 + round * 10 + 5; i++) {
             m.insert_unique(i, i);
         }
-        
+
         // Verify
         for (auto it3 = m.begin(); it3 != m.end(); ++it3) {
             auto found = m.find(it3->first);
@@ -233,7 +233,7 @@ int test_etail_staleness() {
             }
         }
     }
-    
+
     printf("%s\n", pass ? "PASS" : "FAIL");
     return pass ? 0 : 1;
 }
@@ -246,12 +246,12 @@ int test_etail_staleness() {
 
 int test_key_mutation() {
     printf("\n=== Test 4: Key mutation via non-const iterator ===\n");
-    
+
     emhash8::HashMap<int, int> m;
     for (int i = 0; i < 10; i++) {
         m.insert_unique(i, i * 10);
     }
-    
+
     // Modify key through iterator (this should NOT be allowed)
     auto it = m.find(5);
     if (it != m.end()) {
@@ -259,15 +259,15 @@ int test_key_mutation() {
         int old_key = it->first;
         (void)old_key;
         const_cast<int&>(it->first) = 999;
-        
+
         // Now the table is corrupted: key 999 is in bucket for key 5
         // Try to find original key 5 - should fail
         bool pass = true;
-        
+
         if (m.find(5) != m.end()) {
             printf("UNEXPECTED: key 5 still found after mutation\n");
         }
-        
+
         // Try to find mutated key 999 - may or may not work depending on hash
         auto it2 = m.find(999);
         if (it2 == m.end()) {
@@ -277,7 +277,7 @@ int test_key_mutation() {
             printf("FAIL: mutated key has wrong value %d\n", it2->second);
             pass = false;
         }
-        
+
         // The real issue: iterating may show inconsistent state
         int count = 0;
         for (auto it3 = m.begin(); it3 != m.end(); ++it3) {
@@ -287,11 +287,11 @@ int test_key_mutation() {
             printf("FAIL: iteration count %d != 10 after mutation\n", count);
             pass = false;
         }
-        
+
         printf("%s (key mutation was possible - this is the bug)\n", pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
     }
-    
+
     printf("SKIP: could not find key 5\n");
     return 0;
 }
@@ -304,16 +304,16 @@ int test_key_mutation() {
 
 int test_near_full_deadlock() {
     printf("\n=== Test 5: Near-full table deadlock detection ===\n");
-    
+
     struct ConstHash { size_t operator()(int) const { return 0; } };
     emhash8::HashMap<int, int, ConstHash> m;
-    
+
     // Reserve small space and fill to near capacity
     m.reserve(32);
-    
+
     bool pass = true;
     auto start = std::chrono::steady_clock::now();
-    
+
     try {
         // Try to insert more than capacity to force extreme probing
         for (int i = 0; i < 100; i++) {
@@ -330,7 +330,7 @@ int test_near_full_deadlock() {
         printf("EXCEPTION caught during near-full insertion\n");
         pass = false;
     }
-    
+
     if (pass) {
         printf("PASS (no deadlock detected within time limit)\n");
     }
@@ -346,14 +346,14 @@ int test_near_full_deadlock() {
 #ifdef EMH_PACK_TAIL
 int test_pack_tail_safety() {
     printf("\n=== Test 6: EMH_PACK_TAIL memory safety ===\n");
-    
+
     emhash8::HashMap<int, int> m;
     m.reserve(64);
-    
+
     for (int i = 0; i < 50; i++) {
         m.insert_unique(i, i);
     }
-    
+
     bool pass = true;
     for (int i = 0; i < 50; i++) {
         if (m.find(i) == m.end()) {
@@ -361,7 +361,7 @@ int test_pack_tail_safety() {
             pass = false;
         }
     }
-    
+
     printf("%s\n", pass ? "PASS" : "FAIL");
     return pass ? 0 : 1;
 }
@@ -381,9 +381,9 @@ int test_pack_tail_safety() {
 
 int test_prefetch_safety() {
     printf("\n=== Test 7: Prefetch safety on empty/edge cases ===\n");
-    
+
     bool pass = true;
-    
+
     // Test 1: Insert into freshly constructed small map
     {
         emhash8::HashMap<int, int> m;
@@ -393,7 +393,7 @@ int test_prefetch_safety() {
             pass = false;
         }
     }
-    
+
     // Test 2: Insert after clear
     {
         emhash8::HashMap<int, int> m;
@@ -405,7 +405,7 @@ int test_prefetch_safety() {
             pass = false;
         }
     }
-    
+
     // Test 3: operator[] on empty map
     {
         emhash8::HashMap<int, int> m;
@@ -415,7 +415,7 @@ int test_prefetch_safety() {
             pass = false;
         }
     }
-    
+
     printf("%s\n", pass ? "PASS" : "FAIL");
     return pass ? 0 : 1;
 }
@@ -425,10 +425,10 @@ int test_prefetch_safety() {
 // =============================================================================
 int main() {
     int rc = 0;
-    
+
     printf("Starting hidden bug tests for emhash8...\n");
     printf("=======================================\n");
-    
+
     rc |= test_hash_collision();
     rc |= test_kickout_chain_integrity();
     rc |= test_etail_staleness();
@@ -436,7 +436,7 @@ int main() {
     rc |= test_near_full_deadlock();
     rc |= test_pack_tail_safety();
     rc |= test_prefetch_safety();
-    
+
     printf("\n=======================================\n");
     printf("Final result: %s\n", rc == 0 ? "ALL PASSED" : "SOME FAILED");
     return rc;
