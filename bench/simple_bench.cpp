@@ -19,10 +19,10 @@
 #include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
 
-#include "hash_table6.hpp"
-#include "hash_table5.hpp"
-#include "hash_table7.hpp"
-#include "hash_table8.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
 
 #include "phmap/phmap.h"
 #if __x86_64__ || _M_X64 || _M_IX86 || __i386__
@@ -45,9 +45,9 @@
 #endif
 
 
-#include "hash_set2.hpp"
-#include "hash_set3.hpp"
-#include "hash_set4.hpp"
+#include "emhash/hash_set2.hpp"
+#include "emhash/hash_set3.hpp"
+#include "emhash/hash_set4.hpp"
 
 using k_value = int;
 

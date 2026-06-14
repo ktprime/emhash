@@ -11,9 +11,9 @@
 //#include "patchmap/patchmap.hpp"
 
 
-#include "hash_table6.hpp"
-#include "hash_table7.hpp"
-#include "hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table5.hpp"
 //#include "old/hash_table2.hpp"
 
 #if HAVE_BOOST

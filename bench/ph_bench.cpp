@@ -4,15 +4,15 @@
 //#define THR 1
 
 #if EMH == 8
-    #include "hash_table8.hpp"
+    #include "emhash/hash_table8.hpp"
     #define MAPNAME emhash8::HashMap
     #define EXTRAARGS
 #elif EMH == 2
-    #include "hash_table2.hpp"
+    #include "emhash/hash_table2.hpp"
     #define MAPNAME emhash2::HashMap
     #define EXTRAARGS
 #elif EMH == 6
-    #include "hash_table6.hpp"
+    #include "emhash/hash_table6.hpp"
     #define MAPNAME emhash6::HashMap
     #define EXTRAARGS
 #elif ABSL_HMAP
@@ -101,7 +101,7 @@
         #define EXTRAARGS
     #endif
 #else
-    #include "hash_table5.hpp"
+    #include "emhash/hash_table5.hpp"
     #define MAPNAME emhash5::HashMap
     #define EXTRAARGS
 #endif

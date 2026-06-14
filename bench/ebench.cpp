@@ -115,11 +115,11 @@ std::map<std::string, std::string> maps =
 //#define EMH_SMALL_SIZE        12345
 //#define EMH_SMALL_SIZE      8
 
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
 //#define EMH_HIGH_LOAD 12345
-#include "../../hash_table5.hpp"
+#include "emhash/hash_table5.hpp"
 
 #include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
@@ -1611,13 +1611,13 @@ static int test_lru(int n)
 
 int TestFindHit()
 {
-    // key = -1 ¼´ INACTIVE Öµ (0xFFFFFFFF)
+    // key = -1 ï¿½ï¿½ INACTIVE Öµ (0xFFFFFFFF)
     int32_t bad_key = (int32_t)0xFFFFFFFF; // -1
 
     emhash5::HashMap<int32_t, int32_t> map(16);
 
-    // ÓÃ find(key, hash) Ö¸¶¨ hash Ó³Éäµ½·Ç sanitized µÄ¿ÕÍ°
-    // hash=0 ¡ú main_bucket=0£¬¸ÃÍ°Î´±» reset_bucket ÐÞ¸´
+    // ï¿½ï¿½ find(key, hash) Ö¸ï¿½ï¿½ hash Ó³ï¿½äµ½ï¿½ï¿½ sanitized ï¿½Ä¿ï¿½Í°
+    // hash=0 ï¿½ï¿½ main_bucket=0ï¿½ï¿½ï¿½ï¿½Í°Î´ï¿½ï¿½ reset_bucket ï¿½Þ¸ï¿½
     auto it = map.find(bad_key, 0);
 
     if (it != map.end()) {

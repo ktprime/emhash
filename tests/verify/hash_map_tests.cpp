@@ -23,10 +23,10 @@
  */
 
 //#define EMH_BUCKET_INDEX 1
-#include "../../hash_table5.hpp"
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
 #include "emilib/emilib2.hpp"
 
 #include <boost/mpl/list.hpp>

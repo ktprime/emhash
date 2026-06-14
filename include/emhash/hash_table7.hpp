@@ -330,7 +330,7 @@ struct entry {
 /// @tparam EqT     Key equality functor (default: std::equal_to<KeyT>)
 /// @tparam AllocT  Allocator type (default: std::allocator<std::pair<KeyT, ValueT>>)
 ///
-/// @note Header-only: just `#include "hash_table7.hpp"` and use `emhash7::HashMap`.
+/// @note Header-only: just `#include "emhash/hash_table7.hpp"` and use `emhash7::HashMap`.
 /// @note Not thread-safe. Concurrent read-only access is safe.
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap

@@ -44,12 +44,12 @@ using value_type = uint64_t;
 #include "khash.h"
 #endif
 
-#include "hash_table6.hpp"
+#include "emhash/hash_table6.hpp"
 #if EMH == 8
 //#define EMH_HIGH_LOAD  100000
-#include "hash_table8.hpp"
+#include "emhash/hash_table8.hpp"
 #elif EMH == 7
-#include "hash_table7.hpp"
+#include "emhash/hash_table7.hpp"
 #elif MARTIN
 #include "martin/robin_hood.h"
 #elif PHMAP

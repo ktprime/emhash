@@ -1,13 +1,13 @@
 // Test custom allocator support for emhash HashMap/HashSet
 
-#include "../../hash_table5.hpp"
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
-#include "../../hash_set2.hpp"
-#include "../../hash_set3.hpp"
-#include "../../hash_set4.hpp"
-#include "../../hash_set8.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
+#include "emhash/hash_set2.hpp"
+#include "emhash/hash_set3.hpp"
+#include "emhash/hash_set4.hpp"
+#include "emhash/hash_set8.hpp"
 
 #include <cassert>
 #include <cstdio>

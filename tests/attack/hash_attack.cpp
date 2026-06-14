@@ -6,7 +6,7 @@
 //
 // Build: g++ -O2 -std=c++17 -o hash_attack hash_attack.cpp
 //
-#include "../../hash_table5.hpp"
+#include "emhash/hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstring>

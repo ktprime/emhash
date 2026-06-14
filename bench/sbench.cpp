@@ -90,10 +90,10 @@ std::map<std::string, std::string> maps =
 //#define EMH_SIZE_TYPE_64BIT  1
 
 //
-#include "hash_set2.hpp"
-#include "hash_set3.hpp"
-#include "hash_set4.hpp"
-#include "hash_set8.hpp"
+#include "emhash/hash_set2.hpp"
+#include "emhash/hash_set3.hpp"
+#include "emhash/hash_set4.hpp"
+#include "emhash/hash_set8.hpp"
 
 #ifdef HAVE_BOOST
     #include <boost/unordered/unordered_flat_set.hpp>

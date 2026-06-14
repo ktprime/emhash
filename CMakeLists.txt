@@ -22,24 +22,21 @@ message("  CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_
 add_library(emhash INTERFACE)
 
 set(EMHASH_HEADERS
-    hash_set2.hpp
-    hash_set3.hpp
-    hash_set4.hpp
-    hash_set8.hpp
-    hash_set81.hpp
-    hash_table5.hpp
-    hash_table6.hpp
-    hash_table7.hpp
-    hash_table7s.hpp
-    hash_table8.hpp
-    utils.hpp
+    include/emhash/hash_set2.hpp
+    include/emhash/hash_set3.hpp
+    include/emhash/hash_set4.hpp
+    include/emhash/hash_set8.hpp
+    include/emhash/hash_table5.hpp
+    include/emhash/hash_table6.hpp
+    include/emhash/hash_table7.hpp
+    include/emhash/hash_table8.hpp
 )
 
 set_target_properties(emhash PROPERTIES PUBLIC_HEADER "${EMHASH_HEADERS}")
 
 target_include_directories(
      emhash INTERFACE
-     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}}>
+     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
      $<INSTALL_INTERFACE:include>
 )
 
@@ -48,7 +45,7 @@ include(CMakePackageConfigHelpers)
 
 install(TARGETS emhash
     EXPORT emhash-targets
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/emhash
 )
 
 install(EXPORT emhash-targets
@@ -75,7 +72,7 @@ install(FILES
 )
 
 if(WITH_BENCHMARKS)
-    include_directories(${PROJECT_SOURCE_DIR})
+    include_directories(${PROJECT_SOURCE_DIR}/include)
     include_directories(${PROJECT_SOURCE_DIR}/thirdparty)
     include_directories(${PROJECT_SOURCE_DIR}/bench)
     add_definitions(-DHAVE_BOOST=1 -DABSL_HAMP=1 -DEMH_PSL=16)# -DET=1)

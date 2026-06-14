@@ -1,6 +1,6 @@
 // Collision test with EMH_FIND_HIT=1
 #define EMH_FIND_HIT 1
-#include "../../hash_table5.hpp"
+#include "emhash/hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 

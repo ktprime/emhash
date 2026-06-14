@@ -11,13 +11,13 @@
 // Build: g++ -O2 -std=c++17 -o hash_attack_all hash_attack_all.cpp
 //
 
-#include "../../hash_table5.hpp"
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
-#include "../../thirdparty/emilib/emilib2ss.hpp"
-#include "../../thirdparty/emilib/emilib2o.hpp"
-#include "../../thirdparty/emilib/emilib2s.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
+#include "emilib/emilib2ss.hpp"
+#include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
 
 #include <cstdio>
 #include <cstdint>

@@ -68,13 +68,13 @@ git clone https://github.com/ktprime/emhash.git
 ```
 
 ```cpp
-#include "hash_table7.hpp"  // Or hash_table[5-8].hpp
+#include "emhash/hash_table7.hpp"  // Or emhash/hash_table[5-8].hpp
 ```
 
 ### 2. Basic Usage
 
 ```cpp
-#include "hash_table7.hpp"
+#include "emhash/hash_table7.hpp"
 #include <iostream>
 
 int main() {

@@ -115,11 +115,11 @@ std::map<std::string, std::string> maps =
 //#define EMH_SMALL_SIZE        12345
 //#define EMH_SMALL_SIZE      8
 
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
 //#define EMH_HIGH_LOAD 12345
-#include "../../hash_table5.hpp"
+#include "emhash/hash_table5.hpp"
 
 #include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"

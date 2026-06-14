@@ -31,7 +31,7 @@ amalgamate() {
     while IFS= read -r line; do
         if [[ "$line" =~ ^[[:space:]]*#\ *include\ \"([^\"]+)\" ]]; then
             local inc="${BASH_REMATCH[1]}"
-            local inc_path="$ROOT_DIR/$inc"
+            local inc_path="$ROOT_DIR/include/$inc"
             if [[ -f "$inc_path" ]]; then
                 # Inline local header (skip its own include guard and pragma once)
                 echo "// --- begin included: $inc ---" >> "$output"

@@ -27,7 +27,7 @@ emhash7::HashMap<int64_t, int> myhash(1 << 20, 0.999f);
 ### How it works
 
 ```cpp
-// Compile: g++ -O3 -march=native -I.. -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 highload_bench.cpp
+// Compile: g++ -O3 -march=native -I../include -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 highload_bench.cpp
 
 #include "hash_table7.hpp"
 

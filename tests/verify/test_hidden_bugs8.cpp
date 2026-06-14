@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 #include <chrono>
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table8.hpp"
 
 // =============================================================================
 // Test 1: Hash high-bit collision causing false positive match (EMH_EQHASH bug)

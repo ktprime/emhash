@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include "hash_table8.hpp"
+#include "emhash/hash_table8.hpp"
 
 // Custom hash for case-insensitive string keys
 struct CaseInsensitiveHash {

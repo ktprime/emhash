@@ -2,8 +2,8 @@
 // Compile: g++ -O3 -march=native -std=c++17 -I. quick_bench.cpp -o quick_bench
 // Usage:   ./quick_bench [num_elements]
 
-#include "hash_table7.hpp"
-#include "hash_table8.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
 #include <chrono>
 #include <iostream>
 #include <random>

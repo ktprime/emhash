@@ -7,7 +7,7 @@ RELEASE_FLAGS := -O2
 DEBUG_FLAGS := -g -O0
 BENCH_FLAGS := -O3 -march=native
 
-INCLUDES := -I.. -I../thirdparty -I../bench
+INCLUDES := -I../include -I../thirdparty -I../bench
 
 # ============================================================================
 # Targets

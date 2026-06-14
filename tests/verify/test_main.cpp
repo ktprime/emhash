@@ -23,18 +23,18 @@
 //#define EMH_FIND_HIT  1
 //#define EMH_BUCKET_INDEX 2
 
-#include "../../hash_table5.hpp"
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
 
-#include "../../thirdparty/emilib/emilib2o.hpp"
-#include "../../thirdparty/emilib/emilib2s.hpp"
-#include "../../thirdparty/emilib/emilib2ss.hpp"
+#include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
+#include "emilib/emilib2ss.hpp"
 
 //#include "martin/robin_hood.h"
-#include "../../thirdparty/martin/unordered_dense.h"
-#include "../../thirdparty/phmap/phmap.h"
+#include "martin/unordered_dense.h"
+#include "phmap/phmap.h"
 
 #if CXX20
 #include <string_view>

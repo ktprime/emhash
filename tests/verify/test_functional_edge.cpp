@@ -25,13 +25,13 @@
 #include <unordered_map>
 #include <type_traits>
 
-#include "hash_table5.hpp"
-#include "hash_table6.hpp"
-#include "hash_table7.hpp"
-#include "hash_table8.hpp"
-#include "thirdparty/emilib/emilib2ss.hpp"
-#include "thirdparty/emilib/emilib2o.hpp"
-#include "thirdparty/emilib/emilib2s.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
+#include "emilib/emilib2ss.hpp"
+#include "emilib/emilib2o.hpp"
+#include "emilib/emilib2s.hpp"
 
 static int g_pass = 0, g_fail = 0;
 

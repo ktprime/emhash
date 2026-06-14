@@ -15,10 +15,10 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include "martin/robin_hood.h"
 #include "martin/unordered_dense.h"
-#include "hash_table8.hpp"
-#include "hash_table7.hpp"
-#include "hash_table6.hpp"
-#include "hash_table5.hpp"
+#include "emhash/hash_table8.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table5.hpp"
 
 #include "util.h"
 #include "emilib/emilib2s.hpp"

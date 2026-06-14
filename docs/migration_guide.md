@@ -12,7 +12,7 @@ For most cases, just change the type and add the include:
 std::unordered_map<int, std::string> map;
 
 // After
-#include "hash_table7.hpp"
+#include "emhash/hash_table7.hpp"
 emhash7::HashMap<int, std::string> map;
 ```
 

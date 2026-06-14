@@ -3,10 +3,10 @@
 // Restored from original RunHighLoadFactor() code
 
 #include "util.h"
-#include "../../hash_table7.hpp"
-#include "../../hash_table5.hpp"
-#include "../../hash_table6.hpp"
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table8.hpp"
 
 template<typename HashT>
 static void RunHighLoadFactorT(const char* name)

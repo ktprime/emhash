@@ -1,5 +1,5 @@
 // Stress test for emhash5
-#include "../../hash_table5.hpp"
+#include "emhash/hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>

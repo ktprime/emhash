@@ -6,8 +6,8 @@
 
 #define EMH_HIGH_LOAD 1234567
 
-#include "../../hash_table5.hpp"
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table8.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>

@@ -1,5 +1,5 @@
 // Comprehensive emhash5 verification
-#include "../../hash_table5.hpp"
+#include "emhash/hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cassert>

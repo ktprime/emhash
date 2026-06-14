@@ -23,13 +23,8 @@ class EmhashConan(ConanFile):
 
     def package(self):
         copy(self, "LICENSE", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
-        headers = [
-            "hash_table5.hpp", "hash_table6.hpp", "hash_table7.hpp", "hash_table8.hpp",
-            "hash_set2.hpp", "hash_set3.hpp", "hash_set4.hpp", "hash_set8.hpp", "hash_set81.hpp",
-            "hash_table7s.hpp", "utils.hpp",
-        ]
-        for h in headers:
-            copy(self, h, src=self.source_folder, dst=os.path.join(self.package_folder, "include"))
+        copy(self, "*.hpp", src=os.path.join(self.source_folder, "include", "emhash"),
+             dst=os.path.join(self.package_folder, "include", "emhash"))
 
     def package_info(self):
         self.cpp_info.bindirs = []

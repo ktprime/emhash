@@ -96,7 +96,7 @@ struct DefaultPolicy {
 /// @tparam AllocT  Allocator type (default: std::allocator<std::pair<KeyT, ValueT>>)
 /// @tparam Policy  Configuration policy (default: DefaultPolicy)
 ///
-/// @note Header-only: just `#include "hash_table8.hpp"` and use `emhash8::HashMap`.
+/// @note Header-only: just `#include "emhash/hash_table8.hpp"` and use `emhash8::HashMap`.
 /// @note Not thread-safe. Concurrent read-only access is safe.
 template<typename KeyT, typename ValueT,
         typename HashT = std::hash<KeyT>,

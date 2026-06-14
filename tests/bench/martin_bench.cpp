@@ -139,10 +139,10 @@ static void do_warmup(HMAP& hmap, RNG& rng, size_t iterations) {
 #endif
 
 
-#include "../../hash_table5.hpp"
-#include "../../hash_table6.hpp"
-#include "../../hash_table7.hpp"
-#include "../../hash_table8.hpp"
+#include "emhash/hash_table5.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table8.hpp"
 
 #if HAVE_BOOST
   #include <boost/unordered/unordered_flat_map.hpp>

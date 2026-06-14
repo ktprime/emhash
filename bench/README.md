@@ -18,13 +18,13 @@ other compile options
  ### make AVX2=1 AH=1 QB=1 std=20
 
  # compile ebench (ET=1/2 means more hash map added)
- ### g++ -I.. -I../thirdparty -O3 -march=native -DET=1 -DHOOD_HASH=1 -DABSL_HMAP=1 ebench.cpp -o eb
+ ### g++ -I../include -I../thirdparty -O3 -march=native -DET=1 -DHOOD_HASH=1 -DABSL_HMAP=1 ebench.cpp -o eb
 
 # compile martinus bench
- ### g++ -I.. -I../thirdparty -O3 -march=native -DET=2 -DHAVE_BOOST=1 -DABSL_HMAP=1 martin_bench.cpp -o mb
+ ### g++ -I../include -I../thirdparty -O3 -march=native -DET=2 -DHAVE_BOOST=1 -DABSL_HMAP=1 martin_bench.cpp -o mb
 
 # compile qc bench
- ### g++ -I.. -I../thirdparty -std=c++20 -O3 -march=native -DCXX20=1 -DET=1 -DABSL_HMAP=1 qbench.cpp -o qb
+ ### g++ -I../include -I../thirdparty -std=c++20 -O3 -march=native -DCXX20=1 -DET=1 -DABSL_HMAP=1 qbench.cpp -o qb
  
 
 
@@ -206,7 +206,7 @@ Theoretical probes per lookup (from Knuth):
 ## Usage
 
 ```cpp
-#include "hash_table7.hpp"
+#include "emhash/hash_table7.hpp"
 
 // Pre-allocate 1M buckets, allow up to 99.9% load factor
 emhash7::HashMap<int64_t, int> myhash(1 << 20, 0.999f);

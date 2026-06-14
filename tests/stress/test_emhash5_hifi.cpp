@@ -1,6 +1,6 @@
 // High-intensity stress test for emhash5
 // #define EMH_FIND_HIT 1
-#include "../../hash_table5.hpp"
+#include "emhash/hash_table5.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>

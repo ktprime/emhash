@@ -2,7 +2,7 @@
 // emhash7 uses Swiss Table style with 8-bit metadata
 // Compare its robustness under hash attack
 //
-#include "../../hash_table7.hpp"
+#include "emhash/hash_table7.hpp"
 #include <cstdio>
 #include <cstdint>
 #include <cstring>

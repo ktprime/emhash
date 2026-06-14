@@ -30,10 +30,10 @@
 #include "emilib/emilib2o.hpp"
 #include "emilib/emilib2s.hpp"
 
-#include "hash_table8.hpp"
-#include "hash_table7.hpp"
-#include "hash_table6.hpp"
-#include "hash_table5.hpp"
+#include "emhash/hash_table8.hpp"
+#include "emhash/hash_table7.hpp"
+#include "emhash/hash_table6.hpp"
+#include "emhash/hash_table5.hpp"
 
 static std::random_device rd;
 static std::mt19937_64 rnd(rd());

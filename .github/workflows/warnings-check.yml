@@ -30,7 +30,7 @@ jobs:
           ${{ matrix.compiler }} -std=${{ matrix.standard }} \
             -O2 -g \
             -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast \
-            -I.. -I../thirdparty -I../bench \
+            -I../include -I../thirdparty -I../bench \
             verify/test_all_maps.cpp -o /tmp/test_warnings || true
           # We capture exit code; this job is informational on first run.
           # Switch to non-zero exit once warnings are cleaned up.

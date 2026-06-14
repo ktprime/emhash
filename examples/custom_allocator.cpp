@@ -1,7 +1,7 @@
 #include <iostream>
 #include <memory_resource>
 #include <vector>
-#include "hash_table8.hpp"
+#include "emhash/hash_table8.hpp"
 
 // Custom allocator with counting (must be at namespace scope for rebind support)
 template <typename T>

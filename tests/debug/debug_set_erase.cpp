@@ -1,6 +1,6 @@
 // Debug emhash8 HashSet erase_slot chain corruption
 // Compile: clang++-20 -fsanitize=address -std=c++17 -g -O0 -I. fuzz/debug_set_erase.cpp -o fuzz/debug_set_erase
-#include "hash_set8.hpp"
+#include "emhash/hash_set8.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include "hash_set8.hpp"
+#include "emhash/hash_set8.hpp"
 
 int main() {
     emhash8::HashSet<std::string> set;

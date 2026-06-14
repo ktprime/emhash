@@ -1,6 +1,6 @@
 // Debug emhash8 chain corruption with FuzzHasher
 // Compile: clang++-20 -fsanitize=address -std=c++17 -g -O0 -I. fuzz/debug_chain.cpp -o fuzz/debug_chain
-#include "hash_table8.hpp"
+#include "emhash/hash_table8.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

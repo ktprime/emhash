@@ -1,6 +1,6 @@
 // Minimal reproduction for emhash8 chain corruption bug
 // Reads a crash file and replays it
-#include "hash_table8.hpp"
+#include "emhash/hash_table8.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
