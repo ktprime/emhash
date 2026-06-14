@@ -1377,7 +1377,7 @@ private:
     //it will break the orgin link and relnik again.
     //before: main_bucket --> prev_bucket --> bucket --> next_bucket(maybe none exist)
     //atfer : main_bucket --> prev_bucket   (kickout)    next_bucket <-- new_bucket(bucket)
-    //                          \|/                                        /|\
+    //                          \|/                                         ^
     //                          -|------------------------------------------|
     size_type kickout_bucket(const size_type kmain, const size_type bucket) noexcept
     {
