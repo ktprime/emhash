@@ -24,6 +24,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
+/// @file hash_table7.hpp
+/// @brief No-tombstone linked-bucket open addressing hash map (emhash7)
+/// @version 2.2.5
+/// @copyright Copyright (c) 2020-2026 Huang Yuanbing
+
 // From
 // NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
 // Quadratic collision resolution  1 - ln(1-L) - L/2     1/(1-L) - L - ln(1-L)
@@ -311,7 +316,22 @@ struct entry {
 #endif
 };
 
-/// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
+/// @brief Cache-friendly hash map with no-tombstone linked-bucket design.
+///
+/// emhash7 uses a linked-bucket layout with in-place chain repair on erase,
+/// eliminating tombstones entirely. This provides stable performance in
+/// insert/erase-heavy workloads without periodic rehashing.
+///
+/// Supports load factors from 0.80 to 0.999 natively (no EMH_HIGH_LOAD needed).
+///
+/// @tparam KeyT    Key type
+/// @tparam ValueT  Mapped value type
+/// @tparam HashT   Hash functor (default: std::hash<KeyT>)
+/// @tparam EqT     Key equality functor (default: std::equal_to<KeyT>)
+/// @tparam AllocT  Allocator type (default: std::allocator<std::pair<KeyT, ValueT>>)
+///
+/// @note Header-only: just `#include "hash_table7.hpp"` and use `emhash7::HashMap`.
+/// @note Not thread-safe. Concurrent read-only access is safe.
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap
 {

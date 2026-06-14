@@ -1,0 +1,14 @@
+# Number of days of inactivity before an issue becomes stale
+daysUntilStale: 90
+# Number of days of inactivity before a stale issue is closed
+daysUntilClose: 14
+# Label to use when marking an issue as stale
+staleLabel: stale
+# Comment to post when marking an issue as stale
+markComment: >
+  This issue has been automatically marked as stale because it has not had
+  recent activity. It will be closed in 14 days if no further activity occurs.
+  Thank you for your contributions.
+# Comment to post when closing a stale issue
+closeComment: >
+  This issue has been closed due to inactivity. Feel free to reopen if needed.

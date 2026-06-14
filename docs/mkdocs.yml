@@ -1,0 +1,27 @@
+site_name: emhash documentation
+site_description: High-performance C++ hash table library
+site_author: Huang Yuanbing
+
+theme:
+  name: material
+  palette:
+    primary: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.suggest
+
+nav:
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - API Reference: api.md
+  - Design: design.md
+  - Performance: performance.md
+  - Build & Test: build_and_test.md
+  - Usage Notes: usage_notes.md
+  - Architecture Decisions: adr/README.md
+
+markdown_extensions:
+  - tables
+  - fenced_code
+  - codehilite

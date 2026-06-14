@@ -1167,32 +1167,19 @@ public:
         return do_insert(std::move(value)).first;
     }
 
-#if 0
-    //TODO: fix tuple
-    template<class... Args>
+template<class... Args>
     std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args)
     {
         check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        const auto bempty = EMH_EMPTY(_pairs, bucket);
-        if (bempty) {
-//            EMH_NEW(key, std::forward_as_tuple(std::forward<Args>(args)...), bucket);
-        }
-        return { {this, bucket}, bempty };
+        return do_insert(key, std::forward<Args>(args)...);
     }
 
     template<class... Args>
     std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args)
     {
         check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        const auto bempty = EMH_EMPTY(_pairs, bucket);
-        if (bempty) {
-//            EMH_NEW(std::move(key), std::forward_as_tuple(std::forward<Args>(args)...), bucket);
-        }
-        return { {this, bucket}, bempty };
+        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
-#endif
 
     template<class... Args>
     iterator try_emplace(const_iterator hint, const KeyT& key, Args&&... args)

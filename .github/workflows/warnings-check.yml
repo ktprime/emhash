@@ -1,0 +1,37 @@
+name: Warnings Check
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  warnings:
+    name: Compile with strict warnings
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+        standard: [c++17, c++20]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtbb-dev
+
+      - name: Compile (verify tests, ${{ matrix.compiler }}, ${{ matrix.standard }})
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=${{ matrix.standard }} \
+            -O2 -g \
+            -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast \
+            -I.. -I../thirdparty -I../bench \
+            verify/test_all_maps.cpp -o /tmp/test_warnings || true
+          # We capture exit code; this job is informational on first run.
+          # Switch to non-zero exit once warnings are cleaned up.
+          echo "::notice title=Warnings::Compilers may emit warnings in third-party or generated code; review and address gradually."

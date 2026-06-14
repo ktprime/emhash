@@ -1,10 +1,10 @@
 # emhash Test Code Analysis Document
 
-This document organizes all test code in `fuzz/`, `test/`, and `bench/` directories, explaining the purpose and test type of each file.
+This document organizes all test code in `tests/` directory, explaining the purpose and test type of each file.
 
 ---
 
-## 1. fuzz/ Directory — Fuzzing and Debug Tests
+## 1. tests/fuzz/ — Fuzzing and Debug Tests
 
 ### 1.1 Core Fuzzers
 
@@ -38,9 +38,9 @@ This document organizes all test code in `fuzz/`, `test/`, and `bench/` director
 
 ---
 
-## 2. test/ Directory — Unit Tests and Functional Verification
+## 2. tests/ — Unit Tests and Functional Verification
 
-### 2.1 Comprehensive Tests
+### 2.1 verify/ — Comprehensive Tests
 
 | File | Type | Target | Description |
 |------|------|--------|-------------|
@@ -48,27 +48,32 @@ This document organizes all test code in `fuzz/`, `test/`, and `bench/` director
 | `main.cpp` | Unit | All versions | Main test entry, integrated test suite |
 | `hash_map_tests.cpp` | Unit | All versions | Historical test code |
 
-### 2.2 emhash5 Specific Tests
+### 2.2 stress/ — Stress Tests
 
 | File | Type | Target | Description |
 |------|------|--------|-------------|
-| `test_emhash5_verify.cpp` | Unit | emhash5 | Verification test: basic operations, random deletion, rehash loop |
-| `test_emhash5_stress.cpp` | Stress | emhash5 | Stress test: insert/delete loop, INACTIVE key test |
+| `stress_all_maps.cpp` | Stress | All 7 maps | Insert/delete loop across all implementations |
 | `test_emhash5_hifi.cpp` | Stress | emhash5 | High-intensity test: large-scale random operations, hash attack, iteration deletion |
+| `highload_test.cpp` | Stress | emhash5/8 | High load test: LF=0.999, oscillation test |
+| `test_bad_hash_stress.cpp` | Stress | Bad hash | Test behavior under bad hash functions |
+| `stress_fix.cpp` | Stress | emhash8 | Stress test: reserve(1) + random operations, verifies crash fix |
 
-### 2.3 emilib2 Test Series
+### 2.3 debug/ — Boundary and Bug Tests
 
 | File | Type | Target | Description |
 |------|------|--------|-------------|
-| `test_emilib2o.cpp` | Unit | emilib2o | Basic insertion test |
-| `test_emilib2o_basic.cpp` | Unit | emilib2o | Basic insert/find/delete test |
-| `test_emilib2o_hang.cpp` | Stress | emilib2o | Loop insert/delete, verifies no infinite loop |
-| `test_emilib2o_interleaved.cpp` | Stress | emilib2o | Interleaved insert/delete test |
-| `test_emilib2o_stress.cpp` | Stress | emilib2o | Stress test |
-| `test_emilib2s.cpp` | Unit | emilib2s | emilib2s version test |
-| `test_emilib_comprehensive.cpp` | Unit | emilib | Comprehensive test |
+| `debug_all_maps.cpp` | Debug | All 7 maps | Comprehensive debug test suite |
+| `debug_chain.cpp` | Debug | emhash8 chain | Debug `_index` chain corruption issues |
+| `debug_set_erase.cpp` | Debug | emhash8 HashSet | Debug erase_slot chain corruption |
+| `min_repro.cpp` | Debug | Crash reproduction | Minimal reproduction of specific crash scenarios |
+| `reproduce_crash.cpp` | Debug | emhash8 | Reproduce specific crash: reserve(1) + 0x68686868 key |
+| `fuzz_reproduce.cpp` | Debug | emhash8 | Reproduce fuzzer-discovered crash sequence |
+| `test_debug_find.cpp` | Debug | EMH_FIND_HIT | Test find_hit related bugs |
+| `test_probe_bug.cpp` | Bug | Probe mode | Test probe mode bugs |
+| `test_probe_coverage.cpp` | Coverage | Probe strategy | Verify coverage of different probe strategies |
+| `test_repro_collision.cpp` | Bug | Hash collision | Reproduce hash collision issues |
 
-### 2.4 Boundary and Bug Tests
+### 2.4 verify/ — Boundary and Bug Tests
 
 | File | Type | Target | Description |
 |------|------|--------|-------------|
@@ -80,20 +85,29 @@ This document organizes all test code in `fuzz/`, `test/`, and `bench/` director
 | `test_find_hit_bug*.cpp` | Bug | EMH_FIND_HIT | Test find_hit related bugs |
 | `test_find_hit_ok.cpp` | Verify | EMH_FIND_HIT | Verify correctness after fix |
 
-### 2.5 Other Tests
+### 2.5 attack/ — Hash Attack Tests
 
 | File | Type | Target | Description |
 |------|------|--------|-------------|
-| `test_size_sweep.cpp` | Unit | Size adjustment | Test table behavior at different sizes |
-| `test_steps.cpp` | Unit | Step | Test impact of insert/delete order |
-| `test_struct_layout.cpp` | Unit | Struct layout | Verify struct layout compatibility |
-| `test_bad_hash_stress.cpp` | Stress | Bad hash | Test behavior under bad hash functions |
-| `test_allocator.cpp` | Unit | Custom allocator | Test custom allocator support |
-| `test_coverage_detail.cpp` | Coverage | Coverage | Detailed coverage test |
+| `hash_attack_all.cpp` | Attack | All 7 maps | Comprehensive hash attack: constant hash, small range hash, linear hash |
+| `hash_attack.cpp` | Attack | emhash5 | Hash attack benchmark: constant hash, small range hash, linear hash |
+| `hash_attack7.cpp` | Attack | emhash7 | emhash7 hash attack test |
+
+### 2.6 tests/bench/ — Benchmark Test Files
+
+| File | Type | Target | Description |
+|------|------|--------|-------------|
+| `ebench.cpp` | Perf | All versions | Basic benchmark: insert/find/erase/iterate |
+| `martin_bench.cpp` | Perf | All versions | Martin Ankerl format benchmark |
+| `highload_bench.cpp` | Perf | All versions | High load benchmark |
 
 ---
 
-## 3. bench/ Directory — Performance Benchmarks and Verification Tests
+## 3. bench/ — Legacy Performance Benchmarks
+
+Files in the root `bench/` directory are legacy benchmarks and analysis tools.
+The main benchmark runners are `bench/ebench.cpp` and `tests/bench/ebench.cpp`
+(these share most code; the `tests/bench/` copy is preferred).
 
 ### 3.1 Quick Validation Tests
 
@@ -148,57 +162,57 @@ This document organizes all test code in `fuzz/`, `test/`, and `bench/` director
 
 ```bash
 # Quick build validation tests
-./tests_new/scripts/build_tests.sh quick
+./tests/scripts/build_tests.sh quick
 
 # Build stress tests (with ASan)
-./tests_new/scripts/build_tests.sh stress
+./tests/scripts/build_tests.sh stress
 
 # Build hash attack tests
-./tests_new/scripts/build_tests.sh attack
+./tests/scripts/build_tests.sh attack
 
 # Build all tests
-./tests_new/scripts/build_tests.sh all
+./tests/scripts/build_tests.sh all
 
 # Build and run quick tests
-./tests_new/scripts/build_tests.sh run
+./tests/scripts/build_tests.sh run
 
 # Build with clang (fuzzer requires)
-./tests_new/scripts/build_tests.sh fuzz clang
+./tests/scripts/build_tests.sh fuzz clang
 
 # Clean
-./tests_new/scripts/build_tests.sh clean
+./tests/scripts/build_tests.sh clean
 ```
 
 ### Windows PowerShell Environment
 
 ```powershell
 # Quick build
-.\tests_new\scripts\build_tests.ps1 quick
+.\tests\scripts\build_tests.ps1 quick
 
 # Stress tests
-.\tests_new\scripts\build_tests.ps1 stress
+.\tests\scripts\build_tests.ps1 stress
 
 # Build and run
-.\tests_new\scripts\build_tests.ps1 run
+.\tests\scripts\build_tests.ps1 run
 
 # Clean
-.\tests_new\scripts\build_tests.ps1 clean
+.\tests\scripts\build_tests.ps1 clean
 ```
 
 ### Using Makefile
 
 ```bash
 # Build and run all quick tests
-cd tests_new && make quick
+cd tests && make quick
 
 # Build specific test
-cd tests_new && make test_verify
+cd tests && make test_verify
 ```
 
 ### Using CMake
 
 ```bash
-cd tests_new
+cd tests
 mkdir build && cd build
 cmake ..
 cmake --build . --target quick_test
@@ -208,46 +222,46 @@ cmake --build . --target quick_test
 
 ## 5. Test Classification Summary
 
-| Category | File Count | Main Directory | Key Tests |
-|----------|------------|----------------|-----------|
-| **Fuzzing** | 10+ | fuzz/ | fuzz_emhash_all, fuzz_extreme |
-| **Unit Tests** | 20+ | test/ | test_emhash58, test_emhash5_verify |
-| **Stress Tests** | 8 | test/, bench/ | test_emhash5_hifi, stress_fix |
-| **Bug Reproduction** | 15+ | fuzz/, bench/ | debug_chain, reproduce_crash |
-| **Performance Benchmarks** | 12 | bench/ | ebench, martin_bench |
-| **Hash Attack** | 2 | bench/ | hash_attack, hash_attack7 |
+| Category | File Count | Location | Key Tests |
+|----------|------------|----------|-----------|
+| **Fuzzing** | 8 | tests/fuzz/ | fuzz_emhash_all, fuzz_extreme |
+| **Unit Tests** | 15+ | tests/verify/ | test_all_maps, test_emhash58, test_extreme |
+| **Stress Tests** | 6 | tests/stress/ | stress_all_maps, stress_fix |
+| **Bug Reproduction** | 12+ | tests/debug/ | debug_chain, reproduce_crash |
+| **Performance Benchmarks** | 20+ | bench/, tests/bench/ | ebench, martin_bench |
+| **Hash Attack** | 3 | tests/attack/ | hash_attack_all, hash_attack7 |
 
 ---
 
 ## 6. Test Coverage Matrix
 
-| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emilib |
-|-----------|---------|---------|---------|---------|--------|
-| Fuzzing | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Unit Tests | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Stress Tests | ✓ | - | - | ✓ | ✓ |
-| High Load | ✓ | ✓ | ✓ | ✓ | - |
-| Hash Attack | ✓ | - | ✓ | - | - |
-| Bug Reproduction | ✓ | - | - | ✓ | ✓ |
+| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emilib2ss | emilib2o | emilib2s |
+|-----------|---------|---------|---------|---------|-----------|----------|----------|
+| Fuzzing | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Unit Tests | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Stress Tests | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| High Load | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Hash Attack | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Bug Reproduction | Yes | - | - | Yes | Yes | - | - |
 
 ---
 
 ## 7. Recommended Test Order
 
-1. **Quick Validation**: `quick_test8` → `test_hidden_bugs8` → `highload_test`
-2. **Unit Tests**: `test_emhash58` → `test_emhash5_verify` → `test_extreme`
-3. **Stress Tests**: `stress_fix_asan` → `test_emhash5_hifi_asan`
-4. **Fuzzing**: `fuzz_extreme_asan` (60s) → `fuzz_emhash8` (requires clang)
-5. **Performance Benchmarks**: `ebench` → `martin_bench` → `highload_bench`
+1. **Quick Validation**: `cd tests && make quick` (~20s)
+2. **Stress Tests**: `cd tests && make stress` (~1min)
+3. **Hash Attack**: `cd tests && make attack` (~2min)
+4. **Fuzzing (ASan)**: `cd tests && make fuzz` (non-fuzzer variant)
+5. **Performance Benchmarks**: `cd tests && make bench`
 
 ---
 
 ## 8. Unified Test Directory
 
-A unified test directory `tests_new/` has been created for easier maintenance:
+A unified test directory `tests/` has been created for easier maintenance:
 
 ```
-tests_new/
+tests/
 ├── fuzz/      # Fuzzing tests
 ├── stress/    # Stress tests
 ├── debug/     # Debug tools
@@ -258,4 +272,4 @@ tests_new/
 └── README.md  # Documentation
 ```
 
-See `tests_new/README.md` for detailed usage instructions.
+See `tests/README.md` for detailed usage instructions.

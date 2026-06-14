@@ -1,14 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(emhash)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" EMHASH_VERSION LIMIT_COUNT 1)
+project(emhash VERSION ${EMHASH_VERSION} LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(WITH_BENCHMARKS "Build benchmarks." ON)
+option(WITH_EXAMPLES "Build examples." ON)
 
 message("------------ Options -------------")
 message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
@@ -23,10 +26,13 @@ set(EMHASH_HEADERS
     hash_set3.hpp
     hash_set4.hpp
     hash_set8.hpp
+    hash_set81.hpp
     hash_table5.hpp
     hash_table6.hpp
     hash_table7.hpp
+    hash_table7s.hpp
     hash_table8.hpp
+    utils.hpp
 )
 
 set_target_properties(emhash PROPERTIES PUBLIC_HEADER "${EMHASH_HEADERS}")
@@ -51,6 +57,12 @@ install(EXPORT emhash-targets
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/emhash
 )
 
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/emhashConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
 configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/emhashConfig.cmake"
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/emhash
@@ -58,6 +70,7 @@ configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.in
 
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/emhashConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/emhashConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/emhash
 )
 
@@ -100,5 +113,9 @@ if(WITH_BENCHMARKS)
     #target_link_libraries(mbench PRIVATE Threads::Threads)
     #target_link_libraries(hbench PRIVATE Threads::Threads)
     #target_link_libraries(fbench PRIVATE Threads::Threads)
+endif()
+
+if(WITH_EXAMPLES)
+    add_subdirectory(examples)
 endif()
 

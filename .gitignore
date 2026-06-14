@@ -54,73 +54,62 @@ bench/ebench.exe
 bench/join_hash.exe
 bench/mbench.exe
 
-# Test binaries
-test/test_bug
-test/test_debug
-test/test_extreme
-test/test_extreme_gcc
-test/test_extreme_run.exe
-test/test_find_hit_bug
-test/test_find_hit_bug2
-test/test_find_hit_bug3
-test/test_find_hit_ok
-test/test_probe_bug_run.exe
-test/emhash_test
-test58
+# Test binaries (old test/ directory removed, binaries kept for reference)
 test_emilib2o
 
-# tests_new binaries and crash dumps
-tests_new/verify/bin/
-tests_new/debug/bin/
-tests_new/fuzz/bin/
-tests_new/stress/bin/
-tests_new/attack/bin/
-tests_new/bench/bin/
-tests_new/fuzz/fuzz_emhash8
-tests_new/fuzz/fuzz_emhash8_advanced
-tests_new/fuzz/fuzz_emhash8_advanced_fixed
-tests_new/fuzz/fuzz_emhash_all
-tests_new/fuzz/fuzz_emilib_all
-tests_new/fuzz/fuzz_nocoll_asan
-tests_new/fuzz/reproduce_bug
-tests_new/crash-*
-tests_new/test_verify
-tests_new/test_stress
-tests_new/test_attack
-tests_new/test_debug
-tests_new/quick_test8
-tests_new/test_emhash58
-tests_new/test_hidden_bugs8
-tests_new/test_extreme
-tests_new/test_interface_combo
-tests_new/test_emhash5_verify
-tests_new/test_emhash_allocator
-tests_new/test_functional_edge
-tests_new/stress_fix
-tests_new/highload_test
-tests_new/test_emhash5_stress
-tests_new/test_emhash5_hifi
-tests_new/hash_attack5
-tests_new/hash_attack7
-tests_new/debug_chain
-tests_new/debug_set_erase
-tests_new/min_repro
-tests_new/reproduce_crash
-tests_new/fuzz_reproduce
-tests_new/ebench
-tests_new/martin_bench
-tests_new/highload_bench
-tests_new/fuzz_extreme
-tests_new/fuzz_nocoll
-tests_new/reproduce_emhash8_bug
-tests_new/fuzz_emhash_all
-tests_new/fuzz_emhash8
-tests_new/fuzz_emhash8_advanced
-tests_new/fuzz_emilib_all
-tests_new/asan_stress
-tests_new/asan_verify
-tests_new/t1
-tests_new/t2
+# tests binaries and crash dumps
+tests/verify/bin/
+tests/debug/bin/
+tests/fuzz/bin/
+tests/stress/bin/
+tests/attack/bin/
+tests/bench/bin/
+tests/fuzz/fuzz_emhash8
+tests/fuzz/fuzz_emhash8_advanced
+tests/fuzz/fuzz_emhash8_advanced_fixed
+tests/fuzz/fuzz_emhash_all
+tests/fuzz/fuzz_emilib_all
+tests/fuzz/fuzz_nocoll_asan
+tests/fuzz/reproduce_bug
+tests/crash-*
+tests/test_verify
+tests/test_stress
+tests/test_attack
+tests/test_debug
+tests/quick_test8
+tests/test_emhash58
+tests/test_hidden_bugs8
+tests/test_extreme
+tests/test_interface_combo
+tests/test_emhash5_verify
+tests/test_emhash_allocator
+tests/test_functional_edge
+tests/test_main
+tests/stress_fix
+tests/highload_test
+tests/test_emhash5_stress
+tests/test_emhash5_hifi
+tests/hash_attack5
+tests/hash_attack7
+tests/debug_chain
+tests/debug_set_erase
+tests/min_repro
+tests/reproduce_crash
+tests/fuzz_reproduce
+tests/ebench
+tests/martin_bench
+tests/highload_bench
+tests/fuzz_extreme
+tests/fuzz_nocoll
+tests/reproduce_emhash8_bug
+tests/fuzz_emhash_all
+tests/fuzz_emhash8
+tests/fuzz_emhash8_advanced
+tests/fuzz_emilib_all
+tests/asan_stress
+tests/asan_verify
+tests/t1
+tests/t2
 
 # Root-level build/test binaries
 bench_emilib2o_opt
@@ -128,42 +117,25 @@ bench_emilib2o_orig
 bench_emilib2ss_clang
 bench_emilib2ss_gcc
 mbench
+quick_bench
 
-# fuzz/ directory binaries and crash dumps
-fuzz/debug_emilib2ss
-fuzz/debug_emilib2ss2
-fuzz/debug_emilib2ss3
-fuzz/debug_emilib2ss4
-fuzz/debug_emilib2s
-fuzz/debug_emilib2o
-fuzz/debug_emilib2o_offset
-fuzz/debug_emilib2o_hash
-fuzz/debug_emilib2o_min
-fuzz/debug_rehash
-fuzz/debug_set_erase
-fuzz/debug_orig
-fuzz/debug_chain
-fuzz/fuzz_emilib
-fuzz/fuzz_extreme_asan
-fuzz/fuzz_emhash_all
-fuzz/fuzz_extreme
-fuzz/fuzz_nocoll
-fuzz/fuzz_all
-fuzz/fuzz_orig
-fuzz/fuzz_emhash8_advanced
-fuzz/fuzz_emhash8
-fuzz/min_repro
-fuzz/minimized_crash
-fuzz/crash-*
+# Root-level isolated files (not in project structure)
+test58
+test_emilib2o
+
+# Old fuzz/ directory (moved to tests/fuzz/)
+fuzz/
 
 # Build directories
 build/
 build_test/
 vsbuild/
-test/vsbuild/
-test/CMakeFiles/
 bench/bin/
+tests/build/
 .cache/
+
+# Amalgamated single-header distributions
+dist/
 
 # IDE/Editor files
 .vs/
@@ -190,6 +162,13 @@ Directory.build.props
 # Output files
 hash_attack_output.txt
 out7.txt
+bench/ebench.txt
+bench/hbench.txt
+bench/martin_bench.txt
+bench/dense_hash_bench.txt
+bench/qbench-out.txt
+bench/ph_bench.txt
+bench/llvm.sh
 
 # Third-party benchmark directories (not part of emhash)
 bench/STC/
@@ -202,4 +181,3 @@ bench/hashtable-bench/
 bench/kudb3/
 bench/mem-meta-kv-benchmark/
 bench/udb3/
-bench/llvm.sh

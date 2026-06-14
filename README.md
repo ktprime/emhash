@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![C++ Standard](https://img.shields.io/badge/C%2B%2B-11%2F14%2F17%2F20-blue.svg)](https://en.cppreference.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
+[![CI](https://github.com/ktprime/emhash/actions/workflows/ci.yml/badge.svg)](https://github.com/ktprime/emhash/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/ktprime/emhash/releases)
 
 emhash is a family of high-performance, **header-only** hash table implementations designed for maximum performance and memory efficiency. Through innovative collision resolution strategies and cache optimization techniques, emhash demonstrates exceptional performance across various benchmarks.
 
@@ -13,13 +15,8 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 ## Table of Contents
 
 - [Core Features](#core-features)
-- [Performance Overview](#performance-overview)
 - [Quick Start](#quick-start)
-- [API Reference](#api-reference)
-- [Design Principles](#design-principles)
-- [Implementation Comparison](#implementation-comparison)
-- [Build and Test](#build-and-test)
-- [Usage Notes](#usage-notes)
+- [Documentation](#documentation)
 - [Third-Party Benchmarks](#third-party-benchmarks)
 - [License](#license)
 
@@ -52,90 +49,6 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 - **Operating Systems**: Windows, Linux, macOS
 - **Processors**: x86_64, ARM64 (Apple M1/M2, AMD, Intel)
 - **Compilers**: GCC, Clang, MSVC (C++11/14/17/20)
-
----
-
-## Performance Overview
-
-### Performance Comparison with Mainstream Implementations (lower is better)
-
-Test Environment: AMD 5800H / Windows 10 / GCC 11.3
-
-| Operation | emhash7 | emhash8 | emhash6 | emhash5 | phmap | absl | std::unordered_map |
-|-----------|---------|---------|---------|---------|-------|------|-------------------|
-| Insert (10M) | 66.0 | 95.6 | 63.6 | 64.7 | 59.5 | 53.2 | 295 |
-| Find Hit | 16.9 | 18.3 | 15.1 | 16.6 | 36.4 | 22.6 | 33.0 |
-| Find Miss | 18.1 | 18.1 | 17.0 | 18.8 | 19.7 | 11.7 | 52.0 |
-| Erase | 20.4 | 46.3 | 24.0 | 22.3 | 56.2 | 41.5 | 293 |
-| Iterate | 0.74 | 0.00 | 0.75 | 4.75 | 3.46 | 3.49 | 62.6 |
-
-> **Note**: emhash8's iteration time of 0.00 ms indicates extremely fast iteration due to its contiguous memory layout (actual time is < 0.005 ms).
-
-### Excellent Performance at High Load Factors
-
-Even at an extreme load factor of **0.999**, emhash maintains outstanding performance:
-
-```cpp
-emhash7::HashMap<int64_t, int> myhash(1 << 20, 0.999f);
-// Insert 1M+ elements without rehash
-// Stable insert/erase performance without degradation
-```
-
-#### How it works
-
-```cpp
-// Compile: g++ -O3 -march=native -I.. -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 highload_bench.cpp
-
-#include "hash_table7.hpp"
-
-static void RunHighLoadFactor()
-{
-    std::random_device rd;
-    const auto rand_key = rd();
-    WyRand srngi(rand_key), srnge(rand_key);
-
-    const auto max_lf   = 0.999f; //<= 0.999f
-    const auto vsize    = 1u << (20 + rand_key % 6); //must be power of 2
-    emhash7::HashMap<int64_t, int> myhash(vsize, max_lf);
-
-    auto nowus = getus();
-    for (size_t i = 0; i < size_t(vsize * max_lf); i++)
-        myhash.emplace(srngi(), i);
-    assert(myhash.bucket_count() == vsize); //no rehash
-
-    const auto insert_time = getus() - nowus; nowus = getus();
-    //erase & insert at a fixed load factor
-    for (size_t i = 0; i < vsize; i++) {
-        myhash.erase(srnge()); //erase an old key
-        myhash[srngi()] = 1;   //insert a new key
-    }
-    const auto erase_time = getus() - nowus;
-    printf("vsize = %d, load factor = %.4f, insert/erase = %ld/%ld ms\n",
-        vsize, myhash.load_factor(), insert_time / 1000, erase_time / 1000);
-    assert(myhash.load_factor() >= max_lf - 0.001);
-}
-```
-
-Full benchmark code with multi-version comparison: [bench/highload_bench.cpp](https://github.com/ktprime/emhash/blob/master/bench/highload_bench.cpp)
-
-#### Real benchmark results (1M buckets, LF=0.999, compiled with `-DEMH_HIGH_LOAD=123456`)
-
-Test Environment: AMD 5800H / Windows 10 / GCC 11.3
-
-| hashmap          | Insert(ms) | Erase+Insert(ms) | LF    |
-|------------------|------------|------------------|------|
-| emhash7::HashMap |         44 |              118 | 99.9 |
-| emhash6::HashMap |         38 |              202 | 99.9 |
-| emhash5::HashMap |         42 |               90 | 99.9 |
-| emhash8::HashMap |         49 |              110 | 99.9 |
-
-| hashmap          | Fhit(ms) | Fmiss(ms) | Iter(ms) | LF    |
-|------------------|----------|-----------|----------|------|
-| emhash7::HashMap |       18 |        21 |        2 | 99.9 |
-| emhash6::HashMap |       15 |        18 |        2 | 99.9 |
-| emhash5::HashMap |       17 |        17 |        1 | 99.9 |
-
-> Other hash maps (absl, phmap, ska, tsl, robin_hood) cannot run at 0.999 LF — they either cap max_load_factor at ~0.875 or suffer catastrophic clustering.
 
 ---
 
@@ -221,415 +134,38 @@ emhash7::HashMap<Point, int, decltype(hash), decltype(eq)> map(0, hash, eq);
 #endif
 ```
 
----
-
-## API Reference
-
-### Constructors
-
-```cpp
-HashMap();                                    // Default constructor
-HashMap(size_t bucket_count);                 // Specify initial bucket count
-HashMap(size_t bucket_count, float max_load_factor);  // Specify load factor
-HashMap(const HashMap& other);                // Copy constructor
-HashMap(HashMap&& other) noexcept;            // Move constructor
-HashMap(std::initializer_list<value_type> il);// Initializer list
-```
-
-### Capacity Operations
-
-| Method | Description |
-|--------|-------------|
-| `size()` / `empty()` | Element count / is empty |
-| `bucket_count()` | Current bucket count |
-| `load_factor()` / `max_load_factor()` | Current/max load factor |
-| `reserve(n)` | Reserve space for at least n elements |
-| `shrink_to_fit()` | Shrink to fit current size |
-
-### Element Access
-
-| Method | Description |
-|--------|-------------|
-| `operator[key]` | Insert or access element |
-| `at(key)` | Access element, undefined behavior if not found |
-| `find(key)` | Find element, returns iterator |
-| `try_get(key)` | Find element, returns pointer to value (`nullptr` on failure) |
-| `contains(key)` | Check if key exists |
-| `count(key)` | Key occurrence count (0 or 1) |
-
-### Modification Operations
-
-| Method | Description |
-|--------|-------------|
-| `emplace(key, val)` | In-place construct insert |
-| `insert({key, val})` | Insert key-value pair |
-| `insert_unique(key, val)` | Direct insert (no existence check, best performance) |
-| `try_set(key, val)` | Set only if key does not exist (emhash5/8) |
-| `set_get(key, val)` | Set new value, return old value (emhash5/8) |
-| `erase(key)` / `erase(it)` | Delete element |
-| `_erase(key)` | Delete element, return void (faster) |
-| `clear()` | Clear all elements |
-
-### Iterators
-
-```cpp
-for (auto it = map.begin(); it != map.end(); ++it) {
-    // it->first: key, it->second: value
-}
-
-// C++17 structured binding
-for (const auto& [key, value] : map) { }
-```
+More examples: [examples/](examples/)
 
 ---
 
-## Design Principles
+## Version Selection Guide
 
-### Collision Resolution (varies by version)
+| Version | Best For | Key Strengths | Weaknesses |
+|---------|----------|---------------|------------|
+| **emhash5** | Integer keys, fast lookup | Small-size optimization (`EMH_SMALL_SIZE`), lowest probe count | EhKey must be default-constructible |
+| **emhash6** | Fast lookup/erase, integer keys | Fastest find/erase, linked-bucket with bitmask | More memory for metadata |
+| **emhash7** | Insert-heavy, mixed workloads | No tombstones, stable insert/erase, high load factor | Slower erase than emhash5/6 |
+| **emhash8** | Iteration-heavy, large KV types | Dense pairs array, near-zero iteration time | Higher memory, EhKey default-constructible req. |
+| **emilib2** | Swiss-table style SIMD-accelerated lookup | Group-level SIMD probing, very fast find | Higher memory overhead per bucket |
 
-| Version | Strategy | High LF Support |
-|---------|----------|----------------|
-| **emhash5** | Three-way hybrid: linear probing → quadratic probing → bidirectional search | With `EMH_HIGH_LOAD` |
-| **emhash6** | Linked-bucket with separate bitmask for fast empty-bucket search | With `EMH_HIGH_LOAD` |
-| **emhash7** | Linked-bucket with separate bitmask, no tombstones | Native (0.80-0.999) |
-| **emhash8** | Separate index + dense pairs array, linked-bucket chains | With `EMH_HIGH_LOAD` |
-
-> In `hash_table5.hpp`, the optimized three-way linear probing strategy is still **2-3x faster** than traditional strategies even at load factors **> 0.9**.
-
-### Memory Layout
-
-**emhash5/6/7** — Single inline array with embedded bucket linkage:
-
-```cpp
-struct Entry {
-    Key key;           // Key
-    size_t bucket;     // Bucket chain linkage / state info
-    Value value;       // Value
-};
-// _pairs[bucket] stores key, value, and chain pointer in one struct
-// emhash6/7 additionally use a separate _bitmask for fast empty-bucket search
-```
-
-**emhash8** — Split index + dense pairs (like `std::vector`):
-
-```cpp
-struct Index { size_t next, slot; };  // Per-bucket chain linkage
-Index*    _index;   // bucket → slot mapping
-value_type* _pairs; // dense, compact key-value array (no metadata)
-// _pairs is always packed: _pairs[0].._pairs[_num_filled-1]
-// This enables extremely fast iteration (just scan _pairs sequentially)
-```
-
-### Primary Bucket Mapping
-
-- Primary bucket is always assigned to `key_hash(key) % size` and **cannot be occupied**
-- All operations start searching from the primary bucket
-- Avoids circular displacement issues in cuckoo hashing
-
-### Backup Hash Function
-
-Enable backup hash function by defining `EMH_SAFE_HASH` macro to defend against hash attacks (performance cost ~ **10%**).
+See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
 
 ---
 
-## Implementation Comparison
-
-emhash provides 4 different implementations, each with different focus:
-
-| Implementation | Layout | Collision Strategy | Default LF | Best Scenario |
-|----------------|--------|--------------------|------------|---------------|
-| **emhash5** | Inline `_pairs[]` | Three-way hybrid probing | 0.80 | Fast lookup/erase with integer keys, SBO support |
-| **emhash6** | Inline `_pairs[]` + `_bitmask` | Linked-bucket | 0.80 | Lookup/erase with integer keys, fast empty scan |
-| **emhash7** | Inline `_pairs[]` + `_bitmask` | Linked-bucket, no tombstones | 0.80 | High load factor (0.80-0.999), insert-intensive |
-| **emhash8** | Separate `_index[]` + dense `_pairs[]` | Linked-bucket | 0.80 | Complex keys/values, extremely fast iteration |
-
-### Selection Guide
-
-- **Complex/large keys/values** (e.g., `std::string`, custom structs) → **emhash8**
-- **Insert-intensive workloads** or need high load factor → **emhash7**
-- **Fast search and erase with integer keys** → **emhash5/6**
-- **Small maps that should avoid heap allocation** → **emhash5** with `EMH_SMALL_SIZE`
-
-### HashSet
-
-emhash also provides `HashSet` implementations:
-
-```cpp
-#include "hash_set3.hpp"   // Based on emhash7, namespace emhash7
-#include "hash_set81.hpp"  // Based on emhash8, namespace emhash8
-
-emhash7::HashSet<int> set1;
-emhash8::HashSet<int> set2;
-```
-
-### Custom Allocator
-
-All `HashMap` versions support custom allocators (emhash5/6/7/8):
-
-```cpp
-emhash7::HashMap<Key, Val, Hash, Eq, MyAllocator> mymap;
-```
-
----
-
-## Build and Test
-
-### Using CMake
-
-```bash
-# Clone repository
-git clone https://github.com/ktprime/emhash.git
-cd emhash
-
-# Create build directory
-mkdir build && cd build
-
-# Configure (optional: disable benchmarks)
-cmake .. -DWITH_BENCHMARKS=ON
-
-# Build
-cmake --build . --config Release
-```
-
-### Running Tests
-
-The `tests_new/` directory provides a unified test suite covering all 7 implementations:
-**emhash5/6/7/8** and **emilib2ss/2o/2s**.
-
-#### Quick Start (Recommended)
-
-```bash
-cd tests_new
-
-# Using Makefile (fastest)
-make quick          # Quick validation (~20s, 247,268 assertions)
-make stress         # Stress tests (~1min)
-make attack         # Hash attack tests (~2min)
-make bench          # Build benchmarks
-make all            # Run all tests
-make help           # Show all available targets
-
-# Using CMake
-mkdir build && cd build
-cmake ..
-cmake --build . --target quick_test    # Quick tests
-cmake --build . --target stress_test   # Stress tests
-cmake --build . --target attack_test   # Attack tests
-cmake --build . --target all_tests     # All tests
-
-# Using build scripts
-./scripts/build_tests.sh quick          # Linux/WSL
-./scripts/build_tests.sh run            # Build and run
-./scripts/build_tests.sh all clang      # All tests with clang
-
-.\scripts\build_tests.ps1 quick         # Windows (via WSL)
-.\scripts\build_tests.ps1 run
-```
-
-#### Manual Compilation
-
-```bash
-cd tests_new
-
-# Quick validation tests (~10 seconds, 247,268 assertions)
-g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify && ./test_verify
-
-# Stress tests (~30 seconds)
-g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench stress/stress_all_maps.cpp -o test_stress && ./test_stress
-
-# Hash attack tests (~2 minutes, requires EMH_SAFE_PSL)
-g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty -I../bench attack/hash_attack_all.cpp -o test_attack && ./test_attack
-
-# Debug tests (~10 seconds, built with -g -O0)
-g++ -std=c++17 -g -O0 -I.. -I../thirdparty -I../bench debug/debug_all_maps.cpp -o test_debug && ./test_debug
-```
-
-#### Windows (MSVC)
-
-```powershell
-cd tests_new
-
-# Quick validation tests
-cl /std:c++17 /O2 /I.. /I..\thirdparty /I..\bench verify\test_all_maps.cpp /Fe:test_verify.exe && .\test_verify.exe
-
-# Stress tests
-cl /std:c++17 /O2 /I.. /I..\thirdparty /I..\bench stress\stress_all_maps.cpp /Fe:test_stress.exe && .\test_stress.exe
-
-# Hash attack tests (requires EMH_SAFE_PSL)
-cl /std:c++17 /O2 /DEMH_SAFE_PSL /I.. /I..\thirdparty /I..\bench attack\hash_attack_all.cpp /Fe:test_attack.exe && .\test_attack.exe
-```
-
-#### Address Sanitizer (ASan)
-
-```bash
-cd tests_new
-
-# Build with ASan for memory error detection
-make asan_verify    # ASan + UBSan validation tests
-make asan_stress    # ASan + UBSan stress tests
-
-# Manual ASan build
-g++ -std=c++17 -fsanitize=address,undefined -I.. -I../thirdparty -I../bench \
-    stress/stress_all_maps.cpp -o asan_stress && ./asan_stress
-```
-
-#### Fuzz Testing (requires clang + libfuzzer)
-
-```bash
-cd tests_new
-
-# Build fuzzer (requires clang)
-clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty -I../bench \
-    fuzz/fuzz_emhash_all.cpp -o fuzz_all
-
-# Run fuzzer for 60 seconds
-./fuzz_all -max_total_time=60 corpus/
-
-# Fuzz emilib implementations
-clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty -I../bench \
-    fuzz/fuzz_emilib_all.cpp -o fuzz_emilib
-./fuzz_emilib -max_total_time=60 corpus/
-```
-
-### Test Coverage
-
-| Test Type | File | Coverage | Assertions | Time |
-|-----------|------|----------|------------|------|
-| **Quick Validation** | `verify/test_all_maps.cpp` | emhash5-8 + emilib2ss/2o/2s | 247,268 | ~5s |
-| **Stress** | `stress/stress_all_maps.cpp` | 7 maps x 5 items x 1000 trials | 35,000 trials | ~30s |
-| **Hash Attack** | `attack/hash_attack_all.cpp` | 7 maps x 3 attack patterns | correctness+perf | ~2min |
-| **Debug** | `debug/debug_all_maps.cpp` | 7 maps x 10 debug tests | 70 tests | ~10s |
-| **Fuzz** | `fuzz/fuzz_emhash_all.cpp` | All emhash versions (5/6/7/8) | - | - |
-| **Fuzz (emilib)** | `fuzz/fuzz_emilib_all.cpp` | emilib2ss/2o/2s | - | - |
-
-### Test Coverage Matrix
-
-| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emilib2ss | emilib2o | emilib2s |
-|-----------|---------|---------|---------|---------|-----------|----------|----------|
-| Quick Validation | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Stress | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| High Load (LF=0.999) | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Hash Attack | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Fuzzing | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| ASan/UBSan | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-
-### Recommended Test Order
-
-1. **Quick Validation** (~20s) - fast correctness check
-   ```bash
-   make quick
-   ```
-
-2. **Stress Tests** (~1min) - random operation sequences
-   ```bash
-   make stress
-   ```
-
-3. **Hash Attack** (~2min) - worst-case collision scenarios
-   ```bash
-   make attack
-   ```
-
-4. **Fuzz Testing** (optional, ~5min) - memory error detection
-   ```bash
-   # ASan variants (gcc compatible)
-   make fuzz
-
-   # LibFuzzer variants (requires clang)
-   make fuzz_emhash_all CXX=clang++
-   make fuzz_emilib_all CXX=clang++
-   ```
-
-> **Note**: Hash attack tests require `-DEMH_SAFE_PSL` flag for emilib implementations. Fuzz tests require clang + libfuzzer. ASan tests should use `-O2` or `-g`, not `-O3`.
-
-### Compile Options
-
-| Macro | Description |
-|-------|-------------|
-| `EMH_HIGH_LOAD=<value>` | Enable high load factor support. Must be a positive integer (e.g. `123456`), not 0. Enables empty-bucket chain (`_ehead`) for LF up to 0.999 |
-| `EMH_WY_HASH=1` | Use wyhash algorithm (faster for string keys) |
-| `EMH_SAFE_HASH=1` | Enable backup hash function (hash attack protection, ~10% cost) |
-| `EMH_SAFE_PSL=1` | Enable safe PSL limit for emilib implementations (required for hash attack tests) |
-| `EMH_LRU_SET=1` | Enable LRU cache mode |
-| `EMH_STATIS=1` | Enable collision statistics output |
-| `EMH_FIBONACCI_HASH=1` | Use Fibonacci hashing |
-| `EMH_IDENTITY_HASH=1` | Use identity hashing (integer key optimization) |
-| `EMH_SMALL_SIZE=<N>` | Small Buffer Optimization for emhash5: inline storage for ≤N buckets, no heap alloc (emhash5 only, N≥2) |
-| `EMH_PACK_TAIL=<1-100>` | Add extra tail buckets (N% of total) for faster probing near table end (emhash5/8) |
-| `EMH_ITER_SAFE=1` | Eager iterator initialization, safer if container modified during iteration (emhash6/7) |
-| `EMH_ALIGN64=1` | Use 64-bit aligned bitmask access for faster empty-bucket scan (emhash6) |
-
----
-
-## Usage Notes
-
-### 0. Thread Safety
-
-emhash is **not thread-safe**. Concurrent access from multiple threads requires external synchronization:
-
-```cpp
-// ❌ Wrong: concurrent access without synchronization
-// Thread 1: map[key] = val;
-// Thread 2: map.find(key);
-
-// ✅ Correct: use mutex for concurrent access
-std::mutex mtx;
-{
-    std::lock_guard<std::mutex> lock(mtx);
-    map[key] = val;
-}
-
-// ✅ Correct: concurrent read-only access is safe
-// Multiple threads can call find()/contains()/count() simultaneously
-// as long as no thread is modifying the map
-```
-
-### 1. Non-Node-Based Hash Table
-
-emhash **does not guarantee** reference stability during insert/erase/rehash operations.
-
-```cpp
-// ❌ Wrong: reference may become invalid after rehash
-auto& ref = myhash[1];
-myhash[2] = ref;  // Danger! May trigger rehash
-
-// ✅ Correct: copy value first
-auto val = myhash[1];
-myhash.reserve(10000);  // Pre-allocate
-myhash[2] = val;
-```
-
-### 2. Erasing During Iteration
-
-Deleting elements during iteration may cause some keys to be visited twice or skipped.
-
-```cpp
-// ❌ Wrong: direct deletion without updating iterator
-for (const auto& it : myhash) {
-    if (condition) myhash.erase(it.first);
-}
-
-// ✅ Correct: use iterator erase and update
-for (auto it = myhash.begin(); it != myhash.end(); ) {
-    if (condition) {
-        it = myhash.erase(it);  // Returns next valid iterator
-    } else {
-        ++it;
-    }
-}
-```
-
-### 3. Large Value Type Optimization
-
-For very large value types (e.g., `> 100 bytes`), consider using pointer storage:
-
-```cpp
-// High memory usage
-emhash7::HashMap<Key, LargeValue> map1;
-
-// Optimized memory usage
-emhash7::HashMap<Key, std::unique_ptr<LargeValue>> map2;
-```
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Performance Overview](docs/performance.md) | Benchmark results, high load factor performance |
+| [API Reference](docs/api.md) | Constructors, methods, iterators |
+| [Design Principles](docs/design.md) | Collision resolution, memory layout, implementation comparison |
+| [Build and Test](docs/build_and_test.md) | CMake, Makefile, ASan, fuzz testing, compile options |
+| [Usage Notes](docs/usage_notes.md) | Thread safety, reference stability, iteration, large values |
+| [Performance Tips](docs/performance_tips.md) | Compile flags, pre-allocation, hash selection, anti-patterns |
+| [FAQ](docs/faq.md) | Frequently asked questions |
+| [Migration Guide](docs/migration_guide.md) | Migrating from std::unordered_map |
+| [Performance Tracking](docs/PERFORMANCE_TRACKING.md) | Version-by-version benchmark history, regression policy |
+| [Architecture Decisions (ADR)](docs/adr/README.md) | Why we chose open addressing, header-only, emhash8 layout, etc. |
 
 ---
 
@@ -642,8 +178,8 @@ emhash has been validated by multiple well-known third-party benchmarks:
 
 ### Benchmark Code
 
-- [Comprehensive Benchmark](https://github.com/ktprime/emhash/blob/master/bench/ebench.cpp)
-- [High Load Test](https://github.com/ktprime/emhash/blob/master/bench/martin_bench.cpp)
+- [Comprehensive Benchmark](bench/ebench.cpp)
+- [High Load Test](bench/martin_bench.cpp)
 
 ### Performance Charts
 

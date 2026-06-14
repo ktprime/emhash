@@ -81,7 +81,7 @@
   #include "ahash-cxx/ahash-cxx.h"
 #endif
 
-#if _WIN32 && _WIN64 == 0
+#if _WIN32 && _WIN64 == 0 && !defined(__SIZEOF_INT128__)
 uint64_t _umul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_hi)
 {
     // multiplier   = ab = a * 2^32 + b
@@ -279,11 +279,18 @@ public:
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _WIN32
+#elif defined(_WIN32)
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
         return high;
+#else
+        uint64_t a = operator()();
+        uint64_t ah = a >> 32, al = a & 0xFFFFFFFF;
+        uint64_t bh = boundExcluded >> 32, bl = boundExcluded & 0xFFFFFFFF;
+        uint64_t lo = al * bl;
+        uint64_t mid = ah * bl + al * bh;
+        return ah * bh + (mid >> 32) + ((mid << 32) + lo < lo ? 1 : 0);
 #endif
     }
 
@@ -329,11 +336,18 @@ public:
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _WIN32
+#elif defined(_WIN32)
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
         return high;
+#else
+        uint64_t a = operator()();
+        uint64_t ah = a >> 32, al = a & 0xFFFFFFFF;
+        uint64_t bh = boundExcluded >> 32, bl = boundExcluded & 0xFFFFFFFF;
+        uint64_t lo = al * bl;
+        uint64_t mid = ah * bl + al * bh;
+        return ah * bh + (mid >> 32) + ((mid << 32) + lo < lo ? 1 : 0);
 #endif
     }
 
@@ -380,11 +394,18 @@ public:
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _WIN32
+#elif defined(_WIN32)
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
         return high;
+#else
+        uint64_t a = operator()();
+        uint64_t ah = a >> 32, al = a & 0xFFFFFFFF;
+        uint64_t bh = boundExcluded >> 32, bl = boundExcluded & 0xFFFFFFFF;
+        uint64_t lo = al * bl;
+        uint64_t mid = ah * bl + al * bh;
+        return ah * bh + (mid >> 32) + ((mid << 32) + lo < lo ? 1 : 0);
 #endif
     }
 
@@ -615,11 +636,18 @@ struct WyRand
     uint64_t operator()(uint64_t boundExcluded) noexcept {
 #ifdef __SIZEOF_INT128__
         return static_cast<uint64_t>((static_cast<unsigned __int128>(operator()()) * static_cast<unsigned __int128>(boundExcluded)) >> 64u);
-#elif _WIN32
+#elif defined(_WIN32)
         uint64_t high;
         uint64_t a = operator()();
         _umul128(a, boundExcluded, &high);
         return high;
+#else
+        uint64_t a = operator()();
+        uint64_t ah = a >> 32, al = a & 0xFFFFFFFF;
+        uint64_t bh = boundExcluded >> 32, bl = boundExcluded & 0xFFFFFFFF;
+        uint64_t lo = al * bl;
+        uint64_t mid = ah * bl + al * bh;
+        return ah * bh + (mid >> 32) + ((mid << 32) + lo < lo ? 1 : 0);
 #endif
     }
 };

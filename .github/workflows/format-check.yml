@@ -1,0 +1,38 @@
+name: Format Check
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  clang-format:
+    name: clang-format (LLVM style)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format-16
+
+      - name: Check formatting
+        run: |
+          # Only check our own source files (not third-party, not generated)
+          find . \
+            -path ./thirdparty -prune -o \
+            -path ./bench/tsl_bench -prune -o \
+            -path ./.git -prune -o \
+            -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
+            -print | xargs clang-format-16 --dry-run --Werror
+
+      - name: Show diff (if any)
+        if: failure()
+        run: |
+          find . \
+            -path ./thirdparty -prune -o \
+            -path ./bench/tsl_bench -prune -o \
+            -path ./.git -prune -o \
+            -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
+            -print | xargs clang-format-16 --dry-run

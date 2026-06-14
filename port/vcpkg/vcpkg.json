@@ -1,0 +1,9 @@
+{
+  "name": "emhash",
+  "version-string": "1.1.0",
+  "port-version": 0,
+  "description": "High-performance, memory-efficient C++ open addressing flat hash table",
+  "homepage": "https://github.com/ktprime/emhash",
+  "license": "MIT",
+  "dependencies": []
+}

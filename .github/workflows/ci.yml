@@ -1,0 +1,202 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'images/**'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }} / ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: g++
+          - os: ubuntu-latest
+            compiler: clang++
+          - os: macos-latest
+            compiler: g++
+          - os: macos-latest
+            compiler: clang++
+          - os: windows-latest
+            compiler: g++
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.compiler }}
+
+      - name: Build verify tests
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++17 -O2 -I.. -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify
+          ${{ matrix.compiler }} -std=c++17 -O2 -I.. -I../thirdparty -I../bench verify/test_extreme.cpp -o test_extreme
+          ${{ matrix.compiler }} -std=c++17 -O2 -I.. -I../thirdparty -I../bench verify/test_hashset_allocator.cpp -o test_hashset_allocator
+        shell: bash
+
+      - name: Build debug tests
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++17 -g -O0 -I.. -I../thirdparty -I../bench debug/debug_all_maps.cpp -o test_debug
+        shell: bash
+
+      - name: Build attack tests
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty -I../bench attack/hash_attack_all.cpp -o test_attack
+        shell: bash
+
+      - name: Build stress tests
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++17 -O2 -I.. -I../thirdparty -I../bench stress/stress_all_maps.cpp -o test_stress
+        shell: bash
+
+      - name: Run verify tests
+        run: |
+          cd tests
+          ./test_verify
+          ./test_extreme
+          ./test_hashset_allocator
+        shell: bash
+
+      - name: Run debug tests
+        run: cd tests && ./test_debug
+        shell: bash
+
+  # Multi-version compiler compatibility check
+  compat:
+    name: Compat / ${{ matrix.compiler }} / C++${{ matrix.std }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: g++-11
+            std: 17
+          - compiler: g++-12
+            std: 17
+          - compiler: g++-13
+            std: 17
+          - compiler: g++-13
+            std: 20
+          - compiler: clang++-16
+            std: 17
+          - compiler: clang++-17
+            std: 17
+          - compiler: clang++-18
+            std: 17
+          - compiler: clang++-18
+            std: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          # Install specific GCC versions
+          if [[ "${{ matrix.compiler }}" == g++-* ]]; then
+            sudo apt-get install -y ${{ matrix.compiler }}
+          fi
+          # Install specific Clang versions via apt.llvm.org
+          if [[ "${{ matrix.compiler }}" == clang++-* ]]; then
+            VER="${{ matrix.compiler }}"
+            VER="${VER#clang++-}"
+            wget -q -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+            sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${VER} main"
+            sudo apt-get update
+            sudo apt-get install -y clang-${VER}
+          fi
+
+      - name: Compile verify tests
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -I.. -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify_compat
+        shell: bash
+
+      - name: Run verify tests
+        run: cd tests && ./test_verify_compat
+        shell: bash
+
+  asan:
+    name: ASan / UBSan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.compiler }}
+
+      - name: Build with ASan
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I.. -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify_asan
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I.. -I../thirdparty -I../bench stress/stress_fix.cpp -o test_stress_asan
+        shell: bash
+
+      - name: Run with ASan
+        run: |
+          cd tests
+          ./test_verify_asan
+          ./test_stress_asan
+        shell: bash
+
+  cmake:
+    name: CMake / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -S tests
+        shell: bash
+
+      - name: Build
+        run: cmake --build build --target test_verify test_debug test_attack
+        shell: bash
+
+  windows-msvc:
+    name: Windows / MSVC / C++${{ matrix.std }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        std: [17, 20]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (CMake)
+        run: cmake -B build -S tests -DCMAKE_CXX_STANDARD=${{ matrix.std }}
+        shell: bash
+
+      - name: Build
+        run: cmake --build build --target test_verify test_debug test_attack --config Release
+        shell: bash
+
+      - name: Run tests
+        run: |
+          ./build/Release/test_verify.exe
+          ./build/Release/test_debug.exe
+        shell: bash
