@@ -22,9 +22,9 @@
 #include "martin/robin_hood.h"
 #include "martin/unordered_dense.h"
 
-#include "../hash_table8.hpp"
-#include "../hash_table7.hpp"
-#include "../hash_table5.hpp"
+#include "../include/emhash/hash_table8.hpp"
+#include "../include/emhash/hash_table7.hpp"
+#include "../include/emhash/hash_table5.hpp"
 
 #include "emilib/emilib2ss.hpp"
 #include "emilib/emilib2o.hpp"
