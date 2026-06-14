@@ -18,7 +18,7 @@ BENCH_DIR="$ROOT_DIR/bench"
 
 COMPILER="${2:-gcc}"
 CXX="g++"
-CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.. -I$ROOT_DIR/../thirdparty"
+CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.. -I$ROOT_DIR/../thirdparty -I$ROOT_DIR/../bench"
 ASAN_FLAGS="-fsanitize=address,undefined"
 FUZZ_CXXFLAGS="-std=c++17 -g -O1 -fno-omit-frame-pointer"
 

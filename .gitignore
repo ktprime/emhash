@@ -72,6 +72,10 @@ test_emilib2o
 # tests_new binaries and crash dumps
 tests_new/verify/bin/
 tests_new/debug/bin/
+tests_new/fuzz/bin/
+tests_new/stress/bin/
+tests_new/attack/bin/
+tests_new/bench/bin/
 tests_new/fuzz/fuzz_emhash8
 tests_new/fuzz/fuzz_emhash8_advanced
 tests_new/fuzz/fuzz_emhash8_advanced_fixed
@@ -80,6 +84,43 @@ tests_new/fuzz/fuzz_emilib_all
 tests_new/fuzz/fuzz_nocoll_asan
 tests_new/fuzz/reproduce_bug
 tests_new/crash-*
+tests_new/test_verify
+tests_new/test_stress
+tests_new/test_attack
+tests_new/test_debug
+tests_new/quick_test8
+tests_new/test_emhash58
+tests_new/test_hidden_bugs8
+tests_new/test_extreme
+tests_new/test_interface_combo
+tests_new/test_emhash5_verify
+tests_new/test_emhash_allocator
+tests_new/test_functional_edge
+tests_new/stress_fix
+tests_new/highload_test
+tests_new/test_emhash5_stress
+tests_new/test_emhash5_hifi
+tests_new/hash_attack5
+tests_new/hash_attack7
+tests_new/debug_chain
+tests_new/debug_set_erase
+tests_new/min_repro
+tests_new/reproduce_crash
+tests_new/fuzz_reproduce
+tests_new/ebench
+tests_new/martin_bench
+tests_new/highload_bench
+tests_new/fuzz_extreme
+tests_new/fuzz_nocoll
+tests_new/reproduce_emhash8_bug
+tests_new/fuzz_emhash_all
+tests_new/fuzz_emhash8
+tests_new/fuzz_emhash8_advanced
+tests_new/fuzz_emilib_all
+tests_new/asan_stress
+tests_new/asan_verify
+tests_new/t1
+tests_new/t2
 
 # Root-level build/test binaries
 bench_emilib2o_opt
@@ -87,6 +128,33 @@ bench_emilib2o_orig
 bench_emilib2ss_clang
 bench_emilib2ss_gcc
 mbench
+
+# fuzz/ directory binaries and crash dumps
+fuzz/debug_emilib2ss
+fuzz/debug_emilib2ss2
+fuzz/debug_emilib2ss3
+fuzz/debug_emilib2ss4
+fuzz/debug_emilib2s
+fuzz/debug_emilib2o
+fuzz/debug_emilib2o_offset
+fuzz/debug_emilib2o_hash
+fuzz/debug_emilib2o_min
+fuzz/debug_rehash
+fuzz/debug_set_erase
+fuzz/debug_orig
+fuzz/debug_chain
+fuzz/fuzz_emilib
+fuzz/fuzz_extreme_asan
+fuzz/fuzz_emhash_all
+fuzz/fuzz_extreme
+fuzz/fuzz_nocoll
+fuzz/fuzz_all
+fuzz/fuzz_orig
+fuzz/fuzz_emhash8_advanced
+fuzz/fuzz_emhash8
+fuzz/min_repro
+fuzz/minimized_crash
+fuzz/crash-*
 
 # Build directories
 build/

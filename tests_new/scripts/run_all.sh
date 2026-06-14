@@ -10,7 +10,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 TESTS_DIR="$ROOT_DIR"
 
 CXX="g++"
-CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.. -I$ROOT_DIR/../thirdparty"
+CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.. -I$ROOT_DIR/../thirdparty -I$ROOT_DIR/../bench"
 ASAN_FLAGS="-fsanitize=address,undefined"
 
 # 颜色输出
@@ -100,8 +100,8 @@ run_attack() {
     log_info "=== Hash Attack Tests ==="
     
     log_test "Building hash_attack..."
-    $CXX $CXXFLAGS "$TESTS_DIR/attack/hash_attack.cpp" -o /tmp/hash_attack
-    
+    $CXX $CXXFLAGS -DEMH_SAFE_PSL "$TESTS_DIR/attack/hash_attack_all.cpp" -o /tmp/hash_attack
+
     log_test "Running hash_attack..."
     /tmp/hash_attack || log_warn "hash_attack shows expected slowdown under attack"
     

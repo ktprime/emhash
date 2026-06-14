@@ -432,16 +432,16 @@ cmake --build . --target all_tests     # All tests
 cd tests_new
 
 # Quick validation tests (~10 seconds, 247,268 assertions)
-g++ -std=c++17 -O2 -I.. -I../thirdparty verify/test_all_maps.cpp -o test_verify && ./test_verify
+g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify && ./test_verify
 
 # Stress tests (~30 seconds)
-g++ -std=c++17 -O2 -I.. -I../thirdparty stress/stress_all_maps.cpp -o test_stress && ./test_stress
+g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench stress/stress_all_maps.cpp -o test_stress && ./test_stress
 
 # Hash attack tests (~2 minutes, requires EMH_SAFE_PSL)
-g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty attack/hash_attack_all.cpp -o test_attack && ./test_attack
+g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty -I../bench attack/hash_attack_all.cpp -o test_attack && ./test_attack
 
 # Debug tests (~10 seconds, built with -g -O0)
-g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o test_debug && ./test_debug
+g++ -std=c++17 -g -O0 -I.. -I../thirdparty -I../bench debug/debug_all_maps.cpp -o test_debug && ./test_debug
 ```
 
 #### Windows (MSVC)
@@ -450,13 +450,13 @@ g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o test_debu
 cd tests_new
 
 # Quick validation tests
-cl /std:c++17 /O2 /I.. /I..\thirdparty verify\test_all_maps.cpp /Fe:test_verify.exe && .\test_verify.exe
+cl /std:c++17 /O2 /I.. /I..\thirdparty /I..\bench verify\test_all_maps.cpp /Fe:test_verify.exe && .\test_verify.exe
 
 # Stress tests
-cl /std:c++17 /O2 /I.. /I..\thirdparty stress\stress_all_maps.cpp /Fe:test_stress.exe && .\test_stress.exe
+cl /std:c++17 /O2 /I.. /I..\thirdparty /I..\bench stress\stress_all_maps.cpp /Fe:test_stress.exe && .\test_stress.exe
 
 # Hash attack tests (requires EMH_SAFE_PSL)
-cl /std:c++17 /O2 /DEMH_SAFE_PSL /I.. /I..\thirdparty attack\hash_attack_all.cpp /Fe:test_attack.exe && .\test_attack.exe
+cl /std:c++17 /O2 /DEMH_SAFE_PSL /I.. /I..\thirdparty /I..\bench attack\hash_attack_all.cpp /Fe:test_attack.exe && .\test_attack.exe
 ```
 
 #### Address Sanitizer (ASan)
@@ -469,7 +469,7 @@ make asan_verify    # ASan + UBSan validation tests
 make asan_stress    # ASan + UBSan stress tests
 
 # Manual ASan build
-g++ -std=c++17 -fsanitize=address,undefined -I.. -I../thirdparty \
+g++ -std=c++17 -fsanitize=address,undefined -I.. -I../thirdparty -I../bench \
     stress/stress_all_maps.cpp -o asan_stress && ./asan_stress
 ```
 
@@ -479,14 +479,14 @@ g++ -std=c++17 -fsanitize=address,undefined -I.. -I../thirdparty \
 cd tests_new
 
 # Build fuzzer (requires clang)
-clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty \
+clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty -I../bench \
     fuzz/fuzz_emhash_all.cpp -o fuzz_all
 
 # Run fuzzer for 60 seconds
 ./fuzz_all -max_total_time=60 corpus/
 
 # Fuzz emilib implementations
-clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty \
+clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty -I../bench \
     fuzz/fuzz_emilib_all.cpp -o fuzz_emilib
 ./fuzz_emilib -max_total_time=60 corpus/
 ```

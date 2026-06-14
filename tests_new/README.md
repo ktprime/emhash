@@ -79,24 +79,24 @@ cmake --build .
 cd tests_new
 
 # Quick validation tests (~10 seconds)
-g++ -std=c++17 -O2 -I.. -I../thirdparty verify/test_all_maps.cpp -o test_verify && ./test_verify
+g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify && ./test_verify
 
 # Stress tests (~30 seconds)
-g++ -std=c++17 -O2 -I.. -I../thirdparty stress/stress_all_maps.cpp -o test_stress && ./test_stress
+g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench stress/stress_all_maps.cpp -o test_stress && ./test_stress
 
 # Hash attack tests (~2 minutes, requires EMH_SAFE_PSL)
-g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty attack/hash_attack_all.cpp -o test_attack && ./test_attack
+g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty -I../bench attack/hash_attack_all.cpp -o test_attack && ./test_attack
 
 # Debug tests (~10 seconds)
-g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o test_debug && ./test_debug
+g++ -std=c++17 -g -O0 -I.. -I../thirdparty -I../bench debug/debug_all_maps.cpp -o test_debug && ./test_debug
 
 # Fuzz tests (requires clang+libfuzzer)
-clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty fuzz/fuzz_emilib_all.cpp -o test_fuzz
+clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty -I../bench fuzz/fuzz_emilib_all.cpp -o test_fuzz
 ./test_fuzz -max_total_time=60
 
 # Run all quick tests (~20 seconds)
-g++ -std=c++17 -O2 -I.. -I../thirdparty verify/test_all_maps.cpp -o t1 && ./t1 && \
-g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o t2 && ./t2 && \
+g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench verify/test_all_maps.cpp -o t1 && ./t1 && \
+g++ -std=c++17 -g -O0 -I.. -I../thirdparty -I../bench debug/debug_all_maps.cpp -o t2 && ./t2 && \
 echo "=== ALL QUICK TESTS PASSED ==="
 ```
 
@@ -152,7 +152,7 @@ tests_new/
 | `fuzz_emhash8_advanced.cpp` | Advanced fuzzer with variable hasher | `clang++ -fsanitize=fuzzer,address -std=c++17 -I.. fuzz_emhash8_advanced.cpp -o fuzz8_adv` |
 | `fuzz_extreme.cpp` | Extreme tests: 100% collision, high LF | `g++ -fsanitize=address,undefined -std=c++17 -I.. fuzz_extreme.cpp -o fuzz_extreme_asan` |
 | `fuzz_nocoll.cpp` | No-collision boundary tests | `g++ -fsanitize=address,undefined -std=c++17 -I.. fuzz_nocoll.cpp -o fuzz_nocoll_asan` |
-| `fuzz_emilib_all.cpp` | emilib2ss/2o/2s fuzzing | `clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty fuzz_emilib_all.cpp -o test_fuzz` |
+| `fuzz_emilib_all.cpp` | emilib2ss/2o/2s fuzzing | `clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty -I../bench fuzz_emilib_all.cpp -o test_fuzz` |
 
 **Run Examples**:
 ```bash
@@ -173,7 +173,7 @@ tests_new/
 | `highload_test.cpp` | High load tests (LF=0.999) | `g++ -std=c++17 -O2 -I.. highload_test.cpp -o highload_test` |
 | `test_emhash5_hifi.cpp` | High-intensity random operations | `g++ -fsanitize=address,undefined -std=c++17 -I.. test_emhash5_hifi.cpp -o hifi_asan` |
 | `test_emhash5_stress.cpp` | emhash5 stress test | `g++ -fsanitize=address,undefined -std=c++17 -I.. test_emhash5_stress.cpp -o stress5_asan` |
-| `stress_all_maps.cpp` | All 7 maps stress test | `g++ -std=c++17 -O2 -I.. -I../thirdparty stress_all_maps.cpp -o test_stress` |
+| `stress_all_maps.cpp` | All 7 maps stress test | `g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench stress_all_maps.cpp -o test_stress` |
 
 **Run Examples**:
 ```bash
@@ -193,7 +193,7 @@ tests_new/
 | `min_repro.cpp` | Minimal crash reproduction | Identify specific crash root cause |
 | `reproduce_crash.cpp` | Reproduce fuzzer-discovered crash | Verify fix effectiveness |
 | `fuzz_reproduce.cpp` | Replay crash input file | Parse fuzzer crash files |
-| `debug_all_maps.cpp` | Debug tests for all 7 maps | `g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug_all_maps.cpp -o test_debug` |
+| `debug_all_maps.cpp` | Debug tests for all 7 maps | `g++ -std=c++17 -g -O0 -I.. -I../thirdparty -I../bench debug_all_maps.cpp -o test_debug` |
 
 ---
 
@@ -207,7 +207,7 @@ tests_new/
 | `test_interface_combo.cpp` | Interface combination tests | `g++ -std=c++17 -O2 -I.. test_interface_combo.cpp -o interface_combo` |
 | `test_emhash58.cpp` | Comprehensive tests (5/6/7/8) | `g++ -std=c++17 -O2 -I.. test_emhash58.cpp -o emhash58` |
 | `test_emhash5_verify.cpp` | emhash5 verification | `g++ -std=c++17 -O2 -I.. test_emhash5_verify.cpp -o verify5` |
-| `test_all_maps.cpp` | All 7 maps validation | `g++ -std=c++17 -O2 -I.. -I../thirdparty test_all_maps.cpp -o test_verify` |
+| `test_all_maps.cpp` | All 7 maps validation | `g++ -std=c++17 -O2 -I.. -I../thirdparty -I../bench test_all_maps.cpp -o test_verify` |
 
 **Run Examples**:
 ```bash
@@ -225,7 +225,7 @@ tests_new/
 |------|---------|-----------------|
 | `hash_attack.cpp` | emhash5 hash attack | `g++ -std=c++17 -O2 -I.. hash_attack.cpp -o hash_attack5` |
 | `hash_attack7.cpp` | emhash7 hash attack | `g++ -std=c++17 -O2 -I.. hash_attack7.cpp -o hash_attack7` |
-| `hash_attack_all.cpp` | All 7 maps hash attack | `g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty hash_attack_all.cpp -o test_attack` |
+| `hash_attack_all.cpp` | All 7 maps hash attack | `g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty -I../bench hash_attack_all.cpp -o test_attack` |
 
 **Test Scenarios**:
 - Constant hash (all keys map to same bucket)

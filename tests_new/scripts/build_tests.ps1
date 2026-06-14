@@ -55,7 +55,7 @@ function Build-WithWSL {
     $wslRoot = $ROOT_DIR -replace '^[A-Z]:', '/mnt/$0' -replace '\\', '/' -replace ':', ''
     $wslProject = Split-Path $wslRoot -Parent
 
-    $cmd = "g++ -std=c++17 -O2 -g -I$wslRoot -I$wslProject/thirdparty $ExtraFlags $wslSource -o $wslOutput"
+    $cmd = "g++ -std=c++17 -O2 -g -I$wslRoot -I$wslProject/thirdparty -I$wslProject/bench $ExtraFlags $wslSource -o $wslOutput"
     Log-Info "Compiling: $Source"
     wsl bash -c $cmd
 }
@@ -133,8 +133,10 @@ function Run-Tests {
     $compiler = Get-Compiler
     if ($compiler -eq "wsl g++") {
         Log-Info "=== Verification tests (WSL) ==="
-        wsl bash -c "cd /mnt/d/emhash/tests_new/verify/bin && ./test_all_maps"
-        wsl bash -c "cd /mnt/d/emhash/tests_new/debug/bin && ./debug_all_maps"
+        $wslBinVerify = ($VERIFY_DIR -replace '^[A-Z]:', '/mnt/$0' -replace '\\', '/') + "/bin"
+        $wslBinDebug = ($DEBUG_DIR -replace '^[A-Z]:', '/mnt/$0' -replace '\\', '/') + "/bin"
+        wsl bash -c "cd $wslBinVerify && ./test_all_maps"
+        wsl bash -c "cd $wslBinDebug && ./debug_all_maps"
     }
     
     Log-Info "All tests completed"
