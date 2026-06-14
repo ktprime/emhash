@@ -1018,7 +1018,7 @@ private:
 		
         if (buckets > max_size() || buckets < _num_filled)
             std::abort(); //throw std::length_error("too large size");
-        
+
         const auto num_buckets = (size_type)buckets;
 
         _mask        = num_buckets - 1;

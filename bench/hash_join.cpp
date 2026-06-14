@@ -259,7 +259,7 @@ int main(int argc, const char* argv[])
 
     test_loops<martin_dense>("martin_dense"); test_block<martin_dense>("martin_dense");
 
-    test_loops<martin_flat> ("martin_flat"); 
+    test_loops<martin_flat> ("martin_flat");
 	//test_block<martin_flat> ("martin_flat");
 
     test_loops<tsl_robin_map> ("tsl_robin_map");

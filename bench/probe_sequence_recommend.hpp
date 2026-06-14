@@ -11,14 +11,14 @@ inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept
     else {
         // 交替步长：在两个不同的奇数步长之间交替
         // 打破聚集模式，保证覆盖所有bucket
-        
+
         // 步长1: 较大步长，快速跳转
         // 步长2: 较小步长，精细探测
         // 两个步长都是奇数，与power-of-2的num_buckets互质
-        
+
         const size_t step1 = (_num_buckets / 7) | 1;   // 约14%的表大小
         const size_t step2 = (_num_buckets / 13) | 1;  // 约8%的表大小
-        
+
         // 交替使用两个步长，打破聚集模式
         if ((offset - 5) % 2 == 0)
             next_bucket += step1;
@@ -41,7 +41,7 @@ inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept
     const size_t golden_step = ((offset * 0x9e3779b9ULL) >> 16) | 1;
     next_bucket += golden_step % (_num_buckets / 4) + 1;
 #endif
-    
+
     return next_bucket & _mask;
 }
 
@@ -56,20 +56,20 @@ inline size_t get_next_bucket_golden(size_t next_bucket, size_t offset) const no
         // 黄金比例步长：产生伪随机序列，避免聚集
         // 公式：step = (offset * phi) mod num_buckets
         // phi = 0x9e3779b9 (黄金比例整数近似)
-        
+
         // 方法1: 直接使用黄金比例乘法
         const size_t phi = 0x9e3779b9ULL;
         size_t step = (offset * phi) >> 16;  // 取高位，更随机
-        
+
         // 确保步长在合理范围内：1 到 num_buckets/4
         step = step % (_num_buckets / 4) + 1;
-        
+
         // 确保奇数（与power-of-2互质）
         step |= 1;
-        
+
         next_bucket += step;
     }
-    
+
     return next_bucket & _mask;
 }
 
@@ -83,12 +83,12 @@ inline size_t get_next_bucket_ultimate(size_t next_bucket, size_t offset) const 
     else {
         // 三步长交替：彻底打破聚集模式
         // 使用三个互质的奇数步长，保证覆盖
-        
+
         // 计算三个步长（都是奇数，互质）
         const size_t s1 = (_num_buckets / 5)  | 1;  // 20% - 大跳跃
         const size_t s2 = (_num_buckets / 11) | 1;  // 9%  - 中跳跃
         const size_t s3 = (_num_buckets / 17) | 1;  // 6%  - 小跳跃
-        
+
         // 三步循环：s1 -> s2 -> s3 -> s1 -> ...
         const size_t phase = (offset - 5) % 3;
         if (phase == 0)
@@ -98,7 +98,7 @@ inline size_t get_next_bucket_ultimate(size_t next_bucket, size_t offset) const 
         else
             next_bucket += s3;
     }
-    
+
     return next_bucket & _mask;
 }
 
@@ -107,7 +107,7 @@ size_t find_empty_slot(size_t main_bucket, size_t next_bucket, size_t offset) no
 {
     // 最大探测次数：num_buckets / simd_bytes（所有group）
     const size_t max_probe = _num_buckets / simd_bytes;
-    
+
     do {
         const auto maske = empty_delete(next_bucket);
         if (maske) {
@@ -117,9 +117,9 @@ size_t find_empty_slot(size_t main_bucket, size_t next_bucket, size_t offset) no
                 set_offset(main_bucket, offset);
             return ebucket;
         }
-        
+
         next_bucket = get_next_bucket(next_bucket, ++offset);
-        
+
         // 终止条件：探测次数超过最大值
         if (offset >= max_probe) {
             // 表可能满了，触发rehash
@@ -128,6 +128,6 @@ size_t find_empty_slot(size_t main_bucket, size_t next_bucket, size_t offset) no
             return find_empty_slot(main_bucket, main_bucket, 0);
         }
     } while (true);
-    
+
     return 0;  // 永不执行，但需要返回值
 }

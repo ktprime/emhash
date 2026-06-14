@@ -1275,7 +1275,7 @@ static void high_load()
 }
 
 
-int test7() 
+int test7()
 {
     using clock = std::chrono::steady_clock;
     using ehash_func = robin_hood::hash<uint64_t>;
