@@ -67,13 +67,9 @@ tests/fuzz/bin/
 tests/stress/bin/
 tests/attack/bin/
 tests/bench/bin/
-tests/fuzz/fuzz_emhash8
-tests/fuzz/fuzz_emhash8_advanced
-tests/fuzz/fuzz_emhash8_advanced_fixed
-tests/fuzz/fuzz_emhash_all
-tests/fuzz/fuzz_emilib_all
-tests/fuzz/fuzz_nocoll_asan
-tests/fuzz/reproduce_bug
+# Fuzz/test binaries (only bin/ subdirectory, NOT source files)
+# Source files in tests/fuzz/*.cpp MUST be tracked by git
+# Compiled output should go to tests/fuzz/bin/ or be ignored via *.exe
 tests/crash-*
 tests/test_verify
 tests/test_stress
@@ -102,13 +98,8 @@ tests/fuzz_reproduce
 tests/ebench
 tests/martin_bench
 tests/highload_bench
-tests/fuzz_extreme
-tests/fuzz_nocoll
-tests/reproduce_emhash8_bug
-tests/fuzz_emhash_all
-tests/fuzz_emhash8
-tests/fuzz_emhash8_advanced
-tests/fuzz_emilib_all
+# Note: fuzz/test source files (tests/fuzz/*.cpp) are tracked - do NOT ignore them
+# Fuzz binaries: use tests/fuzz/bin/ or they show as untracked (acceptable)
 tests/asan_stress
 tests/asan_verify
 tests/t1
@@ -130,8 +121,8 @@ test_emilib2o
 hash_set81.hpp
 hash_table7s.hpp
 
-# Old fuzz/ directory (moved to tests/fuzz/)
-fuzz/
+# Old fuzz/ directory (moved to tests/fuzz/) - anchored to root
+/fuzz/
 
 # Build directories
 build/
