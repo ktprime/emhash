@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format-16
+        run: sudo apt-get update && sudo apt-get install -y clang-format
 
       - name: Check formatting
         run: |
@@ -25,7 +25,7 @@ jobs:
             -path ./bench/tsl_bench -prune -o \
             -path ./.git -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
-            -print | xargs clang-format-16 --dry-run --Werror
+            -print | xargs clang-format --dry-run --Werror
 
       - name: Show diff (if any)
         if: failure()
@@ -35,4 +35,4 @@ jobs:
             -path ./bench/tsl_bench -prune -o \
             -path ./.git -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
-            -print | xargs clang-format-16 --dry-run
+            -print | xargs clang-format --dry-run

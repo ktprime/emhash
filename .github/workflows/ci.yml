@@ -93,13 +93,13 @@ jobs:
             std: 17
           - compiler: g++-13
             std: 20
-          - compiler: clang++-16
-            std: 17
           - compiler: clang++-17
             std: 17
-          - compiler: clang++-18
+          - compiler: clang++-20
             std: 17
-          - compiler: clang++-18
+          - compiler: clang++-21
+            std: 20
+          - compiler: clang++-22
             std: 20
 
     steps:
