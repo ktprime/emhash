@@ -37,7 +37,12 @@ jobs:
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.compiler }}
+        run: |
+          package="${{ matrix.compiler }}"
+          if [[ "$package" == "clang++" ]]; then
+            package="clang"
+          fi
+          sudo apt-get update && sudo apt-get install -y "$package"
 
       - name: Build verify tests
         run: |
@@ -148,7 +153,12 @@ jobs:
           submodules: true
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.compiler }}
+        run: |
+          package="${{ matrix.compiler }}"
+          if [[ "$package" == "clang++" ]]; then
+            package="clang"
+          fi
+          sudo apt-get update && sudo apt-get install -y "$package"
 
       - name: Build with ASan
         run: |
