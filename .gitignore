@@ -126,6 +126,10 @@ quick_bench
 test58
 test_emilib2o
 
+# Test-only headers (not part of public API)
+hash_set81.hpp
+hash_table7s.hpp
+
 # Old fuzz/ directory (moved to tests/fuzz/)
 fuzz/
 
