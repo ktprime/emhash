@@ -175,11 +175,13 @@ if(ENABLE_FUZZ_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Non-fuzzer versions (can be built with gcc)
-add_executable(fuzz_extreme fuzz/fuzz_extreme.cpp)
+add_executable(fuzz_extreme fuzz/fuzz_extreme.cpp fuzz/fuzz_main.cpp)
 target_compile_features(fuzz_extreme PUBLIC cxx_std_17)
+target_compile_options(fuzz_extreme PRIVATE -fsanitize=address,undefined)
 
-add_executable(fuzz_nocoll fuzz/fuzz_nocoll.cpp)
+add_executable(fuzz_nocoll fuzz/fuzz_nocoll.cpp fuzz/fuzz_main.cpp)
 target_compile_features(fuzz_nocoll PUBLIC cxx_std_17)
+target_compile_options(fuzz_nocoll PRIVATE -fsanitize=address,undefined)
 
 add_executable(reproduce_emhash8_bug fuzz/reproduce_emhash8_bug.cpp)
 target_compile_features(reproduce_emhash8_bug PUBLIC cxx_std_17)
@@ -195,6 +197,12 @@ add_custom_target(quick_test
     COMMAND test_debug
     COMMAND ${CMAKE_COMMAND} -E echo "=== All Quick Tests Passed ==="
     DEPENDS test_verify test_debug
+)
+
+# Aggregate fuzz target (ASan variants work with gcc/clang; LibFuzzer variants need clang)
+add_custom_target(fuzz
+    COMMAND ${CMAKE_COMMAND} -E echo "=== Building ASan Fuzz Variants ==="
+    DEPENDS fuzz_extreme fuzz_nocoll
 )
 
 # Stress test suite
@@ -226,11 +234,12 @@ add_custom_target(all_tests
 )
 
 # Print help
-add_custom_target(help
+add_custom_target(emhash_test_help
     COMMAND ${CMAKE_COMMAND} -E echo "Available targets:"
     COMMAND ${CMAKE_COMMAND} -E echo "  quick_test    - Quick validation tests (~20s)"
     COMMAND ${CMAKE_COMMAND} -E echo "  stress_test   - Stress tests (~1min)"
     COMMAND ${CMAKE_COMMAND} -E echo "  attack_test   - Hash attack tests (~2min)"
     COMMAND ${CMAKE_COMMAND} -E echo "  all_tests     - Run all tests"
-    COMMAND ${CMAKE_COMMAND} -E echo "  help          - Show this help"
+    COMMAND ${CMAKE_COMMAND} -E echo "  fuzz          - Build fuzz variants"
+    COMMAND ${CMAKE_COMMAND} -E echo "  emhash_test_help - Show this help"
 )

@@ -393,18 +393,40 @@ cmake --build . --config Release
 
 ### Running Tests
 
-```bash
-# Run unit tests
-./test/emhash_test
+The `tests_new/` directory provides a unified test suite covering all 7 implementations:
+**emhash5/6/7/8** and **emilib2ss/2o/2s**.
 
-# Run benchmarks
-./bench/ebench
-./bench/mbench
+#### Quick Start (Recommended)
+
+```bash
+cd tests_new
+
+# Using Makefile (fastest)
+make quick          # Quick validation (~20s, 247,268 assertions)
+make stress         # Stress tests (~1min)
+make attack         # Hash attack tests (~2min)
+make bench          # Build benchmarks
+make all            # Run all tests
+make help           # Show all available targets
+
+# Using CMake
+mkdir build && cd build
+cmake ..
+cmake --build . --target quick_test    # Quick tests
+cmake --build . --target stress_test   # Stress tests
+cmake --build . --target attack_test   # Attack tests
+cmake --build . --target all_tests     # All tests
+
+# Using build scripts
+./scripts/build_tests.sh quick          # Linux/WSL
+./scripts/build_tests.sh run            # Build and run
+./scripts/build_tests.sh all clang      # All tests with clang
+
+.\scripts\build_tests.ps1 quick         # Windows (via WSL)
+.\scripts\build_tests.ps1 run
 ```
 
-### Quick Test Suite (tests_new)
-
-The `tests_new/` directory provides a unified test suite covering all implementations:
+#### Manual Compilation
 
 ```bash
 cd tests_new
@@ -418,23 +440,107 @@ g++ -std=c++17 -O2 -I.. -I../thirdparty stress/stress_all_maps.cpp -o test_stres
 # Hash attack tests (~2 minutes, requires EMH_SAFE_PSL)
 g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I.. -I../thirdparty attack/hash_attack_all.cpp -o test_attack && ./test_attack
 
-# Debug tests (~10 seconds)
+# Debug tests (~10 seconds, built with -g -O0)
 g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o test_debug && ./test_debug
-
-# Run all quick tests (~20 seconds)
-g++ -std=c++17 -O2 -I.. -I../thirdparty verify/test_all_maps.cpp -o t1 && ./t1 && \
-g++ -std=c++17 -g -O0 -I.. -I../thirdparty debug/debug_all_maps.cpp -o t2 && ./t2 && \
-echo "=== ALL QUICK TESTS PASSED ==="
 ```
 
-| Test File | Coverage | Assertions | Time |
-|-----------|----------|------------|------|
-| `verify/test_all_maps.cpp` | emhash5-8 + emilib2ss/2o/2s | 247,268 | ~5s |
-| `stress/stress_all_maps.cpp` | 7 maps x 5 items x 1000 trials | 35,000 trials | ~30s |
-| `attack/hash_attack_all.cpp` | 7 maps x 3 hash attacks | correctness+performance | ~2min |
-| `debug/debug_all_maps.cpp` | 7 maps x 10 debug tests | 70 tests | ~10s |
+#### Windows (MSVC)
 
-> **Note**: Hash attack tests require `-DEMH_SAFE_PSL` flag for emilib implementations to handle extreme collisions.
+```powershell
+cd tests_new
+
+# Quick validation tests
+cl /std:c++17 /O2 /I.. /I..\thirdparty verify\test_all_maps.cpp /Fe:test_verify.exe && .\test_verify.exe
+
+# Stress tests
+cl /std:c++17 /O2 /I.. /I..\thirdparty stress\stress_all_maps.cpp /Fe:test_stress.exe && .\test_stress.exe
+
+# Hash attack tests (requires EMH_SAFE_PSL)
+cl /std:c++17 /O2 /DEMH_SAFE_PSL /I.. /I..\thirdparty attack\hash_attack_all.cpp /Fe:test_attack.exe && .\test_attack.exe
+```
+
+#### Address Sanitizer (ASan)
+
+```bash
+cd tests_new
+
+# Build with ASan for memory error detection
+make asan_verify    # ASan + UBSan validation tests
+make asan_stress    # ASan + UBSan stress tests
+
+# Manual ASan build
+g++ -std=c++17 -fsanitize=address,undefined -I.. -I../thirdparty \
+    stress/stress_all_maps.cpp -o asan_stress && ./asan_stress
+```
+
+#### Fuzz Testing (requires clang + libfuzzer)
+
+```bash
+cd tests_new
+
+# Build fuzzer (requires clang)
+clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty \
+    fuzz/fuzz_emhash_all.cpp -o fuzz_all
+
+# Run fuzzer for 60 seconds
+./fuzz_all -max_total_time=60 corpus/
+
+# Fuzz emilib implementations
+clang++ -fsanitize=fuzzer,address -std=c++17 -I.. -I../thirdparty \
+    fuzz/fuzz_emilib_all.cpp -o fuzz_emilib
+./fuzz_emilib -max_total_time=60 corpus/
+```
+
+### Test Coverage
+
+| Test Type | File | Coverage | Assertions | Time |
+|-----------|------|----------|------------|------|
+| **Quick Validation** | `verify/test_all_maps.cpp` | emhash5-8 + emilib2ss/2o/2s | 247,268 | ~5s |
+| **Stress** | `stress/stress_all_maps.cpp` | 7 maps x 5 items x 1000 trials | 35,000 trials | ~30s |
+| **Hash Attack** | `attack/hash_attack_all.cpp` | 7 maps x 3 attack patterns | correctness+perf | ~2min |
+| **Debug** | `debug/debug_all_maps.cpp` | 7 maps x 10 debug tests | 70 tests | ~10s |
+| **Fuzz** | `fuzz/fuzz_emhash_all.cpp` | All emhash versions (5/6/7/8) | - | - |
+| **Fuzz (emilib)** | `fuzz/fuzz_emilib_all.cpp` | emilib2ss/2o/2s | - | - |
+
+### Test Coverage Matrix
+
+| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emilib2ss | emilib2o | emilib2s |
+|-----------|---------|---------|---------|---------|-----------|----------|----------|
+| Quick Validation | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Stress | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| High Load (LF=0.999) | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Hash Attack | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Fuzzing | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| ASan/UBSan | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+
+### Recommended Test Order
+
+1. **Quick Validation** (~20s) - fast correctness check
+   ```bash
+   make quick
+   ```
+
+2. **Stress Tests** (~1min) - random operation sequences
+   ```bash
+   make stress
+   ```
+
+3. **Hash Attack** (~2min) - worst-case collision scenarios
+   ```bash
+   make attack
+   ```
+
+4. **Fuzz Testing** (optional, ~5min) - memory error detection
+   ```bash
+   # ASan variants (gcc compatible)
+   make fuzz
+
+   # LibFuzzer variants (requires clang)
+   make fuzz_emhash_all CXX=clang++
+   make fuzz_emilib_all CXX=clang++
+   ```
+
+> **Note**: Hash attack tests require `-DEMH_SAFE_PSL` flag for emilib implementations. Fuzz tests require clang + libfuzzer. ASan tests should use `-O2` or `-g`, not `-O3`.
 
 ### Compile Options
 

@@ -51,8 +51,8 @@ build_fuzz() {
         log_info "Fuzzer binaries built (clang + libfuzzer)"
     else
         log_warn "Fuzzer requires clang. Building non-fuzzer versions with gcc..."
-        $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_extreme.cpp" -o "$FUZZ_DIR/bin/fuzz_extreme_asan"
-        $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_nocoll.cpp" -o "$FUZZ_DIR/bin/fuzz_nocoll_asan"
+        $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_extreme.cpp" "$FUZZ_DIR/fuzz_main.cpp" -o "$FUZZ_DIR/bin/fuzz_extreme_asan"
+        $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_nocoll.cpp" "$FUZZ_DIR/fuzz_main.cpp" -o "$FUZZ_DIR/bin/fuzz_nocoll_asan"
         log_info "Non-fuzzer debug binaries built (gcc + ASan)"
     fi
 }

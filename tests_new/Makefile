@@ -46,7 +46,6 @@ quick: test_verify test_debug
 	@./test_verify
 	@./test_debug
 	@echo "=== All Quick Tests Passed ==="
-
 test_verify: verify/test_all_maps.cpp
 	$(CXX) $(CXXFLAGS) $(RELEASE_FLAGS) $(INCLUDES) verify/test_all_maps.cpp -o test_verify
 
@@ -165,11 +164,12 @@ highload_bench: bench/highload_bench.cpp
 # Fuzz Tests (non-fuzzer versions, can be built with gcc)
 # ============================================================================
 
-fuzz_extreme: fuzz/fuzz_extreme.cpp
-	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) $(INCLUDES) fuzz/fuzz_extreme.cpp -o fuzz_extreme
+# Non-fuzzer ASan variants (gcc + ASan with main wrapper)
+fuzz_extreme: fuzz/fuzz_extreme.cpp fuzz/fuzz_main.cpp
+	$(CXX) $(CXXFLAGS) $(ASAN_FLAGS) $(INCLUDES) fuzz/fuzz_extreme.cpp fuzz/fuzz_main.cpp -o fuzz_extreme
 
-fuzz_nocoll: fuzz/fuzz_nocoll.cpp
-	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) $(INCLUDES) fuzz/fuzz_nocoll.cpp -o fuzz_nocoll
+fuzz_nocoll: fuzz/fuzz_nocoll.cpp fuzz/fuzz_main.cpp
+	$(CXX) $(CXXFLAGS) $(ASAN_FLAGS) $(INCLUDES) fuzz/fuzz_nocoll.cpp fuzz/fuzz_main.cpp -o fuzz_nocoll
 
 reproduce_emhash8_bug: fuzz/reproduce_emhash8_bug.cpp
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) $(INCLUDES) fuzz/reproduce_emhash8_bug.cpp -o reproduce_emhash8_bug
@@ -186,6 +186,12 @@ fuzz_emhash8_advanced: fuzz/fuzz_emhash8_advanced.cpp
 
 fuzz_emilib_all: fuzz/fuzz_emilib_all.cpp
 	clang++ -std=c++17 -fsanitize=fuzzer,address $(INCLUDES) fuzz/fuzz_emilib_all.cpp -o fuzz_emilib_all
+
+# Aggregate fuzz target (builds both ASan and LibFuzzer versions)
+fuzz: fuzz_extreme fuzz_nocoll
+	@echo "=== Fuzz Tests Built (ASan variants) ==="
+	@echo "Run: ./fuzz_extreme, ./fuzz_nocoll"
+	@echo "For LibFuzzer: CXX=clang++ make fuzz_emhash_all fuzz_emilib_all"
 
 # ============================================================================
 # ASan Tests (Address Sanitizer)
