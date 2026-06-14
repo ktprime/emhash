@@ -1578,10 +1578,10 @@ private:
         return find_filled_hash(key, hash_key(key));
     }
 
-    //kick out bucket and find empty to occpuy
-    //it will break the orgin link and relnik again.
+    //kick out bucket and find empty to occupy
+    //it will break the original link and relink again.
     //before: main_bucket-->prev_bucket --> bucket   --> next_bucket
-    //atfer : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
+    //after : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
     size_type kickout_bucket(const size_type bucket)
     {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);

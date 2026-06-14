@@ -611,7 +611,7 @@ public:
     }
 #endif
 
-    //only useful for at fucntion if not find key then return zero
+    //only useful for at function if not find key then return zero
     void pack_zero(ValueT zero)
     {
         _pairs[_num_filled] = { KeyT(), zero };
@@ -1565,10 +1565,10 @@ private:
     }
 #endif
 
-    //kick out bucket and find empty to occpuy
-    //it will break the orgin link and relnik again.
+    //kick out bucket and find empty to occupy
+    //it will break the original link and relink again.
     //before: main_bucket --> prev_bucket --> bucket --> next_bucket(maybe none exist)
-    //atfer : main_bucket --> prev_bucket   (kickout)    next_bucket <-- new_bucket(bucket)
+    //after : main_bucket --> prev_bucket   (kickout)    next_bucket <-- new_bucket(bucket)
     //                          \|/                                         ^
     //                          -|------------------------------------------|
     size_type kickout_bucket(const size_type kmain, const size_type bucket) noexcept
