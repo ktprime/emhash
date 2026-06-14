@@ -1,0 +1,30 @@
+# Compiled binaries
+*.exe
+*.out
+*.o
+*.obj
+
+# No-extension binaries (Linux/macOS)
+analyze_inactive
+analyze_crash
+analyze_crash_asan
+analyze_crash_deep
+bench_bit_mixer
+hbench
+zbench
+app
+wc
+bi
+ebench
+
+# Build directories
+bin/
+vsbuild/
+build/
+
+# IDE files
+.vs/
+*.user
+*.filters
+*.vcxproj
+*.sln

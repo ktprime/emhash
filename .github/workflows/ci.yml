@@ -32,6 +32,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -102,6 +104,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install compiler
         run: |
@@ -140,6 +144,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.compiler }}
@@ -168,6 +174,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Configure
         run: cmake -B build -S tests
@@ -186,6 +194,8 @@ jobs:
         std: [17, 20]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Configure (CMake)
         run: cmake -B build -S tests -DCMAKE_CXX_STANDARD=${{ matrix.std }}

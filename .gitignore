@@ -19,7 +19,9 @@
 bench/analyze_crash
 bench/analyze_crash_asan
 bench/analyze_crash_deep
+bench/analyze_inactive
 bench/app
+bench/bench_bit_mixer
 bench/bi
 bench/bs
 bench/cbench
@@ -39,6 +41,7 @@ bench/sbench
 bench/tbench
 bench/wc
 bench/zbench
+bench/hbench
 bench/stress_fix
 bench/quick_test8_fixed
 bench/quick_test8_gcc
