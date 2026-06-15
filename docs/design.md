@@ -70,8 +70,8 @@ emhash provides 4 different implementations, each with different focus:
 emhash also provides `HashSet` implementations:
 
 ```cpp
-#include "hash_set3.hpp"   // Based on emhash7, namespace emhash7
-#include "hash_set81.hpp"  // Based on emhash8, namespace emhash8
+#include "emhash/hash_set3.hpp"   // Based on emhash7, namespace emhash7
+#include "emhash/hash_set81.hpp"  // Based on emhash8, namespace emhash8
 
 emhash7::HashSet<int> set1;
 emhash8::HashSet<int> set2;

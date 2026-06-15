@@ -85,8 +85,8 @@ static void test_pmr_allocator()
 
     // monotonic_buffer_resource
     {
-        char buffer[1 << 20];
-        std::pmr::monotonic_buffer_resource pool(buffer, sizeof(buffer));
+        auto buffer = std::make_unique<char[]>(1 << 20);
+        std::pmr::monotonic_buffer_resource pool(buffer.get(), 1 << 20);
         emhash5::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m(2, 0.8f, PmrAlloc(&pool));
         for (int i = 0; i < 1000; i++)
             m[i] = i;
@@ -108,8 +108,8 @@ static void test_pmr_allocator()
 
     // emhash6
     {
-        char buffer[1 << 20];
-        std::pmr::monotonic_buffer_resource pool(buffer, sizeof(buffer));
+        auto buffer = std::make_unique<char[]>(1 << 20);
+        std::pmr::monotonic_buffer_resource pool(buffer.get(), 1 << 20);
         emhash6::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m(2, 0.8f, PmrAlloc(&pool));
         for (int i = 0; i < 1000; i++)
             m[i] = i;
@@ -118,8 +118,8 @@ static void test_pmr_allocator()
 
     // emhash7
     {
-        char buffer[1 << 20];
-        std::pmr::monotonic_buffer_resource pool(buffer, sizeof(buffer));
+        auto buffer = std::make_unique<char[]>(1 << 20);
+        std::pmr::monotonic_buffer_resource pool(buffer.get(), 1 << 20);
         emhash7::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m(2, 0.8f, PmrAlloc(&pool));
         for (int i = 0; i < 1000; i++)
             m[i] = i;
@@ -128,8 +128,8 @@ static void test_pmr_allocator()
 
     // emhash8
     {
-        char buffer[1 << 20];
-        std::pmr::monotonic_buffer_resource pool(buffer, sizeof(buffer));
+        auto buffer = std::make_unique<char[]>(1 << 20);
+        std::pmr::monotonic_buffer_resource pool(buffer.get(), 1 << 20);
         emhash8::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m(2, 0.8f, PmrAlloc(&pool));
         for (int i = 0; i < 1000; i++)
             m[i] = i;
