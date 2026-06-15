@@ -1,8 +1,4 @@
 [submodule "thirdparty"]
 	path = thirdparty
-<<<<<<< Updated upstream
-	url = ../emhash-bench-deps
-=======
 	url = https://github.com/ktprime/emhash-bench-deps.git
 	branch = main
->>>>>>> Stashed changes

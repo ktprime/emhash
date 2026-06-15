@@ -168,6 +168,9 @@ qb:
 ww:
 	./wc
 
+cbench:
+	$(CXX) $(CXXFLAGS) comprehensive_bench.cpp -o cbench
+
 clean:
 	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench wc bi bs cbench
 
