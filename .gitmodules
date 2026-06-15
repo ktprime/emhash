@@ -1,4 +1,4 @@
 [submodule "thirdparty"]
 	path = thirdparty
 	url = https://github.com/ktprime/emhash-bench-deps.git
-	branch = main
+	branch = master
