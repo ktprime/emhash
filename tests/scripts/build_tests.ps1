@@ -122,17 +122,17 @@ function Build-Source {
     if ($Script:CXX -eq "wsl_g++") {
         $wslSource = Convert-ToWslPath $Source
         $wslOutput = Convert-ToWslPath $Output
-        $cmd = "g++ -std=c++17 -O2 -g -I$wslRoot -I$wslProject/thirdparty -I$wslProject/bench $ExtraFlags $wslSource -o $wslOutput"
+        $cmd = "g++ -std=c++17 -O2 -g -I$wslRoot $ExtraFlags $wslSource -o $wslOutput"
         Log-Info "Compiling (WSL): $(Split-Path $Source -Leaf)"
         wsl bash -c $cmd
     }
     elseif ($Script:CXX -match "clang\+\+") {
-        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..`" -I`"$($ROOT_DIR)\..\thirdparty`" -I`"$($ROOT_DIR)\..\bench`""
+        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..`""
         Log-Info "Compiling (clang++): $(Split-Path $Source -Leaf)"
         & clang++ $cxxFlags.Split(' ') $ExtraFlags.Split(' ') $Source -o $Output
     }
     else {
-        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..`" -I`"$($ROOT_DIR)\..\thirdparty`" -I`"$($ROOT_DIR)\..\bench`""
+        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..`""
         Log-Info "Compiling (g++): $(Split-Path $Source -Leaf)"
         & g++ $cxxFlags.Split(' ') $ExtraFlags.Split(' ') $Source -o $Output
     }

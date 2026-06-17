@@ -23,7 +23,7 @@ if ! command -v "$CXX" &>/dev/null; then
     exit 1
 fi
 
-CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.. -I$ROOT_DIR/../thirdparty -I$ROOT_DIR/../bench"
+CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.."
 ASAN_FLAGS="-fsanitize=address,undefined"
 
 # Platform-specific settings

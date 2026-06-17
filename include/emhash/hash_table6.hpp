@@ -102,7 +102,7 @@
 #define EMH_SET(n)  _bitmask[n / MASK_BIT] &= (uint8_t)~(EMH_MASK(n))
 #define EMH_CLS(n)  _bitmask[n / MASK_BIT] |= EMH_MASK(n)
 
-#if _WIN32
+#ifdef _WIN32
     #include <intrin.h>
 #endif
 
@@ -135,7 +135,7 @@ static inline size_type CTZ(size_t n)
     n = __builtin_bswap64(n);
 #endif
 
-#if _WIN32
+#ifdef _WIN32
     unsigned long index;
     #if defined(_WIN64)
     _BitScanForward64(&index, n);
@@ -144,16 +144,8 @@ static inline size_type CTZ(size_t n)
     #endif
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     auto index = __builtin_ctzll(n);
-#elif 1
-    auto index = __builtin_ctzl(n);
 #else
-    #if defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    size_type index;
-    __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-    #else
-    size_type index;
-    __asm__("bsf %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-    #endif
+    auto index = __builtin_ctzl(n);
 #endif
 
     return (size_type)index;

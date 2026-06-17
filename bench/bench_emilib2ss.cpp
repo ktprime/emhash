@@ -64,7 +64,7 @@ struct IdentityHasher {
     size_t operator()(uint64_t key) const { return key; }
 };
 
-#include "../thirdparty/emilib/emilib2ss.hpp"
+#include "../thirdparty/emilib/emihmap1.hpp"
 #include "../thirdparty/emilib/emilib2ss2.hpp"
 
 static const int N = 10000000;  // 10M for stable measurement

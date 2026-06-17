@@ -31,7 +31,7 @@ jobs:
             compiler: g++
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -47,27 +47,27 @@ jobs:
       - name: Build verify tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include -I../thirdparty -I../bench verify/test_extreme.cpp -o test_extreme
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include -I../thirdparty -I../bench verify/test_hashset_allocator.cpp -o test_hashset_allocator
+          ${{ matrix.compiler }} -std=c++17 -O2 -I../include verify/test_all_maps.cpp -o test_verify
+          ${{ matrix.compiler }} -std=c++17 -O2 -I../include verify/test_extreme.cpp -o test_extreme
+          ${{ matrix.compiler }} -std=c++17 -O2 -I../include verify/test_hashset_allocator.cpp -o test_hashset_allocator
         shell: bash
 
       - name: Build debug tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -g -O0 -I../include -I../thirdparty -I../bench debug/debug_all_maps.cpp -o test_debug
+          ${{ matrix.compiler }} -std=c++17 -g -O0 -I../include debug/debug_all_maps.cpp -o test_debug
         shell: bash
 
       - name: Build attack tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -DEMH_SAFE_PSL -I../include -I../thirdparty -I../bench attack/hash_attack_all.cpp -o test_attack
+          ${{ matrix.compiler }} -std=c++17 -O2 -DEMH_SAFE_PSL -I../include attack/hash_attack_all.cpp -o test_attack
         shell: bash
 
       - name: Build stress tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include -I../thirdparty -I../bench stress/stress_all_maps.cpp -o test_stress
+          ${{ matrix.compiler }} -std=c++17 -O2 -I../include stress/stress_all_maps.cpp -o test_stress
         shell: bash
 
       - name: Run verify tests
@@ -108,7 +108,7 @@ jobs:
             std: 20
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -132,7 +132,7 @@ jobs:
       - name: Compile verify tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -I../include -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify_compat
+          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -I../include verify/test_all_maps.cpp -o test_verify_compat
         shell: bash
 
       - name: Run verify tests
@@ -148,7 +148,7 @@ jobs:
         compiler: [g++, clang++]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -163,8 +163,8 @@ jobs:
       - name: Build with ASan
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include -I../thirdparty -I../bench verify/test_all_maps.cpp -o test_verify_asan
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include -I../thirdparty -I../bench stress/stress_fix.cpp -o test_stress_asan
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include verify/test_all_maps.cpp -o test_verify_asan
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include stress/stress_fix.cpp -o test_stress_asan
         shell: bash
 
       - name: Run with ASan
@@ -183,7 +183,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -203,12 +203,12 @@ jobs:
       matrix:
         std: [17, 20]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
       - name: Configure (CMake)
-        run: cmake -B build -S tests -DCMAKE_CXX_STANDARD=${{ matrix.std }}
+        run: cmake -B build -S tests
         shell: bash
 
       - name: Build

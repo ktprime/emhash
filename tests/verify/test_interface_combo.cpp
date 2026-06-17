@@ -12,9 +12,9 @@
 #include <cassert>
 #include <type_traits>
 
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 static int g_pass = 0, g_fail = 0;
 

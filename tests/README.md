@@ -1,12 +1,44 @@
-# emhash Test Code Organization
+# emhash Test Suite
 
-This directory contains the newly added test code for the emhash project, organized by functionality.
+This directory contains the test suite for the emhash project, organized by functionality.
+All tests depend only on emhash/emilib headers — **no third-party dependencies required**.
 
 ---
 
 ## Quick Start
 
-### Using Makefile (Recommended)
+### Using CMake (Recommended)
+
+```bash
+cd tests
+
+# Configure
+cmake -B build
+
+# Build all tests
+cmake --build build --config Release
+
+# Run quick tests
+cmake --build build --target quick_test
+
+# Run stress tests
+cmake --build build --target stress_test
+
+# Run attack tests
+cmake --build build --target attack_test
+
+# Run all tests
+cmake --build build --target all_tests
+
+# Show available targets
+cmake --build build --target emhash_test_help
+
+# Enable fuzz tests (requires clang)
+cmake -B build -DENABLE_FUZZ_TESTS=ON
+cmake --build build
+```
+
+### Using Makefile (Linux/WSL)
 
 ```bash
 cd tests
@@ -26,9 +58,6 @@ make attack
 # Debug tests
 make debug
 
-# Build benchmarks
-make bench
-
 # Run all tests
 make all
 
@@ -42,62 +71,26 @@ make quick CXX=clang++
 make asan_verify
 ```
 
-### Using CMake
-
-```bash
-cd tests
-
-# Create build directory
-mkdir build && cd build
-
-# Configure
-cmake ..
-
-# Build all tests
-cmake --build .
-
-# Run quick tests
-cmake --build . --target quick_test
-
-# Run stress tests
-cmake --build . --target stress_test
-
-# Run attack tests
-cmake --build . --target attack_test
-
-# Run all tests
-cmake --build . --target all_tests
-
-# Enable fuzz tests (requires clang)
-cmake .. -DENABLE_FUZZ_TESTS=ON
-cmake --build .
-```
-
-### Linux/WSL (Manual)
+### Manual Compilation (Linux/WSL)
 
 ```bash
 cd tests
 
 # Quick validation tests (~10 seconds)
-g++ -std=c++17 -O2 -I../include -I../include/thirdparty -I../include/bench verify/test_all_maps.cpp -o test_verify && ./test_verify
+g++ -std=c++17 -O2 -I../include verify/test_all_maps.cpp -o test_verify && ./test_verify
 
 # Stress tests (~30 seconds)
-g++ -std=c++17 -O2 -I../include -I../include/thirdparty -I../include/bench stress/stress_all_maps.cpp -o test_stress && ./test_stress
+g++ -std=c++17 -O2 -I../include stress/stress_all_maps.cpp -o test_stress && ./test_stress
 
 # Hash attack tests (~2 minutes, requires EMH_SAFE_PSL)
-g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I../include -I../include/thirdparty -I../include/bench attack/hash_attack_all.cpp -o test_attack && ./test_attack
+g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I../include attack/hash_attack_all.cpp -o test_attack && ./test_attack
 
 # Debug tests (~10 seconds)
-g++ -std=c++17 -g -O0 -I../include -I../include/thirdparty -I../include/bench debug/debug_all_maps.cpp -o test_debug && ./test_debug
+g++ -std=c++17 -g -O0 -I../include debug/debug_all_maps.cpp -o test_debug && ./test_debug
 
 # Fuzz tests (requires clang+libfuzzer)
-clang++ -fsanitize=fuzzer,address -std=c++17 -I../include -I../include/thirdparty -I../include/bench fuzz/fuzz_emilib_all.cpp -o test_fuzz
+clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz/fuzz_emilib_all.cpp -o test_fuzz
 ./test_fuzz -max_total_time=60
-
-# Run all quick tests (~20 seconds)
-g++ -std=c++17 -O2 -I../include -I../include/thirdparty -I../include/bench verify/test_all_maps.cpp -o t1 && ./t1 && \
-g++ -std=c++17 -g -O0 -I../include -I../include/thirdparty -I../include/bench debug/debug_all_maps.cpp -o t2 && ./t2 && \
-echo "=== ALL QUICK TESTS PASSED ==="
 ```
 
 ### Windows (MSVC)
@@ -106,24 +99,26 @@ echo "=== ALL QUICK TESTS PASSED ==="
 cd tests
 
 # Quick validation tests
-cl /std:c++17 /O2 /I../include /I..\thirdparty verify\test_all_maps.cpp /Fe:test_verify.exe && .\test_verify.exe
+cl /std:c++17 /O2 /I../include verify\test_all_maps.cpp /Fe:test_verify.exe && .\test_verify.exe
 
 # Stress tests
-cl /std:c++17 /O2 /I../include /I..\thirdparty stress\stress_all_maps.cpp /Fe:test_stress.exe && .\test_stress.exe
+cl /std:c++17 /O2 /I../include stress\stress_all_maps.cpp /Fe:test_stress.exe && .\test_stress.exe
 
 # Hash attack tests (requires EMH_SAFE_PSL)
-cl /std:c++17 /O2 /DEMH_SAFE_PSL /I../include /I..\thirdparty attack\hash_attack_all.cpp /Fe:test_attack.exe && .\test_attack.exe
+cl /std:c++17 /O2 /DEMH_SAFE_PSL /I../include attack\hash_attack_all.cpp /Fe:test_attack.exe && .\test_attack.exe
 ```
 
-### Test Coverage
+---
+
+## Test Coverage
 
 | Test File | Coverage | Assertions | Time |
 |-----------|----------|------------|------|
-| `verify/test_all_maps.cpp` | emhash5-8 + emilib2ss/2o/2s | 247,268 | ~5s |
+| `verify/test_all_maps.cpp` | emhash5-8 + emihmap1/2/3 | 247,268 | ~5s |
 | `stress/stress_all_maps.cpp` | 7 maps x 5 items x 1000 trials | 35,000 trials | ~30s |
 | `attack/hash_attack_all.cpp` | 7 maps x 3 hash attacks | correctness+performance | ~2min |
 | `debug/debug_all_maps.cpp` | 7 maps x 10 debug tests | 70 tests | ~10s |
-| `fuzz/fuzz_emilib_all.cpp` | emilib2ss/2o/2s fuzzing (requires clang) | - | - |
+| `fuzz/fuzz_emilib_all.cpp` | emihmap1/2/3 fuzzing (requires clang) | - | - |
 
 ---
 
@@ -131,36 +126,49 @@ cl /std:c++17 /O2 /DEMH_SAFE_PSL /I../include /I..\thirdparty attack\hash_attack
 
 ```
 tests/
-├── fuzz/              # Fuzzing tests (requires clang + libfuzzer)
+├── verify/            # Quick validation tests (no third-party deps)
 ├── stress/            # Stress tests (with ASan)
 ├── debug/             # Debug tools
-├── verify/            # Quick validation tests
 ├── attack/            # Hash attack tests
-├── bench/             # Performance benchmarks
-├── scripts/           # Build scripts
+├── fuzz/              # Fuzzing tests (requires clang + libfuzzer)
+├── scripts/           # Build scripts (build_tests.sh, build_tests.ps1, run_all.sh)
+├── CMakeLists.txt     # CMake build configuration
+├── Makefile           # GNU Make build configuration
 └── README.md          # This document
 ```
 
+> **Note**: Performance benchmarks have been moved to the project-level [`bench/`](../bench/) directory, which requires third-party dependencies. The `tests/` directory is fully self-contained.
+
 ---
 
-## 1. fuzz/ — Fuzzing Tests
+## 1. verify/ — Quick Validation Tests
+
+Comprehensive validation tests for all emhash versions. No third-party dependencies.
 
 | File | Purpose | Compile Command |
 |------|---------|-----------------|
-| `fuzz_emhash_all.cpp` | Test all emhash versions (5/6/7/8) | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz_emhash_all.cpp -o fuzz_all` |
-| `fuzz_emhash8.cpp` | emhash8 basic fuzzer | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz_emhash8.cpp -o fuzz8` |
-| `fuzz_emhash8_advanced.cpp` | Advanced fuzzer with variable hasher | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz_emhash8_advanced.cpp -o fuzz8_adv` |
-| `fuzz_extreme.cpp` | Extreme tests: 100% collision, high LF | `g++ -fsanitize=address,undefined -std=c++17 -I../include fuzz_extreme.cpp -o fuzz_extreme_asan` |
-| `fuzz_nocoll.cpp` | No-collision boundary tests | `g++ -fsanitize=address,undefined -std=c++17 -I../include fuzz_nocoll.cpp -o fuzz_nocoll_asan` |
-| `fuzz_emilib_all.cpp` | emilib2ss/2o/2s fuzzing | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include -I../include/thirdparty -I../include/bench fuzz_emilib_all.cpp -o test_fuzz` |
+| `test_all_maps.cpp` | All 7 maps validation (247K assertions) | `g++ -std=c++17 -O2 -I../include test_all_maps.cpp -o test_verify` |
+| `test_hashmap_full_api.cpp` | Full API coverage for all HashMap versions | `g++ -std=c++17 -O2 -I../include test_hashmap_full_api.cpp -o test_hashmap_api` |
+| `test_hashset_full_api.cpp` | Full API coverage for all HashSet versions | `g++ -std=c++17 -O2 -I../include test_hashset_full_api.cpp -o test_hashset_api` |
+| `test_special_key_types.cpp` | Special key types: float, string, move-only, large values | `g++ -std=c++17 -O2 -I../include test_special_key_types.cpp -o test_special_keys` |
+| `test_merge_correctness.cpp` | Merge operation correctness | `g++ -std=c++17 -O2 -I../include test_merge_correctness.cpp -o test_merge` |
+| `test_interface_combo.cpp` | Interface combination tests | `g++ -std=c++17 -O2 -I../include test_interface_combo.cpp -o test_interface` |
+| `test_emhash_allocator.cpp` | Custom allocator support | `g++ -std=c++17 -O2 -I../include test_emhash_allocator.cpp -o test_alloc` |
+| `test_hashset_allocator.cpp` | HashSet custom allocator | `g++ -std=c++17 -O2 -I../include test_hashset_allocator.cpp -o test_set_alloc` |
+| `test_emilib_comprehensive.cpp` | emilib1/2/3 comprehensive tests | `g++ -std=c++17 -O2 -I../include test_emilib_comprehensive.cpp -o test_emilib` |
+| `test_size_sweep.cpp` | Size sweep tests | `g++ -std=c++17 -O2 -I../include test_size_sweep.cpp -o test_sweep` |
+| `test_functional_edge.cpp` | Functional edge cases | `g++ -std=c++17 -O2 -I../include test_functional_edge.cpp -o test_edge` |
+| `test_extreme.cpp` | Extreme boundary tests | `g++ -std=c++17 -O2 -I../include test_extreme.cpp -o test_extreme` |
+| `test_hidden_bugs8.cpp` | Hidden bug tests (7 items) | `g++ -std=c++17 -O2 -I../include test_hidden_bugs8.cpp -o test_hidden` |
+| `test_emhash58.cpp` | Comprehensive tests (5/6/7/8) | `g++ -std=c++17 -O2 -I../include test_emhash58.cpp -o test_58` |
+| `test_emhash5_verify.cpp` | emhash5 verification | `g++ -std=c++17 -O2 -I../include test_emhash5_verify.cpp -o test_verify5` |
+| `quick_test8.cpp` | emhash8 quick validation | `g++ -std=c++17 -O2 -I../include quick_test8.cpp -o quick_test8` |
 
 **Run Examples**:
 ```bash
-# Fuzzer (requires clang)
-./fuzz8 -max_total_time=60 corpus/
-
-# Non-fuzzer version
-./fuzz_extreme_asan
+./test_verify          # 247,268 assertions for all maps
+./test_hashmap_api     # Full HashMap API coverage
+./test_special_keys    # Special key type tests
 ```
 
 ---
@@ -169,64 +177,29 @@ tests/
 
 | File | Purpose | Compile Command |
 |------|---------|-----------------|
+| `stress_all_maps.cpp` | All 7 maps stress test | `g++ -std=c++17 -O2 -I../include stress_all_maps.cpp -o test_stress` |
 | `stress_fix.cpp` | Verify reserve(1) crash fix | `g++ -fsanitize=address,undefined -std=c++17 -I../include stress_fix.cpp -o stress_fix_asan` |
 | `highload_test.cpp` | High load tests (LF=0.999) | `g++ -std=c++17 -O2 -I../include highload_test.cpp -o highload_test` |
 | `test_emhash5_hifi.cpp` | High-intensity random operations | `g++ -fsanitize=address,undefined -std=c++17 -I../include test_emhash5_hifi.cpp -o hifi_asan` |
 | `test_emhash5_stress.cpp` | emhash5 stress test | `g++ -fsanitize=address,undefined -std=c++17 -I../include test_emhash5_stress.cpp -o stress5_asan` |
-| `stress_all_maps.cpp` | All 7 maps stress test | `g++ -std=c++17 -O2 -I../include -I../include/thirdparty -I../include/bench stress_all_maps.cpp -o test_stress` |
-| `test_bad_hash_stress.cpp` | Bad hash stress tests | `g++ -std=c++17 -O2 -I../include -I../include/thirdparty -I../include/bench test_bad_hash_stress.cpp -o test_bad_hash_stress` |
+| `test_bad_hash_stress.cpp` | Bad hash stress tests | `g++ -std=c++17 -O2 -I../include test_bad_hash_stress.cpp -o test_bad_hash` |
 
 **Run Examples**:
 ```bash
+./test_stress           # 35,000 trials for all maps
 ./stress_fix_asan       # 11000 random stress tests
 ./highload_test         # LF oscillation tests
-./test_stress           # 35,000 trials for all maps
 ```
 
 ---
 
-## 3. debug/ — Debug Tools
-
-| File | Purpose | Use Case |
-|------|---------|----------|
-| `debug_chain.cpp` | Debug `_index` chain corruption | Analyze kickout_bucket issues |
-| `debug_set_erase.cpp` | Debug erase_slot issues | HashSet deletion chain breakage |
-| `min_repro.cpp` | Minimal crash reproduction | Identify specific crash root cause |
-| `reproduce_crash.cpp` | Reproduce fuzzer-discovered crash | Verify fix effectiveness |
-| `fuzz_reproduce.cpp` | Replay crash input file | Parse fuzzer crash files |
-| `debug_all_maps.cpp` | Debug tests for all 7 maps | `g++ -std=c++17 -g -O0 -I../include -I../include/thirdparty -I../include/bench debug_all_maps.cpp -o test_debug` |
-
----
-
-## 4. verify/ — Quick Validation Tests
+## 3. attack/ — Hash Attack Tests
 
 | File | Purpose | Compile Command |
 |------|---------|-----------------|
-| `quick_test8.cpp` | emhash8 quick validation | `g++ -std=c++17 -O2 -I../include quick_test8.cpp -o quick_test8` |
-| `test_hidden_bugs8.cpp` | Hidden bug tests (7 items) | `g++ -std=c++17 -O2 -I../include test_hidden_bugs8.cpp -o hidden_bugs8` |
-| `test_extreme.cpp` | Extreme boundary tests | `g++ -std=c++17 -O2 -I../include test_extreme.cpp -o extreme` |
-| `test_interface_combo.cpp` | Interface combination tests | `g++ -std=c++17 -O2 -I../include test_interface_combo.cpp -o interface_combo` |
-| `test_emhash58.cpp` | Comprehensive tests (5/6/7/8) | `g++ -std=c++17 -O2 -I../include test_emhash58.cpp -o emhash58` |
-| `test_emhash5_verify.cpp` | emhash5 verification | `g++ -std=c++17 -O2 -I../include test_emhash5_verify.cpp -o verify5` |
-| `test_all_maps.cpp` | All 7 maps validation | `g++ -std=c++17 -O2 -I../include -I../include/thirdparty -I../include/bench test_all_maps.cpp -o test_verify` |
-
-**Run Examples**:
-```bash
-./quick_test8          # Quick validation (seconds)
-./hidden_bugs8         # Hidden bug tests
-./extreme              # Extreme boundary tests
-./test_verify          # 247,268 assertions for all maps
-```
-
----
-
-## 5. attack/ — Hash Attack Tests
-
-| File | Purpose | Compile Command |
-|------|---------|-----------------|
-| `hash_attack.cpp` | emhash5 hash attack | `g++ -std=c++17 -O2 -I../include hash_attack.cpp -o hash_attack5` |
-| `hash_attack7.cpp` | emhash7 hash attack | `g++ -std=c++17 -O2 -I../include hash_attack7.cpp -o hash_attack7` |
-| `hash_attack_all.cpp` | All 7 maps hash attack | `g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I../include -I../include/thirdparty -I../include/bench hash_attack_all.cpp -o test_attack` |
+| `hash_attack_all.cpp` | All 7 maps hash attack | `g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I../include hash_attack_all.cpp -o test_attack` |
+| `hash_attack.cpp` | emhash5 hash attack | `g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I../include hash_attack.cpp -o hash_attack5` |
+| `hash_attack7.cpp` | emhash7 hash attack | `g++ -std=c++17 -O2 -DEMH_SAFE_PSL -I../include hash_attack7.cpp -o hash_attack7` |
 
 **Test Scenarios**:
 - Constant hash (all keys map to same bucket)
@@ -235,23 +208,52 @@ tests/
 
 **Run Examples**:
 ```bash
-./hash_attack5         # emhash5 attack test
 ./test_attack          # All 7 maps attack test (requires EMH_SAFE_PSL)
+./hash_attack5         # emhash5 attack test
 ```
 
 ---
 
-## 6. bench/ — Performance Benchmarks
+## 4. debug/ — Debug Tools
 
-| File | Purpose | Compile Command |
-|------|---------|-----------------|
-| `ebench.cpp` | Basic performance benchmark | `g++ -std=c++17 -O3 -march=native -I../include ebench.cpp -o ebench` |
-| `martin_bench.cpp` | Martin Ankerl format benchmark | `g++ -std=c++17 -O3 -march=native -I../include martin_bench.cpp -o martin_bench` |
-| `highload_bench.cpp` | High load performance benchmark | `g++ -std=c++17 -O3 -DEMH_HIGH_LOAD=123456 -I../include highload_bench.cpp -o highload_bench` |
+| File | Purpose | Use Case |
+|------|---------|----------|
+| `debug_all_maps.cpp` | Debug tests for all 7 maps | `g++ -std=c++17 -g -O0 -I../include debug_all_maps.cpp -o test_debug` |
+| `debug_chain.cpp` | Debug `_index` chain corruption | Analyze kickout_bucket issues |
+| `debug_set_erase.cpp` | Debug erase_slot issues | HashSet deletion chain breakage |
+| `min_repro.cpp` | Minimal crash reproduction | Identify specific crash root cause |
+| `reproduce_crash.cpp` | Reproduce fuzzer-discovered crash | Verify fix effectiveness |
+| `fuzz_reproduce.cpp` | Replay crash input file | Parse fuzzer crash files |
+| `test_probe_bug.cpp` | Probe sequence debugging | `g++ -std=c++17 -g -O0 -I../include test_probe_bug.cpp -o test_probe` |
+| `test_probe_coverage.cpp` | Probe coverage analysis | `g++ -std=c++17 -g -O0 -I../include test_probe_coverage.cpp -o test_probe_cov` |
+| `test_debug_find.cpp` | Find operation debugging | `g++ -std=c++17 -g -O0 -I../include test_debug_find.cpp -o test_find` |
+| `test_repro_collision.cpp` | Collision reproduction | `g++ -std=c++17 -g -O0 -I../include test_repro_collision.cpp -o test_coll` |
 
 ---
 
-## 7. scripts/ — Build Scripts
+## 5. fuzz/ — Fuzzing Tests
+
+| File | Purpose | Compile Command |
+|------|---------|-----------------|
+| `fuzz_emhash_all.cpp` | Test all emhash versions (5/6/7/8) | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz_emhash_all.cpp -o fuzz_all` |
+| `fuzz_emhash8.cpp` | emhash8 basic fuzzer | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz_emhash8.cpp -o fuzz8` |
+| `fuzz_emhash8_advanced.cpp` | Advanced fuzzer with variable hasher | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz_emhash8_advanced.cpp -o fuzz8_adv` |
+| `fuzz_extreme.cpp` | Extreme tests: 100% collision, high LF | `g++ -fsanitize=address,undefined -std=c++17 -I../include fuzz_extreme.cpp fuzz_main.cpp -o fuzz_extreme_asan` |
+| `fuzz_nocoll.cpp` | No-collision boundary tests | `g++ -fsanitize=address,undefined -std=c++17 -I../include fuzz_nocoll.cpp fuzz_main.cpp -o fuzz_nocoll_asan` |
+| `fuzz_emilib_all.cpp` | emihmap1/2/3 fuzzing | `clang++ -fsanitize=fuzzer,address -std=c++17 -I../include fuzz_emilib_all.cpp -o test_fuzz` |
+
+**Run Examples**:
+```bash
+# Fuzzer (requires clang)
+./fuzz8 -max_total_time=60 corpus/
+
+# Non-fuzzer version (works with gcc)
+./fuzz_extreme_asan
+```
+
+---
+
+## 6. scripts/ — Build Scripts
 
 ### build_tests.sh (Linux/WSL)
 
@@ -303,19 +305,22 @@ tests/
 
 ---
 
-## 8. Test Coverage Matrix
+## 7. Test Coverage Matrix
 
-| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emilib | emilib2 | emilib3 |
-|-----------|---------|---------|---------|---------|--------|---------|---------|
+| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emilib1 | emilib2 | emilib3 |
+|-----------|---------|---------|---------|---------|---------|---------|---------|
 | Fuzzing | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Stress | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | High Load | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Hash Attack | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Validation | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Full API | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Special Keys | Yes | Yes | Yes | Yes | - | - | - |
+| Allocator | Yes | Yes | Yes | Yes | - | - | - |
 
 ---
 
-## 9. Recommended Test Order
+## 8. Recommended Test Order
 
 1. **Quick Validation** (seconds):
    ```bash
@@ -335,29 +340,20 @@ tests/
    ./test_attack          # Requires EMH_SAFE_PSL
    ```
 
-4. **Performance Benchmarks**:
+4. **Performance Benchmarks** (see `bench/` directory):
    ```bash
-   ./ebench
-   ./martin_bench
+   # Benchmarks are in the project-level bench/ directory
+   # See bench/README.md for details
    ```
 
 ---
 
-## 10. Notes
+## 9. Notes
 
-1. **Fuzzer requires clang + libfuzzer**, gcc cannot compile libfuzzer entry point
-2. **ASan tests should not use -O3**, use -O2 or -g
-3. **High load tests require `-DEMH_HIGH_LOAD=123456`** compile flag
-4. **Hash attack tests require `-DEMH_SAFE_PSL`** for emilib to handle extreme collisions
-5. **Windows users should use WSL** for compilation and execution
-
----
-
-## 11. Original Test File Locations
-
-Original test files remain in their original locations:
-- `fuzz/` — Original fuzzer directory
-- `test/` — Original unit test directory
-- `bench/` — Original benchmark directory
-
-This directory `tests/` is the unified entry point after organization, for easier maintenance and usage.
+1. **No third-party dependencies**: All tests in `tests/` depend only on emhash/emilib headers
+2. **Fuzzer requires clang + libfuzzer**, gcc cannot compile libfuzzer entry point
+3. **ASan tests should not use -O3**, use -O2 or -g
+4. **High load tests require `-DEMH_HIGH_LOAD=123456`** compile flag
+5. **Hash attack tests require `-DEMH_SAFE_PSL`** for emilib to handle extreme collisions
+6. **Windows users can use MSVC or WSL** for compilation and execution
+7. **Performance benchmarks** are in the project-level `bench/` directory, which requires third-party dependencies

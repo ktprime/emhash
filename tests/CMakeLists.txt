@@ -21,8 +21,7 @@ endif()
 
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../bench)
+# thirdparty and bench are only needed for benchmark tests, not core verification tests
 
 # ============================================================================
 # Verification Tests
@@ -62,11 +61,21 @@ target_compile_features(test_hashset_allocator PUBLIC cxx_std_17)
 add_executable(test_emilib_comprehensive verify/test_emilib_comprehensive.cpp)
 target_compile_features(test_emilib_comprehensive PUBLIC cxx_std_17)
 
-add_executable(test_main verify/test_main.cpp)
-target_compile_features(test_main PUBLIC cxx_std_17)
-
 add_executable(test_size_sweep verify/test_size_sweep.cpp)
 target_compile_features(test_size_sweep PUBLIC cxx_std_17)
+
+# Full API coverage tests
+add_executable(test_hashmap_full_api verify/test_hashmap_full_api.cpp)
+target_compile_features(test_hashmap_full_api PUBLIC cxx_std_17)
+
+add_executable(test_hashset_full_api verify/test_hashset_full_api.cpp)
+target_compile_features(test_hashset_full_api PUBLIC cxx_std_17)
+
+add_executable(test_special_key_types verify/test_special_key_types.cpp)
+target_compile_features(test_special_key_types PUBLIC cxx_std_17)
+
+add_executable(test_merge_correctness verify/test_merge_correctness.cpp)
+target_compile_features(test_merge_correctness PUBLIC cxx_std_17)
 
 # Boost.Test based comprehensive unit tests (requires Boost)
 # add_executable(hash_map_tests verify/hash_map_tests.cpp)
@@ -153,33 +162,11 @@ add_executable(test_repro_collision debug/test_repro_collision.cpp)
 target_compile_features(test_repro_collision PUBLIC cxx_std_17)
 
 # ============================================================================
-# Benchmarks
+# Benchmarks moved to bench/ directory (require thirdparty dependencies)
+# The following benchmarks are now built from the main bench/ directory:
+# - ebench, martin_bench, highload_bench, test_main
+# These files remain in tests/bench/ for reference but are not built here.
 # ============================================================================
-
-add_executable(ebench bench/ebench.cpp)
-target_compile_features(ebench PUBLIC cxx_std_17)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(ebench PRIVATE -O3 -march=native)
-elseif(MSVC)
-    target_compile_options(ebench PRIVATE /O2)
-endif()
-
-add_executable(martin_bench bench/martin_bench.cpp)
-target_compile_features(martin_bench PUBLIC cxx_std_17)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(martin_bench PRIVATE -O3 -march=native)
-elseif(MSVC)
-    target_compile_options(martin_bench PRIVATE /O2)
-endif()
-
-add_executable(highload_bench bench/highload_bench.cpp)
-target_compile_features(highload_bench PUBLIC cxx_std_17)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(highload_bench PRIVATE -O3)
-elseif(MSVC)
-    target_compile_options(highload_bench PRIVATE /O2)
-endif()
-target_compile_definitions(highload_bench PRIVATE EMH_HIGH_LOAD=123456)
 
 # ============================================================================
 # Fuzz Tests (optional, requires clang)
@@ -207,6 +194,11 @@ if(ENABLE_FUZZ_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_features(fuzz_emilib_all PUBLIC cxx_std_17)
     target_compile_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
     target_link_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
+
+    add_executable(fuzz_emilib fuzz/fuzz_emilib.cpp)
+    target_compile_features(fuzz_emilib PUBLIC cxx_std_17)
+    target_compile_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
+    target_link_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
 endif()
 
 # Non-fuzzer versions (can be built with gcc on Linux/macOS; skip on MinGW/MSVC)

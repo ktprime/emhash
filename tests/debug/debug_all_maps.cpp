@@ -1,15 +1,15 @@
 // Debug test for all 7 hash map implementations
 // Tests: chain integrity, erase correctness, find after rehash, edge cases
-// Compile: g++ -std=c++17 -g -O0 -fsanitize=address -I.. -I../thirdparty debug_all_maps.cpp -o debug_all_maps
+// Compile: g++ -std=c++17 -g -O0 -fsanitize=address -I../.. debug_all_maps.cpp -o debug_all_maps
 //
 // Hash maps tested:
 //   - emhash5::HashMap (hash_table5.hpp)
 //   - emhash6::HashMap (hash_table6.hpp)
 //   - emhash7::HashMap (hash_table7.hpp)
 //   - emhash8::HashMap (hash_table8.hpp)
-//   - emilib::HashMap (emilib2ss.hpp)
-//   - emilib2::HashMap (emilib2o.hpp)
-//   - emilib3::HashMap (emilib2s.hpp)
+//   - emilib::HashMap (emihmap1.hpp)
+//   - emilib2::HashMap (emihmap2.hpp)
+//   - emilib3::HashMap (emihmap3.hpp)
 
 #include <cstdio>
 #include <cstdlib>
@@ -27,9 +27,9 @@
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table7.hpp"
 #include "emhash/hash_table8.hpp"
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 // =============================================================================
 // Test utilities
@@ -736,14 +736,10 @@ int main() {
     // Test emhash8
     run_all_tests<emhash8::HashMap<int, int>>("emhash8::HashMap");
 
-    // Test emilib (from emilib2ss.hpp)
-    run_all_tests<emilib::HashMap<int, int>>("emilib::HashMap (emilib2ss)");
-
-    // Test emilib2 (from emilib2o.hpp)
-    run_all_tests<emilib2::HashMap<int, int>>("emilib2::HashMap (emilib2o)");
-
-    // Test emilib3 (from emilib2s.hpp)
-    run_all_tests<emilib3::HashMap<int, int>>("emilib3::HashMap (emilib2s)");
+    // Test emilib (from emihmap1.hpp)
+    run_all_tests<emilib::HashMap<int, int>>("emilib::HashMap (emihmap1)");
+    run_all_tests<emilib2::HashMap<int, int>>("emilib2::HashMap (emihmap2)");
+    run_all_tests<emilib3::HashMap<int, int>>("emilib3::HashMap (emihmap3)");
 
     // Summary
     printf("\n");

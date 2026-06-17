@@ -13,12 +13,14 @@ theme:
 
 nav:
   - Home: index.md
-  - Quick Start: quickstart.md
   - API Reference: api.md
   - Design: design.md
   - Performance: performance.md
-  - Build & Test: build_and_test.md
+  - Performance Tips: performance_tips.md
   - Usage Notes: usage_notes.md
+  - FAQ: faq.md
+  - Migration Guide: migration_guide.md
+  - Performance Tracking: performance_tracking.md
   - Architecture Decisions: adr/README.md
 
 markdown_extensions:

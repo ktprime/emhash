@@ -16,6 +16,8 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 
 - [Core Features](#core-features)
 - [Quick Start](#quick-start)
+- [Version Selection Guide](#version-selection-guide)
+- [Testing](#testing)
 - [Documentation](#documentation)
 - [Third-Party Benchmarks](#third-party-benchmarks)
 - [License](#license)
@@ -146,9 +148,44 @@ More examples: [examples/](examples/)
 | **emhash6** | Fast lookup/erase, integer keys | Fastest find/erase, linked-bucket with bitmask | More memory for metadata |
 | **emhash7** | Insert-heavy, mixed workloads | No tombstones, stable insert/erase, high load factor | Slower erase than emhash5/6 |
 | **emhash8** | Iteration-heavy, large KV types | Dense pairs array, near-zero iteration time | Higher memory, EhKey default-constructible req. |
-| **emilib2** | Swiss-table style SIMD-accelerated lookup | Group-level SIMD probing, very fast find | Higher memory overhead per bucket |
+| **emilib1/2/3** | Swiss-table style SIMD-accelerated lookup | Group-level SIMD probing, very fast find | Higher memory overhead per bucket |
 
 See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
+
+---
+
+## Testing
+
+The test suite is in [`tests/`](tests/) and requires **no third-party dependencies** — only emhash/emilib headers.
+
+### Quick Start
+
+```bash
+cd tests
+
+# Build and run quick validation tests (247,268 assertions, ~5 seconds)
+cmake -B build && cmake --build build --config Release
+./build/Release/test_verify.exe        # Windows
+./build/test_verify                    # Linux/WSL
+
+# Or use the custom targets
+cmake --build build --target quick_test    # Quick validation
+cmake --build build --target stress_test   # Stress tests
+cmake --build build --target attack_test   # Hash attack tests
+cmake --build build --target all_tests     # All tests
+```
+
+### Test Categories
+
+| Category | Directory | Description |
+|----------|-----------|-------------|
+| Validation | `tests/verify/` | 247K+ assertions, full API coverage, special key types |
+| Stress | `tests/stress/` | 35K trials, high load factor, bad hash scenarios |
+| Attack | `tests/attack/` | Hash collision attacks (constant/small-range/linear) |
+| Debug | `tests/debug/` | Debugging tools for chain corruption, probe bugs |
+| Fuzz | `tests/fuzz/` | LibFuzzer + ASan fuzzing (requires clang) |
+
+See [tests/README.md](tests/README.md) for detailed instructions.
 
 ---
 
@@ -156,15 +193,15 @@ See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
 
 | Document | Description |
 |----------|-------------|
+| [Test Suite](tests/README.md) | Test organization, build instructions, coverage matrix |
 | [Performance Overview](docs/performance.md) | Benchmark results, high load factor performance |
 | [API Reference](docs/api.md) | Constructors, methods, iterators |
 | [Design Principles](docs/design.md) | Collision resolution, memory layout, implementation comparison |
-| [Build and Test](docs/build_and_test.md) | CMake, Makefile, ASan, fuzz testing, compile options |
 | [Usage Notes](docs/usage_notes.md) | Thread safety, reference stability, iteration, large values |
 | [Performance Tips](docs/performance_tips.md) | Compile flags, pre-allocation, hash selection, anti-patterns |
 | [FAQ](docs/faq.md) | Frequently asked questions |
 | [Migration Guide](docs/migration_guide.md) | Migrating from std::unordered_map |
-| [Performance Tracking](docs/PERFORMANCE_TRACKING.md) | Version-by-version benchmark history, regression policy |
+| [Performance Tracking](docs/performance_tracking.md) | Version-by-version benchmark history, regression policy |
 | [Architecture Decisions (ADR)](docs/adr/README.md) | Why we chose open addressing, header-only, emhash8 layout, etc. |
 
 ---

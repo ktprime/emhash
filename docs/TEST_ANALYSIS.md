@@ -235,7 +235,7 @@ cmake --build . --target quick_test
 
 ## 6. Test Coverage Matrix
 
-| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emilib2ss | emilib2o | emilib2s |
+| Test Type | emhash5 | emhash6 | emhash7 | emhash8 | emihmap1 | emihmap2 | emihmap3 |
 |-----------|---------|---------|---------|---------|-----------|----------|----------|
 | Fuzzing | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Unit Tests | Yes | Yes | Yes | Yes | Yes | Yes | Yes |

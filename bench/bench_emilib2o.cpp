@@ -46,7 +46,7 @@ struct IdentityHasher {
     size_t operator()(uint64_t key) const { return key; }
 };
 
-#include "../thirdparty/emilib/emilib2o.hpp"
+#include "../thirdparty/emilib/emihmap2.hpp"
 
 static const int N = 2000000;
 static const int NUM_RUNS  = 3;

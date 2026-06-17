@@ -121,9 +121,9 @@ std::map<std::string, std::string> maps =
 //#define EMH_HIGH_LOAD 12345
 #include "emhash/hash_table5.hpp"
 
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 #if FHT_HMAP && __linux__
 #include <sys/mman.h>
@@ -154,8 +154,8 @@ std::map<std::string, std::string> maps =
     #include "tsl/robin_map.h"
     #include "tsl/hopscotch_map.h"
 #if ET > 1
-    #include "lru_size.h"
-    #include "lru_time.h"
+    #include "emhash/lru_size.hpp"
+    #include "emhash/lru_time.hpp"
     #include "ska/flat_hash_map.hpp"
     #include "ska/bytell_hash_map.hpp"
 #endif

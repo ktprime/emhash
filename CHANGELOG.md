@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `VERSION` file at repo root for build scripts to read the current version
 - `docs/adr/` directory with initial 4 ADRs (open addressing, emhash8 layout, no-tombstone emhash7, header-only)
-- `docs/PERFORMANCE_TRACKING.md` for tracking benchmark results across versions
+- `docs/performance_tracking.md` for tracking benchmark results across versions
 - `.github/workflows/format-check.yml` — clang-format LLVM style check on PRs
 - `.github/workflows/warnings-check.yml` — strict warnings build matrix (gcc/clang × c++17/20)
 - `.github/workflows/release.yml` — automatic GitHub Release creation on tag push
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.editorconfig` — consistent editor settings across IDEs
 - CMake: version from `VERSION` file, `emhashConfigVersion.cmake`, complete header list
 - `conanfile.py` — Conan package manager support
-- `port/vcpkg/` — vcpkg port definition (ready for submission)
+- `scripts/vcpkg/` — vcpkg port definition (ready for submission)
 - `scripts/amalgamate.sh` — generate single-header distributions
 - `docs/mkdocs.yml` — MkDocs Material configuration for documentation site
 - Doxygen class-level documentation for `hash_table7.hpp` and `hash_table8.hpp`

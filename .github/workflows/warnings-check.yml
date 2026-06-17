@@ -2,9 +2,9 @@ name: Warnings Check
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, master]
   pull_request:
-    branches: [main, dev]
+    branches: [main, master]
 
 jobs:
   warnings:
@@ -19,10 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install dependencies
+      - name: Install compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y libtbb-dev
+          package="${{ matrix.compiler }}"
+          if [[ "$package" == "clang++" ]]; then
+            package="clang"
+          fi
+          sudo apt-get install -y "$package"
 
       - name: Compile (verify tests, ${{ matrix.compiler }}, ${{ matrix.standard }})
         run: |
@@ -30,8 +34,10 @@ jobs:
           ${{ matrix.compiler }} -std=${{ matrix.standard }} \
             -O2 -g \
             -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast \
-            -I../include -I../thirdparty -I../bench \
-            verify/test_all_maps.cpp -o /tmp/test_warnings || true
-          # We capture exit code; this job is informational on first run.
-          # Switch to non-zero exit once warnings are cleaned up.
-          echo "::notice title=Warnings::Compilers may emit warnings in third-party or generated code; review and address gradually."
+            -I../include \
+            verify/test_all_maps.cpp -o /tmp/test_warnings 2>&1 | tee /tmp/warnings.log
+          # Fail if there are warnings (grep returns 0 if match found)
+          if grep -q "warning:" /tmp/warnings.log; then
+            echo "::warning::Compiler warnings detected, see log above"
+            exit 1
+          fi

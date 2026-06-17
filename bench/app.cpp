@@ -19,8 +19,8 @@
 #include "emhash/hash_table5.hpp"
 #include "emhash/hash_set2.hpp"
 #include "emhash/hash_set4.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 #include "emilib/emiset.hpp"
 
 // https://github.com/Tessil/robin-map

@@ -1,7 +1,7 @@
 // Hash Attack Benchmark for All 7 HashMap Implementations
 // Tests hash collision attacks on:
 //   - emhash5::HashMap, emhash6::HashMap, emhash7::HashMap, emhash8::HashMap
-//   - emilib::HashMap (emilib2ss), emilib2::HashMap (emilib2o), emilib3::HashMap (emilib2s)
+//   - emilib::HashMap (emihmap1), emilib2::HashMap (emihmap2), emilib3::HashMap (emihmap3)
 //
 // Attack scenarios:
 //   1. Constant hash: all keys map to bucket 0 (worst-case collision)
@@ -15,9 +15,9 @@
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table7.hpp"
 #include "emhash/hash_table8.hpp"
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 #include <cstdio>
 #include <cstdint>
@@ -519,9 +519,9 @@ int main()
     printf("#   - emhash6::HashMap  (hash_table6.hpp)\n");
     printf("#   - emhash7::HashMap  (hash_table7.hpp)\n");
     printf("#   - emhash8::HashMap  (hash_table8.hpp)\n");
-    printf("#   - emilib::HashMap   (emilib2ss.hpp)\n");
-    printf("#   - emilib2::HashMap  (emilib2o.hpp)\n");
-    printf("#   - emilib3::HashMap  (emilib2s.hpp)\n");
+    printf("#   - emilib::HashMap   (emihmap1.hpp)\n");
+    printf("#   - emilib2::HashMap  (emihmap2.hpp)\n");
+    printf("#   - emilib3::HashMap  (emihmap3.hpp)\n");
     printf("#\n");
     printf("# Attack scenarios:\n");
     printf("#   1. const_hasher   - all keys -> bucket 0 (worst-case)\n");

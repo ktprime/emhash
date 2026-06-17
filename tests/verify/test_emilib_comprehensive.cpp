@@ -1,7 +1,7 @@
 // Comprehensive bug test for three hash map implementations:
-//   1. emilib::HashMap      (emilib2ss.hpp)
-//   2. emilib2::HashMap     (emilib2o.hpp)
-//   3. emilib3::HashMap     (emilib2s.hpp)
+//   1. emilib::HashMap      (emihmap1.hpp)
+//   2. emilib2::HashMap     (emihmap2.hpp)
+//   3. emilib3::HashMap     (emihmap3.hpp)
 //
 // Focus: get_next_bucket probing coverage, hash sensitivity, and correctness
 
@@ -23,9 +23,9 @@
 #include <functional>
 #include <unordered_map>
 
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 // ============================================================================
 // Test infrastructure

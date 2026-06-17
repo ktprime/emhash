@@ -1,30 +1,48 @@
-# about bench
-  each cpp bench file(collected from github) can be complied and benched.
+# emhash Benchmarks
 
-# how to build (compile options in makefile)
-set c++ compiler and absl hash/some hash map(ET=1 : martin/phmap/ska/tsl. ET=2.. more hash maps)
- ###  make CXX=clang++ ET=1 SW=1 BF=1
+This directory contains performance benchmarks comparing emhash against other hash map implementations.
+**Note**: Benchmarks require third-party dependencies in [`../thirdparty/`](../thirdparty/).
 
-set key=string,val=int (0-uint32_t 1-int64_t 2-std::string/(view) 4-struct)
- ###  make Key=2 Val=0
+---
 
-use martinus's hash and rand function (RT=1-5)
- ###  make MH=1 RT=3
+## How to Build
 
-set interger hash function and c++20 (FH=1-6, if FH > 100 means bad hash function ex: hash(n) = n / FH or n * FH)
- ###  make FH=2 std=20
+Compile options are controlled via Makefile variables:
 
-other compile options
- ### make AVX2=1 AH=1 QB=1 std=20
+```bash
+# Set C++ compiler and enable third-party hash maps
+# ET=1: martin/phmap/ska/tsl, ET=2+: more hash maps
+make CXX=clang++ ET=1 SW=1 BF=1
 
- # compile ebench (ET=1/2 means more hash map added)
- ### g++ -I../include -I../thirdparty -O3 -march=native -DET=1 -DHOOD_HASH=1 -DABSL_HMAP=1 ebench.cpp -o eb
+# Set key/value types
+# Key: 0=uint32_t, 1=int64_t, 2=std::string, 4=struct
+# Val: 0=int, 1=int64_t, 2=std::string
+make Key=2 Val=0
 
-# compile martinus bench
- ### g++ -I../include -I../thirdparty -O3 -march=native -DET=2 -DHAVE_BOOST=1 -DABSL_HMAP=1 martin_bench.cpp -o mb
+# Use martinus's hash and rand function (RT=1-5)
+make MH=1 RT=3
 
-# compile qc bench
- ### g++ -I../include -I../thirdparty -std=c++20 -O3 -march=native -DCXX20=1 -DET=1 -DABSL_HMAP=1 qbench.cpp -o qb
+# Set integer hash function and C++20 (FH=1-6, FH>100 = bad hash)
+make FH=2 std=20
+
+# Other compile options
+make AVX2=1 AH=1 QB=1 std=20
+```
+
+### Manual Compilation
+
+```bash
+# Compile ebench (ET=1/2 means more hash map added)
+g++ -I../include -I../thirdparty -O3 -march=native -DET=1 -DHOOD_HASH=1 -DABSL_HMAP=1 ebench.cpp -o eb
+
+# Compile martinus bench
+g++ -I../include -I../thirdparty -O3 -march=native -DET=2 -DHAVE_BOOST=1 -DABSL_HMAP=1 martin_bench.cpp -o mb
+
+# Compile qc bench
+g++ -I../include -I../thirdparty -std=c++20 -O3 -march=native -DCXX20=1 -DET=1 -DABSL_HMAP=1 qbench.cpp -o qb
+```
+
+---
 
 
 
@@ -167,6 +185,8 @@ other compile options
 |emhash6::HashMap|  51.6| 13.6| 17.6| 30.8| 1.46| 59.6     |
 |emhash5::HashMap|  59.4| 15.2| 17.6| 19.7| 5.10| 59.6     |
 
+
+### Extreme Scale (50,000,000 elements)
 
 |50000000 hashmap|Insert|Fhit |Fmiss|Erase|Iter |LoadFactor|
 |----------------|------|-----|-----|-----|-----|----------|

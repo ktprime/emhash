@@ -60,9 +60,9 @@
 #define EMH_UNLIKELY(condition) (condition)
 #endif
 
-#if _WIN32
+#ifdef _WIN32
 #include <intrin.h>
-#if _WIN64
+#ifdef _WIN64
 #pragma intrinsic(_umul128)
 #endif
 #endif
@@ -85,21 +85,13 @@ static uint32_t CTZ(size_t n)
     n = __builtin_bswap64(n);
 #endif
 
-#if _WIN32
+#ifdef _WIN32
     unsigned long index;
     _BitScanForward64(&index, n);
 #elif defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
     int32_t index = __builtin_ctzll(n);
-#elif 1
-    int32_t index = __builtin_ctzl(n);
 #else
-    #if defined (__LP64__) || (SIZE_MAX == UINT64_MAX) || defined (__x86_64__)
-    int32_t index;
-    __asm__("bsfq %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-    #else
-    int32_t index;
-    __asm__("bsf %1, %0\n" : "=r" (index) : "rm" (n) : "cc");
-    #endif
+    int32_t index = __builtin_ctzl(n);
 #endif
 
     return (uint32_t)index;

@@ -1,18 +1,21 @@
 ---
 name: Feature Request
-about: Suggest a feature for emhash
+about: Suggest a new feature or improvement for emhash
 title: "[FEATURE] "
-labels: feature
+labels: enhancement
 ---
 
-## Problem Statement
-A clear description of the problem this feature would solve.
+## Feature Description
+A clear description of the feature you'd like to see.
+
+## Motivation
+Why is this feature needed? What problem does it solve?
 
 ## Proposed Solution
-A clear description of the proposed feature.
+How do you envision this feature working?
 
 ## Alternatives Considered
-Any alternative solutions you've considered.
+Any alternative solutions or features you've considered.
 
 ## Additional Context
-Any other context, usage examples, or references.
+Any other context, screenshots, or references.

@@ -165,9 +165,9 @@ static void do_warmup(HMAP& hmap, RNG& rng, size_t iterations) {
 //    #define EMH_STATIS 123456
 //    #define AVX2_EHASH 1
 //    #define EMH_PSL_LINEAR 1
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 #include "martin/robin_hood.h"
 

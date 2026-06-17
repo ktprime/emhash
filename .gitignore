@@ -15,122 +15,61 @@
 *.out
 *.app
 
-# Binary executables (no extension)
-bench/analyze_crash
-bench/analyze_crash_asan
-bench/analyze_crash_deep
-bench/analyze_inactive
-bench/app
-bench/bench_bit_mixer
-bench/bi
-bench/bs
-bench/cbench
-bench/ebench
-bench/ecov.exe
-bench/fbench
-bench/fuzz_reproduce_asan
-bench/join_hash
-bench/join_hash2
-bench/mbench
-bench/mcov.exe
-bench/reproduce_crash
-bench/reproduce_crash_asan
-bench/sb
-bench/simbench
-bench/sbench
-bench/tbench
-bench/wc
-bench/zbench
-bench/hbench
-bench/stress_fix
-bench/quick_test8_fixed
-bench/quick_test8_gcc
-bench/highload_test_fixed
-bench/test_hidden_bugs8_fixed
-bench/test_hidden_bugs8_gcc
-bench/highload_bench.exe
-bench/highload_test.exe
-bench/smallsize_test.exe
-bench/test_hidden_bugs8.exe
-bench/cbench.exe
-bench/ebench.exe
-bench/join_hash.exe
-bench/mbench.exe
-
-# Test binaries (old test/ directory removed, binaries kept for reference)
-test_emilib2o
-
-# tests binaries and crash dumps
-tests/verify/bin/
-tests/debug/bin/
-tests/fuzz/bin/
-tests/stress/bin/
-tests/attack/bin/
-tests/bench/bin/
-# Fuzz/test binaries (only bin/ subdirectory, NOT source files)
-# Source files in tests/fuzz/*.cpp MUST be tracked by git
-# Compiled output should go to tests/fuzz/bin/ or be ignored via *.exe
-tests/crash-*
-tests/test_verify
-tests/test_stress
-tests/test_attack
-tests/test_debug
-tests/quick_test8
-tests/test_emhash58
-tests/test_hidden_bugs8
-tests/test_extreme
-tests/test_interface_combo
-tests/test_emhash5_verify
-tests/test_emhash_allocator
-tests/test_functional_edge
-tests/test_main
-tests/stress_fix
-tests/highload_test
-tests/test_emhash5_stress
-tests/test_emhash5_hifi
-tests/hash_attack5
-tests/hash_attack7
-tests/debug_chain
-tests/debug_set_erase
-tests/min_repro
-tests/reproduce_crash
-tests/fuzz_reproduce
-tests/ebench
-tests/martin_bench
-tests/highload_bench
-# Note: fuzz/test source files (tests/fuzz/*.cpp) are tracked - do NOT ignore them
-# Fuzz binaries: use tests/fuzz/bin/ or they show as untracked (acceptable)
-tests/asan_stress
-tests/asan_verify
-tests/t1
-tests/t2
-
-# Root-level build/test binaries
-bench_emilib2o_opt
-bench_emilib2o_orig
-bench_emilib2ss_clang
-bench_emilib2ss_gcc
-mbench
-quick_bench
-
-# Root-level isolated files (not in project structure)
-test58
-test_emilib2o
-
-# Test-only headers (not part of public API)
-hash_set81.hpp
-hash_table7s.hpp
-
-# Old fuzz/ directory (moved to tests/fuzz/) - anchored to root
-/fuzz/
-
 # Build directories
 build/
+build_ci_check/
+build_ci_wsl/
 build_test/
 vsbuild/
 bench/bin/
 tests/build/
+tests/CMakeFiles/
+tests/compile_commands.json
+tests/Makefile
 .cache/
+
+# CMake generated files (any location)
+CMakeCache.txt
+cmake_install.cmake
+/Makefile
+Directory.build.props
+
+# Binary executables (no extension) - use pattern matching
+# Ignore compiled binaries in bench/ and tests/ directories
+bench/*
+!bench/*/
+!bench/*.cpp
+!bench/*.cc
+!bench/*.h
+!bench/*.hpp
+!bench/*.md
+!bench/Makefile
+!bench/.gitignore
+tests/*
+!tests/*/
+!tests/*.cpp
+!tests/*.h
+!tests/*.md
+!tests/CMakeLists.txt
+!tests/Makefile
+!tests/.gitignore
+# Note: fuzz/test source files (tests/fuzz/*.cpp) are tracked - do NOT ignore them
+tests/fuzz/fuzz_*
+tests/fuzz/reproduce_bug
+tests/crash-*
+
+# Root-level build/test binaries
+/mbench
+/quick_bench
+/test58
+/test_emilib2o
+/bench_emilib2o_opt
+/bench_emilib2o_orig
+/bench_emilib2ss_clang
+/bench_emilib2ss_gcc
+
+# Old fuzz/ directory (moved to tests/fuzz/) - anchored to root
+/fuzz/
 
 # Amalgamated single-header distributions
 dist/
@@ -143,12 +82,6 @@ dist/
 *.user
 *.sln.docstates
 
-# CMake cache
-CMakeCache.txt
-cmake_install.cmake
-/Makefile
-Directory.build.props
-
 # Temporary files
 *.bak
 *.TMP
@@ -160,12 +93,7 @@ Directory.build.props
 # Output files
 hash_attack_output.txt
 out7.txt
-bench/ebench.txt
-bench/hbench.txt
-bench/martin_bench.txt
-bench/dense_hash_bench.txt
-bench/qbench-out.txt
-bench/ph_bench.txt
+bench/*.txt
 bench/llvm.sh
 
 # Third-party benchmark directories (not part of emhash)

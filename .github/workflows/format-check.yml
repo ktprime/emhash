@@ -2,9 +2,9 @@ name: Format Check
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, master]
   pull_request:
-    branches: [main, dev]
+    branches: [main, master]
 
 jobs:
   clang-format:

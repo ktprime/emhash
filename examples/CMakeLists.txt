@@ -13,5 +13,5 @@ add_executable(basic_set basic_set.cpp)
 add_executable(custom_hash custom_hash.cpp)
 add_executable(custom_allocator custom_allocator.cpp)
 
-# Quick benchmark
-add_executable(quick_bench ../quick_bench.cpp)
+# Quick benchmark (moved to bench/)
+# add_executable(quick_bench ../bench/quick_bench.cpp)

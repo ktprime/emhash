@@ -16,8 +16,8 @@
 #include "ska/bytell_hash_map.hpp"
 #include "martin/robin_hood.h"
 
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
 
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table5.hpp"

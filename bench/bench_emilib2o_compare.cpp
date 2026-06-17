@@ -47,7 +47,7 @@ struct IdentityHasher {
 };
 
 // Include both versions: original (emilib2 namespace) and optimized (emilib2_opt namespace)
-#include "../thirdparty/emilib/emilib2o.hpp"
+#include "../thirdparty/emilib/emihmap2.hpp"
 
 // Create optimized version by copying the file with different namespace
 namespace emilib2_opt = emilib2;

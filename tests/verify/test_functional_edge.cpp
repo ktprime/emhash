@@ -12,7 +12,7 @@
 //
 // Implementations: emhash5/6/7/8 HashMap + emilib (emilib2ss/emilib2o/emilib2s)
 //
-// Compile: g++ -std=c++17 -O2 -I. -Ithirdparty -I../bench tests/verify/test_functional_edge.cpp -o /tmp/test_edge
+// Compile: g++ -std=c++17 -O2 -I../.. tests/verify/test_functional_edge.cpp -o /tmp/test_edge
 
 #include <cstdio>
 #include <cstdlib>
@@ -29,9 +29,9 @@
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table7.hpp"
 #include "emhash/hash_table8.hpp"
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 static int g_pass = 0, g_fail = 0;
 

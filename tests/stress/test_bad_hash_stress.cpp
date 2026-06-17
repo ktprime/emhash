@@ -7,9 +7,9 @@
 #include <cstring>
 #include <chrono>
 
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 // Bad hash: all keys map to the same hash value
 struct BadHash {

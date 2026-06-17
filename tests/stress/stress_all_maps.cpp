@@ -15,9 +15,9 @@
 #include "emhash/hash_table6.hpp"   // emhash6::HashMap
 #include "emhash/hash_table7.hpp"   // emhash7::HashMap
 #include "emhash/hash_table8.hpp"   // emhash8::HashMap
-#include "emilib/emilib2ss.hpp"  // emilib::HashMap
-#include "emilib/emilib2o.hpp"   // emilib2::HashMap
-#include "emilib/emilib2s.hpp"   // emilib3::HashMap
+#include "emilib/emihmap1.hpp"  // emilib::HashMap
+#include "emilib/emihmap2.hpp"   // emilib2::HashMap
+#include "emilib/emihmap3.hpp"   // emilib3::HashMap
 
 // ============================================================================
 // Test 1: reserve(1) + many inserts (stress the tiny table path)

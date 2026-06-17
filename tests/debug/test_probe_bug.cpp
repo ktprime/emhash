@@ -1,5 +1,5 @@
 // Focused test: get_next_bucket probing bug with bad hash functions
-// Compile: g++ -std=c++17 -O2 -I. -Ithirdparty -msse4.2 -o test_probe_bug test/test_probe_bug.cpp
+// Compile: g++ -std=c++17 -O2 -I../.. -msse4.2 -o test_probe_bug test_probe_bug.cpp
 
 #include <cstdio>
 #include <cstdlib>
@@ -10,9 +10,9 @@
 #include <chrono>
 #include <unordered_map>
 
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 // ============================================================================
 // Bad hash functions that expose get_next_bucket weaknesses

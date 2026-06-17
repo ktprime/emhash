@@ -8,9 +8,9 @@
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table5.hpp"
 #include "emhash/hash_table8.hpp"
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
-#include "emilib/emilib2s.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
+#include "emilib/emihmap3.hpp"
 
 #include "rigtorp/rigtorp.hpp"
 

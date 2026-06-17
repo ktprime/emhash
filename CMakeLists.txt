@@ -10,8 +10,9 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(WITH_BENCHMARKS "Build benchmarks." ON)
+option(WITH_BENCHMARKS "Build benchmarks." OFF)
 option(WITH_EXAMPLES "Build examples." ON)
+option(WITH_TESTS "Build tests." OFF)
 
 message("------------ Options -------------")
 message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
@@ -30,9 +31,12 @@ set(EMHASH_HEADERS
     include/emhash/hash_table6.hpp
     include/emhash/hash_table7.hpp
     include/emhash/hash_table8.hpp
+    include/emhash/lru_size.hpp
+    include/emhash/lru_time.hpp
+    include/emilib/emihmap1.hpp
+    include/emilib/emihmap2.hpp
+    include/emilib/emihmap3.hpp
 )
-
-set_target_properties(emhash PROPERTIES PUBLIC_HEADER "${EMHASH_HEADERS}")
 
 target_include_directories(
      emhash INTERFACE
@@ -45,8 +49,10 @@ include(CMakePackageConfigHelpers)
 
 install(TARGETS emhash
     EXPORT emhash-targets
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/emhash
 )
+
+# Install headers preserving directory structure (emhash/ and emilib/)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(EXPORT emhash-targets
         FILE emhashTargets.cmake
@@ -72,49 +78,71 @@ install(FILES
 )
 
 if(WITH_BENCHMARKS)
-    include_directories(${PROJECT_SOURCE_DIR}/include)
-    include_directories(${PROJECT_SOURCE_DIR}/thirdparty)
-    include_directories(${PROJECT_SOURCE_DIR}/bench)
-    add_definitions(-DHAVE_BOOST=1 -DABSL_HAMP=1 -DEMH_PSL=16)# -DET=1)
     find_package(Threads REQUIRED)
     find_package(OpenMP REQUIRED COMPONENTS CXX)
+
+    set(BENCH_INCLUDES ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/thirdparty ${PROJECT_SOURCE_DIR}/bench)
+    set(BENCH_DEFS -DHAVE_BOOST=1 -DABSL_HMAP=1 -DEMH_PSL=16)
+
     if(WIN32)
-        set(CMAKE_CXX_FLAGS "/WX- /MP")
-        set(CMAKE_CXX_FLAGS_DEBUG "/W3 /Zi /Od /WX- ${CMAKE_CXX_FLAGS}")
-        set(CMAKE_CXX_FLAGS_RELEASE "/WX- /Ob1 /Ot /Oi /Oy /Gy /GF /GL /GS- /arch:AVX2 ${CMAKE_CXX_FLAGS}")
-        add_compile_options(/Ob2 /DNDEBUG /O2 /Ot /Oi /Oy /Gy /GF /GS- /GL /arch:AVX2)
+        add_compile_options(/WX- /MP /Ob2 /DNDEBUG /O2 /Ot /Oi /Oy /Gy /GF /GS- /GL /arch:AVX2)
         set(CMAKE_SUPPRESS_REGENERATION ON)
         if(CMAKE_GENERATOR MATCHES "Visual Studio")
           set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-          set(INSTALL_TARGETS_DIRECTORY "")
         endif()
-    elseif(1)
+    else()
         set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
-        set(CMAKE_CXX_FLAGS "-flto=auto -DNDEBUG -march=native  ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS "-flto=auto -DNDEBUG -march=native ${CMAKE_CXX_FLAGS}")
     endif()
 
     add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)
-    add_executable(sbench ${PROJECT_SOURCE_DIR}/bench/sbench.cpp)
-    add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martin_bench.cpp)
-    add_executable(cbench ${PROJECT_SOURCE_DIR}/bench/comprehensive_bench.cpp)
-    add_executable(bs ${PROJECT_SOURCE_DIR}/bench/bstring.cpp)
-    add_executable(bi ${PROJECT_SOURCE_DIR}/bench/buint64.cpp)
-    add_executable(fbench ${PROJECT_SOURCE_DIR}/bench/fbench.cpp)
-    add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hbench.cpp)
-    add_executable(zbench ${PROJECT_SOURCE_DIR}/bench/zhash_bench.cc)
-    add_executable(jbench ${PROJECT_SOURCE_DIR}/bench/hash_join2.cpp)
-    target_link_libraries(jbench PRIVATE OpenMP::OpenMP_CXX)
-    #add_executable(qbench ${PROJECT_SOURCE_DIR}/bench/qbench.cpp)
-    #add_executable(sibench ${PROJECT_SOURCE_DIR}/bench/simple_bench.cpp)
+    target_include_directories(ebench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(ebench PRIVATE ${BENCH_DEFS})
 
-    #target_link_libraries(ebench PRIVATE Threads::Threads)
-    #target_link_libraries(sbench PRIVATE Threads::Threads)
-    #target_link_libraries(mbench PRIVATE Threads::Threads)
-    #target_link_libraries(hbench PRIVATE Threads::Threads)
-    #target_link_libraries(fbench PRIVATE Threads::Threads)
+    add_executable(sbench ${PROJECT_SOURCE_DIR}/bench/sbench.cpp)
+    target_include_directories(sbench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(sbench PRIVATE ${BENCH_DEFS})
+
+    add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martin_bench.cpp)
+    target_include_directories(mbench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(mbench PRIVATE ${BENCH_DEFS})
+
+    add_executable(cbench ${PROJECT_SOURCE_DIR}/bench/comprehensive_bench.cpp)
+    target_include_directories(cbench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(cbench PRIVATE ${BENCH_DEFS})
+
+    add_executable(bs ${PROJECT_SOURCE_DIR}/bench/bstring.cpp)
+    target_include_directories(bs PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(bs PRIVATE ${BENCH_DEFS})
+
+    add_executable(bi ${PROJECT_SOURCE_DIR}/bench/buint64.cpp)
+    target_include_directories(bi PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(bi PRIVATE ${BENCH_DEFS})
+
+    add_executable(fbench ${PROJECT_SOURCE_DIR}/bench/fbench.cpp)
+    target_include_directories(fbench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(fbench PRIVATE ${BENCH_DEFS})
+
+    add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hbench.cpp)
+    target_include_directories(hbench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(hbench PRIVATE ${BENCH_DEFS})
+
+    add_executable(zbench ${PROJECT_SOURCE_DIR}/bench/zhash_bench.cc)
+    target_include_directories(zbench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(zbench PRIVATE ${BENCH_DEFS})
+
+    add_executable(jbench ${PROJECT_SOURCE_DIR}/bench/hash_join2.cpp)
+    target_include_directories(jbench PRIVATE ${BENCH_INCLUDES})
+    target_compile_definitions(jbench PRIVATE ${BENCH_DEFS})
+    target_link_libraries(jbench PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 if(WITH_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(WITH_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 

@@ -18,8 +18,8 @@
 #include "../hash_table5.hpp"
 
 #include "./util.h"
-#include "emilib/emilib2ss.hpp"
-#include "emilib/emilib2o.hpp"
+#include "emilib/emihmap1.hpp"
+#include "emilib/emihmap2.hpp"
 
 
 #include <unordered_map>
