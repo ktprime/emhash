@@ -28,6 +28,8 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
+#include <stdexcept>
 #include <iterator>
 #include <utility>
 #include <cassert>
@@ -37,7 +39,7 @@
 #elif defined(__x86_64__)
     #include <x86intrin.h>
 #else
-    #include "sse2neon.h"
+    #include <sse2neon.h>
 #endif
 
 #undef EMH_LIKELY
@@ -109,7 +111,7 @@ namespace emilib3 {
 //find filled or empty
 constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 
-inline static uint32_t CTZ(uint32_t n)
+inline static uint32_t CTZ(size_t n)
 {
 #ifdef _WIN32
     unsigned long index;
@@ -131,7 +133,7 @@ private:
     using PairT = std::pair<const KeyT, ValueT>;
 
 public:
-    using size_t          = uint32_t;
+    using size_t          = uint32_t; // intentionally shadows global size_t for 32-bit compact storage
     using value_type      = PairT;
     using reference       = PairT&;
     using const_reference = const PairT&;
@@ -484,7 +486,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const noexcept
     {
-        return float(_num_filled) / float(_num_buckets);
+        return _num_buckets ? float(_num_filled) / float(_num_buckets) : 0.0f;
     }
 
     inline constexpr float max_load_factor() const { return EMH_MAX_LOAD_FACTOR; }
@@ -525,16 +527,20 @@ public:
     }
 
     template<typename K=KeyT>
-    ValueT& at(const K& key) noexcept
+    ValueT& at(const K& key)
     {
         const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            throw std::out_of_range("emilib3::HashMap::at(): key not found");
         return _pairs[bucket].second;
     }
 
     template<typename K=KeyT>
-    const ValueT& at(const K& key) const noexcept
+    const ValueT& at(const K& key) const
     {
         const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            throw std::out_of_range("emilib3::HashMap::at(): key not found");
         return _pairs[bucket].second;
     }
 
@@ -542,14 +548,14 @@ public:
     ValueT* try_get(const K& key) noexcept
     {
         auto bucket = find_filled_bucket(key);
-        return &_pairs[bucket].second;
+        return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
     }
 
     template<typename K>
     ValueT* try_get(const K& key) const noexcept
     {
         auto bucket = find_filled_bucket(key);
-        return &_pairs[bucket].second;
+        return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
     }
 
     template<typename Con>
