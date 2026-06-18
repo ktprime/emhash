@@ -136,7 +136,7 @@ emhash7::HashMap<Point, int, decltype(hash), decltype(eq)> map(0, hash, eq);
 #endif
 ```
 
-More examples: [examples/](examples/)
+More examples: [docs/examples/](docs/examples/)
 
 ---
 

@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/performance_tips.md` — performance tuning guide (compile flags, pre-allocation, hash selection, anti-patterns)
 - `docs/faq.md` — frequently asked questions
 - `docs/migration_guide.md` — migration guide from std::unordered_map
-- `examples/CMakeLists.txt` — CMake build for all examples + quick_bench
+- `docs/examples/CMakeLists.txt` — CMake build for all examples + quick_bench
 - Method-level Doxygen for hash_table8.hpp core API (contains, try_get, try_set, insert_unique, set_get, erase)
 
 ### Changed

@@ -33,6 +33,7 @@
 #include <cstring>
 #include <string>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -466,10 +467,10 @@ public:
     const value_type* values() const { return _pairs; }
     const Index* index() const { return _index; }
 
-    size_type size() const { return _num_filled; }
-    bool empty() const { return _num_filled == 0; }
-    size_type bucket_count() const { return _num_buckets; }
-    float load_factor() const { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
+    size_type size() const noexcept { return _num_filled; }
+    bool empty() const noexcept { return _num_filled == 0; }
+    size_type bucket_count() const noexcept { return _num_buckets; }
+    float load_factor() const noexcept { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
 
     const HashT& hash_function() const { return _hasher; }
     const EqT& key_eq() const { return _eq; }
@@ -630,18 +631,22 @@ public:
         return {this, find_filled_slot(key)};
     }
 
-    //it key is not found, it will return value at end()
+    //it key is not found, throws std::out_of_range
     template<typename K=KeyT>
-    ValueT& at(const K& key) noexcept
+    ValueT& at(const K& key)
     {
         const auto slot = find_filled_slot(key);
+        if (slot == _num_filled)
+            throw std::out_of_range("emhash8::at(): key not found");
         return _pairs[slot].second;
     }
 
     template<typename K=KeyT>
-    const ValueT& at(const K& key) const noexcept
+    const ValueT& at(const K& key) const
     {
         const auto slot = find_filled_slot(key);
+        if (slot == _num_filled)
+            throw std::out_of_range("emhash8::at(): key not found");
         return _pairs[slot].second;
     }
 

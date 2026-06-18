@@ -17,7 +17,7 @@
 
 struct CollisionHasher {
     size_t collision_high_bits;
-    size_t operator()(int x) const {
+    size_t operator()(int /*x*/) const {
         // Force all keys to have the same high bits after masking
         // bucket = hash & _mask, high = hash & ~_mask
         // We want different keys to map to same bucket AND same high bits

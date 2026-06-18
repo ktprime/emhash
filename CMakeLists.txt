@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" EMHASH_VERSION LIMIT_COUNT 1)
-project(emhash VERSION ${EMHASH_VERSION} LANGUAGES CXX)
+project(emhash VERSION ${EMHASH_VERSION} LANGUAGES CXX
+    DESCRIPTION "High-performance, memory-efficient C++ open addressing flat hash table"
+    HOMEPAGE_URL "https://github.com/ktprime/emhash"
+)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -138,7 +141,7 @@ if(WITH_BENCHMARKS)
 endif()
 
 if(WITH_EXAMPLES)
-    add_subdirectory(examples)
+    add_subdirectory(docs/examples)
 endif()
 
 if(WITH_TESTS)

@@ -21,6 +21,8 @@ nav:
   - FAQ: faq.md
   - Migration Guide: migration_guide.md
   - Performance Tracking: performance_tracking.md
+  - Test Analysis: test_analysis.md
+  - Examples: examples/README.md
   - Architecture Decisions: adr/README.md
 
 markdown_extensions:

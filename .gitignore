@@ -57,6 +57,7 @@ tests/*
 tests/fuzz/fuzz_*
 tests/fuzz/reproduce_bug
 tests/crash-*
+tests/verify/bin/
 
 # Root-level build/test binaries
 /mbench

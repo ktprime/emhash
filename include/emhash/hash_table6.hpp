@@ -30,6 +30,7 @@
 #include <string>
 #include <cmath>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -680,11 +681,11 @@ public:
     const_iterator cend() const { return {this, _mask + 1}; }
     const_iterator end() const { return {this, _mask + 1}; }
 
-    size_type size() const { return _num_filled; }
-    bool empty() const { return _num_filled == 0; }
+    size_type size() const noexcept { return _num_filled; }
+    bool empty() const noexcept { return _num_filled == 0; }
 
-    size_type bucket_count() const { return _mask + 1; }
-    float load_factor() const { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
+    size_type bucket_count() const noexcept { return _mask + 1; }
+    float load_factor() const noexcept { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
 
     const HashT& hash_function() const { return _hasher; }
     const EqT& key_eq() const { return _eq; }
@@ -853,7 +854,8 @@ public:
     inline ValueT& at(const KeyT& key)
     {
         const auto bucket = find_filled_bucket(key);
-        //throw
+        if (bucket == _mask + 1)
+            throw std::out_of_range("emhash6::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
@@ -861,7 +863,8 @@ public:
     inline const ValueT& at(const KeyT& key) const
     {
         const auto bucket = find_filled_bucket(key);
-        //throw
+        if (bucket == _mask + 1)
+            throw std::out_of_range("emhash6::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
@@ -1034,28 +1037,28 @@ public:
     {
         reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin)
-            do_insert_unqiue(*begin);
+            do_insert_unique(*begin);
     }
 #endif
 
     template<typename K, typename V>
     inline size_type insert_unique(K&& key, V&& val)
     {
-        return do_insert_unqiue(std::forward<K>(key), std::forward<V>(val));
+        return do_insert_unique(std::forward<K>(key), std::forward<V>(val));
     }
 
     inline size_type insert_unique(value_type&& value)
     {
-        return do_insert_unqiue(std::move(value.first), std::move(value.second));
+        return do_insert_unique(std::move(value.first), std::move(value.second));
     }
 
     inline size_type insert_unique(const value_type& value)
     {
-        return do_insert_unqiue(value.first, value.second);
+        return do_insert_unique(value.first, value.second);
     }
 
     template<typename K, typename V>
-    inline size_type do_insert_unqiue(K&& key, V&& val)
+    inline size_type do_insert_unique(K&& key, V&& val)
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);

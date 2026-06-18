@@ -31,8 +31,8 @@ g++ -std=c++17 -I../include basic_map.cpp -o basic_map
 | `emhash/hash_table7.hpp` | `emhash7::HashMap<K,V>` | No-tombstone design |
 | `emhash/hash_table8.hpp` | `emhash8::HashMap<K,V>` | Latest version, recommended |
 | `emhash/hash_set8.hpp` | `emhash8::HashSet<K>` | HashSet (latest) |
-| `emilib/emilib1.hpp` | `emilib1::HashMap<K,V>` | LRU-based eviction |
-| `emilib/emilib2.hpp` | `emilib2::HashMap<K,V>` | With load factor control |
-| `emilib/emilib3.hpp` | `emilib3::HashMap<K,V>` | SIMD-accelerated |
+| `emilib/emihmap1.hpp` | `emilib::HashMap<K,V>` | SIMD-accelerated, inline probe depth |
+| `emilib/emihmap2.hpp` | `emilib2::HashMap<K,V>` | SIMD-accelerated, high load factor |
+| `emilib/emihmap3.hpp` | `emilib3::HashMap<K,V>` | SIMD-accelerated, balanced default |
 | `emhash/lru_size.hpp` | `emhash::lru_size_cache<K,V>` | LRU cache (size-based) |
 | `emhash/lru_time.hpp` | `emhash::lru_time_cache<K,V>` | LRU cache (time-based) |

@@ -369,11 +369,11 @@ static void test_probe_sequence_coverage(const char* name) {
         return covered;
     };
 
-    int cov_ss = check_coverage("emilib2ss/s", get_next_ss);
-    int cov_o = check_coverage("emilib2o", get_next_o);
+    (void)check_coverage("emilib2ss/s", get_next_ss);
+    (void)check_coverage("emilib2o", get_next_o);
 
     // Also check from a different starting bucket
-    auto check_coverage_from = [&](const char* algo_name, auto get_next_fn, size_t start) {
+    auto check_coverage_from = [&](const char* /*algo_name*/, auto get_next_fn, size_t start) {
         std::vector<bool> visited(num_groups, false);
         size_t bucket = start;
         for (int offset = 0; offset < num_groups * 2; offset++) {

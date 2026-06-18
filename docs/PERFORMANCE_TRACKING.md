@@ -14,7 +14,7 @@ performance evolution and detect regressions.
 
 ## Baseline: v1.1.0 (2026-06-13)
 
-Source: [README.md](../../README.md) performance section.
+Source: [README.md](../README.md) performance section.
 
 ### Throughput (10M elements, integer keys)
 

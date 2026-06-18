@@ -110,7 +110,7 @@ bool test_size_n_bad_hash(int N)
         map[i] = i * 3;
 
     if ((int)map.size() != N) {
-        printf("    FAIL: bad hash size mismatch at N=%d (got %zu)\n", N, map.size());
+        printf("    FAIL: bad hash size mismatch at N=%d (got %u)\n", N, (unsigned)map.size());
         g_fail++;
         return false;
     }

@@ -19,11 +19,12 @@ jobs:
 
       - name: Check formatting
         run: |
-          # Only check our own source files (not third-party, not generated)
+          # Only check our own source files (not third-party, not generated, not vendored)
           find . \
             -path ./thirdparty -prune -o \
             -path ./bench/tsl_bench -prune -o \
             -path ./.git -prune -o \
+            -path ./include/sse2neon.h -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
             -print | xargs clang-format --dry-run --Werror
 
@@ -34,5 +35,6 @@ jobs:
             -path ./thirdparty -prune -o \
             -path ./bench/tsl_bench -prune -o \
             -path ./.git -prune -o \
+            -path ./include/sse2neon.h -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
             -print | xargs clang-format --dry-run

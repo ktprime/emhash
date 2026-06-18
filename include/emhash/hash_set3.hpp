@@ -97,13 +97,13 @@ class HashSet
 public:
 #if EMH_SIZE_TYPE_BIT == 64
     typedef uint64_t size_type;
-    constexpr static size_type INACTIVE = (size_type)(0 - 1ull);
+    constexpr static size_type INACTIVE = ~size_type(0);
 #elif EMH_SIZE_TYPE_BIT == 16
     typedef uint16_t size_type;
-    constexpr static size_type INACTIVE = (size_type)(0 - 1ul);
+    constexpr static size_type INACTIVE = ~size_type(0);
 #else
     typedef uint32_t size_type;
-    constexpr static size_type INACTIVE = (size_type)(0 - 1ull);
+    constexpr static size_type INACTIVE = ~size_type(0);
 #endif
 
     typedef KeyT     key_type;
@@ -479,12 +479,12 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return ((float)size()) / _total_buckets;
+        return _total_buckets ? ((float)size()) / _total_buckets : 0.0f;
         //return (_num_colls / static_cast<float>(_colls_buckets));
         //return (_num_mains / static_cast<float>(_mains_buckets + 1));
     }
 
-    HashT hash_function() const
+    const HashT& hash_function() const
     {
         return _hasher;
     }
@@ -778,7 +778,6 @@ public:
     size_type insert_unique(const KeyT& key)
     {
         check_expand_need();
-        assert(false);
         auto bucket = find_unique_bucket(key);
         new_key(key, bucket, hash_main_bucket(key));
         return bucket;
@@ -799,7 +798,7 @@ public:
     }
     std::pair<iterator, bool> try_emplace(const key_type& k)
     {
-        return insert(k).first;
+        return insert(k);
     }
     template <class... Args>
     inline std::pair<iterator, bool> emplace_unique(Args&&... args)
@@ -1300,7 +1299,6 @@ private:
 
     size_type find_unique_bucket(const KeyT& key)
     {
-        assert(false);
         const auto bucket = hash_coll_bucket(key);
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)

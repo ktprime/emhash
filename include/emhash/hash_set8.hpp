@@ -649,7 +649,7 @@ public:
     std::pair<iterator, iterator> equal_range(const K& key)
     {
         const auto found = find(key);
-        if (found.second == _num_filled)
+        if (found == end())
             return { found, found };
         else
             return { found, std::next(found) };

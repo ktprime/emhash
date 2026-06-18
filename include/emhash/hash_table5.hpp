@@ -30,6 +30,7 @@
 #include <string>
 #include <cmath>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -82,7 +83,7 @@
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
     #define EMH_BUCKET(p,n)  p[n].second
-    #define EMH_PREVET(p,n)  *(size_type*)(&p[n].first.first)
+    #define EMH_PREVET(p,n)  (*reinterpret_cast<size_type*>(&p[n].first.first))
     #define EMH_PKV(p,n)     p[n].first
     #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(value_type(key, val), bucket); _num_filled ++
 #else
@@ -92,7 +93,7 @@
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n)  p[n].bucket
-    #define EMH_PREVET(p,n)  *(size_type*)(&p[n].first)
+    #define EMH_PREVET(p,n)  (*reinterpret_cast<size_type*>(&p[n].first))
     #define EMH_PKV(p,n)     p[n]
     #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(key, val, bucket); _num_filled ++; if (bucket < _first) _first = bucket
 #endif
@@ -143,7 +144,7 @@ struct entry {
 
     template<typename K, typename V>
     entry(K&& key, std::tuple<V> val, size_type ibucket)
-        :second(std::get<1>(val)),
+        :second(std::get<0>(val)),
         first(std::forward<K>(key))
     {
         bucket = ibucket;
@@ -162,7 +163,7 @@ struct entry {
     }
 
     entry(std::tuple<First, Second>&& tup)
-        :second(std::move(std::get<2>(tup))), first(std::move(std::get<1>(tup)))
+        :second(std::move(std::get<1>(tup))), first(std::move(std::get<0>(tup)))
     {
         bucket = INACTIVE;
     }
@@ -654,7 +655,7 @@ public:
     EqT key_eq() const noexcept { return static_cast<const EqT&>(_eq); }
     allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
 
-    float load_factor() const noexcept { return static_cast<float>(_num_filled) / (float)_num_buckets; }
+    float load_factor() const noexcept { return _num_buckets ? static_cast<float>(_num_filled) / (float)_num_buckets : 0.0f; }
     float max_load_factor() const noexcept { return (1 << 27) / (float)_mlf; }
     void max_load_factor(float mlf) noexcept
     {
@@ -822,7 +823,8 @@ public:
     ValueT& at(const K& key)
     {
         const auto bucket = find_filled_key(key);
-        //throw
+        if (EMH_EMPTY(_pairs, bucket))
+            throw std::out_of_range("emhash5::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
@@ -830,6 +832,8 @@ public:
     const ValueT& at(const K& key) const
     {
         const auto bucket = find_filled_key(key);
+        if (EMH_EMPTY(_pairs, bucket))
+            throw std::out_of_range("emhash5::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
@@ -838,6 +842,8 @@ public:
     {
         const auto main_bucket = key_hash & _mask;
         const auto bucket = find_hash_bucket(key, main_bucket);
+        if (EMH_EMPTY(_pairs, bucket))
+            throw std::out_of_range("emhash5::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
@@ -846,6 +852,8 @@ public:
     {
         const auto main_bucket = key_hash & _mask;
         const auto bucket = find_hash_bucket(key, main_bucket);
+        if (EMH_EMPTY(_pairs, bucket))
+            throw std::out_of_range("emhash5::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 

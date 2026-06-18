@@ -13,7 +13,7 @@
 
 // Bad hash: all keys map to the same hash value
 struct BadHash {
-    size_t operator()(int key) const { return 42; }
+    size_t operator()(int /*key*/) const { return 42; }
 };
 
 // Less bad: only a few distinct hash values
@@ -117,7 +117,7 @@ bool stress_test_sequential(const char* name, int num_keys, int timeout_ms = 300
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start).count();
 
-    printf("  %-12s %s size=%zu time=%dms\n", name, ok ? "OK" : "FAIL", map.size(), (int)elapsed);
+    printf("  %-12s %s size=%u time=%dms\n", name, ok ? "OK" : "FAIL", (unsigned)map.size(), (int)elapsed);
     return ok;
 }
 
@@ -166,7 +166,7 @@ bool test_erase_reinsert(const char* name, int num_keys, int timeout_ms = 30000)
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start).count();
 
-    printf("  %-12s %s size=%zu time=%dms\n", name, ok ? "OK" : "FAIL", map.size(), (int)elapsed);
+    printf("  %-12s %s size=%u time=%dms\n", name, ok ? "OK" : "FAIL", (unsigned)map.size(), (int)elapsed);
     return ok;
 }
 

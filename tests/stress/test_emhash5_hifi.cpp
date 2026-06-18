@@ -105,7 +105,7 @@ static void test_collision_attack()
     printf("=== Test 2: hash collision attack (small map) ===\n");
     // Use a hasher that returns constant
     struct const_hasher {
-        size_t operator()(int k) const { return 0; }
+        size_t operator()(int /*k*/) const { return 0; }
     };
     emhash5::HashMap<int, int, const_hasher> m(8);
     std::unordered_map<int, int, const_hasher> ref;
@@ -267,7 +267,7 @@ static void test_copy_move_heavy()
         CHECK_EQ(copy.size(), 0, "moved-from size");
 
         // Self-assignment test
-        dest = dest;
+        dest = static_cast<decltype(dest)&>(dest);
         CHECK_EQ(dest.size(), 1000, "self-assign");
 
         // Verify all

@@ -319,6 +319,7 @@ bool test_iterator_after_erase(const char* name) {
 
     // Iterate and erase - handle both returning iterator and void
     int erase_count = 0;
+    (void)erase_count;
     if constexpr (erase_returns_iterator<HashMap>::value) {
         // erase returns iterator (emhash style)
         auto it = m.begin();

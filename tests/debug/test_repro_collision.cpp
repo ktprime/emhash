@@ -5,7 +5,7 @@
 #include <cstdint>
 
 struct const_hasher {
-    size_t operator()(int k) const { return 0; }
+    size_t operator()(int /*k*/) const { return 0; }
 };
 
 int main()

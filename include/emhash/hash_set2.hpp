@@ -96,7 +96,7 @@ public:
     typedef uint32_t size_type;
 #endif
 
-    static constexpr size_type INACTIVE = size_type(0 - 1ull);
+    static constexpr size_type INACTIVE = ~size_type(0);
     typedef HashSet<KeyT, HashT, EqT, AllocT> htype;
     typedef AllocT allocator_type;
     typedef std::pair<KeyT, size_type> PairT;

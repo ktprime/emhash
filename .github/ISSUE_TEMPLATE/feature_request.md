@@ -1,21 +1,25 @@
 ---
 name: Feature Request
-about: Suggest a new feature or improvement for emhash
-title: "[FEATURE] "
+about: Suggest a feature or enhancement for emhash
+title: "[FEAT] "
 labels: enhancement
 ---
 
-## Feature Description
-A clear description of the feature you'd like to see.
+## Summary
+A brief description of the proposed feature.
 
 ## Motivation
 Why is this feature needed? What problem does it solve?
 
 ## Proposed Solution
-How do you envision this feature working?
+Describe your preferred approach or API design.
+
+```cpp
+// Example usage (if applicable)
+```
 
 ## Alternatives Considered
-Any alternative solutions or features you've considered.
+Any alternative approaches you've thought about.
 
 ## Additional Context
-Any other context, screenshots, or references.
+Any benchmarks, references, or other context.

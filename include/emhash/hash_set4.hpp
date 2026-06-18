@@ -116,7 +116,7 @@ public:
     using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
     using PairAllocTraits = std::allocator_traits<PairAlloc>;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
-    static constexpr uint32_t INACTIVE = (uint32_t)(0 - 1);
+    static constexpr uint32_t INACTIVE = ~uint32_t(0);
 
     typedef KeyT     value_type;
     typedef KeyT&    reference;
@@ -442,7 +442,7 @@ public:
 
     ~HashSet()
     {
-        if (isno_triviall_destructable())
+        if (is_trivially_destructible())
             clearkv();
 
         dealloc_bucket(_pairs, _num_buckets);
@@ -558,7 +558,7 @@ public:
         return static_cast<float>(_num_filled) / (_num_buckets + 0.01f);
     }
 
-    const HashT& hash_function()
+    const HashT& hash_function() const
     {
         return _hasher;
     }
@@ -849,7 +849,7 @@ public:
     }
     std::pair<iterator, bool> try_emplace(const value_type& k)
     {
-        return insert(k).first;
+        return insert(k);
     }
     template <class... Args>
     inline std::pair<iterator, bool> emplace_unique(Args&&... args)
@@ -910,7 +910,7 @@ public:
 
     void clear_bucket(size_type bucket)
     {
-        if (isno_triviall_destructable())
+        if (is_trivially_destructible())
             _pairs[bucket].~PairT();
         _pairs[bucket].second = INACTIVE;
         _num_filled --;
@@ -953,7 +953,7 @@ public:
         clear_bucket(bucket);
     }
 
-    static constexpr bool isno_triviall_destructable()
+    static constexpr bool is_trivially_destructible()
     {
 #if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value);
@@ -973,7 +973,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (isno_triviall_destructable())
+        if (is_trivially_destructible())
             clearkv();
         else {
             memset((void*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
@@ -1050,7 +1050,7 @@ private:
 
             const auto bucket = find_unique_bucket(opair.first);
             new_key(std::move(opair.first), bucket);
-            if (isno_triviall_destructable())
+            if (is_trivially_destructible())
                 opair.first.~KeyT();
         }
 
@@ -1183,7 +1183,7 @@ private:
         _pairs[prev_bucket].second = new_bucket;
         if (next_bucket == bucket)
             _pairs[new_bucket].second = new_bucket;
-        if (isno_triviall_destructable())
+        if (is_trivially_destructible())
             _pairs[bucket].~PairT();
         _pairs[bucket].second = INACTIVE;
         return bucket;

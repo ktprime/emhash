@@ -308,7 +308,7 @@ public:
         clone(other);
     }
 
-    lru_cache(lru_cache&& other)
+    lru_cache(lru_cache&& other) noexcept
     {
         init(1);
         reserve(1);
@@ -342,7 +342,7 @@ public:
         return *this;
     }
 
-    lru_cache& operator=(lru_cache&& other)
+    lru_cache& operator=(lru_cache&& other) noexcept
     {
         if (this != &other) {
             swap(other);
@@ -351,7 +351,7 @@ public:
         return *this;
     }
 
-    ~lru_cache()
+    ~lru_cache() noexcept
     {
         if (is_notrivially())
             clearkv();
@@ -470,12 +470,12 @@ public:
         return static_cast<float>(_num_filled) / (_mask + 1);
     }
 
-    HashT& hash_function() const
+    const HashT& hash_function() const
     {
         return _hasher;
     }
 
-    EqT& key_eq() const
+    const EqT& key_eq() const
     {
         return _eq;
     }
@@ -590,7 +590,7 @@ public:
         return ibucket_size;
     }
 
-    void dump_statis() const
+    void dump_statics() const
     {
         uint32_t buckets[129] = {0};
         uint32_t steps[129]   = {0};
@@ -867,7 +867,7 @@ public:
     template<class... Args>
     std::pair<iterator, bool> try_emplace(key_type&& k, Args&&... args)
     {
-        return insert(k, std::forward<Args>(args)...).first;
+        return insert(k, std::forward<Args>(args)...);
     }
 
     template <class... Args>
@@ -1396,7 +1396,7 @@ private:
     uint32_t  _num_filled;
     uint32_t  _time_out;
 };
-} // namespace emhash
+} // namespace emlru_time
 #if __cplusplus > 199711
 //template <class Key, class Val> using emihash = emhash1::lru_cache<Key, Val, std::hash<Key>>;
 #endif

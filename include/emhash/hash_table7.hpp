@@ -84,6 +84,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #include <cstring>
 #include <string>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -245,7 +246,7 @@ struct entry {
     }
 
     entry(std::tuple<First, Second>&& tup)
-        :second(std::move(std::get<2>(tup))), first(std::move(std::get<1>(tup)))
+        :second(std::move(std::get<1>(tup))), first(std::move(std::get<0>(tup)))
     {
         bucket = INACTIVE;
     }
@@ -803,11 +804,11 @@ public:
     inline const_iterator cend() const { return {this, _num_buckets}; }
     inline const_iterator end() const { return cend(); }
 
-    inline size_type size() const { return _num_filled; }
-    inline bool empty() const { return _num_filled == 0; }
+    inline size_type size() const noexcept { return _num_filled; }
+    inline bool empty() const noexcept { return _num_filled == 0; }
 
-    inline size_type bucket_count() const { return _num_buckets; }
-    inline float load_factor() const { return ((float)_num_filled) / ((float)_mask + 1.0f); }
+    inline size_type bucket_count() const noexcept { return _num_buckets; }
+    inline float load_factor() const noexcept { return ((float)_num_filled) / ((float)_mask + 1.0f); }
 
     inline const HashT& hash_function() const { return _hasher; }
     inline const EqT& key_eq() const { return _eq; }
@@ -1019,7 +1020,8 @@ public:
     ValueT& at(const KeyT& key)
     {
         const auto bucket = find_filled_bucket(key);
-        //throw
+        if (bucket == _num_buckets)
+            throw std::out_of_range("emhash7::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
@@ -1027,7 +1029,8 @@ public:
     const ValueT& at(const KeyT& key) const
     {
         const auto bucket = find_filled_bucket(key);
-        //throw
+        if (bucket == _num_buckets)
+            throw std::out_of_range("emhash7::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
@@ -1194,28 +1197,28 @@ public:
     {
         reserve(std::distance(begin, end) + _num_filled);
         for (; begin != end; ++begin)
-            do_insert_unqiue(*begin);
+            do_insert_unique(*begin);
     }
 #endif
 
     template<typename K, typename V>
     inline size_type insert_unique(K&& key, V&& val)
     {
-        return do_insert_unqiue(std::forward<K>(key), std::forward<V>(val));
+        return do_insert_unique(std::forward<K>(key), std::forward<V>(val));
     }
 
     inline size_type insert_unique(value_type&& value)
     {
-        return do_insert_unqiue(std::move(value.first), std::move(value.second));
+        return do_insert_unique(std::move(value.first), std::move(value.second));
     }
 
     inline size_type insert_unique(const value_type& value)
     {
-        return do_insert_unqiue(value.first, value.second);
+        return do_insert_unique(value.first, value.second);
     }
 
     template<typename K, typename V>
-    size_type do_insert_unqiue(K&& key, V&& val)
+    size_type do_insert_unique(K&& key, V&& val)
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
@@ -1952,7 +1955,7 @@ private:
     static constexpr uint32_t BIT_PACK = sizeof(uint64_t);
     static constexpr uint32_t MASK_BIT = sizeof(_bitmask[0]) * 8;
     static constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
-    static constexpr uint32_t EPACK_SIZE = sizeof(PairT) >= sizeof(size_t) == 0 ? 1 : 2; // > 1
+    static constexpr uint32_t EPACK_SIZE = sizeof(PairT) >= sizeof(size_t) ? 2 : 1; // > 1
 };
 }
 // namespace emhash7

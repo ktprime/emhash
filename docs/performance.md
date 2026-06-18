@@ -79,3 +79,17 @@ Test Environment: AMD 5800H / Windows 10 / GCC 11.3
 | emhash5::HashMap |       17 |        17 |        1 | 99.9 |
 
 > Other hash maps (absl, phmap, ska, tsl, robin_hood) cannot run at 0.999 LF — they either cap max_load_factor at ~0.875 or suffer catastrophic clustering.
+
+## Performance Charts
+
+### Integer Key Performance
+
+![int64_t benchmark](images/int64_t.png)
+
+### String Key Performance
+
+![string benchmark](images/string_int.png)
+
+### Structure Layout
+
+![Struct layout](images/Struct_int64_t.png)

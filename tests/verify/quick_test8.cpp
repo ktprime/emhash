@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include "emhash/hash_table8.hpp"
 
-struct ConstHasher { size_t operator()(int x) const { return 0; } };
+struct ConstHasher { size_t operator()(int /*x*/) const { return 0; } };
 struct R4Hasher   { size_t operator()(int x) const { return x & 3; } };
 struct IdHasher   { size_t operator()(int x) const { return x; } };
 

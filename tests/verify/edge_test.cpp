@@ -98,9 +98,9 @@ int main() {
                 int k = (i * 7 + seed) % 1000;
                 m5[k] = i; m6[k] = i; m7[k] = i; m8[k] = i;
             }
-            assert(m5.size() == m6.size());
-            assert(m6.size() == m7.size());
-            assert(m7.size() == m8.size());
+            assert((size_t)m5.size() == (size_t)m6.size());
+            assert((size_t)m6.size() == (size_t)m7.size());
+            assert((size_t)m7.size() == (size_t)m8.size());
             
             for (int i = 0; i < 500; i++) {
                 int k = (i * 7 + seed) % 1000;
