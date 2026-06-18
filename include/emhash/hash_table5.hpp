@@ -305,7 +305,7 @@ public:
     private:
         void goto_next_element()
         {
-            while ((size_type)_map->EMH_BUCKET(_pairs, ++_bucket) < 0);
+            while (static_cast<size_type>(_map->EMH_BUCKET(_pairs, ++_bucket)) < 0);
         }
 
     public:
@@ -351,7 +351,7 @@ public:
     private:
         void goto_next_element()
         {
-            while ((size_type)_map->EMH_BUCKET(_pairs, ++_bucket) < 0);
+            while (static_cast<size_type>(_map->EMH_BUCKET(_pairs, ++_bucket)) < 0);
         }
 
     public:

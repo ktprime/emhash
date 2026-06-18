@@ -28,8 +28,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <cstdint>
-#include <stdexcept>
 #include <iterator>
 #include <utility>
 #include <cassert>
@@ -39,7 +37,7 @@
 #elif defined(__x86_64__)
     #include <x86intrin.h>
 #else
-    #include <sse2neon.h>
+    #include "sse2neon.h"
 #endif
 
 #undef EMH_LIKELY
@@ -98,7 +96,7 @@ constexpr static uint8_t slot_size  = simd_bytes - STATE_BITS;
 constexpr static uint8_t group_index = simd_bytes - 1;//> 0
 constexpr static uint32_t group_bmask = (1u << slot_size) - 1;
 
-inline static uint32_t CTZ(size_t n)
+inline static uint32_t CTZ(uint32_t n)
 {
 #ifdef _WIN32
     unsigned long index;
@@ -121,7 +119,7 @@ private:
     constexpr static uint8_t MXLOAD_FACTOR = 5; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
-    using size_t          = uint32_t; // intentionally shadows global size_t for 32-bit compact storage
+    using size_t          = uint32_t;
     using value_type      = PairT;
     using reference       = PairT&;
     using const_reference = const PairT&;
@@ -507,38 +505,36 @@ public:
     }
 
     template<typename K=KeyT>
-    ValueT& at(const K& key)
+    ValueT& at(const K& key) noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        if (bucket == _num_buckets)
-            throw std::out_of_range("emilib::HashMap::at(): key not found");
         return _pairs[bucket].second;
     }
 
     template<typename K=KeyT>
-    const ValueT& at(const K& key) const
+    const ValueT& at(const K& key) const noexcept
     {
         const auto bucket = find_filled_bucket(key);
-        if (bucket == _num_buckets)
-            throw std::out_of_range("emilib::HashMap::at(): key not found");
         return _pairs[bucket].second;
     }
 
+#if 0
     /// Returns the matching ValueT or nullptr if k isn't found.
     template<typename K>
     ValueT* try_get(const K& key) noexcept
     {
         auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
+        return &_pairs[bucket].second;
     }
 
     /// Const version of the above
     template<typename K>
-    const ValueT* try_get(const K& key) const noexcept
+    ValueT* try_get(const K& key) const noexcept
     {
         auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
+        return &_pairs[bucket].second;
     }
+#endif
 
     template<typename Con>
     bool operator == (const Con& rhs) const noexcept
@@ -970,12 +966,12 @@ private:
         return _states[gbucket + slot_size - 1] == State::EEMPTY;
     }
 
-    inline int group_probe(size_t gbucket) const noexcept
+    inline size_t group_probe(size_t gbucket) const noexcept
     {
         const auto offset = (uint8_t)_states[gbucket + group_index];
 #if EMH_SAFE_PSL
         if (EMH_UNLIKELY(offset > 128))
-            return (offset - 127) * 128;
+            return (size_t)(offset - 127) * 128;
 #endif
         return offset;
     }
@@ -1031,7 +1027,7 @@ private:
                 } while (maskf &= maskf - 1);
             }
 
-            if ((int)++offset > group_probe(main_bucket))
+            if (++offset > group_probe(main_bucket))
                 return _num_buckets;
             next_bucket = get_next_bucket(next_bucket, offset);
         }

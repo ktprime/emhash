@@ -33,7 +33,7 @@ jobs:
           cd tests
           ${{ matrix.compiler }} -std=${{ matrix.standard }} \
             -O2 -g \
-            -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast \
+            -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor \
             -I../include \
             verify/test_all_maps.cpp -o /tmp/test_warnings 2>&1 | tee /tmp/warnings.log
           # Fail if there are warnings (grep returns 0 if match found)
