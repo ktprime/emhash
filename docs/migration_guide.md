@@ -157,3 +157,46 @@ Typical speedup when migrating from `std::unordered_map`:
 2. **Don't rely on `at()` throwing** — emhash's `at()` is UB on missing keys
 3. **Don't use `bucket()` / `bucket_size()`** — not available in open addressing
 4. **Don't assume iterator stability** — any modification may invalidate all iterators
+
+---
+
+## Upgrading from emhash < 1.1.0
+
+If you are upgrading from an older version where headers were in the repository root:
+
+### Include path changes
+
+```cpp
+// Old (before v1.1.0)
+#include "hash_table7.hpp"
+
+// New (v1.1.0+)
+#include "emhash/hash_table7.hpp"
+```
+
+### Compiler flags
+
+```bash
+# Old
+g++ -I/path/to/emhash ...
+
+# New
+g++ -I/path/to/emhash/include ...
+```
+
+### CMake
+
+No changes needed if using `find_package(emhash)`. The CMake config automatically provides the correct include paths.
+
+### Header files moved
+
+| Old location | New location |
+|---|---|
+| `hash_table5.hpp` | `include/emhash/hash_table5.hpp` |
+| `hash_table6.hpp` | `include/emhash/hash_table6.hpp` |
+| `hash_table7.hpp` | `include/emhash/hash_table7.hpp` |
+| `hash_table8.hpp` | `include/emhash/hash_table8.hpp` |
+| `hash_set2.hpp` | `include/emhash/hash_set2.hpp` |
+| `hash_set3.hpp` | `include/emhash/hash_set3.hpp` |
+| `hash_set4.hpp` | `include/emhash/hash_set4.hpp` |
+| `hash_set8.hpp` | `include/emhash/hash_set8.hpp` |

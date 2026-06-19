@@ -9,7 +9,7 @@
 | **emhash7** | Linked-bucket with separate bitmask, no tombstones | Native (0.80-0.999) |
 | **emhash8** | Separate index + dense pairs array, linked-bucket chains | With `EMH_HIGH_LOAD` |
 
-> In `hash_table5.hpp`, the optimized three-way linear probing strategy is still **2-3x faster** than traditional strategies even at load factors **> 0.9**.
+> In `emhash/hash_table5.hpp`, the optimized three-way linear probing strategy is still **2-3x faster** than traditional strategies even at load factors **> 0.9**.
 
 ## Memory Layout
 

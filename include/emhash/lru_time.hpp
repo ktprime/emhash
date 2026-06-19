@@ -1326,10 +1326,10 @@ private:
 #elif _WIN64
         uint64_t high;
         return _umul128(key, KC, &high) + high;
-#elif 1
+#elif 0 // alternate: mul-hash
         uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
-#elif 1
+#elif 0 // alternate: MurmurHash3Mixer
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1338,7 +1338,7 @@ private:
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif 1
+#elif 0 // alternate: splitmix64
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);

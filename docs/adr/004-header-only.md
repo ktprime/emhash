@@ -33,9 +33,9 @@ emhash is distributed as **header-only** files: just copy one `.hpp` into your p
 ### Usage pattern
 ```bash
 # Simplest: copy one header
-cp hash_table7.hpp /your/project/
+cp include/emhash/hash_table7.hpp /your/project/emhash/
 
 # Or: include path
 git clone https://github.com/ktprime/emhash.git
-g++ -I/path/to/emhash your_app.cpp
+g++ -I/path/to/emhash/include your_app.cpp
 ```

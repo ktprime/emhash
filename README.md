@@ -62,11 +62,11 @@ emhash is **header-only** — just copy one `.hpp` file to your project:
 
 ```bash
 # Option A: Copy directly (simplest, no build system needed)
-cp hash_table7.hpp /your/project/
+cp include/emhash/hash_table7.hpp /your/project/emhash/
 
 # Option B: Clone and include
 git clone https://github.com/ktprime/emhash.git
-# Then add -I/path/to/emhash to your compiler flags
+# Then add -I/path/to/emhash/include to your compiler flags
 ```
 
 ```cpp

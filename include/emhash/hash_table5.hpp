@@ -26,9 +26,10 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
+
 #include <cstring>
 #include <string>
-#include <cmath>
 #include <cstdlib>
 #include <stdexcept>
 #include <type_traits>
@@ -54,17 +55,6 @@
     #undef  EMH_PREVET
 #endif
 
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-    #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
-    #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-    #define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
-    #define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!(condition)), 0))
-#else
-    #define EMH_LIKELY(condition)   (condition)
-    #define EMH_UNLIKELY(condition) (condition)
-#endif
 
 #ifndef EMH_BUCKET_INDEX
     #define EMH_BUCKET_INDEX 1
@@ -1485,46 +1475,23 @@ template<class... Args>
         reset_bucket(hash_main(0));
 #endif
 
-        (void)old_buckets;
-        if (0 && is_trivially_copyable() && old_num_filled && num_buckets >= 2 * old_buckets) {
-            memcpy((char*)_pairs, old_pairs, (uint32_t)old_buckets * sizeof(PairT));
-            for (size_type src_bucket = 0; src_bucket < old_buckets; src_bucket++) {
-                if (EMH_EMPTY(_pairs, src_bucket))
-                    continue;
-
-                _num_filled ++;
-                auto nbucket = hash_main(src_bucket);
-                if (nbucket < old_buckets)
-                    continue;
-
-                auto bucket = move_unique_bucket(src_bucket, nbucket);
-                _pairs[bucket] = std::move(_pairs[src_bucket]);
-                erase_bucket(src_bucket);
-                if ((size_type)EMH_BUCKET(_pairs, src_bucket) >= 0)
-                    src_bucket --;
-
-                EMH_BUCKET(_pairs, bucket) = bucket;
-            }
-        } else {
-            //for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
-            for (size_type src_bucket = old_buckets - 1; _num_filled < old_num_filled; src_bucket--) {
-                if (EMH_EMPTY(old_pairs, src_bucket))
-                    continue;
+        for (size_type src_bucket = old_buckets - 1; _num_filled < old_num_filled; src_bucket--) {
+            if (EMH_EMPTY(old_pairs, src_bucket))
+                continue;
 #if EMH_REHASH_LOG
-                else if (src_bucket != EMH_BUCKET(old_pairs, src_bucket))
-                    collision ++;
+            else if (src_bucket != EMH_BUCKET(old_pairs, src_bucket))
+                collision ++;
 #endif
 
-                const auto& key = EMH_KEY(old_pairs, src_bucket);
-                const auto bucket = find_unique_bucket(key);
-                new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
-                EMH_BUCKET(_pairs, bucket) = bucket;
-                if (need_explicit_dtor())
-                    old_pairs[src_bucket].~PairT();
+            const auto& key = EMH_KEY(old_pairs, src_bucket);
+            const auto bucket = find_unique_bucket(key);
+            new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
+            EMH_BUCKET(_pairs, bucket) = bucket;
+            if (need_explicit_dtor())
+                old_pairs[src_bucket].~PairT();
 
-                if (src_bucket == 0)
-                    break;
-            }
+            if (src_bucket == 0)
+                break;
         }
 
 #if EMH_REHASH_LOG
@@ -2133,7 +2100,7 @@ private:
     size_type _ehead;
 #endif
 };
-} // namespace emhash
+} // namespace emhash5
 
 //#define ehmap emhash5::HashMap
 #if __cplusplus > 199711

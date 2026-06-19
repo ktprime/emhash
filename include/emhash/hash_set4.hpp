@@ -1,5 +1,5 @@
 // version 1.4.5
-// https://github.com/ktprime/ktprime/blob/master/hash_set4.hpp
+// https://github.com/ktprime/emhash/blob/master/hash_set4.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -25,9 +25,10 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
+
 #include <cstring>
 #include <string>
-#include <cmath>
 #include <cstdlib>
 #include <stdexcept>
 #include <type_traits>
@@ -46,20 +47,6 @@
     #include "wyhash.h"
 #endif
 
-#undef EMH_LIKELY
-#undef EMH_UNLIKELY
-
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-#define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
-#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-#define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
-#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!(condition)), 0))
-#else
-#define EMH_LIKELY(condition)   (condition)
-#define EMH_UNLIKELY(condition) (condition)
-#endif
 
 #ifdef _WIN32
 #include <intrin.h>
@@ -1370,10 +1357,10 @@ private:
 #elif _WIN64
         uint64_t high;
         return _umul128(key, KC, &high) + high;
-#elif 1
+#elif 0 // alternate: mul-hash
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
-#elif 1
+#elif 0 // alternate: MurmurHash3Mixer
         //MurmurHash3Mixer
         uint64_t h = key;
         h ^= h >> 33;
@@ -1382,7 +1369,7 @@ private:
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif 1
+#elif 0 // alternate: splitmix64
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);

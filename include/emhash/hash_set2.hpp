@@ -1,5 +1,5 @@
 // version 1.3.3
-// https://github.com/ktprime/ktprime/blob/master/hash_set2.hpp
+// https://github.com/ktprime/emhash/blob/master/hash_set2.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -39,6 +39,8 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
+
 #include <cstring>
 #include <string>
 #include <cstdlib>
@@ -63,20 +65,6 @@
     #undef EMH_ENTRY
 #endif
 
-#undef EMH_LIKELY
-#undef EMH_UNLIKELY
-
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-#define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
-#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-#define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
-#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!(condition)), 0))
-#else
-#define EMH_LIKELY(condition)   (condition)
-#define EMH_UNLIKELY(condition) (condition)
-#endif
 
 #define EMH_ENTRY(key, bucket) new(_pairs + bucket) PairT(key, bucket), _num_filled ++
 #define EMH_MOVE(bucket, bobj) new(_pairs + bucket) PairT(bobj)
@@ -1356,16 +1344,12 @@ private:
 #elif _WIN64
         uint64_t high;
         return _umul128(key, KC, &high) + high;
-#elif 1
+#elif 0 // alternate: mix-hash
         auto low  =  key;
         auto high = (key >> 32) | (key << 32);
         auto mix  = (0x94d049bb133111ebull * low + 0xbf58476d1ce4e5b9ull * high);
         return mix >> 32;
-#elif 1
-        uint64_t r = key * UINT64_C(0xca4bcaa75ec3f625);
-        return (r >> 32) + r;
-#elif 1
-        //MurmurHash3Mixer
+#elif 0 // alternate: mul-hash
         uint64_t h = key;
         h ^= h >> 33;
         h *= 0xff51afd7ed558ccd;
@@ -1373,7 +1357,7 @@ private:
         h *= 0xc4ceb9fe1a85ec53;
         h ^= h >> 33;
         return h;
-#elif 1
+#elif 0 // alternate: splitmix64
         uint64_t x = key;
         x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);

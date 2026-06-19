@@ -26,9 +26,10 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
+
 #include <cstring>
 #include <string>
-#include <cmath>
 #include <cstdlib>
 #include <stdexcept>
 #include <type_traits>
@@ -56,17 +57,6 @@
     #undef  EMH_CLS	
 #endif
 
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-    #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
-    #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-    #define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
-    #define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!(condition)), 0))
-#else
-    #define EMH_LIKELY(condition)   (condition)
-    #define EMH_UNLIKELY(condition) (condition)
-#endif
 
 #ifndef EMH_BUCKET_INDEX
     #define EMH_BUCKET_INDEX 1

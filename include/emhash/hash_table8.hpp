@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
+
 #include <cstring>
 #include <string>
 #include <cstdlib>
@@ -53,17 +55,6 @@
 #undef  EMH_EMPTY
 #undef  EMH_EQHASH
 
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-    #define EMH_LIKELY(condition)   __builtin_expect(!!(condition), 1)
-    #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-    #define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
-    #define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!(condition)), 0))
-#else
-    #define EMH_LIKELY(condition)   (condition)
-    #define EMH_UNLIKELY(condition) (condition)
-#endif
 
 #define EMH_EMPTY(n) (0 > (int)(_index[n].next))
 #define EMH_EQHASH(n, key_hash) (((size_type)(key_hash) & ~_mask) == (_index[n].slot & ~_mask))
@@ -1235,7 +1226,6 @@ public:
 
     void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) noexcept
     {
-        dealloc_index(_index, old_num_buckets);
         const auto need_size = std::max((size_type)((double)num_buckets * max_load_factor()) + 4, required_buckets + 2);
         auto new_pairs = alloc_bucket(need_size);
         if (is_trivially_copyable()) {
@@ -1251,7 +1241,10 @@ public:
         dealloc_bucket(_pairs, _pairs_capacity);
         _pairs = new_pairs;
         _pairs_capacity = need_size;
-        _index = alloc_index(num_buckets);
+
+        auto new_index = alloc_index(num_buckets);
+        dealloc_index(_index, old_num_buckets);
+        _index = new_index;
 
         memset((char*)_index, (int)INACTIVE, sizeof(_index[0]) * num_buckets);
         memset((char*)(_index + num_buckets), 0, sizeof(_index[0]) * EAD);
@@ -1425,10 +1418,7 @@ private:
         while (true) {
             if (EMH_LIKELY(slot == (_index[next_bucket].slot & _mask)))
                 return next_bucket;
-            const auto nbucket = _index[next_bucket].next;
-            if (nbucket == next_bucket)
-                break;
-            next_bucket = nbucket;
+            next_bucket = _index[next_bucket].next;
         }
 
         return INACTIVE;
@@ -1953,5 +1943,5 @@ private:
     PairAlloc _pair_allocator;
     IndexAlloc _index_allocator;
 };
-} // namespace emhash
+} // namespace emhash8
 
