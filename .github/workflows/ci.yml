@@ -180,6 +180,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         compiler: [g++, clang++]
+        exclude:
+          # Real GCC on macOS (Homebrew gcc) does not ship libasan, so
+          # `-fsanitize=address` fails with "ld: library 'asan' not found".
+          # macOS ASan coverage is already provided by macos + clang++.
+          - os: macos-latest
+            compiler: g++
 
     steps:
       - uses: actions/checkout@v6
@@ -204,24 +210,7 @@ jobs:
           fi
           sudo apt-get update && sudo apt-get install -y "$package"
 
-      - name: Install GCC on macOS (real gcc, not clang)
-        if: runner.os == 'macOS' && matrix.compiler == 'g++'
-        run: |
-          brew install gcc
-          BREW_PREFIX=$(brew --prefix)
-          GPP_BIN=$(ls "$BREW_PREFIX/bin/g++-"* 2>/dev/null | head -1)
-          if [[ -n "$GPP_BIN" ]]; then
-            ln -sf "$GPP_BIN" "$BREW_PREFIX/bin/g++"
-          fi
-          echo "$BREW_PREFIX/bin" >> $GITHUB_PATH
-          g++ --version | head -1
-
-      - name: Set compiler flags for macOS GCC
-        if: runner.os == 'macOS' && matrix.compiler == 'g++'
-        run: echo "CXXFLAGS_EXTRA=-fpermissive" >> $GITHUB_ENV
-
       - name: Set compiler flags (default)
-        if: runner.os != 'macOS' || matrix.compiler != 'g++'
         run: echo "CXXFLAGS_EXTRA=" >> $GITHUB_ENV
 
       - name: Build with ASan

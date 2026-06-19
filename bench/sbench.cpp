@@ -1196,7 +1196,7 @@ static int benchHashSet(int n)
 
         {  benOneHash<emhash8::HashSet <keyType, ehash_func>>("emhash8", vList); }
 //        {  benOneHash<emhash6::HashSet <keyType, ehash_func>>("emhash6", vList); }
-        {  benOneHash<emhash7::HashSet <keyType, ehash_func>>("emhash7", vList); }
+//        {  benOneHash<emhash7::HashSet <keyType, ehash_func>>("emhash7", vList); } // hash_table7.hpp only has HashMap, no HashSet
         {  benOneHash<emilib ::HashSet <keyType, ehash_func>>("emiset", vList); }
         {  benOneHash<emilib2::HashSet <keyType, ehash_func>>("emiset2", vList); }
 
@@ -1207,7 +1207,7 @@ static int benchHashSet(int n)
 #endif
 
         {  benOneHash<emilib3::HashSet <keyType, ehash_func>>("emiset2s", vList); }
-        {  benOneHash<emhash9::HashSet <keyType, ehash_func>>("emhash9", vList); }
+//        {  benOneHash<emhash9::HashSet <keyType, ehash_func>>("emhash9", vList); } // emhash9 does not exist
 
 //        {  benOneHash<CK::HashSet <keyType,  ehash_func>>("ck_hash", vList); }
 
@@ -1232,6 +1232,7 @@ static void high_load()
     auto dis = std::uniform_int_distribution<uint32_t>{0, (1U << 31) - 1};
 
     for (size_t rep = 0; rep < numReps; ++rep) {
+#if 0
         {
             auto rng = std::mt19937(rep);
             emhash9::HashSet<uint32_t> set;
@@ -1250,6 +1251,7 @@ static void high_load()
             }
             std::cout << "emhash loop " << rep << " time use " << (getus() - t1) / 1000000.000 << " sec\n";
         }
+#endif
 
 #if X86_64 && ET
         {
@@ -1281,7 +1283,7 @@ int test7()
     using ehash_func = robin_hood::hash<uint64_t>;
     // ankerl::unordered_dense::hash<uint64_t>;
 #if 1
-    emhash7::HashSet<uint64_t, ehash_func> current_uniques, old_uniques;
+    emhash8::HashSet<uint64_t, ehash_func> current_uniques, old_uniques;
 #elif 1
     emilib3::HashSet<uint64_t, ehash_func> current_uniques, old_uniques;
 #else

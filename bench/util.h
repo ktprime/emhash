@@ -819,9 +819,7 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 #define CXX17 1
 //#include "fph/dynamic_fph_table.h" //https://github.com/renzibei/fph-table
 //#include "fph/meta_fph_table.h"
-#if JG_HMAP
 #include "jg/dense_hash_map.hpp" //https://github.com/Jiwan/dense_hash_map
-#endif
 #endif
 
 #if __cplusplus > 201703L || CXX20 //|| _MSC_VER >= 1920
