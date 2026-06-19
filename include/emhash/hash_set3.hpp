@@ -995,12 +995,12 @@ public:
                 old_pair.~PairT();
             }
 #else
-            const auto main_bucket = hash_main_bucket(key);
-            auto& next_bucket = EMH_BUCKET(_pairs, main_bucket);
+            const auto new_main_bucket = hash_main_bucket(key);
+            auto& next_bucket = EMH_BUCKET(_pairs, new_main_bucket);
             next_bucket += 2;
 
             if (next_bucket == 1) {
-                new(_pairs + main_bucket) PairT(std::move(key), next_bucket); old_pair.~PairT();
+                new(_pairs + new_main_bucket) PairT(std::move(key), next_bucket); old_pair.~PairT();
                 _num_mains ++;
             } else {
                 const auto bucket = hash_coll_bucket(key);
@@ -1021,13 +1021,13 @@ public:
         //reset all collisions bucket
         for (size_type colls = 0; colls < collision; colls++) {
             const auto src_bucket = EMH_BUCKET(old_pairs, colls);
-            const auto main_bucket = hash_coll_bucket(EMH_KEY(old_pairs, src_bucket));
+            const auto new_main_bucket = hash_coll_bucket(EMH_KEY(old_pairs, src_bucket));
             auto& old_pair = old_pairs[src_bucket];
 
-            auto next_bucket = EMH_BUCKET(_pairs, main_bucket);
+            auto next_bucket = EMH_BUCKET(_pairs, new_main_bucket);
             //assert(next_bucket != INACTIVE);
             //check current bucket_key is in main bucket or not
-            if (next_bucket != main_bucket)
+            if (next_bucket != new_main_bucket)
                 next_bucket = find_last_bucket(next_bucket);
             //find a new empty and link it to tail
             auto new_bucket = EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
@@ -1252,9 +1252,9 @@ private:
         }
 #else
         for (size_type slot = 1, step = 2; ; slot += ++step) {
-            auto bucket = next_coll_bucket(bucket_from + slot);
-            if (EMH_BUCKET(_pairs, bucket) == INACTIVE || EMH_BUCKET(_pairs, ++bucket) == INACTIVE)
-                return bucket;
+            auto probe_bucket = next_coll_bucket(bucket_from + slot);
+            if (EMH_BUCKET(_pairs, probe_bucket) == INACTIVE || EMH_BUCKET(_pairs, ++probe_bucket) == INACTIVE)
+                return probe_bucket;
 
             if (step >= max_probe_length) {
                 auto bucket3 = next_coll_bucket(_num_mains + step);

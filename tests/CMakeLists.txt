@@ -77,6 +77,9 @@ target_compile_features(test_special_key_types PUBLIC cxx_std_17)
 add_executable(test_merge_correctness verify/test_merge_correctness.cpp)
 target_compile_features(test_merge_correctness PUBLIC cxx_std_17)
 
+add_executable(edge_test verify/edge_test.cpp)
+target_compile_features(edge_test PUBLIC cxx_std_17)
+
 # Boost.Test based comprehensive unit tests (requires Boost)
 # add_executable(hash_map_tests verify/hash_map_tests.cpp)
 # target_compile_features(hash_map_tests PUBLIC cxx_std_17)
@@ -170,49 +173,52 @@ target_compile_features(test_repro_collision PUBLIC cxx_std_17)
 
 # ============================================================================
 # Fuzz Tests (optional, requires clang)
+# Note: Most fuzz source files are not tracked in git (see .gitignore).
+# Only reproduce_emhash8_bug.cpp is currently available.
+# To add fuzz tests, create fuzz_*.cpp files in fuzz/ and uncomment below.
 # ============================================================================
 
 option(ENABLE_FUZZ_TESTS "Enable fuzz tests (requires clang)" OFF)
 
-if(ENABLE_FUZZ_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_executable(fuzz_emhash_all fuzz/fuzz_emhash_all.cpp)
-    target_compile_features(fuzz_emhash_all PUBLIC cxx_std_17)
-    target_compile_options(fuzz_emhash_all PRIVATE -fsanitize=fuzzer,address)
-    target_link_options(fuzz_emhash_all PRIVATE -fsanitize=fuzzer,address)
-
-    add_executable(fuzz_emhash8 fuzz/fuzz_emhash8.cpp)
-    target_compile_features(fuzz_emhash8 PUBLIC cxx_std_17)
-    target_compile_options(fuzz_emhash8 PRIVATE -fsanitize=fuzzer,address)
-    target_link_options(fuzz_emhash8 PRIVATE -fsanitize=fuzzer,address)
-
-    add_executable(fuzz_emhash8_advanced fuzz/fuzz_emhash8_advanced.cpp)
-    target_compile_features(fuzz_emhash8_advanced PUBLIC cxx_std_17)
-    target_compile_options(fuzz_emhash8_advanced PRIVATE -fsanitize=fuzzer,address)
-    target_link_options(fuzz_emhash8_advanced PRIVATE -fsanitize=fuzzer,address)
-
-    add_executable(fuzz_emilib_all fuzz/fuzz_emilib_all.cpp)
-    target_compile_features(fuzz_emilib_all PUBLIC cxx_std_17)
-    target_compile_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
-    target_link_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
-
-    add_executable(fuzz_emilib fuzz/fuzz_emilib.cpp)
-    target_compile_features(fuzz_emilib PUBLIC cxx_std_17)
-    target_compile_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
-    target_link_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
-endif()
+# if(ENABLE_FUZZ_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+#     add_executable(fuzz_emhash_all fuzz/fuzz_emhash_all.cpp)
+#     target_compile_features(fuzz_emhash_all PUBLIC cxx_std_17)
+#     target_compile_options(fuzz_emhash_all PRIVATE -fsanitize=fuzzer,address)
+#     target_link_options(fuzz_emhash_all PRIVATE -fsanitize=fuzzer,address)
+#
+#     add_executable(fuzz_emhash8 fuzz/fuzz_emhash8.cpp)
+#     target_compile_features(fuzz_emhash8 PUBLIC cxx_std_17)
+#     target_compile_options(fuzz_emhash8 PRIVATE -fsanitize=fuzzer,address)
+#     target_link_options(fuzz_emhash8 PRIVATE -fsanitize=fuzzer,address)
+#
+#     add_executable(fuzz_emhash8_advanced fuzz/fuzz_emhash8_advanced.cpp)
+#     target_compile_features(fuzz_emhash8_advanced PUBLIC cxx_std_17)
+#     target_compile_options(fuzz_emhash8_advanced PRIVATE -fsanitize=fuzzer,address)
+#     target_link_options(fuzz_emhash8_advanced PRIVATE -fsanitize=fuzzer,address)
+#
+#     add_executable(fuzz_emilib_all fuzz/fuzz_emilib_all.cpp)
+#     target_compile_features(fuzz_emilib_all PUBLIC cxx_std_17)
+#     target_compile_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
+#     target_link_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
+#
+#     add_executable(fuzz_emilib fuzz/fuzz_emilib.cpp)
+#     target_compile_features(fuzz_emilib PUBLIC cxx_std_17)
+#     target_compile_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
+#     target_link_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
+# endif()
 
 # Non-fuzzer versions (can be built with gcc on Linux/macOS; skip on MinGW/MSVC)
-if(NOT WIN32 OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_executable(fuzz_extreme fuzz/fuzz_extreme.cpp fuzz/fuzz_main.cpp)
-    target_compile_features(fuzz_extreme PUBLIC cxx_std_17)
-    target_compile_options(fuzz_extreme PRIVATE -fsanitize=address,undefined)
-    target_link_options(fuzz_extreme PRIVATE -fsanitize=address,undefined)
-
-    add_executable(fuzz_nocoll fuzz/fuzz_nocoll.cpp fuzz/fuzz_main.cpp)
-    target_compile_features(fuzz_nocoll PUBLIC cxx_std_17)
-    target_compile_options(fuzz_nocoll PRIVATE -fsanitize=address,undefined)
-    target_link_options(fuzz_nocoll PRIVATE -fsanitize=address,undefined)
-endif()
+# if(NOT WIN32 OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+#     add_executable(fuzz_extreme fuzz/fuzz_extreme.cpp fuzz/fuzz_main.cpp)
+#     target_compile_features(fuzz_extreme PUBLIC cxx_std_17)
+#     target_compile_options(fuzz_extreme PRIVATE -fsanitize=address,undefined)
+#     target_link_options(fuzz_extreme PRIVATE -fsanitize=address,undefined)
+#
+#     add_executable(fuzz_nocoll fuzz/fuzz_nocoll.cpp fuzz/fuzz_main.cpp)
+#     target_compile_features(fuzz_nocoll PUBLIC cxx_std_17)
+#     target_compile_options(fuzz_nocoll PRIVATE -fsanitize=address,undefined)
+#     target_link_options(fuzz_nocoll PRIVATE -fsanitize=address,undefined)
+# endif()
 
 add_executable(reproduce_emhash8_bug fuzz/reproduce_emhash8_bug.cpp)
 target_compile_features(reproduce_emhash8_bug PUBLIC cxx_std_17)
@@ -230,11 +236,11 @@ add_custom_target(quick_test
     DEPENDS test_verify test_debug
 )
 
-# Aggregate fuzz target (ASan variants work with gcc/clang; LibFuzzer variants need clang)
-add_custom_target(fuzz
-    COMMAND ${CMAKE_COMMAND} -E echo "=== Building ASan Fuzz Variants ==="
-    DEPENDS fuzz_extreme fuzz_nocoll
-)
+# Aggregate fuzz target (commented out until fuzz source files are added)
+# add_custom_target(fuzz
+#     COMMAND ${CMAKE_COMMAND} -E echo "=== Building ASan Fuzz Variants ==="
+#     DEPENDS fuzz_extreme fuzz_nocoll
+# )
 
 # Stress test suite
 add_custom_target(stress_test

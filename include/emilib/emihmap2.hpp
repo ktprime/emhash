@@ -126,9 +126,11 @@ namespace emilib2 {
     #define EMH_ITERATOR_BITS 16
 #endif
 
+#ifndef EMILIB2_CTZ_DEFINED
+#define EMILIB2_CTZ_DEFINED
  inline static uint32_t CTZ(size_t n)
  {
-#ifdef _WIN32
+#if defined(_MSC_VER)
     unsigned long index;
     _BitScanForward(&index, n);
 #else
@@ -137,6 +139,7 @@ namespace emilib2 {
 
     return (uint32_t)index;
 }
+#endif
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>

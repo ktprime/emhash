@@ -995,7 +995,9 @@ public:
     bool remove_half()
     {
         const auto old_nums = _num_filled;
+#if EMHASH_REHASH_LOG || EMHASH_USE_LOG
         const auto ts = clock();
+#endif
         const auto medium_id = uint32_t(_sum_orderid / _num_filled);
 
 #if EMHASH_TIME_DELAY
@@ -1063,19 +1065,17 @@ public:
         _num_filled  = 0;
         _num_buckets = num_buckets;
         _mask        = num_buckets - 1;
-        const auto osum = _sum_orderid;
 
         uint64_t sum_orderid = 0;
         for (uint32_t bucket = 0; bucket < num_buckets; bucket++) {
             NEXT_BUCKET(new_pairs, bucket) = INACTIVE;
             new_pairs[bucket].orderid = 0;
         }
-        memset(new_pairs + num_buckets, 0, sizeof(PairT) * 2);
+        NEXT_BUCKET(new_pairs, num_buckets) = NEXT_BUCKET(new_pairs, num_buckets + 1) = 0;
 
         _pairs       = new_pairs;
         for (uint32_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE) {
-                assert(old_pairs.orderid == 0);
                 continue;
             }
 

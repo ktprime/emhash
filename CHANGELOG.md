@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.github/workflows/deploy-docs.yml` — GitHub Pages auto-deploy for MkDocs documentation site
 - `docs/faq.md` — Frequently asked questions
 - `docs/migration_guide.md` — Migration guide from std::unordered_map
-- `docs/pre-commit.sh` — Git pre-commit hook for clang-format checking
+- `scripts/pre-commit.sh` — Git pre-commit hook for clang-format checking
 - README: added CI status and version badges, FAQ and migration guide links
 - `quick_bench.cpp` — zero-dependency quick benchmark (emhash7/8 vs std::unordered_map)
 - `docs/performance_tips.md` — performance tuning guide (compile flags, pre-allocation, hash selection, anti-patterns)

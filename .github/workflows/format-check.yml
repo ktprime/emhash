@@ -23,8 +23,10 @@ jobs:
           find . \
             -path ./thirdparty -prune -o \
             -path ./bench/tsl_bench -prune -o \
+            -path ./bench/qc-core -prune -o \
+            -path ./bench/boost_bench -prune -o \
             -path ./.git -prune -o \
-            -path ./include/sse2neon.h -prune -o \
+            -name sse2neon.h -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
             -print | xargs clang-format-18 --dry-run --Werror
 
@@ -34,7 +36,9 @@ jobs:
           find . \
             -path ./thirdparty -prune -o \
             -path ./bench/tsl_bench -prune -o \
+            -path ./bench/qc-core -prune -o \
+            -path ./bench/boost_bench -prune -o \
             -path ./.git -prune -o \
-            -path ./include/sse2neon.h -prune -o \
+            -name sse2neon.h -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
             -print | xargs clang-format-18 --dry-run

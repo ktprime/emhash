@@ -63,7 +63,9 @@
 #ifdef _WIN32
 #include <intrin.h>
 #ifdef _WIN64
+#if defined(_MSC_VER)
 #pragma intrinsic(_umul128)
+#endif
 #endif
 #endif
 

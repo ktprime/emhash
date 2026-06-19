@@ -147,8 +147,19 @@ function Build-Fuzz {
     $binDir = Join-Path $FUZZ_DIR "bin"
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
-    Build-Source (Join-Path $FUZZ_DIR "fuzz_extreme.cpp") (Join-Path $binDir "fuzz_extreme_asan") "-fsanitize=address,undefined"
-    Build-Source (Join-Path $FUZZ_DIR "fuzz_nocoll.cpp") (Join-Path $binDir "fuzz_nocoll_asan") "-fsanitize=address,undefined"
+    # Only build fuzz files that actually exist
+    $fuzzFiles = @("fuzz_extreme", "fuzz_nocoll")
+    foreach ($f in $fuzzFiles) {
+        $src = Join-Path $FUZZ_DIR "$f.cpp"
+        if (Test-Path $src) {
+            Build-Source $src (Join-Path $binDir "${f}_asan") "-fsanitize=address,undefined"
+        } else {
+            Log-Warn "Skipping $f.cpp (not found)"
+        }
+    }
+
+    # Always build reproduce_emhash8_bug
+    Build-Source (Join-Path $FUZZ_DIR "reproduce_emhash8_bug.cpp") (Join-Path $binDir "reproduce_emhash8_bug")
 
     Log-Info "Fuzz tests built"
 }
@@ -160,7 +171,8 @@ function Build-Verify {
 
     $verifyTests = @(
         "test_all_maps", "test_extreme", "test_interface_combo",
-        "test_hashset_allocator", "test_emilib_comprehensive", "test_size_sweep", "test_main"
+        "test_hashset_allocator", "test_emilib_comprehensive", "test_size_sweep",
+        "edge_test", "test_hashmap_full_api", "test_hashset_full_api", "test_special_key_types", "test_merge_correctness"
     )
     foreach ($test in $verifyTests) {
         Build-Source (Join-Path $VERIFY_DIR "$test.cpp") (Join-Path $binDir $test)

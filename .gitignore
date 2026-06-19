@@ -51,11 +51,12 @@ tests/*
 !tests/*.h
 !tests/*.md
 !tests/CMakeLists.txt
-!tests/Makefile
 !tests/.gitignore
-# Note: fuzz/test source files (tests/fuzz/*.cpp) are tracked - do NOT ignore them
-tests/fuzz/fuzz_*
+# Fuzz test binaries and crash files (source .cpp files are tracked)
+tests/fuzz/bin/
 tests/fuzz/reproduce_bug
+tests/fuzz/corpus/
+tests/fuzz/crash-*
 tests/crash-*
 tests/verify/bin/
 

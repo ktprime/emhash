@@ -143,7 +143,7 @@ endif
 	$(CXX) $(CXXFLAGS) -fno-rtti hash_join.cpp -o join_hash
 	$(CXX) $(CXXFLAGS) -fno-rtti buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) -fno-rtti bstring.cpp -o bs
-	$(CXX) $(CXXFLAGS) word_count.cpp -o wc
+	$(CXX) $(CXXFLAGS) boost_bench/word_count.cpp -o wc
 	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
@@ -152,7 +152,8 @@ endif
 	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
 	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
 ifneq ($(EMH),)
-	$(CXX) $(CXXFLAGS) template.cc -o template
+# template.cc is not currently available; uncomment when added
+# $(CXX) $(CXXFLAGS) template.cc -o template
 	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
 	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
 endif

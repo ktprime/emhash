@@ -60,26 +60,26 @@ namespace emilib2 {
 #define KEYHASH_MASK(key_hash) ((uint8_t)(key_hash >> 24) << 1)
 
 #ifndef AVX2_EHASH
-    const static auto simd_empty  = _mm_set1_epi8(1);
-    const static auto simd_delete = _mm_set1_epi8(3);
-    constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
+    const static auto set_simd_empty  = _mm_set1_epi8(1);
+    const static auto set_simd_delete = _mm_set1_epi8(3);
+    constexpr static uint8_t set_simd_bytes = sizeof(set_simd_empty) / sizeof(uint8_t);
 
     #define SET1_EPI8      _mm_set1_epi8
     #define LOADU_EPI8     _mm_loadu_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
 #elif 1
-    const static auto simd_empty  = _mm256_set1_epi8(1);
-    const static auto simd_delete = _mm256_set1_epi8(3);
-    constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
+    const static auto set_simd_empty  = _mm256_set1_epi8(1);
+    const static auto set_simd_delete = _mm256_set1_epi8(3);
+    constexpr static uint8_t set_simd_bytes = sizeof(set_simd_empty) / sizeof(uint8_t);
     #define SET1_EPI8      _mm256_set1_epi8
     #define LOADU_EPI8     _mm256_loadu_si256
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
 #elif AVX512_EHASH
-    const static auto simd_empty  = _mm512_set1_epi8(1);
-    const static auto simd_delete = _mm512_set1_epi8(3);
-    constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
+    const static auto set_simd_empty  = _mm512_set1_epi8(1);
+    const static auto set_simd_delete = _mm512_set1_epi8(3);
+    constexpr static uint8_t set_simd_bytes = sizeof(set_simd_empty) / sizeof(uint8_t);
     #define SET1_EPI8      _mm512_set1_epi8
     #define LOADU_EPI8     _mm512_loadu_si512
     #define MOVEMASK_EPI8  _mm512_movemask_epi8 //avx512 error
@@ -92,9 +92,11 @@ namespace emilib2 {
 constexpr static uint8_t stat_bits = sizeof(uint8_t) * 8;
 constexpr static uint8_t stat_bytes = sizeof(uint64_t) / sizeof(uint8_t);
 
+#ifndef EMILIB2_CTZ_DEFINED
+#define EMILIB2_CTZ_DEFINED
 inline static uint32_t CTZ(uint64_t n)
 {
-#if _WIN32
+#if defined(_MSC_VER)
     unsigned long index;
     _BitScanForward64(&index, n);
 #elif 1
@@ -103,6 +105,7 @@ inline static uint32_t CTZ(uint64_t n)
 
     return (uint32_t)index;
 }
+#endif
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
@@ -346,7 +349,7 @@ public:
         //assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
         _max_probe_length = other._max_probe_length;
-        memcpy(_states, other._states, (_num_buckets + simd_bytes) * sizeof(_states[0]));
+        memcpy(_states, other._states, (_num_buckets + set_simd_bytes) * sizeof(_states[0]));
     }
 
     void swap(HashSet& other)
@@ -673,7 +676,7 @@ public:
         if (num_buckets > max_size() || num_buckets < _num_filled)
             std::abort(); //throw std::length_error("too large size");
 
-        auto status_size = (simd_bytes + num_buckets) * sizeof(uint8_t);
+        auto status_size = (set_simd_bytes + num_buckets) * sizeof(uint8_t);
         status_size += (8 - status_size % 8) % 8;
 
         auto new_states = (uint8_t*)malloc(status_size + (num_buckets + 1) * sizeof(KeyT));
@@ -693,9 +696,9 @@ public:
 
         std::fill_n(_states, num_buckets, State::EEMPTY);
         //find empty tombstone
-        std::fill_n(_states + num_buckets, simd_bytes / 2, State::EFILLED + 4);
+        std::fill_n(_states + num_buckets, set_simd_bytes / 2, State::EFILLED + 4);
         //find filled tombstone
-        std::fill_n(_states + num_buckets + simd_bytes / 2, simd_bytes / 2, State::EEMPTY + 4);
+        std::fill_n(_states + num_buckets + set_simd_bytes / 2, set_simd_bytes / 2, State::EEMPTY + 4);
         //fill last packet zero
         memset(new_keys + num_buckets, 0, sizeof(new_keys[0]));
 
@@ -744,7 +747,7 @@ private:
         int i = _max_probe_length;
 
         for ( ; ; ) {
-            const auto vec = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+            const auto vec = LOADU_EPI8((decltype(&set_simd_empty))((char*)_states + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
@@ -756,19 +759,19 @@ private:
                 maskf &= maskf - 1;
             }
 
-//            if (_max_probe_length >= simd_bytes) {
-                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+//            if (_max_probe_length >= set_simd_bytes) {
+                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_empty));
                 if (maske != 0)
                     break;
 //            }
 
-            next_bucket += simd_bytes;
+            next_bucket += set_simd_bytes;
             if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
                 i += next_bucket - _num_buckets;
                 next_bucket = 0;
             }
 
-            if (EMH_UNLIKELY((i -= simd_bytes) < 0))
+            if (EMH_UNLIKELY((i -= set_simd_bytes) < 0))
                 break;
         }
 
@@ -788,7 +791,7 @@ private:
         auto next_bucket  = bucket, i = bucket;
 
         for ( ; ; ) {
-            const auto vec  = LOADU_EPI8((decltype(&simd_empty))((char*)_states + next_bucket));
+            const auto vec  = LOADU_EPI8((decltype(&set_simd_empty))((char*)_states + next_bucket));
             auto maskf  = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             //1. find filled
@@ -802,7 +805,7 @@ private:
             }
 
             //2. find empty
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_empty));
             if (maske != 0) {
                 const auto ebucket = hole == (size_t)-1 ? next_bucket + CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
@@ -813,19 +816,19 @@ private:
 
             //3. find erased
             if (hole == (size_t)-1) {
-                const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
+                const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_delete));
                 if (maskd != 0)
                     hole = next_bucket + CTZ(maskd);
             }
 
             //4. next round
-            next_bucket += simd_bytes;
+            next_bucket += set_simd_bytes;
             if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
                 i -= next_bucket - _num_buckets;
                 next_bucket = 0;
             }
 
-            if (EMH_UNLIKELY((i += simd_bytes) > round))
+            if (EMH_UNLIKELY((i += set_simd_bytes) > round))
                 break;
         }
 

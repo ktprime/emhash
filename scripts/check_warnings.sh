@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Check compiler warnings across all test files
-# Usage: ./docs/check_warnings.sh [gcc|clang] [c++-standard]
+# Usage: ./scripts/check_warnings.sh [gcc|clang] [c++-standard]
 #   compiler: gcc (default) or clang
 #   standard: c++17 (default) or c++20
 

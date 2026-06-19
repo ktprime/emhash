@@ -13,7 +13,7 @@ VERIFY_DIR="$ROOT_DIR/verify"
 STRESS_DIR="$ROOT_DIR/stress"
 ATTACK_DIR="$ROOT_DIR/attack"
 DEBUG_DIR="$ROOT_DIR/debug"
-BENCH_DIR="$ROOT_DIR/bench"
+BENCH_DIR="$ROOT_DIR/../../bench"
 
 # Compiler selection
 COMPILER="${2:-auto}"
@@ -33,7 +33,7 @@ if ! command -v "$CXX" &>/dev/null; then
     exit 1
 fi
 
-CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.."
+CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/../include"
 ASAN_FLAGS="-fsanitize=address,undefined"
 FUZZ_CXXFLAGS="-std=c++17 -g -O1 -fno-omit-frame-pointer"
 
@@ -64,17 +64,34 @@ build_fuzz() {
     log_info "Building fuzz tests..."
     mkdir -p "$FUZZ_DIR/bin"
     if [ "$COMPILER" = "clang" ]; then
-        $CXX -fsanitize=fuzzer,address $FUZZ_CXXFLAGS "$FUZZ_DIR/fuzz_emhash_all.cpp" -o "$FUZZ_DIR/bin/fuzz_emhash_all"
-        $CXX -fsanitize=fuzzer,address $FUZZ_CXXFLAGS "$FUZZ_DIR/fuzz_emhash8.cpp" -o "$FUZZ_DIR/bin/fuzz_emhash8"
-        $CXX -fsanitize=fuzzer,address $FUZZ_CXXFLAGS "$FUZZ_DIR/fuzz_emhash8_advanced.cpp" -o "$FUZZ_DIR/bin/fuzz_emhash8_advanced"
-        $CXX -fsanitize=fuzzer,address $FUZZ_CXXFLAGS "$FUZZ_DIR/fuzz_emilib_all.cpp" -o "$FUZZ_DIR/bin/fuzz_emilib_all"
-        log_info "Fuzzer binaries built (clang + libfuzzer)"
+        # LibFuzzer targets - only build if source files exist
+        for src in fuzz_emhash_all fuzz_emhash8 fuzz_emhash8_advanced fuzz_emilib_all fuzz_emilib; do
+            if [ -f "$FUZZ_DIR/${src}.cpp" ]; then
+                $CXX -fsanitize=fuzzer,address $FUZZ_CXXFLAGS "$FUZZ_DIR/${src}.cpp" -o "$FUZZ_DIR/bin/${src}"
+                log_info "Built ${src} (libfuzzer)"
+            else
+                log_warn "Skipping ${src}.cpp (not found)"
+            fi
+        done
     else
-        log_warn "Fuzzer requires clang. Building non-fuzzer versions..."
-        $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_extreme.cpp" "$FUZZ_DIR/fuzz_main.cpp" -o "$FUZZ_DIR/bin/fuzz_extreme_asan"
-        $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_nocoll.cpp" "$FUZZ_DIR/fuzz_main.cpp" -o "$FUZZ_DIR/bin/fuzz_nocoll_asan"
-        log_info "Non-fuzzer ASan binaries built"
+        log_warn "LibFuzzer requires clang. Building non-fuzzer versions..."
+        # Non-fuzzer ASan targets - only build if source files exist
+        if [ -f "$FUZZ_DIR/fuzz_extreme.cpp" ] && [ -f "$FUZZ_DIR/fuzz_main.cpp" ]; then
+            $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_extreme.cpp" "$FUZZ_DIR/fuzz_main.cpp" -o "$FUZZ_DIR/bin/fuzz_extreme_asan"
+            log_info "Built fuzz_extreme_asan"
+        else
+            log_warn "Skipping fuzz_extreme (source files not found)"
+        fi
+        if [ -f "$FUZZ_DIR/fuzz_nocoll.cpp" ] && [ -f "$FUZZ_DIR/fuzz_main.cpp" ]; then
+            $CXX $CXXFLAGS $ASAN_FLAGS "$FUZZ_DIR/fuzz_nocoll.cpp" "$FUZZ_DIR/fuzz_main.cpp" -o "$FUZZ_DIR/bin/fuzz_nocoll_asan"
+            log_info "Built fuzz_nocoll_asan"
+        else
+            log_warn "Skipping fuzz_nocoll (source files not found)"
+        fi
     fi
+    # Always build reproduce_emhash8_bug
+    $CXX $CXXFLAGS "$FUZZ_DIR/reproduce_emhash8_bug.cpp" -o "$FUZZ_DIR/bin/reproduce_emhash8_bug"
+    log_info "Fuzz tests built"
 }
 
 build_verify() {
@@ -82,7 +99,8 @@ build_verify() {
     mkdir -p "$VERIFY_DIR/bin"
     for src in test_all_maps quick_test8 test_emhash58 test_hidden_bugs8 test_extreme \
                test_interface_combo test_emhash5_verify test_emhash_allocator \
-               test_functional_edge test_hashset_allocator test_emilib_comprehensive test_size_sweep test_main; do
+               test_functional_edge test_hashset_allocator test_emilib_comprehensive test_size_sweep \
+               edge_test test_hashmap_full_api test_hashset_full_api test_special_key_types test_merge_correctness; do
         $CXX $CXXFLAGS "$VERIFY_DIR/${src}.cpp" -o "$VERIFY_DIR/bin/${src}"
     done
     log_info "Verification tests built"
@@ -130,8 +148,7 @@ build_bench() {
     mkdir -p "$BENCH_DIR/bin"
     $CXX $CXXFLAGS -O3 -march=native "$BENCH_DIR/ebench.cpp" -o "$BENCH_DIR/bin/ebench"
     $CXX $CXXFLAGS -O3 -march=native "$BENCH_DIR/martin_bench.cpp" -o "$BENCH_DIR/bin/martin_bench"
-    $CXX $CXXFLAGS -O3 -march=native -DEMH_HIGH_LOAD=123456 "$BENCH_DIR/highload_bench.cpp" -o "$BENCH_DIR/bin/highload_bench"
-    log_info "Benchmarks built"
+    log_info "Benchmarks built (note: bench/ requires thirdparty dependencies)"
 }
 
 build_quick() { build_verify; build_debug; }

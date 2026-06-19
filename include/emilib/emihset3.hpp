@@ -57,6 +57,7 @@
 
 namespace emilib3 {
 
+#ifndef EMILIB3_STATE_DEFINED
     enum State : int8_t
     {
         EFILLED  = -126,
@@ -65,13 +66,18 @@ namespace emilib3 {
         SENTINEL = 127,
         GROUP_INDEX = 15,//> 0
     };
+#endif
 
+#ifndef EMILIB3_LOAD_FACTOR_DEFINED
+#define EMILIB3_LOAD_FACTOR_DEFINED
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;
 #endif
     constexpr static float EMH_MAX_LOAD_FACTOR = 0.999f;
     constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
+#endif
 
+#ifndef EMILIB3_SIMD_DEFINED
 #ifndef AVX2_EHASH
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm_set1_epi8(EDELETE);
@@ -108,7 +114,10 @@ namespace emilib3 {
 
 //find filled or empty
 constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
+#endif
 
+#ifndef EMILIB3_CTZ_DEFINED
+#define EMILIB3_CTZ_DEFINED
 inline static uint32_t CTZ(uint32_t n)
 {
 #if _WIN32
@@ -120,6 +129,7 @@ inline static uint32_t CTZ(uint32_t n)
 
     return (uint32_t)index;
 }
+#endif
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>

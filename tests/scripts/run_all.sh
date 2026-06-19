@@ -23,7 +23,7 @@ if ! command -v "$CXX" &>/dev/null; then
     exit 1
 fi
 
-CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/.."
+CXXFLAGS="-std=c++17 -O2 -g -I$ROOT_DIR/../include"
 ASAN_FLAGS="-fsanitize=address,undefined"
 
 # Platform-specific settings
@@ -117,12 +117,16 @@ run_stress() {
 # ============================================================================
 
 run_fuzz() {
-    log_info "=== Fuzz Tests (non-fuzzer version) ==="
+    log_info "=== Fuzz Tests ==="
 
-    log_test "Building fuzz_extreme_asan..."
-    $CXX $CXXFLAGS $ASAN_FLAGS "$TESTS_DIR/fuzz/fuzz_extreme.cpp" -o "$TMPDIR/fuzz_extreme_asan"
-    log_test "Running fuzz_extreme_asan (60 seconds)..."
-    $TIMEOUT_CMD 60 "$TMPDIR/fuzz_extreme_asan" || log_warn "fuzz_extreme timed out or failed"
+    if [ -f "$TESTS_DIR/fuzz/fuzz_extreme.cpp" ]; then
+        log_test "Building fuzz_extreme_asan..."
+        $CXX $CXXFLAGS $ASAN_FLAGS "$TESTS_DIR/fuzz/fuzz_extreme.cpp" -o "$TMPDIR/fuzz_extreme_asan"
+        log_test "Running fuzz_extreme_asan (60 seconds)..."
+        $TIMEOUT_CMD 60 "$TMPDIR/fuzz_extreme_asan" || log_warn "fuzz_extreme timed out or failed"
+    else
+        log_warn "fuzz_extreme.cpp not found, skipping fuzz tests"
+    fi
 
     log_info "Fuzz tests completed!"
 }
@@ -134,11 +138,16 @@ run_fuzz() {
 run_bench() {
     log_info "=== Benchmark Tests ==="
 
+    local bench_dir="$ROOT_DIR/../../bench"
     local bench_flags="-O3 -march=native"
-    log_test "Building ebench..."
-    $CXX $CXXFLAGS $bench_flags "$TESTS_DIR/bench/ebench.cpp" -o "$TMPDIR/ebench"
-    log_test "Running ebench (brief)..."
-    $TIMEOUT_CMD 30 "$TMPDIR/ebench" || log_warn "ebench timed out"
+    if [ -f "$bench_dir/ebench.cpp" ]; then
+        log_test "Building ebench..."
+        $CXX $CXXFLAGS $bench_flags "$bench_dir/ebench.cpp" -o "$TMPDIR/ebench"
+        log_test "Running ebench (brief)..."
+        $TIMEOUT_CMD 30 "$TMPDIR/ebench" || log_warn "ebench timed out"
+    else
+        log_warn "bench/ebench.cpp not found (requires thirdparty/), skipping"
+    fi
 
     log_info "Bench tests completed!"
 }
