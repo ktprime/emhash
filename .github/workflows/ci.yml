@@ -32,8 +32,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: true
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -92,25 +90,19 @@ jobs:
         include:
           - compiler: g++-11
             std: 17
-          - compiler: g++-12
-            std: 17
           - compiler: g++-13
             std: 17
-          - compiler: g++-13
+          - compiler: g++-15
             std: 20
           - compiler: clang++-17
             std: 17
           - compiler: clang++-20
             std: 17
-          - compiler: clang++-21
-            std: 20
           - compiler: clang++-22
             std: 20
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: true
 
       - name: Install compiler
         run: |
@@ -149,8 +141,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: true
 
       - name: Install dependencies
         run: |
@@ -184,8 +174,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: true
 
       - name: Configure
         run: cmake -B build -S tests
@@ -204,8 +192,6 @@ jobs:
         std: [17, 20]
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: true
 
       - name: Configure (CMake)
         run: cmake -B build -S tests

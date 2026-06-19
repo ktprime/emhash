@@ -37,7 +37,10 @@ jobs:
 
             ```bash
             # Option 1: Copy header directly
-            cp hash_table7.hpp /your/project/
+            cp include/emhash/hash_table7.hpp /your/project/
+            # Other variants: hash_table5/6/8.hpp, hash_set2/3/4/8.hpp,
+            #   emilib/emihmap1/2/3.hpp, emilib/emihset2/3.hpp,
+            #   emhash/lru_size.hpp, emhash/lru_time.hpp
 
             # Option 2: CMake FetchContent
             include(FetchContent)
