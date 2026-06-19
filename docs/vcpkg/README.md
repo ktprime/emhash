@@ -6,7 +6,7 @@ To submit to vcpkg-registry, copy this directory to `ports/emhash/` in the vcpkg
 ## Usage (local overlay)
 
 ```bash
-vcpkg install emhash --overlay-ports=/path/to/emhash/scripts/vcpkg
+vcpkg install emhash --overlay-ports=/path/to/emhash/docs/vcpkg
 ```
 
 ## Files

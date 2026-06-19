@@ -25,6 +25,10 @@ class EmhashConan(ConanFile):
         copy(self, "LICENSE", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
         copy(self, "*.hpp", src=os.path.join(self.source_folder, "include", "emhash"),
              dst=os.path.join(self.package_folder, "include", "emhash"))
+        copy(self, "*.hpp", src=os.path.join(self.source_folder, "include", "emilib"),
+             dst=os.path.join(self.package_folder, "include", "emilib"))
+        copy(self, "sse2neon.h", src=os.path.join(self.source_folder, "include"),
+             dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.bindirs = []

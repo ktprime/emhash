@@ -1,6 +1,6 @@
 // LICENSE:
 // version 1.1.0
-// https://github.com/ktprime/emhash/blob/master/thirdparty/emilib/emiset2s.hpp
+// https://github.com/ktprime/emhash/blob/master/include/emilib/emihmap3.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
