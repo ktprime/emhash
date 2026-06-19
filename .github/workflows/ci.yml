@@ -42,6 +42,16 @@ jobs:
           fi
           sudo apt-get update && sudo apt-get install -y "$package"
 
+      - name: Install GCC on macOS (real gcc, not clang)
+        if: runner.os == 'macOS' && matrix.compiler == 'g++'
+        run: |
+          brew install gcc
+          # Make brew's g++-14 available as g++ in PATH
+          BREW_PREFIX=$(brew --prefix)
+          ln -sf "$BREW_PREFIX/bin/g++-14" "$BREW_PREFIX/bin/g++"
+          echo "$BREW_PREFIX/bin" >> $GITHUB_PATH
+          g++ --version | head -1
+
       - name: Build verify tests
         run: |
           cd tests
@@ -78,6 +88,18 @@ jobs:
 
       - name: Run debug tests
         run: cd tests && ./test_debug
+        shell: bash
+
+      - name: Strict warnings (C++17)
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++17 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Werror -I../include verify/test_all_maps.cpp -o test_warnings17
+        shell: bash
+
+      - name: Strict warnings (C++20)
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++20 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Werror -I../include verify/test_all_maps.cpp -o test_warnings20
         shell: bash
 
   # Multi-version compiler compatibility check
