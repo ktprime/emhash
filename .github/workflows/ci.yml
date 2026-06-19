@@ -53,30 +53,39 @@ jobs:
           echo "$BREW_PREFIX/bin" >> $GITHUB_PATH
           g++ --version | head -1
 
+      # macOS ARM64 + GCC has a system header bug (arm_acle.h uint64_t vs unsigned long)
+      - name: Set compiler flags for macOS GCC
+        if: runner.os == 'macOS' && matrix.compiler == 'g++'
+        run: echo "CXXFLAGS_EXTRA=-fpermissive" >> $GITHUB_ENV
+
+      - name: Set compiler flags (default)
+        if: runner.os != 'macOS' || matrix.compiler != 'g++'
+        run: echo "CXXFLAGS_EXTRA=" >> $GITHUB_ENV
+
       - name: Build verify tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include verify/test_all_maps.cpp -o test_verify
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include verify/test_extreme.cpp -o test_extreme
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include verify/test_hashset_allocator.cpp -o test_hashset_allocator
+          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include verify/test_all_maps.cpp -o test_verify
+          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include verify/test_extreme.cpp -o test_extreme
+          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include verify/test_hashset_allocator.cpp -o test_hashset_allocator
         shell: bash
 
       - name: Build debug tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -g -O0 -I../include debug/debug_all_maps.cpp -o test_debug
+          ${{ matrix.compiler }} -std=c++17 -g -O0 $CXXFLAGS_EXTRA -I../include debug/debug_all_maps.cpp -o test_debug
         shell: bash
 
       - name: Build attack tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -DEMH_SAFE_PSL -I../include attack/hash_attack_all.cpp -o test_attack
+          ${{ matrix.compiler }} -std=c++17 -O2 -DEMH_SAFE_PSL $CXXFLAGS_EXTRA -I../include attack/hash_attack_all.cpp -o test_attack
         shell: bash
 
       - name: Build stress tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -I../include stress/stress_all_maps.cpp -o test_stress
+          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include stress/stress_all_maps.cpp -o test_stress
         shell: bash
 
       - name: Run verify tests
@@ -92,12 +101,14 @@ jobs:
         shell: bash
 
       - name: Strict warnings (C++17)
+        if: runner.os != 'macOS' || matrix.compiler != 'g++'
         run: |
           cd tests
           ${{ matrix.compiler }} -std=c++17 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include verify/test_all_maps.cpp -o test_warnings17
         shell: bash
 
       - name: Strict warnings (C++20)
+        if: runner.os != 'macOS' || matrix.compiler != 'g++'
         run: |
           cd tests
           ${{ matrix.compiler }} -std=c++20 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include verify/test_all_maps.cpp -o test_warnings20
