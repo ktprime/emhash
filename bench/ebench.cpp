@@ -1059,7 +1059,6 @@ static void copy_clear(hash_type& ht_hash, const std::string& hash_name)
         ht_hash = thash;
         sum  += ht_hash.size();
 
-        ht_hash = std::move(ht_hash);
         ht_hash = std::move(thash);
         sum  += ht_hash.size();
         assert(ht_hash.size() > 0 && thash.size() == 0);

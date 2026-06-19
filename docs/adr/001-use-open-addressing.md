@@ -26,7 +26,7 @@ inline array, rather than chaining with node allocations.
 
 ### Negative
 - **No reference stability** during insert/erase/rehash (see [usage_notes.md](../usage_notes.md))
-- Deletion requires care (handled differently per version: emhash5/6/8 use tombstones or swap-erase; emhash7 uses no-tombstone linked-bucket)
+- Deletion requires care (handled differently per version: emhash7 uses no-tombstone linked-bucket; emhash5/6/8 use bucket chain or backshift deletion)
 - Cluster management is critical to performance at high load factors
 
 ### Mitigations

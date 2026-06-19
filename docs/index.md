@@ -15,7 +15,7 @@ A high-performance, header-only C++ hash table library with multiple implementat
 ## Quick Start
 
 ```cpp
-#include <emhash/hash_table7.hpp>
+#include "emhash/hash_table7.hpp"
 
 emhash7::HashMap<std::string, int> scores;
 scores["alice"] = 95;
@@ -35,6 +35,8 @@ if (auto it = scores.find("alice"); it != scores.end()) {
 | `emhash/hash_table7.hpp` | `emhash7::HashMap` | High load factor, insert-intensive |
 | `emhash/hash_table8.hpp` | `emhash8::HashMap` | Complex keys/values, fast iteration |
 | `emhash/hash_set2.hpp` | `emhash2::HashSet` | HashSet (based on emhash2) |
+| `emhash/hash_set3.hpp` | `emhash3::HashSet` | HashSet (based on emhash3) |
+| `emhash/hash_set4.hpp` | `emhash4::HashSet` | HashSet (based on emhash4) |
 | `emhash/hash_set8.hpp` | `emhash8::HashSet` | HashSet (based on emhash8) |
 | `emilib/emihmap1.hpp` | `emilib::HashMap` | SIMD-accelerated, inline probe depth |
 | `emilib/emihmap2.hpp` | `emilib2::HashMap` | SIMD-accelerated, high load factor |

@@ -1,4 +1,4 @@
-// emhash5::HashMap for C++11/14/17
+// emhash5::HashMap for C++17/20
 // version 2.1.2
 // https://github.com/ktprime/emhash/blob/master/hash_table5.hpp
 //
@@ -41,7 +41,11 @@
 #include <algorithm>
 #include <memory>
 
-#if EMH_WY_HASH
+#ifdef __has_include
+    #if __has_include("wyhash.h")
+    #include "wyhash.h"
+    #endif
+#elif EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -73,7 +77,7 @@
     #define EMH_KEY(p,n)     p[n].first.first
     #define EMH_VAL(p,n)     p[n].first.second
     #define EMH_BUCKET(p,n)  p[n].second
-    #define EMH_PREVET(p,n)  (*reinterpret_cast<size_type*>(&p[n].first.first))
+    #define EMH_PREVET(p,n)  emh_prevet_get(p, n)
     #define EMH_PKV(p,n)     p[n].first
     #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(value_type(key, val), bucket); _num_filled ++
 #else
@@ -83,7 +87,7 @@
     #define EMH_KEY(p,n)     p[n].first
     #define EMH_VAL(p,n)     p[n].second
     #define EMH_BUCKET(p,n)  p[n].bucket
-    #define EMH_PREVET(p,n)  (*reinterpret_cast<size_type*>(&p[n].first))
+    #define EMH_PREVET(p,n)  emh_prevet_get(p, n)
     #define EMH_PKV(p,n)     p[n]
     #define EMH_NEW(key, val, bucket) new(_pairs + bucket) PairT(key, val, bucket); _num_filled ++; if (bucket < _first) _first = bucket
 #endif
@@ -93,14 +97,14 @@
 namespace emhash5 {
 
 #if EMH_SIZE_TYPE_64BIT
-    typedef int64_t size_type;
+    using size_type = int64_t;
     static constexpr size_type INACTIVE = 0 - 0x1ull;
-#elif EMH_SIZE_TYPE_16BIT == 0
-    typedef int32_t size_type;
-    static constexpr size_type INACTIVE = int32_t(0xFFFFFFFF);
-#else
-    typedef int16_t size_type;
+#elif EMH_SIZE_TYPE_16BIT
+    using size_type = int16_t;
     static constexpr size_type INACTIVE = 0xFFFF;
+#else
+    using size_type = int32_t;
+    static constexpr size_type INACTIVE = int32_t(0xFFFFFFFF);
 #endif
 
 #ifdef EMH_ALLOC
@@ -213,6 +217,31 @@ struct entry {
 #endif
 };
 
+/// @brief Safe access to prev-bucket field (avoids strict aliasing UB)
+#if EMH_BUCKET_INDEX == 2
+template<typename P>
+static inline size_type emh_prevet_get(P p, size_t n) {
+    size_type result;
+    std::memcpy(&result, &p[n].first.first, sizeof(result));
+    return result;
+}
+template<typename P>
+static inline void emh_prevet_set(P p, size_t n, size_type val) {
+    std::memcpy(&p[n].first.first, &val, sizeof(val));
+}
+#else
+template<typename P>
+static inline size_type emh_prevet_get(P p, size_t n) {
+    size_type result;
+    std::memcpy(&result, &p[n].first, sizeof(result));
+    return result;
+}
+template<typename P>
+static inline void emh_prevet_set(P p, size_t n, size_type val) {
+    std::memcpy(&p[n].first, &val, sizeof(val));
+}
+#endif
+
 /// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap
@@ -228,42 +257,42 @@ class HashMap
     constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f; //< 0.5
 
 public:
-    typedef HashMap<KeyT, ValueT, HashT, EqT, AllocT> htype;
-    typedef std::pair<KeyT, ValueT>           value_type;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
+    using value_type = std::pair<KeyT, ValueT>;
 
 #if EMH_BUCKET_INDEX == 0
-    typedef value_type                        value_pair;
-    typedef std::pair<size_type, value_type>  PairT;
+    using value_pair = value_type;
+    using PairT = std::pair<size_type, value_type>;
 #elif EMH_BUCKET_INDEX == 2
-    typedef value_type                        value_pair;
-    typedef std::pair<value_type, size_type>  PairT;
+    using value_pair = value_type;
+    using PairT = std::pair<value_type, size_type>;
 #else
-    typedef entry<KeyT, ValueT>               value_pair;
-    typedef entry<KeyT, ValueT>               PairT;
+    using value_pair = entry<KeyT, ValueT>;
+    using PairT = entry<KeyT, ValueT>;
 #endif
 
-    typedef KeyT   key_type;
-    typedef ValueT val_type;
-    typedef ValueT mapped_type;
-    typedef HashT  hasher;
-    typedef EqT    key_equal;
-    typedef AllocT allocator_type;
+    using key_type = KeyT;
+    using val_type = ValueT;
+    using mapped_type = ValueT;
+    using hasher = HashT;
+    using key_equal = EqT;
+    using allocator_type = AllocT;
 #if EMH_HIGH_LOAD
     static_assert(sizeof(KeyT) >= sizeof(size_type), "EMH_HIGH_LOAD requires sizeof(KeyT) >= sizeof(size_type). Use a larger key type or disable EMH_HIGH_LOAD.");
 #endif
-    typedef PairT&       reference;
-    typedef const PairT& const_reference;
+    using reference = PairT&;
+    using const_reference = const PairT&;
 
     class const_iterator;
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef value_pair                value_type;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = value_pair;
 
-        typedef value_pair*               pointer;
-        typedef value_pair&               reference;
+        using pointer = value_pair*;
+        using reference = value_pair&;
 
         iterator() { _map = nullptr; _bucket = -1; }
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { }
@@ -306,12 +335,12 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef value_pair                value_type;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = value_pair;
 
-        typedef const value_pair*         pointer;
-        typedef const value_pair&         reference;
+        using pointer = const value_pair*;
+        using reference = const value_pair&;
 
         //const_iterator() { }
         const_iterator(const iterator& proto) : _map(proto._map), _bucket(proto._bucket) { }
@@ -527,7 +556,7 @@ public:
                     new(_pairs + bucket) PairT(opairs[bucket]);
 #if EMH_HIGH_LOAD
                 else if (next_bucket != INACTIVE)
-                    EMH_PREVET(_pairs, bucket) = EMH_PREVET(opairs, bucket);
+                    emh_prevet_set(_pairs, bucket, emh_prevet_get(opairs, bucket));
 #endif
             }
             memcpy((char*)(_pairs + _num_buckets), opairs + _num_buckets, sizeof(PairT) * 2);
@@ -704,8 +733,8 @@ public:
     size_type get_diss(uint32_t bucket, uint32_t next_bucket, const uint32_t slots) const
     {
         constexpr static uint32_t EMH_CACHE_LINE_SIZE  = 64;
-        auto pbucket = reinterpret_cast<std::ptrdiff_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<std::ptrdiff_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
             return 0;
         uint32_t diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
@@ -1534,7 +1563,7 @@ private:
         for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
             if (EMH_EMPTY(_pairs, bucket)) {
                 if (prev != 0) {
-                    EMH_PREVET(_pairs, bucket) = prev;
+                    emh_prevet_set(_pairs, bucket, prev);
                     EMH_BUCKET(_pairs, prev) = -bucket;
                 }
                 else
@@ -1544,17 +1573,17 @@ private:
         }
 
         if (prev == 0) { _ehead = 0; return; } //no empty bucket
-        EMH_PREVET(_pairs, _ehead) = prev;
+        emh_prevet_set(_pairs, _ehead, prev);
         EMH_BUCKET(_pairs, prev) = 0-_ehead;
         _ehead = 0-EMH_BUCKET(_pairs, _ehead);
     }
 
     void clear_empty()
     {
-        auto prev = EMH_PREVET(_pairs, _ehead);
+        auto prev = emh_prevet_get(_pairs, _ehead);
         while (prev != _ehead) {
             EMH_BUCKET(_pairs, prev) = INACTIVE;
-            prev = EMH_PREVET(_pairs, prev);
+            prev = emh_prevet_get(_pairs, prev);
         }
         EMH_BUCKET(_pairs, _ehead) = INACTIVE;
         _ehead = 0;
@@ -1563,12 +1592,12 @@ private:
     //prev-ehead->next
     size_type pop_empty(const size_type bucket)
     {
-        const auto prev_bucket = EMH_PREVET(_pairs, bucket);
+        const auto prev_bucket = emh_prevet_get(_pairs, bucket);
         const auto next_bucket = (size_type)(0-EMH_BUCKET(_pairs, bucket));
         assert(next_bucket > 0 && _ehead > 0);
         assert(next_bucket <= _mask && prev_bucket <= _mask);
 
-        EMH_PREVET(_pairs, next_bucket) = prev_bucket;
+        emh_prevet_set(_pairs, next_bucket, prev_bucket);
         EMH_BUCKET(_pairs, prev_bucket) = -next_bucket;
 
         _ehead = next_bucket;
@@ -1581,10 +1610,10 @@ private:
         const int next_bucket = 0-EMH_BUCKET(_pairs, _ehead);
         assert(next_bucket > 0);
 
-        EMH_PREVET(_pairs, bucket) = _ehead;
+        emh_prevet_set(_pairs, bucket, _ehead);
         EMH_BUCKET(_pairs, bucket) = -next_bucket;
 
-        EMH_PREVET(_pairs, next_bucket) = bucket;
+        emh_prevet_set(_pairs, next_bucket, bucket);
         EMH_BUCKET(_pairs, _ehead) = -bucket;
         //        _ehead = bucket;
     }

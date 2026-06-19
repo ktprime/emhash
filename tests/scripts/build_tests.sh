@@ -13,7 +13,7 @@ VERIFY_DIR="$ROOT_DIR/verify"
 STRESS_DIR="$ROOT_DIR/stress"
 ATTACK_DIR="$ROOT_DIR/attack"
 DEBUG_DIR="$ROOT_DIR/debug"
-BENCH_DIR="$ROOT_DIR/../../bench"
+BENCH_DIR="$ROOT_DIR/../bench"
 
 # Compiler selection
 COMPILER="${2:-auto}"
@@ -100,7 +100,8 @@ build_verify() {
     for src in test_all_maps quick_test8 test_emhash58 test_hidden_bugs8 test_extreme \
                test_interface_combo test_emhash5_verify test_emhash_allocator \
                test_functional_edge test_hashset_allocator test_emilib_comprehensive test_size_sweep \
-               edge_test test_hashmap_full_api test_hashset_full_api test_special_key_types test_merge_correctness; do
+               edge_test test_hashmap_full_api test_hashset_full_api test_special_key_types test_merge_correctness \
+               test_find_slot_bucket; do
         $CXX $CXXFLAGS "$VERIFY_DIR/${src}.cpp" -o "$VERIFY_DIR/bin/${src}"
     done
     log_info "Verification tests built"

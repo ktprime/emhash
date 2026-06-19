@@ -45,8 +45,8 @@ This document organizes all test code in `tests/` directory, explaining the purp
 | File | Type | Target | Description |
 |------|------|--------|-------------|
 | `test_emhash58.cpp` | Unit | emhash5/6/7/8 | Comprehensive test: CRUD, copy/move, iterator, rehash, boundary cases |
-| `main.cpp` | Unit | All versions | Main test entry, integrated test suite |
-| `hash_map_tests.cpp` | Unit | All versions | Historical test code |
+| `test_all_maps.cpp` | Unit | All versions | Main validation test, 247K+ assertions |
+| `quick_test8.cpp` | Unit | emhash8 | Quick correctness validation, compares with std::unordered_map |
 
 ### 2.2 stress/ — Stress Tests
 
@@ -73,17 +73,12 @@ This document organizes all test code in `tests/` directory, explaining the purp
 | `test_probe_coverage.cpp` | Coverage | Probe strategy | Verify coverage of different probe strategies |
 | `test_repro_collision.cpp` | Bug | Hash collision | Reproduce hash collision issues |
 
-### 2.4 verify/ — Boundary and Bug Tests
+### 2.4 verify/ — Edge Case and Bug Verification Tests
 
 | File | Type | Target | Description |
 |------|------|--------|-------------|
 | `test_extreme.cpp` | Edge | emhash5/8 | Extreme test: various integer keys, boundary values, clear/redistribute |
 | `test_interface_combo.cpp` | Unit | emilib series | Generic interface test, string key/value edge cases |
-| `test_probe_bug.cpp` | Bug | Probe mode | Test probe mode bugs |
-| `test_probe_coverage.cpp` | Coverage | Probe strategy | Verify coverage of different probe strategies |
-| `test_repro_collision.cpp` | Bug | Hash collision | Reproduce hash collision issues |
-| `test_find_hit_bug*.cpp` | Bug | EMH_FIND_HIT | Test find_hit related bugs |
-| `test_find_hit_ok.cpp` | Verify | EMH_FIND_HIT | Verify correctness after fix |
 
 ### 2.5 attack/ — Hash Attack Tests
 
@@ -93,21 +88,11 @@ This document organizes all test code in `tests/` directory, explaining the purp
 | `hash_attack.cpp` | Attack | emhash5 | Hash attack benchmark: constant hash, small range hash, linear hash |
 | `hash_attack7.cpp` | Attack | emhash7 | emhash7 hash attack test |
 
-### 2.6 tests/bench/ — Benchmark Test Files
+## 3. bench/ — Performance Benchmarks
 
-| File | Type | Target | Description |
-|------|------|--------|-------------|
-| `ebench.cpp` | Perf | All versions | Basic benchmark: insert/find/erase/iterate |
-| `martin_bench.cpp` | Perf | All versions | Martin Ankerl format benchmark |
-| `highload_bench.cpp` | Perf | All versions | High load benchmark |
-
----
-
-## 3. bench/ — Legacy Performance Benchmarks
-
-Files in the root `bench/` directory are legacy benchmarks and analysis tools.
-The main benchmark runners are `bench/ebench.cpp` and `tests/bench/ebench.cpp`
-(these share most code; the `tests/bench/` copy is preferred).
+Files in the root `bench/` directory are performance benchmarks and analysis tools.
+The main benchmark runners are `bench/ebench.cpp`, `bench/comprehensive_bench.cpp`
+and `bench/martin_bench.cpp`. These require third-party dependencies in `thirdparty/`.
 
 ### 3.1 Quick Validation Tests
 
@@ -142,7 +127,6 @@ The main benchmark runners are `bench/ebench.cpp` and `tests/bench/ebench.cpp`
 | `hbench.cpp` | Perf | All versions | Hash table benchmark |
 | `tbench.cpp` | Perf | All versions | Threading benchmark |
 | `martin_bench.cpp` | Perf | All versions | Martin Ankerl format benchmark |
-| `highload_bench.cpp` | Perf | All versions | High load benchmark |
 | `bench_find_hit.cpp` | Perf | Find hit rate | Find hit rate benchmark |
 
 ### 3.5 Other Benchmarks
@@ -199,16 +183,6 @@ The main benchmark runners are `bench/ebench.cpp` and `tests/bench/ebench.cpp`
 .\tests\scripts\build_tests.ps1 clean
 ```
 
-### Using Makefile
-
-```bash
-# Build and run all quick tests
-cd tests && make quick
-
-# Build specific test
-cd tests && make test_verify
-```
-
 ### Using CMake
 
 ```bash
@@ -228,7 +202,7 @@ cmake --build . --target quick_test
 | **Unit Tests** | 15+ | tests/verify/ | test_all_maps, test_emhash58, test_extreme |
 | **Stress Tests** | 6 | tests/stress/ | stress_all_maps, stress_fix |
 | **Bug Reproduction** | 12+ | tests/debug/ | debug_chain, reproduce_crash |
-| **Performance Benchmarks** | 20+ | bench/, tests/bench/ | ebench, martin_bench |
+| **Performance Benchmarks** | 20+ | bench/ | ebench, martin_bench |
 | **Hash Attack** | 3 | tests/attack/ | hash_attack_all, hash_attack7 |
 
 ---
@@ -248,11 +222,11 @@ cmake --build . --target quick_test
 
 ## 7. Recommended Test Order
 
-1. **Quick Validation**: `cd tests && make quick` (~20s)
-2. **Stress Tests**: `cd tests && make stress` (~1min)
-3. **Hash Attack**: `cd tests && make attack` (~2min)
-4. **Fuzzing (ASan)**: `cd tests && make fuzz` (non-fuzzer variant)
-5. **Performance Benchmarks**: `cd tests && make bench`
+1. **Quick Validation**: `cd tests && cmake -B build && cmake --build build --target quick_test` (~20s)
+2. **Stress Tests**: `cmake --build build --target stress_test` (~1min)
+3. **Hash Attack**: `cmake --build build --target attack_test` (~2min)
+4. **Fuzzing (ASan)**: `./tests/scripts/build_tests.sh fuzz` (non-fuzzer variant, requires clang)
+5. **Performance Benchmarks**: `cd bench && make`
 
 ---
 
@@ -267,7 +241,7 @@ tests/
 ├── debug/     # Debug tools
 ├── verify/    # Quick validation tests
 ├── attack/    # Hash attack tests
-├── bench/     # Performance benchmarks
+├── bench/     # Performance benchmarks (root directory)
 ├── scripts/   # Build scripts
 └── README.md  # Documentation
 ```

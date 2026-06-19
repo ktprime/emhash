@@ -34,6 +34,7 @@ EOF
 
 # Collect all headers in dependency order
 HEADERS=(
+    "emhash/config.hpp"
     "emhash/hash_table5.hpp"
     "emhash/hash_table6.hpp"
     "emhash/hash_table7.hpp"
@@ -57,8 +58,8 @@ for header in "${HEADERS[@]}"; do
         echo "// $header" >> "$OUTPUT"
         echo "// ========================================================================" >> "$OUTPUT"
         echo "" >> "$OUTPUT"
-        # Strip #pragma once and leading comments, keep the rest
-        sed -e '/^#pragma once$/d' "$INCLUDE_DIR/$header" >> "$OUTPUT"
+        # Strip #pragma once, internal config include, and leading comments, keep the rest
+        sed -e '/^#pragma once$/d' -e '/^#include "emhash\/config\.hpp"$/d' "$INCLUDE_DIR/$header" >> "$OUTPUT"
         echo "" >> "$OUTPUT"
     else
         echo "WARNING: $header not found, skipping" >&2

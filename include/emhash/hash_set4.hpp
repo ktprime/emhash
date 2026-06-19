@@ -57,7 +57,7 @@
 #endif
 #endif
 
-namespace emhash9 {
+namespace emhash4 {
 
 constexpr uint32_t MASK_BIT = sizeof(uint8_t) * 8;
 constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
@@ -93,35 +93,35 @@ class HashSet
 {
 public:
 #if EMH_SIZE_TYPE_BIT == 64
-    typedef uint64_t size_type;
+    using size_type = uint64_t;
 #elif EMH_SIZE_TYPE_BIT == 16
-    typedef uint16_t size_type;
+    using size_type = uint16_t;
 #else
-    typedef uint32_t size_type;
+    using size_type = uint32_t;
 #endif
 
-    typedef HashSet<KeyT, HashT, EqT, AllocT> htype;
-    typedef AllocT allocator_type;
-    typedef std::pair<KeyT, uint32_t> PairT;
+    using htype = HashSet<KeyT, HashT, EqT, AllocT>;
+    using allocator_type = AllocT;
+    using PairT = std::pair<KeyT, uint32_t>;
     using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
     using PairAllocTraits = std::allocator_traits<PairAlloc>;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
     static constexpr uint32_t INACTIVE = ~uint32_t(0);
 
-    typedef KeyT     value_type;
-    typedef KeyT&    reference;
-    typedef KeyT*    pointer;
-    typedef const KeyT& const_reference;
+    using value_type = KeyT;
+    using reference = KeyT&;
+    using pointer = KeyT*;
+    using const_reference = const KeyT&;
 
     class const_iterator;
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef KeyT                      value_type;
-        typedef value_type*               pointer;
-        typedef value_type&               reference;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = KeyT;
+        using pointer = value_type*;
+        using reference = value_type&;
 
         iterator(const const_iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
@@ -217,11 +217,11 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef KeyT                      const value_type;
-        typedef value_type*               pointer;
-        typedef value_type&               reference;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = const KeyT;
+        using pointer = value_type*;
+        using reference = value_type&;
 
         const_iterator(const iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         const_iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
@@ -633,8 +633,8 @@ public:
 
     int get_cache_info(size_type bucket, size_type next_bucket) const
     {
-        auto pbucket = reinterpret_cast<size_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<size_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / 64 == pnext / 64)
             return 0;
         auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
@@ -1001,7 +1001,7 @@ private:
         while (buckets < required_buckets) { buckets *= 2; }
 		
         if (buckets > max_size() || buckets < _num_filled)
-            throw std::length_error("emhash9::HashSet: too many elements");
+            throw std::length_error("emhash4::HashSet: too many elements");
 
         const auto num_buckets = (size_type)buckets;
 
@@ -1427,8 +1427,8 @@ private:
 
     size_type  _num_filled;
 };
-} // namespace emhash9
+} // namespace emhash4
 #if __cplusplus >= 201103L
-template <class Key, typename Hash = std::hash<Key>, typename Alloc = std::allocator<Key>> using em_hash_set = emhash9::HashSet<Key, Hash, std::equal_to<Key>, Alloc>;
+template <class Key, typename Hash = std::hash<Key>, typename Alloc = std::allocator<Key>> using em_hash_set = emhash4::HashSet<Key, Hash, std::equal_to<Key>, Alloc>;
 #endif
 

@@ -13,6 +13,7 @@
 #include <cassert>
 #include <string>
 #include <memory>
+#include <limits>
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -41,7 +42,7 @@ void test_float_key() {
     TEST_ASSERT(map.at(0.0f) == 200, "float +0.0 overwrites -0.0");
 
     // Infinity
-    float inf = 1.0f / 0.0f;
+    float inf = std::numeric_limits<float>::infinity();
     map[inf] = 999;
     TEST_ASSERT(map.contains(inf), "float infinity key");
 

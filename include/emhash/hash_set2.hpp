@@ -78,33 +78,33 @@ class HashSet
 public:
     //if constexpr (sizeof(KeyT) <= 4 && std::is_integral<KeyT>::value)
 #if EMH_SIZE_TYPE_BIT == 64
-    typedef uint64_t size_type;
+    using size_type = uint64_t;
 #elif EMH_SIZE_TYPE_BIT == 16
-    typedef uint16_t size_type;
+    using size_type = uint16_t;
 #else
-    typedef uint32_t size_type;
+    using size_type = uint32_t;
 #endif
 
     static constexpr size_type INACTIVE = ~size_type(0);
-    typedef HashSet<KeyT, HashT, EqT, AllocT> htype;
-    typedef AllocT allocator_type;
-    typedef std::pair<KeyT, size_type> PairT;
+    using htype = HashSet<KeyT, HashT, EqT, AllocT>;
+    using allocator_type = AllocT;
+    using PairT = std::pair<KeyT, size_type>;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
     static constexpr float default_load_factor = 0.95f;
 
-    typedef KeyT     value_type;
-    typedef KeyT&    reference;
-    typedef KeyT*    pointer;
-    typedef const KeyT& const_reference;
+    using value_type = KeyT;
+    using reference = KeyT&;
+    using pointer = KeyT*;
+    using const_reference = const KeyT&;
 
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef KeyT                      value_type;
-        typedef value_type*               pointer;
-        typedef value_type&               reference;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = KeyT;
+        using pointer = value_type*;
+        using reference = value_type&;
 
         iterator() { }
         iterator(htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) { }
@@ -163,11 +163,11 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef KeyT                      value_type;
-        typedef value_type*               pointer;
-        typedef value_type&               reference;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = KeyT;
+        using pointer = value_type*;
+        using reference = value_type&;
 
         const_iterator() { }
         const_iterator(iterator proto) : _set(proto._set), _bucket(proto._bucket) {  }
@@ -637,8 +637,8 @@ public:
 
     int get_cache_info(size_type bucket, size_type next_bucket) const
     {
-        auto pbucket = reinterpret_cast<size_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<size_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / 64 == pnext / 64)
             return 0;
         auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;

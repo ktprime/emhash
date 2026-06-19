@@ -273,20 +273,20 @@ int main() {
 
     // Common tests for all versions
     run_common_tests<emhash2::HashSet<int>>("hash_set2");
-    run_common_tests<emhash9::HashSet<int>>("hash_set4");
+    run_common_tests<emhash4::HashSet<int>>("hash_set4");
     run_common_tests<emhash8::HashSet<int>>("hash_set8");
 
     // hash_set3: no insert_unique (has assert(false))
     printf("Testing hash_set3:\n");
-    test_basic_crud_no_unique<emhash7::HashSet<int>>();
-    test_copy_move_swap<emhash7::HashSet<int>>();
-    test_iterator<emhash7::HashSet<int>>();
+    test_basic_crud_no_unique<emhash3::HashSet<int>>();
+    test_copy_move_swap<emhash3::HashSet<int>>();
+    test_iterator<emhash3::HashSet<int>>();
     printf("  hash_set3 done\n\n");
 
     // shrink_to_fit: hash_set2, hash_set4, hash_set8
     printf("Testing shrink_to_fit:\n");
     test_shrink_to_fit<emhash2::HashSet<int>>();
-    test_shrink_to_fit<emhash9::HashSet<int>>();
+    test_shrink_to_fit<emhash4::HashSet<int>>();
     test_shrink_to_fit<emhash8::HashSet<int>>();
     printf("  shrink_to_fit done\n\n");
 

@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/adr/` directory with initial 4 ADRs (open addressing, emhash8 layout, no-tombstone emhash7, header-only)
 - `docs/performance_tracking.md` for tracking benchmark results across versions
 - `.github/workflows/format-check.yml` — clang-format LLVM style check on PRs
-- `.github/workflows/warnings-check.yml` — strict warnings build matrix (gcc/clang × c++17/20)
 - `.github/workflows/release.yml` — automatic GitHub Release creation on tag push
 - `.github/workflows/ci.yml` — added `compat` job with multi-version compiler matrix (GCC 11-13, Clang 16-18, C++17/20)
 - `.github/dependabot.yml` — monthly GitHub Actions dependency updates

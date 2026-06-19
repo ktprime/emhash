@@ -42,10 +42,12 @@ Deleting elements during iteration may cause some keys to be visited twice or sk
 
 ```cpp
 // ❌ Wrong: direct deletion without updating iterator
-for (const auto& it : myhash) {
-    if (condition) myhash.erase(it.first);
+for (const auto& [key, value] : myhash) {
+    if (condition) myhash.erase(key);  // UB: modifying container during range-for
 }
+```
 
+```cpp
 // ✅ Correct: use iterator erase and update
 for (auto it = myhash.begin(); it != myhash.end(); ) {
     if (condition) {
@@ -54,7 +56,9 @@ for (auto it = myhash.begin(); it != myhash.end(); ) {
         ++it;
     }
 }
+```
 
+```cpp
 // ✅ Correct: use erase_if for conditional removal (C++17)
 auto removed = myhash.erase_if([](const auto& pair) {
     return pair.second < 0;
@@ -118,7 +122,11 @@ emhash7::HashMap<Point, int, PointHash> point_map;
 
 ## 7. Exception Safety
 
-emhash does not throw exceptions from hash table operations. However, if the key or value type's constructor/copy/move throws during insert, the table remains in a valid state (basic guarantee), but the specific element may not be inserted.
+emhash operations themselves do not throw exceptions. The exception safety level depends on the operation and the underlying key/value types. Below is the guarantee per operation category:
+
+### Insert / Emplace (Basic Guarantee)
+
+If the key or value type's constructor, copy, or move operation throws during insertion, the table remains in a valid, consistent state. The element will simply not be inserted. No memory is leaked and all internal invariants are preserved.
 
 ```cpp
 // If ValueT's constructor throws, the map is still valid
@@ -127,5 +135,138 @@ try {
     map.emplace(key, value_that_may_throw);
 } catch (...) {
     // map is still valid, element was not added
+    assert(map.size() == original_size);
 }
 ```
+
+### operator[] / insert_or_assign (Basic Guarantee)
+
+Same as insert — if construction of the default value or assignment throws, the table state remains valid.
+
+### Emplace (Basic Guarantee)
+
+If the forwarded constructor arguments throw during in-place construction, the table is unchanged.
+
+### Erase / clear (Noexcept / Strong Guarantee)
+
+Erase and clear operations do not allocate memory and never throw (assuming key/value destructors do not throw, which is the C++ convention).
+
+```cpp
+// Erase is noexcept in practice
+map.erase(key);  // never throws
+map.clear();     // never throws
+```
+
+### reserve / rehash (Strong Guarantee or Basic Guarantee)
+
+If the allocator's allocation or the element move/copy constructor throws during rehash:
+
+- **If `std::is_nothrow_move_constructible_v<value_type>` is true** (e.g., keys and values are primitive types or smart pointers): rehashing is safe and provides a **strong guarantee** — the table is rolled back to its original state on failure.
+- **Otherwise**: a **basic guarantee** is provided — the table remains valid but some elements may have been moved.
+
+```cpp
+// Prefer nothrow-movable types for best rehash safety
+static_assert(std::is_nothrow_move_constructible_v<std::pair<KeyT, ValueT>>,
+              "rehash may be slower and less safe");
+```
+
+### Iterator Operations (Noexcept)
+
+All iterator operations (`++`, `--`, `*`, `->`, comparisons) are noexcept.
+
+### Summary
+
+| Operation | Guarantee | Notes |
+|-----------|-----------|-------|
+| `insert` / `emplace` / `operator[]` | Basic | Unsuccessful insert leaves table unchanged |
+| `insert_unique` / `emplace_unique` | Basic | Same as insert |
+| `erase` / `clear` | Noexcept | Destructors assumed not to throw |
+| `find` / `contains` / `count` | Noexcept | Read-only, no allocation |
+| `reserve` / `rehash` | Strong* | *If value_type is nothrow-move-constructible; otherwise Basic |
+| `swap` | Noexcept | Swaps internal pointers |
+| Iterator operations | Noexcept | `++`, `--`, `*`, `->`, comparisons |
+
+## 8. Iterator and Reference Invalidation
+
+emhash is an **open-addressing flat hash table**. Because key-value pairs are stored inline in a contiguous array, many operations can move elements and invalidate iterators and references.
+
+### Invalidation Rules by Operation
+
+| Operation | Iterators Invalidated | References Invalidated |
+|-----------|----------------------|----------------------|
+| `insert` / `emplace` / `operator[]` | **All** if rehash triggered; none otherwise | **All** if rehash triggered; none otherwise |
+| `erase(it)` | Only `it` and any iterator pointing to the same element | Only the erased element's reference |
+| `erase(key)` | Only the erased element's iterator | Only the erased element's reference |
+| `erase_if` | Only iterators to erased elements | Only references to erased elements |
+| `clear` | **All** | **All** |
+| `reserve(n)` | **All** if rehash triggered | **All** if rehash triggered |
+| `rehash(n)` | **All** | **All** |
+| `shrink_to_fit` | **All** (always rehashes) | **All** (always rehashes) |
+| `swap` | Swapped (iterators refer to the other container after swap) | Swapped (references refer to the other container after swap) |
+| `find` / `contains` / `count` | None (read-only) | None (read-only) |
+| `begin` / `end` | N/A | N/A |
+
+### Key Consequences
+
+1. **Do not hold references across rehash operations.** If an insert might trigger a rehash (e.g., you haven't reserved enough space), copy values rather than holding references.
+
+```cpp
+// ❌ Wrong: reference may become invalid after insert triggers rehash
+auto& ref = myhash[1];
+myhash[2] = ref;  // Danger: myhash may rehash on insert
+
+// ✅ Correct: copy value first, ensure capacity
+auto val = myhash[1];
+myhash.reserve(myhash.size() + 1);
+myhash[2] = val;
+```
+
+2. **Erase during iteration — always update the iterator.**
+
+```cpp
+// ✅ Correct: use erase returning next iterator
+for (auto it = myhash.begin(); it != myhash.end(); ) {
+    if (condition(it)) {
+        it = myhash.erase(it);
+    } else {
+        ++it;
+    }
+}
+```
+
+3. **Pre-reserve to avoid unexpected invalidation in hot paths.**
+
+```cpp
+// Pre-allocate enough buckets before a critical section
+map.reserve(expected_max_size);
+
+// Now inserts will not invalidate iterators/references
+// (unless size exceeds expected_max_size)
+```
+
+### Comparison with std::unordered_map
+
+| Property | emhash (open addressing) | std::unordered_map (node-based) |
+|----------|-------------------------|--------------------------------|
+| Reference stability after insert | ❌ (if rehash) | ✅ (always) |
+| Iterator stability after insert | ❌ (if rehash) | ✅ (always) |
+| Reference stability after erase | ❌ | ✅ |
+| Iterator stability after erase | ✅ (erase returns next) | ✅ (only erased invalidated) |
+| Memory locality | ✅ Excellent | ❌ Poor (linked list) |
+
+> **Rule of thumb**: If you need stable references/iterators across insertions, use `std::unordered_map`. If you need performance and can manage invalidation, use emhash.
+
+## 9. Known Issues
+
+### emilib2ss may hang under extreme hash collisions
+
+`emilib2ss` (a variant of `emilib2::HashMap`) does not limit probe-sequence length when **all keys hash to the same bucket**. Under this crafted hash-collision attack, insertion/lookup can degenerate into a full table scan and appear to hang.
+
+**Affected scenario**:
+- An adversary supplies keys that all produce the same hash value, or
+- A pathological custom hash function maps many distinct keys to the same bucket.
+
+**Mitigation**:
+- Prefer `emilib2o` or `emilib2s` for untrusted input.
+- For adversarial workloads, use `emhash7` or enable `EMH_SAFE_PSL` on the emilib variants that support it.
+- Do not expose `emilib2ss` to unvalidated user-provided keys in security-sensitive contexts.

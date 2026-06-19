@@ -525,8 +525,8 @@ public:
 
     size_type get_diss(size_type bucket, size_type next_bucket, const size_type slots) const
     {
-        auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
             return 0;
         size_type diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);

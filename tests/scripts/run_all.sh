@@ -138,7 +138,7 @@ run_fuzz() {
 run_bench() {
     log_info "=== Benchmark Tests ==="
 
-    local bench_dir="$ROOT_DIR/../../bench"
+    local bench_dir="$ROOT_DIR/../bench"
     local bench_flags="-O3 -march=native"
     if [ -f "$bench_dir/ebench.cpp" ]; then
         log_test "Building ebench..."

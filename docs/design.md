@@ -70,11 +70,15 @@ emhash provides 4 different implementations, each with different focus:
 emhash also provides `HashSet` implementations:
 
 ```cpp
-#include "emhash/hash_set3.hpp"   // Based on emhash7, namespace emhash7
-#include "emhash/hash_set8.hpp"   // Based on emhash8, namespace emhash8
+#include "emhash/hash_set2.hpp"   // namespace emhash2
+#include "emhash/hash_set3.hpp"   // namespace emhash3
+#include "emhash/hash_set4.hpp"   // namespace emhash4
+#include "emhash/hash_set8.hpp"   // namespace emhash8
 
-emhash7::HashSet<int> set1;
-emhash8::HashSet<int> set2;
+emhash2::HashSet<int> set1;
+emhash3::HashSet<int> set2;
+emhash4::HashSet<int> set3;
+emhash8::HashSet<int> set4;
 ```
 
 ### Custom Allocator

@@ -352,18 +352,18 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) noexcept
+    HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
         _mlf = (uint32_t)((1 << 28) / lf);
         rehash(n);
     }
 
-    HashMap(const HashMap& other) noexcept
+    HashMap(const HashMap& other)
     {
         clone(other);
     }
 
-    HashMap(HashMap&& other) noexcept
+    HashMap(HashMap&& other)
     {
         rehash(1);
         if (this != &other) {
@@ -371,7 +371,7 @@ public:
         }
     }
 
-    HashMap(std::initializer_list<value_type> il) noexcept
+    HashMap(std::initializer_list<value_type> il)
     {
         rehash((size_t)il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
@@ -379,14 +379,14 @@ public:
     }
 
     template<class InputIt>
-    HashMap(InputIt first, InputIt last, size_t bucket_count = 4) noexcept
+    HashMap(InputIt first, InputIt last, size_t bucket_count = 4)
     {
         rehash((size_t)std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
 
-    HashMap& operator=(const HashMap& other) noexcept
+    HashMap& operator=(const HashMap& other)
     {
         if (this != &other)
             clone(other);
@@ -406,12 +406,12 @@ public:
     {
         clear_data();
         _num_filled = 0;
-        if (!is_trivially_destructible())
+        if (!need_explicit_dtor())
             _pairs[_num_buckets].~PairT();
         free(_pairs);
     }
 
-    void clone(const HashMap& other) noexcept
+    void clone(const HashMap& other)
     {
         if (other.size() == 0) {
             clear();
@@ -822,7 +822,7 @@ public:
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
-        if (!is_trivially_destructible())
+        if (!need_explicit_dtor())
             _pairs[bucket].~PairT();
 
 #if EMH_PSL_LINEAR
@@ -869,7 +869,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -896,7 +896,7 @@ public:
 
     void clear_data() noexcept
     {
-        if (!is_trivially_destructible() && _num_filled) {
+        if (!need_explicit_dtor() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -919,7 +919,7 @@ public:
         rehash(_num_filled + 1);
     }
 
-    bool reserve(size_t num_elems) noexcept
+    bool reserve(size_t num_elems)
     {
         const auto required_buckets = ((uint64_t)num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
@@ -998,7 +998,7 @@ public:
             new(_pairs + num_buckets) PairT(KeyT(), ValueT());
             //size_t main_bucket;
             //_states[num_buckets] = hash_key2(main_bucket, _pairs[num_buckets].first) + 2; //iterator end tombstone:
-            if (old_buckets && !is_trivially_destructible())
+            if (old_buckets && !need_explicit_dtor())
                 old_pairs[old_buckets].~PairT();
         }
 
@@ -1012,7 +1012,7 @@ public:
                 set_states(bucket, key_h2);
                 new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled ++;
-                if (!is_trivially_destructible())
+                if (!need_explicit_dtor())
                     src_pair.~PairT();
             }
         }
@@ -1021,7 +1021,7 @@ public:
 
 private:
     // Can we fit another element?
-    void check_expand_need() noexcept
+    void check_expand_need()
     {
         reserve(_num_filled);
     }

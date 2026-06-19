@@ -256,7 +256,6 @@ void benchmarkAllUnorderedSets(const Samples& ulongArray,
                                const size_t runCount)
 {
     benchmarkSet<tsl::robin_set<Sample>>(ulongArray, runCount);
-    benchmarkSet<tsl::robin_set<Sample>>(ulongArray, runCount);
     benchmarkSet<tsl::robin_pg_set<Sample>>(ulongArray, runCount);
     benchmarkSet<ska::flat_hash_set<Sample>>(ulongArray, runCount);
     /* TODO: benchmarkSet<ska::bytell_hash_set<Sample>>(ulongArray, runCount); */

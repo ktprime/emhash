@@ -83,7 +83,7 @@ When filing a bug report, please include:
 When submitting performance improvements:
 
 1. Include benchmark numbers before and after
-2. Use the existing benchmark suite (`tests/bench/`)
+2. Use the existing benchmark suite (`bench/`)
 3. Test with multiple compilers
 4. Report ops/sec, not just relative improvement
 

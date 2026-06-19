@@ -39,14 +39,14 @@ Source: [README.md](../README.md) performance section.
 
 ```bash
 # Standard benchmarks
-cd tests
-make bench
-./bench/ebench
+cd bench
+make
+./ebench
 
 # High load factor
-cd bench
-g++ -O3 -march=native -I../include -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 highload_bench.cpp -o highload_bench
-./highload_bench
+cd tests/stress
+g++ -O3 -march=native -I../../include -std=c++17 -DEMH_HIGH_LOAD=123456 highload_test.cpp -o highload_test
+./highload_test
 ```
 
 ## Recording New Results

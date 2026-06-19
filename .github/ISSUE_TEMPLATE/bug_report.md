@@ -16,7 +16,7 @@ A clear description of the bug.
 
 ## Minimal Reproducible Example
 ```cpp
-#include "hash_table8.hpp"
+#include "emhash/hash_table8.hpp"
 // ...
 ```
 

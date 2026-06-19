@@ -1,5 +1,5 @@
 // version 1.7.4
-// https://github.com/ktprime/emhash/blob/master/hash_table8.hpp
+// https://github.com/ktprime/emhash/blob/master/hash_set8.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -529,8 +529,8 @@ public:
 
     size_type get_diss(size_type bucket, size_type next_bucket, const size_type slots) const
     {
-        auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / EMH_CACHE_LINE_SIZE == pnext / EMH_CACHE_LINE_SIZE)
             return 0;
         size_type diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);

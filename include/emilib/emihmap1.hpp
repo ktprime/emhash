@@ -772,7 +772,7 @@ public:
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
-        if (!is_trivially_destructible()) {
+        if (!need_explicit_dtor()) {
             const auto slot = bucket_to_slot(bucket);
             _pairs[slot].~PairT();
         }
@@ -807,7 +807,7 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
@@ -839,7 +839,7 @@ public:
 
     void clear_data() noexcept
     {
-        if (!is_trivially_destructible()) {
+        if (!need_explicit_dtor()) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket_to_slot(bucket)].~PairT();
@@ -940,7 +940,7 @@ public:
                 const auto slot = bucket_to_slot(bucket);
                 new(_pairs + slot) PairT(std::move(src_pair));
                 _num_filled ++;
-                if (!is_trivially_destructible())
+                if (!need_explicit_dtor())
                     src_pair.~PairT();
             }
         }

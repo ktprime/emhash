@@ -88,12 +88,7 @@ std::unordered_map<uint64_t, uint32_t>  // same node size as <uint64_t, uint64_t
 
 ### Which C++ standards are supported?
 
-| Version | C++11 | C++14 | C++17 | C++20 |
-|---------|-------|-------|-------|-------|
-| emhash5 | Yes | Yes | Yes | Yes |
-| emhash6 | Yes | Yes | Yes | Yes |
-| emhash7 | Yes | Yes | Yes | Yes |
-| emhash8 | Partial | Yes | Yes | Yes |
+emhash requires **C++17 or later**. All versions (emhash5, emhash6, emhash7, emhash8) support C++17 and C++20.
 
 ### Which compilers are supported?
 

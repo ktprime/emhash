@@ -11,10 +11,15 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: ${{ matrix.os }} / ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +35,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Cache apt packages
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt
+            ~/.cache/apt
+          key: apt-${{ matrix.compiler }}-${{ runner.os }}-v1
+          restore-keys: |
+            apt-${{ matrix.compiler }}-${{ runner.os }}-
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -94,6 +110,8 @@ jobs:
           ./test_verify
           ./test_extreme
           ./test_hashset_allocator
+          ./test_attack
+          ./test_stress
         shell: bash
 
       - name: Run debug tests
@@ -114,15 +132,22 @@ jobs:
           ${{ matrix.compiler }} -std=c++20 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include verify/test_all_maps.cpp -o test_warnings20
         shell: bash
 
-  # Multi-version compiler compatibility check (uses default compiler versions)
+      - name: Strict warnings (C++23)
+        if: runner.os != 'macOS' || matrix.compiler != 'g++'
+        run: |
+          cd tests
+          ${{ matrix.compiler }} -std=c++23 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include verify/test_all_maps.cpp -o test_warnings23
+        shell: bash
+
   compat:
     name: Compat / ${{ matrix.compiler }} / C++${{ matrix.std }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         compiler: [g++, clang++]
-        std: [17, 20]
+        std: [17, 20, 23]
 
     steps:
       - uses: actions/checkout@v6
@@ -147,17 +172,31 @@ jobs:
         shell: bash
 
   asan:
-    name: ASan / UBSan
-    runs-on: ubuntu-latest
+    name: ASan / UBSan / ${{ matrix.os }} / ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         compiler: [g++, clang++]
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install dependencies
+      - name: Cache apt packages
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt
+            ~/.cache/apt
+          key: apt-asan-${{ matrix.compiler }}-${{ runner.os }}-v1
+          restore-keys: |
+            apt-asan-${{ matrix.compiler }}-${{ runner.os }}-
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           package="${{ matrix.compiler }}"
           if [[ "$package" == "clang++" ]]; then
@@ -165,23 +204,51 @@ jobs:
           fi
           sudo apt-get update && sudo apt-get install -y "$package"
 
+      - name: Install GCC on macOS (real gcc, not clang)
+        if: runner.os == 'macOS' && matrix.compiler == 'g++'
+        run: |
+          brew install gcc
+          BREW_PREFIX=$(brew --prefix)
+          GPP_BIN=$(ls "$BREW_PREFIX/bin/g++-"* 2>/dev/null | head -1)
+          if [[ -n "$GPP_BIN" ]]; then
+            ln -sf "$GPP_BIN" "$BREW_PREFIX/bin/g++"
+          fi
+          echo "$BREW_PREFIX/bin" >> $GITHUB_PATH
+          g++ --version | head -1
+
+      - name: Set compiler flags for macOS GCC
+        if: runner.os == 'macOS' && matrix.compiler == 'g++'
+        run: echo "CXXFLAGS_EXTRA=-fpermissive" >> $GITHUB_ENV
+
+      - name: Set compiler flags (default)
+        if: runner.os != 'macOS' || matrix.compiler != 'g++'
+        run: echo "CXXFLAGS_EXTRA=" >> $GITHUB_ENV
+
       - name: Build with ASan
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include verify/test_all_maps.cpp -o test_verify_asan
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include stress/stress_fix.cpp -o test_stress_asan
+          # Verification tests
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer $CXXFLAGS_EXTRA -I../include verify/test_all_maps.cpp -o test_verify_asan
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer $CXXFLAGS_EXTRA -I../include verify/test_extreme.cpp -o test_extreme_asan
+          # Stress tests
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer $CXXFLAGS_EXTRA -I../include stress/stress_fix.cpp -o test_stress_asan
+          # Attack tests (with EMH_SAFE_PSL)
+          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -DEMH_SAFE_PSL $CXXFLAGS_EXTRA -I../include attack/hash_attack_all.cpp -o test_attack_asan
         shell: bash
 
       - name: Run with ASan
         run: |
           cd tests
           ./test_verify_asan
+          ./test_extreme_asan
           ./test_stress_asan
+          ./test_attack_asan
         shell: bash
 
   cmake:
     name: CMake / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -195,19 +262,34 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive
+        run: cmake --build build --config Release --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive
         shell: bash
 
       - name: Run quick tests
         run: |
-          cd build
-          ./test_verify || true
-          ./test_debug || true
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cd build/Release
+            ./test_verify.exe
+            ./test_debug.exe
+            ./test_attack.exe
+            ./test_stress.exe
+            ./quick_test8.exe
+            ./test_emilib_comprehensive.exe
+          else
+            cd build
+            ./test_verify
+            ./test_debug
+            ./test_attack
+            ./test_stress
+            ./quick_test8
+            ./test_emilib_comprehensive
+          fi
         shell: bash
 
   cmake-install:
     name: CMake install / find_package
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -259,10 +341,11 @@ jobs:
   windows-msvc:
     name: Windows / MSVC / C++${{ matrix.std }}
     runs-on: windows-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        std: [17, 20]
+        std: [17, 20, 23]
     steps:
       - uses: actions/checkout@v6
 
@@ -278,4 +361,43 @@ jobs:
         run: |
           ./build/Release/test_verify.exe
           ./build/Release/test_debug.exe
+          ./build/Release/test_attack.exe
+        shell: bash
+
+  # Temporarily disabled: clang-format check
+  # Re-enable after formatting issues are resolved.
+  clang-format-check:
+    name: clang-format check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check formatting
+        run: |
+          # Only check files changed in this PR/commit to reduce noise.
+          # Falls back to checking all headers if no base commit is available.
+          set -e
+          FILES=$(find include -name '*.hpp' -o -name '*.h' | sort)
+          if [ -z "$FILES" ]; then
+            echo "No header files to check"
+            exit 0
+          fi
+          echo "Checking formatting on:"
+          echo "$FILES"
+          # --dry-run -Werror: report files needing formatting, fail if any.
+          # We use -i with --dry-run to get a diff without writing.
+          DIFF_OUTPUT=$(clang-format --dry-run --Werror --style=file --ferror-limit=0 $FILES 2>&1) || true
+          if echo "$DIFF_OUTPUT" | grep -q "code format"; then
+            echo "::error::Some files need clang-format. Run 'clang-format -i include/**/*.hpp' locally."
+            echo "$DIFF_OUTPUT"
+            exit 1
+          fi
+          echo "All files are properly formatted"
         shell: bash

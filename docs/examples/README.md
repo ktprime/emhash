@@ -19,7 +19,7 @@ cmake -B build -DWITH_EXAMPLES=ON
 cmake --build build
 
 # Or compile manually
-g++ -std=c++17 -I../include basic_map.cpp -o basic_map
+g++ -std=c++17 -I../../include basic_map.cpp -o basic_map
 ```
 
 ## Available Containers
@@ -34,5 +34,5 @@ g++ -std=c++17 -I../include basic_map.cpp -o basic_map
 | `emilib/emihmap1.hpp` | `emilib::HashMap<K,V>` | SIMD-accelerated, inline probe depth |
 | `emilib/emihmap2.hpp` | `emilib2::HashMap<K,V>` | SIMD-accelerated, high load factor |
 | `emilib/emihmap3.hpp` | `emilib3::HashMap<K,V>` | SIMD-accelerated, balanced default |
-| `emhash/lru_size.hpp` | `emhash::lru_size_cache<K,V>` | LRU cache (size-based) |
-| `emhash/lru_time.hpp` | `emhash::lru_time_cache<K,V>` | LRU cache (time-based) |
+| `emhash/lru_size.hpp` | `emlru_size::lru_cache<K,V>` | LRU cache (size-based) |
+| `emhash/lru_time.hpp` | `emlru_time::lru_cache<K,V>` | LRU cache (time-based) |

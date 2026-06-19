@@ -1,4 +1,4 @@
-// By Huang Yuanbing 2019-204
+// By Huang Yuanbing 2019-2024
 // bailuzhou@163.com
 // version 2.1.0
 
@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
+
 #include <cstring>
 #include <cstdlib>
 #include <type_traits>
@@ -37,7 +39,7 @@
     #if __has_include("wyhash.h")
     #include "wyhash.h"
     #endif
-#elif EMHASH_WY_HASH
+#elif EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -47,15 +49,6 @@
     #undef  NEXT_BUCKET
     #undef  EMH_PKV
     #undef  NEW_KVALUE
-#endif
-
-// likely/unlikely
-#if (__GNUC__ >= 4 || __clang__)
-#    define EMHASH_LIKELY(condition) __builtin_expect(condition, 1)
-#    define EMHASH_UNLIKELY(condition) __builtin_expect(condition, 0)
-#else
-#    define EMHASH_LIKELY(condition) condition
-#    define EMHASH_UNLIKELY(condition) condition
 #endif
 
 #define EMH_KEY(p,n)     p[n].first
@@ -169,28 +162,28 @@ template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, type
 class lru_cache
 {
 private:
-    typedef lru_cache<KeyT, ValueT, HashT, EqT> htype;
-    typedef entry<KeyT, ValueT>             PairT;
-    typedef entry<KeyT, ValueT>             value_pair;
+    using htype = lru_cache<KeyT, ValueT, HashT, EqT>;
+    using PairT = entry<KeyT, ValueT>;
+    using value_pair = entry<KeyT, ValueT>;
 
 public:
-    typedef KeyT   key_type;
-    typedef ValueT mapped_type;
+    using key_type = KeyT;
+    using mapped_type = ValueT;
 
-    typedef size_t       size_type;
-    typedef std::pair<KeyT,ValueT>        value_type;
-    typedef PairT&       reference;
-    typedef const PairT& const_reference;
+    using size_type = size_t;
+    using value_type = std::pair<KeyT,ValueT>;
+    using reference = PairT&;
+    using const_reference = const PairT&;
 
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef value_pair                value_type;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = value_pair;
 
-        typedef value_pair*               pointer;
-        typedef value_pair&               reference;
+        using pointer = value_pair*;
+        using reference = value_pair&;
 
         iterator() { }
         iterator(htype* hash_map, uint32_t bucket) : _map(hash_map), _bucket(bucket) { }
@@ -244,12 +237,12 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef value_pair                value_type;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = value_pair;
 
-        typedef value_pair*               pointer;
-        typedef value_pair&               reference;
+        using pointer = value_pair*;
+        using reference = value_pair&;
 
         const_iterator() { }
         const_iterator(const iterator& proto) : _map(proto._map), _bucket(proto._bucket) { }

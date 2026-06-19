@@ -3,7 +3,7 @@
 > High-performance, memory-efficient C++ open addressing flat hash table
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![C++ Standard](https://img.shields.io/badge/C%2B%2B-11%2F14%2F17%2F20-blue.svg)](https://en.cppreference.com/)
+[![C++ Standard](https://img.shields.io/badge/C%2B%2B-17%2F20-blue.svg)](https://en.cppreference.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![CI](https://github.com/ktprime/emhash/actions/workflows/ci.yml/badge.svg)](https://github.com/ktprime/emhash/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/ktprime/emhash/releases)
@@ -50,7 +50,7 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 ### Platform Support
 - **Operating Systems**: Windows, Linux, macOS
 - **Processors**: x86_64, ARM64 (Apple M1/M2, AMD, Intel)
-- **Compilers**: GCC, Clang, MSVC (C++11/14/17/20)
+- **Compilers**: GCC, Clang, MSVC (C++17/20)
 
 ---
 
@@ -144,11 +144,11 @@ More examples: [docs/examples/](docs/examples/)
 
 | Version | Best For | Key Strengths | Weaknesses |
 |---------|----------|---------------|------------|
-| **emhash5** | Integer keys, fast lookup | Small-size optimization (`EMH_SMALL_SIZE`), lowest probe count | EhKey must be default-constructible |
+| **emhash5** | Integer keys, fast lookup | Small-size optimization (`EMH_SMALL_SIZE`), lowest probe count | Slightly slower than emhash6 for high LF |
 | **emhash6** | Fast lookup/erase, integer keys | Fastest find/erase, linked-bucket with bitmask | More memory for metadata |
-| **emhash7** | Insert-heavy, mixed workloads | No tombstones, stable insert/erase, high load factor | Slower erase than emhash5/6 |
-| **emhash8** | Iteration-heavy, large KV types | Dense pairs array, near-zero iteration time | Higher memory, EhKey default-constructible req. |
-| **emilib1/2/3** | Swiss-table style SIMD-accelerated lookup | Group-level SIMD probing, very fast find | Higher memory overhead per bucket |
+| **emhash7** | Insert-heavy, mixed workloads | No tombstones, stable insert/erase, high load factor | Slightly slower erase than emhash5/6 |
+| **emhash8** | Iteration-heavy, large KV types | Dense pairs array, near-zero iteration time | Higher memory for separate index array |
+| **emilib1/2/3** | Swiss-table style SIMD-accelerated lookup | Group-level SIMD probing, very fast find | Higher memory overhead per bucket; **emilib2ss may hang under extreme hash collision attack** (all keys hashing to same bucket) — use emilib2o or emilib2s in such scenarios |
 
 See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
 

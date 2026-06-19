@@ -18,7 +18,7 @@ $STRESS_DIR = Join-Path $ROOT_DIR "stress"
 $DEBUG_DIR = Join-Path $ROOT_DIR "debug"
 $VERIFY_DIR = Join-Path $ROOT_DIR "verify"
 $ATTACK_DIR = Join-Path $ROOT_DIR "attack"
-$BENCH_DIR = Join-Path $ROOT_DIR "bench"
+$BENCH_DIR = Join-Path $ROOT_DIR "../bench"
 
 # ============================================================================
 # OS / Compiler / Architecture detection
@@ -189,6 +189,8 @@ function Build-Stress {
     Build-Source (Join-Path $STRESS_DIR "stress_all_maps.cpp") (Join-Path $binDir "stress_all_maps")
     Build-Source (Join-Path $STRESS_DIR "stress_fix.cpp") (Join-Path $binDir "stress_fix_asan") "-fsanitize=address,undefined"
     Build-Source (Join-Path $STRESS_DIR "highload_test.cpp") (Join-Path $binDir "highload_test")
+    Build-Source (Join-Path $STRESS_DIR "test_emhash5_stress.cpp") (Join-Path $binDir "test_emhash5_stress_asan") "-fsanitize=address,undefined"
+    Build-Source (Join-Path $STRESS_DIR "test_emhash5_hifi.cpp") (Join-Path $binDir "test_emhash5_hifi_asan") "-fsanitize=address,undefined"
     Build-Source (Join-Path $STRESS_DIR "test_bad_hash_stress.cpp") (Join-Path $binDir "test_bad_hash_stress")
 
     Log-Info "Stress tests built"

@@ -348,18 +348,18 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) noexcept
+    HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR)
     {
         _mlf = (uint32_t)((1 << 28) / lf);
         rehash(n);
     }
 
-    HashMap(const HashMap& other) noexcept
+    HashMap(const HashMap& other)
     {
         clone(other);
     }
 
-    HashMap(HashMap&& other) noexcept
+    HashMap(HashMap&& other)
     {
         rehash(1);
         if (this != &other) {
@@ -367,7 +367,7 @@ public:
         }
     }
 
-    HashMap(std::initializer_list<value_type> il) noexcept
+    HashMap(std::initializer_list<value_type> il)
     {
         rehash((size_t)il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
@@ -375,14 +375,14 @@ public:
     }
 
     template<class InputIt>
-    HashMap(InputIt first, InputIt last, size_t bucket_count = 4) noexcept
+    HashMap(InputIt first, InputIt last, size_t bucket_count = 4)
     {
         rehash((size_t)std::distance(first, last) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
 
-    HashMap& operator=(const HashMap& other) noexcept
+    HashMap& operator=(const HashMap& other)
     {
         if (this != &other)
             clone(other);
@@ -406,7 +406,7 @@ public:
         free(_pairs);
     }
 
-    void clone(const HashMap& other) noexcept
+    void clone(const HashMap& other)
     {
         if (other.size() == 0) {
             clear();
@@ -899,7 +899,7 @@ public:
         rehash(_num_filled + 1);
     }
 
-    bool reserve(size_t num_elems) noexcept
+    bool reserve(size_t num_elems)
     {
         const auto required_buckets = ((uint64_t)num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
@@ -978,7 +978,7 @@ public:
 
 private:
     // Can we fit another element?
-    void check_expand_need() noexcept
+    void check_expand_need()
     {
         reserve(_num_filled);
     }

@@ -25,27 +25,13 @@ message("  CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_
 
 add_library(emhash INTERFACE)
 
-set(EMHASH_HEADERS
-    include/emhash/hash_set2.hpp
-    include/emhash/hash_set3.hpp
-    include/emhash/hash_set4.hpp
-    include/emhash/hash_set8.hpp
-    include/emhash/hash_table5.hpp
-    include/emhash/hash_table6.hpp
-    include/emhash/hash_table7.hpp
-    include/emhash/hash_table8.hpp
-    include/emhash/lru_size.hpp
-    include/emhash/lru_time.hpp
-    include/emilib/emihmap1.hpp
-    include/emilib/emihmap2.hpp
-    include/emilib/emihmap3.hpp
-)
-
 target_include_directories(
      emhash INTERFACE
      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
      $<INSTALL_INTERFACE:include>
 )
+
+target_compile_features(emhash INTERFACE cxx_std_17)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -94,8 +80,9 @@ if(WITH_BENCHMARKS)
           set_property(GLOBAL PROPERTY USE_FOLDERS ON)
         endif()
     else()
-        set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
-        set(CMAKE_CXX_FLAGS "-flto=auto -DNDEBUG -march=native ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -fno-strict-aliasing")
+        set(CMAKE_CXX_FLAGS_RELEASE "-flto=auto -DNDEBUG -march=native -O2")
+        set(CMAKE_CXX_FLAGS "-DNDEBUG -march=native ${CMAKE_CXX_FLAGS}")
     endif()
 
     add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)

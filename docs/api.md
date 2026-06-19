@@ -8,7 +8,7 @@ HashMap(size_t bucket_count);                 // Specify initial bucket count
 HashMap(size_t bucket_count, float max_load_factor);  // Specify load factor
 HashMap(const HashMap& other);                // Copy constructor
 HashMap(HashMap&& other) noexcept;            // Move constructor
-HashMap(std::initializer_list<value_type> il);// Initializer list
+HashMap(std::initializer_list<value_type> il); // Initializer list
 ```
 
 ## Capacity Operations
@@ -26,7 +26,7 @@ HashMap(std::initializer_list<value_type> il);// Initializer list
 | Method | Description |
 |--------|-------------|
 | `operator[key]` | Insert or access element |
-| `at(key)` | Access element, undefined behavior if not found |
+| `at(key)` | Access element, throws `std::out_of_range` if not found |
 | `find(key)` | Find element, returns iterator |
 | `try_get(key)` | Find element, returns pointer to value (`nullptr` on failure) |
 | `contains(key)` | Check if key exists |

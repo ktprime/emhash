@@ -27,9 +27,9 @@ emhash7::HashMap<int64_t, int> myhash(1 << 20, 0.999f);
 ### How it works
 
 ```cpp
-// Compile: g++ -O3 -march=native -I../include -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 highload_bench.cpp
+// Compile: g++ -O3 -march=native -I../include -I../thirdparty -std=c++17 -DEMH_HIGH_LOAD=123456 comprehensive_bench.cpp
 
-#include "hash_table7.hpp"
+#include "emhash/hash_table7.hpp"
 
 static void RunHighLoadFactor()
 {
@@ -59,7 +59,7 @@ static void RunHighLoadFactor()
 }
 ```
 
-Full benchmark code with multi-version comparison: [bench/highload_bench.cpp](https://github.com/ktprime/emhash/blob/master/bench/highload_bench.cpp)
+Full benchmark code with multi-version comparison: [bench/comprehensive_bench.cpp](https://github.com/ktprime/emhash/blob/master/bench/comprehensive_bench.cpp)
 
 ### Real benchmark results (1M buckets, LF=0.999, compiled with `-DEMH_HIGH_LOAD=123456`)
 

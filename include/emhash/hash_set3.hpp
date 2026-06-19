@@ -42,6 +42,7 @@
 #include "emhash/config.hpp"
 
 #include <cstring>
+#include <string>
 #include <cstdlib>
 #include <stdexcept>
 #include <type_traits>
@@ -50,6 +51,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <algorithm>
 #include <memory>
 
 #ifdef  EMH_KEY
@@ -74,40 +76,42 @@
     #define next_coll_bucket(bucket)  ((bucket) & _coll_mask) + _mains_buckets
 #endif
 
+// Ensure cache line size is at least 32 bytes
 #if EMH_CACHE_LINE_SIZE < 32
+    #undef EMH_CACHE_LINE_SIZE
     #define EMH_CACHE_LINE_SIZE 64
 #endif
 
 #define EMH_KEY(p,n)      p[n].first
 #define EMH_BUCKET(p,n)   p[n].second
 
-namespace emhash7 {
+namespace emhash3 {
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<KeyT>>
 class HashSet
 {
 public:
 #if EMH_SIZE_TYPE_BIT == 64
-    typedef uint64_t size_type;
+    using size_type = uint64_t;
     constexpr static size_type INACTIVE = ~size_type(0);
 #elif EMH_SIZE_TYPE_BIT == 16
-    typedef uint16_t size_type;
+    using size_type = uint16_t;
     constexpr static size_type INACTIVE = ~size_type(0);
 #else
-    typedef uint32_t size_type;
+    using size_type = uint32_t;
     constexpr static size_type INACTIVE = ~size_type(0);
 #endif
 
-    typedef KeyT     key_type;
-    typedef KeyT     value_type;
-    typedef KeyT& reference;
-    typedef const KeyT& const_reference;
-    typedef AllocT   allocator_type;
+    using key_type = KeyT;
+    using value_type = KeyT;
+    using reference = KeyT&;
+    using const_reference = const KeyT&;
+    using allocator_type = AllocT;
 
 
 private:
-    typedef HashSet<KeyT, HashT, EqT, AllocT> htype;
-    typedef std::pair<KeyT, size_type> PairT;
+    using htype = HashSet<KeyT, HashT, EqT, AllocT>;
+    using PairT = std::pair<KeyT, size_type>;
 
     using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
     using PairAllocTraits = std::allocator_traits<PairAlloc>;
@@ -116,11 +120,11 @@ public:
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef size_type                  difference_type;
-        typedef KeyT                      value_type;
-        typedef value_type*               pointer;
-        typedef value_type&               reference;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = size_type;
+        using value_type = KeyT;
+        using pointer = value_type*;
+        using reference = value_type&;
 
         iterator() { }
         iterator(htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) { }
@@ -179,11 +183,11 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef size_t                    difference_type;
-        typedef const KeyT                value_type;
-        typedef value_type*               pointer;
-        typedef value_type&               reference;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = size_t;
+        using value_type = const KeyT;
+        using pointer = value_type*;
+        using reference = value_type&;
 
         const_iterator() { }
         const_iterator(iterator proto) : _set(proto._set), _bucket(proto._bucket) {  }
@@ -528,8 +532,8 @@ public:
 
     int get_cache_info(size_type bucket, size_type next_bucket) const
     {
-        auto pbucket = reinterpret_cast<size_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<size_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / 64 == pnext / 64)
             return 0;
         auto diff = pbucket > pnext ? (pbucket - pnext) : pnext - pbucket;
@@ -937,7 +941,7 @@ public:
         uint64_t buckets = _num_colls > 65536 ? (1u << 16) : 8u;
         while (buckets < required_buckets) { buckets *= 2; }
         if (buckets >= max_size() || buckets < _num_colls)
-            throw std::length_error("emhash7::HashSet: too many elements");
+            throw std::length_error("emhash3::HashSet: too many elements");
 
         const auto num_buckets = (size_type)buckets;
         const auto main_bucket = num_buckets;
@@ -1380,7 +1384,7 @@ private:
     PairT*    _pairs;
     PairAlloc _alloc;
 };
-} // namespace emhash7
+} // namespace emhash3
 #if __cplusplus > 199711
 //template <class Key> using emihash = emhash1::HashSet<Key, std::hash<Key>>;
 #endif

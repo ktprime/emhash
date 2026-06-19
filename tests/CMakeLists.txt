@@ -1,7 +1,7 @@
 # emhash Test Suite CMakeLists.txt
 # Build all tests with cmake
 
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.16)
 project(emhash_tests LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -63,6 +63,8 @@ emhash_add_test(test_hashset_full_api verify/test_hashset_full_api.cpp)
 emhash_add_test(test_special_key_types verify/test_special_key_types.cpp)
 emhash_add_test(test_merge_correctness verify/test_merge_correctness.cpp)
 emhash_add_test(edge_test verify/edge_test.cpp)
+emhash_add_test(test_find_slot_bucket verify/test_find_slot_bucket.cpp)
+target_link_libraries(test_find_slot_bucket PRIVATE Threads::Threads)
 
 # ============================================================================
 # Stress Tests
@@ -130,6 +132,8 @@ function(emhash_register_test name)
     set_tests_properties(${name} PROPERTIES LABELS "emhash")
 endfunction()
 
+emhash_register_test(reproduce_emhash8_bug)
+
 # Verification tests
 emhash_register_test(test_verify)
 emhash_register_test(quick_test8)
@@ -148,10 +152,15 @@ emhash_register_test(test_hashset_full_api)
 emhash_register_test(test_special_key_types)
 emhash_register_test(test_merge_correctness)
 emhash_register_test(edge_test)
+emhash_register_test(test_find_slot_bucket)
 
 # Stress tests
 emhash_register_test(test_stress)
 emhash_register_test(test_bad_hash_stress)
+emhash_register_test(stress_fix)
+emhash_register_test(highload_test)
+emhash_register_test(test_emhash5_stress)
+emhash_register_test(test_emhash5_hifi)
 
 # Hash attack tests
 emhash_register_test(test_attack)

@@ -1,4 +1,4 @@
-// emhash7::HashMap for C++11/14/17
+// emhash7::HashMap for C++17/20
 // version 2.2.5
 // https://github.com/ktprime/emhash/blob/master/hash_table7.hpp
 //
@@ -45,7 +45,7 @@
 // SEPARATE CHAN RES.
 //    probes/successful lookup    1.05  1.25  1.3   1.25  1.4   1.45  1.50
 //    probes/unsuccessful lookup  1.00  1.11  1.15  1.22  1.25  1.31  1.37
-//    clacul/unsuccessful lookup  1.01  1.25  1.36, 1.56, 1.64, 1.81, 1.97
+//    collision/unsuccessful lookup  1.01  1.25  1.36, 1.56, 1.64, 1.81, 1.97
 
 /****************
     under random hashCodes, the frequency of nodes in bins follows a Poisson
@@ -63,7 +63,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 7: 0.00000094
 8: 0.00000006
 
-  ============== buckets size ration ========
+  ============== buckets size ratio ========
     1   1543981  0.36884964|0.36787944  36.885
     2    768655  0.36725597|0.36787944  73.611
     3    256236  0.18364065|0.18393972  91.975
@@ -73,10 +73,10 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     7       310  0.00051840|0.00051094  99.990
     8        49  0.00009365|0.00007299  99.999
     9         4  0.00000860|0.00000913  100.000
-========== collision miss ration ===========
+========== collision miss ratio ===========
   _num_filled aver_size k.v size_kv = 4185936, 1.58, x.x 24
-  collision,possion,cache_miss hit_find|hit_miss, load_factor = 36.73%,36.74%,31.31%  1.50|2.00, 1.00
-============== buckets size ration ========
+  collision,poisson,cache_miss hit_find|hit_miss, load_factor = 36.73%,36.74%,31.31%  1.50|2.00, 1.00
+============== buckets size ratio ========
 *******************************************************/
 
 #pragma once
@@ -96,7 +96,11 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 #include <algorithm>
 #include <memory>
 
-#if EMH_WY_HASH
+#ifdef __has_include
+    #if __has_include("wyhash.h")
+    #include "wyhash.h"
+    #endif
+#elif EMH_WY_HASH
     #include "wyhash.h"
 #endif
 
@@ -152,13 +156,13 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 namespace emhash7 {
 
 #ifdef EMH_SIZE_TYPE_16BIT
-    typedef uint16_t size_type;
+    using size_type = uint16_t;
     static constexpr size_type INACTIVE = 0xFFFF;
 #elif EMH_SIZE_TYPE_64BIT
-    typedef uint64_t size_type;
+    using size_type = uint64_t;
     static constexpr size_type INACTIVE = 0 - 0x1ull;
 #else
-    typedef uint32_t size_type;
+    using size_type = uint32_t;
     static constexpr size_type INACTIVE = 0xFFFFFFFF;
 #endif
 
@@ -330,28 +334,28 @@ class HashMap
     constexpr static float EMH_MIN_LOAD_FACTOR     = 0.25f;
 
 public:
-    typedef HashMap<KeyT, ValueT, HashT, EqT, AllocT> htype;
-    typedef std::pair<KeyT, ValueT>           value_type;
-    typedef AllocT                            allocator_type;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
+    using value_type = std::pair<KeyT, ValueT>;
+    using allocator_type = AllocT;
 
 #if EMH_BUCKET_INDEX == 0
-    typedef value_type                        value_pair;
-    typedef std::pair<size_type, value_type>  PairT;
+    using value_pair = value_type;
+    using PairT = std::pair<size_type, value_type>;
 #elif EMH_BUCKET_INDEX == 2
-    typedef value_type                        value_pair;
-    typedef std::pair<value_type, size_type>  PairT;
+    using value_pair = value_type;
+    using PairT = std::pair<value_type, size_type>;
 #else
-    typedef entry<KeyT, ValueT>               value_pair;
-    typedef entry<KeyT, ValueT>               PairT;
+    using value_pair = entry<KeyT, ValueT>;
+    using PairT = entry<KeyT, ValueT>;
 #endif
 
-    typedef KeyT   key_type;
-    typedef ValueT val_type;
-    typedef ValueT mapped_type;
-    typedef HashT  hasher;
-    typedef EqT    key_equal;
-    typedef PairT&       reference;
-    typedef const PairT& const_reference;
+    using key_type = KeyT;
+    using val_type = ValueT;
+    using mapped_type = ValueT;
+    using hasher = HashT;
+    using key_equal = EqT;
+    using reference = PairT&;
+    using const_reference = const PairT&;
 
     using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
     using PairAllocTraits = std::allocator_traits<PairAlloc>;
@@ -360,12 +364,12 @@ public:
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef value_pair                value_type;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = value_pair;
 
-        typedef value_pair*               pointer;
-        typedef value_pair&               reference;
+        using pointer = value_pair*;
+        using reference = value_pair&;
 
         iterator() = default;
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
@@ -466,12 +470,12 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef std::ptrdiff_t            difference_type;
-        typedef value_pair                value_type;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = value_pair;
 
-        typedef const value_pair*          pointer;
-        typedef const value_pair&          reference;
+        using pointer = const value_pair*;
+        using reference = const value_pair&;
 
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) { }
         //const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
@@ -875,8 +879,8 @@ public:
     size_type get_diss(size_type bucket, size_type next_bucket, const size_type slots) const
     {
         const int cahe_line_size = 64;
-        auto pbucket = reinterpret_cast<uint64_t>(&_pairs[bucket]);
-        auto pnext   = reinterpret_cast<uint64_t>(&_pairs[next_bucket]);
+        auto pbucket = reinterpret_cast<uintptr_t>(&_pairs[bucket]);
+        auto pnext   = reinterpret_cast<uintptr_t>(&_pairs[next_bucket]);
         if (pbucket / cahe_line_size == pnext / cahe_line_size)
             return 0;
         size_type diff = pbucket > pnext ? (pbucket - pnext) : (pnext - pbucket);
@@ -926,7 +930,7 @@ public:
         size_type sumb = 0, sums = 0, sumn = 0;
         size_type miss = 0, finds = 0, bucket_coll = 0;
         double lf = load_factor(), fk = 1.0 / exp(lf), sum_poisson = 0;
-        int bsize = snprintf(buff, 1024, "============== buckets size ration ========\n");
+        int bsize = snprintf(buff, 1024, "============== buckets size ratio ========\n");
 
         miss += _num_buckets - _num_filled;
         for (int i = 1, factorial = 1; i < int(sizeof(buckets) / sizeof(buckets[0])); i++) {

@@ -25,13 +25,13 @@ The API is largely compatible with `std::unordered_map`.
 | Method | Notes |
 |--------|-------|
 | `operator[]` | Identical behavior |
-| `at()` | Identical behavior (but UB on missing key in emhash) |
+| `at()` | Identical behavior (throws `std::out_of_range` on missing key, same as std::unordered_map) |
 | `insert()` | Identical behavior |
 | `emplace()` | Identical behavior |
 | `erase(key)` | Identical behavior |
 | `erase(it)` | Identical behavior |
 | `find()` | Identical behavior |
-| `contains()` | C++20 method, works in C++17 with emhash |
+| `contains()` | Standard C++20 method, emhash also provides it under C++17 |
 | `count()` | Identical behavior |
 | `size()` / `empty()` | Identical behavior |
 | `clear()` | Identical behavior |
@@ -48,8 +48,8 @@ The API is largely compatible with `std::unordered_map`.
 |---------|---------------------|--------|
 | **Reference stability** | Guaranteed (node-based) | **Not guaranteed** (open addressing) |
 | **Iterator invalidation** | Only on erase of that element | On any insert/erase/rehash |
-| **`at()` on missing key** | Throws `std::out_of_range` | **Undefined behavior** |
-| **`max_load_factor()`** | Can be set freely | Fixed at compile time (0.80 default) |
+| **`at()` on missing key** | Throws `std::out_of_range` | Throws `std::out_of_range` (same as std) |
+| **`max_load_factor()`** | Can be set freely | Settable at runtime (0.80 default, up to 0.999 with `EMH_HIGH_LOAD`) |
 | **`bucket()` / `bucket_size()`** | Available | Not available |
 | **`equal_range()`** | Available | Not available |
 | **`merge()`** | Available (C++17) | Not available |
@@ -154,7 +154,7 @@ Typical speedup when migrating from `std::unordered_map`:
 ## What NOT to Do
 
 1. **Don't store references/pointers to elements** — they may be invalidated
-2. **Don't rely on `at()` throwing** — emhash's `at()` is UB on missing keys
+2. **Don't use `at()` for hot-path lookups** — emhash's `at()` throws `std::out_of_range` (same as std) which incurs exception overhead; prefer `try_get()` for performance-critical code
 3. **Don't use `bucket()` / `bucket_size()`** — not available in open addressing
 4. **Don't assume iterator stability** — any modification may invalidate all iterators
 

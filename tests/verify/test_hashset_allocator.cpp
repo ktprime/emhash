@@ -62,8 +62,8 @@ static void test_over_aligned()
 static void test_hash_sets()
 {
     emhash2::HashSet<int> s2;
-    emhash7::HashSet<int> s3;
-    emhash9::HashSet<int> s4;
+    emhash3::HashSet<int> s3;
+    emhash4::HashSet<int> s4;
     emhash8::HashSet<int> s8;
     for (int i = 0; i < 100; i++) {
         s2.insert(i); s3.insert(i); s4.insert(i); s8.insert(i);

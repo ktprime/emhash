@@ -46,3 +46,19 @@
 #else
     #define EMH_UNREACHABLE() ((void)0)
 #endif
+
+// Compatibility aliases (used by lru_time.hpp / lru_size.hpp)
+#ifndef EMHASH_LIKELY
+    #define EMHASH_LIKELY(condition)   EMH_LIKELY(condition)
+#endif
+#ifndef EMHASH_UNLIKELY
+    #define EMHASH_UNLIKELY(condition) EMH_UNLIKELY(condition)
+#endif
+
+// Default cache line size
+#ifndef EMH_CACHE_LINE_SIZE
+    #define EMH_CACHE_LINE_SIZE 64
+#endif
+#ifndef EMHASH_CACHE_LINE_SIZE
+    #define EMHASH_CACHE_LINE_SIZE EMH_CACHE_LINE_SIZE
+#endif
