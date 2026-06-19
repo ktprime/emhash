@@ -1,5 +1,5 @@
 // LICENSE:
-// version 1.1.0
+// version 1.2.0
 // https://github.com/ktprime/emhash/blob/master/include/emilib/emihmap2.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.

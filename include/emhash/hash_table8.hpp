@@ -1256,9 +1256,11 @@ public:
             return;
 
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
-        while (buckets < required_buckets) { buckets *= 2; }
-        if (buckets > (uint64_t)max_size() || buckets < _num_filled)
-            throw std::length_error("emhash8::HashMap: too many elements");
+        while (buckets < required_buckets) {
+            buckets *= 2;
+            if (buckets > (uint64_t)max_size())
+                throw std::length_error("emhash8::HashMap: too many elements");
+        }
 
 #if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
@@ -1678,6 +1680,7 @@ private:
     // key is not in this slot. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept
     {
+        assert(_num_filled < _num_buckets); // must have empty slots
 #if EMH_HIGH_LOAD
         if (_ehead)
             return pop_empty(_ehead);

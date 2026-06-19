@@ -29,11 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/faq.md` — Frequently asked questions
 - `docs/migration_guide.md` — Migration guide from std::unordered_map
 - `scripts/pre-commit.sh` — Git pre-commit hook for clang-format checking
-- README: added CI status and version badges, FAQ and migration guide links
-- `quick_bench.cpp` — zero-dependency quick benchmark (emhash7/8 vs std::unordered_map)
-- `docs/performance_tips.md` — performance tuning guide (compile flags, pre-allocation, hash selection, anti-patterns)
-- `docs/faq.md` — frequently asked questions
-- `docs/migration_guide.md` — migration guide from std::unordered_map
 - `docs/examples/CMakeLists.txt` — CMake build for all examples + quick_bench
 - Method-level Doxygen for hash_table8.hpp core API (contains, try_get, try_set, insert_unique, set_get, erase)
 

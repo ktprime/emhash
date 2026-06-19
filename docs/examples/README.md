@@ -26,8 +26,8 @@ g++ -std=c++17 -I../../include basic_map.cpp -o basic_map
 
 | Header | Container | Description |
 |--------|-----------|-------------|
-| `emhash/hash_table5.hpp` | `emhash5::HashMap<K,V>` | Linear probing |
-| `emhash/hash_table6.hpp` | `emhash6::HashMap<K,V>` | Quadratic probing |
+| `emhash/hash_table5.hpp` | `emhash5::HashMap<K,V>` | Three-way hybrid probing |
+| `emhash/hash_table6.hpp` | `emhash6::HashMap<K,V>` | Linked-bucket with bitmask |
 | `emhash/hash_table7.hpp` | `emhash7::HashMap<K,V>` | No-tombstone design |
 | `emhash/hash_table8.hpp` | `emhash8::HashMap<K,V>` | Latest version, recommended |
 | `emhash/hash_set8.hpp` | `emhash8::HashSet<K>` | HashSet (latest) |

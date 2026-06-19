@@ -1,5 +1,5 @@
 // LICENSE:
-// version 1.1.0
+// version 1.2.0
 // https://github.com/ktprime/emhash/blob/master/include/emilib/emihmap3.hpp
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -1017,7 +1017,7 @@ private:
         if (offset < 7)// || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else
-            next_bucket += _num_buckets / 8 + simd_bytes;
+            next_bucket += ((_num_buckets / 8 / simd_bytes) | 1) * simd_bytes;
 #else
         next_bucket += 3 * simd_bytes;
         if (next_bucket >= _num_buckets)

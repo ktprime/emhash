@@ -183,10 +183,12 @@ static inline size_type CTZ(size_t n)
 #elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
     n = __builtin_bswap64(n);
 #else
-    static uint32_t endianness = 0x12345678;
-    const auto is_big = *(const char *)&endianness == 0x12;
-    if (is_big)
-    n = __builtin_bswap64(n);
+    // Portable endianness detection without strict aliasing violation
+    uint32_t endianness = 0x12345678;
+    unsigned char first_byte;
+    std::memcpy(&first_byte, &endianness, 1);
+    if (first_byte == 0x12)
+        n = __builtin_bswap64(n);
 #endif
 
 #ifdef _WIN32
@@ -1344,20 +1346,12 @@ public:
 
     static constexpr bool need_explicit_dtor()
     {
-#if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
-#else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
-#endif
     }
 
     static constexpr bool is_trivially_copyable()
     {
-#if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
-#else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
-#endif
     }
 
     static void prefetch_heap_block(char* ctrl)
@@ -1425,15 +1419,11 @@ public:
             return;
 
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2u;
-        while (buckets < required_buckets) { buckets *= 2; }
-
-        // no need alloc large bucket for small key sizeof(KeyT) < sizeof(int).
-        // set small a max_load_factor, insert/reserve() will fail and introduce rehash issue TODO: dothing ?
-        //if (sizeof(KeyT) < sizeof(size_type) && buckets > (1ul << (sizeof(uint16_t) * 8)))
-        //    buckets = 2ul << (sizeof(KeyT) * 8);
-
-        if (buckets > max_size() || buckets < _num_filled)
-            throw std::length_error("emhash7::HashMap: too many elements");
+        while (buckets < required_buckets) {
+            buckets *= 2;
+            if (buckets > (uint64_t)max_size())
+                throw std::length_error("emhash7::HashMap: too many elements");
+        }
 
         auto num_buckets = (size_type)buckets;
         auto old_num_filled = _num_filled;
@@ -1750,6 +1740,7 @@ private:
     // key is not in this map. Find a place to put it.
     size_type find_empty_bucket(const size_type bucket_from, const size_type main_bucket)
     {
+        assert(_num_filled < _num_buckets); // must have empty slots
 #if EMH_ITER_SAFE
         const auto boset = bucket_from % 8;
         auto* const align = (uint8_t*)_bitmask + bucket_from / 8;(void)main_bucket;

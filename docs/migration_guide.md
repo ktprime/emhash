@@ -50,9 +50,9 @@ The API is largely compatible with `std::unordered_map`.
 | **Iterator invalidation** | Only on erase of that element | On any insert/erase/rehash |
 | **`at()` on missing key** | Throws `std::out_of_range` | Throws `std::out_of_range` (same as std) |
 | **`max_load_factor()`** | Can be set freely | Settable at runtime (0.80 default, up to 0.999 with `EMH_HIGH_LOAD`) |
-| **`bucket()` / `bucket_size()`** | Available | Not available |
-| **`equal_range()`** | Available | Not available |
-| **`merge()`** | Available (C++17) | Not available |
+| **`bucket()` / `bucket_size()`** | Available | Available only with `EMH_STATIS` compile flag |
+| **`equal_range()`** | Available | Available (emhash8) |
+| **`merge()`** | Available (C++17) | Available (emhash8) |
 | **Node handle** | Available (C++17) | Not available |
 
 ### emhash-Only Methods (Not in std::unordered_map)
@@ -61,9 +61,9 @@ The API is largely compatible with `std::unordered_map`.
 |--------|-------------|
 | `insert_unique(key, val)` | Direct insert without lookup — faster when key is guaranteed unique |
 | `try_get(key)` | Returns `ValueT*` (`nullptr` if not found) — avoids exception overhead |
-| `try_set(key, val)` | Sets value only if key does not exist (emhash5/8) |
+| `try_set(key, val)` | Set value if key exists, do nothing if it doesn't (emhash5/8) |
 | `set_get(key, val)` | Sets new value, returns old value (emhash5/8) |
-| `_erase(key)` | Erase returning void — slightly faster than `erase()` |
+| `_erase(it)` | Erase by iterator returning void — slightly faster than `erase()` (emhash7 only) |
 | `shrink_to_fit()` | Releases unused memory |
 
 ## Common Migration Patterns

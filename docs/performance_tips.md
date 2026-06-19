@@ -98,11 +98,14 @@ map.contains(key);
 
 ## Hash Function Selection
 
-### 9. Integer Keys: Default Hash Is Usually Best
+### 9. Integer Keys: Consider Bit-Mixing Hash
 
 ```cpp
-// Default std::hash<int> is identity — optimal for open addressing
-emhash7::HashMap<int, int> map;  // Good
+// Default std::hash<int> is identity — can cause clustering with power-of-2 buckets
+// for arithmetic sequence keys (0, 1024, 2048, ...). Consider enabling EMH_INT_HASH:
+emhash7::HashMap<int, int> map;  // OK for random keys
+
+// For sequential/arithmetic keys, compile with -DEMH_INT_HASH=1 for golden-ratio mixing
 ```
 
 ### 10. String Keys: Consider wyhash

@@ -42,7 +42,7 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 |---------|-------------|
 | `insert_unique` | Direct insertion without lookup (performance boost) |
 | `try_get` | Returns pointer to value, `nullptr` if key not found |
-| `try_set` | Sets value only if key does not exist (emhash5/8) |
+| `try_set` | Set value if key exists, do nothing if it doesn't (emhash5/8) |
 | `set_get` | Updates value and returns old value (emhash5/8) |
 | `_erase` | Delete operation returning void (faster) |
 | **LRU Mode** | Enable LRU cache optimization with `EMH_LRU_SET` |
