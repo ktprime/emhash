@@ -42,6 +42,7 @@
 #include <cstring>
 #include <string>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -378,7 +379,7 @@ public:
     void swap(HashSet& other)
     {
         std::swap(_hasher, other._hasher);
-//      std::swap(_eq, other._eq);
+        std::swap(_eq, other._eq);
         std::swap(_alloc, other._alloc);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
@@ -851,6 +852,7 @@ public:
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
+        (void)position; // unused parameter
         return insert(std::forward<Args>(args)...);
     }
 
@@ -1025,7 +1027,7 @@ private:
         uint64_t buckets = _num_filled > 65536 ? (1u << 16) : 8u;
         while (buckets < required_buckets) { buckets *= 2; }
         if (buckets > max_size() || buckets < _num_filled)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emhash2::HashSet: too many elements");
 
         const auto num_buckets = (uint32_t)buckets;
         if (num_buckets == _num_buckets && _mask != 0)
@@ -1075,7 +1077,7 @@ private:
             const auto mbucket = bucket_main();
             const auto collision = _num_filled - mbucket;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/type/sizeof/collision/load_factor = %u/%.2lf/%s/%zd/%2.lf%%|%.2f",
+            snprintf(buff, sizeof(buff), "    _num_filled/aver_size/type/sizeof/collision/load_factor = %u/%.2lf/%s/%zd/%2.lf%%|%.2f",
             _num_filled, (double)_num_filled / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]), (collision * 100.0 / _num_filled), load_factor());
 #ifdef EMH_LOG
             static size_type ihashs = 0;
@@ -1431,7 +1433,7 @@ private:
     size_type  _last_colls;
     size_type  _num_buckets;
 };
-} // namespace emhash
+} // namespace emhash2
 #if __cplusplus >= 201103L
 //template <class Key, typename Hash = std::hash<Key>> using ktprime_hashset_v8 = emhash8::HashSet<Key, Hash>;
 #endif

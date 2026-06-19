@@ -127,12 +127,12 @@ public:
     using mapped_type = ValueT;
     //using dPolicy = Policy;
 
-#ifdef EMH_SMALL_TYPE
+#if defined(EMH_SMALL_TYPE)
     using size_type = uint16_t;
-#elif EMH_SIZE_TYPE == 0
-    using size_type = uint32_t;
-#else
+#elif defined(EMH_SIZE_TYPE) && EMH_SIZE_TYPE != 0
     using size_type = uint64_t;
+#else
+    using size_type = uint32_t;
 #endif
 
     using hasher = HashT;
@@ -423,7 +423,7 @@ public:
 
     void swap(HashMap& rhs)
     {
-        //      std::swap(_eq, rhs._eq);
+        std::swap(_eq, rhs._eq);
         std::swap(_hasher, rhs._hasher);
         std::swap(_pairs, rhs._pairs);
         std::swap(_index, rhs._index);
@@ -894,7 +894,7 @@ public:
     }
 
     template <class... Args>
-    std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -957,7 +957,7 @@ public:
     }
 
     /// Like std::map<KeyT, ValueT>::operator[].
-    ValueT& operator[](const KeyT& key) noexcept
+    ValueT& operator[](const KeyT& key)
     {
         check_expand_need();
         const auto key_hash = hash_key(key);
@@ -971,7 +971,7 @@ public:
         return _pairs[slot].second;
     }
 
-    ValueT& operator[](KeyT&& key) noexcept
+    ValueT& operator[](KeyT&& key)
     {
         check_expand_need();
         const auto key_hash = hash_key(key);
@@ -1044,12 +1044,12 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1064,7 +1064,7 @@ public:
 
     void clearkv()
     {
-        if (!is_trivially_destructible()) {
+        if (need_explicit_dtor()) {
             while (_num_filled --)
                 _pairs[_num_filled].~value_type();
         }
@@ -1100,7 +1100,7 @@ public:
     void set_empty()
     {
         auto prev = 0;
-        for (int32_t bucket = 1; bucket < _num_buckets; ++bucket) {
+        for (size_type bucket = 1; bucket < _num_buckets; ++bucket) {
             if (EMH_EMPTY(bucket)) {
                 if (prev != 0) {
                     EMH_PREVET(_index, bucket) = prev;
@@ -1244,7 +1244,7 @@ public:
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++) {
                 new(new_pairs + slot) value_type(std::move(_pairs[slot]));
-                if (!is_trivially_destructible())
+                if (need_explicit_dtor())
                     _pairs[slot].~value_type();
             }
         }
@@ -1265,7 +1265,7 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (buckets < required_buckets) { buckets *= 2; }
         if (buckets > (uint64_t)max_size() || buckets < _num_filled)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emhash8::HashMap: too many elements");
 
 #if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
@@ -1321,7 +1321,7 @@ public:
         if (_num_filled > EMH_REHASH_LOG) {
             auto mbucket = _num_filled - collision;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
+            snprintf(buff, sizeof(buff), "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0; EMH_LOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
@@ -1379,7 +1379,7 @@ private:
             _index[update_bucket].slot = slot | (_index[update_bucket].slot & ~_mask);
         }
 
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[last_slot].~value_type();
 
         _etail = INACTIVE;
@@ -1425,7 +1425,10 @@ private:
         while (true) {
             if (EMH_LIKELY(slot == (_index[next_bucket].slot & _mask)))
                 return next_bucket;
-            next_bucket = _index[next_bucket].next;
+            const auto nbucket = _index[next_bucket].next;
+            if (nbucket == next_bucket)
+                break;
+            next_bucket = nbucket;
         }
 
         return INACTIVE;

@@ -28,6 +28,7 @@
 #include <cstring>
 #include <string>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -96,12 +97,12 @@ public:
     using key_type = const KeyT;
     //using dPolicy = Policy;
 
-#ifdef EMH_SMALL_TYPE
+#if defined(EMH_SMALL_TYPE)
     using size_type = uint16_t;
-#elif EMH_SIZE_TYPE == 0
-    using size_type = uint32_t;
-#else
+#elif defined(EMH_SIZE_TYPE) && EMH_SIZE_TYPE != 0
     using size_type = uint64_t;
+#else
+    using size_type = uint32_t;
 #endif
 
     using hasher = HashT;
@@ -131,12 +132,12 @@ public:
         using const_pointer = const value_type*;
         using const_reference = const value_type&;
 
-        // Maak constructoren constexpr
+        // Make constructors constexpr
         constexpr iterator() : kv_(nullptr) {}
         constexpr iterator(const const_iterator& cit) : kv_(cit.kv_) {}
-        constexpr iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<int>(bucket)) {}
+        constexpr iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<std::ptrdiff_t>(bucket)) {}
 
-        // Maak operatoren constexpr
+        // Make operators constexpr
         constexpr iterator& operator++()
         {
             kv_++;
@@ -166,25 +167,24 @@ public:
         constexpr reference operator*() const { return *kv_; }
         constexpr pointer operator->() const { return kv_; }
 
-        // Maak vergelijking operatoren constexpr
+        // Make comparison operators constexpr
         constexpr bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
         constexpr bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
         constexpr bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
         constexpr bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
 
-    public:
-        value_type* kv_;
     private:
+        value_type* kv_;
 
-        // Vriend klasse om toegang te geven aan const_iterator
         friend class const_iterator;
+        friend class HashSet;
     };
 
     class const_iterator
     {
     public:
         using iterator_category = std::bidirectional_iterator_tag;
-        using iterator_concept = std::bidirectional_iterator_tag; // Toegevoegd voor C++20 Ranges
+        using iterator_concept = std::bidirectional_iterator_tag; // Added for C++20 Ranges
         using value_type = typename htype::value_type;
         using difference_type = std::ptrdiff_t;
         using pointer = const value_type*;
@@ -192,12 +192,12 @@ public:
         using reference = const value_type&;
         using const_reference = const value_type&;
 
-        // Maak constructoren constexpr
+        // Make constructors constexpr
         constexpr const_iterator() : kv_(nullptr) {}
         constexpr const_iterator(const iterator& it) : kv_(it.kv_) {}
-        constexpr const_iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<int>(bucket)) {}
+        constexpr const_iterator(const htype* hash_map, size_type bucket) : kv_(hash_map->_pairs + static_cast<std::ptrdiff_t>(bucket)) {}
 
-        // Maak operatoren constexpr
+        // Make operators constexpr
         constexpr const_iterator& operator++()
         {
             kv_++;
@@ -227,14 +227,17 @@ public:
         constexpr const_reference operator*() const { return *kv_; }
         constexpr const_pointer operator->() const { return kv_; }
 
-        // Maak vergelijking operatoren constexpr
+        // Make comparison operators constexpr
         constexpr bool operator==(const const_iterator& rhs) const { return kv_ == rhs.kv_; }
         constexpr bool operator!=(const const_iterator& rhs) const { return kv_ != rhs.kv_; }
         constexpr bool operator==(const iterator& rhs) const { return kv_ == rhs.kv_; }
         constexpr bool operator!=(const iterator& rhs) const { return kv_ != rhs.kv_; }
 
-    public:
+    private:
         const value_type* kv_;
+
+        friend class iterator;
+        friend class HashSet;
     };
 
     void init(size_type bucket, float mlf = EMH_DEFAULT_LOAD_FACTOR)
@@ -426,7 +429,7 @@ public:
 
     void swap(HashSet& rhs)
     {
-        //      std::swap(_eq, rhs._eq);
+        std::swap(_eq, rhs._eq);
         std::swap(_hasher, rhs._hasher);
         std::swap(_pairs, rhs._pairs);
         std::swap(_index, rhs._index);
@@ -759,7 +762,7 @@ public:
     }
 
     template <class... Args>
-    std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -851,12 +854,12 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return (std::is_trivially_destructible<KeyT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value);
 #else
-        return (std::is_pod<KeyT>::value);
+        return !(std::is_pod<KeyT>::value);
 #endif
     }
 
@@ -871,7 +874,7 @@ public:
 
     void clearkv()
     {
-        if (!is_trivially_destructible()) {
+        if (need_explicit_dtor()) {
             while (_num_filled --)
                 _pairs[_num_filled].~value_type();
         }
@@ -1048,7 +1051,7 @@ public:
         } else {
             for (size_type slot = 0; slot < _num_filled; slot++) {
                 new(new_pairs + slot) value_type(std::move(_pairs[slot]));
-                if (!is_trivially_destructible())
+                if (need_explicit_dtor())
                     _pairs[slot].~value_type();
             }
         }
@@ -1069,7 +1072,7 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (buckets < required_buckets) { buckets *= 2; }
         if (buckets > (uint64_t)max_size() || buckets < _num_filled)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emhash8::HashSet: too many elements");
 
 #if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
@@ -1125,7 +1128,7 @@ public:
         if (_num_filled > EMH_REHASH_LOG) {
             auto mbucket = _num_filled - collision;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s/%zd|%.2lf%%,%.2lf%%",
+            snprintf(buff, sizeof(buff), "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s/%zd|%.2lf%%,%.2lf%%",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0; EMH_LOG() << "hash_nums = " << ihashs ++ << "|" <<__FUNCTION__ << "|" << buff << endl;
@@ -1148,8 +1151,7 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(__GNUC__) || defined(__clang__)
-        (void)ctrl;
-//        __builtin_prefetch(static_cast<const void*>(ctrl));
+        __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32 && defined(_M_ARM64)
         __prefetch((const char*)ctrl);
 #elif _WIN32
@@ -1184,7 +1186,7 @@ private:
             _index[update_bucket].slot = slot | (_index[update_bucket].slot & ~_mask);
         }
 
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[last_slot].~value_type();
 
         _etail = INACTIVE;
@@ -1230,7 +1232,10 @@ private:
         while (true) {
             if (EMH_LIKELY(slot == (_index[next_bucket].slot & _mask)))
                 return next_bucket;
-            next_bucket = _index[next_bucket].next;
+            const auto nbucket = _index[next_bucket].next;
+            if (nbucket == next_bucket)
+                break;
+            next_bucket = nbucket;
         }
 
         return INACTIVE;
@@ -1752,4 +1757,4 @@ private:
     PairAlloc _pair_allocator;
     IndexAlloc _index_allocator;
 };
-} // namespace emhash
+} // namespace emhash8

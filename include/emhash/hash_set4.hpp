@@ -29,6 +29,7 @@
 #include <string>
 #include <cmath>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -405,6 +406,7 @@ public:
 
     HashSet(std::initializer_list<value_type> il, size_t n = 8)
     {
+        (void)n; // unused parameter
         init((size_type)il.size());
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
@@ -444,7 +446,7 @@ public:
 
     ~HashSet()
     {
-        if (is_trivially_destructible())
+        if (need_explicit_dtor())
             clearkv();
 
         dealloc_bucket(_pairs, _num_buckets);
@@ -481,7 +483,7 @@ public:
     inline void swap(HashSet& other)
     {
         std::swap(_hasher, other._hasher);
-//      std::swap(_eq, other._eq);
+        std::swap(_eq, other._eq);
         std::swap(_alloc, other._alloc);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
@@ -847,6 +849,7 @@ public:
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
+        (void)position; // unused parameter
         return insert(std::forward<Args>(args)...).first;
     }
     std::pair<iterator, bool> try_emplace(const value_type& k)
@@ -912,7 +915,7 @@ public:
 
     void clear_bucket(size_type bucket)
     {
-        if (is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[bucket].~PairT();
         _pairs[bucket].second = INACTIVE;
         _num_filled --;
@@ -955,7 +958,7 @@ public:
         clear_bucket(bucket);
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value);
@@ -975,7 +978,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_trivially_destructible())
+        if (need_explicit_dtor())
             clearkv();
         else {
             memset((void*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
@@ -1011,7 +1014,7 @@ private:
         while (buckets < required_buckets) { buckets *= 2; }
 		
         if (buckets > max_size() || buckets < _num_filled)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emhash9::HashSet: too many elements");
 
         const auto num_buckets = (size_type)buckets;
 
@@ -1052,7 +1055,7 @@ private:
 
             const auto bucket = find_unique_bucket(opair.first);
             new_key(std::move(opair.first), bucket);
-            if (is_trivially_destructible())
+            if (need_explicit_dtor())
                 opair.first.~KeyT();
         }
 
@@ -1060,7 +1063,7 @@ private:
         if (_num_filled > EMH_REHASH_LOG) {
             const auto mbucket = bucket_main();
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/type/sizeof/coll|load_factor = %u/%s/%zd/%.2lf%%|%.2f",
+            snprintf(buff, sizeof(buff), "    _num_filled/type/sizeof/coll|load_factor = %u/%s/%zd/%.2lf%%|%.2f",
                     _num_filled, typeid(value_type).name(), sizeof(PairT), 100. - 100.0 * mbucket / _num_filled, load_factor());
 #ifdef EMH_LOG
             static size_type ihashs = 0;
@@ -1185,7 +1188,7 @@ private:
         _pairs[prev_bucket].second = new_bucket;
         if (next_bucket == bucket)
             _pairs[new_bucket].second = new_bucket;
-        if (is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[bucket].~PairT();
         _pairs[bucket].second = INACTIVE;
         return bucket;
@@ -1437,7 +1440,7 @@ private:
 
     size_type  _num_filled;
 };
-} // namespace emhash
+} // namespace emhash9
 #if __cplusplus >= 201103L
 template <class Key, typename Hash = std::hash<Key>, typename Alloc = std::allocator<Key>> using em_hash_set = emhash9::HashSet<Key, Hash, std::equal_to<Key>, Alloc>;
 #endif

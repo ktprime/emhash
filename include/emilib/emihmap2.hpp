@@ -80,7 +80,7 @@ namespace emilib2 {
     constexpr static uint8_t OFFSET_STEP = 8;
 #endif
 
-#if AVX2_EHASH == 0
+#if !defined(AVX2_EHASH)
     const static auto simd_empty  = _mm_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm_set1_epi8(EDELETE);
     const static auto simd_sentinel = _mm_set1_epi8(ESENTINEL);
@@ -93,7 +93,7 @@ namespace emilib2 {
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
     #define CMPGT_EPI8     _mm_cmpgt_epi8
-#elif SSE2_EMHASH == 0
+#elif defined(AVX2_EHASH)
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm256_set1_epi8(EDELETE);
     const static auto simd_sentinel = _mm256_set1_epi8(ESENTINEL);
@@ -106,7 +106,7 @@ namespace emilib2 {
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
     #define CMPGT_EPI8     _mm256_cmpgt_epi8
 
-#elif AVX512_EHASH
+#elif defined(AVX512_EHASH)
     const static auto simd_empty  = _mm512_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm512_set1_epi8(EDELETE);
     constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
@@ -950,7 +950,7 @@ public:
 
     //#define EMH_STATIS 10'000'000
     /// Make room for this many elements
-    void rehash(uint64_t required_buckets) noexcept
+    void rehash(uint64_t required_buckets)
     {
         if (required_buckets < _num_filled)
             return;
@@ -967,7 +967,7 @@ public:
         const auto state_size = buckets + simd_bytes;
         //assert(state_size % 8 == 0);
         if (buckets > max_size() || buckets < _num_filled)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emilib2::HashMap: too many elements");
 
         const auto num_buckets = (size_t)buckets;
         const auto* new_data = (char*)malloc(pairs_size + state_size * sizeof(_states[0]) + (state_size / OFFSET_STEP) * sizeof(_offset[0]));
@@ -1255,5 +1255,5 @@ private:
     uint32_t _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
 };
 
-} // namespace emilib
+} // namespace emilib2
 #undef LOAD_UEPI8

@@ -41,6 +41,7 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <stdexcept>
 #include <type_traits>
 #include <cassert>
 #include <utility>
@@ -355,6 +356,7 @@ public:
     HashSet(std::initializer_list<key_type> il, size_type n = 8, const HashT& hash = HashT(), const EqT& eq = EqT(), const AllocT& alloc = AllocT())
         : _alloc(alloc)
     {
+        (void)n; // unused parameter
         init();
         _hasher = hash;
         _eq = eq;
@@ -794,6 +796,7 @@ public:
     template <class... Args>
     iterator emplace_hint(const_iterator position, Args&&... args)
     {
+        (void)position; // unused parameter
         return insert(std::forward<Args>(args)...).first;
     }
     std::pair<iterator, bool> try_emplace(const key_type& k)
@@ -943,7 +946,7 @@ public:
         uint64_t buckets = _num_colls > 65536 ? (1u << 16) : 8u;
         while (buckets < required_buckets) { buckets *= 2; }
         if (buckets >= max_size() || buckets < _num_colls)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emhash7::HashSet: too many elements");
 
         const auto num_buckets = (size_type)buckets;
         const auto main_bucket = num_buckets;
@@ -1041,7 +1044,7 @@ public:
         if (_num_colls > 100000) {
             auto mbucket = size() - collision;
             char buff[255] = {0};
-            sprintf(buff, "    _num_colls/main_factor/coll_factor/K/pack/collision = %u/%.2lf%%/%.2lf%%/%s/%zd/%.2lf%%",
+            snprintf(buff, sizeof(buff), "    _num_colls/main_factor/coll_factor/K/pack/collision = %u/%.2lf%%/%.2lf%%/%s/%zd/%.2lf%%",
                     _num_colls, old_num_mains * 100.0 / old_main_buckets, 100.0 * _num_colls / _colls_buckets, typeid(KeyT).name(), sizeof(_pairs[0]), _num_colls * 100.0 / size());
 #ifdef EMH_LOG
             static size_type ihashs = 0;
@@ -1386,7 +1389,7 @@ private:
     PairT*    _pairs;
     PairAlloc _alloc;
 };
-} // namespace emhash
+} // namespace emhash7
 #if __cplusplus > 199711
 //template <class Key> using emihash = emhash1::HashSet<Key, std::hash<Key>>;
 #endif

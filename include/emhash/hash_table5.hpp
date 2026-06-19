@@ -107,10 +107,10 @@ namespace emhash5 {
     static constexpr size_type INACTIVE = 0 - 0x1ull;
 #elif EMH_SIZE_TYPE_16BIT == 0
     typedef int32_t size_type;
-    const constexpr size_type INACTIVE = int32_t(0xFFFFFFFF);
+    static constexpr size_type INACTIVE = int32_t(0xFFFFFFFF);
 #else
     typedef int16_t size_type;
-    const constexpr size_type INACTIVE = 0xFFFF;
+    static constexpr size_type INACTIVE = 0xFFFF;
 #endif
 
 #ifdef EMH_ALLOC
@@ -589,7 +589,7 @@ public:
             }
         }
 #endif
-        //      std::swap(_eq, rhs._eq);
+        std::swap(_eq, rhs._eq);
         std::swap(_alloc, rhs._alloc);
         std::swap(_hasher, rhs._hasher);
         std::swap(_pairs, rhs._pairs);
@@ -1057,20 +1057,20 @@ public:
         return { {this, bucket}, bempty };
     }
 
-    std::pair<iterator, bool> insert(const value_type& value) noexcept
+    std::pair<iterator, bool> insert(const value_type& value)
     {
         check_expand_need();
         return do_insert(value);
     }
 
-    std::pair<iterator, bool> insert(value_type&& value) noexcept
+    std::pair<iterator, bool> insert(value_type&& value)
     {
         check_expand_need();
         return do_insert(std::move(value));
     }
 
     template< typename P >
-    std::pair<iterator, bool> insert(P&& value) noexcept
+    std::pair<iterator, bool> insert(P&& value)
     {
         check_expand_need();
         return do_insert(std::forward<P>(value));
@@ -1131,7 +1131,7 @@ public:
 #endif
 
     template<typename K, typename V>
-    size_type insert_unique(K&& key, V&& val) noexcept
+    size_type insert_unique(K&& key, V&& val)
     {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
@@ -1139,7 +1139,7 @@ public:
         return bucket;
     }
 
-    size_type insert_unique(value_type&& value) noexcept
+    size_type insert_unique(value_type&& value)
     {
         return insert_unique(std::move(value.first), std::move(value.second));
     }
@@ -1150,13 +1150,13 @@ public:
     }
 
     template <class... Args>
-    size_type emplace_unique(Args&&... args) noexcept
+    size_type emplace_unique(Args&&... args)
     {
         return insert_unique(std::forward<Args>(args)...);
     }
 
     template <class... Args>
-    std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -1204,9 +1204,9 @@ template<class... Args>
     }
 
     template <class M>
-    std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) noexcept { return do_assign(key, std::forward<M>(val)); }
+    std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) { return do_assign(key, std::forward<M>(val)); }
     template <class M>
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) noexcept { return do_assign(std::move(key), std::forward<M>(val)); }
+    std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) { return do_assign(std::move(key), std::forward<M>(val)); }
 
     template <class M>
     iterator insert_or_assign(const_iterator hint, const KeyT& key, M&& val) {
@@ -1231,7 +1231,7 @@ template<class... Args>
     }
 
     /// Like std::map<KeyT, ValueT>::operator[].
-    ValueT& operator[](const KeyT& key) noexcept
+    ValueT& operator[](const KeyT& key)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1243,7 +1243,7 @@ template<class... Args>
         return EMH_VAL(_pairs, bucket);
     }
 
-    ValueT& operator[](KeyT&& key) noexcept
+    ValueT& operator[](KeyT&& key)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1322,12 +1322,12 @@ template<class... Args>
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1342,7 +1342,7 @@ template<class... Args>
 
     void clearkv() noexcept
     {
-        if (!is_trivially_destructible()) {
+        if (need_explicit_dtor()) {
             for (size_type bucket = 0; _num_filled > 0; ++bucket) {
                 if (!EMH_EMPTY(_pairs, bucket))
                     clear_bucket(bucket, false);
@@ -1369,7 +1369,7 @@ template<class... Args>
             clear_empty();
         clearkv();
 #else
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             clearkv();
         else if (_num_filled)
             memset((char*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * (size_t)_num_buckets);
@@ -1444,7 +1444,7 @@ template<class... Args>
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
         if (buckets > max_size() || buckets < (uint64_t)_num_filled)
-            std::abort();//TODO: throwOverflowError
+            throw std::length_error("emhash5::HashMap: too many elements");
 
         auto num_buckets = (size_type)buckets;
         auto old_num_filled  = _num_filled;
@@ -1519,8 +1519,11 @@ template<class... Args>
                 const auto bucket = find_unique_bucket(key);
                 new(_pairs + bucket) PairT(std::move(old_pairs[src_bucket])); _num_filled ++;
                 EMH_BUCKET(_pairs, bucket) = bucket;
-                if (!is_trivially_destructible())
+                if (need_explicit_dtor())
                     old_pairs[src_bucket].~PairT();
+
+                if (src_bucket == 0)
+                    break;
             }
         }
 
@@ -1528,7 +1531,7 @@ template<class... Args>
         if (_num_filled > EMH_REHASH_LOG) {
             auto mbucket = _num_filled - collision;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
+            snprintf(buff, sizeof(buff), "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(),
                     sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / omask);
 #ifdef EMH_LOG
@@ -1628,7 +1631,7 @@ private:
 
     void clear_bucket(size_type bucket, bool bclear = true) noexcept
     {
-        if (!is_trivially_destructible()) {
+        if (need_explicit_dtor()) {
             //EMH_BUCKET(_pairs, bucket) = INACTIVE; //loop call in destructor
             _pairs[bucket].~PairT();
         }

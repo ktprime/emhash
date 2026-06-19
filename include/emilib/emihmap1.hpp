@@ -28,9 +28,11 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
 #include <iterator>
 #include <utility>
 #include <cassert>
+#include <stdexcept>
 
 #ifdef _WIN32
     #include <intrin.h>
@@ -74,7 +76,7 @@ enum State : int8_t
 
     #define SET1_EPI8      _mm_set1_epi8
     #define SET1_EPI32     _mm_set1_epi32
-    #define LOAD_EPI8      _mm_load_si128
+    #define LOAD_EPI8      _mm_loadu_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
     #define CMPGT_EPI8     _mm_cmpgt_epi8
@@ -466,7 +468,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const noexcept
     {
-        return static_cast<float>(_num_filled) / (float)bucket_to_slot(_num_buckets);
+        return _num_buckets ? static_cast<float>(_num_filled) / (float)bucket_to_slot(_num_buckets) : 0.0f;
     }
 
     float max_load_factor(float lf = 7.0f / 8) noexcept
@@ -505,16 +507,20 @@ public:
     }
 
     template<typename K=KeyT>
-    ValueT& at(const K& key) noexcept
+    ValueT& at(const K& key)
     {
         const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            throw std::out_of_range("emilib::HashMap::at(): key not found");
         return _pairs[bucket].second;
     }
 
     template<typename K=KeyT>
-    const ValueT& at(const K& key) const noexcept
+    const ValueT& at(const K& key) const
     {
         const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            throw std::out_of_range("emilib::HashMap::at(): key not found");
         return _pairs[bucket].second;
     }
 

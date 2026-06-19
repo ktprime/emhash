@@ -31,6 +31,7 @@
 #include <iterator>
 #include <utility>
 #include <cassert>
+#include <stdexcept>
 
 #ifdef _MSC_VER
 #  include <intrin.h>
@@ -308,7 +309,7 @@ public:
 
     ~HashSet()
     {
-        if (is_trivially_destructible())
+        if (need_explicit_dtor())
             clear();
 
         _num_filled = 0;
@@ -331,7 +332,7 @@ public:
             return;
         }
 
-        if (is_trivially_destructible()) {
+        if (need_explicit_dtor()) {
             clear();
         }
 
@@ -415,7 +416,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const
     {
-        return _num_filled / static_cast<float>(_num_buckets);
+        return _num_buckets ? _num_filled / static_cast<float>(_num_buckets) : 0.0f;
     }
 
     float max_load_factor(float lf = 8.0f/9)
@@ -611,7 +612,7 @@ public:
 
     void _erase(size_t bucket)
     {
-        if (is_trivially_destructible())
+        if (need_explicit_dtor())
             _keys[bucket].~KeyT();
         auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
         if (state == State::EEMPTY) {
@@ -621,7 +622,7 @@ public:
         _num_filled -= 1;
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value);
@@ -633,7 +634,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_trivially_destructible()) {
+        if (need_explicit_dtor()) {
             for (size_t bucket=0; _num_filled; ++bucket) {
                 if (_states[bucket] % 2 == State::EFILLED) {
                     _keys[bucket].~KeyT();
@@ -674,7 +675,7 @@ public:
         while (num_buckets < required_buckets) { num_buckets *= 2; }
 
         if (num_buckets > max_size() || num_buckets < _num_filled)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emilib2::HashSet: too many elements");
 
         auto status_size = (set_simd_bytes + num_buckets) * sizeof(uint8_t);
         status_size += (8 - status_size % 8) % 8;
@@ -902,4 +903,4 @@ private:
     int     _max_probe_length = -1; // Our longest bucket-brigade is this long. ONLY when we have zero elements is this ever negative (-1).
 };
 
-} // namespace emilib
+} // namespace emilib2

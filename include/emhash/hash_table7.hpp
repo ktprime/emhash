@@ -708,7 +708,7 @@ public:
 
     ~HashMap() noexcept
     {
-        if (!is_trivially_destructible() && _num_filled) {
+        if (need_explicit_dtor() && _num_filled) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _num_filled --;
                 it->~value_pair();
@@ -745,7 +745,7 @@ public:
     void swap(HashMap& rhs)
     {
         std::swap(_hasher, rhs._hasher);
-        //std::swap(_eq, rhs._eq);
+        std::swap(_eq, rhs._eq);
         std::swap(_alloc, rhs._alloc);
         std::swap(_pairs, rhs._pairs);
         std::swap(_num_buckets, rhs._num_buckets);
@@ -935,7 +935,7 @@ public:
         size_type sumb = 0, sums = 0, sumn = 0;
         size_type miss = 0, finds = 0, bucket_coll = 0;
         double lf = load_factor(), fk = 1.0 / exp(lf), sum_poisson = 0;
-        int bsize = sprintf (buff, "============== buckets size ration ========\n");
+        int bsize = snprintf(buff, 1024, "============== buckets size ration ========\n");
 
         miss += _num_buckets - _num_filled;
         for (int i = 1, factorial = 1; i < int(sizeof(buckets) / sizeof(buckets[0])); i++) {
@@ -953,31 +953,31 @@ public:
             finds += bucketsi * i * (i + 1) / 2;
             miss  += bucketsi * i * i;
             auto errs = (bucketsi * 1.0 * i / _num_filled - poisson) * 100 / poisson;
-            bsize += sprintf(buff + bsize, "  %2d  %8ld  %0.8lf|%0.2lf%%  %2.3lf\n",
+            bsize += snprintf(buff + bsize, 1024 - bsize, "  %2d  %8ld  %0.8lf|%0.2lf%%  %2.3lf\n",
                     i, bucketsi, bucketsi * 1.0 * i / _num_filled, errs, sumn * 100.0 / _num_filled);
             if (sumn >= _num_filled)
                 break;
         }
 
-        bsize += sprintf(buff + bsize, "========== collision miss ration ===========\n");
+        bsize += snprintf(buff + bsize, 1024 - bsize, "========== collision miss ration ===========\n");
         for (size_type i = 0; show_cache && i < sizeof(steps) / sizeof(steps[0]); i++) {
             sums += steps[i];
             if (steps[i] == 0)
                 continue;
             if (steps[i] > 10)
-                bsize += sprintf(buff + bsize, "  %2d  %8u  %0.2lf  %.2lf\n", (int)i, steps[i], steps[i] * 100.0 / bucket_coll, sums * 100.0 / bucket_coll);
+                bsize += snprintf(buff + bsize, 1024 - bsize, "  %2d  %8u  %0.2lf  %.2lf\n", (int)i, steps[i], steps[i] * 100.0 / bucket_coll, sums * 100.0 / bucket_coll);
         }
 
         if (sumb == 0)  return;
 
-        bsize += sprintf(buff + bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n",
+        bsize += snprintf(buff + bsize, 1024 - bsize, "  _num_filled aver_size k.v size_kv = %u, %.2lf, %s.%s %zd\n",
                 _num_filled, _num_filled * 1.0 / sumb, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(PairT));
 
-        bsize += sprintf(buff + bsize, "  collision, poisson, cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%% %.2lf|%.2lf, %.2lf\n",
+        bsize += snprintf(buff + bsize, 1024 - bsize, "  collision, poisson, cache_miss hit_find|hit_miss, load_factor = %.2lf%%,%.2lf%%,%.2lf%% %.2lf|%.2lf, %.2lf\n",
                 (bucket_coll * 100.0 / _num_filled), sum_poisson, (bucket_coll - steps[0]) * 100.0 / _num_filled,
                 finds * 1.0 / _num_filled, miss * 1.0 / _num_buckets, _num_filled * 1.0 / _num_buckets);
 
-        bsize += sprintf(buff + bsize, "============== buckets size end =============\n");
+        bsize += snprintf(buff + bsize, 1024 - bsize, "============== buckets size end =============\n");
         buff[bsize + 1] = 0;
 
 #ifdef EMH_LOG
@@ -1230,7 +1230,7 @@ public:
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) { return do_assign(std::move(key), std::forward<ValueT>(val)); }
 
     template <typename... Args>
-    std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -1259,13 +1259,13 @@ public:
     }
 
     template <class... Args>
-    size_type emplace_unique(Args&&... args) noexcept
+    size_type emplace_unique(Args&&... args)
     {
         return insert_unique(std::forward<Args>(args)...);
     }
 
     /* Check if inserting a new value rather than overwriting an old entry */
-    ValueT& operator[](const KeyT& key) noexcept
+    ValueT& operator[](const KeyT& key)
     {
         check_expand_need();
 
@@ -1278,7 +1278,7 @@ public:
         return EMH_VAL(_pairs, bucket);
     }
 
-    ValueT& operator[](KeyT&& key) noexcept
+    ValueT& operator[](KeyT&& key)
     {
         check_expand_need();
 
@@ -1347,12 +1347,12 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1378,7 +1378,7 @@ public:
 
     void clearkv()
     {
-        if (!is_trivially_destructible()) {
+        if (need_explicit_dtor()) {
             auto it = cbegin(); it.init();
             for (; _num_filled; ++it)
                 clear_bucket(it.bucket());
@@ -1388,10 +1388,10 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (is_trivially_destructible() && _num_filled) {
+        if (!need_explicit_dtor() && _num_filled) {
             memset(_bitmask, (int)0xFFFFFFFF, (_num_buckets + 7) / 8);
             if (_num_buckets < 8 * sizeof(_bitmask[0]))
-                _bitmask[0] =  (bit_type)((1 << _num_buckets) - 1);
+                _bitmask[0] =  (bit_type)((1u << _num_buckets) - 1);
         }
         else if (_num_filled)
             clearkv();
@@ -1433,12 +1433,12 @@ public:
         while (buckets < required_buckets) { buckets *= 2; }
 
         // no need alloc large bucket for small key sizeof(KeyT) < sizeof(int).
-        // set small a max_load_factor, insert/reserve() will fail and introduce rehash issiue TODO: dothing ?
+        // set small a max_load_factor, insert/reserve() will fail and introduce rehash issue TODO: dothing ?
         //if (sizeof(KeyT) < sizeof(size_type) && buckets > (1ul << (sizeof(uint16_t) * 8)))
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
         if (buckets > max_size() || buckets < _num_filled)
-            std::abort();//TODO: throwOverflowError
+            throw std::length_error("emhash7::HashMap: too many elements");
 
         auto num_buckets = (size_type)buckets;
         auto old_num_filled = _num_filled;
@@ -1457,10 +1457,10 @@ public:
         _bitmask     = decltype(_bitmask)(_pairs + EPACK_SIZE + num_buckets);
 
         const auto mask_byte = (num_buckets + 7) / 8;
-        memset(_bitmask, (int)0xFFFFFFFF, mask_byte);
+        memset(_bitmask, (unsigned char)0xFF, mask_byte);
         memset(((char*)_bitmask) + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8 * sizeof(_bitmask[0]))
-            _bitmask[0] = (bit_type)((1 << num_buckets) - 1);
+            _bitmask[0] = (bit_type)((1u << num_buckets) - 1);
 
         //for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
         for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket --) {
@@ -1470,15 +1470,18 @@ public:
             auto& key = EMH_KEY(old_pairs, src_bucket);
             const auto bucket = find_unique_bucket(key);
             EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
-            if (!is_trivially_destructible())
+            if (need_explicit_dtor())
                 old_pairs[src_bucket].~PairT();
+
+            if (src_bucket == 0)
+                break;
         }
 
 #if EMH_REHASH_LOG
         if (_num_filled > EMH_REHASH_LOG) {
             auto mbucket = bucket_main();
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/collision/main/K.V/pack/ = %u/%.2lf%%(%.2lf%%)/%s.%s/%zd",
+            snprintf(buff, sizeof(buff), "    _num_filled/collision/main/K.V/pack/ = %u/%.2lf%%(%.2lf%%)/%s.%s/%zd",
                     _num_filled, 200.0f * (_num_filled - mbucket) / _mask,  100.0f * mbucket / _mask,
                     typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #ifdef EMH_LOG
@@ -1505,7 +1508,7 @@ private:
     {
         EMH_CLS(bucket);
         _num_filled--;
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[bucket].~PairT();
     }
 
@@ -1665,7 +1668,7 @@ private:
             next_bucket = nbucket;
         }
 
-        return 0;
+        return _num_buckets;
     }
 
     //kick out bucket and find empty to occupy
@@ -1678,7 +1681,7 @@ private:
         const auto new_bucket  = find_empty_bucket(next_bucket, kbucket);
         const auto prev_bucket = find_prev_bucket(kmain, kbucket);
         new(_pairs + new_bucket) PairT(std::move(_pairs[kbucket]));
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[kbucket].~PairT();
 
         if (next_bucket == kbucket)

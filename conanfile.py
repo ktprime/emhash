@@ -6,7 +6,6 @@ import os
 
 class EmhashConan(ConanFile):
     name = "emhash"
-    version = "1.1.0"
     description = "High-performance, memory-efficient C++ open addressing flat hash table"
     license = "MIT"
     url = "https://github.com/ktprime/emhash"
@@ -14,9 +13,18 @@ class EmhashConan(ConanFile):
     topics = ("hash-map", "hash-table", "header-only", "open-addressing")
     settings = "os", "compiler", "build_type", "arch"
     no_copy_source = True
+    exports_sources = "include/*", "CMakeLists.txt", "config.cmake.in", "VERSION"
 
     def layout(self):
         basic_layout(self)
+
+    def set_version(self):
+        version_file = os.path.join(self.recipe_folder, "VERSION")
+        if os.path.exists(version_file):
+            with open(version_file) as f:
+                self.version = f.read().strip()
+        else:
+            self.version = "1.1.0"
 
     def package_id(self):
         self.info.clear()

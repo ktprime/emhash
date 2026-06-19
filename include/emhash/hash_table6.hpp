@@ -538,7 +538,7 @@ public:
             return *this;
         }
 
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             clearkv();
 
         if (_mask != rhs._mask) {
@@ -578,7 +578,7 @@ public:
 
     ~HashMap() noexcept
     {
-        if (!is_trivially_destructible() && _num_filled) {
+        if (need_explicit_dtor() && _num_filled) {
             for (auto it = cbegin(); _num_filled; ++it) {
                 _num_filled --;
                 it->~value_pair();
@@ -618,7 +618,7 @@ public:
     void swap(HashMap& rhs)
     {
         std::swap(_hasher, rhs._hasher);
-//      std::swap(_eq, rhs._eq);
+        std::swap(_eq, rhs._eq);
         std::swap(_alloc, rhs._alloc);
         std::swap(_pairs, rhs._pairs);
 #if EMH_SAFE_HASH
@@ -1070,7 +1070,7 @@ public:
     std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) { return do_assign(std::move(key), std::forward<ValueT>(val)); }
 
     template <typename... Args>
-    inline std::pair<iterator, bool> emplace(Args&&... args) noexcept
+    inline std::pair<iterator, bool> emplace(Args&&... args)
     {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
@@ -1099,12 +1099,12 @@ public:
     }
 
     template <class... Args>
-    inline size_type emplace_unique(Args&&... args) noexcept
+    inline size_type emplace_unique(Args&&... args)
     {
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    ValueT& operator[](const KeyT& key) noexcept
+    ValueT& operator[](const KeyT& key)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1118,7 +1118,7 @@ public:
         return EMH_VAL(_pairs, next);
     }
 
-    ValueT& operator[](KeyT&& key) noexcept
+    ValueT& operator[](KeyT&& key)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1186,12 +1186,12 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
 #endif
     }
 
@@ -1214,7 +1214,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear()
     {
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             clearkv();
         else if (_num_filled) {
             memset((char*)_bitmask, (int)0xFFFFFFFF, (_mask + 1) / 8);
@@ -1270,7 +1270,7 @@ public:
         //    buckets = 2ul << (sizeof(KeyT) * 8);
 
         if (buckets > max_size() || buckets < _num_filled)
-            std::abort();//TODO: throwOverflowError
+            throw std::length_error("emhash6::HashMap: too many elements");
         //assert(num_buckets == (2 << CTZ(required_buckets)));
 #endif
 
@@ -1314,7 +1314,7 @@ public:
         memset((char*)_bitmask, (int)0xFFFFFFFF, mask_byte);
         memset((char*)_bitmask + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8)
-            _bitmask[0] = (uint8_t)((1 << num_buckets) - 1);
+            _bitmask[0] = (uint8_t)((1u << num_buckets) - 1);
         //pack last position to bit 0
         /**************** -------------------------------- *************/
 
@@ -1333,8 +1333,11 @@ public:
             if (bucket / 2 != hash_main(bucket / 2))
                 collision++;
 #endif
-            if (!is_trivially_destructible())
+            if (need_explicit_dtor())
                 old_pairs[src_bucket].~PairT();
+
+            if (src_bucket == 0)
+                break;
         }
 
 #if EMH_REHASH_LOG
@@ -1345,7 +1348,7 @@ public:
             const auto num_buckets = _mask + 1;
             auto last = EMH_ADDR(_pairs, num_buckets);
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd/%.2lf%%|%.2lf%%",
+            snprintf(buff, sizeof(buff), "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd/%.2lf%%|%.2lf%%",
                     _num_filled,(double)_num_filled / _num_main, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]), (collision * 100.0 / num_buckets), (last * 100.0 / num_buckets));
 #ifdef EMH_LOG
             static size_type ihashs = 0;
@@ -1388,7 +1391,7 @@ private:
     {
         EMH_CLS(bucket);
         _num_filled--;
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[bucket].~PairT();
 
         EMH_ADDR(_pairs, bucket) = INACTIVE;

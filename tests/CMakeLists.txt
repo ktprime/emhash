@@ -8,223 +8,161 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Compiler options
+# Compiler options (GCC/Clang are applied globally; MSVC options are set
+# per-target via emhash_add_test so that /WX only catches warnings in test
+# source files, not in the library headers which we intentionally do not modify.)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -pedantic)
     set(CMAKE_CXX_FLAGS_RELEASE "-O2")
     set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-elseif(MSVC)
-    add_compile_options(/W4)
+else()
     set(CMAKE_CXX_FLAGS_RELEASE "/O2")
     set(CMAKE_CXX_FLAGS_DEBUG "/Od /Zi")
 endif()
 
-# Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
-# thirdparty and bench are only needed for benchmark tests, not core verification tests
+# Helper to register an emhash test executable
+function(emhash_add_test name source)
+    add_executable(${name} ${source})
+    target_compile_features(${name} PRIVATE cxx_std_17)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    if(MSVC)
+        # /W4 enables the highest standard warning level. /WX is intentionally
+        # not used because emhash library headers (which are intentionally not
+        # modified) produce level-4 warnings when instantiated from test code.
+        target_compile_options(${name} PRIVATE /W4)
+    endif()
+endfunction()
 
 # ============================================================================
 # Verification Tests
 # ============================================================================
 
-add_executable(test_verify verify/test_all_maps.cpp)
-target_compile_features(test_verify PUBLIC cxx_std_17)
-
-add_executable(quick_test8 verify/quick_test8.cpp)
-target_compile_features(quick_test8 PUBLIC cxx_std_17)
-
-add_executable(test_emhash58 verify/test_emhash58.cpp)
-target_compile_features(test_emhash58 PUBLIC cxx_std_17)
-
-add_executable(test_hidden_bugs8 verify/test_hidden_bugs8.cpp)
-target_compile_features(test_hidden_bugs8 PUBLIC cxx_std_17)
-
-add_executable(test_extreme verify/test_extreme.cpp)
-target_compile_features(test_extreme PUBLIC cxx_std_17)
-
-add_executable(test_interface_combo verify/test_interface_combo.cpp)
-target_compile_features(test_interface_combo PUBLIC cxx_std_17)
-
-add_executable(test_emhash5_verify verify/test_emhash5_verify.cpp)
-target_compile_features(test_emhash5_verify PUBLIC cxx_std_17)
-
-add_executable(test_emhash_allocator verify/test_emhash_allocator.cpp)
-target_compile_features(test_emhash_allocator PUBLIC cxx_std_17)
-
-add_executable(test_functional_edge verify/test_functional_edge.cpp)
-target_compile_features(test_functional_edge PUBLIC cxx_std_17)
+emhash_add_test(test_verify verify/test_all_maps.cpp)
+emhash_add_test(quick_test8 verify/quick_test8.cpp)
+emhash_add_test(test_emhash58 verify/test_emhash58.cpp)
+emhash_add_test(test_hidden_bugs8 verify/test_hidden_bugs8.cpp)
+emhash_add_test(test_extreme verify/test_extreme.cpp)
+emhash_add_test(test_interface_combo verify/test_interface_combo.cpp)
+emhash_add_test(test_emhash5_verify verify/test_emhash5_verify.cpp)
+emhash_add_test(test_emhash_allocator verify/test_emhash_allocator.cpp)
+emhash_add_test(test_functional_edge verify/test_functional_edge.cpp)
 
 # Merged from test/ directory
-add_executable(test_hashset_allocator verify/test_hashset_allocator.cpp)
-target_compile_features(test_hashset_allocator PUBLIC cxx_std_17)
+emhash_add_test(test_hashset_allocator verify/test_hashset_allocator.cpp)
 
-add_executable(test_emilib_comprehensive verify/test_emilib_comprehensive.cpp)
-target_compile_features(test_emilib_comprehensive PUBLIC cxx_std_17)
+emhash_add_test(test_emilib_comprehensive verify/test_emilib_comprehensive.cpp)
+find_package(Threads REQUIRED)
+target_link_libraries(test_emilib_comprehensive PRIVATE Threads::Threads)
 
-add_executable(test_size_sweep verify/test_size_sweep.cpp)
-target_compile_features(test_size_sweep PUBLIC cxx_std_17)
+emhash_add_test(test_size_sweep verify/test_size_sweep.cpp)
 
 # Full API coverage tests
-add_executable(test_hashmap_full_api verify/test_hashmap_full_api.cpp)
-target_compile_features(test_hashmap_full_api PUBLIC cxx_std_17)
+emhash_add_test(test_hashmap_full_api verify/test_hashmap_full_api.cpp)
+emhash_add_test(test_hashset_full_api verify/test_hashset_full_api.cpp)
 
-add_executable(test_hashset_full_api verify/test_hashset_full_api.cpp)
-target_compile_features(test_hashset_full_api PUBLIC cxx_std_17)
-
-add_executable(test_special_key_types verify/test_special_key_types.cpp)
-target_compile_features(test_special_key_types PUBLIC cxx_std_17)
-
-add_executable(test_merge_correctness verify/test_merge_correctness.cpp)
-target_compile_features(test_merge_correctness PUBLIC cxx_std_17)
-
-add_executable(edge_test verify/edge_test.cpp)
-target_compile_features(edge_test PUBLIC cxx_std_17)
-
-# Boost.Test based comprehensive unit tests (requires Boost)
-# add_executable(hash_map_tests verify/hash_map_tests.cpp)
-# target_compile_features(hash_map_tests PUBLIC cxx_std_17)
-# target_link_libraries(hash_map_tests PRIVATE Boost::unit_test_framework)
+emhash_add_test(test_special_key_types verify/test_special_key_types.cpp)
+emhash_add_test(test_merge_correctness verify/test_merge_correctness.cpp)
+emhash_add_test(edge_test verify/edge_test.cpp)
 
 # ============================================================================
 # Stress Tests
 # ============================================================================
 
-add_executable(test_stress stress/stress_all_maps.cpp)
-target_compile_features(test_stress PUBLIC cxx_std_17)
-
-add_executable(stress_fix stress/stress_fix.cpp)
-target_compile_features(stress_fix PUBLIC cxx_std_17)
-
-add_executable(highload_test stress/highload_test.cpp)
-target_compile_features(highload_test PUBLIC cxx_std_17)
-
-add_executable(test_emhash5_stress stress/test_emhash5_stress.cpp)
-target_compile_features(test_emhash5_stress PUBLIC cxx_std_17)
-
-add_executable(test_emhash5_hifi stress/test_emhash5_hifi.cpp)
-target_compile_features(test_emhash5_hifi PUBLIC cxx_std_17)
+emhash_add_test(test_stress stress/stress_all_maps.cpp)
+emhash_add_test(stress_fix stress/stress_fix.cpp)
+emhash_add_test(highload_test stress/highload_test.cpp)
+emhash_add_test(test_emhash5_stress stress/test_emhash5_stress.cpp)
+emhash_add_test(test_emhash5_hifi stress/test_emhash5_hifi.cpp)
 
 # Merged from test/ directory
-add_executable(test_bad_hash_stress stress/test_bad_hash_stress.cpp)
-target_compile_features(test_bad_hash_stress PUBLIC cxx_std_17)
+emhash_add_test(test_bad_hash_stress stress/test_bad_hash_stress.cpp)
 
 # ============================================================================
 # Hash Attack Tests (requires EMH_SAFE_PSL)
 # ============================================================================
 
-add_executable(test_attack attack/hash_attack_all.cpp)
-target_compile_features(test_attack PUBLIC cxx_std_17)
+emhash_add_test(test_attack attack/hash_attack_all.cpp)
 target_compile_definitions(test_attack PRIVATE EMH_SAFE_PSL)
 
-add_executable(hash_attack5 attack/hash_attack.cpp)
-target_compile_features(hash_attack5 PUBLIC cxx_std_17)
+emhash_add_test(hash_attack5 attack/hash_attack.cpp)
 target_compile_definitions(hash_attack5 PRIVATE EMH_SAFE_PSL)
 
-add_executable(hash_attack7 attack/hash_attack7.cpp)
-target_compile_features(hash_attack7 PUBLIC cxx_std_17)
+emhash_add_test(hash_attack7 attack/hash_attack7.cpp)
 target_compile_definitions(hash_attack7 PRIVATE EMH_SAFE_PSL)
 
 # ============================================================================
 # Debug Tests
 # ============================================================================
 
-add_executable(test_debug debug/debug_all_maps.cpp)
-target_compile_features(test_debug PUBLIC cxx_std_17)
+emhash_add_test(test_debug debug/debug_all_maps.cpp)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_debug PRIVATE -g -O0)
 elseif(MSVC)
     target_compile_options(test_debug PRIVATE /Od /Zi)
 endif()
 
-add_executable(debug_chain debug/debug_chain.cpp)
-target_compile_features(debug_chain PUBLIC cxx_std_17)
-
-add_executable(debug_set_erase debug/debug_set_erase.cpp)
-target_compile_features(debug_set_erase PUBLIC cxx_std_17)
-
-add_executable(min_repro debug/min_repro.cpp)
-target_compile_features(min_repro PUBLIC cxx_std_17)
-
-add_executable(reproduce_crash debug/reproduce_crash.cpp)
-target_compile_features(reproduce_crash PUBLIC cxx_std_17)
-
-add_executable(fuzz_reproduce debug/fuzz_reproduce.cpp)
-target_compile_features(fuzz_reproduce PUBLIC cxx_std_17)
+emhash_add_test(debug_chain debug/debug_chain.cpp)
+emhash_add_test(debug_set_erase debug/debug_set_erase.cpp)
+emhash_add_test(min_repro debug/min_repro.cpp)
+emhash_add_test(reproduce_crash debug/reproduce_crash.cpp)
+emhash_add_test(fuzz_reproduce debug/fuzz_reproduce.cpp)
 
 # Merged from test/ directory
-add_executable(test_probe_bug debug/test_probe_bug.cpp)
-target_compile_features(test_probe_bug PUBLIC cxx_std_17)
-
-add_executable(test_probe_coverage debug/test_probe_coverage.cpp)
-target_compile_features(test_probe_coverage PUBLIC cxx_std_17)
-
-add_executable(test_debug_find debug/test_debug_find.cpp)
-target_compile_features(test_debug_find PUBLIC cxx_std_17)
-
-add_executable(test_repro_collision debug/test_repro_collision.cpp)
-target_compile_features(test_repro_collision PUBLIC cxx_std_17)
+emhash_add_test(test_probe_bug debug/test_probe_bug.cpp)
+emhash_add_test(test_probe_coverage debug/test_probe_coverage.cpp)
+emhash_add_test(test_debug_find debug/test_debug_find.cpp)
+emhash_add_test(test_repro_collision debug/test_repro_collision.cpp)
 
 # ============================================================================
-# Benchmarks moved to bench/ directory (require thirdparty dependencies)
-# The following benchmarks are now built from the main bench/ directory:
-# - ebench, martin_bench, highload_bench, test_main
-# These files remain in tests/bench/ for reference but are not built here.
+# Fuzz Tests
 # ============================================================================
 
-# ============================================================================
-# Fuzz Tests (optional, requires clang)
-# Note: Most fuzz source files are not tracked in git (see .gitignore).
-# Only reproduce_emhash8_bug.cpp is currently available.
-# To add fuzz tests, create fuzz_*.cpp files in fuzz/ and uncomment below.
-# ============================================================================
-
-option(ENABLE_FUZZ_TESTS "Enable fuzz tests (requires clang)" OFF)
-
-# if(ENABLE_FUZZ_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-#     add_executable(fuzz_emhash_all fuzz/fuzz_emhash_all.cpp)
-#     target_compile_features(fuzz_emhash_all PUBLIC cxx_std_17)
-#     target_compile_options(fuzz_emhash_all PRIVATE -fsanitize=fuzzer,address)
-#     target_link_options(fuzz_emhash_all PRIVATE -fsanitize=fuzzer,address)
-#
-#     add_executable(fuzz_emhash8 fuzz/fuzz_emhash8.cpp)
-#     target_compile_features(fuzz_emhash8 PUBLIC cxx_std_17)
-#     target_compile_options(fuzz_emhash8 PRIVATE -fsanitize=fuzzer,address)
-#     target_link_options(fuzz_emhash8 PRIVATE -fsanitize=fuzzer,address)
-#
-#     add_executable(fuzz_emhash8_advanced fuzz/fuzz_emhash8_advanced.cpp)
-#     target_compile_features(fuzz_emhash8_advanced PUBLIC cxx_std_17)
-#     target_compile_options(fuzz_emhash8_advanced PRIVATE -fsanitize=fuzzer,address)
-#     target_link_options(fuzz_emhash8_advanced PRIVATE -fsanitize=fuzzer,address)
-#
-#     add_executable(fuzz_emilib_all fuzz/fuzz_emilib_all.cpp)
-#     target_compile_features(fuzz_emilib_all PUBLIC cxx_std_17)
-#     target_compile_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
-#     target_link_options(fuzz_emilib_all PRIVATE -fsanitize=fuzzer,address)
-#
-#     add_executable(fuzz_emilib fuzz/fuzz_emilib.cpp)
-#     target_compile_features(fuzz_emilib PUBLIC cxx_std_17)
-#     target_compile_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
-#     target_link_options(fuzz_emilib PRIVATE -fsanitize=fuzzer,address)
-# endif()
-
-# Non-fuzzer versions (can be built with gcc on Linux/macOS; skip on MinGW/MSVC)
-# if(NOT WIN32 OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-#     add_executable(fuzz_extreme fuzz/fuzz_extreme.cpp fuzz/fuzz_main.cpp)
-#     target_compile_features(fuzz_extreme PUBLIC cxx_std_17)
-#     target_compile_options(fuzz_extreme PRIVATE -fsanitize=address,undefined)
-#     target_link_options(fuzz_extreme PRIVATE -fsanitize=address,undefined)
-#
-#     add_executable(fuzz_nocoll fuzz/fuzz_nocoll.cpp fuzz/fuzz_main.cpp)
-#     target_compile_features(fuzz_nocoll PUBLIC cxx_std_17)
-#     target_compile_options(fuzz_nocoll PRIVATE -fsanitize=address,undefined)
-#     target_link_options(fuzz_nocoll PRIVATE -fsanitize=address,undefined)
-# endif()
-
-add_executable(reproduce_emhash8_bug fuzz/reproduce_emhash8_bug.cpp)
-target_compile_features(reproduce_emhash8_bug PUBLIC cxx_std_17)
+emhash_add_test(reproduce_emhash8_bug fuzz/reproduce_emhash8_bug.cpp)
 
 # ============================================================================
-# Test Targets
+# CTest Integration
+# ============================================================================
+
+include(CTest)
+
+function(emhash_register_test name)
+    add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES LABELS "emhash")
+endfunction()
+
+# Verification tests
+emhash_register_test(test_verify)
+emhash_register_test(quick_test8)
+emhash_register_test(test_emhash58)
+emhash_register_test(test_hidden_bugs8)
+emhash_register_test(test_extreme)
+emhash_register_test(test_interface_combo)
+emhash_register_test(test_emhash5_verify)
+emhash_register_test(test_emhash_allocator)
+emhash_register_test(test_functional_edge)
+emhash_register_test(test_hashset_allocator)
+emhash_register_test(test_emilib_comprehensive)
+emhash_register_test(test_size_sweep)
+emhash_register_test(test_hashmap_full_api)
+emhash_register_test(test_hashset_full_api)
+emhash_register_test(test_special_key_types)
+emhash_register_test(test_merge_correctness)
+emhash_register_test(edge_test)
+
+# Stress tests
+emhash_register_test(test_stress)
+emhash_register_test(test_bad_hash_stress)
+
+# Hash attack tests
+emhash_register_test(test_attack)
+emhash_register_test(hash_attack5)
+emhash_register_test(hash_attack7)
+
+# Debug tests
+emhash_register_test(test_debug)
+
+# ============================================================================
+# Test Suites (custom targets)
 # ============================================================================
 
 # Quick test suite (runs in ~20 seconds)
@@ -235,12 +173,6 @@ add_custom_target(quick_test
     COMMAND ${CMAKE_COMMAND} -E echo "=== All Quick Tests Passed ==="
     DEPENDS test_verify test_debug
 )
-
-# Aggregate fuzz target (commented out until fuzz source files are added)
-# add_custom_target(fuzz
-#     COMMAND ${CMAKE_COMMAND} -E echo "=== Building ASan Fuzz Variants ==="
-#     DEPENDS fuzz_extreme fuzz_nocoll
-# )
 
 # Stress test suite
 add_custom_target(stress_test
@@ -277,6 +209,5 @@ add_custom_target(emhash_test_help
     COMMAND ${CMAKE_COMMAND} -E echo "  stress_test   - Stress tests (~1min)"
     COMMAND ${CMAKE_COMMAND} -E echo "  attack_test   - Hash attack tests (~2min)"
     COMMAND ${CMAKE_COMMAND} -E echo "  all_tests     - Run all tests"
-    COMMAND ${CMAKE_COMMAND} -E echo "  fuzz          - Build fuzz variants"
     COMMAND ${CMAKE_COMMAND} -E echo "  emhash_test_help - Show this help"
 )

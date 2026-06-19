@@ -402,6 +402,7 @@ public:
     void swap(lru_cache& other)
     {
         std::swap(_hasher, other._hasher);
+        std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -414,6 +415,8 @@ public:
     // -------------------------------------------------------------
     iterator begin()
     {
+        if (EMHASH_UNLIKELY(_num_filled == 0))
+            return end();
         uint32_t bucket = 0;
         while (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
             ++bucket;
@@ -423,6 +426,8 @@ public:
 
     const_iterator cbegin() const
     {
+        if (EMHASH_UNLIKELY(_num_filled == 0))
+            return cend();
         uint32_t bucket = 0;
         while (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
             ++bucket;
@@ -1087,6 +1092,7 @@ public:
                 old_pairs[src_bucket].~PairT();
             sum_orderid += _pairs[bucket].orderid;
         }
+        _sum_orderid = sum_orderid;
 
 #if EMHASH_REHASH_LOG
         if (_num_filled > EMHASH_REHASH_LOG) {

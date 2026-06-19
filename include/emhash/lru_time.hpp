@@ -386,6 +386,7 @@ public:
     void swap(lru_cache& other)
     {
         std::swap(_hasher, other._hasher);
+        std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
@@ -412,6 +413,8 @@ public:
 
     iterator begin()
     {
+        if (EMHASH_UNLIKELY(_num_filled == 0))
+            return end();
         uint32_t bucket = 0;
         while (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
             ++bucket;
@@ -421,6 +424,8 @@ public:
 
     const_iterator cbegin() const
     {
+        if (EMHASH_UNLIKELY(_num_filled == 0))
+            return cend();
         uint32_t bucket = 0;
         while (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
             ++bucket;
@@ -715,7 +720,7 @@ public:
         return { {this, bucket}, found };
     }
 
-    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value, int timeout) noexcept
+    std::pair<iterator, bool> insert(const KeyT& key, const ValueT& value, int timeout)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -734,7 +739,7 @@ public:
     }
 
 //    std::pair<iterator, bool> insert(const value_pair& value) { return insert(value.first, value.second); }
-    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value) noexcept
+    std::pair<iterator, bool> insert(KeyT&& key, ValueT&& value)
     {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1052,7 +1057,7 @@ public:
         if (_num_filled > 1000000) {
             auto mbucket = _num_filled;
             char buff[255] = {0};
-            sprintf(buff, "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
+            snprintf(buff, sizeof(buff), "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd",
                     _num_filled, double (_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #if EMHASH_USER_LOG
             static uint32_t ihashs = 0;
@@ -1166,7 +1171,7 @@ private:
 
         while (true) {
             if (_eq(key, EMH_KEY(_pairs, next_bucket)))
-                return (IS_TIMEOUT(_pairs, bucket)) ? _num_buckets : next_bucket;
+                return (IS_TIMEOUT(_pairs, next_bucket)) ? _num_buckets : next_bucket;
 
             const auto nbucket = NEXT_BUCKET(_pairs, next_bucket);
             if (nbucket == next_bucket)

@@ -31,6 +31,7 @@
 #include <iterator>
 #include <utility>
 #include <cassert>
+#include <stdexcept>
 
 #ifdef _WIN32
     #include <intrin.h>
@@ -85,11 +86,11 @@ namespace emilib3 {
 
     #define SET1_EPI8      _mm_set1_epi8
     #define SET1_EPI32     _mm_set1_epi32
-    #define LOAD_EPI8      _mm_load_si128
+    #define LOAD_EPI8      _mm_loadu_si128
     #define MOVEMASK_EPI8  _mm_movemask_epi8
     #define CMPEQ_EPI8     _mm_cmpeq_epi8
     #define CMPGT_EPI8     _mm_cmpgt_epi8
-#elif 1
+#elif defined(AVX2_EHASH)
     const static auto simd_empty  = _mm256_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm256_set1_epi8(EDELETE);
     const static auto simd_filled = _mm256_set1_epi8(EFILLED);
@@ -99,7 +100,7 @@ namespace emilib3 {
     #define MOVEMASK_EPI8  _mm256_movemask_epi8
     #define CMPEQ_EPI8     _mm256_cmpeq_epi8
     #define CMPGT_EPI8     _mm256_cmpgt_epi8
-#elif AVX512_EHASH
+#elif defined(AVX512_EHASH)
     const static auto simd_empty  = _mm512_set1_epi8(EEMPTY);
     const static auto simd_delete = _mm512_set1_epi8(EDELETE);
     const static auto simd_filled = _mm512_set1_epi8(EFILLED);
@@ -492,7 +493,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const noexcept
     {
-        return float(_num_filled) / float(_num_buckets);
+        return _num_buckets ? float(_num_filled) / float(_num_buckets) : 0.0f;
     }
 
     inline constexpr float max_load_factor() const { return EMH_MAX_LOAD_FACTOR; }
@@ -700,7 +701,7 @@ public:
     void _erase(size_t bucket) noexcept
     {
         _num_filled -= 1;
-        if (!is_trivially_destructible())
+        if (need_explicit_dtor())
             _pairs[bucket].~PairT();
 #if 1
         const auto gbucket = bucket / simd_bytes * simd_bytes;
@@ -734,12 +735,12 @@ public:
         return old_size - size();
     }
 
-    static constexpr bool is_trivially_destructible()
+    static constexpr bool need_explicit_dtor()
     {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return std::is_trivially_destructible<KeyT>::value;
+        return !std::is_trivially_destructible<KeyT>::value;
 #else
-        return std::is_pod<KeyT>::value;
+        return !std::is_pod<KeyT>::value;
 #endif
     }
 
@@ -765,7 +766,7 @@ public:
 
     void clear_data() noexcept
     {
-        if (!is_trivially_destructible() && _num_filled) {
+        if (need_explicit_dtor() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -799,7 +800,7 @@ public:
     }
 
     /// Make room for this many elements
-    void rehash(uint64_t required_buckets) noexcept
+    void rehash(uint64_t required_buckets)
     {
         if (required_buckets < _num_filled)
             return;
@@ -808,7 +809,7 @@ public:
         while (buckets < required_buckets) { buckets *= 2; }
 
         if (buckets > max_size() || buckets < _num_filled)
-            std::abort(); //throw std::length_error("too large size");
+            throw std::length_error("emilib3::HashSet: too many elements");
 
         const auto num_buckets = (size_t)buckets;
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
@@ -850,7 +851,7 @@ public:
                 set_states(bucket, key_h2);
                 new(_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled ++;
-                if (!is_trivially_destructible())
+                if (need_explicit_dtor())
                     src_pair.~PairT();
             }
         }
