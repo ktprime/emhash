@@ -43,8 +43,7 @@ struct StepHash {
 // Test: insert many keys with bad hash, verify all are findable
 // ============================================================================
 
-template<typename MapType>
-static int test_bad_hash(const char* name, int num_keys) {
+template <typename MapType> static int test_bad_hash(const char* name, int num_keys) {
     printf("\n[%s] Inserting %d keys with bad hash...\n", name, num_keys);
     MapType map;
 
@@ -63,10 +62,12 @@ static int test_bad_hash(const char* name, int num_keys) {
         auto it = map.find(i);
         if (it == map.end()) {
             missing++;
-            if (missing <= 5) fprintf(stderr, "  MISSING key=%d\n", i);
+            if (missing <= 5)
+                fprintf(stderr, "  MISSING key=%d\n", i);
         } else if (it->second != i * 2) {
             wrong_val++;
-            if (wrong_val <= 5) fprintf(stderr, "  WRONG key=%d expected=%d got=%d\n", i, i*2, it->second);
+            if (wrong_val <= 5)
+                fprintf(stderr, "  WRONG key=%d expected=%d got=%d\n", i, i * 2, it->second);
         }
     }
 
@@ -74,8 +75,8 @@ static int test_bad_hash(const char* name, int num_keys) {
     double insert_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
     double verify_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
 
-    printf("  Size: %u, Missing: %d, Wrong: %d, Insert: %.1fms, Verify: %.1fms\n",
-           (unsigned)map.size(), missing, wrong_val, insert_ms, verify_ms);
+    printf("  Size: %u, Missing: %d, Wrong: %d, Insert: %.1fms, Verify: %.1fms\n", (unsigned)map.size(), missing,
+           wrong_val, insert_ms, verify_ms);
 
     return missing + wrong_val;
 }
@@ -89,7 +90,7 @@ static void analyze_probe_coverage() {
     printf("  PROBE SEQUENCE COVERAGE ANALYSIS\n");
     printf("============================================================\n\n");
 
-    const int simd_bytes = 16;  // SSE2
+    const int simd_bytes = 16; // SSE2
 
     // Test various bucket counts
     for (int num_buckets : {128, 256, 512, 1024, 2048, 4096, 8192, 16384}) {
@@ -133,7 +134,9 @@ static void analyze_probe_coverage() {
                     bucket = get_next_ss(bucket, step + 1);
                 }
                 int covered = 0;
-                for (auto v : visited) if (v) covered++;
+                for (auto v : visited)
+                    if (v)
+                        covered++;
                 if (covered < min_cov_ss) {
                     min_cov_ss = covered;
                     worst_start_ss = start;
@@ -150,7 +153,9 @@ static void analyze_probe_coverage() {
                     bucket = get_next_o(bucket, step + 1);
                 }
                 int covered = 0;
-                for (auto v : visited) if (v) covered++;
+                for (auto v : visited)
+                    if (v)
+                        covered++;
                 if (covered < min_cov_o) {
                     min_cov_o = covered;
                     worst_start_o = start;
@@ -162,8 +167,8 @@ static void analyze_probe_coverage() {
         float pct_o = 100.0f * min_cov_o / num_groups;
 
         printf("  nb=%5d: emilib2ss/s worst %3d/%3d (%5.1f%%, start=%3d)  emilib2o worst %3d/%3d (%5.1f%%, start=%3d)",
-               num_buckets, min_cov_ss, num_groups, pct_ss, worst_start_ss,
-               min_cov_o, num_groups, pct_o, worst_start_o);
+               num_buckets, min_cov_ss, num_groups, pct_ss, worst_start_ss, min_cov_o, num_groups, pct_o,
+               worst_start_o);
 
         if (min_cov_ss < num_groups || min_cov_o < num_groups) {
             printf("  ** BUG: unreachable groups!");
@@ -198,8 +203,13 @@ static void analyze_probe_coverage() {
                 bucket = get_next_o(bucket, step + 1);
             }
             int covered = 0;
-            for (auto v : visited) if (v) covered++;
-            if (covered < min_cov) { min_cov = covered; worst_start = start; }
+            for (auto v : visited)
+                if (v)
+                    covered++;
+            if (covered < min_cov) {
+                min_cov = covered;
+                worst_start = start;
+            }
         }
 
         // Show unreachable groups
@@ -214,11 +224,13 @@ static void analyze_probe_coverage() {
         printf("  Unreachable groups from start=%d: ", worst_start);
         for (int i = 0; i < num_groups; i++) {
             if (!visited[i]) {
-                if (unreachable_count < 20) printf("%d ", i);
+                if (unreachable_count < 20)
+                    printf("%d ", i);
                 unreachable_count++;
             }
         }
-        if (unreachable_count > 20) printf("... (%d total)", unreachable_count);
+        if (unreachable_count > 20)
+            printf("... (%d total)", unreachable_count);
         printf("\n");
 
         // Show the probe sequence for first 30 steps
@@ -339,8 +351,8 @@ int main() {
                 break;
             }
         }
-        printf("  emilib2o + SameHash stress: %s (map_size=%u ref_size=%u)\n",
-               ok ? "PASS" : "FAIL", (unsigned)map.size(), (unsigned)ref.size());
+        printf("  emilib2o + SameHash stress: %s (map_size=%u ref_size=%u)\n", ok ? "PASS" : "FAIL",
+               (unsigned)map.size(), (unsigned)ref.size());
     }
 
     printf("\n============================================================\n");

@@ -27,15 +27,14 @@ struct linear_hasher {
 };
 
 static double now_ms() {
-    return std::chrono::duration<double, std::milli>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    return std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now().time_since_epoch())
+        .count();
 }
 
 // ---------------------------------------------------------------------------
 // Correctness tests
 // ---------------------------------------------------------------------------
-static int test_attack_correctness_const()
-{
+static int test_attack_correctness_const() {
     printf("=== Correctness: constant hash (all keys -> bucket 0) ===\n");
     emhash7::HashMap<int, int, const_hasher> m(8);
     std::unordered_map<int, int, const_hasher> ref(8);
@@ -46,14 +45,19 @@ static int test_attack_correctness_const()
         ref[i] = i;
     }
     int fail = 0;
-    if (m.size() != (size_t)N) { printf("  FAIL: size %zu != %d\n", (size_t)m.size(), N); fail++; }
+    if (m.size() != (size_t)N) {
+        printf("  FAIL: size %zu != %d\n", (size_t)m.size(), N);
+        fail++;
+    }
 
     for (int i = 0; i < N; i++) {
         auto it = m.find(i);
         auto refit = ref.find(i);
         if (it == m.end() || it->second != i) {
             printf("  FAIL: find(%d)\n", i);
-            fail++; if (fail > 5) return fail;
+            fail++;
+            if (fail > 5)
+                return fail;
         }
         if (refit == ref.end() || refit->second != i) {
             printf("  FAIL: ref find(%d)\n", i);
@@ -70,24 +74,33 @@ static int test_attack_correctness_const()
         auto refit = ref.find(i);
         if ((it == m.end()) != (refit == ref.end())) {
             printf("  FAIL: erase mismatch at %d\n", i);
-            fail++; if (fail > 5) return fail;
+            fail++;
+            if (fail > 5)
+                return fail;
         }
         if (it != m.end() && it->second != refit->second) {
             printf("  FAIL: post-erase value mismatch at %d\n", i);
-            fail++; if (fail > 5) return fail;
+            fail++;
+            if (fail > 5)
+                return fail;
         }
     }
 
-    for (int i = 0; i < N; i += 2) m[i] = i;
+    for (int i = 0; i < N; i += 2)
+        m[i] = i;
     for (int i = 0; i < N; i++) {
-        if (m[i] != i) { printf("  FAIL: reinsert %d\n", i); fail++; if (fail > 5) return fail; }
+        if (m[i] != i) {
+            printf("  FAIL: reinsert %d\n", i);
+            fail++;
+            if (fail > 5)
+                return fail;
+        }
     }
     printf("  %s: N=%d, all operations correct (%d failures)\n", fail == 0 ? "PASS" : "FAIL", N, fail);
     return fail;
 }
 
-static int test_attack_correctness_range4()
-{
+static int test_attack_correctness_range4() {
     printf("\n=== Correctness: range-4 hash (keys -> 4 buckets) ===\n");
     emhash7::HashMap<int, int, range4_hasher> m(8);
     std::unordered_map<int, int, range4_hasher> ref(8);
@@ -102,15 +115,16 @@ static int test_attack_correctness_range4()
         auto it = m.find(i);
         if (it == m.end() || it->second != i) {
             printf("  FAIL: find(%d) under range-4\n", i);
-            fail++; if (fail > 5) return fail;
+            fail++;
+            if (fail > 5)
+                return fail;
         }
     }
     printf("  %s: N=%d, all operations correct\n", fail == 0 ? "PASS" : "FAIL", N);
     return fail;
 }
 
-static int test_attack_correctness_linear()
-{
+static int test_attack_correctness_linear() {
     printf("\n=== Correctness: linear hash (key == hash) ===\n");
     emhash7::HashMap<int, int, linear_hasher> m(8);
     std::unordered_map<int, int, linear_hasher> ref(8);
@@ -125,7 +139,9 @@ static int test_attack_correctness_linear()
         auto it = m.find(i);
         if (it == m.end() || it->second != i) {
             printf("  FAIL: find(%d) under linear\n", i);
-            fail++; if (fail > 5) return fail;
+            fail++;
+            if (fail > 5)
+                return fail;
         }
     }
     printf("  %s: N=%d, all operations correct\n", fail == 0 ? "PASS" : "FAIL", N);
@@ -135,23 +151,20 @@ static int test_attack_correctness_linear()
 // ---------------------------------------------------------------------------
 // Performance benchmarks
 // ---------------------------------------------------------------------------
-template <typename Hash>
-static double bench_insert(int N, const char* name)
-{
+template <typename Hash> static double bench_insert(int N, const char* name) {
     emhash7::HashMap<int, int, Hash> m(8);
     auto t0 = now_ms();
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
     auto t1 = now_ms();
-    printf("  %-30s insert N=%-7d -> %.1f ms (%.0f ops/ms)\n",
-        name, N, t1 - t0, N / (t1 - t0));
+    printf("  %-30s insert N=%-7d -> %.1f ms (%.0f ops/ms)\n", name, N, t1 - t0, N / (t1 - t0));
     return t1 - t0;
 }
 
-template <typename Hash>
-static double bench_find(int N, const char* name)
-{
+template <typename Hash> static double bench_find(int N, const char* name) {
     emhash7::HashMap<int, int, Hash> m(8);
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
     auto t0 = now_ms();
     volatile int sink = 0;
     for (int round = 0; round < 10; round++)
@@ -160,29 +173,26 @@ static double bench_find(int N, const char* name)
     (void)sink;
     auto t1 = now_ms();
     double ops = (double)N * 10;
-    printf("  %-30s find   N=%-7d -> %.1f ms (%.0f ops/ms)\n",
-        name, N, t1 - t0, ops / (t1 - t0));
+    printf("  %-30s find   N=%-7d -> %.1f ms (%.0f ops/ms)\n", name, N, t1 - t0, ops / (t1 - t0));
     return t1 - t0;
 }
 
-template <typename Hash>
-static double bench_erase(int N, const char* name)
-{
+template <typename Hash> static double bench_erase(int N, const char* name) {
     emhash7::HashMap<int, int, Hash> m(8);
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
     auto t0 = now_ms();
-    for (int i = 0; i < N; i++) m.erase(i);
+    for (int i = 0; i < N; i++)
+        m.erase(i);
     auto t1 = now_ms();
-    printf("  %-30s erase  N=%-7d -> %.1f ms (%.0f ops/ms)\n",
-        name, N, t1 - t0, N / (t1 - t0));
+    printf("  %-30s erase  N=%-7d -> %.1f ms (%.0f ops/ms)\n", name, N, t1 - t0, N / (t1 - t0));
     return t1 - t0;
 }
 
-template <typename Hash>
-static double bench_mixed(int N, const char* name)
-{
+template <typename Hash> static double bench_mixed(int N, const char* name) {
     emhash7::HashMap<int, int, Hash> m(8);
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
     std::mt19937 rng(42);
     std::uniform_int_distribution<int> opd(0, 9);
     std::uniform_int_distribution<int> keyd(0, N - 1);
@@ -191,18 +201,19 @@ static double bench_mixed(int N, const char* name)
     for (int i = 0; i < N; i++) {
         int op = opd(rng);
         int k = keyd(rng);
-        if (op < 5) m[k] = k;
-        else if (op < 8) m.find(k);
-        else m.erase(k);
+        if (op < 5)
+            m[k] = k;
+        else if (op < 8)
+            m.find(k);
+        else
+            m.erase(k);
     }
     auto t1 = now_ms();
-    printf("  %-30s mixed  N=%-7d -> %.1f ms (%.0f ops/ms)\n",
-        name, N, t1 - t0, N / (t1 - t0));
+    printf("  %-30s mixed  N=%-7d -> %.1f ms (%.0f ops/ms)\n", name, N, t1 - t0, N / (t1 - t0));
     return t1 - t0;
 }
 
-int main()
-{
+int main() {
     printf("################################################################\n");
     printf("# Hash Attack Benchmark for emhash7 (Swiss Table style)\n");
     printf("# Attack scenarios: const hash / range-4 hash / linear hash\n");
@@ -240,10 +251,10 @@ int main()
     {
         emhash7::HashMap<int, int, const_hasher> m(1024, 0.99f);
         auto t0 = now_ms();
-        for (int i = 0; i < 100000; i++) m[i] = i;
+        for (int i = 0; i < 100000; i++)
+            m[i] = i;
         auto t1 = now_ms();
-        printf("  insert N=100K (const+high_load): %.1f ms (%.0f ops/ms)\n",
-            t1 - t0, 100000.0 / (t1 - t0));
+        printf("  insert N=100K (const+high_load): %.1f ms (%.0f ops/ms)\n", t1 - t0, 100000.0 / (t1 - t0));
     }
 
     printf("\n################################################################\n");

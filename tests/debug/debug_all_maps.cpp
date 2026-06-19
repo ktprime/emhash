@@ -38,18 +38,29 @@
 static int g_tests_passed = 0;
 static int g_tests_failed = 0;
 
-#define TEST_ASSERT(cond, ...) do { \
-    if (!(cond)) { \
-        fprintf(stderr, "FAIL at %s:%d: ", __FILE__, __LINE__); \
-        fprintf(stderr, __VA_ARGS__); \
-        fprintf(stderr, "\n"); \
-        return false; \
-    } \
-} while(0)
+#define TEST_ASSERT(cond, ...)                                                                                         \
+    do {                                                                                                               \
+        if (!(cond)) {                                                                                                 \
+            fprintf(stderr, "FAIL at %s:%d: ", __FILE__, __LINE__);                                                    \
+            fprintf(stderr, __VA_ARGS__);                                                                              \
+            fprintf(stderr, "\n");                                                                                     \
+            return false;                                                                                              \
+        }                                                                                                              \
+    } while (0)
 
 #define TEST_START(name) printf("\n=== %s ===\n", name)
-#define TEST_PASS() do { printf("PASS\n"); g_tests_passed++; return true; } while(0)
-#define TEST_FAIL(msg, ...) do { fprintf(stderr, "FAIL: " msg "\n", ##__VA_ARGS__); g_tests_failed++; return false; } while(0)
+#define TEST_PASS()                                                                                                    \
+    do {                                                                                                               \
+        printf("PASS\n");                                                                                              \
+        g_tests_passed++;                                                                                              \
+        return true;                                                                                                   \
+    } while (0)
+#define TEST_FAIL(msg, ...)                                                                                            \
+    do {                                                                                                               \
+        fprintf(stderr, "FAIL: " msg "\n", ##__VA_ARGS__);                                                             \
+        g_tests_failed++;                                                                                              \
+        return false;                                                                                                  \
+    } while (0)
 
 // Custom hashers for controlled collision testing
 struct ConstHasher {
@@ -57,7 +68,7 @@ struct ConstHasher {
     explicit ConstHasher(size_t s = 0) : seed(s) {}
     size_t operator()(int x) const {
         (void)x;
-        return seed;  // All keys get same hash -> maximum collision
+        return seed; // All keys get same hash -> maximum collision
     }
 };
 
@@ -65,14 +76,14 @@ struct ModHasher {
     size_t mod;
     explicit ModHasher(size_t m = 16) : mod(m) {}
     size_t operator()(int x) const {
-        return static_cast<size_t>(x) % mod;  // Controlled collision
+        return static_cast<size_t>(x) % mod; // Controlled collision
     }
 };
 
 struct BadHasher {
     size_t operator()(int x) const {
         // High bits collision - tests EMH_EQHASH in emhash8
-        return static_cast<size_t>(x) & 0xFF;  // Only low 8 bits vary
+        return static_cast<size_t>(x) & 0xFF; // Only low 8 bits vary
     }
 };
 
@@ -80,8 +91,7 @@ struct BadHasher {
 // Test 1: Basic insert/find/erase consistency
 // =============================================================================
 
-template<typename HashMap>
-bool test_basic_operations(const char* name) {
+template <typename HashMap> bool test_basic_operations(const char* name) {
     TEST_START(name);
 
     HashMap m;
@@ -137,8 +147,7 @@ bool test_basic_operations(const char* name) {
 // Test 2: Erase correctness - verify erased keys are truly gone
 // =============================================================================
 
-template<typename HashMap>
-bool test_erase_correctness(const char* name) {
+template <typename HashMap> bool test_erase_correctness(const char* name) {
     TEST_START(name);
 
     HashMap m;
@@ -146,7 +155,7 @@ bool test_erase_correctness(const char* name) {
 
     // Insert keys with specific pattern
     for (int i = 0; i < 200; i++) {
-        m[i * 3] = i;  // Keys: 0, 3, 6, 9, ...
+        m[i * 3] = i; // Keys: 0, 3, 6, 9, ...
         ref[i * 3] = i;
     }
 
@@ -178,11 +187,12 @@ bool test_erase_correctness(const char* name) {
 
     // Insert some new keys that may reuse erased slots
     for (int i = 0; i < 50; i++) {
-        m[i * 7] = i * 100;  // New keys: 0, 7, 14, ...
+        m[i * 7] = i * 100; // New keys: 0, 7, 14, ...
         ref[i * 7] = i * 100;
     }
 
-    TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch after reinsert: %zu vs %zu", (size_t)m.size(), ref.size());
+    TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch after reinsert: %zu vs %zu", (size_t)m.size(),
+                ref.size());
 
     // Verify all keys
     for (const auto& [k, v] : ref) {
@@ -198,8 +208,7 @@ bool test_erase_correctness(const char* name) {
 // Test 3: Find after rehash
 // =============================================================================
 
-template<typename HashMap>
-bool test_find_after_rehash(const char* name) {
+template <typename HashMap> bool test_find_after_rehash(const char* name) {
     TEST_START(name);
 
     HashMap m;
@@ -249,12 +258,11 @@ bool test_find_after_rehash(const char* name) {
 // Test 4: Collision handling with custom hasher
 // =============================================================================
 
-template<typename HashMap>
-bool test_collision_handling(const char* name) {
+template <typename HashMap> bool test_collision_handling(const char* name) {
     TEST_START(name);
 
     // Use const hasher to force all keys to collide
-    HashMap m(4);  // Start with small capacity
+    HashMap m(4); // Start with small capacity
     std::unordered_map<int, int> ref;
 
     // Insert keys - all will collide
@@ -299,15 +307,13 @@ bool test_collision_handling(const char* name) {
 // =============================================================================
 
 // Helper trait to detect if erase returns iterator
-template<typename T, typename = void>
-struct erase_returns_iterator : std::false_type {};
+template <typename T, typename = void> struct erase_returns_iterator : std::false_type {};
 
-template<typename T>
+template <typename T>
 struct erase_returns_iterator<T, std::void_t<decltype(std::declval<T>().erase(std::declval<typename T::iterator>()))>>
     : std::is_same<decltype(std::declval<T>().erase(std::declval<typename T::iterator>())), typename T::iterator> {};
 
-template<typename HashMap>
-bool test_iterator_after_erase(const char* name) {
+template <typename HashMap> bool test_iterator_after_erase(const char* name) {
     TEST_START(name);
 
     HashMap m;
@@ -367,8 +373,7 @@ bool test_iterator_after_erase(const char* name) {
 // Test 6: Edge cases - empty map, single element
 // =============================================================================
 
-template<typename HashMap>
-bool test_edge_cases(const char* name) {
+template <typename HashMap> bool test_edge_cases(const char* name) {
     TEST_START(name);
 
     // Empty map operations
@@ -439,14 +444,13 @@ bool test_edge_cases(const char* name) {
 // Test 7: Stress test with random operations
 // =============================================================================
 
-template<typename HashMap>
-bool test_stress_random(const char* name) {
+template <typename HashMap> bool test_stress_random(const char* name) {
     TEST_START(name);
 
     HashMap m;
     std::unordered_map<int, int> ref;
 
-    std::mt19937 rng(12345);  // Fixed seed for reproducibility
+    std::mt19937 rng(12345); // Fixed seed for reproducibility
     std::uniform_int_distribution<int> key_dist(0, 999);
     std::uniform_int_distribution<int> op_dist(0, 9);
 
@@ -456,50 +460,46 @@ bool test_stress_random(const char* name) {
         int op_type = op_dist(rng);
 
         switch (op_type) {
-            case 0:  // insert via []
-                m[key] = val;
-                ref[key] = val;
-                break;
-            case 1:  // insert
-                m.insert({key, val});
-                ref[key] = val;
-                break;
-            case 2:  // erase
-                m.erase(key);
-                ref.erase(key);
-                break;
-            case 3:  // find
-                {
-                    auto it = m.find(key);
-                    auto ref_it = ref.find(key);
-                    TEST_ASSERT((it == m.end()) == (ref_it == ref.end()),
-                        "find mismatch for key %d at op %d", key, op);
-                }
-                break;
-            case 4:  // count
-                TEST_ASSERT((size_t)m.count(key) == ref.count(key),
-                    "count mismatch for key %d at op %d", key, op);
-                break;
-            case 5:  // contains (if available)
-                // Use count as fallback
-                TEST_ASSERT((size_t)m.count(key) == ref.count(key),
-                    "contains mismatch for key %d at op %d", key, op);
-                break;
-            case 6:  // clear
-                m.clear();
-                ref.clear();
-                break;
-            case 7:  // reserve
-                m.reserve(500);
-                break;
-            case 8:  // emplace
-                m.emplace(key, val);
-                ref[key] = val;
-                break;
-            case 9:  // insert_or_assign
-                m.insert_or_assign(key, std::move(val));
-                ref[key] = val;
-                break;
+        case 0: // insert via []
+            m[key] = val;
+            ref[key] = val;
+            break;
+        case 1: // insert
+            m.insert({key, val});
+            ref[key] = val;
+            break;
+        case 2: // erase
+            m.erase(key);
+            ref.erase(key);
+            break;
+        case 3: // find
+        {
+            auto it = m.find(key);
+            auto ref_it = ref.find(key);
+            TEST_ASSERT((it == m.end()) == (ref_it == ref.end()), "find mismatch for key %d at op %d", key, op);
+        } break;
+        case 4: // count
+            TEST_ASSERT((size_t)m.count(key) == ref.count(key), "count mismatch for key %d at op %d", key, op);
+            break;
+        case 5: // contains (if available)
+            // Use count as fallback
+            TEST_ASSERT((size_t)m.count(key) == ref.count(key), "contains mismatch for key %d at op %d", key, op);
+            break;
+        case 6: // clear
+            m.clear();
+            ref.clear();
+            break;
+        case 7: // reserve
+            m.reserve(500);
+            break;
+        case 8: // emplace
+            m.emplace(key, val);
+            ref[key] = val;
+            break;
+        case 9: // insert_or_assign
+            m.insert_or_assign(key, std::move(val));
+            ref[key] = val;
+            break;
         }
 
         // Check size consistency
@@ -530,8 +530,7 @@ bool test_stress_random(const char* name) {
 // Test 8: Chain integrity after many erase operations
 // =============================================================================
 
-template<typename HashMap>
-bool test_chain_after_erase(const char* name) {
+template <typename HashMap> bool test_chain_after_erase(const char* name) {
     TEST_START(name);
 
     HashMap m;
@@ -601,8 +600,7 @@ bool test_chain_after_erase(const char* name) {
 // Test 9: High load factor operations
 // =============================================================================
 
-template<typename HashMap>
-bool test_high_load_factor(const char* name) {
+template <typename HashMap> bool test_high_load_factor(const char* name) {
     TEST_START(name);
 
     HashMap m;
@@ -643,8 +641,7 @@ bool test_high_load_factor(const char* name) {
 // Test 10: Copy and move semantics
 // =============================================================================
 
-template<typename HashMap>
-bool test_copy_move(const char* name) {
+template <typename HashMap> bool test_copy_move(const char* name) {
     TEST_START(name);
 
     // Create and fill original
@@ -697,8 +694,7 @@ bool test_copy_move(const char* name) {
 // Run all tests for a specific map type
 // =============================================================================
 
-template<typename HashMap>
-void run_all_tests(const char* map_name) {
+template <typename HashMap> void run_all_tests(const char* map_name) {
     printf("\n");
     printf("============================================================\n");
     printf("Testing: %s\n", map_name);

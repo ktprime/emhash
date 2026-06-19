@@ -36,6 +36,7 @@
 
 static int g_pass = 0, g_fail = 0;
 
+// clang-format off
 #define TEST_ASSERT(expr, msg) do { \
     if (!(expr)) { \
         printf("    FAIL: %s (line %d)\n", msg, __LINE__); \
@@ -47,6 +48,7 @@ static int g_pass = 0, g_fail = 0;
     if (fn()) printf("  [PASS] %s\n", #fn); \
     else      printf("  [FAIL] %s\n", #fn); \
 } while(0)
+// clang-format on
 
 // Helper: convert int to key/value
 template<typename T>

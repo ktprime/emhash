@@ -103,94 +103,93 @@ static std::vector<Op> parse_input(const uint8_t* data, size_t size) {
 // The hasher is a template parameter but not a constructor argument for emhash5/6/7.
 // We use the default constructor for all versions.
 // ============================================================================
-template<typename HashMapT>
-static void fuzz_hashmap(const std::vector<Op>& ops) {
+template <typename HashMapT> static void fuzz_hashmap(const std::vector<Op>& ops) {
     HashMapT em(2, 0.8f);
     std::unordered_map<int, int> ref;
 
     for (const auto& op : ops) {
         switch (op.code) {
-            case OP_INSERT: {
-                auto em_r = em.insert({op.key, op.value});
-                auto ref_r = ref.insert({op.key, op.value});
-                assert(em_r.second == ref_r.second);
-                break;
+        case OP_INSERT: {
+            auto em_r = em.insert({op.key, op.value});
+            auto ref_r = ref.insert({op.key, op.value});
+            assert(em_r.second == ref_r.second);
+            break;
+        }
+        case OP_ERASE: {
+            size_t em_r = em.erase(op.key);
+            size_t ref_r = ref.erase(op.key);
+            assert(em_r == ref_r);
+            break;
+        }
+        case OP_FIND: {
+            auto em_it = em.find(op.key);
+            auto ref_it = ref.find(op.key);
+            bool em_found = (em_it != em.end());
+            bool ref_found = (ref_it != ref.end());
+            assert(em_found == ref_found);
+            if (em_found && ref_found) {
+                assert(em_it->second == ref_it->second);
             }
-            case OP_ERASE: {
-                size_t em_r = em.erase(op.key);
-                size_t ref_r = ref.erase(op.key);
-                assert(em_r == ref_r);
-                break;
+            break;
+        }
+        case OP_ACCESS: {
+            em[op.key] = op.value;
+            ref[op.key] = op.value;
+            break;
+        }
+        case OP_ITERATE: {
+            std::unordered_map<int, int> em_collect;
+            for (auto it = em.begin(); it != em.end(); ++it) {
+                em_collect[it->first] = it->second;
             }
-            case OP_FIND: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                bool em_found = (em_it != em.end());
-                bool ref_found = (ref_it != ref.end());
-                assert(em_found == ref_found);
-                if (em_found && ref_found) {
-                    assert(em_it->second == ref_it->second);
-                }
-                break;
+            assert(em_collect == ref);
+            break;
+        }
+        case OP_CLEAR: {
+            em.clear();
+            ref.clear();
+            break;
+        }
+        case OP_RESERVE: {
+            size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
+            if (cap < 1000000) {
+                em.reserve(cap);
+                ref.reserve(cap);
             }
-            case OP_ACCESS: {
-                em[op.key] = op.value;
-                ref[op.key] = op.value;
-                break;
+            break;
+        }
+        case OP_INSERT_OR_ASSIGN: {
+            // insert_or_assign requires ValueT&& for emhash6/7/8
+            int v = op.value;
+            em.insert_or_assign(op.key, std::move(v));
+            ref[op.key] = op.value;
+            break;
+        }
+        case OP_ERASE_ITERATOR: {
+            auto em_it = em.find(op.key);
+            auto ref_it = ref.find(op.key);
+            if (em_it != em.end() && ref_it != ref.end()) {
+                em.erase(em_it);
+                ref.erase(ref_it);
             }
-            case OP_ITERATE: {
-                std::unordered_map<int, int> em_collect;
-                for (auto it = em.begin(); it != em.end(); ++it) {
-                    em_collect[it->first] = it->second;
-                }
-                assert(em_collect == ref);
-                break;
-            }
-            case OP_CLEAR: {
-                em.clear();
-                ref.clear();
-                break;
-            }
-            case OP_RESERVE: {
-                size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
-                if (cap < 1000000) {
-                    em.reserve(cap);
-                    ref.reserve(cap);
-                }
-                break;
-            }
-            case OP_INSERT_OR_ASSIGN: {
-                // insert_or_assign requires ValueT&& for emhash6/7/8
-                int v = op.value;
-                em.insert_or_assign(op.key, std::move(v));
-                ref[op.key] = op.value;
-                break;
-            }
-            case OP_ERASE_ITERATOR: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
-                }
-                break;
-            }
-            case OP_COUNT: {
-                assert(em.count(op.key) == ref.count(op.key));
-                break;
-            }
-            case OP_CONTAINS: {
-                bool em_has = em.contains(op.key);
-                bool ref_has = (ref.find(op.key) != ref.end());
-                assert(em_has == ref_has);
-                break;
-            }
-            case OP_EMPLACE: {
-                auto em_r = em.emplace(op.key, op.value);
-                auto ref_r = ref.emplace(op.key, op.value);
-                assert(em_r.second == ref_r.second);
-                break;
-            }
+            break;
+        }
+        case OP_COUNT: {
+            assert(em.count(op.key) == ref.count(op.key));
+            break;
+        }
+        case OP_CONTAINS: {
+            bool em_has = em.contains(op.key);
+            bool ref_has = (ref.find(op.key) != ref.end());
+            assert(em_has == ref_has);
+            break;
+        }
+        case OP_EMPLACE: {
+            auto em_r = em.emplace(op.key, op.value);
+            auto ref_r = ref.emplace(op.key, op.value);
+            assert(em_r.second == ref_r.second);
+            break;
+        }
         }
         assert(em.size() == ref.size());
     }
@@ -210,89 +209,88 @@ static void fuzz_hashmap(const std::vector<Op>& ops) {
 // ============================================================================
 // Helper: run operations on HashSet and compare with reference
 // ============================================================================
-template<typename HashSetT>
-static void fuzz_hashset(const std::vector<Op>& ops) {
+template <typename HashSetT> static void fuzz_hashset(const std::vector<Op>& ops) {
     HashSetT em(2);
     std::unordered_set<int> ref;
 
     for (const auto& op : ops) {
         switch (op.code) {
-            case OP_INSERT: {
-                auto em_r = em.insert(op.key);
-                auto ref_r = ref.insert(op.key);
-                assert(em_r.second == ref_r.second);
-                break;
+        case OP_INSERT: {
+            auto em_r = em.insert(op.key);
+            auto ref_r = ref.insert(op.key);
+            assert(em_r.second == ref_r.second);
+            break;
+        }
+        case OP_ERASE: {
+            size_t em_r = em.erase(op.key);
+            size_t ref_r = ref.erase(op.key);
+            assert(em_r == ref_r);
+            break;
+        }
+        case OP_FIND: {
+            auto em_it = em.find(op.key);
+            auto ref_it = ref.find(op.key);
+            bool em_found = (em_it != em.end());
+            bool ref_found = (ref_it != ref.end());
+            assert(em_found == ref_found);
+            break;
+        }
+        case OP_ACCESS: {
+            em.insert(op.key);
+            ref.insert(op.key);
+            break;
+        }
+        case OP_ITERATE: {
+            std::unordered_set<int> em_collect;
+            for (auto it = em.begin(); it != em.end(); ++it) {
+                em_collect.insert(*it);
             }
-            case OP_ERASE: {
-                size_t em_r = em.erase(op.key);
-                size_t ref_r = ref.erase(op.key);
-                assert(em_r == ref_r);
-                break;
+            assert(em_collect == ref);
+            break;
+        }
+        case OP_CLEAR: {
+            em.clear();
+            ref.clear();
+            break;
+        }
+        case OP_RESERVE: {
+            size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
+            if (cap < 1000000) {
+                em.reserve(cap);
+                ref.reserve(cap);
             }
-            case OP_FIND: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                bool em_found = (em_it != em.end());
-                bool ref_found = (ref_it != ref.end());
-                assert(em_found == ref_found);
-                break;
+            break;
+        }
+        case OP_INSERT_OR_ASSIGN: {
+            em.insert(op.key);
+            ref.insert(op.key);
+            break;
+        }
+        case OP_ERASE_ITERATOR: {
+            auto em_it = em.find(op.key);
+            auto ref_it = ref.find(op.key);
+            if (em_it != em.end() && ref_it != ref.end()) {
+                em.erase(em_it);
+                ref.erase(ref_it);
             }
-            case OP_ACCESS: {
-                em.insert(op.key);
-                ref.insert(op.key);
-                break;
-            }
-            case OP_ITERATE: {
-                std::unordered_set<int> em_collect;
-                for (auto it = em.begin(); it != em.end(); ++it) {
-                    em_collect.insert(*it);
-                }
-                assert(em_collect == ref);
-                break;
-            }
-            case OP_CLEAR: {
-                em.clear();
-                ref.clear();
-                break;
-            }
-            case OP_RESERVE: {
-                size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
-                if (cap < 1000000) {
-                    em.reserve(cap);
-                    ref.reserve(cap);
-                }
-                break;
-            }
-            case OP_INSERT_OR_ASSIGN: {
-                em.insert(op.key);
-                ref.insert(op.key);
-                break;
-            }
-            case OP_ERASE_ITERATOR: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
-                }
-                break;
-            }
-            case OP_COUNT: {
-                assert(em.count(op.key) == ref.count(op.key));
-                break;
-            }
-            case OP_CONTAINS: {
-                bool em_has = em.contains(op.key);
-                bool ref_has = (ref.find(op.key) != ref.end());
-                assert(em_has == ref_has);
-                break;
-            }
-            case OP_EMPLACE: {
-                auto em_r = em.emplace(op.key);
-                auto ref_r = ref.emplace(op.key);
-                assert(em_r.second == ref_r.second);
-                break;
-            }
+            break;
+        }
+        case OP_COUNT: {
+            assert(em.count(op.key) == ref.count(op.key));
+            break;
+        }
+        case OP_CONTAINS: {
+            bool em_has = em.contains(op.key);
+            bool ref_has = (ref.find(op.key) != ref.end());
+            assert(em_has == ref_has);
+            break;
+        }
+        case OP_EMPLACE: {
+            auto em_r = em.emplace(op.key);
+            auto ref_r = ref.emplace(op.key);
+            assert(em_r.second == ref_r.second);
+            break;
+        }
         }
         assert(em.size() == ref.size());
     }
@@ -309,8 +307,7 @@ static void fuzz_hashset(const std::vector<Op>& ops) {
 // ============================================================================
 // Helper: fuzz string key types
 // ============================================================================
-template<typename HashMapT>
-static void fuzz_string_hashmap(const uint8_t* data, size_t size) {
+template <typename HashMapT> static void fuzz_string_hashmap(const uint8_t* data, size_t size) {
     HashMapT em;
     std::unordered_map<std::string, int> ref;
 
@@ -325,40 +322,40 @@ static void fuzz_string_hashmap(const uint8_t* data, size_t size) {
         int value = static_cast<int>(data[i + 4]);
 
         switch (op) {
-            case 0: { // insert
-                em.insert({key, value});
-                ref.insert({key, value});
-                break;
+        case 0: { // insert
+            em.insert({key, value});
+            ref.insert({key, value});
+            break;
+        }
+        case 1: { // erase
+            em.erase(key);
+            ref.erase(key);
+            break;
+        }
+        case 2: { // find
+            auto em_it = em.find(key);
+            auto ref_it = ref.find(key);
+            assert((em_it != em.end()) == (ref_it != ref.end()));
+            break;
+        }
+        case 3: { // operator[]
+            em[key] = value;
+            ref[key] = value;
+            break;
+        }
+        case 4: { // iterate
+            std::unordered_map<std::string, int> em_collect;
+            for (auto it = em.begin(); it != em.end(); ++it) {
+                em_collect[it->first] = it->second;
             }
-            case 1: { // erase
-                em.erase(key);
-                ref.erase(key);
-                break;
-            }
-            case 2: { // find
-                auto em_it = em.find(key);
-                auto ref_it = ref.find(key);
-                assert((em_it != em.end()) == (ref_it != ref.end()));
-                break;
-            }
-            case 3: { // operator[]
-                em[key] = value;
-                ref[key] = value;
-                break;
-            }
-            case 4: { // iterate
-                std::unordered_map<std::string, int> em_collect;
-                for (auto it = em.begin(); it != em.end(); ++it) {
-                    em_collect[it->first] = it->second;
-                }
-                assert(em_collect.size() == em.size());
-                break;
-            }
-            case 5: { // clear
-                em.clear();
-                ref.clear();
-                break;
-            }
+            assert(em_collect.size() == em.size());
+            break;
+        }
+        case 5: { // clear
+            em.clear();
+            ref.clear();
+            break;
+        }
         }
         assert(em.size() == ref.size());
         i += 5;
@@ -368,35 +365,34 @@ static void fuzz_string_hashmap(const uint8_t* data, size_t size) {
 // ============================================================================
 // Helper: high load factor stress test
 // ============================================================================
-template<typename HashMapT>
-static void fuzz_high_load(const std::vector<Op>& ops) {
+template <typename HashMapT> static void fuzz_high_load(const std::vector<Op>& ops) {
     HashMapT em(4, 0.95f); // high load factor
     std::unordered_map<int, int> ref;
 
     // Only insert and find, to stress the high load path
     for (const auto& op : ops) {
         switch (op.code % 4) {
-            case 0: {
-                em.insert({op.key, op.value});
-                ref.insert({op.key, op.value});
-                break;
-            }
-            case 1: {
-                em.erase(op.key);
-                ref.erase(op.key);
-                break;
-            }
-            case 2: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                assert((em_it != em.end()) == (ref_it != ref.end()));
-                break;
-            }
-            case 3: {
-                em[op.key] = op.value;
-                ref[op.key] = op.value;
-                break;
-            }
+        case 0: {
+            em.insert({op.key, op.value});
+            ref.insert({op.key, op.value});
+            break;
+        }
+        case 1: {
+            em.erase(op.key);
+            ref.erase(op.key);
+            break;
+        }
+        case 2: {
+            auto em_it = em.find(op.key);
+            auto ref_it = ref.find(op.key);
+            assert((em_it != em.end()) == (ref_it != ref.end()));
+            break;
+        }
+        case 3: {
+            em[op.key] = op.value;
+            ref[op.key] = op.value;
+            break;
+        }
         }
         assert(em.size() == ref.size());
     }
@@ -419,78 +415,78 @@ static void fuzz_emhash8_custom_hash(const std::vector<Op>& ops, uint64_t seed) 
 
     for (const auto& op : ops) {
         switch (op.code) {
-            case OP_INSERT: {
-                auto em_r = em.insert({op.key, op.value});
-                auto ref_r = ref.insert({op.key, op.value});
-                assert(em_r.second == ref_r.second);
-                break;
+        case OP_INSERT: {
+            auto em_r = em.insert({op.key, op.value});
+            auto ref_r = ref.insert({op.key, op.value});
+            assert(em_r.second == ref_r.second);
+            break;
+        }
+        case OP_ERASE: {
+            size_t em_r = em.erase(op.key);
+            size_t ref_r = ref.erase(op.key);
+            assert(em_r == ref_r);
+            break;
+        }
+        case OP_FIND: {
+            auto em_it = em.find(op.key);
+            auto ref_it = ref.find(op.key);
+            assert((em_it != em.end()) == (ref_it != ref.end()));
+            break;
+        }
+        case OP_ACCESS: {
+            em[op.key] = op.value;
+            ref[op.key] = op.value;
+            break;
+        }
+        case OP_ITERATE: {
+            std::unordered_map<int, int> em_collect;
+            for (auto it = em.begin(); it != em.end(); ++it) {
+                em_collect[it->first] = it->second;
             }
-            case OP_ERASE: {
-                size_t em_r = em.erase(op.key);
-                size_t ref_r = ref.erase(op.key);
-                assert(em_r == ref_r);
-                break;
+            assert(em_collect == ref);
+            break;
+        }
+        case OP_CLEAR: {
+            em.clear();
+            ref.clear();
+            break;
+        }
+        case OP_RESERVE: {
+            size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
+            if (cap < 1000000) {
+                em.reserve(cap);
             }
-            case OP_FIND: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                assert((em_it != em.end()) == (ref_it != ref.end()));
-                break;
+            break;
+        }
+        case OP_INSERT_OR_ASSIGN: {
+            int v = op.value;
+            em.insert_or_assign(op.key, std::move(v));
+            ref[op.key] = op.value;
+            break;
+        }
+        case OP_ERASE_ITERATOR: {
+            auto em_it = em.find(op.key);
+            auto ref_it = ref.find(op.key);
+            if (em_it != em.end() && ref_it != ref.end()) {
+                em.erase(em_it);
+                ref.erase(ref_it);
             }
-            case OP_ACCESS: {
-                em[op.key] = op.value;
-                ref[op.key] = op.value;
-                break;
-            }
-            case OP_ITERATE: {
-                std::unordered_map<int, int> em_collect;
-                for (auto it = em.begin(); it != em.end(); ++it) {
-                    em_collect[it->first] = it->second;
-                }
-                assert(em_collect == ref);
-                break;
-            }
-            case OP_CLEAR: {
-                em.clear();
-                ref.clear();
-                break;
-            }
-            case OP_RESERVE: {
-                size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
-                if (cap < 1000000) {
-                    em.reserve(cap);
-                }
-                break;
-            }
-            case OP_INSERT_OR_ASSIGN: {
-                int v = op.value;
-                em.insert_or_assign(op.key, std::move(v));
-                ref[op.key] = op.value;
-                break;
-            }
-            case OP_ERASE_ITERATOR: {
-                auto em_it = em.find(op.key);
-                auto ref_it = ref.find(op.key);
-                if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
-                }
-                break;
-            }
-            case OP_COUNT: {
-                assert(em.count(op.key) == ref.count(op.key));
-                break;
-            }
-            case OP_CONTAINS: {
-                assert(em.contains(op.key) == (ref.find(op.key) != ref.end()));
-                break;
-            }
-            case OP_EMPLACE: {
-                auto em_r = em.emplace(op.key, op.value);
-                auto ref_r = ref.emplace(op.key, op.value);
-                assert(em_r.second == ref_r.second);
-                break;
-            }
+            break;
+        }
+        case OP_COUNT: {
+            assert(em.count(op.key) == ref.count(op.key));
+            break;
+        }
+        case OP_CONTAINS: {
+            assert(em.contains(op.key) == (ref.find(op.key) != ref.end()));
+            break;
+        }
+        case OP_EMPLACE: {
+            auto em_r = em.emplace(op.key, op.value);
+            auto ref_r = ref.emplace(op.key, op.value);
+            assert(em_r.second == ref_r.second);
+            break;
+        }
         }
         assert(em.size() == ref.size());
     }
@@ -506,7 +502,8 @@ static void fuzz_emhash8_custom_hash(const std::vector<Op>& ops, uint64_t seed) 
 // Main fuzzer entry point
 // ============================================================================
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-    if (size < 10) return 0;
+    if (size < 10)
+        return 0;
 
     // First byte selects which test to run
     uint8_t test_selector = data[0] % 9;
@@ -516,36 +513,37 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     auto ops = parse_input(op_data, op_size);
 
     // Limit operations to prevent timeout
-    if (ops.size() > 500) ops.resize(500);
+    if (ops.size() > 500)
+        ops.resize(500);
 
     switch (test_selector) {
-        case 0: // emhash5::HashMap
-            fuzz_hashmap<emhash5::HashMap<int, int>>(ops);
-            break;
-        case 1: // emhash6::HashMap
-            fuzz_hashmap<emhash6::HashMap<int, int>>(ops);
-            break;
-        case 2: // emhash7::HashMap
-            fuzz_hashmap<emhash7::HashMap<int, int>>(ops);
-            break;
-        case 3: // emhash8::HashMap
-            fuzz_hashmap<emhash8::HashMap<int, int>>(ops);
-            break;
-        case 4: // emhash8::HashSet
-            fuzz_hashset<emhash8::HashSet<int>>(ops);
-            break;
-        case 5: // String key test for emhash8
-            fuzz_string_hashmap<emhash8::HashMap<std::string, int>>(op_data, op_size);
-            break;
-        case 6: // High load factor test for emhash5
-            fuzz_high_load<emhash5::HashMap<int, int>>(ops);
-            break;
-        case 7: // High load factor test for emhash8
-            fuzz_high_load<emhash8::HashMap<int, int>>(ops);
-            break;
-        case 8: // emhash8 with custom hash (collision patterns)
-            fuzz_emhash8_custom_hash(ops, 0xDEADBEEF);
-            break;
+    case 0: // emhash5::HashMap
+        fuzz_hashmap<emhash5::HashMap<int, int>>(ops);
+        break;
+    case 1: // emhash6::HashMap
+        fuzz_hashmap<emhash6::HashMap<int, int>>(ops);
+        break;
+    case 2: // emhash7::HashMap
+        fuzz_hashmap<emhash7::HashMap<int, int>>(ops);
+        break;
+    case 3: // emhash8::HashMap
+        fuzz_hashmap<emhash8::HashMap<int, int>>(ops);
+        break;
+    case 4: // emhash8::HashSet
+        fuzz_hashset<emhash8::HashSet<int>>(ops);
+        break;
+    case 5: // String key test for emhash8
+        fuzz_string_hashmap<emhash8::HashMap<std::string, int>>(op_data, op_size);
+        break;
+    case 6: // High load factor test for emhash5
+        fuzz_high_load<emhash5::HashMap<int, int>>(ops);
+        break;
+    case 7: // High load factor test for emhash8
+        fuzz_high_load<emhash8::HashMap<int, int>>(ops);
+        break;
+    case 8: // emhash8 with custom hash (collision patterns)
+        fuzz_emhash8_custom_hash(ops, 0xDEADBEEF);
+        break;
     }
 
     return 0;

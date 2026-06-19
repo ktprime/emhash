@@ -53,8 +53,8 @@ struct linear_hasher {
 // ============================================================================
 
 static double now_ms() {
-    return std::chrono::duration<double, std::milli>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    return std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now().time_since_epoch())
+        .count();
 }
 
 // ============================================================================
@@ -76,9 +76,7 @@ struct TestResult {
 // Template Test Functions for Any HashMap Type
 // ============================================================================
 
-template <typename HashMap>
-static int test_correctness_const(const char* map_name, int N)
-{
+template <typename HashMap> static int test_correctness_const(const char* map_name, int N) {
     printf("  [%s] Correctness: constant hash (all keys -> bucket 0), N=%d\n", map_name, N);
     HashMap m(8);
     std::unordered_map<int, int, const_hasher> ref(8);
@@ -102,7 +100,8 @@ static int test_correctness_const(const char* map_name, int N)
         if (it == m.end() || it->second != i) {
             printf("    FAIL: find(%d)\n", i);
             fail++;
-            if (fail > 5) return fail;
+            if (fail > 5)
+                return fail;
         }
         if (refit == ref.end() || refit->second != i) {
             printf("    FAIL: ref find(%d)\n", i);
@@ -121,22 +120,26 @@ static int test_correctness_const(const char* map_name, int N)
         if ((it == m.end()) != (refit == ref.end())) {
             printf("    FAIL: erase mismatch at %d\n", i);
             fail++;
-            if (fail > 5) return fail;
+            if (fail > 5)
+                return fail;
         }
         if (it != m.end() && it->second != refit->second) {
             printf("    FAIL: post-erase value mismatch at %d\n", i);
             fail++;
-            if (fail > 5) return fail;
+            if (fail > 5)
+                return fail;
         }
     }
 
     // Re-insert erased
-    for (int i = 0; i < N; i += 2) m[i] = i;
+    for (int i = 0; i < N; i += 2)
+        m[i] = i;
     for (int i = 0; i < N; i++) {
         if (m[i] != i) {
             printf("    FAIL: reinsert %d\n", i);
             fail++;
-            if (fail > 5) return fail;
+            if (fail > 5)
+                return fail;
         }
     }
 
@@ -144,9 +147,7 @@ static int test_correctness_const(const char* map_name, int N)
     return fail;
 }
 
-template <typename HashMap>
-static int test_correctness_range4(const char* map_name, int N)
-{
+template <typename HashMap> static int test_correctness_range4(const char* map_name, int N) {
     printf("  [%s] Correctness: range-4 hash (keys -> 4 buckets), N=%d\n", map_name, N);
     HashMap m(8);
     std::unordered_map<int, int, range4_hasher> ref(8);
@@ -161,16 +162,15 @@ static int test_correctness_range4(const char* map_name, int N)
         if (it == m.end() || it->second != i) {
             printf("    FAIL: find(%d) under range-4\n", i);
             fail++;
-            if (fail > 5) return fail;
+            if (fail > 5)
+                return fail;
         }
     }
     printf("    %s\n", fail == 0 ? "PASS" : "FAIL");
     return fail;
 }
 
-template <typename HashMap>
-static int test_correctness_linear(const char* map_name, int N)
-{
+template <typename HashMap> static int test_correctness_linear(const char* map_name, int N) {
     printf("  [%s] Correctness: linear hash (key == hash), N=%d\n", map_name, N);
     HashMap m(8);
     std::unordered_map<int, int, linear_hasher> ref(8);
@@ -185,7 +185,8 @@ static int test_correctness_linear(const char* map_name, int N)
         if (it == m.end() || it->second != i) {
             printf("    FAIL: find(%d) under linear\n", i);
             fail++;
-            if (fail > 5) return fail;
+            if (fail > 5)
+                return fail;
         }
     }
     printf("    %s\n", fail == 0 ? "PASS" : "FAIL");
@@ -197,23 +198,23 @@ static int test_correctness_linear(const char* map_name, int N)
 // ============================================================================
 
 template <typename HashMap, typename Hash>
-static double bench_insert(const char* map_name, const char* hash_name, int N)
-{
+static double bench_insert(const char* map_name, const char* hash_name, int N) {
     HashMap m(8);
     auto t0 = now_ms();
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
     auto t1 = now_ms();
     double elapsed = t1 - t0;
-    printf("  %-12s %-8s insert N=%-6d -> %8.1f ms (%.0f ops/ms), buckets=%zu, LF=%.2f\n",
-        map_name, hash_name, N, elapsed, N / elapsed, (size_t)m.bucket_count(), m.load_factor());
+    printf("  %-12s %-8s insert N=%-6d -> %8.1f ms (%.0f ops/ms), buckets=%zu, LF=%.2f\n", map_name, hash_name, N,
+           elapsed, N / elapsed, (size_t)m.bucket_count(), m.load_factor());
     return elapsed;
 }
 
 template <typename HashMap, typename Hash>
-static double bench_find(const char* map_name, const char* hash_name, int N)
-{
+static double bench_find(const char* map_name, const char* hash_name, int N) {
     HashMap m(8);
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
 
     auto t0 = now_ms();
     volatile int sink = 0;
@@ -226,31 +227,30 @@ static double bench_find(const char* map_name, const char* hash_name, int N)
     auto t1 = now_ms();
     double ops = (double)N * 10;
     double elapsed = t1 - t0;
-    printf("  %-12s %-8s find   N=%-6d -> %8.1f ms (%.0f ops/ms)\n",
-        map_name, hash_name, N, elapsed, ops / elapsed);
+    printf("  %-12s %-8s find   N=%-6d -> %8.1f ms (%.0f ops/ms)\n", map_name, hash_name, N, elapsed, ops / elapsed);
     return elapsed;
 }
 
 template <typename HashMap, typename Hash>
-static double bench_erase(const char* map_name, const char* hash_name, int N)
-{
+static double bench_erase(const char* map_name, const char* hash_name, int N) {
     HashMap m(8);
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
 
     auto t0 = now_ms();
-    for (int i = 0; i < N; i++) m.erase(i);
+    for (int i = 0; i < N; i++)
+        m.erase(i);
     auto t1 = now_ms();
     double elapsed = t1 - t0;
-    printf("  %-12s %-8s erase  N=%-6d -> %8.1f ms (%.0f ops/ms)\n",
-        map_name, hash_name, N, elapsed, N / elapsed);
+    printf("  %-12s %-8s erase  N=%-6d -> %8.1f ms (%.0f ops/ms)\n", map_name, hash_name, N, elapsed, N / elapsed);
     return elapsed;
 }
 
 template <typename HashMap, typename Hash>
-static double bench_mixed(const char* map_name, const char* hash_name, int N)
-{
+static double bench_mixed(const char* map_name, const char* hash_name, int N) {
     HashMap m(8);
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
 
     std::mt19937 rng(42);
     std::uniform_int_distribution<int> opd(0, 9);
@@ -260,14 +260,16 @@ static double bench_mixed(const char* map_name, const char* hash_name, int N)
     for (int i = 0; i < N; i++) {
         int op = opd(rng);
         int k = keyd(rng);
-        if (op < 5) m[k] = k;       // 50% insert
-        else if (op < 8) m.find(k); // 30% find
-        else m.erase(k);            // 20% erase
+        if (op < 5)
+            m[k] = k; // 50% insert
+        else if (op < 8)
+            m.find(k); // 30% find
+        else
+            m.erase(k); // 20% erase
     }
     auto t1 = now_ms();
     double elapsed = t1 - t0;
-    printf("  %-12s %-8s mixed  N=%-6d -> %8.1f ms (%.0f ops/ms)\n",
-        map_name, hash_name, N, elapsed, N / elapsed);
+    printf("  %-12s %-8s mixed  N=%-6d -> %8.1f ms (%.0f ops/ms)\n", map_name, hash_name, N, elapsed, N / elapsed);
     return elapsed;
 }
 
@@ -275,9 +277,7 @@ static double bench_mixed(const char* map_name, const char* hash_name, int N)
 // Test All Maps for a Given Hash Type
 // ============================================================================
 
-template <typename Hash>
-static void test_all_maps_correctness(const char* hash_name, int N)
-{
+template <typename Hash> static void test_all_maps_correctness(const char* hash_name, int N) {
     printf("\n=== Correctness Test: %s hasher, N=%d ===\n", hash_name, N);
     int total_fail = 0;
 
@@ -323,9 +323,7 @@ static void test_all_maps_correctness(const char* hash_name, int N)
 // Performance Comparison for All Maps
 // ============================================================================
 
-template <typename Hash>
-static void bench_all_maps_insert(const char* hash_name, int N)
-{
+template <typename Hash> static void bench_all_maps_insert(const char* hash_name, int N) {
     printf("\n--- Insert Performance: %s hasher, N=%d ---\n", hash_name, N);
     bench_insert<emhash5::HashMap<int, int, Hash>, Hash>("emhash5", hash_name, N);
     bench_insert<emhash6::HashMap<int, int, Hash>, Hash>("emhash6", hash_name, N);
@@ -336,9 +334,7 @@ static void bench_all_maps_insert(const char* hash_name, int N)
     bench_insert<emilib3::HashMap<int, int, Hash>, Hash>("emilib3", hash_name, N);
 }
 
-template <typename Hash>
-static void bench_all_maps_find(const char* hash_name, int N)
-{
+template <typename Hash> static void bench_all_maps_find(const char* hash_name, int N) {
     printf("\n--- Find Performance (10 rounds): %s hasher, N=%d ---\n", hash_name, N);
     bench_find<emhash5::HashMap<int, int, Hash>, Hash>("emhash5", hash_name, N);
     bench_find<emhash6::HashMap<int, int, Hash>, Hash>("emhash6", hash_name, N);
@@ -349,9 +345,7 @@ static void bench_all_maps_find(const char* hash_name, int N)
     bench_find<emilib3::HashMap<int, int, Hash>, Hash>("emilib3", hash_name, N);
 }
 
-template <typename Hash>
-static void bench_all_maps_erase(const char* hash_name, int N)
-{
+template <typename Hash> static void bench_all_maps_erase(const char* hash_name, int N) {
     printf("\n--- Erase Performance: %s hasher, N=%d ---\n", hash_name, N);
     bench_erase<emhash5::HashMap<int, int, Hash>, Hash>("emhash5", hash_name, N);
     bench_erase<emhash6::HashMap<int, int, Hash>, Hash>("emhash6", hash_name, N);
@@ -362,9 +356,7 @@ static void bench_all_maps_erase(const char* hash_name, int N)
     bench_erase<emilib3::HashMap<int, int, Hash>, Hash>("emilib3", hash_name, N);
 }
 
-template <typename Hash>
-static void bench_all_maps_mixed(const char* hash_name, int N)
-{
+template <typename Hash> static void bench_all_maps_mixed(const char* hash_name, int N) {
     printf("\n--- Mixed Operations (50%% insert, 30%% find, 20%% erase): %s hasher, N=%d ---\n", hash_name, N);
     bench_mixed<emhash5::HashMap<int, int, Hash>, Hash>("emhash5", hash_name, N);
     bench_mixed<emhash6::HashMap<int, int, Hash>, Hash>("emhash6", hash_name, N);
@@ -380,9 +372,8 @@ static void bench_all_maps_mixed(const char* hash_name, int N)
 // ============================================================================
 
 // Helper to create HashMap with high load factor (handles different constructor signatures)
-template <typename HashMap>
-static HashMap create_high_load_map() {
-    return HashMap(1024, 0.99f);  // For emhash5/6/7/8, emilib2, emilib3
+template <typename HashMap> static HashMap create_high_load_map() {
+    return HashMap(1024, 0.99f); // For emhash5/6/7/8, emilib2, emilib3
 }
 
 // Specialization for emilib (emilib2ss) which only supports single-arg constructor
@@ -392,34 +383,32 @@ static emilib::HashMap<int, int, const_hasher> create_high_load_map_emilib() {
     return m;
 }
 
-template <typename HashMap>
-static double test_high_load_attack(const char* map_name, int N)
-{
+template <typename HashMap> static double test_high_load_attack(const char* map_name, int N) {
     HashMap m = create_high_load_map<HashMap>();
     auto t0 = now_ms();
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
     auto t1 = now_ms();
     double elapsed = t1 - t0;
-    printf("  %-12s insert N=%d (const+high_load): %8.1f ms (%.0f ops/ms), buckets=%zu, LF=%.2f\n",
-        map_name, N, elapsed, N / elapsed, (size_t)m.bucket_count(), m.load_factor());
+    printf("  %-12s insert N=%d (const+high_load): %8.1f ms (%.0f ops/ms), buckets=%zu, LF=%.2f\n", map_name, N,
+           elapsed, N / elapsed, (size_t)m.bucket_count(), m.load_factor());
     return elapsed;
 }
 
 // Specialized function for emilib
-static double test_high_load_attack_emilib(const char* map_name, int N)
-{
+static double test_high_load_attack_emilib(const char* map_name, int N) {
     auto m = create_high_load_map_emilib();
     auto t0 = now_ms();
-    for (int i = 0; i < N; i++) m[i] = i;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
     auto t1 = now_ms();
     double elapsed = t1 - t0;
-    printf("  %-12s insert N=%d (const+high_load): %8.1f ms (%.0f ops/ms), buckets=%zu, LF=%.2f\n",
-        map_name, N, elapsed, N / elapsed, (size_t)m.bucket_count(), m.load_factor());
+    printf("  %-12s insert N=%d (const+high_load): %8.1f ms (%.0f ops/ms), buckets=%zu, LF=%.2f\n", map_name, N,
+           elapsed, N / elapsed, (size_t)m.bucket_count(), m.load_factor());
     return elapsed;
 }
 
-static void test_all_high_load(int N)
-{
+static void test_all_high_load(int N) {
     printf("\n=== High Load + Attack: N=%d, MLF=0.99 ===\n", N);
     test_high_load_attack<emhash5::HashMap<int, int, const_hasher>>("emhash5", N);
     test_high_load_attack<emhash6::HashMap<int, int, const_hasher>>("emhash6", N);
@@ -434,9 +423,7 @@ static void test_all_high_load(int N)
 // Stress Test: Verify No Crash or Hang
 // ============================================================================
 
-template <typename HashMap>
-static bool stress_test_no_crash(const char* map_name, int N)
-{
+template <typename HashMap> static bool stress_test_no_crash(const char* map_name, int N) {
     printf("  [%s] Stress test (no crash/hang)... ", map_name);
     fflush(stdout);
 
@@ -491,8 +478,7 @@ static bool stress_test_no_crash(const char* map_name, int N)
     }
 }
 
-static void test_all_stress(int N)
-{
+static void test_all_stress(int N) {
     printf("\n=== Stress Test (No Crash/Hang): N=%d ===\n", N);
     int passed = 0;
     passed += stress_test_no_crash<emhash5::HashMap<int, int, const_hasher>>("emhash5", N) ? 1 : 0;
@@ -509,8 +495,7 @@ static void test_all_stress(int N)
 // Main Entry Point
 // ============================================================================
 
-int main()
-{
+int main() {
     printf("################################################################\n");
     printf("# Hash Attack Benchmark for All 7 HashMap Implementations\n");
     printf("#\n");

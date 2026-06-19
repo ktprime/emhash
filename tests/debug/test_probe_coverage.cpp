@@ -8,8 +8,7 @@
 #include <set>
 
 // Simulate emilib2ss/emilib2s get_next_bucket (aligned loads, step must be multiple of simd_bytes)
-size_t get_next_bucket_aligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes)
-{
+size_t get_next_bucket_aligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes) {
     if (offset < 7)
         next_bucket += simd_bytes * offset;
     else {
@@ -19,8 +18,7 @@ size_t get_next_bucket_aligned(size_t next_bucket, size_t offset, size_t num_buc
 }
 
 // Simulate emilib2o get_next_bucket (unaligned loads, step can be any value)
-size_t get_next_bucket_unaligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes)
-{
+size_t get_next_bucket_unaligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes) {
     if (offset < 5)
         next_bucket += simd_bytes * offset;
     else {
@@ -30,8 +28,7 @@ size_t get_next_bucket_unaligned(size_t next_bucket, size_t offset, size_t num_b
 }
 
 // Test probe coverage for aligned implementation (emilib2ss/emilib2s)
-bool test_aligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
-{
+bool test_aligned_coverage(size_t num_buckets, size_t simd_bytes = 16) {
     size_t num_groups = num_buckets / simd_bytes;
     size_t max_steps = num_groups * 2; // should need at most num_groups steps
 
@@ -51,9 +48,8 @@ bool test_aligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
         }
 
         if (visited_groups.size() != num_groups) {
-            printf("  FAIL: nb=%zu start=%zu covered %zu/%zu groups (%.1f%%)\n",
-                   num_buckets, start, visited_groups.size(), num_groups,
-                   100.0 * visited_groups.size() / num_groups);
+            printf("  FAIL: nb=%zu start=%zu covered %zu/%zu groups (%.1f%%)\n", num_buckets, start,
+                   visited_groups.size(), num_groups, 100.0 * visited_groups.size() / num_groups);
             all_ok = false;
             break; // one failure is enough
         }
@@ -62,8 +58,7 @@ bool test_aligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
 }
 
 // Test probe coverage for unaligned implementation (emilib2o)
-bool test_unaligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
-{
+bool test_unaligned_coverage(size_t num_buckets, size_t simd_bytes = 16) {
     size_t max_steps = num_buckets * 2;
 
     bool all_ok = true;
@@ -81,9 +76,8 @@ bool test_unaligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
         }
 
         if (visited.size() != num_buckets) {
-            printf("  FAIL: nb=%zu start=%zu covered %zu/%zu positions (%.1f%%)\n",
-                   num_buckets, start, visited.size(), num_buckets,
-                   100.0 * visited.size() / num_buckets);
+            printf("  FAIL: nb=%zu start=%zu covered %zu/%zu positions (%.1f%%)\n", num_buckets, start, visited.size(),
+                   num_buckets, 100.0 * visited.size() / num_buckets);
             all_ok = false;
             break;
         }
@@ -92,8 +86,7 @@ bool test_unaligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
 }
 
 // Test the OLD buggy implementation for comparison
-size_t get_next_bucket_old_aligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes)
-{
+size_t get_next_bucket_old_aligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes) {
     if (offset < 7)
         next_bucket += simd_bytes * offset;
     else if (offset < 14)
@@ -103,8 +96,7 @@ size_t get_next_bucket_old_aligned(size_t next_bucket, size_t offset, size_t num
     return next_bucket & (num_buckets - 1);
 }
 
-size_t get_next_bucket_old_unaligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes)
-{
+size_t get_next_bucket_old_unaligned(size_t next_bucket, size_t offset, size_t num_buckets, size_t simd_bytes) {
     if (offset < 5)
         next_bucket += simd_bytes * offset;
     else if (offset < 11)
@@ -114,8 +106,7 @@ size_t get_next_bucket_old_unaligned(size_t next_bucket, size_t offset, size_t n
     return next_bucket & (num_buckets - 1);
 }
 
-bool test_old_aligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
-{
+bool test_old_aligned_coverage(size_t num_buckets, size_t simd_bytes = 16) {
     size_t num_groups = num_buckets / simd_bytes;
     size_t max_steps = num_groups * 2;
 
@@ -139,8 +130,7 @@ bool test_old_aligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
     return true;
 }
 
-bool test_old_unaligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
-{
+bool test_old_unaligned_coverage(size_t num_buckets, size_t simd_bytes = 16) {
     size_t max_steps = num_buckets * 2;
 
     for (size_t start = 0; start < num_buckets; start += simd_bytes) {
@@ -163,24 +153,27 @@ bool test_old_unaligned_coverage(size_t num_buckets, size_t simd_bytes = 16)
     return true;
 }
 
-int main()
-{
+int main() {
     int pass = 0, fail = 0;
 
     printf("=== Testing NEW (fixed) aligned probe coverage (emilib2ss/emilib2s) ===\n");
     for (size_t nb = 64; nb <= 65536; nb *= 2) {
-        if (test_aligned_coverage(nb))
-            { printf("  nb=%-6zu PASS (all %zu groups reachable)\n", nb, nb/16); pass++; }
-        else
-            { fail++; }
+        if (test_aligned_coverage(nb)) {
+            printf("  nb=%-6zu PASS (all %zu groups reachable)\n", nb, nb / 16);
+            pass++;
+        } else {
+            fail++;
+        }
     }
 
     printf("\n=== Testing NEW (fixed) unaligned probe coverage (emilib2o) ===\n");
     for (size_t nb = 64; nb <= 65536; nb *= 2) {
-        if (test_unaligned_coverage(nb))
-            { printf("  nb=%-6zu PASS (all %zu positions reachable)\n", nb, nb); pass++; }
-        else
-            { fail++; }
+        if (test_unaligned_coverage(nb)) {
+            printf("  nb=%-6zu PASS (all %zu positions reachable)\n", nb, nb);
+            pass++;
+        } else {
+            fail++;
+        }
     }
 
     printf("\n=== Testing OLD (buggy) aligned probe coverage for comparison ===\n");
@@ -203,9 +196,13 @@ int main()
         size_t step_g = step / 16;
         // compute GCD
         size_t a = step_g, b = ng;
-        while (b) { size_t t = b; b = a % b; a = t; }
-        printf("  nb=%-6zu ng=%-5zu step=%-5zu step_g=%-3zu GCD(step_g,ng)=%zu %s\n",
-               nb, ng, step, step_g, a, a == 1 ? "OK" : "BUG");
+        while (b) {
+            size_t t = b;
+            b = a % b;
+            a = t;
+        }
+        printf("  nb=%-6zu ng=%-5zu step=%-5zu step_g=%-3zu GCD(step_g,ng)=%zu %s\n", nb, ng, step, step_g, a,
+               a == 1 ? "OK" : "BUG");
     }
 
     printf("\n  Unaligned: step = (nb/11+1)|1\n");
@@ -213,9 +210,12 @@ int main()
         size_t step = (nb / 11 + 1) | 1;
         // compute GCD
         size_t a = step, b = nb;
-        while (b) { size_t t = b; b = a % b; a = t; }
-        printf("  nb=%-6zu step=%-5zu GCD(step,nb)=%zu %s\n",
-               nb, step, a, a == 1 ? "OK" : "BUG");
+        while (b) {
+            size_t t = b;
+            b = a % b;
+            a = t;
+        }
+        printf("  nb=%-6zu step=%-5zu GCD(step,nb)=%zu %s\n", nb, step, a, a == 1 ? "OK" : "BUG");
     }
 
     printf("\n=== Summary: %d passed, %d failed ===\n", pass, fail);

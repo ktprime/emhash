@@ -4,8 +4,7 @@
 #include <cstdio>
 #include <cstdint>
 
-int main()
-{
+int main() {
     emhash5::HashMap<int32_t, int32_t> m(16);
     printf("--- find(-1) and find(-1, b) tests ---\n");
     fflush(stdout);
