@@ -356,7 +356,7 @@ public:
         void init() {
             _from = (_bucket / SIZE_BIT) * SIZE_BIT;
             if (_bucket < _map->bucket_count()) {
-                _bmask = *(size_t*)((size_t*)_map->_bitmask + _from / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + _from / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
@@ -414,7 +414,8 @@ public:
             }
 
             do {
-                _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
+                _bmask = ~_bmask;
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
@@ -449,7 +450,7 @@ public:
         void init() {
             _from = (_bucket / SIZE_BIT) * SIZE_BIT;
             if (_bucket < _map->bucket_count()) {
-                _bmask = *(size_t*)((size_t*)_map->_bitmask + _from / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + _from / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
@@ -494,7 +495,8 @@ public:
             }
 
             do {
-                _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
+                _bmask = ~_bmask;
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
@@ -682,7 +684,9 @@ public:
             return {this, _num_buckets};
 #endif
 
-        const auto bmask = ~(*(size_t*)_bitmask);
+        size_t bmask;
+        memcpy(&bmask, _bitmask, sizeof(bmask));
+        bmask = ~bmask;
         if (bmask != 0)
             return {this, (size_type)CTZ(bmask)};
 
@@ -697,7 +701,9 @@ public:
             return {this, _num_buckets};
 #endif
 
-        const auto bmask = ~(*(size_t*)_bitmask);
+        size_t bmask;
+        memcpy(&bmask, _bitmask, sizeof(bmask));
+        bmask = ~bmask;
         if (bmask != 0)
             return {this, (size_type)CTZ(bmask)};
 
@@ -1590,7 +1596,9 @@ private:
         const auto boset = bucket_from % 8;
         auto* const align = (uint8_t*)_bitmask + bucket_from / 8;
         (void)main_bucket;
-        const size_t bmask = (*(size_t*)(align) >> boset); // & 0xF0F0F0F0FF0FF0FFull;//
+        size_t bmask;
+        memcpy(&bmask, align, sizeof(bmask));
+        bmask >>= boset;
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 #endif
@@ -1599,12 +1607,14 @@ private:
         auto& last = EMH_BUCKET(_pairs, _num_buckets);
         for (;;) {
             last &= qmask;
-            const auto bmask2 = *((size_t*)_bitmask + last);
+            size_t bmask2;
+            memcpy(&bmask2, _bitmask + last * sizeof(size_t), sizeof(bmask2));
             if (bmask2 != 0)
                 return last * SIZE_BIT + CTZ(bmask2);
 #if 1
             const auto next1 = (qmask / 2 + last) & qmask;
-            const auto bmask1 = *((size_t*)_bitmask + next1);
+            size_t bmask1;
+            memcpy(&bmask1, _bitmask + next1 * sizeof(size_t), sizeof(bmask1));
             if (bmask1 != 0) {
                 last = next1;
                 return next1 * SIZE_BIT + CTZ(bmask1);
@@ -1637,14 +1647,17 @@ private:
         memcpy(&bmask, align + 0, sizeof(bmask));
         bmask >>= boset;
 #else
-        const auto bmask = (*(size_t*)(align) >> boset); // maybe not aligned and warning
+        size_t bmask;
+        memcpy(&bmask, align, sizeof(bmask));
+        bmask >>= boset;
 #endif
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
 
         const auto qmask = _mask / SIZE_BIT;
         for (auto last = (bucket_from + _mask) & qmask;;) {
-            const auto bmask2 = *((size_t*)_bitmask + last); // & 0xF0F0F0F0FF0FF0FFull;
+            size_t bmask2;
+            memcpy(&bmask2, _bitmask + last * sizeof(size_t), sizeof(bmask2));
             if (EMH_LIKELY(bmask2 != 0))
                 return last * SIZE_BIT + CTZ(bmask2);
             last = (last + 1) & qmask;
