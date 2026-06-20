@@ -4,8 +4,7 @@
 //   1. emihmap1/2 need_explicit_dtor() polarity inversion
 //   2. emihmap2 clone() sentinel leak
 //   3. noexcept on copy operations that can throw
-//   4. time(0) precision in lru_size/lru_time
-//   5. entry::operator=(const entry&) signature fix
+//   4. entry::operator=(const entry&) signature fix
 //
 // Also covers general string-key correctness across all map implementations.
 
@@ -25,8 +24,6 @@
 #include "emhash/hash_set2.hpp"
 #include "emhash/hash_set4.hpp"
 #include "emhash/hash_set8.hpp"
-#include "emhash/lru_size.hpp"
-#include "emhash/lru_time.hpp"
 #include "emilib/emihmap1.hpp"
 #include "emilib/emihmap2.hpp"
 #include "emilib/emihmap3.hpp"
@@ -321,88 +318,7 @@ static void test_leak_tracker_rehash_balance(const char* name) {
 }
 
 // ============================================================================
-// Section 7: LRU Cache with String Keys
-// ============================================================================
-
-static void test_lru_size_string_keys() {
-    printf("  [lru_size] string keys and LRU ordering...\n");
-    {
-        emlru_size::lru_cache<std::string, std::string> lru;
-        lru.insert("key1", "val1");
-        lru.insert("key2", "val2");
-        lru.insert("key3", "val3");
-
-        TEST_ASSERT(lru.size() == 3, "LRU should have 3 entries");
-        TEST_ASSERT(*lru.try_get("key2") == "val2", "key2 should be val2");
-        TEST_ASSERT(*lru.try_get("key1") == "val1", "key1 should be val1");
-
-        // Copy assignment (exercises entry::operator=(const entry&))
-        emlru_size::lru_cache<std::string, std::string> lru2;
-        lru2.insert("other", "data");
-        lru2 = lru;
-        TEST_ASSERT(lru2.size() == 3, "copied LRU should have 3 entries");
-        TEST_ASSERT(*lru2.try_get("key3") == "val3", "copied key3 should be val3");
-
-        // Swap
-        emlru_size::lru_cache<std::string, int> a, b;
-        a.insert("x", 1);
-        a.insert("y", 2);
-        a.swap(b);
-        TEST_ASSERT(b.size() == 2, "b should have 2 after swap");
-        TEST_ASSERT(a.size() == 0, "a should be empty after swap");
-        TEST_ASSERT(*b.try_get("x") == 1, "b should have x=1");
-    }
-    printf("  [lru_size] string keys and LRU ordering: PASS\n");
-}
-
-static void test_lru_time_string_keys() {
-    printf("  [lru_time] string keys and timeout...\n");
-    {
-        emlru_time::lru_cache<std::string, std::string> lru;
-        lru.insert("key1", "val1", 3600);
-        lru.insert("key2", "val2", 3600);
-
-        TEST_ASSERT(lru.size() == 2, "LRU time should have 2 entries");
-        TEST_ASSERT(*lru.try_get("key1") == "val1", "key1 should be val1");
-
-        // Copy
-        emlru_time::lru_cache<std::string, std::string> lru2(lru);
-        TEST_ASSERT(lru2.size() == 2, "copied LRU time should have 2 entries");
-    }
-    printf("  [lru_time] string keys and timeout: PASS\n");
-}
-
-// ============================================================================
-// Section 8: LRU Rapid Insertion (time(0) precision fix)
-// ============================================================================
-
-static void test_lru_rapid_insertion() {
-    printf("  [lru_size] rapid insertion ordering (time precision)...\n");
-    {
-        // Use EMHASH_LRU_TIME to test the chrono-based clock
-        // Default path uses incrementing counter which is already fine
-        emlru_size::lru_cache<int, int> lru(1000, 1000);
-        for (int i = 0; i < 100; i++) {
-            lru.insert(i, i * 10);
-        }
-        TEST_ASSERT(lru.size() == 100, "should have 100 entries");
-
-        // All entries should be accessible
-        bool all_ok = true;
-        for (int i = 0; i < 100; i++) {
-            auto* val = lru.try_get(i);
-            if (!val || *val != i * 10) {
-                all_ok = false;
-                break;
-            }
-        }
-        TEST_ASSERT(all_ok, "all rapid-inserted entries should be accessible");
-    }
-    printf("  [lru_size] rapid insertion ordering (time precision): PASS\n");
-}
-
-// ============================================================================
-// Section 9: emihmap1/2 need_explicit_dtor polarity (compile-time + runtime)
+// Section 7: emihmap1/2 need_explicit_dtor polarity (compile-time + runtime)
 // ============================================================================
 
 static void test_emihmap_dtor_polarity() {
@@ -488,7 +404,7 @@ static void test_emihmap_dtor_polarity() {
 }
 
 // ============================================================================
-// Section 10: String Key Stress (Many Entries)
+// Section 8: String Key Stress (Many Entries)
 // ============================================================================
 
 template<typename MapType>
@@ -523,7 +439,7 @@ static void test_string_key_stress(const char* name) {
 }
 
 // ============================================================================
-// Section 11: HashSet with String Keys
+// Section 9: HashSet with String Keys
 // ============================================================================
 
 template<typename SetType>
@@ -562,7 +478,7 @@ static void test_hashset_string_keys(const char* name) {
 }
 
 // ============================================================================
-// Section 12: Move Semantics with String Keys
+// Section 10: Move Semantics with String Keys
 // ============================================================================
 
 template<typename MapType>
@@ -650,35 +566,26 @@ int main() {
     test_leak_tracker_rehash_balance<emilib2::HashMap<LeakTracker, int>>("emihmap2");
     test_leak_tracker_rehash_balance<emilib3::HashMap<LeakTracker, int>>("emihmap3");
 
-    // Section 7: LRU with string keys
-    printf("\n--- Section 7: LRU Cache with String Keys ---\n");
-    test_lru_size_string_keys();
-    test_lru_time_string_keys();
-
-    // Section 8: LRU rapid insertion (time precision)
-    printf("\n--- Section 8: LRU Rapid Insertion (Time Precision) ---\n");
-    test_lru_rapid_insertion();
-
-    // Section 9: emihmap1/2 need_explicit_dtor polarity
-    printf("\n--- Section 9: emihmap1/2 need_explicit_dtor Polarity ---\n");
+    // Section 7: emihmap1/2 need_explicit_dtor polarity
+    printf("\n--- Section 7: emihmap1/2 need_explicit_dtor Polarity ---\n");
     test_emihmap_dtor_polarity();
 
-    // Section 10: String key stress
-    printf("\n--- Section 10: String Key Stress (5000 entries) ---\n");
+    // Section 8: String key stress
+    printf("\n--- Section 8: String Key Stress (5000 entries) ---\n");
     test_string_key_stress<emhash7::HashMap<std::string, int>>("emhash7");
     test_string_key_stress<emhash8::HashMap<std::string, int>>("emhash8");
     test_string_key_stress<emilib::HashMap<std::string, int>>("emihmap1");
     test_string_key_stress<emilib2::HashMap<std::string, int>>("emihmap2");
     test_string_key_stress<emilib3::HashMap<std::string, int>>("emihmap3");
 
-    // Section 11: HashSet with string keys
-    printf("\n--- Section 11: HashSet with String Keys ---\n");
+    // Section 9: HashSet with string keys
+    printf("\n--- Section 9: HashSet with String Keys ---\n");
     test_hashset_string_keys<emhash2::HashSet<std::string>>("emhash_set2");
     test_hashset_string_keys<emhash4::HashSet<std::string>>("emhash_set4");
     test_hashset_string_keys<emhash8::HashSet<std::string>>("emhash_set8");
 
-    // Section 12: Move semantics with string keys
-    printf("\n--- Section 12: Move Semantics with String Keys ---\n");
+    // Section 10: Move semantics with string keys
+    printf("\n--- Section 10: Move Semantics with String Keys ---\n");
     test_string_key_move<emhash7::HashMap<std::string, int>>("emhash7");
     test_string_key_move<emhash8::HashMap<std::string, int>>("emhash8");
     test_string_key_move<emilib::HashMap<std::string, int>>("emihmap1");

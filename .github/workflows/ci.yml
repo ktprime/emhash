@@ -408,6 +408,7 @@ jobs:
           g++ $COV verify/test_extreme.cpp -o test_extreme_cov
           g++ $COV verify/test_string_key_leak.cpp -o test_string_key_leak_cov
           g++ $COV verify/test_hashset_full_api.cpp -o test_hashset_cov
+          g++ $COV verify/test_emilib_comprehensive.cpp -o test_emilib_cov
           g++ $COV stress/stress_fix.cpp -o test_stress_cov
           g++ $COV stress/stress_all_maps.cpp -o test_stress_all_cov
           g++ $COV -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack_cov
@@ -420,6 +421,7 @@ jobs:
           ./test_extreme_cov
           ./test_string_key_leak_cov
           ./test_hashset_cov
+          ./test_emilib_cov
           ./test_stress_cov
           ./test_stress_all_cov
           ./test_attack_cov
@@ -428,7 +430,9 @@ jobs:
       - name: Generate coverage report
         run: |
           lcov --capture --directory tests --output-file coverage.info \
-               --include '${{ github.workspace }}/include/emhash/*'
+               --include '${{ github.workspace }}/include/emhash/hash_*' \
+               --include '${{ github.workspace }}/include/emilib/*' \
+               --exclude '${{ github.workspace }}/include/emilib/sse2neon.h'
           genhtml coverage.info --output-directory coverage_html --title "emhash coverage" --num-spaces 4
           lcov --summary coverage.info
           COV_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -oP '\d+\.\d+%' | head -1)

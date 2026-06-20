@@ -820,6 +820,192 @@ static void test_erase_if(const char* name) {
 }
 
 // ============================================================================
+// Section F: Container properties & capacity interfaces
+// ============================================================================
+
+template<typename HashMapType>
+static void test_load_factor(const char* name) {
+    printf("\n--- [%s] Load Factor / Capacity ---\n", name);
+    HashMapType map;
+
+    // Empty map
+    TEST_ASSERT(map.load_factor() == 0.0f, "load_factor of empty map should be 0");
+    TEST_ASSERT(map.bucket_count() >= 4, "default bucket_count should be at least 4");
+    TEST_ASSERT(map.max_load_factor() > 0.0f, "max_load_factor should be positive");
+
+    // Insert and check load factor grows but stays <= max
+    const int N = 1000;
+    for (int i = 0; i < N; i++) map[i] = i;
+    TEST_ASSERT(map.load_factor() > 0.0f, "load_factor should be > 0 after inserts");
+    TEST_ASSERT(map.load_factor() <= map.max_load_factor() + 1e-3f,
+                "load_factor should be <= max_load_factor after rehash");
+
+    TEST_ASSERT(map.max_size() > 0ULL, "max_size should be non-zero");
+    TEST_ASSERT(map.max_bucket_count() == map.max_size(),
+                "max_bucket_count should equal max_size");
+}
+
+template<typename HashMapType>
+static void test_swap(const char* name) {
+    printf("\n--- [%s] Swap ---\n", name);
+    using KeyT = typename HashMapType::key_type;
+    HashMapType a;
+    HashMapType b;
+
+    for (int i = 0; i < 50; i++) a[KeyT(i)] = i * 10;
+    for (int i = 0; i < 30; i++) b[KeyT(i + 1000)] = i;
+
+    const size_t a_size_before = a.size();
+    const size_t b_size_before = b.size();
+    const size_t a_buckets_before = a.bucket_count();
+    const size_t b_buckets_before = b.bucket_count();
+
+    a.swap(b);
+
+    TEST_ASSERT(a.size() == b_size_before, "swapped a should have b's size");
+    TEST_ASSERT(b.size() == a_size_before, "swapped b should have a's size");
+    TEST_ASSERT(a.bucket_count() == b_buckets_before, "swapped a should have b's bucket_count");
+    TEST_ASSERT(b.bucket_count() == a_buckets_before, "swapped b should have a's bucket_count");
+
+    // Verify values moved correctly
+    TEST_ASSERT(a.contains(KeyT(1000)), "swapped a should contain key 1000");
+    TEST_ASSERT(!a.contains(KeyT(0)), "swapped a should not contain key 0");
+    TEST_ASSERT(b.contains(KeyT(0)), "swapped b should contain key 0");
+    TEST_ASSERT(b[KeyT(0)] == 0, "swapped b[0] should be 0");
+    TEST_ASSERT(!b.contains(KeyT(1000)), "swapped b should not contain key 1000");
+}
+
+template<typename HashMapType>
+static void test_initializer_list_ctor(const char* name) {
+    printf("\n--- [%s] Initializer List Constructor ---\n", name);
+    using KeyT = typename HashMapType::key_type;
+
+    HashMapType map = {
+        {KeyT(1), 100},
+        {KeyT(2), 200},
+        {KeyT(3), 300},
+    };
+    TEST_ASSERT(map.size() == 3, "initializer_list ctor: size should be 3");
+    TEST_ASSERT(map[KeyT(1)] == 100, "initializer_list ctor: key 1 = 100");
+    TEST_ASSERT(map[KeyT(2)] == 200, "initializer_list ctor: key 2 = 200");
+    TEST_ASSERT(map[KeyT(3)] == 300, "initializer_list ctor: key 3 = 300");
+
+    HashMapType empty_map{};
+    TEST_ASSERT(empty_map.empty(), "empty initializer_list ctor should be empty");
+}
+
+template<typename HashMapType>
+static void test_input_iterator_ctor(const char* name) {
+    printf("\n--- [%s] Input Iterator Constructor ---\n", name);
+    using KeyT = typename HashMapType::key_type;
+    using ValT = typename HashMapType::mapped_type;
+
+    std::vector<std::pair<KeyT, ValT>> data;
+    for (int i = 0; i < 50; i++) data.emplace_back(KeyT(i), i * 7);
+
+    HashMapType map(data.begin(), data.end());
+    TEST_ASSERT(map.size() == 50, "input-iter ctor: size should be 50");
+    for (int i = 0; i < 50; i++) {
+        TEST_ASSERT(map.contains(KeyT(i)), "input-iter ctor: should contain key");
+        TEST_ASSERT(map[KeyT(i)] == i * 7, "input-iter ctor: value should match");
+    }
+}
+
+template<typename HashMapType>
+static void test_equality(const char* name) {
+    printf("\n--- [%s] Equality / Inequality ---\n", name);
+    using KeyT = typename HashMapType::key_type;
+    HashMapType a;
+    HashMapType b;
+
+    TEST_ASSERT(a == b, "two empty maps should be equal");
+    TEST_ASSERT(!(a != b), "two empty maps should not be unequal");
+
+    for (int i = 0; i < 100; i++) {
+        a[KeyT(i)] = i;
+        b[KeyT(i)] = i;
+    }
+    TEST_ASSERT(a == b, "equal-content maps should be equal");
+    TEST_ASSERT(!(a != b), "equal-content maps should not be unequal");
+
+    // Modify one entry
+    b[KeyT(50)] = 999;
+    TEST_ASSERT(a != b, "differing-content maps should be unequal");
+    TEST_ASSERT(!(a == b), "differing-content maps should not be equal");
+
+    // Different size
+    HashMapType c;
+    for (int i = 0; i < 50; i++) c[KeyT(i)] = i;
+    TEST_ASSERT(a != c, "different-size maps should be unequal");
+
+    // Cross-comparison with std::unordered_map
+    std::unordered_map<int, int> ref;
+    for (int i = 0; i < 100; i++) ref[i] = i;
+    HashMapType d;
+    for (int i = 0; i < 100; i++) d[KeyT(i)] = i;
+    TEST_ASSERT(d == ref, "HashMap should compare equal to equivalent std::unordered_map");
+}
+
+template<typename HashMapType>
+static void test_merge(const char* name) {
+    printf("\n--- [%s] Merge ---\n", name);
+    using KeyT = typename HashMapType::key_type;
+    HashMapType dst;
+    HashMapType src;
+
+    for (int i = 0; i < 100; i++) dst[KeyT(i)] = i;
+    for (int i = 50; i < 150; i++) src[KeyT(i)] = i * 10;
+
+    const size_t src_size_before = src.size();
+    const size_t dst_size_before = dst.size();
+
+    dst.merge(src);
+
+    // New keys (100..149) from src should be moved into dst
+    for (int i = 100; i < 150; i++) {
+        TEST_ASSERT(dst.contains(KeyT(i)), "merge: new key should be in dst");
+        TEST_ASSERT(dst[KeyT(i)] == i * 10, "merge: new key value should be from src");
+    }
+    // Original keys (0..99) in dst should be unchanged
+    for (int i = 0; i < 100; i++) {
+        TEST_ASSERT(dst.contains(KeyT(i)), "merge: original key should remain");
+        TEST_ASSERT(dst[KeyT(i)] == i, "merge: original value should be unchanged");
+    }
+    // Overlapping keys (50..99) should remain in src (merge is move-only, not overwrite)
+    TEST_ASSERT(src.size() < src_size_before, "merge: src should lose moved elements");
+    TEST_ASSERT(dst.size() > dst_size_before, "merge: dst should grow");
+
+    // Empty dst merge
+    HashMapType empty_dst;
+    HashMapType src2;
+    for (int i = 0; i < 10; i++) src2[KeyT(i)] = i;
+    empty_dst.merge(src2);
+    TEST_ASSERT(empty_dst.size() == 10, "merge into empty dst should populate it");
+    TEST_ASSERT(src2.empty(), "merge into empty dst should drain src");
+}
+
+// ============================================================================
+// Section G: insert(std::initializer_list) and emplace edge cases
+// ============================================================================
+
+template<typename HashMapType>
+static void test_initializer_list_insert(const char* name) {
+    printf("\n--- [%s] Initializer List Insert ---\n", name);
+    using KeyT = typename HashMapType::key_type;
+    HashMapType map;
+
+    map[KeyT(1)] = 100;
+    map.insert({
+        {KeyT(2), 200},
+        {KeyT(3), 300},
+        {KeyT(4), 400},
+    });
+    TEST_ASSERT(map.size() == 4, "initializer_list insert: size should be 4");
+    TEST_ASSERT(map[KeyT(1)] == 100, "initializer_list insert: pre-existing key preserved");
+    TEST_ASSERT(map[KeyT(4)] == 400, "initializer_list insert: new key added");
+}
+
+// ============================================================================
 // Run all tests for one map type
 // ============================================================================
 
@@ -861,6 +1047,17 @@ static void run_all_tests(const char* name) {
     test_concurrent_read<HashMapType>(name);
     test_negative_keys<HashMapType>(name);
     test_erase_if<HashMapType>(name);
+
+    // F: Container properties & capacity
+    test_load_factor<HashMapType>(name);
+    test_swap<HashMapType>(name);
+    test_initializer_list_ctor<HashMapType>(name);
+    test_input_iterator_ctor<HashMapType>(name);
+    test_equality<HashMapType>(name);
+    test_merge<HashMapType>(name);
+
+    // G: insert(std::initializer_list) and emplace edge cases
+    test_initializer_list_insert<HashMapType>(name);
 }
 
 // String-key specific tests (only tests that work with string keys)
