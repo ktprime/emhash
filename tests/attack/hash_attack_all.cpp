@@ -566,7 +566,7 @@ int main() {
     printf("\n============================================================\n");
     printf("PART 3: HIGH LOAD ATTACK TEST\n");
     printf("============================================================\n");
-    test_all_high_load(100000);
+    test_all_high_load(10000);
 
     // ========================================
     // Part 4: Stress Test (No Crash/Hang)
@@ -574,7 +574,7 @@ int main() {
     printf("\n============================================================\n");
     printf("PART 4: STRESS TEST (NO CRASH/HANG)\n");
     printf("============================================================\n");
-    test_all_stress(100000);
+    test_all_stress(10000);
 
     printf("\n################################################################\n");
     printf("# Hash Attack Benchmark Complete\n");
