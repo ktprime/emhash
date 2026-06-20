@@ -769,7 +769,7 @@ public:
     /// Make room for this many elements
     void rehash(size_t num_elems) noexcept {
         const size_t required_buckets = num_elems;
-        if (EMH_UNLIKELY(required_buckets < _num_filled))
+        if (required_buckets < _num_filled)
             return;
 
 #if EMH_STATIS
@@ -957,7 +957,7 @@ private:
             return hole;
         }
 
-        const auto ebucket = find_empty_slot(main_bucket, next_bucket, offset);
+        const auto ebucket = find_empty_slot(main_bucket, next_bucket, (int)offset);
         set_states(ebucket, key_h2);
 
         return ebucket;

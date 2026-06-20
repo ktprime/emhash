@@ -124,7 +124,7 @@ public:
 
         iterator(const const_iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
         iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
-        iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) { _from = _bmask = 0; }
+        iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) { _from = size_type(0); _bmask = size_t(0); }
 
         void init() {
             _from = (_bucket / SIZE_BIT) * SIZE_BIT;
@@ -133,7 +133,7 @@ public:
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
-                _bmask = 0;
+                _bmask = size_t(0);
             }
         }
 
@@ -203,7 +203,7 @@ public:
         const_iterator(const iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
         const_iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
         const_iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) {
-            _from = _bmask = 0;
+            _from = size_type(0); _bmask = size_t(0);
         }
 
         void init() {
@@ -213,7 +213,7 @@ public:
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
-                _bmask = 0;
+                _bmask = size_t(0);
             }
         }
 
@@ -740,7 +740,7 @@ public:
             _pairs[bucket].second = bucket;
         }
         _num_filled++;
-        _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT));
+        _bitmask[bucket / MASK_BIT] &= (uint8_t)~(uint8_t)(1 << (bucket % MASK_BIT));
     }
 
     template <typename T> inline void new_key(T&& key, size_type bucket) {
@@ -751,7 +751,7 @@ public:
             _pairs[bucket].second = bucket;
         }
         _num_filled++;
-        _bitmask[bucket / MASK_BIT] &= ~(1 << (bucket % MASK_BIT));
+        _bitmask[bucket / MASK_BIT] &= (uint8_t)~(uint8_t)(1 << (bucket % MASK_BIT));
     }
 
     void clear_bucket(size_type bucket) {
@@ -814,8 +814,8 @@ public:
         if (need_explicit_dtor())
             clearkv();
         else {
-            memset((void*)_pairs, INACTIVE, sizeof(_pairs[0]) * _num_buckets);
-            memset(_bitmask, INACTIVE, _num_buckets / 8);
+            memset((void*)_pairs, (int)INACTIVE, sizeof(_pairs[0]) * _num_buckets);
+            memset(_bitmask, (int)INACTIVE, _num_buckets / 8);
         }
         _last = 0;
         _num_filled = 0;
@@ -866,7 +866,7 @@ private:
         _last = 0;
 
         if (bInCacheLine)
-            memset((void*)new_pairs, INACTIVE, sizeof(_pairs[0]) * num_buckets);
+            memset((void*)new_pairs, (int)INACTIVE, sizeof(_pairs[0]) * num_buckets);
         else
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 new_pairs[bucket].second = INACTIVE;
@@ -874,7 +874,7 @@ private:
 
         // set bit mask
         _bitmask = decltype(_bitmask)(new_pairs + 2 + num_buckets);
-        memset(_bitmask, INACTIVE, num_byte);
+        memset(_bitmask, (int)INACTIVE, num_byte);
         memset((char*)_bitmask + num_byte, 0, sizeof(size_t));
 
         _pairs = new_pairs;
@@ -1007,7 +1007,7 @@ private:
         const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
         new (_pairs + new_bucket) PairT(std::move(_pairs[bucket]));
 
-        _bitmask[new_bucket / MASK_BIT] &= ~(1 << (new_bucket % MASK_BIT));
+        _bitmask[new_bucket / MASK_BIT] &= (uint8_t)~(uint8_t)(1 << (new_bucket % MASK_BIT));
 
         _pairs[prev_bucket].second = new_bucket;
         if (next_bucket == bucket)
@@ -1123,7 +1123,7 @@ private:
             const auto step = (bucket_from + i * SIZE_BIT) & qmask;
             const auto bmask3 = *((size_t*)_bitmask + step);
             if (bmask3 != 0)
-                return step * SIZE_BIT + CTZ(bmask3);
+                return (size_type)(step * SIZE_BIT + CTZ(bmask3));
 #if 0
             const auto next1 = (qmask / 2 + _last)  & qmask;
 //            const auto next1 = qmask - _last;
@@ -1214,22 +1214,22 @@ private:
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType key) const {
 #ifdef EMH_INT_HASH
-        return hash64(key);
+        return (size_type)hash64(key);
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #elif EMH_WYHASH64
-        return wyhash64(key, KC);
+        return (size_type)wyhash64(key, KC);
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size());
+        return (size_type)wyhash(key.data(), key.size(), key.size());
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 
@@ -1238,9 +1238,9 @@ private:
                                       size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const {
 #ifdef EMH_INT_HASH
-        return (_hasher(key) * 11400714819323198485ull);
+        return (size_type)(_hasher(key) * 11400714819323198485ull);
 #else
-        return _hasher(key);
+        return (size_type)_hasher(key);
 #endif
     }
 

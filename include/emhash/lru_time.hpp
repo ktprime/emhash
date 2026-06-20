@@ -1188,14 +1188,14 @@ private:
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.c_str(), key.size(), key.size()) & _mask;
+        return (uint32_t)(wyhash(key.c_str(), key.size(), key.size()) & _mask);
 #elif EMHASH_BKR_HASH
         uint32_t hash = 0;
         for (int i = 0, j = 1; i < key.size(); i += j++)
             hash = key[i] + hash * 131;
         return hash & _mask;
 #else
-        return _hasher(key) & _mask;
+        return (uint32_t)(_hasher(key) & _mask);
 #endif
     }
 
@@ -1203,7 +1203,7 @@ private:
               typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
                                       uint32_t>::type = 0>
     inline uint32_t hash_bucket(const UType& key) const {
-        return _hasher(key) & _mask;
+        return (uint32_t)(_hasher(key) & _mask);
     }
 
 private:

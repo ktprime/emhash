@@ -130,7 +130,7 @@ const static auto simd2_filled = _mm256_set1_epi8(EFILLED);
 inline static uint32_t CTZ(size_t n) {
 #if defined(_MSC_VER)
     unsigned long index;
-    _BitScanForward(&index, n);
+    _BitScanForward(&index, (unsigned long)n);
 #else
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
@@ -597,8 +597,8 @@ public:
     }
 
     template <typename K, typename V> size_t insert_unique(K&& key, V&& val) noexcept {
-        const auto required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
-        if (EMH_UNLIKELY(required_buckets >= _num_buckets))
+        const size_t required_buckets = ((size_t)_num_filled * _mlf >> 28);
+        if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 
         size_t main_bucket;
@@ -956,7 +956,7 @@ private:
 
         if (1) {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
@@ -966,7 +966,7 @@ private:
                 } while (maskf &= maskf - 1);
             }
 
-            const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
             if (maske)
                 return _num_buckets;
             else if (0 == (max_offset = get_offset(main_bucket)))
@@ -976,7 +976,7 @@ private:
         do {
             next_bucket = get_next_bucket(next_bucket, ++offset);
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
                 do {
@@ -998,8 +998,8 @@ private:
     // Find the main_bucket with this key, or return a good empty main_bucket to place the key in.
     // In the later case, the main_bucket is expected to be filled.
     template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
-        const auto required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
-        if (EMH_UNLIKELY(required_buckets >= _num_buckets))
+        const size_t required_buckets = ((size_t)_num_filled * _mlf >> 28);
+        if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 
         size_t main_bucket;
@@ -1012,7 +1012,7 @@ private:
 
         do {
             const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             // 1. find filled
             while (maskf) {
@@ -1026,13 +1026,13 @@ private:
 
             if (hole == chole) {
                 // 2. find empty
-                const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+                const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
                 if (maske) {
                     const auto ebucket = next_bucket + CTZ(maske);
                     set_states(ebucket, key_h2);
                     return ebucket;
                 }
-                const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
+                const auto maskd = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
                 if (maskd)
                     hole = next_bucket + CTZ(maskd);
             }

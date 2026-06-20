@@ -1903,9 +1903,9 @@ private:
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     size_type hash_key(const UType key) const {
 #if EMH_INT_HASH
-        return hash64(key);
+        return (size_type)hash64(key);
 #elif EMH_IDENTITY_HASH
-        return key + (key >> 24);
+        return (size_type)(key + (key >> 24));
 #else
         return (size_type)_hasher(key);
 #endif

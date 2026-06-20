@@ -426,7 +426,7 @@ public:
     allocator_type get_allocator() const { return allocator_type(_pair_allocator); }
 
     void max_load_factor(float mlf) {
-        if (mlf <= 0.999 && mlf > EMH_MIN_LOAD_FACTOR) {
+        if (mlf <= 0.999f && mlf > EMH_MIN_LOAD_FACTOR) {
             _mlf = (uint32_t)((1 << 28) / mlf);
             // if (_num_buckets > 0) rehash(_num_buckets);
         }
@@ -1097,7 +1097,7 @@ public:
     }
 
     void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) noexcept {
-        const auto need_size = std::max((size_type)((double)num_buckets * max_load_factor()) + 4, required_buckets + 2);
+        const auto need_size = std::max((size_type)((double)num_buckets * (double)max_load_factor()) + 4, required_buckets + 2);
         auto new_pairs = alloc_bucket(need_size);
         if (is_trivially_copyable()) {
             if (_pairs)

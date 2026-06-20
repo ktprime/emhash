@@ -354,8 +354,8 @@ public:
     constexpr float max_load_factor() const { return (1 << 27) / (float)_loadlf; }
 
     void max_load_factor(float value) {
-        if (value < 0.999 && value > 0.2f)
-            _loadlf = (1 << 27) / value;
+        if (value < 0.999f && value > 0.2f)
+            _loadlf = (uint32_t)((1 << 27) / value);
     }
 
     constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
@@ -809,7 +809,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear() {
         if (_num_filled > _num_buckets / 4 && std::is_trivially_destructible<KeyT>::value)
-            memset((void*)_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * _num_buckets);
+            memset((void*)_pairs, -1, sizeof(_pairs[0]) * _num_buckets);
         else
             clearkv();
 
@@ -880,7 +880,7 @@ private:
         _last_colls = num_buckets - 1;
 
         if (bInCacheLine) {
-            memset((void*)_pairs, (uint32_t)(-1u), sizeof(_pairs[0]) * num_buckets);
+            memset((void*)_pairs, (int)(uint32_t)(-1u), sizeof(_pairs[0]) * num_buckets);
         } else {
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 _pairs[bucket].second = INACTIVE;
@@ -1201,22 +1201,22 @@ private:
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType key) const {
 #ifdef EMH_INT_HASH
-        return hash64(key) & _mask;
+        return (size_type)(hash64(key) & _mask);
 #elif EMH_IDENTITY_HASH
-        return (key + (key >> (sizeof(UType) * 4))) & _mask;
+        return (size_type)((key + (key >> (sizeof(UType) * 4))) & _mask);
 #elif EMH_WYHASH64
-        return wyhash64(key, KC) & _mask;
+        return (size_type)(wyhash64(key, KC) & _mask);
 #else
-        return _hasher(key) & _mask;
+        return (size_type)(_hasher(key) & _mask);
 #endif
     }
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return wyhash(key.data(), key.size(), key.size()) & _mask;
+        return (size_type)(wyhash(key.data(), key.size(), key.size()) & _mask);
 #else
-        return _hasher(key) & _mask;
+        return (size_type)(_hasher(key) & _mask);
 #endif
     }
 
@@ -1225,9 +1225,9 @@ private:
                                       size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const {
 #ifdef EMH_INT_HASH
-        return (_hasher(key) * KC) & _mask;
+        return (size_type)((_hasher(key) * KC) & _mask);
 #else
-        return _hasher(key) & _mask;
+        return (size_type)(_hasher(key) & _mask);
 #endif
     }
 
