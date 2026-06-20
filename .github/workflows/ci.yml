@@ -38,7 +38,7 @@ jobs:
 
       - name: Cache apt packages
         if: runner.os == 'Linux'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             /var/cache/apt
@@ -192,7 +192,7 @@ jobs:
 
       - name: Cache apt packages
         if: runner.os == 'Linux'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             /var/cache/apt
@@ -534,14 +534,14 @@ jobs:
         shell: bash
 
       - name: Upload coverage HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-html
           path: coverage_html/
           retention-days: 30
 
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-info
           path: coverage.info
