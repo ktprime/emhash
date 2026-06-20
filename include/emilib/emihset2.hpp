@@ -216,7 +216,7 @@ public:
 
     HashSet() = default;
 
-    HashSet(size_t n) { rehash(n); }
+    explicit HashSet(size_t n) { rehash(n); }
 
     HashSet(const HashSet& other) { clone(other); }
 
@@ -258,7 +258,7 @@ public:
 #if __cplusplus >= 201103L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value);
 #else
-        return (std::is_pod<KeyT>::value);
+        return (std::is_trivially_copyable<KeyT>::value);
 #endif
     }
 
@@ -289,7 +289,7 @@ public:
         memcpy(_states, other._states, (_num_buckets + set_simd_bytes) * sizeof(_states[0]));
     }
 
-    void swap(HashSet& other) {
+    void swap(HashSet& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
         std::swap(_states, other._states);
@@ -489,7 +489,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value);
 #else
-        return !(std::is_pod<KeyT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value);
 #endif
     }
 

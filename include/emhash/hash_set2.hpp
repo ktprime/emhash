@@ -202,7 +202,7 @@ public:
         reserve(bucket);
     }
 
-    HashSet(size_type bucket = 2, float lf = default_load_factor) { init(bucket, lf); }
+    explicit HashSet(size_type bucket = 2, float lf = default_load_factor) { init(bucket, lf); }
 
     explicit HashSet(const allocator_type& alloc) : _alloc(alloc) { init(2, default_load_factor); }
 
@@ -305,7 +305,7 @@ public:
         _pairs[_num_buckets].second = _pairs[_num_buckets + 1].second = 0;
     }
 
-    void swap(HashSet& other) {
+    void swap(HashSet& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
         std::swap(_alloc, other._alloc);

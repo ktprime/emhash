@@ -330,12 +330,15 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) {
+    explicit HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) {
         _mlf = (uint32_t)((1 << 28) / lf);
         rehash(n);
     }
 
-    HashMap(const HashMap& other) { clone(other); }
+    HashMap(const HashMap& other) {
+        rehash(1);
+        clone(other);
+    }
 
     HashMap(HashMap&& other) {
         rehash(1);
@@ -373,7 +376,7 @@ public:
     ~HashMap() noexcept {
         clear_data();
         _num_filled = 0;
-        if (!need_explicit_dtor())
+        if (need_explicit_dtor())
             _pairs[_num_buckets].~PairT();
         free(_pairs);
     }
@@ -387,8 +390,16 @@ public:
         clear_data();
 
         if (other._num_buckets != _num_buckets) {
+            if (need_explicit_dtor() && _num_buckets > 0)
+                _pairs[_num_buckets].~PairT();
             _num_filled = _num_buckets = 0;
             rehash(other._num_buckets);
+            // rehash() constructed a default sentinel at _pairs[_num_buckets];
+            // destruct it so the copy section below can re-construct from other.
+            if (need_explicit_dtor())
+                _pairs[_num_buckets].~PairT();
+        } else if (need_explicit_dtor()) {
+            _pairs[_num_buckets].~PairT();
         }
 
         if (is_trivially_copyable()) {
@@ -703,7 +714,7 @@ public:
 
     void _erase(size_t bucket) noexcept {
         _num_filled -= 1;
-        if (!need_explicit_dtor())
+        if (need_explicit_dtor())
             _pairs[bucket].~PairT();
 
 #if EMH_PSL_LINEAR
@@ -751,9 +762,9 @@ public:
 
     static constexpr bool need_explicit_dtor() {
 #if __cplusplus >= 201402L || _MSC_VER > 1600
-        return (std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #endif
     }
 
@@ -761,7 +772,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #endif
     }
 
@@ -772,7 +783,7 @@ public:
     }
 
     void clear_data() noexcept {
-        if (!need_explicit_dtor() && _num_filled) {
+        if (need_explicit_dtor() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
                 _pairs[bucket].~PairT();
@@ -871,7 +882,7 @@ public:
             new (_pairs + num_buckets) PairT(KeyT(), ValueT());
             // size_t main_bucket;
             //_states[num_buckets] = hash_key2(main_bucket, _pairs[num_buckets].first) + 2; //iterator end tombstone:
-            if (old_buckets && !need_explicit_dtor())
+            if (old_buckets && need_explicit_dtor())
                 old_pairs[old_buckets].~PairT();
         }
 
@@ -885,7 +896,7 @@ public:
                 set_states(bucket, key_h2);
                 new (_pairs + bucket) PairT(std::move(src_pair));
                 _num_filled++;
-                if (!need_explicit_dtor())
+                if (need_explicit_dtor())
                     src_pair.~PairT();
             }
         }

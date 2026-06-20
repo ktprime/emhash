@@ -526,7 +526,7 @@ public:
         rehash(bucket);
     }
 
-    HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) noexcept { init(bucket, mlf); }
+    explicit HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) noexcept { init(bucket, mlf); }
 
     explicit HashMap(const AllocT& alloc) noexcept : _alloc(PairAlloc(alloc)) { init(2, EMH_DEFAULT_LOAD_FACTOR); }
 
@@ -553,7 +553,7 @@ public:
         }
     }
 
-    HashMap(const HashMap& rhs) noexcept : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
+    HashMap(const HashMap& rhs) : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             _pairs = alloc_bucket(rhs._num_buckets);
             clone(rhs);
@@ -673,7 +673,7 @@ public:
         }
     }
 
-    void swap(HashMap& rhs) {
+    void swap(HashMap& rhs) noexcept {
         std::swap(_hasher, rhs._hasher);
         std::swap(_eq, rhs._eq);
         std::swap(_alloc, rhs._alloc);

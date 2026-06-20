@@ -41,6 +41,7 @@
 #include <functional>
 #include <iterator>
 #include <ctime>
+#include <chrono>
 
 #define IS_TIMEOUT(p, b) (p[b].timeout < nowts())
 #define SET_TIMEOUT(b, t) _pairs[b].timeout = nowts() + t
@@ -61,7 +62,7 @@ inline static uint32_t nowts() {
 #if EMHASH_LRU_TIME > 0
     return EMHASH_LRU_TIME;
 #else
-    return time(0);
+    return (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 #endif
 }
 
@@ -107,7 +108,7 @@ template <typename First, typename Second> struct entry {
         return *this;
     }
 
-    entry& operator=(entry& o) {
+    entry& operator=(const entry& o) {
         second = o.second;
         first = o.first;
         bucket = o.bucket;
@@ -243,7 +244,7 @@ public:
         max_load_factor(0.8f);
     }
 
-    lru_cache(uint32_t bucket = 4, uint32_t max_bucket = 1 << 24, int timeout = 3600 * 24 * 365) {
+    explicit lru_cache(uint32_t bucket = 4, uint32_t max_bucket = 1 << 24, int timeout = 3600 * 24 * 365) {
         init(max_bucket);
         _time_out = timeout;
         reserve(bucket);
@@ -311,7 +312,7 @@ public:
         _time_out = other._time_out;
         auto opairs = other._pairs;
 
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
+        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value) {
             memcpy(_pairs, opairs, (_num_buckets + 2) * sizeof(PairT));
         } else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
@@ -324,7 +325,7 @@ public:
         }
     }
 
-    void swap(lru_cache& other) {
+    void swap(lru_cache& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
@@ -809,7 +810,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #endif
     }
 

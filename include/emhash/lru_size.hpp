@@ -41,6 +41,7 @@
 #include <functional>
 #include <iterator>
 #include <ctime>
+#include <chrono>
 #include <algorithm>
 
 #ifdef __has_include
@@ -77,7 +78,7 @@ template <typename First, typename Second> struct entry {
 #if EMHASH_SET_TIME
         return EMHASH_SET_TIME;
 #elif EMHASH_LRU_TIME
-        return time(0);
+        return (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 #else
         static uint32_t _sid = 0;
         return ++_sid; // overflow
@@ -128,7 +129,7 @@ template <typename First, typename Second> struct entry {
         return *this;
     }
 
-    entry& operator=(entry& o) {
+    entry& operator=(const entry& o) {
         second = o.second;
         first = o.first;
         bucket = o.bucket;
@@ -264,7 +265,7 @@ public:
         max_load_factor(0.85f);
     }
 
-    lru_cache(uint32_t bucket = 8, uint32_t max_bucket = 1 << 20) {
+    explicit lru_cache(uint32_t bucket = 8, uint32_t max_bucket = 1 << 20) {
         init(max_bucket);
         reserve(bucket);
     }
@@ -289,7 +290,7 @@ public:
             insert(*begin);
     }*/
 
-    lru_cache& operator=(const lru_cache& other) noexcept {
+    lru_cache& operator=(const lru_cache& other) {
         if (this == &other)
             return *this;
 
@@ -330,7 +331,7 @@ public:
         _sum_orderid = other._sum_orderid;
         auto opairs = other._pairs;
 
-        if (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value) {
+        if (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value) {
             memcpy(_pairs, opairs, (_num_buckets + 2) * sizeof(PairT));
         } else {
             for (uint32_t bucket = 0; bucket < _num_buckets; bucket++) {
@@ -342,7 +343,7 @@ public:
         }
     }
 
-    void swap(lru_cache& other) {
+    void swap(lru_cache& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
         std::swap(_pairs, other._pairs);
@@ -780,7 +781,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #endif
     }
 

@@ -33,9 +33,9 @@ cmake --build build --target all_tests
 # Show available targets
 cmake --build build --target emhash_test_help
 
-# Enable fuzz tests (requires clang)
-cmake -B build -DENABLE_FUZZ_TESTS=ON
-cmake --build build
+# Enable Google Benchmark performance tests (requires internet to fetch dependency)
+cmake -B build -DEMHASH_ENABLE_BENCH=ON
+cmake --build build --target emhash_bench
 ```
 
 ### Manual Compilation (Linux/WSL)

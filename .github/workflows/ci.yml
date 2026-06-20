@@ -89,6 +89,7 @@ jobs:
           $CXX $FLAGS verify/test_all_maps.cpp -o test_verify
           $CXX $FLAGS verify/test_extreme.cpp -o test_extreme
           $CXX $FLAGS verify/test_hashset_allocator.cpp -o test_hashset_allocator
+          $CXX $FLAGS verify/test_string_key_leak.cpp -o test_string_key_leak
           $CXX -std=c++17 -g -O0 $CXXFLAGS_EXTRA -I../include debug/debug_all_maps.cpp -o test_debug
           $CXX $FLAGS -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack
           $CXX $FLAGS stress/stress_all_maps.cpp -o test_stress
@@ -101,6 +102,7 @@ jobs:
           $TIMEOUT 300 ./test_verify
           $TIMEOUT 120 ./test_extreme
           $TIMEOUT 60  ./test_hashset_allocator
+          $TIMEOUT 120 ./test_string_key_leak
           $TIMEOUT 300 ./test_attack
           $TIMEOUT 300 ./test_stress
           $TIMEOUT 300 ./test_debug
@@ -183,6 +185,7 @@ jobs:
           SAN="-std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include"
           $CXX $SAN verify/test_all_maps.cpp -o test_verify_asan
           $CXX $SAN verify/test_extreme.cpp -o test_extreme_asan
+          $CXX $SAN verify/test_string_key_leak.cpp -o test_string_key_leak_asan
           $CXX $SAN stress/stress_fix.cpp -o test_stress_asan
           $CXX $SAN -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack_asan
         shell: bash
@@ -192,6 +195,7 @@ jobs:
           cd tests
           ./test_verify_asan
           ./test_extreme_asan
+          ./test_string_key_leak_asan
           ./test_stress_asan
           ./test_attack_asan
         shell: bash
@@ -216,7 +220,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive test_hashset_allocator
+        run: cmake --build build --config Release --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive test_hashset_allocator test_string_key_leak
         shell: bash
 
   cmake-install:
@@ -325,9 +329,11 @@ jobs:
           GXX=g++-${{ matrix.gcc_version }}
           $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_all_maps.cpp -o test_verify_gcc
           $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_extreme.cpp -o test_extreme_gcc
+          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_gcc
           $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include stress/stress_all_maps.cpp -o test_stress_gcc
           ./test_verify_gcc
           ./test_extreme_gcc
+          ./test_string_key_leak_gcc
           ./test_stress_gcc
         shell: bash
 
@@ -358,7 +364,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --target test_verify test_debug test_extreme test_hashset_allocator test_attack test_stress --config ${{ matrix.config }}
+        run: cmake --build build --target test_verify test_debug test_extreme test_hashset_allocator test_string_key_leak test_attack test_stress --config ${{ matrix.config }}
         shell: bash
 
       - name: Run tests
@@ -368,6 +374,7 @@ jobs:
           ./build/${{ matrix.config }}/test_verify.exe
           ./build/${{ matrix.config }}/test_extreme.exe
           ./build/${{ matrix.config }}/test_hashset_allocator.exe
+          ./build/${{ matrix.config }}/test_string_key_leak.exe
           # test_attack and test_stress do high-load cases;
           # in Debug config (/Od) this takes too long, so we skip them.
           if [[ "${{ matrix.config }}" == "Release" ]]; then
@@ -399,6 +406,7 @@ jobs:
           COV="-std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include"
           g++ $COV verify/test_all_maps.cpp -o test_verify_cov
           g++ $COV verify/test_extreme.cpp -o test_extreme_cov
+          g++ $COV verify/test_string_key_leak.cpp -o test_string_key_leak_cov
           g++ $COV verify/test_hashset_full_api.cpp -o test_hashset_cov
           g++ $COV stress/stress_fix.cpp -o test_stress_cov
           g++ $COV stress/stress_all_maps.cpp -o test_stress_all_cov
@@ -410,6 +418,7 @@ jobs:
           cd tests
           ./test_verify_cov
           ./test_extreme_cov
+          ./test_string_key_leak_cov
           ./test_hashset_cov
           ./test_stress_cov
           ./test_stress_all_cov

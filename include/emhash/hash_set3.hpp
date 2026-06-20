@@ -237,7 +237,7 @@ public:
 
     allocator_type get_allocator() const { return allocator_type(_alloc); }
 
-    HashSet(size_type bucket = 4, const HashT& hash = HashT(), const EqT& eq = EqT(), const AllocT& alloc = AllocT())
+    explicit HashSet(size_type bucket = 4, const HashT& hash = HashT(), const EqT& eq = EqT(), const AllocT& alloc = AllocT())
         : _alloc(alloc) {
         init();
         _hasher = hash;
@@ -346,7 +346,7 @@ public:
         dealloc_bucket(_pairs, _total_buckets > 0 ? 2 + _total_buckets : 0);
     }
 
-    void swap(HashSet& other) {
+    void swap(HashSet& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
         std::swap(_loadlf, other._loadlf);

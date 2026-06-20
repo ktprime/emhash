@@ -297,7 +297,7 @@ public:
         reserve(bucket);
     }
 
-    HashSet(size_type bucket = 4, float load_factor = 0.95f) { init(bucket, load_factor); }
+    explicit HashSet(size_type bucket = 4, float load_factor = 0.95f) { init(bucket, load_factor); }
 
     explicit HashSet(const allocator_type& alloc) : _alloc(alloc) { init(4, 0.95f); }
 
@@ -393,7 +393,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
         if (std::is_trivially_copyable<KeyT>::value)
 #else
-        if (std::is_pod<KeyT>::value)
+        if (std::is_trivially_copyable<KeyT>::value)
 #endif
             memcpy((void*)_pairs, opairs, _num_buckets * sizeof(PairT));
         else {
@@ -407,7 +407,7 @@ public:
                2 * sizeof(PairT) + _num_buckets / 8 + sizeof(size_t));
     }
 
-    inline void swap(HashSet& other) {
+    inline void swap(HashSet& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
         std::swap(_alloc, other._alloc);

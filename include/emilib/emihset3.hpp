@@ -318,7 +318,7 @@ public:
 
     // ------------------------------------------------------------------------
 
-    HashSet(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) {
+    explicit HashSet(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) {
         _mlf = (uint32_t)((1 << 28) / lf);
         rehash(n);
     }
@@ -626,7 +626,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return !std::is_trivially_destructible<KeyT>::value;
 #else
-        return !std::is_pod<KeyT>::value;
+        return !std::is_trivially_destructible<KeyT>::value;
 #endif
     }
 
@@ -635,7 +635,7 @@ public:
         // is_trivially_copy_constructible
         return std::is_trivially_copyable<KeyT>::value;
 #else
-        return std::is_pod<KeyT>::value;
+        return std::is_trivially_copyable<KeyT>::value;
 #endif
     }
 

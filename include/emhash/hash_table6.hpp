@@ -440,7 +440,7 @@ public:
         rehash(bucket);
     }
 
-    HashMap(size_type bucket = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, lf); }
+    explicit HashMap(size_type bucket = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, lf); }
 
     explicit HashMap(const AllocT& alloc) : _alloc(PairAlloc(alloc)) { init(2, EMH_DEFAULT_LOAD_FACTOR); }
 
@@ -483,7 +483,7 @@ public:
             emplace(*first);
     }
 
-    HashMap& operator=(const HashMap& rhs) noexcept {
+    HashMap& operator=(const HashMap& rhs) {
         if (this == &rhs)
             return *this;
 
@@ -572,7 +572,7 @@ public:
                PACK_SIZE * sizeof(PairT) + _num_buckets / 8 + BIT_PACK);
     }
 
-    void swap(HashMap& rhs) {
+    void swap(HashMap& rhs) noexcept {
         std::swap(_hasher, rhs._hasher);
         std::swap(_eq, rhs._eq);
         std::swap(_alloc, rhs._alloc);
@@ -1085,7 +1085,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #else
-        return !(std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
 #endif
     }
 
@@ -1093,7 +1093,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #else
-        return (std::is_pod<KeyT>::value && std::is_pod<ValueT>::value);
+        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
 #endif
     }
 

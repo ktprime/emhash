@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.editorconfig` — consistent editor settings across IDEs
 - CMake: version from `VERSION` file, `emhashConfigVersion.cmake`, complete header list
 - `conanfile.py` — Conan package manager support
-- `docs/vcpkg/` — vcpkg port definition (ready for submission)
-- `docs/amalgamate.sh` — generate single-header distributions
+- `scripts/vcpkg/` — vcpkg port definition (ready for submission)
+- `scripts/amalgamate.sh` — generate single-header distributions
 - `docs/mkdocs.yml` — MkDocs Material configuration for documentation site
 - Doxygen class-level documentation for `hash_table7.hpp` and `hash_table8.hpp`
 - Cross-links from README to new docs/adr/ and PERFORMANCE_TRACKING.md

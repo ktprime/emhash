@@ -236,7 +236,7 @@ public:
         rehash(bucket);
     }
 
-    HashSet(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, mlf); }
+    explicit HashSet(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, mlf); }
 
     HashSet(const HashSet& rhs)
         : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
@@ -386,7 +386,7 @@ public:
         }
     }
 
-    void swap(HashSet& rhs) {
+    void swap(HashSet& rhs) noexcept {
         std::swap(_eq, rhs._eq);
         std::swap(_hasher, rhs._hasher);
         std::swap(_pairs, rhs._pairs);
@@ -768,7 +768,7 @@ public:
 #if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value);
 #else
-        return !(std::is_pod<KeyT>::value);
+        return !(std::is_trivially_destructible<KeyT>::value);
 #endif
     }
 
@@ -776,7 +776,7 @@ public:
 #if __cplusplus >= 201103L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value);
 #else
-        return (std::is_pod<KeyT>::value);
+        return (std::is_trivially_copyable<KeyT>::value);
 #endif
     }
 
