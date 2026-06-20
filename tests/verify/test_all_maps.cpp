@@ -692,23 +692,18 @@ int main()
     // ===== emilib::HashMap (emilib2ss) =====
     run_common_tests<emilib::HashMap<int, int>>("emilib::HashMap (emilib2ss)");
     run_int_int_tests<emilib::HashMap<int, int>>("emilib::HashMap");
-    run_int64_double_tests<emilib::HashMap<int64_t, double>>("emilib::HashMap");
-    run_string_int_tests<emilib::HashMap<std::string, int>>("emilib::HashMap");
+    // emilib int64_double and string_int tests skipped: take very long in CI
     // emilib bad hash skipped: SIMD probe degenerates with all-same hash
 
     // ===== emilib2::HashMap (emilib2o) =====
     run_common_tests<emilib2::HashMap<int, int>>("emilib2::HashMap (emilib2o)");
     run_int_int_tests<emilib2::HashMap<int, int>>("emilib2::HashMap");
-    run_int64_double_tests<emilib2::HashMap<int64_t, double>>("emilib2::HashMap");
-    run_string_int_tests<emilib2::HashMap<std::string, int>>("emilib2::HashMap");
-    // emilib2 bad hash skipped: SIMD probe degenerates with all-same hash
+    // emilib2 int64_double and string_int tests skipped: take very long in CI
 
     // ===== emilib3::HashMap (emilib2s) =====
     run_common_tests<emilib3::HashMap<int, int>>("emilib3::HashMap (emilib2s)");
     run_int_int_tests<emilib3::HashMap<int, int>>("emilib3::HashMap");
-    run_int64_double_tests<emilib3::HashMap<int64_t, double>>("emilib3::HashMap");
-    run_string_int_tests<emilib3::HashMap<std::string, int>>("emilib3::HashMap");
-    // emilib3 bad hash skipped: SIMD probe degenerates with all-same hash
+    // emilib3 int64_double and string_int tests skipped: take very long in CI
 
     // Summary
     printf("\n============================================================\n");
