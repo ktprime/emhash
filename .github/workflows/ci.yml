@@ -432,7 +432,8 @@ jobs:
           lcov --capture --directory tests --output-file coverage.info \
                --include '${{ github.workspace }}/include/emhash/hash_*' \
                --include '${{ github.workspace }}/include/emilib/*' \
-               --exclude '${{ github.workspace }}/include/emilib/sse2neon.h'
+               --exclude '${{ github.workspace }}/include/emilib/sse2neon.h' \
+               --ignore-errors unused
           genhtml coverage.info --output-directory coverage_html --title "emhash coverage" --num-spaces 4
           lcov --summary coverage.info
           COV_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -oP '\d+\.\d+%' | head -1)
