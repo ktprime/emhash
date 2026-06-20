@@ -597,7 +597,7 @@ public:
     }
 
     template <typename K, typename V> size_t insert_unique(K&& key, V&& val) noexcept {
-        const size_t required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
+        const size_t required_buckets = static_cast<size_t>((uint64_t)_num_filled * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 
@@ -998,7 +998,7 @@ private:
     // Find the main_bucket with this key, or return a good empty main_bucket to place the key in.
     // In the later case, the main_bucket is expected to be filled.
     template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
-        const size_t required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
+        const size_t required_buckets = static_cast<size_t>((uint64_t)_num_filled * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 
