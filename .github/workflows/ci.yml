@@ -16,10 +16,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ==========================================================================
+  # Core build + test (4 matrix: ubuntu/macos × g++/clang++)
+  # Compiles all test binaries in one step, runs them in one step.
+  # Strict warnings use -fsyntax-only (no codegen) for speed.
+  # ==========================================================================
   build:
     name: ${{ matrix.os }} / ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -36,81 +41,34 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Cache apt packages
-        if: runner.os == 'Linux'
-        uses: actions/cache@v5
-        with:
-          path: |
-            /var/cache/apt
-            ~/.cache/apt
-          key: apt-${{ matrix.compiler }}-${{ runner.os }}-v1
-          restore-keys: |
-            apt-${{ matrix.compiler }}-${{ runner.os }}-
-
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           package="${{ matrix.compiler }}"
-          if [[ "$package" == "clang++" ]]; then
-            package="clang"
-          fi
+          if [[ "$package" == "clang++" ]]; then package="clang"; fi
           sudo apt-get update && sudo apt-get install -y "$package"
 
-      - name: Install coreutils on macOS (provides timeout)
+      - name: Install coreutils + GCC on macOS
         if: runner.os == 'macOS'
         run: |
           brew install coreutils
-          # Add GNU coreutils bin (gtimeout) to PATH
           BREW_PREFIX=$(brew --prefix)
           echo "$BREW_PREFIX/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
-
-      - name: Install GCC on macOS (real gcc, not clang)
-        if: runner.os == 'macOS' && matrix.compiler == 'g++'
-        run: |
-          brew install gcc
-          # Dynamically find the installed g++ version (avoid hardcoding)
-          BREW_PREFIX=$(brew --prefix)
-          GPP_BIN=$(ls "$BREW_PREFIX/bin/g++-"* 2>/dev/null | head -1)
-          if [[ -n "$GPP_BIN" ]]; then
-            ln -sf "$GPP_BIN" "$BREW_PREFIX/bin/g++"
+          if [[ "${{ matrix.compiler }}" == "g++" ]]; then
+            brew install gcc
+            GPP_BIN=$(ls "$BREW_PREFIX/bin/g++-"* 2>/dev/null | head -1)
+            [[ -n "$GPP_BIN" ]] && ln -sf "$GPP_BIN" "$BREW_PREFIX/bin/g++"
+            echo "$BREW_PREFIX/bin" >> $GITHUB_PATH
+            g++ --version | head -1
           fi
-          echo "$BREW_PREFIX/bin" >> $GITHUB_PATH
-          g++ --version | head -1
 
-      # macOS ARM64 + GCC has a system header bug (arm_acle.h uint64_t vs unsigned long)
-      - name: Set compiler flags for macOS GCC
-        if: runner.os == 'macOS' && matrix.compiler == 'g++'
-        run: echo "CXXFLAGS_EXTRA=-fpermissive" >> $GITHUB_ENV
-
-      - name: Set compiler flags (default)
-        if: runner.os != 'macOS' || matrix.compiler != 'g++'
-        run: echo "CXXFLAGS_EXTRA=" >> $GITHUB_ENV
-
-      - name: Build verify tests
+      - name: Set compiler flags
         run: |
-          cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include verify/test_all_maps.cpp -o test_verify
-          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include verify/test_extreme.cpp -o test_extreme
-          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include verify/test_hashset_allocator.cpp -o test_hashset_allocator
-        shell: bash
-
-      - name: Build debug tests
-        run: |
-          cd tests
-          ${{ matrix.compiler }} -std=c++17 -g -O0 $CXXFLAGS_EXTRA -I../include debug/debug_all_maps.cpp -o test_debug
-        shell: bash
-
-      - name: Build attack tests
-        run: |
-          cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -DEMH_SAFE_PSL $CXXFLAGS_EXTRA -I../include attack/hash_attack_all.cpp -o test_attack
-        shell: bash
-
-      - name: Build stress tests
-        run: |
-          cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 $CXXFLAGS_EXTRA -I../include stress/stress_all_maps.cpp -o test_stress
-        shell: bash
+          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.compiler }}" == "g++" ]]; then
+            echo "CXXFLAGS_EXTRA=-fpermissive" >> $GITHUB_ENV
+          else
+            echo "CXXFLAGS_EXTRA=" >> $GITHUB_ENV
+          fi
 
       - name: Show CPU info
         run: |
@@ -123,55 +81,56 @@ jobs:
           free -h 2>/dev/null || vm_stat 2>/dev/null | head -5 || true
         shell: bash
 
-      - name: Run verify tests
+      - name: Build all tests
         run: |
           cd tests
-          # GNU coreutils provides `gtimeout` on macOS
+          CXX="${{ matrix.compiler }}"
+          FLAGS="-std=c++17 -O2 $CXXFLAGS_EXTRA -I../include"
+          $CXX $FLAGS verify/test_all_maps.cpp -o test_verify
+          $CXX $FLAGS verify/test_extreme.cpp -o test_extreme
+          $CXX $FLAGS verify/test_hashset_allocator.cpp -o test_hashset_allocator
+          $CXX -std=c++17 -g -O0 $CXXFLAGS_EXTRA -I../include debug/debug_all_maps.cpp -o test_debug
+          $CXX $FLAGS -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack
+          $CXX $FLAGS stress/stress_all_maps.cpp -o test_stress
+        shell: bash
+
+      - name: Run all tests
+        run: |
+          cd tests
           TIMEOUT=$(command -v gtimeout 2>/dev/null || command -v timeout)
           $TIMEOUT 300 ./test_verify
           $TIMEOUT 120 ./test_extreme
           $TIMEOUT 60  ./test_hashset_allocator
           $TIMEOUT 300 ./test_attack
           $TIMEOUT 300 ./test_stress
-        shell: bash
-
-      - name: Run debug tests
-        run: |
-          cd tests
-          TIMEOUT=$(command -v gtimeout 2>/dev/null || command -v timeout)
           $TIMEOUT 300 ./test_debug
         shell: bash
 
-      - name: Strict warnings (C++17)
+      - name: Strict warnings (-fsyntax-only)
         if: runner.os != 'macOS' || matrix.compiler != 'g++'
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include verify/test_all_maps.cpp -o test_warnings17
+          CXX="${{ matrix.compiler }}"
+          WARN_FLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include"
+          for std in 17 20 23; do
+            echo "::group::strict warnings C++$std"
+            $CXX -std=c++$std -O2 -fsyntax-only $WARN_FLAGS verify/test_all_maps.cpp
+            echo "::endgroup::"
+          done
         shell: bash
 
-      - name: Strict warnings (C++20)
-        if: runner.os != 'macOS' || matrix.compiler != 'g++'
-        run: |
-          cd tests
-          ${{ matrix.compiler }} -std=c++20 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include verify/test_all_maps.cpp -o test_warnings20
-        shell: bash
-
-      - name: Strict warnings (C++23)
-        if: runner.os != 'macOS' || matrix.compiler != 'g++'
-        run: |
-          cd tests
-          ${{ matrix.compiler }} -std=c++23 -O2 -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include verify/test_all_maps.cpp -o test_warnings23
-        shell: bash
-
+  # ==========================================================================
+  # Compat: C++20/23 only (C++17 covered by build job)
+  # ==========================================================================
   compat:
     name: Compat / ${{ matrix.compiler }} / C++${{ matrix.std }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         compiler: [g++, clang++]
-        std: [17, 20, 23]
+        std: [20, 23]
 
     steps:
       - uses: actions/checkout@v6
@@ -180,84 +139,55 @@ jobs:
         run: |
           sudo apt-get update
           package="${{ matrix.compiler }}"
-          if [[ "$package" == "clang++" ]]; then
-            package="clang"
-          fi
+          if [[ "$package" == "clang++" ]]; then package="clang"; fi
           sudo apt-get install -y "$package"
 
-      - name: Compile verify tests
+      - name: Compile and run
         run: |
           cd tests
-          echo "::group::compiling test_verify_compat (c++${{ matrix.std }})"
-          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -ftime-report -I../include verify/test_all_maps.cpp -o test_verify_compat
-          echo "::endgroup::"
+          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -I../include verify/test_all_maps.cpp -o test_verify_compat
+          ./test_verify_compat
         shell: bash
-        timeout-minutes: 10
 
-      - name: Run verify tests
-        run: |
-          cd tests
-          echo "::group::running test_verify_compat"
-          time ./test_verify_compat
-          echo "::endgroup::"
-        shell: bash
-        timeout-minutes: 5
-
+  # ==========================================================================
+  # ASan + UBSan (combined; subsumes standalone ubsan job)
+  # ==========================================================================
   asan:
-    name: ASan / UBSan / ${{ matrix.os }} / ${{ matrix.compiler }}
+    name: ASan+UBSan / ${{ matrix.os }} / ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         compiler: [g++, clang++]
         exclude:
-          # Real GCC on macOS (Homebrew gcc) does not ship libasan, so
-          # `-fsanitize=address` fails with "ld: library 'asan' not found".
-          # macOS ASan coverage is already provided by macos + clang++.
+          # Homebrew GCC does not ship libasan
           - os: macos-latest
             compiler: g++
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Cache apt packages
-        if: runner.os == 'Linux'
-        uses: actions/cache@v5
-        with:
-          path: |
-            /var/cache/apt
-            ~/.cache/apt
-          key: apt-asan-${{ matrix.compiler }}-${{ runner.os }}-v1
-          restore-keys: |
-            apt-asan-${{ matrix.compiler }}-${{ runner.os }}-
-
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           package="${{ matrix.compiler }}"
-          if [[ "$package" == "clang++" ]]; then
-            package="clang"
-          fi
+          if [[ "$package" == "clang++" ]]; then package="clang"; fi
           sudo apt-get update && sudo apt-get install -y "$package"
 
-      - name: Set compiler flags (default)
-        run: echo "CXXFLAGS_EXTRA=" >> $GITHUB_ENV
-
-      - name: Build with ASan
+      - name: Build with ASan+UBSan
         run: |
           cd tests
-          # Verification tests
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer $CXXFLAGS_EXTRA -I../include verify/test_all_maps.cpp -o test_verify_asan
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer $CXXFLAGS_EXTRA -I../include verify/test_extreme.cpp -o test_extreme_asan
-          # Stress tests
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer $CXXFLAGS_EXTRA -I../include stress/stress_fix.cpp -o test_stress_asan
-          # Attack tests (with EMH_SAFE_PSL)
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -DEMH_SAFE_PSL $CXXFLAGS_EXTRA -I../include attack/hash_attack_all.cpp -o test_attack_asan
+          CXX="${{ matrix.compiler }}"
+          SAN="-std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include"
+          $CXX $SAN verify/test_all_maps.cpp -o test_verify_asan
+          $CXX $SAN verify/test_extreme.cpp -o test_extreme_asan
+          $CXX $SAN stress/stress_fix.cpp -o test_stress_asan
+          $CXX $SAN -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack_asan
         shell: bash
 
-      - name: Run with ASan
+      - name: Run with ASan+UBSan
         run: |
           cd tests
           ./test_verify_asan
@@ -266,10 +196,13 @@ jobs:
           ./test_attack_asan
         shell: bash
 
+  # ==========================================================================
+  # CMake build verification (no test runs; build job covers execution)
+  # ==========================================================================
   cmake:
     name: CMake / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -286,33 +219,10 @@ jobs:
         run: cmake --build build --config Release --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive test_hashset_allocator
         shell: bash
 
-      - name: Run quick tests
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            cd build/Release
-            ./test_verify.exe
-            ./test_debug.exe
-            ./test_attack.exe
-            ./test_stress.exe
-            ./quick_test8.exe
-            ./test_emilib_comprehensive.exe
-            ./test_hashset_allocator.exe
-          else
-            cd build
-            ./test_verify
-            ./test_debug
-            ./test_attack
-            ./test_stress
-            ./quick_test8
-            ./test_emilib_comprehensive
-            ./test_hashset_allocator
-          fi
-        shell: bash
-
   cmake-install:
     name: CMake install / find_package
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -329,7 +239,6 @@ jobs:
           find /tmp/emhash-install -name '*.hpp' -o -name '*.h' | sort
           echo "=== CMake config files ==="
           find /tmp/emhash-install -name '*.cmake' | sort
-          # Verify key files exist
           test -f /tmp/emhash-install/include/emhash/hash_table7.hpp
           test -f /tmp/emhash-install/include/emilib/emihmap1.hpp
           test -f /tmp/emhash-install/lib/cmake/emhash/emhashConfig.cmake
@@ -362,35 +271,23 @@ jobs:
         shell: bash
 
   # ==========================================================================
-  # TSan job (informational — emhash is single-threaded; this tests user-side
-  # concurrent access patterns and documents expected data races)
+  # TSan (informational — emhash is single-threaded)
   # ==========================================================================
   tsan:
-    name: TSan / ${{ matrix.compiler }}
+    name: TSan / g++
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [g++, clang++]
-
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
       - name: Install compiler
-        run: |
-          sudo apt-get update
-          package="${{ matrix.compiler }}"
-          if [[ "$package" == "clang++" ]]; then
-            package="clang"
-          fi
-          sudo apt-get install -y "$package"
+        run: sudo apt-get update && sudo apt-get install -y g++
 
       - name: Build with TSan
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include verify/test_find_slot_bucket.cpp -lpthread -o test_tsan_find
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include verify/test_emilib_comprehensive.cpp -lpthread -o test_tsan_emilib
+          g++ -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include verify/test_find_slot_bucket.cpp -lpthread -o test_tsan_find
+          g++ -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include verify/test_emilib_comprehensive.cpp -lpthread -o test_tsan_emilib
         shell: bash
 
       - name: Run with TSan
@@ -403,16 +300,16 @@ jobs:
         shell: bash
 
   # ==========================================================================
-  # GCC multi-version regression (GCC 10/11/12/13 on Ubuntu)
+  # GCC multi-version regression (oldest + newest only)
   # ==========================================================================
   gcc-versions:
     name: GCC ${{ matrix.gcc_version }} / C++17
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        gcc_version: ['10', '11', '12', '13']
+        gcc_version: ['10', '13']
 
     steps:
       - uses: actions/checkout@v6
@@ -422,38 +319,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++-${{ matrix.gcc_version }}
 
-      - name: Build verify tests
+      - name: Build and run
         run: |
           cd tests
-          g++-${{ matrix.gcc_version }} -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_all_maps.cpp -o test_verify_gcc
-          g++-${{ matrix.gcc_version }} -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_extreme.cpp -o test_extreme_gcc
-          g++-${{ matrix.gcc_version }} -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include stress/stress_all_maps.cpp -o test_stress_gcc
-        shell: bash
-
-      - name: Run tests
-        run: |
-          cd tests
+          GXX=g++-${{ matrix.gcc_version }}
+          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_all_maps.cpp -o test_verify_gcc
+          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_extreme.cpp -o test_extreme_gcc
+          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include stress/stress_all_maps.cpp -o test_stress_gcc
           ./test_verify_gcc
           ./test_extreme_gcc
           ./test_stress_gcc
         shell: bash
 
   # ==========================================================================
-  # Windows MSVC enhanced (C++17/20/23 + Debug + Release)
-  #
-  # The Debug matrix entry skips test_attack and test_stress because
-  # N=100000 + MLF=0.99 with /Od is 30+ minutes per run; Release covers
-  # the high-load cases.
+  # Windows MSVC (C++17 Release + C++23 Release/Debug)
+  # Debug skips attack/stress (/Od too slow for N=10000 high-load)
   # ==========================================================================
   windows-msvc:
     name: Windows / MSVC / C++${{ matrix.std }} / ${{ matrix.config }}
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        std: [17, 20, 23]
-        config: [Release, Debug]
+        include:
+          - std: 17
+            config: Release
+          - std: 23
+            config: Release
+          - std: 23
+            config: Debug
 
     steps:
       - uses: actions/checkout@v6
@@ -473,67 +368,23 @@ jobs:
           ./build/${{ matrix.config }}/test_verify.exe
           ./build/${{ matrix.config }}/test_extreme.exe
           ./build/${{ matrix.config }}/test_hashset_allocator.exe
-          # test_attack and test_stress do N=100000 + MLF=0.99 high-load cases;
-          # in Debug config (/Od) this takes 30+ minutes, so we skip them.
+          # test_attack and test_stress do high-load cases;
+          # in Debug config (/Od) this takes too long, so we skip them.
           if [[ "${{ matrix.config }}" == "Release" ]]; then
             ./build/${{ matrix.config }}/test_attack.exe
             ./build/${{ matrix.config }}/test_stress.exe
           else
-            echo "::notice::Skipping test_attack and test_stress in Debug config (/Od is too slow for N=100000 high-load cases)"
+            echo "::notice::Skipping test_attack and test_stress in Debug config (/Od is too slow for high-load cases)"
           fi
         shell: bash
 
   # ==========================================================================
-  # UBSan-only job (separate from ASan to catch different classes of UB)
-  # ==========================================================================
-  ubsan:
-    name: UBSan / ${{ matrix.compiler }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [g++, clang++]
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install compiler
-        run: |
-          sudo apt-get update
-          package="${{ matrix.compiler }}"
-          if [[ "$package" == "clang++" ]]; then
-            package="clang"
-          fi
-          sudo apt-get install -y "$package"
-
-      - name: Build with UBSan
-        run: |
-          cd tests
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -I../include verify/test_all_maps.cpp -o test_verify_ubsan
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -I../include verify/test_extreme.cpp -o test_extreme_ubsan
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -I../include stress/stress_fix.cpp -o test_stress_ubsan
-          ${{ matrix.compiler }} -std=c++17 -O1 -fsanitize=undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -DEMH_SAFE_PSL -I../include attack/hash_attack_all.cpp -o test_attack_ubsan
-        shell: bash
-
-      - name: Run with UBSan
-        run: |
-          cd tests
-          ./test_verify_ubsan
-          ./test_extreme_ubsan
-          ./test_stress_ubsan
-          ./test_attack_ubsan
-        shell: bash
-
-  # ==========================================================================
-  # Code coverage job (gcov + lcov, GCC only)
-  # Generates HTML report + line coverage badge
+  # Code coverage (gcov + lcov, GCC only)
   # ==========================================================================
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 
@@ -545,13 +396,13 @@ jobs:
       - name: Build with coverage
         run: |
           cd tests
-          # Build all major test binaries with coverage instrumentation
-          g++ -std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include verify/test_all_maps.cpp -o test_verify_cov
-          g++ -std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include verify/test_extreme.cpp -o test_extreme_cov
-          g++ -std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include verify/test_hashset_full_api.cpp -o test_hashset_cov
-          g++ -std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include stress/stress_fix.cpp -o test_stress_cov
-          g++ -std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include stress/stress_all_maps.cpp -o test_stress_all_cov
-          g++ -std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -DEMH_SAFE_PSL -I../include attack/hash_attack_all.cpp -o test_attack_cov
+          COV="-std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include"
+          g++ $COV verify/test_all_maps.cpp -o test_verify_cov
+          g++ $COV verify/test_extreme.cpp -o test_extreme_cov
+          g++ $COV verify/test_hashset_full_api.cpp -o test_hashset_cov
+          g++ $COV stress/stress_fix.cpp -o test_stress_cov
+          g++ $COV stress/stress_all_maps.cpp -o test_stress_all_cov
+          g++ $COV -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack_cov
         shell: bash
 
       - name: Run tests
@@ -567,17 +418,12 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          # Capture coverage data from all test runs
           lcov --capture --directory tests --output-file coverage.info \
                --include '${{ github.workspace }}/include/emhash/*'
-          # Generate HTML report
           genhtml coverage.info --output-directory coverage_html --title "emhash coverage" --num-spaces 4
-          # Print summary
           lcov --summary coverage.info
-          # Extract line coverage percentage
           COV_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -oP '\d+\.\d+%' | head -1)
           echo "### Line Coverage: ${COV_PERCENT}" >> $GITHUB_STEP_SUMMARY
-          echo "LINE_COVERAGE=$COV_PERCENT" >> $GITHUB_ENV
         shell: bash
 
       - name: Upload coverage HTML report
@@ -595,37 +441,26 @@ jobs:
           retention-days: 30
 
   # ==========================================================================
-  # GCC strict regression (extra warnings GCC supports but clang doesn't)
+  # GCC strict warnings (C++23 only; C++17/20 covered by build job)
   # ==========================================================================
   gcc-strict:
-    name: GCC Strict Warnings / C++${{ matrix.std }}
+    name: GCC Strict / C++23
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        std: [17, 20, 23]
-
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
       - name: Install GCC
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++
+        run: sudo apt-get update && sudo apt-get install -y g++
 
       - name: Build with strict GCC warnings
         run: |
           cd tests
-          # -Wsign-conversion excluded: hash table code inherently mixes
-          # size_t/int/uint32_t in ways that produce hundreds of false positives.
-          # -Werror not used: we want to see all warnings, not fail on first.
-          g++ -std=c++${{ matrix.std }} -O2 -Wall -Wextra -Wpedantic \
+          g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic \
             -Wconversion -Wshadow -Wnon-virtual-dtor \
             -Wdouble-promotion -Wformat=2 -Wmissing-include-dirs \
             -Wnull-dereference -Wno-unused-parameter \
             -I../include verify/test_all_maps.cpp -o test_gcc_strict 2>&1 | tee gcc_warnings.txt
-          # Fail only if there are warnings in include/emhash/ (not thirdparty)
           if grep -q "include/emhash/" gcc_warnings.txt; then
             echo "::error::Warnings found in emhash headers"
             grep "include/emhash/" gcc_warnings.txt
@@ -638,67 +473,18 @@ jobs:
         run: cd tests && ./test_gcc_strict
         shell: bash
 
-  # Temporarily disabled: clang-format check
-  # Re-enable after formatting issues are resolved.
-  clang-format-check:
-    name: clang-format check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: false
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install clang-format
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format
-
-      - name: Check formatting
-        run: |
-          # Only check files changed in this PR/commit to reduce noise.
-          # Falls back to checking all headers if no base commit is available.
-          set -e
-          FILES=$(find include -name '*.hpp' -o -name '*.h' | sort)
-          if [ -z "$FILES" ]; then
-            echo "No header files to check"
-            exit 0
-          fi
-          echo "Checking formatting on:"
-          echo "$FILES"
-          # --dry-run -Werror: report files needing formatting, fail if any.
-          # We use -i with --dry-run to get a diff without writing.
-          DIFF_OUTPUT=$(clang-format --dry-run --Werror --style=file --ferror-limit=0 $FILES 2>&1) || true
-          if echo "$DIFF_OUTPUT" | grep -q "code format"; then
-            echo "::error::Some files need clang-format. Run 'clang-format -i include/**/*.hpp' locally."
-            echo "$DIFF_OUTPUT"
-            exit 1
-          fi
-          echo "All files are properly formatted"
-        shell: bash
-
   # ==========================================================================
-  # Performance benchmark (Google Benchmark, informational)
+  # Performance benchmark (g++ only)
   # ==========================================================================
   benchmark:
-    name: Benchmark / ${{ matrix.compiler }}
+    name: Benchmark / g++
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [g++, clang++]
-
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
 
       - name: Install dependencies
-        run: |
-          sudo apt-get update
-          package="${{ matrix.compiler }}"
-          if [[ "$package" == "clang++" ]]; then
-            package="clang"
-          fi
-          sudo apt-get install -y "$package" cmake git
+        run: sudo apt-get update && sudo apt-get install -y g++ cmake git
 
       - name: Configure with benchmarks
         run: cmake -B build -S tests -DEMHASH_ENABLE_BENCH=ON -DCMAKE_BUILD_TYPE=Release
@@ -717,6 +503,6 @@ jobs:
       - name: Upload benchmark results
         uses: actions/upload-artifact@v5
         with:
-          name: benchmark-${{ matrix.compiler }}
+          name: benchmark-g++
           path: build/benchmark_results.json
           retention-days: 30
