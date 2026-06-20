@@ -429,6 +429,10 @@ jobs:
 
   # ==========================================================================
   # Windows MSVC enhanced (C++17/20/23 + Debug + Release)
+  #
+  # The Debug matrix entry skips test_attack and test_stress because
+  # N=100000 + MLF=0.99 with /Od is 30+ minutes per run; Release covers
+  # the high-load cases.
   # ==========================================================================
   windows-msvc:
     name: Windows / MSVC / C++${{ matrix.std }} / ${{ matrix.config }}
