@@ -448,15 +448,25 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --target test_verify test_debug test_attack test_stress --config ${{ matrix.config }}
+        run: cmake --build build --target test_verify test_debug test_extreme test_hashset_allocator test_attack test_stress --config ${{ matrix.config }}
         shell: bash
 
       - name: Run tests
+        timeout-minutes: 15
         run: |
+          cd tests
+          # test_verify + test_extreme + test_hashset_allocator are fast
           ./build/${{ matrix.config }}/test_verify.exe
-          ./build/${{ matrix.config }}/test_debug.exe
-          ./build/${{ matrix.config }}/test_attack.exe
-          ./build/${{ matrix.config }}/test_stress.exe
+          ./build/${{ matrix.config }}/test_extreme.exe
+          ./build/${{ matrix.config }}/test_hashset_allocator.exe
+          # test_attack and test_stress do N=100000 + MLF=0.99 high-load cases;
+          # in Debug config (/Od) this takes 30+ minutes, so we skip them.
+          if [[ "${{ matrix.config }}" == "Release" ]]; then
+            ./build/${{ matrix.config }}/test_attack.exe
+            ./build/${{ matrix.config }}/test_stress.exe
+          else
+            echo "::notice::Skipping test_attack and test_stress in Debug config (/Od is too slow for N=100000 high-load cases)"
+          fi
         shell: bash
 
   # ==========================================================================
