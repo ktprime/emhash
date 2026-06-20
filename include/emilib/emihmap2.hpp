@@ -597,7 +597,7 @@ public:
     }
 
     template <typename K, typename V> size_t insert_unique(K&& key, V&& val) noexcept {
-        const size_t required_buckets = ((size_t)_num_filled * _mlf >> 28);
+        const size_t required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 
@@ -929,14 +929,14 @@ private:
 
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const {
 #if EMH_SAFE_PSL
-        next_bucket += simd_bytes * offset;
+        next_bucket += simd_bytes * offset | 1;
 #elif EMH_PSL_LINEAR == 0
-        next_bucket += offset < 5 ? simd_bytes * offset : _num_buckets / 11 + 1;
+        next_bucket += offset < 5 ? simd_bytes * offset : (_num_buckets / 11) | 1;
 #elif EMH_PSL_LINEAR == 1
         if (offset < 8)
             next_bucket += simd_bytes * 2 + offset;
         else
-            next_bucket += _num_buckets / 32 + 1;
+            next_bucket += (_num_buckets / 32) | 1;
 #else
         next_bucket += simd_bytes;
 #endif
@@ -998,7 +998,7 @@ private:
     // Find the main_bucket with this key, or return a good empty main_bucket to place the key in.
     // In the later case, the main_bucket is expected to be filled.
     template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
-        const size_t required_buckets = ((size_t)_num_filled * _mlf >> 28);
+        const size_t required_buckets = ((uint64_t)_num_filled * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 

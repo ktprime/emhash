@@ -107,15 +107,15 @@ jobs:
       - name: Run verify tests
         run: |
           cd tests
-          ./test_verify
-          ./test_extreme
-          ./test_hashset_allocator
-          ./test_attack
-          ./test_stress
+          timeout 300 ./test_verify
+          timeout 120 ./test_extreme
+          timeout 60 ./test_hashset_allocator
+          timeout 120 ./test_attack
+          timeout 120 ./test_stress
         shell: bash
 
       - name: Run debug tests
-        run: cd tests && ./test_debug
+        run: cd tests && timeout 300 ./test_debug
         shell: bash
 
       - name: Strict warnings (C++17)
@@ -168,7 +168,7 @@ jobs:
         shell: bash
 
       - name: Run verify tests
-        run: cd tests && ./test_verify_compat
+        run: cd tests && timeout 300 ./test_verify_compat
         shell: bash
 
   asan:
