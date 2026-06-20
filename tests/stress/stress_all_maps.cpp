@@ -87,7 +87,7 @@ int test_high_load_factor(const char* name, int trials)
         // Verify load factor
         float lf = static_cast<float>(m.size()) / static_cast<float>(m.bucket_count());
         if (lf < 0.90f) {
-            printf("  Note: LF=%.3f (lower than expected due to duplicates)\n", lf);
+            //printf("  Note: LF=%.3f (lower than expected due to duplicates)\n", lf);
         }
 
         // Random operations: insert, find, erase
