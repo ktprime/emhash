@@ -859,7 +859,7 @@ private:
         if (buckets > max_size() || buckets < _num_filled)
             throw std::length_error("emhash2::HashSet: too many elements");
 
-        const auto num_buckets = (uint32_t)buckets;
+        const uint32_t num_buckets = static_cast<uint32_t>(buckets);
         if (num_buckets == _num_buckets && _mask != 0)
             return;
 

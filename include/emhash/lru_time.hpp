@@ -836,7 +836,7 @@ public:
 
     /// Make room for this many elements
     bool reserve(uint32_t num_elems) {
-        const auto required_buckets = (uint32_t)(((uint64_t)num_elems) * _loadlf >> 27);
+        const uint32_t required_buckets = static_cast<uint32_t>((uint64_t)num_elems * _loadlf >> 27);
         if (EMHASH_LIKELY(required_buckets < _mask))
             return false;
 

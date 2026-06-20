@@ -1120,7 +1120,7 @@ public:
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
-        const auto required_buckets = (uint64_t)(num_elems * _mlf >> 27) + 1;
+        const size_t required_buckets = static_cast<size_t>((uint64_t)(num_elems * _mlf >> 27) + 1);
         if (EMH_LIKELY(required_buckets <= _mask))
             return false;
 

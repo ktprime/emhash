@@ -669,7 +669,7 @@ public:
     void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
 
     bool reserve(size_t num_elems) {
-        const auto required_buckets = ((uint64_t)num_elems * _mlf >> 28);
+        const size_t required_buckets = static_cast<size_t>((uint64_t)num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
