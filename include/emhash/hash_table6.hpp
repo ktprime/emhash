@@ -24,6 +24,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
+/// @file hash_table6.hpp
+/// @brief Linked-bucket open addressing hash map with bitmask (emhash6)
+/// @version 1.7.2
+/// @copyright Copyright (c) 2019-2026 Huang Yuanbing
+
 #pragma once
 
 #ifdef __has_include
@@ -214,7 +219,7 @@ template <typename First, typename Second> struct entry {
 #endif
 };
 
-/// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
+/// A cache-fristd::endly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap {
@@ -343,8 +348,7 @@ public:
         const htype* _map;
         size_type _bucket;
         size_type _from;
-        size_t _bmask;
-    };
+        size_t _bmask = 0;    };
 
     class const_iterator {
     public:
@@ -424,8 +428,7 @@ public:
         const htype* _map;
         size_type _bucket;
         size_type _from;
-        size_t _bmask;
-    };
+        size_t _bmask = 0;    };
 
     void init(size_type bucket, float lf = EMH_DEFAULT_LOAD_FACTOR) {
 #if EMH_SAFE_HASH
@@ -868,7 +871,7 @@ public:
     }
 
     /// Const version of the above
-    ValueT* try_get(const KeyT& key) const noexcept {
+    const ValueT* try_get(const KeyT& key) const noexcept {
         const auto bucket = find_filled_bucket(key);
         return bucket <= _mask ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
@@ -948,16 +951,6 @@ public:
         for (auto it = first; it != last; ++it)
             do_insert(it->first, it->second);
     }
-
-#if 0
-    template <typename Iter>
-    void insert_unique(Iter begin, Iter end)
-    {
-        reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin)
-            do_insert_unique(*begin);
-    }
-#endif
 
     template <typename K, typename V> inline size_type insert_unique(K&& key, V&& val) {
         return do_insert_unique(std::forward<K>(key), std::forward<V>(val));
@@ -1143,11 +1136,6 @@ public:
     void rehash(uint64_t required_buckets) {
         if (required_buckets < _num_filled)
             return;
-#if 0 //(__GNUC__ >= 4 || __clang__)
-        size_type num_buckets = 1ul << (sizeof(required_buckets) * 8 - __builtin_clz(required_buckets));
-        if (num_buckets < sizeof(size_t))
-            num_buckets = sizeof(size_t);
-#else
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : sizeof(size_t);
         while (buckets < required_buckets) {
             buckets *= 2;
@@ -1161,7 +1149,6 @@ public:
         if (buckets > max_size() || buckets < _num_filled)
             throw std::length_error("emhash6::HashMap: too many elements");
         // assert(num_buckets == (2 << CTZ(required_buckets)));
-#endif
 
         auto num_buckets = (size_type)buckets;
         // assert(num_buckets > _num_filled);
@@ -1244,7 +1231,7 @@ public:
 #ifdef EMH_LOG
             static size_type ihashs = 0;
             EMH_LOG() << "EMH_BUCKET_INDEX = " << EMH_BUCKET_INDEX << "|rhash_nums = " << ihashs++ << "|"
-                      << __FUNCTION__ << "|" << buff << endl;
+                      << __FUNCTION__ << "|" << buff << std::endl;
 #else
             puts(buff);
 #endif

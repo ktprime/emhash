@@ -4,7 +4,11 @@ vcpkg_from_github(
     REF "v${VERSION}"
     # SHA512 must be updated after each release:
     #   vcpkg install emhash && vcpkg hash --algorithm SHA512 <tarball>
+    # TODO: Replace with actual SHA512 before first vcpkg submission
     SHA512 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    # WARNING: The SHA512 above is a placeholder and MUST be replaced with the
+    # actual hash computed from the release tarball before submitting to vcpkg.
+    # Failing to do so will cause vcpkg installation to fail or skip integrity checks.
     HEAD_REF main
 )
 

@@ -3,6 +3,7 @@ site_description: High-performance C++ hash table library
 site_author: Huang Yuanbing
 
 docs_dir: '.'
+site_dir: '../site'
 
 theme:
   name: material

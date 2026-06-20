@@ -23,8 +23,6 @@ This document organizes all test code in `tests/` directory, explaining the purp
 |------|------|--------|-------------|
 | `debug_chain.cpp` | Debug | emhash8 chain | Debug `_index` chain corruption issues |
 | `debug_set_erase.cpp` | Debug | emhash8 HashSet | Debug erase_slot chain corruption |
-| `debug_rehash.cpp` | Debug | emhash8 rehash | Debug rehash path issues |
-| `debug_emilib2o*.cpp` | Debug | emilib2o | Multiple debug files for specific emilib2o issues |
 | `min_repro.cpp` | Debug | Crash reproduction | Minimal reproduction of specific crash scenarios |
 | `calc_hash.py` | Script | Helper tool | Python script for hash value calculation |
 
@@ -110,7 +108,6 @@ and `bench/martin_bench.cpp`. These require third-party dependencies in `thirdpa
 | `stress_fix.cpp` | Stress | emhash8 | Stress test: reserve(1) + random operations, verifies crash fix |
 | `fuzz_reproduce.cpp` | Debug | emhash8 | Reproduce fuzzer-discovered crash sequence |
 | `reproduce_crash.cpp` | Debug | emhash8 | Reproduce specific crash: reserve(1) + 0x68686868 key |
-| `analyze_crash.cpp`, `analyze_crash_deep.cpp` | Debug | Crash analysis | Helper tools for crash root cause analysis |
 
 ### 3.3 Hash Attack Tests
 

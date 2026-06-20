@@ -24,6 +24,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
+/// @file hash_table5.hpp
+/// @brief Three-way hybrid open addressing hash map (emhash5)
+/// @version 2.1.2
+/// @copyright Copyright (c) 2019-2026 Huang Yuanbing
+
 #pragma once
 
 #ifdef __has_include
@@ -216,7 +221,7 @@ template <typename P> static inline void emh_prevet_set(P p, size_t n, size_type
 }
 #endif
 
-/// A cache-friendly hash table with open addressing, linear/qua probing and power-of-two capacity
+/// A cache-fristd::endly hash table with open addressing, linear/qua probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap {
@@ -480,7 +485,7 @@ public:
         _pairs = nullptr;
     }
 
-    void clone(const HashMap& rhs) noexcept {
+    void clone(const HashMap& rhs) {
         _hasher = rhs._hasher;
         //        _eq          = rhs._eq;
         _num_buckets = rhs._num_buckets;
@@ -582,18 +587,6 @@ public:
         _first = bucket;
         return {this, bucket};
     }
-
-#if 0
-    iterator last() noexcept
-    {
-        if (_num_filled == 0)
-            return end();
-
-        size_type bucket = _num_buckets - 1;
-        while (EMH_EMPTY(_pairs, bucket)) bucket--;
-        return {this, bucket};
-    }
-#endif
 
     const_iterator cbegin() const noexcept {
         if (_num_filled == 0)
@@ -890,7 +883,7 @@ public:
     }
 
     /// Const version of the above
-    ValueT* try_get(const KeyT& key) const {
+    const ValueT* try_get(const KeyT& key) const {
         const auto bucket = find_filled_key(key);
         return bucket != _num_buckets ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
@@ -1025,17 +1018,6 @@ public:
         return nullptr;
     }
 
-#if 0
-    template <typename Iter>
-    void insert_unique(Iter begin, Iter end) noexcept
-    {
-        reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin) {
-            insert_unique(*begin);
-        }
-    }
-#endif
-
     template <typename K, typename V> size_type insert_unique(K&& key, V&& val) {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
@@ -1140,17 +1122,6 @@ public:
 
     // -------------------------------------------------------
     /// return 0 if not erase
-#if 0
-    size_type erase_node(const KeyT& key, const size_type slot)
-    {
-        if (slot < _num_buckets && _pairs[slot].second != INACTIVE && _pairs[slot].first == key) {
-            erase_bucket(slot);
-            return 1;
-        }
-        return erase(key);
-    }
-#endif
-
     /// Erase an element from the hash table.
     /// return 0 if element was not found
     size_type erase(const KeyT& key) noexcept {
@@ -1161,19 +1132,6 @@ public:
         clear_bucket(bucket);
         return 1;
     }
-
-#if 0
-    template <typename K=KeyT>
-    size_type erase(K&& key)
-    {
-        const auto bucket = erase_key(key);
-        if ((size_type)bucket < 0)
-            return 0;
-
-        clear_bucket(bucket);
-        return 1;
-    }
-#endif
 
     // iterator erase(const_iterator begin_it, const_iterator end_it)
     iterator erase(const_iterator cit) noexcept {
@@ -1390,7 +1348,7 @@ public:
                      sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / omask);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0;
-            EMH_LOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
 #else
             puts(buff);
 #endif
@@ -1503,7 +1461,6 @@ private:
             return INACTIVE;
 
         const auto equalk = _eq(key, EMH_KEY(_pairs, bucket));
-#if 1
         if (next_bucket == bucket)
             return equalk ? bucket : INACTIVE;
         else if (equalk) {
@@ -1514,17 +1471,6 @@ private:
         } /* else if (EMH_UNLIKELY(bucket != hash_main(bucket)))
              return INACTIVE;
          */
-#else
-        if (equalk) {
-            if (next_bucket != bucket) {
-                const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-                EMH_PKV(_pairs, bucket) = std::move(EMH_PKV(_pairs, next_bucket));
-                EMH_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
-            }
-            return next_bucket;
-        } else if (next_bucket == bucket)
-            return INACTIVE;
-#endif
 
         auto prev_bucket = bucket;
         while (true) {
@@ -1556,7 +1502,6 @@ private:
     }
 
     size_type erase_bucket(const size_type bucket) noexcept {
-#if 1
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (EMH_LIKELY(next_bucket == bucket)) {
             const auto main_bucket = hash_main(bucket);
@@ -1571,22 +1516,6 @@ private:
         }
 
         return next_bucket;
-#else
-        const auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        const auto main_bucket = hash_main(bucket);
-        if (bucket == main_bucket) {
-            if (bucket != next_bucket) {
-                const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-                EMH_PKV(_pairs, bucket) = std::move(EMH_PKV(_pairs, next_bucket));
-                EMH_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
-            }
-            return next_bucket;
-        }
-
-        const auto prev_bucket = find_prev_bucket(main_bucket, bucket);
-        EMH_BUCKET(_pairs, prev_bucket) = (bucket == next_bucket) ? prev_bucket : next_bucket;
-        return bucket;
-#endif
     }
 
     template <typename K = KeyT> size_type find_filled_key(const K& key) const noexcept {
@@ -1760,7 +1689,7 @@ private:
     /***
       Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
     Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing the most
-    cache-friendly alternative is typically used.
+    cache-fristd::endly alternative is typically used.
 
         It's the core algorithm of this hash map with highly optimization/benchmark.
     normaly linear probing is inefficient with high load factor, it use a new 3-way linear

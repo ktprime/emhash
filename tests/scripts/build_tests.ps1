@@ -122,17 +122,18 @@ function Build-Source {
     if ($Script:CXX -eq "wsl_g++") {
         $wslSource = Convert-ToWslPath $Source
         $wslOutput = Convert-ToWslPath $Output
-        $cmd = "g++ -std=c++17 -O2 -g -I$wslRoot $ExtraFlags $wslSource -o $wslOutput"
+        $wslInclude = "$wslRoot/../include"
+        $cmd = "g++ -std=c++17 -O2 -g -I$wslInclude $ExtraFlags $wslSource -o $wslOutput"
         Log-Info "Compiling (WSL): $(Split-Path $Source -Leaf)"
         wsl bash -c $cmd
     }
     elseif ($Script:CXX -match "clang\+\+") {
-        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..`""
+        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..\include`""
         Log-Info "Compiling (clang++): $(Split-Path $Source -Leaf)"
         & clang++ $cxxFlags.Split(' ') $ExtraFlags.Split(' ') $Source -o $Output
     }
     else {
-        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..`""
+        $cxxFlags = "-std=c++17 -O2 -g -I`"$($ROOT_DIR)\..\include`""
         Log-Info "Compiling (g++): $(Split-Path $Source -Leaf)"
         & g++ $cxxFlags.Split(' ') $ExtraFlags.Split(' ') $Source -o $Output
     }

@@ -44,7 +44,8 @@ g++ -I../include -I../thirdparty -std=c++20 -O3 -march=native -DCXX20=1 -DET=1 -
 
 ---
 
-
+**All timing values in the tables below are in milliseconds (ms)** for 10 million operations.
+Test environment: see `docs/performance.md` for hardware/compiler details.
 
 |10       hashmap|Insert|Fhit |Fmiss|Erase|Iter |LoadFactor|
 |----------------|------|-----|-----|-----|-----|----------|

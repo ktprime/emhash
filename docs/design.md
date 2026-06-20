@@ -5,7 +5,7 @@
 | Version | Strategy | High LF Support |
 |---------|----------|----------------|
 | **emhash5** | Three-way hybrid: linear probing → quadratic probing → bidirectional search | With `EMH_HIGH_LOAD` |
-| **emhash6** | Linked-bucket with separate bitmask for fast empty-bucket search | With `EMH_HIGH_LOAD` |
+| **emhash6** | Linked-bucket with separate bitmask for fast empty-bucket search | Native (0.80-0.999 via `max_load_factor()`) |
 | **emhash7** | Linked-bucket with separate bitmask, no tombstones | Native (0.80-0.999) |
 | **emhash8** | Separate index + dense pairs array, linked-bucket chains | With `EMH_HIGH_LOAD` |
 

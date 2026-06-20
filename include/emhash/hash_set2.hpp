@@ -77,7 +77,7 @@
 
 namespace emhash2 {
 
-/// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
+/// A cache-fristd::endly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<KeyT>>
 class HashSet {
@@ -433,35 +433,6 @@ public:
         return key - 1;
     }
 
-#if 0
-    size_type get_bucket_value(const size_type main_bucket, const int64_t key, std::vector<KeyT>& vec)
-    {
-        auto node = _pairs[main_bucket].first;
-        assert(main_bucket == hash_bucket(node));
-        if (node->expire <= key)
-            vec.push_back(node);
-
-        auto next_bucket = _pairs[main_bucket].second;
-        if (next_bucket == main_bucket) {
-            //clear_bucket(main_bucket);
-            return 1;
-        }
-
-        while (true) {
-            const auto nbucket = _pairs[next_bucket].second;
-
-            node = _pairs[next_bucket].first;
-            if (node->expire <= key)
-                vec.push_back(node);
-
-            if (nbucket == next_bucket)
-                break;
-            next_bucket = nbucket;
-        }
-        return vec.size();
-    }
-#endif
-
     size_type get_main_bucket(const int64_t key) const {
         const auto bucket = key & _mask;
         const auto next_bucket = _pairs[bucket].second;
@@ -642,46 +613,6 @@ public:
             return {{this, bucket}, false};
         }
     }
-
-#if 0
-    template <typename Iter>
-    inline void insert(Iter begin, Iter end)
-    {
-        reserve(end - begin + _num_filled);
-        for (; begin != end; ++begin) {
-            insert(*begin);
-        }
-    }
-
-    void insert(std::initializer_list<value_type> ilist)
-    {
-        reserve((size_type)ilist.size() + _num_filled);
-        for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
-            insert(*begin);
-        }
-    }
-
-    template <typename Iter>
-    inline void insert(Iter begin, Iter end)
-    {
-        Iter citbeg = begin;
-        Iter citend = begin;
-        reserve(end - begin + _num_filled);
-        for (; begin != end; ++begin) {
-            if (try_insert_mainbucket(*begin) == INACTIVE) {
-                std::swap(*begin, *citend++);
-            }
-        }
-
-        for (; citbeg != citend; ++citbeg) {
-            auto& key = *citbeg;
-            const auto bucket = find_or_allocate(key);
-            if (_pairs[bucket].second == INACTIVE) {
-                EMH_ENTRY(key, bucket);
-            }
-        }
-    }
-#endif
 
     template <typename Iter> inline void insert_unique(Iter begin, Iter end) {
         reserve(end - begin + _num_filled);
@@ -921,7 +852,7 @@ private:
                      (collision * 100.0 / _num_filled), load_factor());
 #ifdef EMH_LOG
             static size_type ihashs = 0;
-            EMH_LOG() << "|rhash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "|rhash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
 #else
             puts(buff);
 #endif

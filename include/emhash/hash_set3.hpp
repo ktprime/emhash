@@ -68,11 +68,7 @@
 #endif
 
 // #define next_coll_bucket(bucket)  ((bucket + 1) & _main_mask + _bucket)
-#if 0
-#define hash_main_bucket(key) (size_type)((_hasher(key) & (_mains_buckets - 1)) + _colls_buckets)
-#define next_coll_bucket(bucket) (bucket) & _main_mask
-#define hash_coll_bucket(key) (hash_inter(key) & _main_mask)
-#elif EMH_HASH
+#if EMH_HASH
 #define hash_main_bucket(key) (size_type)(_hasher(key) & _main_mask)
 #define hash_coll_bucket(key) ((hash_inter(key) & _coll_mask) + _mains_buckets)
 #define next_coll_bucket(bucket) ((bucket) & _coll_mask) + _mains_buckets
@@ -92,7 +88,7 @@
 #define EMH_BUCKET(p, n) p[n].second
 
 namespace emhash3 {
-/// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
+/// A cache-fristd::endly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<KeyT>>
 class HashSet {
@@ -603,30 +599,6 @@ public:
         _pairs[main_bucket].~PairT();
     }
 
-#if 0
-    std::pair<iterator, bool> insert(KeyT&& key)
-    {
-        check_expand_need();
-        const auto bucket = find_or_allocate(key);
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (next_bucket == INACTIVE || (bucket < _mains_buckets && next_bucket % 2 > 0)) {
-            new_key(std::move(key), bucket);
-            return { {this, bucket}, true };
-        } else {
-            return { {this, bucket}, false };
-        }
-    }
-
-    template <typename Iter>
-    inline void insert(Iter begin, Iter end)
-    {
-        reserve(end - begin + _num_colls);
-        for (; begin != end; ++begin) {
-            insert(*begin);
-        }
-    }
-#endif
-
     void insert(std::initializer_list<value_type> ilist) {
         reserve((size_type)ilist.size() + _num_colls);
         for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
@@ -859,14 +831,6 @@ public:
             auto& old_pair = old_pairs[src_bucket];
             auto& key = EMH_KEY(old_pairs, src_bucket);
 
-#if 0
-            auto bucket = try_insert_mainbucket(key);
-            if (bucket == INACTIVE) {
-                EMH_BUCKET(old_pairs, collision++) = src_bucket;
-            } else {
-                old_pair.~PairT();
-            }
-#else
             const auto new_main_bucket = hash_main_bucket(key);
             auto& next_bucket = EMH_BUCKET(_pairs, new_main_bucket);
             next_bucket += 2;
@@ -888,7 +852,6 @@ public:
                     EMH_BUCKET(old_pairs, collision++) = src_bucket;
                 }
             }
-#endif
         }
 
         _num_colls += collision;
@@ -922,7 +885,7 @@ public:
                      typeid(KeyT).name(), sizeof(_pairs[0]), _num_colls * 100.0 / size());
 #ifdef EMH_LOG
             static size_type ihashs = 0;
-            EMH_LOG() << "|rhash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "|rhash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
 #else
             puts(buff);
 #endif
@@ -1104,23 +1067,6 @@ private:
         constexpr auto max_probe_length =
             2 + EMH_CACHE_LINE_SIZE / sizeof(PairT); // cpu cache line 64 byte,2-3 cache line miss
 
-#if 0
-        for (auto slot = 1; ; ++slot) {
-            const auto bucket1 = next_coll_bucket(bucket_from + slot);
-            if (EMH_BUCKET(_pairs, bucket1) == INACTIVE)
-                return bucket1;
-
-            const auto bucket2 = next_coll_bucket(bucket1 + 1);
-            if (EMH_BUCKET(_pairs, bucket2) == INACTIVE)
-                return bucket2;
-
-            bucket_from += slot;
-            if (slot > 6) {
-                bucket_from += _colls_buckets / 2;
-                slot = 1;
-            }
-        }
-#else
         for (size_type slot = 1, step = 2;; slot += ++step) {
             auto probe_bucket = next_coll_bucket(bucket_from + slot);
             if (EMH_BUCKET(_pairs, probe_bucket) == INACTIVE || EMH_BUCKET(_pairs, ++probe_bucket) == INACTIVE)
@@ -1136,7 +1082,6 @@ private:
                     return bucket2;
             }
         }
-#endif
     }
 
     size_type find_last_bucket(size_type main_bucket) const {

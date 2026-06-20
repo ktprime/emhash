@@ -657,7 +657,7 @@ public:
     }
 
     /// @brief Const version of try_get().
-    ValueT* try_get(const KeyT& key) const noexcept {
+    const ValueT* try_get(const KeyT& key) const noexcept {
         const auto slot = find_filled_slot(key);
         return slot != _num_filled ? &_pairs[slot].second : nullptr;
     }
@@ -765,17 +765,6 @@ public:
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
             do_insert(*it);
     }
-
-#if 0
-    template <typename Iter>
-    void insert_unique(Iter begin, Iter end)
-    {
-        reserve(std::distance(begin, end) + _num_filled, false);
-        for (; begin != end; ++begin) {
-            insert_unique(*begin);
-        }
-    }
-#endif
 
     /// @brief Insert a key-value pair without checking for duplicates.
     /// @param key The key to insert.
@@ -1104,7 +1093,7 @@ public:
         return true;
     }
 
-    void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) noexcept {
+    void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) {
         const auto need_size = std::max((size_type)((double)num_buckets * (double)max_load_factor()) + 4, required_buckets + 2);
         auto new_pairs = alloc_bucket(need_size);
         if (is_trivially_copyable()) {
@@ -1200,7 +1189,7 @@ public:
                      sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0;
-            EMH_LOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << endl;
+            EMH_LOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
 #else
             puts(buff);
 #endif
@@ -1527,7 +1516,7 @@ private:
     /***
         Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
         Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing is
-    the most cache friendly alternativeis typically used.
+    the most cache fristd::endly alternativeis typically used.
 
         It's the core algorithm of this hash map with highly optimization/benchmark.
         normally linear probing is inefficient with high load factor, it use a new 3-way linear

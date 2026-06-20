@@ -27,7 +27,7 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 ## Core Features
 
 ### Extreme Performance
-- **High load factor support**: Set load factor up to **0.999** via `EMH_HIGH_LOAD` macro (available in `hash_table[5-8].hpp`)
+- **High load factor support**: Set load factor up to **0.999** via `EMH_HIGH_LOAD` macro (available in `hash_table5/7/8`) or `max_load_factor()` (emhash6/7)
 - **No tombstones**: Performance does not degrade even with frequent insert/erase operations
 - **Smart collision resolution**: Three-way hybrid strategy combining linear probing, quadratic probing, and bidirectional search
 - **Cache-friendly design**: Single array inline storage minimizes memory footprint and maximizes cache hit rate

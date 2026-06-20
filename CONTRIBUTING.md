@@ -7,23 +7,23 @@ Thank you for your interest in contributing to emhash! This document provides gu
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Make your changes
-4. Run tests: `cd tests && make quick`
+4. Run tests: `cd tests && cmake -B build && cmake --build build --target quick_test`
 5. Submit a pull request
 
 ## Build and Test
 
 ```bash
+# CMake build (recommended)
+cd tests && cmake -B build && cmake --build build --config Release
+
 # Quick verification (~20 seconds)
-cd tests && make quick
+cmake --build build --target quick_test
 
 # Full verification
-cd tests && make all
+cmake --build build --target all_tests
 
 # With specific compiler
-make quick CXX=clang++
-
-# CMake build
-cd tests && cmake -B build && cmake --build build
+cmake -B build -DCMAKE_CXX_COMPILER=clang++ && cmake --build build
 ```
 
 ## Commit Messages

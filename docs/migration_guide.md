@@ -51,8 +51,8 @@ The API is largely compatible with `std::unordered_map`.
 | **`at()` on missing key** | Throws `std::out_of_range` | Throws `std::out_of_range` (same as std) |
 | **`max_load_factor()`** | Can be set freely | Settable at runtime (0.80 default, up to 0.999 with `EMH_HIGH_LOAD`) |
 | **`bucket()` / `bucket_size()`** | Available | Available only with `EMH_STATIS` compile flag |
-| **`equal_range()`** | Available | Available (emhash8) |
-| **`merge()`** | Available (C++17) | Available (emhash8) |
+| **`equal_range()`** | Available | Available (all versions) |
+| **`merge()`** | Available (C++17) | Available (all versions) |
 | **Node handle** | Available (C++17) | Not available |
 
 ### emhash-Only Methods (Not in std::unordered_map)

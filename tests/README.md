@@ -199,9 +199,9 @@ Comprehensive validation tests for all emhash versions. No third-party dependenc
 
 ## 5. fuzz/ — Fuzzing Tests
 
-> **Note**: Most fuzz source files (`fuzz_*.cpp`) are not currently tracked in git.
-> They are generated during fuzzing sessions and stored locally. Only `reproduce_emhash8_bug.cpp`
-> is tracked. To add fuzz tests, create `fuzz_*.cpp` files and enable `ENABLE_FUZZ_TESTS` in CMake.
+> **Note**: Most fuzz source files (`fuzz_*.cpp`) are tracked in git. Only `reproduce_emhash8_bug.cpp`
+> is registered as a CTest target; other fuzz files can be compiled manually with clang+libfuzzer
+> or used with the `ENABLE_FUZZ_TESTS` option (if enabled in CMake).
 
 | File | Purpose | Compile Command |
 |------|---------|-----------------|

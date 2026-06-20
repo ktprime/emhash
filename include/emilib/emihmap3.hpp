@@ -250,8 +250,7 @@ public:
 
     public:
         const htype* _map;
-        size_t _bmask;
-        size_t _bucket;
+        size_t _bmask = 0;        size_t _bucket;
         size_t _from;
     };
 
@@ -318,8 +317,7 @@ public:
 
     public:
         const htype* _map;
-        size_t _bmask;
-        size_t _bucket;
+        size_t _bmask = 0;        size_t _bucket;
         size_t _from;
     };
 

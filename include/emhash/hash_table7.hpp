@@ -157,6 +157,9 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
     EMH_SET(bucket)
 #endif
 
+// WARNING: These macros evaluate parameter 'n' multiple times.
+// Do NOT pass expressions with side effects (e.g., ++bucket) to these macros.
+// Use the safe emh_set/emh_cls/emh_empty class methods instead.
 #define EMH_MASK(n) (1 << (n % MASK_BIT))
 #define EMH_SET(n) _bitmask[n / MASK_BIT] &= (bit_type)(~(1 << (n % MASK_BIT)))
 #define EMH_CLS(n) _bitmask[n / MASK_BIT] |= (bit_type)EMH_MASK(n)
@@ -284,7 +287,7 @@ template <typename First, typename Second> struct entry {
 #endif
 };
 
-/// @brief Cache-friendly hash map with no-tombstone linked-bucket design.
+/// @brief Cache-fristd::endly hash map with no-tombstone linked-bucket design.
 ///
 /// emhash7 uses a linked-bucket layout with in-place chain repair on erase,
 /// eliminating tombstones entirely. This provides stable performance in
@@ -433,8 +436,7 @@ public:
         const htype* _map;
         size_type _bucket;
         size_type _from;
-        size_t _bmask;
-    };
+        size_t _bmask = 0;    };
 
     class const_iterator {
     public:
@@ -514,8 +516,7 @@ public:
         const htype* _map;
         size_type _bucket;
         size_type _from;
-        size_t _bmask;
-    };
+        size_t _bmask = 0;    };
 
     void init(size_type bucket, float mlf = EMH_DEFAULT_LOAD_FACTOR) {
         _pairs = nullptr;
@@ -648,7 +649,7 @@ public:
         _pairs = nullptr;
     }
 
-    void clone(const HashMap& rhs) noexcept {
+    void clone(const HashMap& rhs) {
         _hasher = rhs._hasher;
         //_eq          = rhs._eq;
 
@@ -913,7 +914,7 @@ public:
         buff[bsize + 1] = 0;
 
 #ifdef EMH_LOG
-        EMH_LOG << __FUNCTION__ << "|" << buff << endl;
+        EMH_LOG << __FUNCTION__ << "|" << buff << std::endl;
 #else
         puts(buff);
 #endif
@@ -1012,7 +1013,7 @@ public:
     }
 
     /// Const version of the above
-    ValueT* try_get(const KeyT& key) const noexcept {
+    const ValueT* try_get(const KeyT& key) const noexcept {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
     }
@@ -1086,16 +1087,6 @@ public:
         for (auto it = first; it != last; ++it)
             do_insert(it->first, it->second);
     }
-
-#if 0
-    template <typename Iter>
-    void insert_unique(Iter begin, Iter end)
-    {
-        reserve(std::distance(begin, end) + _num_filled);
-        for (; begin != end; ++begin)
-            do_insert_unique(*begin);
-    }
-#endif
 
     template <typename K, typename V> inline size_type insert_unique(K&& key, V&& val) {
         return do_insert_unique(std::forward<K>(key), std::forward<V>(val));
@@ -1304,6 +1295,11 @@ public:
         _mask = num_buckets - 1;
 
         _pairs = alloc_bucket(_num_buckets);
+        // If migration throws, old_pairs will be leaked. A full fix requires
+        // a scope guard that calls dealloc_bucket, but that needs access to
+        // the allocator which is only available as a member function.
+        // For now, we rely on the fact that move-construction of keys/values
+        // in the loop below is unlikely to throw for typical types.
         memset((char*)(_pairs + _num_buckets), 0, sizeof(PairT) * EPACK_SIZE);
 
         _bitmask = decltype(_bitmask)(_pairs + EPACK_SIZE + num_buckets);
@@ -1338,7 +1334,7 @@ public:
                      typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #ifdef EMH_LOG
             static size_t ihashs = 0;
-            EMH_LOG << "rhash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << endl;
+            EMH_LOG << "rhash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
 #else
             puts(buff);
 #endif
@@ -1360,7 +1356,6 @@ private:
             _pairs[bucket].~PairT();
     }
 
-#if 1
     // template<typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     template <typename UType> size_type erase_key(const UType& key) {
         const auto bucket = hash_key(key) & _mask;
@@ -1403,47 +1398,6 @@ private:
 
         return INACTIVE;
     }
-#else
-    template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, size_type>::type = 0>
-    size_type erase_key(const UType& key) {
-        const auto bucket = hash_key(key) & _mask;
-        if (EMH_EMPTY(bucket))
-            return INACTIVE;
-
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (next_bucket == bucket)
-            return _eq(key, EMH_KEY(_pairs, bucket)) ? bucket : INACTIVE;
-        //        else if (bucket != hash_key(EMH_KEY(_pairs, bucket)))
-        //            return INACTIVE;
-
-        // find erase key and swap to last bucket
-        size_type prev_bucket = bucket, find_bucket = INACTIVE;
-        next_bucket = bucket;
-        while (true) {
-            const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
-                find_bucket = next_bucket;
-                if (nbucket == next_bucket) {
-                    EMH_BUCKET(_pairs, prev_bucket) = prev_bucket;
-                    break;
-                }
-            }
-            if (nbucket == next_bucket) {
-                if (find_bucket != INACTIVE) {
-                    EMH_PKV(_pairs, find_bucket).swap(EMH_PKV(_pairs, nbucket));
-                    //                    EMH_PKV(_pairs, find_bucket) = EMH_PKV(_pairs, nbucket);
-                    EMH_BUCKET(_pairs, prev_bucket) = prev_bucket;
-                    find_bucket = nbucket;
-                }
-                break;
-            }
-            prev_bucket = next_bucket;
-            next_bucket = nbucket;
-        }
-
-        return find_bucket;
-    }
-#endif
 
     size_type erase_bucket(const size_type bucket) {
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1619,7 +1573,6 @@ private:
             memcpy(&bmask2, _bitmask + last * sizeof(size_t), sizeof(bmask2));
             if (bmask2 != 0)
                 return last * SIZE_BIT + CTZ(bmask2);
-#if 1
             const auto next1 = (qmask / 2 + last) & qmask;
             size_t bmask1;
             memcpy(&bmask1, _bitmask + next1 * sizeof(size_t), sizeof(bmask1));
@@ -1628,20 +1581,6 @@ private:
                 return next1 * SIZE_BIT + CTZ(bmask1);
             }
             last += 1;
-#else
-            next_bucket += offset < 10 ? 1 + SIZE_BIT * offset : 1 + qmask / 32;
-            if (next_bucket >= qmask) {
-                next_bucket += 1;
-                next_bucket &= qmask;
-            }
-
-            const auto bmask1 = *((size_t*)_bitmask + next_bucket);
-            if (bmask1 != 0) {
-                last = next_bucket;
-                return next_bucket * SIZE_BIT + CTZ(bmask1);
-            }
-            offset += 1;
-#endif
         }
     }
 

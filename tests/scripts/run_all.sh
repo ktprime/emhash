@@ -56,7 +56,7 @@ log_test()  { echo -e "${BLUE}[TEST]${NC} $1"; }
 print_env() {
     echo -e "${CYAN}=== Test Environment ===${NC}"
     echo "  OS:       $OS"
-    echo "  Arch:     $ARCH"
+    echo "  Arch:     ${ARCH:-(unspecified)}"
     echo "  Compiler: $CXX ($($CXX --version 2>/dev/null | head -1))"
     echo "  MARCH:    ${MARCH_FLAG:-(none)}"
     echo -e "${CYAN}========================${NC}"

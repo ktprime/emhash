@@ -261,11 +261,14 @@ int main() {
     printf("  BAD HASH FUNCTION TESTS\n");
     printf("============================================================\n");
 
+    int total_errors = 0;
+
     // Test emilib2ss with SameHash
     {
         using BadMap = emilib::HashMap<int, int, SameHash>;
         int errors = test_bad_hash<BadMap>("emilib2ss + SameHash", 500);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
 
     // Test emilib2o with SameHash
@@ -273,6 +276,7 @@ int main() {
         using BadMap = emilib2::HashMap<int, int, SameHash>;
         int errors = test_bad_hash<BadMap>("emilib2o + SameHash", 500);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
 
     // Test emilib2s with SameHash
@@ -280,6 +284,7 @@ int main() {
         using BadMap = emilib3::HashMap<int, int, SameHash>;
         int errors = test_bad_hash<BadMap>("emilib2s + SameHash", 500);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
 
     // Test with StepHash (produces values that are multiples of 127)
@@ -287,16 +292,19 @@ int main() {
         using BadMap = emilib::HashMap<int, int, StepHash>;
         int errors = test_bad_hash<BadMap>("emilib2ss + StepHash", 1000);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
     {
         using BadMap = emilib2::HashMap<int, int, StepHash>;
         int errors = test_bad_hash<BadMap>("emilib2o + StepHash", 1000);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
     {
         using BadMap = emilib3::HashMap<int, int, StepHash>;
         int errors = test_bad_hash<BadMap>("emilib2s + StepHash", 1000);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
 
     // Test with TinyHash
@@ -304,16 +312,19 @@ int main() {
         using BadMap = emilib::HashMap<int, int, TinyHash>;
         int errors = test_bad_hash<BadMap>("emilib2ss + TinyHash", 1000);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
     {
         using BadMap = emilib2::HashMap<int, int, TinyHash>;
         int errors = test_bad_hash<BadMap>("emilib2o + TinyHash", 1000);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
     {
         using BadMap = emilib3::HashMap<int, int, TinyHash>;
         int errors = test_bad_hash<BadMap>("emilib2s + TinyHash", 1000);
         printf("  Result: %s\n\n", errors == 0 ? "PASS" : "FAIL");
+        total_errors += errors;
     }
 
     // 3. Stress test: insert/erase with bad hash
@@ -356,7 +367,7 @@ int main() {
     }
 
     printf("\n============================================================\n");
-    printf("  ANALYSIS COMPLETE\n");
+    printf("  ANALYSIS COMPLETE (total errors: %d)\n", total_errors);
     printf("============================================================\n");
-    return 0;
+    return total_errors > 0 ? 1 : 0;
 }

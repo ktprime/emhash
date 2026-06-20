@@ -42,12 +42,12 @@ HashMap(std::initializer_list<value_type> il); // Initializer list
 | `try_set(key, val)` | Set value if key exists, do nothing if it doesn't (emhash5/8) |
 | `set_get(key, val)` | Set new value, return old value (or default if key not found) (emhash5/8) |
 | `erase(key)` / `erase(it)` | Delete element |
-| `_erase(it)` | Delete element by iterator, return void (emhash7 only, faster) |
-| `insert_or_assign(key, val)` | Insert or update value (emhash8) |
-| `get_or_return_default(key)` | Get value or default-constructed (emhash8) |
-| `erase_if(pred)` | Erase elements matching predicate (emhash7/8) |
-| `equal_range(key)` | Get range of elements matching key (emhash8) |
-| `merge(rhs)` | Merge another hash map (emhash8) |
+| `_erase(it)` | Delete element by iterator, return void (emhash5/6/7, faster) |
+| `insert_or_assign(key, val)` | Insert or update value (all versions) |
+| `get_or_return_default(key)` | Get value or default-constructed (all versions) |
+| `erase_if(pred)` | Erase elements matching predicate (all versions) |
+| `equal_range(key)` | Get range of elements matching key (all versions) |
+| `merge(rhs)` | Merge another hash map (all versions) |
 | `clear()` | Clear all elements |
 
 ## Iterators
