@@ -81,7 +81,7 @@ of resizing granularity. Ignoring variance, the expected occurrences of list siz
 
 #pragma once
 
-#include "emhash/config.hpp"
+#include "config.hpp"
 
 #include <cstring>
 #include <string>

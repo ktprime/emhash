@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "emhash/config.hpp"
+#include "config.hpp"
 
 #include <cstring>
 #include <string>
