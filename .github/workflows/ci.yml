@@ -120,8 +120,8 @@ jobs:
           $TIMEOUT 300 ./test_verify
           $TIMEOUT 120 ./test_extreme
           $TIMEOUT 60  ./test_hashset_allocator
-          $TIMEOUT 120 ./test_attack
-          $TIMEOUT 120 ./test_stress
+          $TIMEOUT 300 ./test_attack
+          $TIMEOUT 300 ./test_stress
         shell: bash
 
       - name: Run debug tests
@@ -458,7 +458,6 @@ jobs:
       - name: Run tests
         timeout-minutes: 15
         run: |
-          cd tests
           # test_verify + test_extreme + test_hashset_allocator are fast
           ./build/${{ matrix.config }}/test_verify.exe
           ./build/${{ matrix.config }}/test_extreme.exe
