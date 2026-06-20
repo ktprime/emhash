@@ -58,7 +58,11 @@ jobs:
 
       - name: Install coreutils on macOS (provides timeout)
         if: runner.os == 'macOS'
-        run: brew install coreutils
+        run: |
+          brew install coreutils
+          # Add GNU coreutils bin (gtimeout) to PATH
+          BREW_PREFIX=$(brew --prefix)
+          echo "$BREW_PREFIX/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
 
       - name: Install GCC on macOS (real gcc, not clang)
         if: runner.os == 'macOS' && matrix.compiler == 'g++'
@@ -111,15 +115,11 @@ jobs:
       - name: Run verify tests
         run: |
           cd tests
-          # GNU coreutils provides `timeout` on macOS (installed as `gtimeout`)
-          if command -v gtimeout >/dev/null 2>&1; then
-            TIMEOUT=gtimeout
-          else
-            TIMEOUT=timeout
-          fi
+          # GNU coreutils provides `gtimeout` on macOS
+          TIMEOUT=$(command -v gtimeout 2>/dev/null || command -v timeout)
           $TIMEOUT 300 ./test_verify
           $TIMEOUT 120 ./test_extreme
-          $TIMEOUT 60 ./test_hashset_allocator
+          $TIMEOUT 60  ./test_hashset_allocator
           $TIMEOUT 120 ./test_attack
           $TIMEOUT 120 ./test_stress
         shell: bash
@@ -127,11 +127,7 @@ jobs:
       - name: Run debug tests
         run: |
           cd tests
-          if command -v gtimeout >/dev/null 2>&1; then
-            TIMEOUT=gtimeout
-          else
-            TIMEOUT=timeout
-          fi
+          TIMEOUT=$(command -v gtimeout 2>/dev/null || command -v timeout)
           $TIMEOUT 300 ./test_debug
         shell: bash
 
