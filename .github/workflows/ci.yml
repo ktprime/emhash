@@ -56,6 +56,10 @@ jobs:
           fi
           sudo apt-get update && sudo apt-get install -y "$package"
 
+      - name: Install coreutils on macOS (provides timeout)
+        if: runner.os == 'macOS'
+        run: brew install coreutils
+
       - name: Install GCC on macOS (real gcc, not clang)
         if: runner.os == 'macOS' && matrix.compiler == 'g++'
         run: |
@@ -107,15 +111,28 @@ jobs:
       - name: Run verify tests
         run: |
           cd tests
-          timeout 300 ./test_verify
-          timeout 120 ./test_extreme
-          timeout 60 ./test_hashset_allocator
-          timeout 120 ./test_attack
-          timeout 120 ./test_stress
+          # GNU coreutils provides `timeout` on macOS (installed as `gtimeout`)
+          if command -v gtimeout >/dev/null 2>&1; then
+            TIMEOUT=gtimeout
+          else
+            TIMEOUT=timeout
+          fi
+          $TIMEOUT 300 ./test_verify
+          $TIMEOUT 120 ./test_extreme
+          $TIMEOUT 60 ./test_hashset_allocator
+          $TIMEOUT 120 ./test_attack
+          $TIMEOUT 120 ./test_stress
         shell: bash
 
       - name: Run debug tests
-        run: cd tests && timeout 300 ./test_debug
+        run: |
+          cd tests
+          if command -v gtimeout >/dev/null 2>&1; then
+            TIMEOUT=gtimeout
+          else
+            TIMEOUT=timeout
+          fi
+          $TIMEOUT 300 ./test_debug
         shell: bash
 
       - name: Strict warnings (C++17)
