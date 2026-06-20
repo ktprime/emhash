@@ -164,12 +164,20 @@ jobs:
       - name: Compile verify tests
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -I../include verify/test_all_maps.cpp -o test_verify_compat
+          echo "::group::compiling test_verify_compat (c++${{ matrix.std }})"
+          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -ftime-report -I../include verify/test_all_maps.cpp -o test_verify_compat
+          echo "::endgroup::"
         shell: bash
+        timeout-minutes: 10
 
       - name: Run verify tests
-        run: cd tests && timeout 300 ./test_verify_compat
+        run: |
+          cd tests
+          echo "::group::running test_verify_compat"
+          time ./test_verify_compat
+          echo "::endgroup::"
         shell: bash
+        timeout-minutes: 5
 
   asan:
     name: ASan / UBSan / ${{ matrix.os }} / ${{ matrix.compiler }}
