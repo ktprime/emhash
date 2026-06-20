@@ -266,7 +266,7 @@ public:
         void init() {
             _from = (_bucket / SIZE_BIT) * SIZE_BIT;
             if (_bucket < _map->bucket_count()) {
-                _bmask = *(size_t*)((size_t*)_map->_bitmask + _from / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + _from / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
@@ -324,7 +324,8 @@ public:
             }
 
             do {
-                _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
+                _bmask = ~_bmask;
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
@@ -359,7 +360,7 @@ public:
         void init() {
             _from = (_bucket / SIZE_BIT) * SIZE_BIT;
             if (_bucket < _map->bucket_count()) {
-                _bmask = *(size_t*)((size_t*)_map->_bitmask + _from / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + _from / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
@@ -404,7 +405,8 @@ public:
             }
 
             do {
-                _bmask = ~*(size_t*)((size_t*)_map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
+                memcpy(&_bmask, _map->_bitmask + (_from += SIZE_BIT) / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
+                _bmask = ~_bmask;
             } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
@@ -585,7 +587,9 @@ public:
             return {this, _mask + 1};
 #endif
 
-        const auto bmask = ~(*(size_t*)_bitmask);
+        size_t bmask;
+        memcpy(&bmask, _bitmask, sizeof(bmask));
+        bmask = ~bmask;
         if (bmask != 0)
             return {this, CTZ(bmask)};
 
@@ -600,7 +604,9 @@ public:
             return {this, _mask + 1};
 #endif
 
-        const auto bmask = ~(*(size_t*)_bitmask);
+        size_t bmask;
+        memcpy(&bmask, _bitmask, sizeof(bmask));
+        bmask = ~bmask;
         if (bmask != 0)
             return {this, CTZ(bmask)};
 

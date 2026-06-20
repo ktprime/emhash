@@ -220,3 +220,34 @@ add_custom_target(emhash_test_help
     COMMAND ${CMAKE_COMMAND} -E echo "  all_tests     - Run all tests"
     COMMAND ${CMAKE_COMMAND} -E echo "  emhash_test_help - Show this help"
 )
+
+# ============================================================================
+# Google Benchmark (optional, off by default)
+# ============================================================================
+option(EMHASH_ENABLE_BENCH "Enable Google Benchmark performance tests" OFF)
+
+if(EMHASH_ENABLE_BENCH)
+    include(FetchContent)
+    FetchContent_Declare(
+        googlebench
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG        v1.9.4
+        GIT_SHALLOW    TRUE
+    )
+    # Prevent Google Benchmark from building tests
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+    FetchContent_Populate(googlebench)
+    add_subdirectory(${googlebench_SOURCE_DIR} ${googlebench_BINARY_DIR} EXCLUDE_FROM_ALL)
+
+    add_executable(emhash_bench bench/emhash_bench.cpp)
+    target_compile_features(emhash_bench PRIVATE cxx_std_17)
+    target_include_directories(emhash_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_link_libraries(emhash_bench PRIVATE benchmark::benchmark)
+
+    add_custom_target(bench
+        COMMAND emhash_bench --benchmark_format=console
+        DEPENDS emhash_bench
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+endif()

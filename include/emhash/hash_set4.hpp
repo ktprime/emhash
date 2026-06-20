@@ -129,7 +129,7 @@ public:
         void init() {
             _from = (_bucket / SIZE_BIT) * SIZE_BIT;
             if (_bucket < _set->bucket_count()) {
-                _bmask = *(size_t*)((size_t*)_set->_bitmask + _from / SIZE_BIT);
+                memcpy(&_bmask, _set->_bitmask + _from / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
@@ -178,9 +178,10 @@ public:
                 return;
             }
 
-            do
-                _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
-            while (_bmask == 0);
+            do {
+                memcpy(&_bmask, _set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
+                _bmask = ~_bmask;
+            } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
         }
@@ -209,7 +210,7 @@ public:
         void init() {
             _from = (_bucket / SIZE_BIT) * SIZE_BIT;
             if (_bucket < _set->bucket_count()) {
-                _bmask = *(size_t*)((size_t*)_set->_bitmask + _from / SIZE_BIT);
+                memcpy(&_bmask, _set->_bitmask + _from / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
@@ -246,9 +247,10 @@ public:
                 return;
             }
 
-            do
-                _bmask = ~*(size_t*)((size_t*)_set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT);
-            while (_bmask == 0);
+            do {
+                memcpy(&_bmask, _set->_bitmask + (_from += SIZE_BIT) / SIZE_BIT * sizeof(size_t), sizeof(_bmask));
+                _bmask = ~_bmask;
+            } while (_bmask == 0);
 
             _bucket = _from + CTZ(_bmask);
         }
@@ -1100,7 +1102,9 @@ private:
         auto* const start = (uint8_t*)_bitmask + bucket_from / 8;
 
 #if EMH_X86
-        const auto bmask = *(size_t*)(start) >> boset;
+        size_t bmask;
+        memcpy(&bmask, start, sizeof(bmask));
+        bmask >>= boset;
 #else
         // const auto boset = bucket_from % SIZE_BIT;
         // auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;

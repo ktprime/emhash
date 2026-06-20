@@ -251,7 +251,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive
+        run: cmake --build build --config Release --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive test_hashset_allocator
         shell: bash
 
       - name: Run quick tests
@@ -264,6 +264,7 @@ jobs:
             ./test_stress.exe
             ./quick_test8.exe
             ./test_emilib_comprehensive.exe
+            ./test_hashset_allocator.exe
           else
             cd build
             ./test_verify
@@ -272,6 +273,7 @@ jobs:
             ./test_stress
             ./quick_test8
             ./test_emilib_comprehensive
+            ./test_hashset_allocator
           fi
         shell: bash
 
@@ -628,3 +630,48 @@ jobs:
           fi
           echo "All files are properly formatted"
         shell: bash
+
+  # ==========================================================================
+  # Performance benchmark (Google Benchmark, informational)
+  # ==========================================================================
+  benchmark:
+    name: Benchmark / ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          package="${{ matrix.compiler }}"
+          if [[ "$package" == "clang++" ]]; then
+            package="clang"
+          fi
+          sudo apt-get install -y "$package" cmake git
+
+      - name: Configure with benchmarks
+        run: cmake -B build -S tests -DEMHASH_ENABLE_BENCH=ON -DCMAKE_BUILD_TYPE=Release
+        shell: bash
+
+      - name: Build benchmark
+        run: cmake --build build --target emhash_bench --config Release
+        shell: bash
+
+      - name: Run benchmark
+        run: |
+          cd build
+          ./emhash_bench --benchmark_format=console --benchmark_out=benchmark_results.json
+        shell: bash
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v5
+        with:
+          name: benchmark-${{ matrix.compiler }}
+          path: build/benchmark_results.json
+          retention-days: 30
