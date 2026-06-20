@@ -115,11 +115,12 @@ jobs:
       - name: Show CPU info
         run: |
           echo "=== CPU Info ==="
-          if command -v lscpu &>/dev/null; then lscpu | grep -E "Model name|Socket|Core|Thread|CPU\(s\)|MHz"; fi
-          if command -v sysctl &>/dev/null; then sysctl -n machdep.cpu.brand_string 2>/dev/null; sysctl -n hw.ncpu 2>/dev/null; fi
+          lscpu 2>/dev/null | grep -E "Model name|Socket|Core|Thread|CPU\(s\)|MHz" || true
+          sysctl -n machdep.cpu.brand_string 2>/dev/null || true
+          sysctl -n hw.ncpu 2>/dev/null || true
           nproc 2>/dev/null || echo "nproc N/A"
           echo "=== Memory ==="
-          free -h 2>/dev/null || vm_stat 2>/dev/null | head -5
+          free -h 2>/dev/null || vm_stat 2>/dev/null | head -5 || true
         shell: bash
 
       - name: Run verify tests
