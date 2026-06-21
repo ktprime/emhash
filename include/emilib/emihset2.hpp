@@ -322,7 +322,7 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const { return _num_buckets ? _num_filled / static_cast<float>(_num_buckets) : 0.0f; }
 
-    float max_load_factor(float lf = 8.0f / 9) { return 7 / 8.0f; }
+    float max_load_factor(float lf = 8.0f / 9) { (void)lf; return 7 / 8.0f; }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
@@ -391,7 +391,7 @@ public:
 
     std::pair<iterator, bool> emplace(KeyT&& key) { return insert(std::move(key)); }
 
-    std::pair<iterator, bool> insert(iterator it, const KeyT& key) { return insert(key); }
+    std::pair<iterator, bool> insert([[maybe_unused]] iterator it, const KeyT& key) { return insert(key); }
 
     template <typename T> void insert(T beginc, T endc) {
         reserve(endc - beginc + _num_filled);
@@ -543,7 +543,9 @@ public:
         // auto old_num_buckets = _num_buckets;
         auto old_states = _states;
         auto old_keys = _keys;
+#if EMH_DUMP
         auto max_probe_length = _max_probe_length;
+#endif
 
         _num_filled = 0;
         _num_buckets = num_buckets;
