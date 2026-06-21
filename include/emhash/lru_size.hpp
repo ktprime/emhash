@@ -23,13 +23,13 @@
 #pragma once
 
 #ifdef __has_include
-#  if __has_include("config.hpp")
-#    include "config.hpp"
-#  elif __has_include("emhash/config.hpp")
-#    include "emhash/config.hpp"
-#  endif
+#if __has_include("config.hpp")
+#include "config.hpp"
+#elif __has_include("emhash/config.hpp")
+#include "emhash/config.hpp"
+#endif
 #else
-#  include "config.hpp"
+#include "config.hpp"
 #endif
 
 #include <cstring>
@@ -44,13 +44,7 @@
 #include <chrono>
 #include <algorithm>
 
-#ifdef __has_include
-#if __has_include("wyhash.h")
-#include "wyhash.h"
-#endif
-#elif EMH_WY_HASH
-#include "wyhash.h"
-#endif
+// wyhash is now provided by config.hpp (emh_wyhash / wyhash alias)
 
 #ifdef EMH_KEY
 #undef EMH_KEY
@@ -78,7 +72,9 @@ template <typename First, typename Second> struct entry {
 #if EMHASH_SET_TIME
         return EMHASH_SET_TIME;
 #elif EMHASH_LRU_TIME
-        return (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        return (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+            .count();
 #else
         static uint32_t _sid = 0;
         return ++_sid; // overflow
@@ -574,7 +570,7 @@ public:
     }
 
     /// Const version of the above
-    ValueT* try_get(const KeyT& key) const noexcept {
+    const ValueT* try_get(const KeyT& key) const noexcept {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
     }

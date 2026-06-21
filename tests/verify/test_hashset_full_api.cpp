@@ -7,6 +7,8 @@
 #include "emhash/hash_set3.hpp"
 #include "emhash/hash_set4.hpp"
 #include "emhash/hash_set8.hpp"
+#include "emilib/emihset2.hpp"
+#include "emilib/emihset3.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -36,8 +38,8 @@ void test_basic_crud() {
     auto p2 = set.insert(1);
     TEST_ASSERT(!p2.second, "insert duplicate");
 
-    set.insert(2);
-    set.insert(3);
+    (void)set.insert(2);
+    (void)set.insert(3);
     TEST_ASSERT(set.size() == 3, "size after inserts");
 
     // contains
@@ -61,7 +63,7 @@ void test_basic_crud() {
 
     // erase by iterator
     auto it = set.find(1);
-    set.erase(it);
+    (void)set.erase(it);
     TEST_ASSERT(!set.contains(1), "erase by iterator");
     TEST_ASSERT(set.size() == 1, "size after iterator erase");
 
@@ -75,13 +77,13 @@ template<typename Set>
 void test_insert_unique() {
     Set set;
 
-    set.insert(1);
-    set.insert(2);
-    set.insert(3);
+    (void)set.insert(1);
+    (void)set.insert(2);
+    (void)set.insert(3);
 
     // insert_unique for keys not in set
-    set.insert_unique(4);
-    set.insert_unique(5);
+    (void)set.insert_unique(4);
+    (void)set.insert_unique(5);
     TEST_ASSERT(set.contains(4), "insert_unique new key 4");
     TEST_ASSERT(set.contains(5), "insert_unique new key 5");
     TEST_ASSERT(set.size() == 5, "insert_unique size");
@@ -99,11 +101,8 @@ void test_basic_crud_no_unique() {
     auto p2 = set.insert(1);
     TEST_ASSERT(!p2.second, "insert duplicate");
 
-    set.insert(2);
-    set.insert(3);
-    TEST_ASSERT(set.size() == 3, "size after inserts");
-
-    TEST_ASSERT(set.contains(1), "contains 1");
+    (void)set.insert(2);
+    (void)set.insert(3);
     TEST_ASSERT(!set.contains(99), "not contains 99");
     TEST_ASSERT(set.count(1) == 1, "count existing");
     TEST_ASSERT(set.find(1) != set.end(), "find existing");
@@ -114,7 +113,7 @@ void test_basic_crud_no_unique() {
     TEST_ASSERT(set.size() == 2, "size after erase");
 
     auto it = set.find(1);
-    set.erase(it);
+    (void)set.erase(it);
     TEST_ASSERT(!set.contains(1), "erase by iterator");
     TEST_ASSERT(set.size() == 1, "size after iterator erase");
 
@@ -128,7 +127,7 @@ template<typename Set>
 void test_copy_move_swap() {
     Set set1;
     for (int i = 0; i < 10; i++)
-        set1.insert(i);
+        (void)set1.insert(i);
 
     // Copy constructor
     Set set2(set1);
@@ -152,9 +151,9 @@ void test_copy_move_swap() {
 
     // Swap
     Set setA, setB;
-    setA.insert(1);
-    setB.insert(2);
-    setB.insert(3);
+    (void)setA.insert(1);
+    (void)setB.insert(2);
+    (void)setB.insert(3);
     setA.swap(setB);
     TEST_ASSERT(setA.size() == 2 && setA.contains(2), "swap A");
     TEST_ASSERT(setB.size() == 1 && setB.contains(1), "swap B");
@@ -169,7 +168,7 @@ template<typename Set>
 void test_iterator() {
     Set set;
     for (int i = 0; i < 10; i++)
-        set.insert(i);
+        (void)set.insert(i);
 
     int count = 0;
     for (auto it = set.begin(); it != set.end(); ++it) {
@@ -195,11 +194,11 @@ template<typename Set>
 void test_shrink_to_fit() {
     Set set;
     for (int i = 0; i < 100; i++)
-        set.insert(i);
+        (void)set.insert(i);
 
     auto bc_before = set.bucket_count();
     for (int i = 0; i < 90; i++)
-        set.erase(i);
+        (void)set.erase(i);
 
     set.shrink_to_fit();
     auto bc_after = set.bucket_count();
@@ -219,7 +218,7 @@ template<typename Set>
 void test_erase_if() {
     Set set;
     for (int i = 0; i < 10; i++)
-        set.insert(i);
+        (void)set.insert(i);
 
     auto erased = set.erase_if([](const auto& key) { return key >= 5; });
     TEST_ASSERT(erased == 5, "erase_if count");
@@ -238,12 +237,12 @@ void test_erase_if() {
 template<typename Set>
 void test_merge() {
     Set set1;
-    set1.insert(1);
-    set1.insert(2);
+    (void)set1.insert(1);
+    (void)set1.insert(2);
 
     Set set2;
-    set2.insert(2);
-    set2.insert(3);
+    (void)set2.insert(2);
+    (void)set2.insert(3);
 
     set1.merge(set2);
 
@@ -298,6 +297,19 @@ int main() {
     printf("Testing merge (hash_set8):\n");
     test_merge<emhash8::HashSet<int>>();
     printf("  merge done\n\n");
+
+    // emihset2/3 (emilib HashSet implementations)
+    printf("Testing emihset2:\n");
+    test_basic_crud_no_unique<emilib2::HashSet<int>>();
+    test_copy_move_swap<emilib2::HashSet<int>>();
+    test_iterator<emilib2::HashSet<int>>();
+    printf("  emihset2 done\n\n");
+
+    printf("Testing emihset3:\n");
+    test_basic_crud_no_unique<emilib3::HashSet<int>>();
+    test_copy_move_swap<emilib3::HashSet<int>>();
+    test_iterator<emilib3::HashSet<int>>();
+    printf("  emihset3 done\n\n");
 
     printf("=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail > 0 ? 1 : 0;

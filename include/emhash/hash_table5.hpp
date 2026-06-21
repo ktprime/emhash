@@ -32,13 +32,13 @@
 #pragma once
 
 #ifdef __has_include
-#  if __has_include("config.hpp")
-#    include "config.hpp"
-#  elif __has_include("emhash/config.hpp")
-#    include "emhash/config.hpp"
-#  endif
+#if __has_include("config.hpp")
+#include "config.hpp"
+#elif __has_include("emhash/config.hpp")
+#include "emhash/config.hpp"
+#endif
 #else
-#  include "config.hpp"
+#include "config.hpp"
 #endif
 
 #include <cstring>
@@ -54,13 +54,8 @@
 #include <algorithm>
 #include <memory>
 
-#ifdef __has_include
-#if __has_include("wyhash.h")
-#include "wyhash.h"
-#endif
-#elif EMH_WY_HASH
-#include "wyhash.h"
-#endif
+// wyhash is now provided by config.hpp (emh_wyhash / wyhash alias)
+// No need for external wyhash.h dependency
 
 #ifdef EMH_NEW
 #undef EMH_KEY
@@ -221,7 +216,23 @@ template <typename P> static inline void emh_prevet_set(P p, size_t n, size_type
 }
 #endif
 
-/// A cache-fristd::endly hash table with open addressing, linear/qua probing and power-of-two capacity
+/// @brief Three-way hybrid open addressing hash map (emhash5)
+///
+/// emhash5 uses a three-way probing strategy:
+/// - Linear probing for short distances
+/// - Quadratic probing for medium distances
+/// - Bidirectional search for long probe chains
+///
+/// With EMH_HIGH_LOAD enabled, supports load factors up to 0.999.
+///
+/// @tparam KeyT    Key type
+/// @tparam ValueT  Mapped value type
+/// @tparam HashT   Hash functor (default: std::hash<KeyT>)
+/// @tparam EqT     Key equality functor (default: std::equal_to<KeyT>)
+/// @tparam AllocT  Allocator type (default: std::allocator<std::pair<KeyT, ValueT>>)
+///
+/// @note Header-only: just `#include "emhash/hash_table5.hpp"` and use `emhash5::HashMap`.
+/// @note Not thread-safe. Concurrent read-only access is safe.
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap {
@@ -760,7 +771,7 @@ public:
         return {this, find_hash_bucket(key, main_bucket)};
     }
 
-    template <typename K = KeyT> [[nodiscard]] const_iterator find(const K& key, size_type key_hash) const noexcept {
+    template <typename K = KeyT> const_iterator find(const K& key, size_type key_hash) const noexcept {
         const auto main_bucket = key_hash & _mask;
         return {this, find_hash_bucket(key, main_bucket)};
     }
@@ -825,7 +836,8 @@ public:
             return {found, std::next(found)};
     }
 
-    template <typename K = KeyT> [[nodiscard]] std::pair<const_iterator, const_iterator> equal_range(const K& key) const {
+    template <typename K = KeyT>
+    [[nodiscard]] std::pair<const_iterator, const_iterator> equal_range(const K& key) const {
         const auto found = find(key);
         if (found.bucket() == _num_buckets)
             return {found, found};
@@ -927,7 +939,7 @@ public:
     }
 #endif
 
-    [[nodiscard]] std::pair<iterator, bool> do_insert(const value_type& value) noexcept {
+    [[nodiscard]] std::pair<iterator, bool> do_insert(const value_type& value) {
         const auto bucket = find_or_allocate(value.first);
         const auto bempty = EMH_EMPTY(_pairs, bucket);
         if (bempty) {
@@ -936,7 +948,7 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    [[nodiscard]] std::pair<iterator, bool> do_insert(value_type&& value) noexcept {
+    [[nodiscard]] std::pair<iterator, bool> do_insert(value_type&& value) {
         const auto bucket = find_or_allocate(value.first);
         const auto bempty = EMH_EMPTY(_pairs, bucket);
         if (bempty) {
@@ -945,7 +957,7 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    template <typename K = KeyT, typename V> [[nodiscard]] std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
+    template <typename K = KeyT, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) {
         const auto bucket = find_or_allocate(key);
         const auto bempty = EMH_EMPTY(_pairs, bucket);
         if (bempty) {
@@ -954,7 +966,7 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    template <typename K = KeyT, typename V> [[nodiscard]] std::pair<iterator, bool> do_assign(K&& key, V&& val) noexcept {
+    template <typename K = KeyT, typename V> std::pair<iterator, bool> do_assign(K&& key, V&& val) {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
         const auto bempty = EMH_EMPTY(_pairs, bucket);
@@ -966,22 +978,22 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    [[nodiscard]] std::pair<iterator, bool> insert(const value_type& value) {
+    std::pair<iterator, bool> insert(const value_type& value) {
         check_expand_need();
         return do_insert(value);
     }
 
-    [[nodiscard]] std::pair<iterator, bool> insert(value_type&& value) {
+    std::pair<iterator, bool> insert(value_type&& value) {
         check_expand_need();
         return do_insert(std::move(value));
     }
 
-    template <typename P> [[nodiscard]] std::pair<iterator, bool> insert(P&& value) {
+    template <typename P> std::pair<iterator, bool> insert(P&& value) {
         check_expand_need();
         return do_insert(std::forward<P>(value));
     }
 
-    [[nodiscard]] iterator insert(const_iterator hint, const value_type& value) {
+    iterator insert(const_iterator hint, const value_type& value) {
         if (hint.bucket() != _num_buckets && hint->first == value.first) {
             return {this, hint.bucket()};
         }
@@ -990,7 +1002,7 @@ public:
         return do_insert(value).first;
     }
 
-    [[nodiscard]] iterator insert(const_iterator hint, value_type&& value) {
+    iterator insert(const_iterator hint, value_type&& value) {
         if (hint.bucket() != _num_buckets && hint->first == value.first) {
             return {this, hint.bucket()};
         }
@@ -1012,35 +1024,35 @@ public:
     }
 
     // assert(bucket < _num_buckets)
-    [[nodiscard]] ValueT* find_hint(const KeyT& key, size_t bucket) {
+    ValueT* find_hint(const KeyT& key, size_t bucket) {
         if (!EMH_EMPTY(_pairs, bucket) && EMH_KEY(_pairs, bucket) == key)
             return &EMH_VAL(_pairs, bucket);
         return nullptr;
     }
 
-    template <typename K, typename V> [[nodiscard]] size_type insert_unique(K&& key, V&& val) {
+    template <typename K, typename V> size_type insert_unique(K&& key, V&& val) {
         check_expand_need();
         auto bucket = find_unique_bucket(key);
         EMH_NEW(std::forward<K>(key), std::forward<V>(val), bucket);
         return bucket;
     }
 
-    [[nodiscard]] size_type insert_unique(value_type&& value) {
+    size_type insert_unique(value_type&& value) {
         return insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    [[nodiscard]] size_type insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
+    size_type insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
 
-    template <class... Args> [[nodiscard]] size_type emplace_unique(Args&&... args) {
+    template <class... Args> size_type emplace_unique(Args&&... args) {
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    template <class... Args> [[nodiscard]] std::pair<iterator, bool> emplace(Args&&... args) {
+    template <class... Args> std::pair<iterator, bool> emplace(Args&&... args) {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
 
-    template <class... Args> [[nodiscard]] iterator emplace_hint(const_iterator hint, Args&&... args) {
+    template <class... Args> iterator emplace_hint(const_iterator hint, Args&&... args) {
         value_type value(std::forward<Args>(args)...);
         auto bucket = hint.bucket();
         if (bucket != _num_buckets && hint->first == value.first) {
@@ -1051,34 +1063,34 @@ public:
         return do_insert(std::move(value)).first;
     }
 
-    template <class... Args> [[nodiscard]] std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) {
+    template <class... Args> std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) {
         check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
-    template <class... Args> [[nodiscard]] std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) {
+    template <class... Args> std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) {
         check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
-    template <class... Args> [[nodiscard]] iterator try_emplace(const_iterator hint, const KeyT& key, Args&&... args) {
+    template <class... Args> iterator try_emplace(const_iterator hint, const KeyT& key, Args&&... args) {
         (void)hint;
         return try_emplace(key, std::forward<Args>(args)...).first;
     }
 
-    template <class... Args> [[nodiscard]] iterator try_emplace(const_iterator hint, KeyT&& key, Args&&... args) {
+    template <class... Args> iterator try_emplace(const_iterator hint, KeyT&& key, Args&&... args) {
         (void)hint;
         return try_emplace(std::move(key), std::forward<Args>(args)...).first;
     }
 
-    template <class M> [[nodiscard]] std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) {
+    template <class M> std::pair<iterator, bool> insert_or_assign(const KeyT& key, M&& val) {
         return do_assign(key, std::forward<M>(val));
     }
-    template <class M> [[nodiscard]] std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) {
+    template <class M> std::pair<iterator, bool> insert_or_assign(KeyT&& key, M&& val) {
         return do_assign(std::move(key), std::forward<M>(val));
     }
 
-    template <class M> [[nodiscard]] iterator insert_or_assign(const_iterator hint, const KeyT& key, M&& val) {
+    template <class M> iterator insert_or_assign(const_iterator hint, const KeyT& key, M&& val) {
         auto bucket = hint.bucket();
         if (bucket != _num_buckets && hint->first == key) {
             hint->second = std::forward<M>(val);
@@ -1088,7 +1100,7 @@ public:
         return do_assign(key, std::forward<M>(val)).first;
     }
 
-    template <class M> [[nodiscard]] iterator insert_or_assign(const_iterator hint, KeyT&& key, M&& val) {
+    template <class M> iterator insert_or_assign(const_iterator hint, KeyT&& key, M&& val) {
         auto bucket = hint.bucket();
         if (bucket != _num_buckets && hint->first == key) {
             EMH_VAL(_pairs, bucket) = std::forward<M>(val);
@@ -1124,7 +1136,7 @@ public:
     /// return 0 if not erase
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    [[nodiscard]] size_type erase(const KeyT& key) noexcept {
+    [[nodiscard]] size_type erase(const KeyT& key) {
         const auto bucket = erase_key(key);
         if (bucket == INACTIVE)
             return 0;
@@ -1143,7 +1155,7 @@ public:
         return (bucket == it._bucket) ? ++it : it;
     }
 
-    void _erase(const_iterator it) noexcept {
+    void _erase(const_iterator it) {
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
     }
@@ -1370,7 +1382,15 @@ public:
     }
 
 private:
-    PairT* alloc_bucket(size_type num_buckets) { return PairAllocTraits::allocate(_alloc, 2 + (size_t)num_buckets); }
+    PairT* alloc_bucket(size_type num_buckets) {
+        // Overflow guard: 2 + num_buckets must not wrap around.
+        if ((uint64_t)num_buckets > max_size() || (uint64_t)num_buckets + 2 < (uint64_t)num_buckets)
+            throw std::length_error("emhash5::HashMap: allocation size overflow");
+        auto* p = PairAllocTraits::allocate(_alloc, 2 + (size_t)num_buckets);
+        if (p == nullptr)
+            throw std::bad_alloc();
+        return p;
+    }
 
     void dealloc_bucket(PairT* pairs, size_type num_buckets) {
         if (pairs)

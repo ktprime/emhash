@@ -23,13 +23,13 @@
 #pragma once
 
 #ifdef __has_include
-#  if __has_include("config.hpp")
-#    include "config.hpp"
-#  elif __has_include("emhash/config.hpp")
-#    include "emhash/config.hpp"
-#  endif
+#if __has_include("config.hpp")
+#include "config.hpp"
+#elif __has_include("emhash/config.hpp")
+#include "emhash/config.hpp"
+#endif
 #else
-#  include "config.hpp"
+#include "config.hpp"
 #endif
 
 #include <cstring>
@@ -62,7 +62,9 @@ inline static uint32_t nowts() {
 #if EMHASH_LRU_TIME > 0
     return EMHASH_LRU_TIME;
 #else
-    return (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    return (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
 #endif
 }
 
@@ -252,7 +254,8 @@ public:
 
     lru_cache(const lru_cache& other) {
         _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
-        if (!_pairs) throw std::bad_alloc();
+        if (!_pairs)
+            throw std::bad_alloc();
         clone(other);
     }
 
@@ -282,7 +285,8 @@ public:
         if (_num_buckets != other._num_buckets) {
             free(_pairs);
             _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
-            if (!_pairs) throw std::bad_alloc();
+            if (!_pairs)
+                throw std::bad_alloc();
         }
 
         clone(other);
@@ -566,7 +570,7 @@ public:
     }
 
     /// Const version of the above
-    ValueT* try_get(const KeyT& key) const noexcept {
+    const ValueT* try_get(const KeyT& key) const noexcept {
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
     }
