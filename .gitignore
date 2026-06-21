@@ -20,10 +20,19 @@ build/
 build_ci_check/
 build_ci_wsl/
 build_test/
+build_tests/
 vsbuild/
 bench/bin/
 tests/build/
+tests/build_bench/
+tests/build_msvc/
+tests/cov_build/
+tests/coverage_html/
+tests/coverage.info
+tests/cov_*.txt
+tests/cov_run_log.txt
 tests/CMakeFiles/
+tests/.cache/
 tests/compile_commands.json
 tests/Makefile
 .cache/
@@ -59,6 +68,19 @@ tests/fuzz/corpus/
 tests/fuzz/crash-*
 tests/crash-*
 tests/verify/bin/
+
+# Temporary coverage/debug scripts (not part of the project)
+tests/scripts/check_gcda.py
+tests/scripts/check_progress.py
+tests/scripts/cov_*.py
+tests/scripts/cov_*.sh
+tests/scripts/debug_build.py
+tests/scripts/debug_test.py
+tests/scripts/local_cov.py
+tests/scripts/local_cov.sh
+tests/scripts/quick_debug.py
+tests/scripts/read_*.py
+tests/scripts/run_cov.py
 
 # Root-level build/test binaries
 /mbench

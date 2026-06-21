@@ -1,0 +1,55 @@
+---
+# clang-tidy configuration for emhash
+# Focus on bug prevention, performance, and modernization
+# Conservative checks to avoid excessive noise on header-only library
+
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-reserved-identifier,
+  -bugprone-sizeof-expression,
+  cert-*,
+  -cert-err58-cpp,
+  performance-*,
+  -performance-no-int-to-ptr,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
+  -modernize-avoid-c-arrays,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -readability-function-cognitive-complexity,
+  -readability-else-after-return,
+  -readability-implicit-bool-conversion,
+  -readability-braces-around-statements,
+  -readability-named-parameter,
+  -readability-redundant-access-specifiers,
+  cppcoreguidelines-pro-type-cstyle-cast,
+  cppcoreguidelines-pro-type-const-cast,
+  cppcoreguidelines-slicing,
+  cppcoreguidelines-pro-bounds-pointer-arithmetic,
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: 'include/emhash/.*|include/emilib/.*'
+
+CheckOptions:
+  - key:   readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key:   readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key:   readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key:   readability-identifier-naming.VariableCase
+    value: lower_case
+  - key:   readability-identifier-naming.PrivateMemberSuffix
+    value: '_'
+  - key:   readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key:   modernize-use-override.IgnoreDestructors
+    value: 'true'
+  - key:   performance-unnecessary-value-param.AllowedTypes
+    value: 'std::string_view;std::span'

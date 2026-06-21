@@ -108,8 +108,6 @@ const static auto simd_filled = _mm512_set1_epi8(EFILLED);
 #define LOAD_EPI8 _mm512_loadu_si512
 #define MOVEMASK_EPI8 _mm512_movemask_epi8 // avx512 error
 #define CMPEQ_EPI8 _mm512_test_epi8_mask
-#else
-// TODO sse2neon
 #endif
 
 // find filled or empty

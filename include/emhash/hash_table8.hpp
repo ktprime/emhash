@@ -242,7 +242,7 @@ public:
         } else {
             init(rhs._num_filled + 2, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
-                insert_unique(it->first, it->second);
+                (void)insert_unique(it->first, it->second);
         }
     }
 
@@ -280,7 +280,7 @@ public:
         } else {
             init(rhs._num_filled + 2, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
-                insert_unique(it->first, it->second);
+                (void)insert_unique(it->first, it->second);
         }
     }
 
@@ -305,7 +305,7 @@ public:
             _pairs_capacity = 0;
             rehash(rhs._num_filled + 2);
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
-                insert_unique(it->first, it->second);
+                (void)insert_unique(it->first, it->second);
             return *this;
         }
 
@@ -410,7 +410,7 @@ public:
     value_type& back() { return _pairs[_num_filled - 1]; }
     const value_type& back() const { return _pairs[_num_filled - 1]; }
 
-    void pop_front() { erase(begin()); } // TODO. only erase first without move last
+    void pop_front() { erase(begin()); }
     void pop_back() { erase(last()); }
 
     constexpr iterator begin() { return first(); }
@@ -424,14 +424,14 @@ public:
     const value_type* values() const { return _pairs; }
     const Index* index() const { return _index; }
 
-    size_type size() const noexcept { return _num_filled; }
-    bool empty() const noexcept { return _num_filled == 0; }
-    size_type bucket_count() const noexcept { return _num_buckets; }
-    float load_factor() const noexcept { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
+    [[nodiscard]] size_type size() const noexcept { return _num_filled; }
+    [[nodiscard]] bool empty() const noexcept { return _num_filled == 0; }
+    [[nodiscard]] size_type bucket_count() const noexcept { return _num_buckets; }
+    [[nodiscard]] float load_factor() const noexcept { return static_cast<float>(_num_filled) / ((float)_mask + 1.0f); }
 
-    const HashT& hash_function() const { return _hasher; }
-    const EqT& key_eq() const { return _eq; }
-    allocator_type get_allocator() const { return allocator_type(_pair_allocator); }
+    [[nodiscard]] const HashT& hash_function() const { return _hasher; }
+    [[nodiscard]] const EqT& key_eq() const { return _eq; }
+    [[nodiscard]] allocator_type get_allocator() const { return allocator_type(_pair_allocator); }
 
     void max_load_factor(float mlf) {
         if (mlf <= 0.999f && mlf > EMH_MIN_LOAD_FACTOR) {
@@ -440,9 +440,9 @@ public:
         }
     }
 
-    constexpr float max_load_factor() const { return (1 << 28) / (float)_mlf; }
-    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
-    constexpr uint64_t max_bucket_count() const { return max_size(); }
+    [[nodiscard]] constexpr float max_load_factor() const { return (1 << 28) / (float)_mlf; }
+    [[nodiscard]] constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
+    [[nodiscard]] constexpr uint64_t max_bucket_count() const { return max_size(); }
 
 #if EMH_STATIS
     // Returns the bucket number where the element with key k is located.
@@ -570,9 +570,9 @@ public:
     void pack_zero(ValueT zero) { _pairs[_num_filled] = {KeyT(), zero}; }
 
     // ------------------------------------------------------------
-    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_slot(key)}; }
+    template <typename K = KeyT> [[nodiscard]] iterator find(const K& key) noexcept { return {this, find_filled_slot(key)}; }
 
-    template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
+    template <typename K = KeyT> [[nodiscard]] const_iterator find(const K& key) const noexcept {
         return {this, find_filled_slot(key)};
     }
 
@@ -599,11 +599,11 @@ public:
     /// @param key The key to search for.
     /// @return true if the key exists, false otherwise.
     /// @note Faster than count() > 0 for existence checks.
-    template <typename K = KeyT> bool contains(const K& key) const noexcept {
+    template <typename K = KeyT> [[nodiscard]] bool contains(const K& key) const noexcept {
         return find_filled_slot(key) != _num_filled;
     }
 
-    template <typename K = KeyT> size_type count(const K& key) const noexcept {
+    template <typename K = KeyT> [[nodiscard]] size_type count(const K& key) const noexcept {
         return find_filled_slot(key) == _num_filled ? 0 : 1;
         // return find_sorted_bucket(key) == END ? 0 : 1;
         // return find_hash_bucket(key) == END ? 0 : 1;
@@ -626,7 +626,7 @@ public:
         for (auto rit = rhs.begin(); rit != rhs.end();) {
             auto fit = find(rit->first);
             if (fit == end()) {
-                insert_unique(rit->first, std::move(rit->second));
+                (void)insert_unique(rit->first, std::move(rit->second));
                 rit = rhs.erase(rit);
             } else {
                 ++rit;
@@ -635,7 +635,7 @@ public:
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
-    bool try_get(const KeyT& key, ValueT& val) const noexcept {
+    [[nodiscard]] bool try_get(const KeyT& key, ValueT& val) const noexcept {
         const auto slot = find_filled_slot(key);
         const auto found = slot != _num_filled;
         if (found) {
@@ -651,13 +651,13 @@ public:
     /// @code
     ///   if (auto* pval = map.try_get(key)) { use(*pval); }
     /// @endcode
-    ValueT* try_get(const KeyT& key) noexcept {
+    [[nodiscard]] ValueT* try_get(const KeyT& key) noexcept {
         const auto slot = find_filled_slot(key);
         return slot != _num_filled ? &_pairs[slot].second : nullptr;
     }
 
     /// @brief Const version of try_get().
-    const ValueT* try_get(const KeyT& key) const noexcept {
+    [[nodiscard]] ValueT* try_get(const KeyT& key) const noexcept {
         const auto slot = find_filled_slot(key);
         return slot != _num_filled ? &_pairs[slot].second : nullptr;
     }
@@ -667,7 +667,7 @@ public:
     /// @param val The new value to set.
     /// @return true if the key existed and value was updated, false if key not found.
     /// @note Only available in emhash5/8.
-    bool try_set(const KeyT& key, const ValueT& val) noexcept {
+    [[nodiscard]] bool try_set(const KeyT& key, const ValueT& val) noexcept {
         const auto slot = find_filled_slot(key);
         if (slot == _num_filled)
             return false;
@@ -677,7 +677,7 @@ public:
     }
 
     /// set value if key exist
-    bool try_set(const KeyT& key, ValueT&& val) noexcept {
+    [[nodiscard]] bool try_set(const KeyT& key, ValueT&& val) noexcept {
         const auto slot = find_filled_slot(key);
         if (slot == _num_filled)
             return false;
@@ -687,13 +687,13 @@ public:
     }
 
     /// Convenience function.
-    ValueT get_or_return_default(const KeyT& key) const noexcept {
+    [[nodiscard]] ValueT get_or_return_default(const KeyT& key) const noexcept {
         const auto slot = find_filled_slot(key);
         return slot == _num_filled ? ValueT() : _pairs[slot].second;
     }
 
     // -----------------------------------------------------
-    std::pair<iterator, bool> do_insert(const value_type& value) noexcept {
+    [[nodiscard]] std::pair<iterator, bool> do_insert(const value_type& value) noexcept {
         const auto key_hash = hash_key(value.first);
         const auto bucket = find_or_allocate(value.first, key_hash);
         const auto bempty = EMH_EMPTY(bucket);
@@ -705,7 +705,7 @@ public:
         return {{this, slot}, bempty};
     }
 
-    std::pair<iterator, bool> do_insert(value_type&& value) noexcept {
+    [[nodiscard]] std::pair<iterator, bool> do_insert(value_type&& value) noexcept {
         const auto key_hash = hash_key(value.first);
         const auto bucket = find_or_allocate(value.first, key_hash);
         const auto bempty = EMH_EMPTY(bucket);
@@ -729,7 +729,7 @@ public:
         return {{this, slot}, bempty};
     }
 
-    template <typename K, typename V> std::pair<iterator, bool> do_assign(K&& key, V&& val) noexcept {
+    template <typename K, typename V> [[nodiscard]] std::pair<iterator, bool> do_assign(K&& key, V&& val) noexcept {
         check_expand_need();
         const auto key_hash = hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
@@ -744,7 +744,7 @@ public:
         return {{this, slot}, bempty};
     }
 
-    std::pair<iterator, bool> insert(const value_type& p) {
+    [[nodiscard]] std::pair<iterator, bool> insert(const value_type& p) {
         check_expand_need();
         return do_insert(p);
     }
@@ -766,6 +766,17 @@ public:
             do_insert(*it);
     }
 
+#if 0
+    template <typename Iter>
+    void insert_unique(Iter begin, Iter end)
+    {
+        reserve(std::distance(begin, end) + _num_filled, false);
+        for (; begin != end; ++begin) {
+            insert_unique(*begin);
+        }
+    }
+#endif
+
     /// @brief Insert a key-value pair without checking for duplicates.
     /// @param key The key to insert.
     /// @param val The value to insert.
@@ -781,13 +792,13 @@ public:
         return bucket;
     }
 
-    size_type insert_unique(value_type&& value) {
+    [[nodiscard]] size_type insert_unique(value_type&& value) {
         return insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    size_type insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
+    [[nodiscard]] size_type insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
 
-    template <class... Args> std::pair<iterator, bool> emplace(Args&&... args) {
+    template <class... Args> [[nodiscard]] std::pair<iterator, bool> emplace(Args&&... args) {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
@@ -804,12 +815,12 @@ public:
         return do_insert(k, std::forward<Args>(args)...);
     }
 
-    template <class... Args> std::pair<iterator, bool> try_emplace(KeyT&& k, Args&&... args) {
+    template <class... Args> [[nodiscard]] std::pair<iterator, bool> try_emplace(KeyT&& k, Args&&... args) {
         check_expand_need();
         return do_insert(std::move(k), std::forward<Args>(args)...);
     }
 
-    template <class... Args> size_type emplace_unique(Args&&... args) {
+    template <class... Args> [[nodiscard]] size_type emplace_unique(Args&&... args) {
         return insert_unique(std::forward<Args>(args)...);
     }
 
@@ -817,12 +828,12 @@ public:
         return do_assign(key, std::forward<ValueT>(val));
     }
 
-    std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) {
+    [[nodiscard]] std::pair<iterator, bool> insert_or_assign(KeyT&& key, ValueT&& val) {
         return do_assign(std::move(key), std::forward<ValueT>(val));
     }
 
     /// Return the old value or ValueT() if it didn't exist.
-    ValueT set_get(const KeyT& key, const ValueT& val) {
+    [[nodiscard]] ValueT set_get(const KeyT& key, const ValueT& val) {
         check_expand_need();
         const auto key_hash = hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
@@ -868,7 +879,7 @@ public:
     /// @return 1 if the element was erased, 0 if the key was not found.
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    size_type erase(const KeyT& key) noexcept {
+    [[nodiscard]] size_type erase(const KeyT& key) noexcept {
         const auto key_hash = hash_key(key);
         const auto sbucket = find_filled_bucket(key, key_hash);
         if (sbucket == INACTIVE)
@@ -880,7 +891,7 @@ public:
     }
 
     // iterator erase(const_iterator begin_it, const_iterator end_it)
-    iterator erase(const const_iterator& cit) noexcept {
+    [[nodiscard]] iterator erase(const const_iterator& cit) noexcept {
         const auto slot = (size_type)(cit.kv_ - _pairs);
         size_type main_bucket;
         const auto sbucket = find_slot_bucket(slot, main_bucket); // TODO
@@ -889,7 +900,7 @@ public:
     }
 
     // only last >= first
-    iterator erase(const_iterator first, const_iterator last) noexcept {
+    [[nodiscard]] iterator erase(const_iterator first, const_iterator last) noexcept {
         auto esize = long(last.kv_ - first.kv_);
         auto tsize = long((_pairs + _num_filled) - last.kv_); // last to tail size
         auto next = first;
@@ -907,7 +918,7 @@ public:
         return {this, size_type(next.kv_ - _pairs)};
     }
 
-    template <typename Pred> size_type erase_if(Pred pred) {
+    template <typename Pred> [[nodiscard]] size_type erase_if(Pred pred) {
         auto old_size = size();
         for (auto it = begin(); it != end();) {
             if (pred(*it))
@@ -1093,7 +1104,7 @@ public:
         return true;
     }
 
-    void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) {
+    void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) noexcept {
         const auto need_size = std::max((size_type)((double)num_buckets * (double)max_load_factor()) + 4, required_buckets + 2);
         auto new_pairs = alloc_bucket(need_size);
         if (is_trivially_copyable()) {
@@ -1189,7 +1200,7 @@ public:
                      sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0;
-            EMH_LOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
+            EMH_LOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << endl;
 #else
             puts(buff);
 #endif
@@ -1516,7 +1527,7 @@ private:
     /***
         Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
         Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing is
-    the most cache fristd::endly alternativeis typically used.
+    the most cache friendly alternativeis typically used.
 
         It's the core algorithm of this hash map with highly optimization/benchmark.
         normally linear probing is inefficient with high load factor, it use a new 3-way linear

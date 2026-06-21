@@ -85,8 +85,6 @@ constexpr static uint8_t set_simd_bytes = sizeof(set_simd_empty) / sizeof(uint8_
 #define LOADU_EPI8 _mm512_loadu_si512
 #define MOVEMASK_EPI8 _mm512_movemask_epi8 // avx512 error
 #define CMPEQ_EPI8 _mm512_cmpeq_epi16_mask
-#else
-// TODO arm neon
 #endif
 
 // find filled or empty

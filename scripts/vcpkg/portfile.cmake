@@ -4,11 +4,14 @@ vcpkg_from_github(
     REF "v${VERSION}"
     # SHA512 must be updated after each release:
     #   vcpkg install emhash && vcpkg hash --algorithm SHA512 <tarball>
-    # TODO: Replace with actual SHA512 before first vcpkg submission
+    # To compute: curl -sL https://github.com/ktprime/emhash/archive/refs/tags/v${VERSION}.tar.gz | sha512sum
     SHA512 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-    # WARNING: The SHA512 above is a placeholder and MUST be replaced with the
-    # actual hash computed from the release tarball before submitting to vcpkg.
-    # Failing to do so will cause vcpkg installation to fail or skip integrity checks.
+    # NOTE: The SHA512 above is a placeholder. Before submitting to vcpkg:
+    # 1. Create a release tag (e.g. v1.2.3)
+    # 2. Download the release tarball
+    # 3. Compute SHA512: sha512sum emhash-1.2.3.tar.gz
+    # 4. Replace the placeholder hash above
+    # 5. Test: vcpkg install emhash
     HEAD_REF main
 )
 

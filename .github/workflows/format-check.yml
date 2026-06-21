@@ -11,8 +11,6 @@ jobs:
   clang-format:
     name: clang-format (LLVM style)
     runs-on: ubuntu-latest
-    # Temporarily disabled: format check
-    if: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -45,3 +43,31 @@ jobs:
             -name sse2neon.h -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
             -print | xargs clang-format-18 --dry-run
+
+  clang-tidy:
+    name: clang-tidy (static analysis)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy-18
+
+      - name: Run clang-tidy on headers
+        run: |
+          # Create a dummy TU to analyze header-only library
+          for hdr in include/emhash/hash_table*.hpp include/emilib/emihmap*.hpp; do
+            echo "Checking $hdr..."
+            clang-tidy-18 --header-filter="$hdr" \
+              --checks='-*,bugprone-*,cert-*,performance-*,readability-*' \
+              -std=c++17 -I include \
+              /dev/null -include "$hdr" 2>&1 | tee -a tidy_output.txt
+          done
+          # Check for actual errors (warnings are informational)
+          if grep -q "error:" tidy_output.txt; then
+            echo "clang-tidy found errors"
+            exit 1
+          fi

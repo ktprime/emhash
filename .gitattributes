@@ -1,0 +1,52 @@
+# Line endings: normalize to LF in repo, checkout as-is on Windows
+* text=auto eol=lf
+
+# Source files: always LF
+*.hpp  text eol=lf
+*.cpp  text eol=lf
+*.h    text eol=lf
+*.cc   text eol=lf
+*.c    text eol=lf
+*.in   text eol=lf
+*.cmake text eol=lf
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.py   text eol=lf
+
+# Windows-specific files: CRLF
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binary files: no line ending conversion
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.7z   binary
+
+# Generated files: exclude from release archives
+.gitattributes export-ignore
+.gitignore     export-ignore
+.github        export-ignore
+tests          export-ignore
+bench          export-ignore
+thirdparty     export-ignore
+docs           export-ignore
+scripts        export-ignore
+INSPECTION_REPORT.md export-ignore
+
+# Linguist language detection (GitHub stats)
+*.hpp linguist-language=C++
+*.ipp linguist-language=C++
+docs/examples/*.cpp linguist-language=C++
+*.cmake linguist-language=CMake
+CMakeLists.txt linguist-language=CMake

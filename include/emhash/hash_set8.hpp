@@ -415,7 +415,7 @@ public:
     value_type& back() { return _pairs[_num_filled - 1]; }
     const value_type& back() const { return _pairs[_num_filled - 1]; }
 
-    void pop_front() { erase(begin()); } // TODO. only erase first without move last
+    void pop_front() { erase(begin()); }
     void pop_back() { erase(last()); }
 
     constexpr iterator begin() { return first(); }

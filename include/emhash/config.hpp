@@ -18,9 +18,9 @@
 #define EMH_LIKELY(condition) __builtin_expect(!!(condition), 1)
 #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
 #elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-#define EMH_LIKELY(condition) ((condition) ? 1 : 0)
-#define EMH_UNLIKELY(condition) ((condition) ? 1 : 0)
 #include <intrin.h>
+#define EMH_LIKELY(condition)   ((condition) ? ((void)__assume(condition), 1) : 0)
+#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!(condition)), 0))
 #define EMH_ASSUME(cond) __assume(cond)
 #else
 #define EMH_LIKELY(condition) (condition)
