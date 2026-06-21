@@ -234,7 +234,7 @@ if(EMHASH_ENABLE_BENCH)
     FetchContent_Declare(
         googlebench
         GIT_REPOSITORY https://github.com/google/benchmark.git
-        GIT_TAG        v1.9.4
+        GIT_TAG        31c66f47f60d06790a4885a261d682ba339bd100 # v1.9.4
         GIT_SHALLOW    TRUE
     )
     # Prevent Google Benchmark from building tests

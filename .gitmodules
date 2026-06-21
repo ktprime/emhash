@@ -1,4 +1,5 @@
 [submodule "thirdparty"]
 	path = thirdparty
 	url = https://github.com/ktprime/emhash-bench-deps.git
-	branch = master
+	# Pinned to commit 71d40a91 (2025-06-20) for reproducible builds
+	# To update: git submodule update --remote thirdparty && git add thirdparty

@@ -10,6 +10,7 @@ This directory contains example programs demonstrating how to use the emhash has
 | `basic_set.cpp` | Basic HashSet usage: insert, contains, erase |
 | `custom_allocator.cpp` | Using a custom allocator with emhash containers |
 | `custom_hash.cpp` | Using a custom hash function for user-defined key types |
+| `lru_cache.cpp` | LRU cache usage: time-based and size-based eviction |
 
 ## Build
 

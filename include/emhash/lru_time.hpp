@@ -252,6 +252,7 @@ public:
 
     lru_cache(const lru_cache& other) {
         _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
+        if (!_pairs) throw std::bad_alloc();
         clone(other);
     }
 
@@ -281,6 +282,7 @@ public:
         if (_num_buckets != other._num_buckets) {
             free(_pairs);
             _pairs = (PairT*)malloc((2 + other._num_buckets) * sizeof(PairT));
+            if (!_pairs) throw std::bad_alloc();
         }
 
         clone(other);

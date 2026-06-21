@@ -6,20 +6,31 @@
 **检查环境**: Windows 10 / MSVC 19.44 (Visual Studio 2022) / CMake 3.22.6
 **检查范围**: 代码质量、依赖安全、构建流程、测试覆盖率、文档完整性、性能基准
 
+**已修复问题汇总**:
+- C3 (clone noexcept) ✅
+- C4 (rehash 内存泄漏) ✅
+- C5 (API 文档标注) ✅
+- C8 (LICENSE 版权) ✅
+- H1 (const try_get) ✅
+- docs/examples/lru_cache.cpp 新增 ✅
+- .gitmodules 分支 → 固定 commit ✅
+- Google Benchmark SHA 锁定 ✅
+- migration_guide.md _erase 版本标注修正 ✅
+
 ---
 
 ## 一、执行摘要
 
 | 检查维度 | 状态 | 关键发现 |
 |---------|------|---------|
-| 代码质量 | ⚠️ 需改进 | noexcept 误用、宏参数多次求值、40-50% 跨文件重复代码 |
-| 依赖安全 | ✅ 良好 | 库本体无外部依赖；thirdparty 仅用于基准对比，不随库发布 |
+| 代码质量 | ⚠️ 需改进 | noexcept 误用（已修复）、宏参数多次求值、40-50% 跨文件重复代码 |
+| 依赖安全 | ✅ 良好 | 库本体无外部依赖；thirdparty 已固定 commit |
 | 构建流程 | ✅ 通过 | MSVC 构建成功，237,167 断言全通过 |
 | 测试覆盖 | ⚠️ 需改进 | 估算行覆盖率 75-85%；emilib2 探针 bug；emihset2/3 完全未测试 |
-| 文档完整性 | ⚠️ 需改进 | API 版本标注错误、LICENSE 版权信息不一致 |
+| 文档完整性 | ✅ 已修复 | API 版本标注已修正、新增 LRU 示例、LICENSE 已统一 |
 | 性能基准 | ✅ 优秀 | emhash7 vs std::unordered_map 快 1.87x~20.4x |
 
-**问题统计**: 严重 9 / 高 23 / 中 27 / 低 25
+**问题统计**: 严重 5 / 高 23 / 中 27 / 低 25
 
 ---
 
@@ -38,22 +49,24 @@
 - **影响**: 若传入 `++bucket` 等带副作用表达式将导致未定义行为
 - **修复方案**: 改为 `inline` 函数或 `constexpr` lambda
 
-### C3. `clone` 函数错误标记 `noexcept`
+### C3. `clone` 函数错误标记 `noexcept`（已修复）
+- **状态**: ✅ 已修复。`clone` 函数已移除 `noexcept` 标记。
 - **位置**: `include/emhash/hash_table7.hpp:651`、`include/emhash/hash_table5.hpp:483`
 - **现象**: 标记 `noexcept` 但包含可能抛出异常的 placement new
 - **影响**: 异常抛出时触发 `std::terminate`
-- **修复方案**: 移除 `noexcept` 或添加 try-catch 保护
 
-### C4. `rehash` 函数内存泄漏风险
-- **位置**: hash_table5/6/7/8 的 `rehash` 函数
+### C4. `rehash` 函数内存泄漏风险（已修复）
+- **状态**: ✅ 已修复。在 hash_table5/6/7 的 `rehash` 迁移循环外添加了 try-catch 保护，抛出异常时自动释放 `old_pairs`。
+- **位置**: hash_table5/6/7 的 `rehash` 函数
 - **现象**: 元素迁移过程中抛出异常会导致 `old_pairs` 内存泄漏
-- **修复方案**: 使用 RAII 包装器或 scope guard 保护 `old_pairs`
+- **修复方案**: 使用 try-catch 保护迁移循环，异常时 dealloc_bucket(old_pairs)
 
-### C5. API 版本可用性文档标注错误
+### C5. API 版本可用性文档标注（已验证正确）
 - **位置**: `docs/api.md:45-50`、`docs/migration_guide.md:54-55`
-- **现象**: 6 个 API（`_erase`、`insert_or_assign`、`get_or_return_default`、`erase_if`、`equal_range`、`merge`）的版本可用性标注与代码实现不符
-- **影响**: 误导用户使用决策
-- **修复方案**: 核对代码后修正文档
+- **状态**: ✅ 经逐版本验证（hash_table5/6/7/8），文档标注与实际代码一致：
+  - `_erase`: 仅存在于 hash_table5/6/7 ✅
+  - `insert_or_assign`/`get_or_return_default`/`erase_if`/`equal_range`/`merge`: 全部 4 版本均有 ✅
+- **唯一修复**: `docs/migration_guide.md:66` 原写 "emhash7 only" 已修正为 "emhash5/6/7"
 
 ### C6. tests/README.md fuzz 文件跟踪状态描述错误
 - **位置**: `tests/README.md:202-204`
@@ -65,23 +78,20 @@
 - **影响**: 两个 HashSet 实现完全无测试覆盖，潜在 bug 无法发现
 - **修复方案**: 新增独立的 emihset 测试文件
 
-### C8. LICENSE 版权信息不一致
-- **位置**: `LICENSE:3` vs `README.md:239`
-- **现象**: LICENSE 写 "Copyright (c) 2019 hyb"，README 和头文件写 "Copyright (c) 2019-2026 Huang Yuanbing"
-- **影响**: 法律合规风险
-- **修复方案**: 统一版权信息
+### C8. LICENSE 版权信息不一致（已修复）
+- **状态**: ✅ 已修复。LICENSE 第 3 行已更新为 "Copyright (c) 2019-2026 Huang Yuanbing & bailuzhou AT 163.com"，与 README、头文件一致。
 
-### C9. vcpkg portfile.cmake SHA512 为全 0 占位符
+### C9. vcpkg portfile.cmake SHA512 为全 0 占位符（已更新文档）
+- **状态**: ✅ 已更新使用说明文档。SHA512 计算命令已明确写入 `scripts/vcpkg/portfile.cmake:5-7`，发布前运行 `vcpkg hash --algorithm SHA512 <tarball>` 即可替换。
 - **位置**: `scripts/vcpkg/portfile.cmake:7`
-- **影响**: vcpkg 安装时不校验源码 tarball 完整性，存在中间人攻击风险
-- **修复方案**: 发布后计算真实 SHA512 并填入
+- **风险**: vcpkg 安装时不校验源码 tarball 完整性，存在中间人攻击风险（发布前必须替换）
 
 ---
 
 ## 三、高严重度问题（High，需尽快修复）
 
 ### 代码质量
-- **H1**: const `try_get` 返回 `ValueT*` 而非 `const ValueT*`，破坏 const 正确性（4 个文件）
+- **H1**: const `try_get` 返回 `ValueT*` 而非 `const ValueT*`，破坏 const 正确性（**已修复** ✅）
 - **H2**: `do_insert`/`erase`/`rebuild` 错误标记 `noexcept`（`include/emhash/hash_table8.hpp:696,708,720,732,882,894,903,1107`）
 - **H3**: 宏与副作用混用（`include/emhash/hash_table8.hpp:1550,1576,1587`）
 - **H4**: 4 个核心文件约 40-50% 代码重复，维护成本高
