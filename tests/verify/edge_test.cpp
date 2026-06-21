@@ -22,7 +22,7 @@ int main() {
         m[1] = 100;
         assert(m.size() == 1);
         assert(m[1] == 100);
-        m.erase(1);
+        (void)m.erase(1);
         assert(m.size() == 0);
         assert(m.find(1) == m.end());
     }
@@ -42,7 +42,7 @@ int main() {
     {
         emhash8::HashMap<int,int> m;
         for (int i = 0; i < 50; i++) m[i] = i;
-        for (int i = 0; i < 25; i++) m.erase(i);
+        for (int i = 0; i < 25; i++) (void)m.erase(i);
         auto m2 = m;
         assert(m2.size() == 25);
         for (int i = 25; i < 50; i++) assert(m2[i] == i);
@@ -61,7 +61,7 @@ int main() {
     // Test 6: Large size reserve then partial insert
     {
         emhash5::HashMap<int,int> m;
-        m.reserve(1000000);
+        (void)m.reserve(1000000);
         for (int i = 0; i < 100; i++) m[i] = i;
         assert(m.size() == 100);
         for (int i = 0; i < 100; i++) assert(m[i] == i);
@@ -82,7 +82,7 @@ int main() {
         for (int i = 0; i < 10; i++) m[i] = i;
         auto it = m.begin();
         ++it;
-        m.erase(m.begin());
+        (void)m.erase(m.begin());
         assert(it != m.end());
     }
     
@@ -126,7 +126,7 @@ int main() {
     {
         emhash7::HashMap<int,int> m;
         m.max_load_factor(0.95f);
-        m.reserve(1000);
+        (void)m.reserve(1000);
         for (int i = 0; i < 950; i++) m[i] = i;
         assert(m.size() == 950);
         for (int i = 0; i < 950; i++) assert(m[i] == i);

@@ -111,7 +111,7 @@ template <typename HashMap> static int test_correctness_const(const char* map_na
 
     // Erase half
     for (int i = 0; i < N; i += 2) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
     for (int i = 0; i < N; i++) {
@@ -239,7 +239,7 @@ static double bench_erase(const char* map_name, const char* hash_name, int N) {
 
     auto t0 = now_ms();
     for (int i = 0; i < N; i++)
-        m.erase(i);
+        (void)m.erase(i);
     auto t1 = now_ms();
     double elapsed = t1 - t0;
     printf("  %-12s %-8s erase  N=%-6d -> %8.1f ms (%.0f ops/ms)\n", map_name, hash_name, N, elapsed, N / elapsed);
@@ -263,9 +263,9 @@ static double bench_mixed(const char* map_name, const char* hash_name, int N) {
         if (op < 5)
             m[k] = k; // 50% insert
         else if (op < 8)
-            m.find(k); // 30% find
+            (void)m.find(k); // 30% find
         else
-            m.erase(k); // 20% erase
+            (void)m.erase(k); // 20% erase
     }
     auto t1 = now_ms();
     double elapsed = t1 - t0;
@@ -446,7 +446,7 @@ template <typename HashMap> static bool stress_test_no_crash(const char* map_nam
 
         // Erase and re-insert
         for (int i = 0; i < N; i += 2) {
-            m.erase(i);
+            (void)m.erase(i);
         }
         for (int i = 0; i < N; i += 2) {
             m[i] = i;

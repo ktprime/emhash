@@ -35,12 +35,12 @@ int test_reserve1_tiny(const char* name, int trials)
         if (trial % 200 == 0) { printf("  trial %d...\n", trial); fflush(stdout); }
 
         HashMap m;
-        m.reserve(1);  // Force tiny table
+        (void)m.reserve(1);  // Force tiny table
 
         for (int i = 0; i < 20; i++) {
             int key = key_dist(rng);
             int val = key_dist(rng);
-            m.insert({key, val});
+            (void)m.insert({key, val});
         }
 
         // Verify all inserted keys are findable via iteration
@@ -73,7 +73,7 @@ int test_high_load_factor(const char* name, int trials)
         if (trial % 100 == 0) { printf("  trial %d...\n", trial); fflush(stdout); }
 
         HashMap m;
-        m.reserve(1000);
+        (void)m.reserve(1000);
         m.max_load_factor(0.98f);
 
         std::vector<int64_t> keys;
@@ -104,7 +104,7 @@ int test_high_load_factor(const char* name, int trials)
                     (void)m.count(key);
                     break;
                 case 2: // erase
-                    m.erase(key);
+                    (void)m.erase(key);
                     break;
             }
         }
@@ -153,7 +153,7 @@ int test_rapid_insert_erase(const char* name, int trials)
             // Erase batch
             for (int i = 0; i < 50; i++) {
                 int key = key_dist(rng);
-                m.erase(key);
+                (void)m.erase(key);
             }
         }
 
@@ -274,7 +274,7 @@ int test_interleaved_ops(const char* name, int trials)
                     {
                         auto it = m.find(key);
                         if (it != m.end()) {
-                            m.erase(it);
+                            (void)m.erase(it);
                             // Remove from tracking
                             auto kit = std::find(inserted_keys.begin(), inserted_keys.end(), key);
                             if (kit != inserted_keys.end()) {

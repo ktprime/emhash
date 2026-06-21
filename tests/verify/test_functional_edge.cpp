@@ -96,7 +96,7 @@ bool test_reserve_zero()
     // reserve(0) on empty map
     {
         MapType m;
-        m.reserve(0);
+        (void)m.reserve(0);
         TEST_ASSERT(m.empty(), "reserve(0) empty");
         TEST_ASSERT(m.bucket_count() >= 1, "reserve(0) valid bucket count");
         m[1] = 10;
@@ -107,7 +107,7 @@ bool test_reserve_zero()
     {
         MapType m;
         for (int i = 0; i < 50; i++) m[i] = i;
-        m.reserve(0);
+        (void)m.reserve(0);
         TEST_ASSERT((size_t)m.size() == 50, "reserve(0) non-empty size unchanged");
         for (int i = 0; i < 50; i++)
             TEST_ASSERT(m[i] == i, "reserve(0) non-empty value unchanged");
@@ -145,7 +145,7 @@ bool test_shrink_to_fit()
     // shrink_to_fit on empty reserved map
     {
         MapType m;
-        m.reserve(1000);
+        (void)m.reserve(1000);
         TEST_ASSERT(m.bucket_count() >= 1000, "large reserve before shrink");
         m.shrink_to_fit();
         TEST_ASSERT(m.empty(), "shrink_to_fit empty");
@@ -157,7 +157,7 @@ bool test_shrink_to_fit()
     // shrink_to_fit after clear
     {
         MapType m;
-        m.reserve(10000);
+        (void)m.reserve(10000);
         for (int i = 0; i < 5000; i++) m[i] = i;
         m.clear();
         m.shrink_to_fit();
@@ -250,7 +250,7 @@ bool test_embedded_null_key()
         TEST_ASSERT(m[k4] == 4, "normal key");
         TEST_ASSERT(m.find(std::string("hello")) == m.end(), "prefix not mistaken for embedded null key");
 
-        m.erase(k1);
+        (void)m.erase(k1);
         TEST_ASSERT((size_t)m.size() == 3, "erase embedded null key");
         TEST_ASSERT(m.find(k1) == m.end(), "embedded null key erased");
         TEST_ASSERT(m[k2] == 2, "other keys not affected after erase");
@@ -270,7 +270,7 @@ bool test_high_load_collision()
 {
     MapType m;
     m.max_load_factor(0.95f);
-    m.reserve(8);
+    (void)m.reserve(8);
 
     // Use N that works for all implementations.
     // emilib2ss/emilib2o store group_probe as int8_t (max offset=127).
@@ -291,7 +291,7 @@ bool test_high_load_collision()
 
     // Erase half
     for (int i = 0; i < N; i += 2)
-        m.erase(i);
+        (void)m.erase(i);
     TEST_ASSERT((int)(size_t)m.size() == N / 2, "collision: erase half");
 
     // Verify remaining
@@ -326,8 +326,8 @@ bool test_erase_begin_emplace_loop()
 
         int next_key = INIT;
         for (int j = 0; j < LOOPS; j++) {
-            m.erase(m.begin());
-            m.emplace(next_key++, j);
+            (void)m.erase(m.begin());
+            (void)m.emplace(next_key++, j);
         }
 
         size_t count = 0;
@@ -346,8 +346,8 @@ bool test_erase_begin_emplace_loop()
 
         int next_key = INIT;
         for (int j = 0; j < LOOPS; j++) {
-            m.erase(m.begin());
-            m.emplace(next_key++, j);
+            (void)m.erase(m.begin());
+            (void)m.emplace(next_key++, j);
         }
 
         size_t count = 0;
@@ -363,8 +363,8 @@ bool test_erase_begin_emplace_loop()
         int next_key = 2;
         for (int j = 0; j < 100; j++) {
             if (m.begin() != m.end())
-                m.erase(m.begin());
-            m.emplace(next_key++, j);
+                (void)m.erase(m.begin());
+            (void)m.emplace(next_key++, j);
         }
 
         TEST_ASSERT(!m.empty(), "erase_begin single: not empty");
@@ -381,8 +381,8 @@ bool test_erase_begin_emplace_loop()
 
         int next_key = 100000;
         for (int j = 0; j < LOOPS; j++) {
-            m.erase(m.begin());
-            m.emplace(next_key++, j);
+            (void)m.erase(m.begin());
+            (void)m.emplace(next_key++, j);
         }
 
         for (auto it = m.begin(); it != m.end(); ++it) {
@@ -402,8 +402,8 @@ bool test_erase_begin_emplace_loop()
         for (int cycle = 0; cycle < 50; cycle++) {
             for (int j = 0; j < 100; j++) {
                 if (!m.empty())
-                    m.erase(m.begin());
-                m.emplace(next_key++, cycle * 100 + j);
+                    (void)m.erase(m.begin());
+                (void)m.emplace(next_key++, cycle * 100 + j);
             }
 
             // Verify iteration count matches size

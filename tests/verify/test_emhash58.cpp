@@ -50,13 +50,13 @@ bool test_basic_crud()
     TEST_ASSERT(map.contains(1));
     TEST_ASSERT(!map.contains(999));
 
-    map.erase(2);
+    (void)map.erase(2);
     TEST_ASSERT(map.size() == 2);
     TEST_ASSERT(map.count(2) == 0);
 
-    map.insert_or_assign(1, 100);
+    (void)map.insert_or_assign(1, 100);
     TEST_ASSERT(map[1] == 100);
-    map.insert_or_assign(4, 40);
+    (void)map.insert_or_assign(4, 40);
     TEST_ASSERT(map[4] == 40);
 
     auto res = map.emplace(5, 50);
@@ -122,7 +122,7 @@ template<typename MapType>
 bool test_rehash_reserve_clear()
 {
     MapType map;
-    map.reserve(1000);
+    (void)map.reserve(1000);
     TEST_ASSERT(map.bucket_count() >= 1000);
 
     for (int i = 0; i < 500; i++) map[i] = i;
@@ -178,7 +178,7 @@ bool test_bad_hash()
     TEST_ASSERT((int)map.size() == N);
     for (int i = 0; i < N; i++) TEST_ASSERT(map[i] == i * 7);
 
-    for (int i = 0; i < N / 2; i++) map.erase(i);
+    for (int i = 0; i < N / 2; i++) (void)map.erase(i);
     TEST_ASSERT((int)map.size() == N / 2);
 
     for (int i = 0; i < N / 2; i++) map[i] = i * 11;

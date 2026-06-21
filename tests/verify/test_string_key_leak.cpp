@@ -127,7 +127,7 @@ static void test_string_key_basic(const char* name) {
         // Erase by iterator
         it = m.find("delta");
         TEST_ASSERT(it != m.end(), "find delta before erase");
-        m.erase(it);
+        (void)m.erase(it);
         TEST_ASSERT(m.size() == 3, "size should be 3 after iterator erase");
         TEST_ASSERT(m.find("delta") == m.end(), "delta should not be found");
     }
@@ -237,7 +237,7 @@ static void test_leak_tracker_balance(const char* name) {
 
             // Erase half
             for (int i = 0; i < 100; i++) {
-                m.erase(LeakTracker("lt_" + std::to_string(i)));
+                (void)m.erase(LeakTracker("lt_" + std::to_string(i)));
             }
             TEST_ASSERT(m.size() == 100, "should have 100 entries after erase");
         }
@@ -337,7 +337,7 @@ static void test_emihmap_dtor_polarity() {
 
             // Erase some — exercises _erase() with need_explicit_dtor()
             for (int i = 0; i < 50; i++) {
-                m.erase(i);
+                (void)m.erase(i);
             }
             TEST_ASSERT(m.size() == 50, "emihmap1 should have 50 entries after erase");
 
@@ -373,7 +373,7 @@ static void test_emihmap_dtor_polarity() {
 
             // Erase
             for (int i = 0; i < 50; i++) {
-                m.erase(i);
+                (void)m.erase(i);
             }
             TEST_ASSERT(m.size() == 50, "emihmap2 should have 50 after erase");
 
@@ -459,7 +459,7 @@ static void test_hashset_string_keys(const char* name) {
         TEST_ASSERT(s.count("fig") == 0, "fig should not be in set");
 
         // Erase
-        s.erase("cherry");
+        (void)s.erase("cherry");
         TEST_ASSERT(s.size() == 4, "set should have 4 after erase");
         TEST_ASSERT(s.count("cherry") == 0, "cherry should not be in set");
 

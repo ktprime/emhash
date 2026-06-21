@@ -23,7 +23,7 @@ int run(const char* tag) {
     }
 
     // 2. random erase
-    for (int i = 0; i < 1000; i += 2) m.erase(i);
+    for (int i = 0; i < 1000; i += 2) (void)m.erase(i);
     for (int i = 1; i < 1000; i += 2) {
         auto it = m.find(i);
         if (it == m.end() || it->second != i * 2) {

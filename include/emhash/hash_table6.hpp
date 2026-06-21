@@ -1395,7 +1395,7 @@ private:
     }
 
     // Find the bucket with this key, or return bucket size
-    template <typename K> size_type find_filled_hash(const K& key, const size_t key_hash) const {
+    template <typename K> EMH_INLINE size_type find_filled_hash(const K& key, const size_t key_hash) const {
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = EMH_ADDR(_pairs, bucket);
         const auto _num_buckets = _mask + 1;
@@ -1445,7 +1445,7 @@ private:
     // Find the bucket with this key, or return bucket size
     // 1. next_bucket = INACTIVE, empty bucket
     // 2. next_bucket % 2 == 0 is main bucket
-    template <typename Key = KeyT> inline size_type find_filled_bucket(const Key& key) const {
+    template <typename Key = KeyT> EMH_INLINE size_type find_filled_bucket(const Key& key) const {
         return find_filled_hash(key, hash_key(key));
     }
 
@@ -1523,7 +1523,7 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
-    size_type find_empty_bucket(const size_type bucket_from) {
+    EMH_INLINE size_type find_empty_bucket(const size_type bucket_from) {
 #ifdef EMH_ALIGN64
         const auto boset = bucket_from % MASK_BIT;
         auto* const align = _bitmask + bucket_from / MASK_BIT;
@@ -1596,7 +1596,7 @@ private:
         }
     }
 
-    size_type find_unique_bucket(const KeyT& key) {
+    EMH_INLINE size_type find_unique_bucket(const KeyT& key) {
         const auto bucket = size_type(hash_key(key) & _mask);
         const auto next_bucket = EMH_ADDR(_pairs, bucket);
         if ((int)next_bucket < 0) {
@@ -1657,10 +1657,10 @@ private:
     }
 #endif
 
-    inline size_type hash_main(const size_type bucket) const { return hash_key(EMH_KEY(_pairs, bucket)) & _mask; }
+    EMH_INLINE size_type hash_main(const size_type bucket) const { return hash_key(EMH_KEY(_pairs, bucket)) & _mask; }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    inline size_type hash_key(const UType key) const {
+    EMH_INLINE size_type hash_key(const UType key) const {
 #if EMH_INT_HASH
         return (size_type)hash64(key);
 #elif EMH_SAFE_HASH
@@ -1673,7 +1673,7 @@ private:
     }
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    inline size_type hash_key(const UType& key) const {
+    EMH_INLINE size_type hash_key(const UType& key) const {
 #if EMH_WY_HASH
         return (size_type)wyhash(key.data(), key.size(), 0);
 #else
@@ -1684,7 +1684,7 @@ private:
     template <typename UType,
               typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
                                       size_type>::type = 0>
-    inline size_type hash_key(const UType& key) const {
+    EMH_INLINE size_type hash_key(const UType& key) const {
         return (size_type)_hasher(key);
     }
 

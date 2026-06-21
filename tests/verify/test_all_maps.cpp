@@ -142,11 +142,11 @@ bool test_basic_crud()
     TEST_ASSERT(map[k5] == v5, "emplace duplicate no overwrite");
 
     // insert_or_assign
-    map.insert_or_assign(k1, make_kv<Val>(111));
+    (void)map.insert_or_assign(k1, make_kv<Val>(111));
     TEST_ASSERT(map[k1] == make_kv<Val>(111), "insert_or_assign overwrite");
 
     auto k6 = make_kv<Key>(6);
-    map.insert_or_assign(k6, make_kv<Val>(60));
+    (void)map.insert_or_assign(k6, make_kv<Val>(60));
     TEST_ASSERT(map[k6] == make_kv<Val>(60), "insert_or_assign new key");
 
     // erase by key
@@ -160,7 +160,7 @@ bool test_basic_crud()
     // erase by iterator
     it = map.find(k3);
     if (it != map.end()) {
-        map.erase(it);
+        (void)map.erase(it);
         TEST_ASSERT(map.count(k3) == 0, "erase by iterator");
     }
 
@@ -275,7 +275,7 @@ bool test_reserve_rehash_clear()
     MapType map;
 
     // reserve
-    map.reserve(1000);
+    (void)map.reserve(1000);
     TEST_ASSERT(map.bucket_count() >= 1000, "reserve capacity");
 
     // Insert after reserve
@@ -300,7 +300,7 @@ bool test_reserve_rehash_clear()
     TEST_ASSERT(map.size() == 50, "reuse after clear");
 
     // Multiple reserve/clear cycles
-    map.reserve(5000);
+    (void)map.reserve(5000);
     for (int i = 0; i < 1000; i++)
         map[make_kv<Key>(i)] = make_kv<Val>(i);
     TEST_ASSERT(map.size() == 1050, "size after second reserve");
@@ -340,7 +340,7 @@ bool test_edge_cases()
     TEST_ASSERT(map.at(k) == v, "single element at");
 
     // Erase single element
-    map.erase(k);
+    (void)map.erase(k);
     TEST_ASSERT(map.empty(), "empty after erase single");
     TEST_ASSERT(map.size() == 0, "zero size after erase single");
 
@@ -489,7 +489,7 @@ bool test_bad_hash()
 
     // Erase half
     for (int i = 0; i < N / 2; i++)
-        map.erase(i);
+        (void)map.erase(i);
     TEST_ASSERT((int)map.size() == N / 2, "bad hash erase count");
 
     // Verify remaining
@@ -545,7 +545,7 @@ bool test_erase_patterns()
         for (int i = 0; i < N; i++)
             map[make_kv<Key>(i)] = make_kv<Val>(i);
         for (int i = 0; i < N / 2; i++)
-            map.erase(make_kv<Key>(i));
+            (void)map.erase(make_kv<Key>(i));
         TEST_ASSERT((int)map.size() == N / 2, "erase front size");
         TEST_ASSERT(map.count(make_kv<Key>(0)) == 0, "front key 0 gone");
         TEST_ASSERT(map.count(make_kv<Key>(N - 1)) == 1, "front key N-1 remains");
@@ -557,7 +557,7 @@ bool test_erase_patterns()
         for (int i = 0; i < N; i++)
             map[make_kv<Key>(i)] = make_kv<Val>(i);
         for (int i = N - 1; i >= N / 2; i--)
-            map.erase(make_kv<Key>(i));
+            (void)map.erase(make_kv<Key>(i));
         TEST_ASSERT((int)map.size() == N / 2, "erase back size");
         TEST_ASSERT(map.count(make_kv<Key>(0)) == 1, "back key 0 remains");
         TEST_ASSERT(map.count(make_kv<Key>(N - 1)) == 0, "back key N-1 gone");
@@ -569,7 +569,7 @@ bool test_erase_patterns()
         for (int i = 0; i < N; i++)
             map[make_kv<Key>(i)] = make_kv<Val>(i);
         for (int i = 0; i < N; i++)
-            map.erase(make_kv<Key>(i));
+            (void)map.erase(make_kv<Key>(i));
         TEST_ASSERT(map.empty(), "erase all empty");
         for (int i = 0; i < N; i++)
             map[make_kv<Key>(i)] = make_kv<Val>(i * 2);
@@ -597,7 +597,7 @@ bool test_large_scale()
     }
 
     for (int i = 0; i < N / 2; i++)
-        map.erase(make_kv<Key>(i));
+        (void)map.erase(make_kv<Key>(i));
     TEST_ASSERT((int)map.size() == N / 2, "large erase size");
 
     for (int i = 0; i < N / 2; i++)

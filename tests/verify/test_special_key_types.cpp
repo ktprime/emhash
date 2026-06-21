@@ -121,7 +121,7 @@ void test_dtor_value() {
         map[3] = DtorCounter(30);
 
         // Erase one
-        map.erase(2);
+        (void)map.erase(2);
     }
     // All should be destroyed when map goes out of scope
     TEST_ASSERT(g_dtor_count > 0, "destructors should be called");

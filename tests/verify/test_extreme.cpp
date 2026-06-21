@@ -56,12 +56,12 @@ void test_int_type(const char* name)
     // 3. Insert INACTIVE key then normal find
     {
         Map map(16);
-        map.insert_unique(inactive, KeyT(99));
+        (void)map.insert_unique(inactive, KeyT(99));
         auto it = map.find(inactive);
         CHECK(it != map.end() && it->second == KeyT(99), "find inserted INACTIVE key");
 
         // Find after erase
-        map.erase(inactive);
+        (void)map.erase(inactive);
         CHECK(map.find(inactive) == map.end(), "find INACTIVE after erase");
         fp_check(map, inactive, "find(INACTIVE,hash) after erase");
     }
@@ -70,7 +70,7 @@ void test_int_type(const char* name)
     {
         Map map(16);
         for (KeyT i = 0; i < KeyT(200); i++)
-            map.insert_unique(i, i);
+            (void)map.insert_unique(i, i);
         map.clear();
         CHECK(map.find(inactive) == map.end(), "find INACTIVE after clear");
         fp_check(map, inactive, "find(INACTIVE,hash) after clear");
@@ -80,7 +80,7 @@ void test_int_type(const char* name)
     {
         Map map(4);
         for (KeyT i = 0; i < KeyT(200); i++)
-            map.insert_unique(i, i);
+            (void)map.insert_unique(i, i);
         CHECK(map.find(inactive) == map.end(), "find INACTIVE after rehash");
         fp_check(map, inactive, "find(INACTIVE,hash) after rehash");
     }
@@ -92,7 +92,7 @@ void test_int_type(const char* name)
             for (KeyT i = 0; i < KeyT(100); i++)
                 map[i] = i;
             for (KeyT i = KeyT(1); i < KeyT(100); i += KeyT(2))
-                map.erase(i);
+                (void)map.erase(i);
         }
         CHECK(map.find(inactive) == map.end(), "find INACTIVE after churn");
         fp_check(map, inactive, "find(INACTIVE,hash) after churn");
@@ -111,7 +111,7 @@ void test_int_type(const char* name)
     // 8. Check after reserve
     {
         Map map;
-        map.reserve(1000);
+        (void)map.reserve(1000);
         CHECK(map.find(inactive) == map.end(), "find INACTIVE after reserve");
         fp_check(map, inactive, "find(INACTIVE,hash) after reserve");
     }
@@ -128,10 +128,10 @@ void test_int_type(const char* name)
     {
         Map map(16);
         KeyT sentinel = KeyT(KeyT(0) - 2);
-        map.insert_unique(sentinel, KeyT(77));
+        (void)map.insert_unique(sentinel, KeyT(77));
         auto it = map.find(sentinel);
         CHECK(it != map.end() && it->second == KeyT(77), "find sentinel key (-2)");
-        map.erase(sentinel);
+        (void)map.erase(sentinel);
         CHECK(map.find(sentinel) == map.end(), "find sentinel after erase");
     }
 }
@@ -161,7 +161,7 @@ void test_string_key()
     map[""] = 2;
     CHECK(map.find("hello") != map.end(), "find hello");
     CHECK(map.find("") != map.end(), "find empty string");
-    map.erase("");
+    (void)map.erase("");
     CHECK(map.find("") == map.end(), "find empty string after erase");
 }
 
@@ -207,7 +207,7 @@ void test_alternating_ops()
         for (int32_t i = 0; i < 1000; i++)
             map[i * 3] = i;
         for (int32_t i = 0; i < 1000; i += 2)
-            map.erase(i * 3);
+            (void)map.erase(i * 3);
     }
     CHECK(map.find(inactive) == map.end(), "find INACTIVE after alternating ops");
 
@@ -246,7 +246,7 @@ void test_inactive_boundary()
 
     // Erase one by one then verify
     for (auto k : keys) {
-        map.erase(k);
+        (void)map.erase(k);
         if (map.find(k) != map.end()) {
             CHECK(false, "key still found after erase");
             return;

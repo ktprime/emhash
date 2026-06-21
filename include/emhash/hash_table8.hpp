@@ -1503,7 +1503,7 @@ private:
         return _index[next_bucket].next = new_bucket;
     }
 
-    size_type find_unique_bucket(uint64_t key_hash) noexcept {
+    EMH_INLINE size_type find_unique_bucket(uint64_t key_hash) noexcept {
         const auto bucket = size_type(key_hash & _mask);
         auto next_bucket = _index[bucket].next;
         if ((int)next_bucket < 0) {
@@ -1539,7 +1539,7 @@ private:
         3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
     ****/
     // key is not in this slot. Find a place to put it.
-    size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept {
+    EMH_INLINE size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept {
         assert(_num_filled < _num_buckets); // must have empty slots
 #if EMH_HIGH_LOAD
         if (_ehead)
@@ -1767,7 +1767,7 @@ public:
 
 private:
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline uint64_t hash_key(const UType key) const {
+    EMH_INLINE uint64_t hash_key(const UType key) const {
 #if EMH_INT_HASH
         return hash64(key);
 #else
@@ -1776,7 +1776,7 @@ private:
     }
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
-    inline uint64_t hash_key(const UType& key) const {
+    EMH_INLINE uint64_t hash_key(const UType& key) const {
 #if EMH_WYHASH_HASH
         return wyhashstr(key.data(), key.size());
 #else
@@ -1787,7 +1787,7 @@ private:
     template <typename UType,
               typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
                                       uint32_t>::type = 0>
-    inline uint64_t hash_key(const UType& key) const {
+    EMH_INLINE uint64_t hash_key(const UType& key) const {
         return _hasher(key);
     }
 

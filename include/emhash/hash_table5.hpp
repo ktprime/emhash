@@ -1709,7 +1709,7 @@ private:
     3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
     */
     // key is not in this map. Find a place to put it.
-    size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept {
+    EMH_INLINE size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept {
 #if EMH_HIGH_LOAD
         if (_ehead)
             return pop_empty(_ehead);
@@ -1797,11 +1797,11 @@ private:
         }
     }
 
-    template <typename K = KeyT> size_type key_to_bucket(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE size_type key_to_bucket(const K& key) const noexcept {
         return (size_type)hash_key(key) & _mask;
     }
 
-    size_type hash_main(const size_type bucket) const noexcept {
+    EMH_INLINE size_type hash_main(const size_type bucket) const noexcept {
         return (size_type)hash_key(EMH_KEY(_pairs, bucket)) & _mask;
     }
 
@@ -1846,7 +1846,7 @@ private:
 #endif
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    size_type hash_key(const UType key) const {
+    EMH_INLINE size_type hash_key(const UType key) const {
 #if EMH_INT_HASH
         return (size_type)hash64(key);
 #elif EMH_IDENTITY_HASH
@@ -1857,7 +1857,7 @@ private:
     }
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    size_type hash_key(const UType& key) const {
+    EMH_INLINE size_type hash_key(const UType& key) const {
 #if EMH_WY_HASH
         return (size_type)wyhash(key.data(), key.size(), 0);
 #else
@@ -1868,7 +1868,7 @@ private:
     template <typename UType,
               typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
                                       size_type>::type = 0>
-    size_type hash_key(const UType& key) const {
+    EMH_INLINE size_type hash_key(const UType& key) const {
         return (size_type)_hasher(key);
     }
 

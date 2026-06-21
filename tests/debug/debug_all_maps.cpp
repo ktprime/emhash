@@ -223,7 +223,7 @@ template <typename HashMap> bool test_find_after_rehash(const char* name) {
     TEST_ASSERT((size_t)m.size() == ref.size(), "size mismatch: %zu vs %zu", (size_t)m.size(), ref.size());
 
     // Reserve to force rehash
-    m.reserve(5000);
+    (void)m.reserve(5000);
 
     // All keys should still be findable
     for (int i = 0; i < 1000; i++) {
@@ -234,7 +234,7 @@ template <typename HashMap> bool test_find_after_rehash(const char* name) {
 
     // Erase some keys
     for (int i = 0; i < 500; i++) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
 
@@ -347,7 +347,7 @@ template <typename HashMap> bool test_iterator_after_erase(const char* name) {
             }
         }
         for (int key : keys_to_erase) {
-            m.erase(key);
+            (void)m.erase(key);
             erase_count++;
         }
     }
@@ -429,7 +429,7 @@ template <typename HashMap> bool test_edge_cases(const char* name) {
     // Reserve on empty map
     {
         HashMap m;
-        m.reserve(1000);
+        (void)m.reserve(1000);
         TEST_ASSERT(m.empty(), "map should be empty after reserve");
         for (int i = 0; i < 500; i++) {
             m[i] = i;
@@ -465,11 +465,11 @@ template <typename HashMap> bool test_stress_random(const char* name) {
             ref[key] = val;
             break;
         case 1: // insert
-            m.insert({key, val});
+            (void)m.insert({key, val});
             ref[key] = val;
             break;
         case 2: // erase
-            m.erase(key);
+            (void)m.erase(key);
             ref.erase(key);
             break;
         case 3: // find
@@ -490,14 +490,14 @@ template <typename HashMap> bool test_stress_random(const char* name) {
             ref.clear();
             break;
         case 7: // reserve
-            m.reserve(500);
+            (void)m.reserve(500);
             break;
         case 8: // emplace
-            m.emplace(key, val);
+            (void)m.emplace(key, val);
             ref[key] = val;
             break;
         case 9: // insert_or_assign
-            m.insert_or_assign(key, std::move(val));
+            (void)m.insert_or_assign(key, std::move(val));
             ref[key] = val;
             break;
         }
@@ -545,7 +545,7 @@ template <typename HashMap> bool test_chain_after_erase(const char* name) {
     // Erase keys in various patterns
     // Pattern 1: Erase every 3rd key
     for (int i = 0; i < 500; i += 3) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
 
@@ -558,7 +558,7 @@ template <typename HashMap> bool test_chain_after_erase(const char* name) {
 
     // Pattern 2: Erase consecutive ranges
     for (int i = 100; i < 200; i++) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
 
@@ -571,7 +571,7 @@ template <typename HashMap> bool test_chain_after_erase(const char* name) {
 
     // Pattern 3: Erase from the end
     for (int i = 400; i < 500; i++) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
 
@@ -623,7 +623,7 @@ template <typename HashMap> bool test_high_load_factor(const char* name) {
 
     // Erase half
     for (int i = 0; i < 5000; i++) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
 

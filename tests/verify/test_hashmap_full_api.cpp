@@ -99,8 +99,8 @@ void test_insert_unique() {
     auto n1 = map.insert_unique(1, 10);
     TEST_ASSERT(n1 >= 0, "insert_unique new key should return valid bucket");
 
-    map.insert_unique(2, 20);
-    map.insert_unique(3, 30);
+    (void)map.insert_unique(2, 20);
+    (void)map.insert_unique(3, 30);
     TEST_ASSERT(map.size() == 3, "insert_unique size correct");
 
     g_pass++;
@@ -117,7 +117,7 @@ void test_emplace_unique() {
     auto n1 = map.emplace_unique(1, 10);
     TEST_ASSERT(n1 >= 0, "emplace_unique new key");
 
-    map.emplace_unique(2, 20);
+    (void)map.emplace_unique(2, 20);
     TEST_ASSERT(map.size() == 2, "emplace_unique size");
 
     g_pass++;
@@ -175,7 +175,7 @@ void test_shrink_to_fit() {
 
     auto bc_before = map.bucket_count();
     for (int i = 0; i < 900; i++)
-        map.erase(i);
+        (void)map.erase(i);
 
     map.shrink_to_fit();
     auto bc_after = map.bucket_count();
