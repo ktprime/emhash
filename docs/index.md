@@ -51,4 +51,5 @@ if (auto it = scores.find("alice"); it != scores.end()) {
 - [Usage Notes](usage_notes.md)
 - [FAQ](faq.md)
 - [Migration Guide](migration_guide.md)
+- [Test Analysis & Coverage Report](test_analysis.md)
 - [Examples](examples/README.md)

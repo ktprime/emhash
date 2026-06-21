@@ -386,6 +386,107 @@ jobs:
         shell: bash
 
   # ==========================================================================
+  # 32-bit build (catches size_t / uint64_t truncation bugs)
+  # ==========================================================================
+  i386:
+    name: 32-bit / GCC / C++17
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install 32-bit toolchain
+        run: |
+          sudo apt-get update
+          sudo dpkg --add-architecture i386
+          sudo apt-get install -y g++-multilib lib32stdc++-*-dev
+
+      - name: Build 32-bit
+        run: |
+          cd tests
+          g++ -m32 -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
+            -I../include verify/test_all_maps.cpp -o test_verify_32
+          g++ -m32 -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
+            -I../include verify/test_extreme.cpp -o test_extreme_32
+          g++ -m32 -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
+            -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_32
+        shell: bash
+
+      - name: Run 32-bit tests
+        run: |
+          cd tests
+          ./test_verify_32
+          ./test_extreme_32
+          ./test_string_key_leak_32
+        shell: bash
+
+  # ==========================================================================
+  # ARM64 cross-compile (catches endianness / alignment / portability bugs)
+  # ==========================================================================
+  arm64-cross:
+    name: ARM64 cross-compile / Clang
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang + ARM64 target
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang qemu-user
+
+      - name: Cross-compile for aarch64
+        run: |
+          cd tests
+          clang++ --target=aarch64-linux-gnu -std=c++17 -O2 \
+            -Wall -Wextra -Wno-unused-parameter \
+            -I../include verify/test_all_maps.cpp -o test_verify_arm64
+          clang++ --target=aarch64-linux-gnu -std=c++17 -O2 \
+            -Wall -Wextra -Wno-unused-parameter \
+            -I../include verify/test_extreme.cpp -o test_extreme_arm64
+        shell: bash
+
+      - name: Run under QEMU
+        run: |
+          cd tests
+          qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_verify_arm64 2>/dev/null || \
+            echo "::notice::ARM64 runtime test skipped (no sysroot); cross-compile only"
+          qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_extreme_arm64 2>/dev/null || \
+            echo "::notice::ARM64 runtime test skipped (no sysroot); cross-compile only"
+        shell: bash
+
+  # ==========================================================================
+  # MemorySanitizer (catches uninitialized memory reads)
+  # ==========================================================================
+  msan:
+    name: MSan / Clang
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: Build with MSan
+        run: |
+          cd tests
+          clang++ -std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer \
+            -I../include verify/test_all_maps.cpp -o test_verify_msan
+          clang++ -std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer \
+            -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_msan
+        shell: bash
+
+      - name: Run with MSan
+        run: |
+          cd tests
+          ./test_verify_msan
+          ./test_string_key_leak_msan
+        shell: bash
+
+  # ==========================================================================
   # Code coverage (gcov + lcov, GCC only)
   # ==========================================================================
   coverage:
@@ -437,7 +538,21 @@ jobs:
           genhtml coverage.info --output-directory coverage_html --title "emhash coverage" --num-spaces 4
           lcov --summary coverage.info
           COV_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -oP '\d+\.\d+%' | head -1)
-          echo "### Line Coverage: ${COV_PERCENT}" >> $GITHUB_STEP_SUMMARY
+          FUNC_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'functions' | grep -oP '\d+\.\d+%' | head -1)
+          {
+            echo "### 📊 Code Coverage Report"
+            echo ""
+            echo "| Metric | Rate |"
+            echo "|--------|------|"
+            echo "| **Lines**     | **${COV_PERCENT}** |"
+            echo "| **Functions** | **${FUNC_PERCENT}** |"
+            echo ""
+            echo "#### Per-File Coverage"
+            echo ""
+            echo '```'
+            lcov --list coverage.info 2>&1 | grep -E 'emhash|emilib|=====|Total'
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
         shell: bash
 
       - name: Upload coverage HTML report

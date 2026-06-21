@@ -194,6 +194,7 @@ See [tests/README.md](tests/README.md) for detailed instructions.
 | Document | Description |
 |----------|-------------|
 | [Test Suite](tests/README.md) | Test organization, build instructions, coverage matrix |
+| [Test Analysis & Coverage Report](docs/test_analysis.md) | Per-file coverage data, test classification, CI integration |
 | [Performance Overview](docs/performance.md) | Benchmark results, high load factor performance |
 | [API Reference](docs/api.md) | Constructors, methods, iterators |
 | [Design Principles](docs/design.md) | Collision resolution, memory layout, implementation comparison |
@@ -259,4 +260,4 @@ Thanks to the following projects and authors for inspiration and comparison:
 - [greg7mdp/parallel-hashmap](https://github.com/greg7mdp/parallel-hashmap)
 - [Tessil/hopscotch-map](https://github.com/Tessil/hopscotch-map)
 - [ska::flat_hash_map](https://github.com/skarupke/flat_hash_map)
-- [wyhash](https://github.com/wangyi-fudan/wyhash)
+- [wyhash](https://github.com/wangyi-fudan/wyhash) — integrated directly into [config.hpp](include/emhash/config.hpp) (no external dependency required); pass `-DEMH_NO_BUILTIN_WYHASH` to use your own wyhash.h
