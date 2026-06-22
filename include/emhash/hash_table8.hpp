@@ -130,10 +130,6 @@ public:
     using hasher = HashT;
     using key_equal = EqT;
     using allocator_type = AllocT;
-    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<value_type>;
-    using PairAllocTraits = std::allocator_traits<PairAlloc>;
-    using IndexAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<Index>;
-    using IndexAllocTraits = std::allocator_traits<IndexAlloc>;
 
     constexpr static size_type INACTIVE = size_type(-1);
     constexpr static size_type EAD = 2;
@@ -142,6 +138,11 @@ public:
         size_type next;
         size_type slot;
     };
+
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<value_type>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
+    using IndexAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<Index>;
+    using IndexAllocTraits = std::allocator_traits<IndexAlloc>;
 
     template <bool IsConst, typename HashMapType> class hashmap_iterator {
     public:
