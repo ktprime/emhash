@@ -188,11 +188,9 @@ template <typename First, typename Second> struct entry {
     }
 
     entry& operator=(const entry& o) {
-        if (this != &o) {
-            second = o.second;
-            bucket = o.bucket;
-            first = o.first;
-        }
+        second = o.second;
+        bucket = o.bucket;
+        first = o.first;
         return *this;
     }
 
@@ -264,6 +262,8 @@ public:
     using mapped_type = ValueT;
     using hasher = HashT;
     using key_equal = EqT;
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
     using reference = PairT&;
     using const_reference = const PairT&;
 
@@ -1713,9 +1713,6 @@ private:
 
     // 8 * 2 + 4 * 5 = 16 + 20 = 32
 private:
-    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
-    using PairAllocTraits = std::allocator_traits<PairAlloc>;
-
     static size_type AllocPairCount(uint64_t num_buckets) {
         auto bytes = (num_buckets + PACK_SIZE) * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
         return static_cast<size_type>((bytes + sizeof(PairT) - 1) / sizeof(PairT));

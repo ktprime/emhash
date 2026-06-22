@@ -169,11 +169,9 @@ template <typename First, typename Second> struct entry {
     }
 
     entry& operator=(const entry& rhs) {
-        if (this != &rhs) {
-            second = rhs.second;
-            bucket = rhs.bucket;
-            first = rhs.first;
-        }
+        second = rhs.second;
+        bucket = rhs.bucket;
+        first = rhs.first;
         return *this;
     }
 
@@ -269,6 +267,8 @@ public:
     using hasher = HashT;
     using key_equal = EqT;
     using allocator_type = AllocT;
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
 #if EMH_HIGH_LOAD
     static_assert(
         sizeof(KeyT) >= sizeof(size_type),
@@ -1897,9 +1897,6 @@ private:
     EMH_INLINE size_type hash_key(const UType& key) const {
         return static_cast<size_type>(_hasher(key));
     }
-
-    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
-    using PairAllocTraits = std::allocator_traits<PairAlloc>;
 
 private:
     PairT* _pairs;
