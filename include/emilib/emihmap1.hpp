@@ -217,7 +217,8 @@ public:
 
     public:
         const htype* _map;
-        size_t _bmask = 0;        size_t _bucket;
+        size_t _bmask = 0;
+        size_t _bucket;
         size_t _from;
     };
 
@@ -287,7 +288,8 @@ public:
 
     public:
         const htype* _map;
-        size_t _bmask = 0;        size_t _bucket;
+        size_t _bmask = 0;
+        size_t _bucket;
         size_t _from;
     };
 
@@ -829,14 +831,37 @@ private:
     // Can we fit another element?
     inline void check_expand_need() { reserve(_num_filled); }
 
-    inline static void prefetch_heap_block(char* ctrl) {
-        // Prefetch the heap-allocated memory region to resolve potential TLB
-        // misses.  This is intended to overlap with execution of calculating the hash for a key.
+    // Prefetch for read operations (find)
+    inline static void prefetch_read(char* ctrl) {
+#ifndef EMH_NO_READ_PREFETCH
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
+#endif // EMH_NO_READ_PREFETCH
+    }
+
+    // Prefetch for write operations (insert/erase)
+    inline static void prefetch_write(char* ctrl) {
+#ifndef EMH_NO_WRITE_PREFETCH
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(static_cast<const void*>(ctrl), 1, 1);
+#endif
+#endif // EMH_NO_WRITE_PREFETCH
+    }
+
+    // Legacy function for backward compatibility
+    inline static void prefetch_heap_block(char* ctrl) {
+#ifndef EMH_NO_PREFETCH
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(static_cast<const void*>(ctrl));
+#endif
+#endif // EMH_NO_PREFETCH
     }
 
     inline bool group_has_empty(size_t bucket) const noexcept {
@@ -890,7 +915,7 @@ private:
             const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
             auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)) & group_bmask;
             if (maskf) {
-                prefetch_heap_block((char*)&_pairs[bucket_to_slot(next_bucket)]);
+                prefetch_read((char*)&_pairs[bucket_to_slot(next_bucket)]);
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     const auto slot = bucket_to_slot(fbucket);
@@ -919,7 +944,7 @@ private:
         size_t hole = chole, offset = 0u;
 
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_heap_block((char*)&_pairs[bucket_to_slot(main_bucket)]);
+        prefetch_write((char*)&_pairs[bucket_to_slot(main_bucket)]);
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket;
 
@@ -980,7 +1005,7 @@ private:
             const auto maske = empty_delete(next_bucket) & group_bmask;
             if (maske != 0) {
                 const auto probe = CTZ(maske) + next_bucket;
-                prefetch_heap_block((char*)&_pairs[probe]);
+                prefetch_write((char*)&_pairs[probe]);
                 set_group_probe(gbucket, offset); // bugs for unique
                 return probe;
             }

@@ -162,14 +162,14 @@ public:
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
-        main_bucket = size_t(key_hash) & _mask;
+        main_bucket = static_cast<size_t>(key_hash) & _mask;
         return (int8_t)(size_t)(key_hash % MAP_BITS) + EFILLED;
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
-        main_bucket = size_t(key_hash) & _mask;
+        main_bucket = static_cast<size_t>(key_hash) & _mask;
         return (int8_t)((size_t)key_hash % MAP_BITS) + EFILLED;
     }
 
@@ -190,7 +190,7 @@ public:
 #else
         iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) {
             _bmask = 0;
-            _from = size_t(-1);
+            _from = static_cast<size_t>(-1);
         }
 #endif
 
@@ -211,7 +211,7 @@ public:
 
         iterator& operator++() {
 #ifndef EMH_ITER_SAFE
-            if (_from == (size_t)-1)
+            if (_from == static_cast<size_t>(-1))
                 init();
 #endif
             goto_next_element();
@@ -220,7 +220,7 @@ public:
 
         iterator operator++(int) {
 #ifndef EMH_ITER_SAFE
-            if (_from == (size_t)-1)
+            if (_from == static_cast<size_t>(-1))
                 init();
 #endif
             iterator old(*this);
@@ -253,7 +253,8 @@ public:
 
     public:
         const htype* _map;
-        size_t _bmask = 0;        size_t _bucket;
+        size_t _bmask = 0;
+        size_t _bucket;
         size_t _from;
     };
 
@@ -322,7 +323,8 @@ public:
 
     public:
         const htype* _map;
-        size_t _bmask = 0;        size_t _bucket;
+        size_t _bmask = 0;
+        size_t _bucket;
         size_t _from;
     };
 
@@ -584,7 +586,7 @@ public:
 #endif
 
     template <typename Iter> void insert(Iter beginc, Iter endc) noexcept {
-        rehash(size_t(endc - beginc) + _num_filled);
+        rehash(static_cast<size_t>(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
     }
@@ -600,7 +602,7 @@ public:
     }
 
     void insert(std::initializer_list<value_type> ilist) noexcept {
-        rehash(size_t(ilist.size()) + _num_filled);
+        rehash(static_cast<size_t>(ilist.size()) + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
             do_insert(*it);
     }
@@ -1022,7 +1024,7 @@ private:
         prefetch_heap_block((char*)&_pairs[main_bucket]);
         const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
         auto next_bucket = main_bucket, offset = 0u;
-        constexpr size_t chole = (size_t)-1;
+        constexpr size_t chole = static_cast<size_t>(-1);
         size_t hole = chole;
 
         do {
