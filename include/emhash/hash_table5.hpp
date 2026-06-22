@@ -1218,11 +1218,26 @@ public:
             clear_empty();
         clearkv();
 #else
-        if (need_explicit_dtor())
+        if (need_explicit_dtor()) {
             clearkv();
-        else if (_num_filled)
-            memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
-                   sizeof(_pairs[0]) * static_cast<size_t>(_num_buckets));
+            // Reset empty buckets to INACTIVE after clearkv
+            for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
+                if (EMH_EMPTY(_pairs, bucket))
+                    EMH_BUCKET(_pairs, bucket) = INACTIVE;
+            }
+        }
+        else if (_num_filled) {
+            // Only use memset for trivially default constructible types
+            if constexpr (std::is_trivially_default_constructible_v<PairT>) {
+                memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
+                       sizeof(_pairs[0]) * static_cast<size_t>(_num_buckets));
+            } else {
+                for (size_type bucket = 0; bucket < _num_buckets; ++bucket) {
+                    if (EMH_EMPTY(_pairs, bucket))
+                        EMH_BUCKET(_pairs, bucket) = INACTIVE;
+                }
+            }
+        }
 #endif
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)
@@ -1326,8 +1341,17 @@ public:
         else
 #endif
             _pairs = reinterpret_cast<PairT*>(alloc_bucket(num_buckets));
-        memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
-               sizeof(_pairs[0]) * static_cast<size_t>(num_buckets));
+
+        // Initialize buckets - use memset only for trivially default constructible types
+        if constexpr (std::is_trivially_default_constructible_v<PairT>) {
+            memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
+                   sizeof(_pairs[0]) * static_cast<size_t>(num_buckets));
+        } else {
+            // For non-trivial types, only initialize the bucket field
+            for (size_type i = 0; i < num_buckets; ++i) {
+                EMH_BUCKET(_pairs, i) = INACTIVE;
+            }
+        }
         memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT) * 2u);
 
 #if EMH_FIND_HIT
