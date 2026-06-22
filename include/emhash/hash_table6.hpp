@@ -1121,8 +1121,14 @@ public:
 
     /// Remove all elements, keeping full capacity.
     void clear() {
-        if (need_explicit_dtor())
+        if (need_explicit_dtor()) {
             clearkv();
+            // Reset empty buckets to INACTIVE after clearkv
+            for (size_type bucket = 0; bucket <= _mask; ++bucket) {
+                if (EMH_EMPTY(_pairs, bucket))
+                    _pairs[bucket].second = INACTIVE;
+            }
+        }
         else if (_num_filled) {
             memset(reinterpret_cast<char*>(_bitmask), static_cast<int>(0xFFFFFFFF), (_mask + 1) / 8);
             memset(reinterpret_cast<char*>(_pairs), -1, sizeof(_pairs[0]) * (_mask + 1));
@@ -1197,7 +1203,16 @@ public:
         _num_main = 0;
 #endif
 
-        memset(reinterpret_cast<char*>(_pairs), -1, sizeof(_pairs[0]) * num_buckets);
+        // Initialize bucket field to INACTIVE for all entries.
+        // We must NOT memset the entire entry when it contains non-trivial types
+        // (e.g. std::string), as that is UB and may be optimized away by the compiler.
+        {
+            const auto inactive = INACTIVE;
+            for (size_type i = 0; i < num_buckets; ++i) {
+                std::memcpy(reinterpret_cast<char*>(&_pairs[i]) + offsetof(PairT, bucket),
+                            &inactive, sizeof(inactive));
+            }
+        }
 
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)

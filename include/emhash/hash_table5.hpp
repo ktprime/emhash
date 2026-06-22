@@ -1326,8 +1326,17 @@ public:
         else
 #endif
             _pairs = reinterpret_cast<PairT*>(alloc_bucket(num_buckets));
-        memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
-               sizeof(_pairs[0]) * static_cast<size_t>(num_buckets));
+
+        // Initialize bucket field to INACTIVE for all entries.
+        // We must NOT memset the entire entry when it contains non-trivial types
+        // (e.g. std::string), as that is UB and may be optimized away by the compiler.
+        {
+            const auto inactive = INACTIVE;
+            for (size_type i = 0; i < num_buckets; ++i) {
+                std::memcpy(reinterpret_cast<char*>(&_pairs[i]) + offsetof(PairT, bucket),
+                            &inactive, sizeof(inactive));
+            }
+        }
         memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT) * 2u);
 
 #if EMH_FIND_HIT
