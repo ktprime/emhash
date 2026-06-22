@@ -26,6 +26,7 @@ jobs:
             -path ./bench/tsl_bench -prune -o \
             -path ./bench/qc-core -prune -o \
             -path ./bench/boost_bench -prune -o \
+            -path ./bench/c_cpp_hash_tables_benchmark-shims -prune -o \
             -path ./.git -prune -o \
             -name sse2neon.h -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
@@ -39,6 +40,7 @@ jobs:
             -path ./bench/tsl_bench -prune -o \
             -path ./bench/qc-core -prune -o \
             -path ./bench/boost_bench -prune -o \
+            -path ./bench/c_cpp_hash_tables_benchmark-shims -prune -o \
             -path ./.git -prune -o \
             -name sse2neon.h -prune -o \
             -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
