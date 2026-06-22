@@ -1283,8 +1283,14 @@ public:
             reset_bucket(hash_main(0));
 #endif
 
-        // pack tail two tombstones for fast iterator and find empty_bucket without checking overflow
-        memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT) * PACK_SIZE);
+        // pack tail tombstones for fast iterator and find empty_bucket without checking overflow
+        if (need_explicit_dtor()) {
+            const size_type zero_bucket = 0;
+            for (size_type i = 0; i < PACK_SIZE; ++i)
+                std::memcpy(&_pairs[num_buckets + i].bucket, &zero_bucket, sizeof(zero_bucket));
+        } else {
+            memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT) * PACK_SIZE);
+        }
 
         /***************** init bitmask ---------------------- ***********/
         const auto mask_byte = (num_buckets + 7) / 8;

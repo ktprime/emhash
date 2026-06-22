@@ -317,7 +317,7 @@ public:
 
     private:
         void goto_next_element() {
-            while (static_cast<size_type>(_map->EMH_BUCKET(_pairs, ++_bucket)) < 0)
+            while (static_cast<int>(_map->EMH_BUCKET(_pairs, ++_bucket)) < 0)
                 ;
         }
 
@@ -360,7 +360,7 @@ public:
 
     private:
         void goto_next_element() {
-            while (static_cast<size_type>(_map->EMH_BUCKET(_pairs, ++_bucket)) < 0)
+            while (static_cast<int>(_map->EMH_BUCKET(_pairs, ++_bucket)) < 0)
                 ;
         }
 
@@ -677,7 +677,7 @@ public:
     size_type bucket_slot(const KeyT& key) const {
         const auto bucket = key_to_bucket(key);
         const auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (static_cast<size_type>(next_bucket) < 0)
+        if (static_cast<int>(next_bucket) < 0)
             return 0;
         else if (bucket == next_bucket)
             return bucket + 1;
@@ -688,7 +688,7 @@ public:
     // Returns the number of elements in bucket n.
     size_type bucket_size(const size_type bucket) const {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (static_cast<size_type>(next_bucket) < 0)
+        if (static_cast<int>(next_bucket) < 0)
             return 0;
 
         next_bucket = hash_main(bucket);
@@ -708,7 +708,7 @@ public:
 
     size_type get_main_bucket(const uint32_t bucket) const {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (static_cast<size_type>(next_bucket) < 0)
+        if (static_cast<int>(next_bucket) < 0)
             return INACTIVE;
 
         return hash_main(bucket);
@@ -728,7 +728,7 @@ public:
 
     int get_bucket_info(const uint32_t bucket, uint32_t steps[], const uint32_t slots) const {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (static_cast<size_type>(next_bucket) < 0)
+        if (static_cast<int>(next_bucket) < 0)
             return -1;
 
         const auto main_bucket = hash_main(bucket);
@@ -1376,7 +1376,14 @@ public:
             memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
                    sizeof(_pairs[0]) * static_cast<size_t>(num_buckets));
         }
-        memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT) * 2u);
+        // Initialize tail sentinels (bucket=0 so iterator stops)
+        if (need_explicit_dtor()) {
+            const size_type zero_bucket = 0;
+            for (size_type i = 0; i < 2; ++i)
+                std::memcpy(&EMH_BUCKET(_pairs, num_buckets + i), &zero_bucket, sizeof(zero_bucket));
+        } else {
+            memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT) * 2u);
+        }
 
 #if EMH_FIND_HIT
         if constexpr (std::is_integral<KeyT>::value)
@@ -1541,7 +1548,7 @@ private:
     template <typename K = KeyT> size_type erase_key(const K& key) {
         const auto bucket = key_to_bucket(key);
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (EMH_UNLIKELY(static_cast<size_type>(next_bucket) < 0))
+        if (EMH_UNLIKELY(static_cast<int>(next_bucket) < 0))
             return INACTIVE;
 
         const auto equalk = _eq(key, EMH_KEY(_pairs, bucket));
@@ -1609,7 +1616,7 @@ private:
             auto next_bucket = EMH_BUCKET(_pairs, main_bucket);
             if (_eq(key, EMH_KEY(_pairs, main_bucket)))
                 return main_bucket;
-            if (static_cast<size_type>(next_bucket) < 0)
+            if (static_cast<int>(next_bucket) < 0)
                 return _num_buckets;
         }
 #endif
@@ -1620,7 +1627,7 @@ private:
     template <typename K = KeyT> size_type find_hash_bucket(const K& key, size_type bucket) const noexcept {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
 
-        if (static_cast<size_type>(next_bucket) < 0)
+        if (static_cast<int>(next_bucket) < 0)
             return _num_buckets;
         else if (_eq(key, EMH_KEY(_pairs, bucket)))
             return bucket;
@@ -1674,7 +1681,7 @@ private:
     template <typename K = KeyT> size_type find_or_kickout(const K& key, size_type bucket) noexcept {
         (void)key;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (static_cast<size_type>(next_bucket) < 0) {
+        if (static_cast<int>(next_bucket) < 0) {
 #if EMH_HIGH_LOAD
             if (next_bucket != INACTIVE)
                 pop_empty(bucket);
@@ -1761,7 +1768,7 @@ private:
     size_type move_unique_bucket(size_type old_bucket, size_type bucket) noexcept {
         (void)old_bucket;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (static_cast<size_type>(next_bucket) < 0)
+        if (static_cast<int>(next_bucket) < 0)
             return bucket;
 
         next_bucket = find_last_bucket(next_bucket);

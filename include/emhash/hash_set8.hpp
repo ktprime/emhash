@@ -111,6 +111,11 @@ public:
         size_type slot;
     };
 
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<value_type>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
+    using IndexAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<Index>;
+    using IndexAllocTraits = std::allocator_traits<IndexAlloc>;
+
     class const_iterator; // Forward declaration
 
     class iterator {
@@ -1690,11 +1695,6 @@ private:
     }
 
 private:
-    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<value_type>;
-    using PairAllocTraits = std::allocator_traits<PairAlloc>;
-    using IndexAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<Index>;
-    using IndexAllocTraits = std::allocator_traits<IndexAlloc>;
-
     Index* _index;
     value_type* _pairs;
 
