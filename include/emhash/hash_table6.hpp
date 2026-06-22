@@ -281,7 +281,9 @@ public:
         iterator(const const_iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
         iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 #if EMH_ITER_SAFE
-        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+        iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) {
+            init();
+        }
 #else
         iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) {
             _from = static_cast<size_type>(-1);
@@ -299,7 +301,9 @@ public:
             }
         }
 
-        size_type bucket() const { return _bucket; }
+        size_type bucket() const {
+            return _bucket;
+        }
 
         void clear(size_type bucket) {
             if (_bucket / SIZE_BIT == bucket / SIZE_BIT)
@@ -332,14 +336,26 @@ public:
             return old;
         }
 
-        reference operator*() const { return _map->EMH_PKV(_pairs, _bucket); }
+        reference operator*() const {
+            return _map->EMH_PKV(_pairs, _bucket);
+        }
 
-        pointer operator->() const { return &(_map->EMH_PKV(_pairs, _bucket)); }
+        pointer operator->() const {
+            return &(_map->EMH_PKV(_pairs, _bucket));
+        }
 
-        bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
-        bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
-        bool operator==(const const_iterator& rhs) const { return _bucket == rhs._bucket; }
-        bool operator!=(const const_iterator& rhs) const { return _bucket != rhs._bucket; }
+        bool operator==(const iterator& rhs) const {
+            return _bucket == rhs._bucket;
+        }
+        bool operator!=(const iterator& rhs) const {
+            return _bucket != rhs._bucket;
+        }
+        bool operator==(const const_iterator& rhs) const {
+            return _bucket == rhs._bucket;
+        }
+        bool operator!=(const const_iterator& rhs) const {
+            return _bucket != rhs._bucket;
+        }
 
     private:
         void goto_next_element() {
@@ -375,7 +391,9 @@ public:
         const_iterator(const iterator& it) : _map(it._map), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
         // const_iterator(const htype* hash_map, size_type bucket, bool) : _map(hash_map), _bucket(bucket) { init(); }
 #if EMH_ITER_SAFE
-        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) { init(); }
+        const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) {
+            init();
+        }
 #else
         const_iterator(const htype* hash_map, size_type bucket) : _map(hash_map), _bucket(bucket) {
             _from = static_cast<size_type>(-1);
@@ -393,7 +411,9 @@ public:
             }
         }
 
-        size_type bucket() const { return _bucket; }
+        size_type bucket() const {
+            return _bucket;
+        }
 
         const_iterator& operator++() {
 #ifndef EMH_ITER_SAFE
@@ -414,12 +434,20 @@ public:
             return old;
         }
 
-        reference operator*() const { return _map->EMH_PKV(_pairs, _bucket); }
+        reference operator*() const {
+            return _map->EMH_PKV(_pairs, _bucket);
+        }
 
-        pointer operator->() const { return &(_map->EMH_PKV(_pairs, _bucket)); }
+        pointer operator->() const {
+            return &(_map->EMH_PKV(_pairs, _bucket));
+        }
 
-        bool operator==(const const_iterator& rhs) const { return _bucket == rhs._bucket; }
-        bool operator!=(const const_iterator& rhs) const { return _bucket != rhs._bucket; }
+        bool operator==(const const_iterator& rhs) const {
+            return _bucket == rhs._bucket;
+        }
+        bool operator!=(const const_iterator& rhs) const {
+            return _bucket != rhs._bucket;
+        }
 
     private:
         void goto_next_element() {
@@ -457,11 +485,17 @@ public:
         rehash(bucket);
     }
 
-    explicit HashMap(size_type bucket = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, lf); }
+    explicit HashMap(size_type bucket = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) {
+        init(bucket, lf);
+    }
 
-    explicit HashMap(const AllocT& alloc) : _alloc(PairAlloc(alloc)) { init(2, EMH_DEFAULT_LOAD_FACTOR); }
+    explicit HashMap(const AllocT& alloc) : _alloc(PairAlloc(alloc)) {
+        init(2, EMH_DEFAULT_LOAD_FACTOR);
+    }
 
-    HashMap(size_type bucket, float mlf, const AllocT& alloc) : _alloc(PairAlloc(alloc)) { init(bucket, mlf); }
+    HashMap(size_type bucket, float mlf, const AllocT& alloc) : _alloc(PairAlloc(alloc)) {
+        init(bucket, mlf);
+    }
 
     size_t AllocSize(uint64_t num_buckets) const {
         return (num_buckets + PACK_SIZE) * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
@@ -550,7 +584,9 @@ public:
         return true;
     }
 
-    template <typename Con> bool operator!=(const Con& rhs) const { return !(*this == rhs); }
+    template <typename Con> bool operator!=(const Con& rhs) const {
+        return !(*this == rhs);
+    }
 
     ~HashMap() noexcept {
         if (need_explicit_dtor() && _num_filled) {
@@ -652,23 +688,43 @@ public:
         return {this, bucket, true};
     }
 
-    const_iterator begin() const noexcept { return cbegin(); }
+    const_iterator begin() const noexcept {
+        return cbegin();
+    }
 
-    iterator end() noexcept { return {this, _mask + 1}; }
-    const_iterator cend() const { return {this, _mask + 1}; }
-    const_iterator end() const { return {this, _mask + 1}; }
+    iterator end() noexcept {
+        return {this, _mask + 1};
+    }
+    const_iterator cend() const {
+        return {this, _mask + 1};
+    }
+    const_iterator end() const {
+        return {this, _mask + 1};
+    }
 
-    [[nodiscard]] size_type size() const noexcept { return _num_filled; }
-    [[nodiscard]] bool empty() const noexcept { return _num_filled == 0; }
+    [[nodiscard]] size_type size() const noexcept {
+        return _num_filled;
+    }
+    [[nodiscard]] bool empty() const noexcept {
+        return _num_filled == 0;
+    }
 
-    [[nodiscard]] size_type bucket_count() const noexcept { return _mask + 1; }
+    [[nodiscard]] size_type bucket_count() const noexcept {
+        return _mask + 1;
+    }
     [[nodiscard]] float load_factor() const noexcept {
         return static_cast<float>(_num_filled) / (static_cast<float>(_mask) + 1.0f);
     }
 
-    [[nodiscard]] const HashT& hash_function() const { return _hasher; }
-    [[nodiscard]] const EqT& key_eq() const { return _eq; }
-    [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
+    [[nodiscard]] const HashT& hash_function() const {
+        return _hasher;
+    }
+    [[nodiscard]] const EqT& key_eq() const {
+        return _eq;
+    }
+    [[nodiscard]] allocator_type get_allocator() const noexcept {
+        return allocator_type(_alloc);
+    }
 
     void max_load_factor(float mlf) {
         if (mlf <= 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
@@ -678,8 +734,12 @@ public:
     [[nodiscard]] constexpr float max_load_factor() const {
         return static_cast<float>(1 << 27) / static_cast<float>(_mlf);
     }
-    [[nodiscard]] constexpr uint64_t max_size() const { return 1ull << (sizeof(_mask) * 8 - 1); }
-    [[nodiscard]] constexpr uint64_t max_bucket_count() const { return max_size(); }
+    [[nodiscard]] constexpr uint64_t max_size() const {
+        return 1ull << (sizeof(_mask) * 8 - 1);
+    }
+    [[nodiscard]] constexpr uint64_t max_bucket_count() const {
+        return max_size();
+    }
 
 #if EMH_STATIS
     // Returns the bucket number where the element with key k is located.
@@ -982,7 +1042,9 @@ public:
         return do_insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    inline size_type insert_unique(const value_type& value) { return do_insert_unique(value.first, value.second); }
+    inline size_type insert_unique(const value_type& value) {
+        return do_insert_unique(value.first, value.second);
+    }
 
     template <typename K, typename V> inline size_type do_insert_unique(K&& key, V&& val) {
         check_expand_need();
@@ -1128,8 +1190,7 @@ public:
                 if (EMH_EMPTY(_pairs, bucket))
                     _pairs[bucket].second = INACTIVE;
             }
-        }
-        else if (_num_filled) {
+        } else if (_num_filled) {
             memset(reinterpret_cast<char*>(_bitmask), static_cast<int>(0xFFFFFFFF), (_mask + 1) / 8);
             memset(reinterpret_cast<char*>(_pairs), -1, sizeof(_pairs[0]) * (_mask + 1));
 #if EMH_FIND_HIT
@@ -1145,7 +1206,9 @@ public:
 #endif
     }
 
-    void shrink_to_fit() { rehash(_num_filled + 1); }
+    void shrink_to_fit() {
+        rehash(_num_filled + 1);
+    }
 
     /// Make room for this many elements
     [[nodiscard]] bool reserve(uint64_t num_elems) {
@@ -1154,7 +1217,7 @@ public:
             return false;
 
 #if EMH_STATIS
-        // if (_num_filled > EMH_STATIS) dump_statics();
+            // if (_num_filled > EMH_STATIS) dump_statics();
 #endif
         rehash(required_buckets + 1);
         return true;
@@ -1203,14 +1266,16 @@ public:
         _num_main = 0;
 #endif
 
-        // Initialize bucket field to INACTIVE for all entries.
-        // We must NOT memset the entire entry when it contains non-trivial types
-        // (e.g. std::string), as that is UB and may be optimized away by the compiler.
-        {
+        if (need_explicit_dtor()) {
+            // For non-trivial types (e.g. std::string), only init the bucket field.
+            // memset on the entire entry is UB and may be optimized away by the compiler.
             const auto inactive = INACTIVE;
             for (size_type i = 0; i < num_buckets; ++i) {
                 std::memcpy(&_pairs[i].bucket, &inactive, sizeof(inactive));
             }
+        } else {
+            memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
+                   sizeof(_pairs[0]) * static_cast<size_type>(num_buckets));
         }
 
 #if EMH_FIND_HIT
@@ -1227,8 +1292,8 @@ public:
         memset(reinterpret_cast<char*>(_bitmask) + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8)
             _bitmask[0] = static_cast<uint8_t>((1u << num_buckets) - 1);
-        // pack last position to bit 0
-        /**************** -------------------------------- *************/
+            // pack last position to bit 0
+            /**************** -------------------------------- *************/
 
 #if EMH_REHASH_LOG
         auto collision = 0;
@@ -1694,7 +1759,9 @@ private:
     }
 #endif
 
-    EMH_INLINE size_type hash_main(const size_type bucket) const { return hash_key(EMH_KEY(_pairs, bucket)) & _mask; }
+    EMH_INLINE size_type hash_main(const size_type bucket) const {
+        return hash_key(EMH_KEY(_pairs, bucket)) & _mask;
+    }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     EMH_INLINE size_type hash_key(const UType key) const {

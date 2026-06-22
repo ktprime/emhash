@@ -21,8 +21,10 @@ jobs:
       - name: Check formatting
         run: |
           # Only check include directory (our own header-only library)
+          # Exclude third-party sse2neon.h
           find include \
             -type f \( -name '*.hpp' -o -name '*.h' \) \
+            -not -name 'sse2neon.h' \
             -print | xargs clang-format-18 --dry-run --Werror
 
       - name: Show diff (if any)
@@ -30,6 +32,7 @@ jobs:
         run: |
           find include \
             -type f \( -name '*.hpp' -o -name '*.h' \) \
+            -not -name 'sse2neon.h' \
             -print | xargs clang-format-18 --dry-run
 
   clang-tidy:

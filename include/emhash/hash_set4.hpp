@@ -286,14 +286,18 @@ public:
         return static_cast<size_type>((total_bytes + sizeof(PairT) - 1) / sizeof(PairT));
     }
 
-    PairT* alloc_bucket(size_type num_buckets) { return PairAllocTraits::allocate(_alloc, alloc_count(num_buckets)); }
+    PairT* alloc_bucket(size_type num_buckets) {
+        return PairAllocTraits::allocate(_alloc, alloc_count(num_buckets));
+    }
 
     void dealloc_bucket(PairT* pairs, size_type num_buckets) {
         if (pairs)
             PairAllocTraits::deallocate(_alloc, pairs, alloc_count(num_buckets));
     }
 
-    allocator_type get_allocator() const { return allocator_type(_alloc); }
+    allocator_type get_allocator() const {
+        return allocator_type(_alloc);
+    }
 
     void init(size_type bucket, float load_factor = 0.95f) {
         _num_buckets = 0;
@@ -305,9 +309,13 @@ public:
         reserve(bucket);
     }
 
-    explicit HashSet(size_type bucket = 4, float load_factor = 0.95f) { init(bucket, load_factor); }
+    explicit HashSet(size_type bucket = 4, float load_factor = 0.95f) {
+        init(bucket, load_factor);
+    }
 
-    explicit HashSet(const allocator_type& alloc) : _alloc(alloc) { init(4, 0.95f); }
+    explicit HashSet(const allocator_type& alloc) : _alloc(alloc) {
+        init(4, 0.95f);
+    }
 
     HashSet(size_type bucket, float load_factor, const allocator_type& alloc) : _alloc(alloc) {
         init(bucket, load_factor);
@@ -395,7 +403,8 @@ public:
         _mask = other._mask;
         _loadlf = other._loadlf;
         _last = other._last;
-        _bitmask = decltype(_bitmask)(reinterpret_cast<uint8_t*>(_pairs) + (reinterpret_cast<uint8_t*>(other._bitmask) - reinterpret_cast<uint8_t*>(other._pairs)));
+        _bitmask = decltype(_bitmask)(reinterpret_cast<uint8_t*>(_pairs) + (reinterpret_cast<uint8_t*>(other._bitmask) -
+                                                                            reinterpret_cast<uint8_t*>(other._pairs)));
         auto opairs = other._pairs;
 
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
@@ -452,37 +461,63 @@ public:
         return {this, bucket, true};
     }
 
-    const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const {
+        return cbegin();
+    }
 
-    iterator end() { return {this, _num_buckets}; }
+    iterator end() {
+        return {this, _num_buckets};
+    }
 
-    const_iterator cend() const { return {this, _num_buckets}; }
+    const_iterator cend() const {
+        return {this, _num_buckets};
+    }
 
-    const_iterator end() const { return cend(); }
+    const_iterator end() const {
+        return cend();
+    }
 
-    size_type size() const { return _num_filled; }
+    size_type size() const {
+        return _num_filled;
+    }
 
-    bool empty() const { return _num_filled == 0; }
+    bool empty() const {
+        return _num_filled == 0;
+    }
 
     // Returns the number of buckets.
-    size_type bucket_count() const { return _num_buckets; }
+    size_type bucket_count() const {
+        return _num_buckets;
+    }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const { return static_cast<float>(_num_filled) / (_num_buckets + 0.01f); }
+    float load_factor() const {
+        return static_cast<float>(_num_filled) / (_num_buckets + 0.01f);
+    }
 
-    const HashT& hash_function() const { return _hasher; }
+    const HashT& hash_function() const {
+        return _hasher;
+    }
 
-    const EqT& key_eq() const { return _eq; }
+    const EqT& key_eq() const {
+        return _eq;
+    }
 
-    constexpr float max_load_factor() const { return (1 << 27) / static_cast<float>(_loadlf); }
+    constexpr float max_load_factor() const {
+        return (1 << 27) / static_cast<float>(_loadlf);
+    }
 
     void max_load_factor(float value) {
         if (value < 0.9999f && value > 0.2f)
             _loadlf = static_cast<uint32_t>((1 << 27) / value);
     }
 
-    constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
-    constexpr uint64_t max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const {
+        return (1ull << (sizeof(_num_buckets) * 8 - 1));
+    }
+    constexpr uint64_t max_bucket_count() const {
+        return max_size();
+    }
 
     size_type bucket_main() const {
         size_type bucket_size = 0;
@@ -620,13 +655,21 @@ public:
 
     // ------------------------------------------------------------
 
-    inline iterator find(const KeyT& key) noexcept { return {this, find_filled_bucket(key)}; }
+    inline iterator find(const KeyT& key) noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
-    inline const_iterator find(const KeyT& key) const noexcept { return {this, find_filled_bucket(key)}; }
+    inline const_iterator find(const KeyT& key) const noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
-    inline bool contains(const KeyT& key) const noexcept { return find_filled_bucket(key) != _num_buckets; }
+    inline bool contains(const KeyT& key) const noexcept {
+        return find_filled_bucket(key) != _num_buckets;
+    }
 
-    inline size_type count(const KeyT& key) const noexcept { return find_filled_bucket(key) == _num_buckets ? 0 : 1; }
+    inline size_type count(const KeyT& key) const noexcept {
+        return find_filled_bucket(key) == _num_buckets ? 0 : 1;
+    }
 
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
@@ -711,7 +754,9 @@ public:
         static_cast<void>(position); // unused parameter
         return insert(std::forward<Args>(args)...).first;
     }
-    std::pair<iterator, bool> try_emplace(const value_type& k) { return insert(k); }
+    std::pair<iterator, bool> try_emplace(const value_type& k) {
+        return insert(k);
+    }
     template <class... Args> inline std::pair<iterator, bool> emplace_unique(Args&&... args) {
         return insert_unique(std::forward<Args>(args)...);
     }
@@ -828,7 +873,9 @@ public:
         _num_filled = 0;
     }
 
-    void shrink_to_fit() { rehash(_num_filled); }
+    void shrink_to_fit() {
+        rehash(_num_filled);
+    }
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
@@ -918,7 +965,9 @@ private:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(_num_filled); }
+    inline bool check_expand_need() {
+        return reserve(_num_filled);
+    }
 
     size_type erase_key(const KeyT& key) {
         const auto bucket = hash_bucket(key) & _mask;

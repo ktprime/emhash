@@ -196,11 +196,17 @@ public:
         reserve(bucket);
     }
 
-    explicit HashSet(size_type bucket = 2, float lf = default_load_factor) { init(bucket, lf); }
+    explicit HashSet(size_type bucket = 2, float lf = default_load_factor) {
+        init(bucket, lf);
+    }
 
-    explicit HashSet(const allocator_type& alloc) : _alloc(alloc) { init(2, default_load_factor); }
+    explicit HashSet(const allocator_type& alloc) : _alloc(alloc) {
+        init(2, default_load_factor);
+    }
 
-    HashSet(size_type bucket, float lf, const allocator_type& alloc) : _alloc(alloc) { init(bucket, lf); }
+    HashSet(size_type bucket, float lf, const allocator_type& alloc) : _alloc(alloc) {
+        init(bucket, lf);
+    }
 
     HashSet(const HashSet& other) : _alloc(PairAllocTraits::select_on_container_copy_construction(other._alloc)) {
         _pairs = alloc_bucket(other._num_buckets);
@@ -329,39 +335,67 @@ public:
         return {this, bucket};
     }
 
-    const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const {
+        return cbegin();
+    }
 
-    iterator end() { return {this, _num_buckets}; }
+    iterator end() {
+        return {this, _num_buckets};
+    }
 
-    const_iterator cend() const { return {this, _num_buckets}; }
+    const_iterator cend() const {
+        return {this, _num_buckets};
+    }
 
-    const_iterator end() const { return cend(); }
+    const_iterator end() const {
+        return cend();
+    }
 
-    size_type size() const { return _num_filled; }
+    size_type size() const {
+        return _num_filled;
+    }
 
-    bool empty() const { return _num_filled == 0; }
+    bool empty() const {
+        return _num_filled == 0;
+    }
 
     // Returns the number of buckets.
-    size_type bucket_count() const { return _num_buckets; }
+    size_type bucket_count() const {
+        return _num_buckets;
+    }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const { return static_cast<float>(_num_filled) / (_num_buckets + 0.01f); }
+    float load_factor() const {
+        return static_cast<float>(_num_filled) / (_num_buckets + 0.01f);
+    }
 
-    allocator_type get_allocator() const { return allocator_type(_alloc); }
+    allocator_type get_allocator() const {
+        return allocator_type(_alloc);
+    }
 
-    const HashT& hash_function() const { return _hasher; }
+    const HashT& hash_function() const {
+        return _hasher;
+    }
 
-    const EqT& key_eq() const { return _eq; }
+    const EqT& key_eq() const {
+        return _eq;
+    }
 
-    constexpr float max_load_factor() const { return (1 << 27) / static_cast<float>(_loadlf); }
+    constexpr float max_load_factor() const {
+        return (1 << 27) / static_cast<float>(_loadlf);
+    }
 
     void max_load_factor(float value) {
         if (value < 0.999f && value > 0.2f)
             _loadlf = static_cast<uint32_t>((1 << 27) / value);
     }
 
-    constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
-    constexpr uint64_t max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const {
+        return (1ull << (sizeof(_num_buckets) * 8 - 1));
+    }
+    constexpr uint64_t max_bucket_count() const {
+        return max_size();
+    }
 
 #ifndef TEST_TIMER_FEATURE
     int64_t fast_search(int64_t key, size_type buckets) const {
@@ -575,13 +609,21 @@ public:
 
     // ------------------------------------------------------------
 
-    iterator find(const KeyT& key) { return {this, find_filled_bucket(key)}; }
+    iterator find(const KeyT& key) {
+        return {this, find_filled_bucket(key)};
+    }
 
-    const_iterator find(const KeyT& key) const { return {this, find_filled_bucket(key)}; }
+    const_iterator find(const KeyT& key) const {
+        return {this, find_filled_bucket(key)};
+    }
 
-    bool contains(const KeyT& key) const { return find_filled_bucket(key) != _num_buckets; }
+    bool contains(const KeyT& key) const {
+        return find_filled_bucket(key) != _num_buckets;
+    }
 
-    size_type count(const KeyT& key) const { return find_filled_bucket(key) == _num_buckets ? 0 : 1; }
+    size_type count(const KeyT& key) const {
+        return find_filled_bucket(key) == _num_buckets ? 0 : 1;
+    }
 
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
@@ -641,7 +683,9 @@ public:
         return insert(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> try_emplace(const value_type& k) { return insert(k); }
+    std::pair<iterator, bool> try_emplace(const value_type& k) {
+        return insert(k);
+    }
 
     template <class... Args> inline std::pair<iterator, bool> emplace_unique(Args&&... args) {
         return insert_unique(std::forward<Args>(args)...);
@@ -727,7 +771,9 @@ public:
         return (bucket == it._bucket) ? ++it : it;
     }
 
-    void _erase(const_iterator it) { erase_bucket(it._bucket); }
+    void _erase(const_iterator it) {
+        erase_bucket(it._bucket);
+    }
 
     void clearkv() {
         for (size_type bucket = 0; _num_filled > 0; ++bucket) {
@@ -750,7 +796,9 @@ public:
         _last_colls = _num_buckets - 1;
     }
 
-    void shrink_to_fit() noexcept { rehash(_num_filled); }
+    void shrink_to_fit() noexcept {
+        rehash(_num_filled);
+    }
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
@@ -764,7 +812,9 @@ public:
         return true;
     }
 
-    inline PairT* alloc_bucket(size_type num_buckets) { return PairAllocTraits::allocate(_alloc, num_buckets + 2); }
+    inline PairT* alloc_bucket(size_type num_buckets) {
+        return PairAllocTraits::allocate(_alloc, num_buckets + 2);
+    }
 
     inline void dealloc_bucket(PairT* pairs, size_type num_buckets) {
         if (pairs)
@@ -813,7 +863,8 @@ private:
         _last_colls = num_buckets - 1;
 
         if (bInCacheLine) {
-            memset(static_cast<void*>(_pairs), static_cast<int>(static_cast<uint32_t>(-1u)), sizeof(_pairs[0]) * num_buckets);
+            memset(static_cast<void*>(_pairs), static_cast<int>(static_cast<uint32_t>(-1u)),
+                   sizeof(_pairs[0]) * num_buckets);
         } else {
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 _pairs[bucket].second = INACTIVE;
@@ -859,7 +910,9 @@ private:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(_num_filled); }
+    inline bool check_expand_need() {
+        return reserve(_num_filled);
+    }
 
     size_type erase_key(const KeyT& key) {
         const auto bucket = hash_bucket(key);
@@ -1043,8 +1096,8 @@ private:
         if (_pairs[bucket].second == INACTIVE)
             return bucket;
 
-        constexpr auto linear_probe_length =
-            std::max(static_cast<unsigned int>(128 / sizeof(PairT)) + 2, 4u); // cpu cache line 64 byte,2-3 cache line miss
+        constexpr auto linear_probe_length = std::max(static_cast<unsigned int>(128 / sizeof(PairT)) + 2,
+                                                      4u); // cpu cache line 64 byte,2-3 cache line miss
         auto offset = 1u;
 
         for (; offset < linear_probe_length; offset++) {

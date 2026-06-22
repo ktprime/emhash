@@ -199,8 +199,12 @@ public:
             return copy;
         }
 
-        constexpr reference operator*() const noexcept { return *kv_; }
-        constexpr pointer operator->() const noexcept { return kv_; }
+        constexpr reference operator*() const noexcept {
+            return *kv_;
+        }
+        constexpr pointer operator->() const noexcept {
+            return kv_;
+        }
 
         template <bool OtherIsConst>
         constexpr bool operator==(const hashmap_iterator<OtherIsConst, HashMapType>& rhs) const noexcept {
@@ -232,7 +236,9 @@ public:
         rehash(bucket);
     }
 
-    explicit HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, mlf); }
+    explicit HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) {
+        init(bucket, mlf);
+    }
 
     HashMap(const HashMap& rhs)
         : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
@@ -267,7 +273,9 @@ public:
             emplace(*first);
     }
 
-    explicit HashMap(const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) { init(2); }
+    explicit HashMap(const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) {
+        init(2);
+    }
 
     HashMap(size_type bucket, float mlf, const allocator_type& alloc)
         : _pair_allocator(alloc), _index_allocator(alloc) {
@@ -347,7 +355,9 @@ public:
         return true;
     }
 
-    template <typename Con> bool operator!=(const Con& rhs) const { return !(*this == rhs); }
+    template <typename Con> bool operator!=(const Con& rhs) const {
+        return !(*this == rhs);
+    }
 
     ~HashMap() noexcept {
         clearkv();
@@ -404,10 +414,18 @@ public:
     }
 
     // -------------------------------------------------------------
-    iterator first() { return iterator{this, 0}; }
-    iterator last() { return iterator{this, _num_filled - 1}; }
-    const_iterator first() const { return const_iterator{this, 0}; }
-    const_iterator last() const { return const_iterator{this, _num_filled - 1}; }
+    iterator first() {
+        return iterator{this, 0};
+    }
+    iterator last() {
+        return iterator{this, _num_filled - 1};
+    }
+    const_iterator first() const {
+        return const_iterator{this, 0};
+    }
+    const_iterator last() const {
+        return const_iterator{this, _num_filled - 1};
+    }
 
     // no exception if empty
     value_type& front() {
@@ -436,27 +454,55 @@ public:
         erase(last());
     }
 
-    constexpr iterator begin() { return first(); }
-    constexpr const_iterator cbegin() const { return first(); }
-    constexpr const_iterator begin() const { return first(); }
+    constexpr iterator begin() {
+        return first();
+    }
+    constexpr const_iterator cbegin() const {
+        return first();
+    }
+    constexpr const_iterator begin() const {
+        return first();
+    }
 
-    constexpr iterator end() { return {this, _num_filled}; }
-    constexpr const_iterator cend() const { return {this, _num_filled}; }
-    constexpr const_iterator end() const { return cend(); }
+    constexpr iterator end() {
+        return {this, _num_filled};
+    }
+    constexpr const_iterator cend() const {
+        return {this, _num_filled};
+    }
+    constexpr const_iterator end() const {
+        return cend();
+    }
 
-    const value_type* values() const { return _pairs; }
-    const Index* index() const { return _index; }
+    const value_type* values() const {
+        return _pairs;
+    }
+    const Index* index() const {
+        return _index;
+    }
 
-    [[nodiscard]] size_type size() const noexcept { return _num_filled; }
-    [[nodiscard]] bool empty() const noexcept { return _num_filled == 0; }
-    [[nodiscard]] size_type bucket_count() const noexcept { return _num_buckets; }
+    [[nodiscard]] size_type size() const noexcept {
+        return _num_filled;
+    }
+    [[nodiscard]] bool empty() const noexcept {
+        return _num_filled == 0;
+    }
+    [[nodiscard]] size_type bucket_count() const noexcept {
+        return _num_buckets;
+    }
     [[nodiscard]] float load_factor() const noexcept {
         return static_cast<float>(_num_filled) / (static_cast<float>(_mask) + 1.0f);
     }
 
-    [[nodiscard]] const HashT& hash_function() const { return _hasher; }
-    [[nodiscard]] const EqT& key_eq() const { return _eq; }
-    [[nodiscard]] allocator_type get_allocator() const { return allocator_type(_pair_allocator); }
+    [[nodiscard]] const HashT& hash_function() const {
+        return _hasher;
+    }
+    [[nodiscard]] const EqT& key_eq() const {
+        return _eq;
+    }
+    [[nodiscard]] allocator_type get_allocator() const {
+        return allocator_type(_pair_allocator);
+    }
 
     void max_load_factor(float mlf) {
         if (mlf <= 0.999f && mlf > EMH_MIN_LOAD_FACTOR) {
@@ -468,8 +514,12 @@ public:
     [[nodiscard]] constexpr float max_load_factor() const {
         return static_cast<float>(1 << 28) / static_cast<float>(_mlf);
     }
-    [[nodiscard]] constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
-    [[nodiscard]] constexpr uint64_t max_bucket_count() const { return max_size(); }
+    [[nodiscard]] constexpr uint64_t max_size() const {
+        return 1ull << (sizeof(_num_buckets) * 8 - 1);
+    }
+    [[nodiscard]] constexpr uint64_t max_bucket_count() const {
+        return max_size();
+    }
 
 #if EMH_STATIS
     // Returns the bucket number where the element with key k is located.
@@ -594,10 +644,14 @@ public:
 #endif
 
     // only useful for at function if not find key then return zero
-    void pack_zero(ValueT zero) { _pairs[_num_filled] = {KeyT(), zero}; }
+    void pack_zero(ValueT zero) {
+        _pairs[_num_filled] = {KeyT(), zero};
+    }
 
     // ------------------------------------------------------------
-    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_slot(key)}; }
+    template <typename K = KeyT> iterator find(const K& key) noexcept {
+        return {this, find_filled_slot(key)};
+    }
 
     template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
         return {this, find_filled_slot(key)};
@@ -618,9 +672,13 @@ public:
         return _pairs[slot].second;
     }
 
-    const ValueT& index(const uint32_t index) const noexcept { return _pairs[index].second; }
+    const ValueT& index(const uint32_t index) const noexcept {
+        return _pairs[index].second;
+    }
 
-    ValueT& index(const uint32_t index) noexcept { return _pairs[index].second; }
+    ValueT& index(const uint32_t index) noexcept {
+        return _pairs[index].second;
+    }
 
     /// @brief Check if a key exists in the map.
     /// @param key The key to search for.
@@ -812,7 +870,9 @@ public:
         return insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    size_type insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
+    size_type insert_unique(const value_type& value) {
+        return insert_unique(value.first, value.second);
+    }
 
     template <class... Args> std::pair<iterator, bool> emplace(Args&&... args) {
         check_expand_need();
@@ -1250,7 +1310,9 @@ public:
 
 private:
     // Can we fit another element?
-    bool check_expand_need() { return reserve(_num_filled, false); }
+    bool check_expand_need() {
+        return reserve(_num_filled, false);
+    }
 
     // Prefetch for read operations (find)
     static void prefetch_read(char* ctrl) {
@@ -1293,7 +1355,9 @@ private:
 
     // Safe inline replacement for EMH_EMPTY macro:
     // evaluates the bucket index exactly once, avoiding UB on side-effecting args.
-    EMH_INLINE bool emh_empty(const size_type n) const { return 0 > static_cast<int>(_index[n].next); }
+    EMH_INLINE bool emh_empty(const size_type n) const {
+        return 0 > static_cast<int>(_index[n].next);
+    }
 
     size_type slot_to_bucket(const size_type slot) const noexcept {
         size_type main_bucket;
@@ -1693,7 +1757,9 @@ private:
         }
     }
 
-    size_type hash_bucket(const KeyT& key) const noexcept { return static_cast<size_type>(hash_key(key)) & _mask; }
+    size_type hash_bucket(const KeyT& key) const noexcept {
+        return static_cast<size_type>(hash_key(key)) & _mask;
+    }
 
     size_type hash_main(const size_type bucket) const noexcept {
         const auto slot = _index[bucket].slot & _mask;

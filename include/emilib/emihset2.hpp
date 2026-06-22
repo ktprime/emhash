@@ -38,7 +38,8 @@
 #ifndef __clang__
 #include <zmmintrin.h>
 #endif
-#elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) || defined(_M_X64)
+#elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) ||       \
+    defined(_M_X64)
 #include <x86intrin.h>
 #elif defined(__ARM_ARCH) || defined(__aarch64__) || defined(__arm__)
 #include "sse2neon.h"
@@ -214,9 +215,13 @@ public:
 
     HashSet() = default;
 
-    explicit HashSet(size_t n) { rehash(n); }
+    explicit HashSet(size_t n) {
+        rehash(n);
+    }
 
-    HashSet(const HashSet& other) { clone(other); }
+    HashSet(const HashSet& other) {
+        clone(other);
+    }
 
     HashSet(HashSet&& other) {
         if (this != &other) {
@@ -300,44 +305,77 @@ public:
 
     // -------------------------------------------------------------
 
-    iterator begin() { return {this, find_filled_slot(0)}; }
+    iterator begin() {
+        return {this, find_filled_slot(0)};
+    }
 
-    const_iterator cbegin() const { return {this, find_filled_slot(0)}; }
+    const_iterator cbegin() const {
+        return {this, find_filled_slot(0)};
+    }
 
-    const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const {
+        return cbegin();
+    }
 
-    iterator end() { return {this, _num_buckets}; }
+    iterator end() {
+        return {this, _num_buckets};
+    }
 
-    const_iterator cend() const { return {this, _num_buckets}; }
+    const_iterator cend() const {
+        return {this, _num_buckets};
+    }
 
-    const_iterator end() const { return cend(); }
+    const_iterator end() const {
+        return cend();
+    }
 
-    size_t size() const { return _num_filled; }
+    size_t size() const {
+        return _num_filled;
+    }
 
-    bool empty() const { return _num_filled == 0; }
+    bool empty() const {
+        return _num_filled == 0;
+    }
 
     // Returns the number of buckets.
-    size_t bucket_count() const { return _num_buckets; }
+    size_t bucket_count() const {
+        return _num_buckets;
+    }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const { return _num_buckets ? _num_filled / static_cast<float>(_num_buckets) : 0.0f; }
+    float load_factor() const {
+        return _num_buckets ? _num_filled / static_cast<float>(_num_buckets) : 0.0f;
+    }
 
-    float max_load_factor(float lf = 8.0f / 9) { (void)lf; return 7 / 8.0f; }
+    float max_load_factor(float lf = 8.0f / 9) {
+        (void)lf;
+        return 7 / 8.0f;
+    }
 
-    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
-    constexpr uint64_t max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const {
+        return 1ull << (sizeof(_num_buckets) * 8 - 1);
+    }
+    constexpr uint64_t max_bucket_count() const {
+        return max_size();
+    }
 
     // ------------------------------------------------------------
 
-    template <typename KeyLike> iterator find(const KeyLike& key) { return iterator(this, find_filled_bucket(key)); }
+    template <typename KeyLike> iterator find(const KeyLike& key) {
+        return iterator(this, find_filled_bucket(key));
+    }
 
     template <typename KeyLike> const_iterator find(const KeyLike& key) const {
         return const_iterator(this, find_filled_bucket(key));
     }
 
-    template <typename KeyLike> bool contains(const KeyLike& k) const { return find_filled_bucket(k) != _num_buckets; }
+    template <typename KeyLike> bool contains(const KeyLike& k) const {
+        return find_filled_bucket(k) != _num_buckets;
+    }
 
-    template <typename KeyLike> size_t count(const KeyLike& k) const { return find_filled_bucket(k) != _num_buckets; }
+    template <typename KeyLike> size_t count(const KeyLike& k) const {
+        return find_filled_bucket(k) != _num_buckets;
+    }
 
     template <typename KeyLike> KeyT* try_get(const KeyLike& k) {
         auto bucket = find_filled_bucket(k);
@@ -387,11 +425,17 @@ public:
         }
     }
 
-    std::pair<iterator, bool> emplace(const KeyT& key) { return insert(key); }
+    std::pair<iterator, bool> emplace(const KeyT& key) {
+        return insert(key);
+    }
 
-    std::pair<iterator, bool> emplace(KeyT&& key) { return insert(std::move(key)); }
+    std::pair<iterator, bool> emplace(KeyT&& key) {
+        return insert(std::move(key));
+    }
 
-    std::pair<iterator, bool> insert([[maybe_unused]] iterator it, const KeyT& key) { return insert(key); }
+    std::pair<iterator, bool> insert([[maybe_unused]] iterator it, const KeyT& key) {
+        return insert(key);
+    }
 
     template <typename T> void insert(T beginc, T endc) {
         reserve(endc - beginc + _num_filled);
@@ -470,7 +514,9 @@ public:
         return ++it;
     }
 
-    void _erase(const iterator& it) { _erase(it._bucket); }
+    void _erase(const iterator& it) {
+        _erase(it._bucket);
+    }
 
     void _erase(size_t bucket) {
         if (need_explicit_dtor())
@@ -508,7 +554,9 @@ public:
         _max_probe_length = -1;
     }
 
-    void shrink_to_fit() { rehash(_num_filled); }
+    void shrink_to_fit() {
+        rehash(_num_filled);
+    }
 
     bool reserve(uint64_t num_elems) {
         uint64_t required_buckets = uint64_t(num_elems) + num_elems / 8;
@@ -590,7 +638,9 @@ public:
 
 private:
     // Can we fit another element?
-    void check_expand_need() { reserve(_num_filled); }
+    void check_expand_need() {
+        reserve(_num_filled);
+    }
 
     // Find the bucket with this key, or return (size_t)-1
     template <typename KeyLike> size_t find_filled_bucket(const KeyLike& key) const {

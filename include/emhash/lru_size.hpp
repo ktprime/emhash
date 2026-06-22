@@ -72,9 +72,9 @@ template <typename First, typename Second> struct entry {
 #if EMHASH_SET_TIME
         return EMHASH_SET_TIME;
 #elif EMHASH_LRU_TIME
-        return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                   std::chrono::steady_clock::now().time_since_epoch())
-            .count());
+        return static_cast<uint32_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                .count());
 #else
         static uint32_t _sid = 0;
         return ++_sid; // overflow
@@ -533,13 +533,17 @@ public:
 
     // ------------------------------------------------------------
 
-    iterator find(const KeyT& key) noexcept { return {this, find_filled_bucket(key)}; }
+    iterator find(const KeyT& key) noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
     const_iterator find(const KeyT& key) const noexcept {
         return {this, const_cast<lru_cache&>(*this).find_filled_bucket(key)};
     }
 
-    bool contains(const KeyT& key) const noexcept { return find_filled_bucket(key) != _num_buckets; }
+    bool contains(const KeyT& key) const noexcept {
+        return find_filled_bucket(key) != _num_buckets;
+    }
 
     size_type count(const KeyT& key) const noexcept {
         return const_cast<lru_cache&>(*this).find_filled_bucket(key) == _num_buckets ? 0 : 1;
@@ -610,7 +614,9 @@ public:
         return {{this, bucket}, found};
     }
 
-    inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p) { return insert(p.first, p.second); }
+    inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p) {
+        return insert(p.first, p.second);
+    }
 
     inline std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p) {
         return insert(std::move(p.first), std::move(p.second));
@@ -648,7 +654,9 @@ public:
         return insert_unique(std::move(p.first), std::move(p.second));
     }
 
-    inline uint32_t insert_unique(std::pair<KeyT, ValueT>& p) { return insert_unique(p.first, p.second); }
+    inline uint32_t insert_unique(std::pair<KeyT, ValueT>& p) {
+        return insert_unique(p.first, p.second);
+    }
 
     template <class... Args> inline std::pair<iterator, bool> emplace(Args&&... args) {
         return insert(std::forward<Args>(args)...);
@@ -753,7 +761,9 @@ public:
         _sum_orderid = 0;
     }
 
-    inline void update_sum_orderid(int32_t incr) { _sum_orderid += incr; }
+    inline void update_sum_orderid(int32_t incr) {
+        _sum_orderid += incr;
+    }
 
     // #define EMHASH_LRU_TIME 2
     inline uint32_t incid() {
@@ -770,7 +780,9 @@ public:
         _sum_orderid += delta;
     }
 
-    void shrink_to_fit() { rehash(_num_filled); }
+    void shrink_to_fit() {
+        rehash(_num_filled);
+    }
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
@@ -832,7 +844,8 @@ public:
         char buff[256] = {0};
         snprintf(buff, sizeof(buff),
                  "    _num_filled medium_id.pack_size.erase_ids load_factor|%u %u %zu %u %.3f|, time_use = %3d ms",
-                 _num_filled, medium_id, sizeof(_pairs[0]), old_nums - _num_filled, load_factor(), static_cast<int>(clock() - ts));
+                 _num_filled, medium_id, sizeof(_pairs[0]), old_nums - _num_filled, load_factor(),
+                 static_cast<int>(clock() - ts));
 #if EMHASH_USE_LOG
         static uint32_t iremoves = 0;
         FDLOG("lru_size") << __FUNCTION__ << " removes = " << iremoves++ << "|" << buff << std::endl;
@@ -913,7 +926,9 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(_num_filled); }
+    inline bool check_expand_need() {
+        return reserve(_num_filled);
+    }
 
     void clear_bucket(uint32_t bucket) {
         update_sum_orderid(0 - static_cast<int>(_pairs[bucket].orderid));
