@@ -404,11 +404,11 @@ jobs:
       - name: Build 32-bit
         run: |
           cd tests
-          g++ -m32 -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
+          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
             -I../include verify/test_all_maps.cpp -o test_verify_32
-          g++ -m32 -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
+          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
             -I../include verify/test_extreme.cpp -o test_extreme_32
-          g++ -m32 -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter \
+          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
             -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_32
         shell: bash
 
