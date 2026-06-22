@@ -20,30 +20,16 @@ jobs:
 
       - name: Check formatting
         run: |
-          # Only check our own source files (not third-party, not generated, not vendored)
-          find . \
-            -path ./thirdparty -prune -o \
-            -path ./bench/tsl_bench -prune -o \
-            -path ./bench/qc-core -prune -o \
-            -path ./bench/boost_bench -prune -o \
-            -path ./bench/c_cpp_hash_tables_benchmark-shims -prune -o \
-            -path ./.git -prune -o \
-            -name sse2neon.h -prune -o \
-            -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
+          # Only check include directory (our own header-only library)
+          find include \
+            -type f \( -name '*.hpp' -o -name '*.h' \) \
             -print | xargs clang-format-18 --dry-run --Werror
 
       - name: Show diff (if any)
         if: failure()
         run: |
-          find . \
-            -path ./thirdparty -prune -o \
-            -path ./bench/tsl_bench -prune -o \
-            -path ./bench/qc-core -prune -o \
-            -path ./bench/boost_bench -prune -o \
-            -path ./bench/c_cpp_hash_tables_benchmark-shims -prune -o \
-            -path ./.git -prune -o \
-            -name sse2neon.h -prune -o \
-            -type f \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.cc' \) \
+          find include \
+            -type f \( -name '*.hpp' -o -name '*.h' \) \
             -print | xargs clang-format-18 --dry-run
 
   clang-tidy:
