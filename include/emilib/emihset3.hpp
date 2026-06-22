@@ -35,9 +35,9 @@
 
 #ifdef _WIN32
 #include <intrin.h>
-#elif __x86_64__
+#elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) || defined(_M_X64)
 #include <x86intrin.h>
-#else
+#elif defined(__ARM_ARCH) || defined(__aarch64__) || defined(__arm__)
 #include "sse2neon.h"
 #endif
 
@@ -124,7 +124,7 @@ inline static uint32_t CTZ(uint32_t n) {
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
 
-    return (uint32_t)index;
+    return static_cast<uint32_t>(index);
 }
 #endif
 
@@ -154,17 +154,17 @@ public:
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
-        main_bucket = size_t(key_hash & _mask);
+        main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((size_t)(key_hash % 253) + (size_t)EFILLED);
+        return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
-        main_bucket = size_t(key_hash & _mask);
+        main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return (int8_t)((size_t)key_hash % 253) + EFILLED;
+        return static_cast<int8_t>(static_cast<size_t>(key_hash) % 253) + EFILLED;
     }
 
     class const_iterator;
@@ -179,7 +179,7 @@ public:
         iterator() {}
         // iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
         iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) {
-            _bmask = _from = (size_t)-1;
+            _bmask = _from = static_cast<size_t>(-1);
         }
 
         void init() {
@@ -187,7 +187,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= (size_t)~((1ull << (_bucket % simd_bytes)) - 1);
+                _bmask &= static_cast<size_t>(~((1ull << (_bucket % simd_bytes)) - 1));
             } else {
                 _bmask = 0;
             }
@@ -199,7 +199,7 @@ public:
 
         iterator& operator++() {
 #ifndef EMH_ITER_SAFE
-            if (_from == (size_t)-1)
+            if (_from == static_cast<size_t>(-1))
                 init();
 #endif
             goto_next_element();
@@ -208,7 +208,7 @@ public:
 
         iterator operator++(int) {
 #ifndef EMH_ITER_SAFE
-            if (_from == (size_t)-1)
+            if (_from == static_cast<size_t>(-1))
                 init();
 #endif
             iterator old(*this);
@@ -262,7 +262,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= (size_t)~((1ull << (_bucket % simd_bytes)) - 1);
+                _bmask &= static_cast<size_t>(~((1ull << (_bucket % simd_bytes)) - 1));
             } else {
                 _bmask = 0;
             }
@@ -315,7 +315,7 @@ public:
     // ------------------------------------------------------------------------
 
     explicit HashSet(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) {
-        _mlf = (uint32_t)((1 << 28) / lf);
+        _mlf = static_cast<uint32_t>((1 << 28) / lf);
         rehash(n);
     }
 
@@ -329,13 +329,13 @@ public:
     }
 
     HashSet(std::initializer_list<value_type> il) {
-        rehash((size_t)il.size());
+        rehash(static_cast<size_t>(il.size()));
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
 
     template <class InputIt> HashSet(InputIt first, InputIt last, size_t bucket_count = 4) {
-        rehash((size_t)std::distance(first, last) + bucket_count);
+        rehash(static_cast<size_t>(std::distance(first, last)) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
@@ -428,7 +428,7 @@ public:
     inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }
     inline constexpr void max_load_factor(float mlf) noexcept {
         if (mlf <= max_load_factor() && mlf > min_load_factor())
-            _mlf = (uint32_t)((1 << 28) / mlf);
+            _mlf = static_cast<uint32_t>((1 << 28) / mlf);
     }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
@@ -516,7 +516,7 @@ public:
     std::pair<iterator, bool> insert(const KeyT& value) noexcept { return do_insert(value); }
 
     template <typename Iter> void insert(Iter beginc, Iter endc) noexcept {
-        rehash(size_t(endc - beginc) + _num_filled);
+        rehash(static_cast<size_t>(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
             do_insert(*beginc);
     }
@@ -532,7 +532,7 @@ public:
     }
 
     void insert(std::initializer_list<value_type> ilist) noexcept {
-        rehash(size_t(ilist.size()) + _num_filled);
+        rehash(static_cast<size_t>(ilist.size()) + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
             do_insert(*it);
     }
@@ -665,7 +665,7 @@ public:
     void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
 
     bool reserve(size_t num_elems) {
-        const size_t required_buckets = static_cast<size_t>((uint64_t)num_elems * _mlf >> 28);
+        const size_t required_buckets = static_cast<size_t>(static_cast<uint64_t>(num_elems) * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -686,12 +686,12 @@ public:
         if (buckets > max_size() || buckets < _num_filled)
             throw std::length_error("emilib3::HashSet: too many elements");
 
-        const auto num_buckets = (size_t)buckets;
+        const auto num_buckets = static_cast<size_t>(buckets);
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
         const auto state_size = (simd_bytes + num_buckets) * sizeof(State);
 
-        auto* new_state = (decltype(_states))malloc(state_size);
-        auto* new_pairs = (decltype(_pairs))malloc(pairs_size);
+        auto* new_state = static_cast<decltype(_states)>(malloc(state_size));
+        auto* new_pairs = static_cast<decltype(_pairs)>(malloc(pairs_size));
 
         auto old_num_filled = _num_filled;
         auto old_states = _states;
@@ -745,9 +745,31 @@ private:
     // Can we fit another element?
     void check_expand_need() { reserve(_num_filled); }
 
+    // Prefetch for read operations (find)
+    static void prefetch_read(char* ctrl) {
+#ifndef EMH_NO_READ_PREFETCH
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(static_cast<const void*>(ctrl));
+#endif
+#endif // EMH_NO_READ_PREFETCH
+    }
+
+    // Prefetch for write operations (insert/erase)
+    static void prefetch_write(char* ctrl) {
+#ifndef EMH_NO_WRITE_PREFETCH
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+#elif defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(static_cast<const void*>(ctrl), 1, 1);
+#endif
+#endif // EMH_NO_WRITE_PREFETCH
+    }
+
+    // Legacy function for backward compatibility
     static void prefetch_heap_block(char* ctrl) {
-        // Prefetch the heap-allocated memory region to resolve potential TLB
-        // misses.  This is intended to overlap with execution of calculating the hash for a key.
+#ifndef EMH_NO_PREFETCH
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
 #elif defined(_MSC_VER)
@@ -755,6 +777,7 @@ private:
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
+#endif // EMH_NO_PREFETCH
     }
 
     inline int8_t group_mask(size_t gbucket) const noexcept { return _states[gbucket + simd_bytes - 1]; }
@@ -785,10 +808,10 @@ private:
         auto next_bucket = main_bucket;
 
         do {
-            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
+            auto maskf = static_cast<uint32_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
             if (maskf) {
-                prefetch_heap_block((char*)&_pairs[next_bucket]);
+                prefetch_read((char*)&_pairs[next_bucket]);
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket], key)))
@@ -809,22 +832,22 @@ private:
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the later case, the bucket is expected to be filled.
     template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
-        const size_t required_buckets = static_cast<size_t>((uint64_t)_num_filled * _mlf >> 28);
+        const size_t required_buckets = static_cast<size_t>(static_cast<uint64_t>(_num_filled) * _mlf >> 28);
         if (EMH_UNLIKELY(required_buckets >= _num_buckets))
             rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_heap_block((char*)&_pairs[main_bucket]);
+        prefetch_write((char*)&_pairs[main_bucket]);
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket;
         size_t offset = 0u;
-        constexpr size_t chole = (size_t)-1;
+        constexpr size_t chole = static_cast<size_t>(-1);
         size_t hole = chole;
 
         do {
-            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
-            auto maskf = (uint32_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
+            auto maskf = static_cast<uint32_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
 
             // 1. find filled
             while (maskf != 0) {
@@ -838,7 +861,7 @@ private:
 
             if (hole == chole) {
                 // 2. find empty
-                const auto maskd = (uint32_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
+                const auto maskd = static_cast<uint32_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)));
                 if (group_mask(next_bucket) == State::EEMPTY) {
                     hole = next_bucket + CTZ(maskd);
                     set_states(hole, key_h2);
@@ -866,13 +889,13 @@ private:
     }
 
     inline size_t empty_delete(size_t gbucket) const noexcept {
-        const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec));
+        const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[gbucket]));
+        return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)));
     }
 
     inline size_t filled_mask(size_t gbucket) const noexcept {
-        const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
-        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete));
+        const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[gbucket]));
+        return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete)));
     }
 
     size_t find_empty_slot(size_t next_bucket, size_t offset) noexcept {
@@ -880,12 +903,12 @@ private:
             const auto maske = empty_delete(next_bucket);
             if (maske != 0) {
                 const auto ebucket = CTZ(maske) + next_bucket;
-                prefetch_heap_block((char*)&_pairs[ebucket]);
+                prefetch_write((char*)&_pairs[ebucket]);
                 if (offset > _max_probe_length)
                     set_offset(offset);
                 return ebucket;
             }
-            next_bucket = get_next_bucket(next_bucket, (size_t)++offset);
+            next_bucket = get_next_bucket(next_bucket, static_cast<size_t>(++offset));
         } while (true);
 
         return 0;
@@ -913,7 +936,7 @@ private:
     size_t _mask = 0;
     size_t _num_filled = 0;
     size_t _max_probe_length = 0;
-    uint32_t _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
+    uint32_t _mlf = static_cast<uint32_t>((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
 };
 
 } // namespace emilib3

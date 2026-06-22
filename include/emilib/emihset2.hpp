@@ -38,9 +38,9 @@
 #ifndef __clang__
 #include <zmmintrin.h>
 #endif
-#elif __x86_64__
+#elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) || defined(_M_X64)
 #include <x86intrin.h>
-#else
+#elif defined(__ARM_ARCH) || defined(__aarch64__) || defined(__arm__)
 #include "sse2neon.h"
 #endif
 

@@ -433,7 +433,7 @@ jobs:
       - name: Install clang + ARM64 target
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang qemu-user
+          sudo apt-get install -y clang qemu-user g++-aarch64-linux-gnu
 
       - name: Cross-compile for aarch64
         run: |
@@ -556,14 +556,14 @@ jobs:
         shell: bash
 
       - name: Upload coverage HTML report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-html
           path: coverage_html/
           retention-days: 30
 
       - name: Upload coverage data
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-info
           path: coverage.info
@@ -630,7 +630,7 @@ jobs:
         shell: bash
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: benchmark-g++
           path: build/benchmark_results.json
