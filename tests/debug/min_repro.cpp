@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
                 break;
             }
             case OP_RESERVE: {
-                em.reserve(op.key > 0 ? op.key : 10);
+                (void)em.reserve(op.key > 0 ? op.key : 10);
                 break;
             }
             case OP_INSERT_OR_ASSIGN: {

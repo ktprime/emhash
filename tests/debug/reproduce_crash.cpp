@@ -9,7 +9,7 @@ int main() {
     printf("=== Test 1: Insert 0x68686868 key (has high bit pattern issue) ===\n");
     {
         emhash8::HashMap<int, int> m;
-        m.insert({0x68686868, 1});
+        (void)m.insert({0x68686868, 1});
         auto it = m.find(0x68686868);
         printf("Find 0x68686868: %s\n", it != m.end() ? "FOUND" : "NOT FOUND");
     }
@@ -17,8 +17,8 @@ int main() {
     printf("\n=== Test 2: reserve(1) + insert 0x68686868 ===\n");
     {
         emhash8::HashMap<int, int> m;
-        m.reserve(1);
-        m.insert({0x68686868, 1});
+        (void)m.reserve(1);
+        (void)m.insert({0x68686868, 1});
         auto it = m.find(0x68686868);
         printf("Find 0x68686868: %s\n", it != m.end() ? "FOUND" : "NOT FOUND");
     }
@@ -29,24 +29,24 @@ int main() {
         std::unordered_map<int, int> ref;
 
         // Op 0: ERASE 8447
-        em.erase(8447);
+        (void)em.erase(8447);
         ref.erase(8447);
         // Op 1: CLEAR
         em.clear();
         ref.clear();
         // Op 2: INSERT (131072, 0)
-        em.insert({131072, 0});
+        (void)em.insert({131072, 0});
         ref.insert({131072, 0});
         printf("After op 2: em.size=%u ref.size=%zu\n", em.size(), ref.size());
         // Op 3: FIND 394
         em.find(394);
         ref.find(394);
         // Op 4: RESERVE(1)
-        em.reserve(1);
+        (void)em.reserve(1);
         ref.reserve(1);
         printf("After op 4 reserve(1): em.size=%u ref.size=%zu\n", em.size(), ref.size());
         // Op 5: INSERT (15663104, 13631725)
-        em.insert({15663104, 13631725});
+        (void)em.insert({15663104, 13631725});
         ref.insert({15663104, 13631725});
         printf("After op 5: em.size=%u ref.size=%zu\n", em.size(), ref.size());
         // Op 6: FIND 1744874668
@@ -68,7 +68,7 @@ int main() {
         // Op 11: INSERT (1751672936, 1751672936) <-- This is where it crashes
         printf("About to do op 11 INSERT (1751672936, 1751672936)...\n");
         fflush(stdout);
-        em.insert({1751672936, 1751672936});
+        (void)em.insert({1751672936, 1751672936});
         printf("Op 11 succeeded!\n");
     }
 

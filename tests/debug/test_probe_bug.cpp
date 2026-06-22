@@ -348,7 +348,7 @@ int main() {
             // Erase 25
             for (int i = 0; i < 25; i++) {
                 int key = round * 25 + i;
-                map.erase(key);
+                (void)map.erase(key);
                 ref.erase(key);
             }
         }

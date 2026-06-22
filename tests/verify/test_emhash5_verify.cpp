@@ -137,7 +137,7 @@ static void test_reinsert_erase()
     printf("=== Test 5: reinsert after erase ===\n");
     emhash5::HashMap<int, int> m;
     for (int i = 0; i < 100; i++) m[i] = i;
-    for (int i = 0; i < 100; i++) m.erase(i);
+    for (int i = 0; i < 100; i++) (void)m.erase(i);
     CHECK(m.size() == 0, "after erase all");
     for (int i = 0; i < 100; i++) {
         m[i] = i * 2;
@@ -213,7 +213,7 @@ static void test_string_keys()
         CHECK(it != m.end() && it->second == v, "string find");
     }
     for (auto& [k, v] : ref) {
-        m.erase(k);
+        (void)m.erase(k);
     }
     CHECK(m.size() == 0, "string erase all");
     printf("  string: PASSED\n\n");
@@ -227,7 +227,7 @@ static void test_load_factor_grow()
     size_t b1 = m.bucket_count();
     CHECK(m.load_factor() < 1.0, "load factor < 1");
 
-    for (int i = 0; i < 9000; i++) m.erase(i);
+    for (int i = 0; i < 9000; i++) (void)m.erase(i);
     size_t b2 = m.bucket_count();
     CHECK(m.size() == 1000, "after erase 9000");
 
@@ -256,7 +256,7 @@ static void test_high_load_collision_chain()
     }
 
     // Erase some, re-insert
-    for (int i = 0; i < 50; i++) m.erase(i);
+    for (int i = 0; i < 50; i++) (void)m.erase(i);
     for (int i = 100; i < 200; i++) m[i] = i;
     for (int i = 0; i < 50; i++) {
         CHECK(m.find(i) == m.end(), "erased not found");
@@ -304,7 +304,7 @@ static void test_copy_ctor_after_erase()
     printf("=== Test 13: copy after erase ===\n");
     emhash5::HashMap<int, int> m;
     for (int i = 0; i < 100; i++) m[i] = i;
-    for (int i = 0; i < 50; i++) m.erase(i);
+    for (int i = 0; i < 50; i++) (void)m.erase(i);
 
     auto copy = m;
     CHECK(copy.size() == m.size(), "copy size");

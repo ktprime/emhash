@@ -202,7 +202,7 @@ static void test_high_load_insert(const char* name) {
 
     // Erase every 10th element to create scattered holes
     for (int i = 0; i < N; i += 10) {
-        map.erase(i);
+        (void)map.erase(i);
     }
     TEST_ASSERT((int)map.size() == N - N/10, "should have erased every 10th element");
 
@@ -239,7 +239,7 @@ static void test_insert_erase_interleaved(const char* name) {
         // Erase 50
         for (int i = 0; i < 50; i++) {
             int key = rng() % 500;
-            map.erase(key);
+            (void)map.erase(key);
             ref.erase(key);
         }
     }
@@ -270,7 +270,7 @@ static void test_fill_then_scatter_erase(const char* name) {
     // Erase keys in a pattern that leaves empty groups scattered
     // This is the scenario where get_next_bucket's non-linearity can miss empty slots
     for (int i = 0; i < N; i += 3) {
-        map.erase(i);
+        (void)map.erase(i);
     }
 
     // Now insert new keys that hash to different buckets
@@ -296,7 +296,7 @@ static void test_erase_create_holes_then_insert(const char* name) {
     for (int i = 0; i < 2000; i++) map[i] = i;
 
     // Erase a contiguous range to create a big hole
-    for (int i = 500; i < 600; i++) map.erase(i);
+    for (int i = 500; i < 600; i++) (void)map.erase(i);
 
     // Insert keys that should land in or near that hole
     bool ok = true;
@@ -548,7 +548,7 @@ static void test_basic_insert_find_erase(const char* name) {
     TEST_ASSERT(!map.contains(999), "contains(999) should be false");
     TEST_ASSERT(map.count(1) == 1, "count(1) should be 1");
 
-    map.erase(1);
+    (void)map.erase(1);
     TEST_ASSERT(!map.contains(1), "erased key should not be found");
 }
 
@@ -628,7 +628,7 @@ static void test_insert_erase_cycle(const char* name) {
     for (int cycle = 0; cycle < 10; cycle++) {
         for (int i = 0; i < 50; i++) map[i] = cycle * 50 + i;
         TEST_ASSERT(map.size() == 50, "size should be 50 after insert");
-        for (int i = 0; i < 50; i++) map.erase(i);
+        for (int i = 0; i < 50; i++) (void)map.erase(i);
         TEST_ASSERT(map.empty(), "map should be empty after erase");
     }
 }
@@ -697,7 +697,7 @@ static void test_random_ops_consistency(const char* name, int N) {
                 if (m != r || (m && it->second != ref_it->second)) consistent = false;
                 break;
             }
-            case 2: { map.erase(key); ref.erase(key); break; }
+            case 2: { (void)map.erase(key); ref.erase(key); break; }
             case 3: {
                 bool m = map.contains(key), r = (ref.find(key) != ref.end());
                 if (m != r) consistent = false;
@@ -721,7 +721,7 @@ static void test_shrink_to_fit(const char* name) {
     HashMapType map;
 
     for (int i = 0; i < 1000; i++) map[i] = i;
-    for (int i = 0; i < 990; i++) map.erase(i);
+    for (int i = 0; i < 990; i++) (void)map.erase(i);
     map.shrink_to_fit();
 
     bool ok = true;

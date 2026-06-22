@@ -21,7 +21,7 @@ int main() {
             em.insert({key, val});
             break;
         case 1:
-            em.erase(key);
+            (void)em.erase(key);
             break;
         case 2:
             em.find(key);
@@ -39,7 +39,7 @@ int main() {
         case 6: {
             size_t cap = static_cast<size_t>(key & 0x7FFFFFFF);
             if (cap < 1000000)
-                em.reserve(cap);
+                (void)em.reserve(cap);
         } break;
         case 7: {
             int v = val;
@@ -48,7 +48,7 @@ int main() {
         case 8: {
             auto it = em.find(key);
             if (it != em.end())
-                em.erase(it);
+                (void)em.erase(it);
         } break;
         case 9:
             em.count(key);

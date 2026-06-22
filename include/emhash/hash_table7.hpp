@@ -244,12 +244,9 @@ template <typename First, typename Second> struct entry {
     }
 
     entry& operator=(const entry& rhs) {
-        if (this != &rhs) // not a self-assignment
-        {
-            second = rhs.second;
-            bucket = rhs.bucket;
-            first = rhs.first;
-        }
+        second = rhs.second;
+        bucket = rhs.bucket;
+        first = rhs.first;
         return *this;
     }
 

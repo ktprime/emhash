@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
                 auto em_it = em.find(op.key);
                 auto ref_it = ref.find(op.key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
+                    (void)em.erase(em_it);
                     ref.erase(ref_it);
                     printf("  ERASE_ITER done\n");
                 } else {
@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
             case OP_RESERVE: {
                 size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
                 if (cap < 1000000)
-                    em.reserve(cap);
+                    (void)em.reserve(cap);
                 break;
             }
             case OP_INSERT_OR_ASSIGN: {

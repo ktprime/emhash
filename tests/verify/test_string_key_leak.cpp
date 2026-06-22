@@ -447,11 +447,11 @@ static void test_hashset_string_keys(const char* name) {
     printf("  [%s] string key set operations...\n", name);
     {
         SetType s;
-        s.insert("apple");
-        s.insert("banana");
-        s.insert("cherry");
-        s.insert("date");
-        s.insert("elderberry");
+        (void)s.insert("apple");
+        (void)s.insert("banana");
+        (void)s.insert("cherry");
+        (void)s.insert("date");
+        (void)s.insert("elderberry");
 
         TEST_ASSERT(s.size() == 5, "set should have 5 elements");
         TEST_ASSERT(s.count("apple") == 1, "apple should be in set");

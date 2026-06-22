@@ -95,7 +95,7 @@ static int test_bucket0_push_empty()
 
     // Erase half
     for (int i = 0; i < 130000; i++) {
-        myhash.erase(i);
+        (void)myhash.erase(i);
         refmap.erase(i);
     }
 
@@ -170,7 +170,7 @@ static int test_high_load_stress()
     for (size_t i = 0; i < vsize; i++) {
         auto old_k = rng2();
         auto new_k = rng();
-        myhash.erase(old_k); // erase old key (may miss)
+        (void)myhash.erase(old_k); // erase old key (may miss)
         myhash[new_k] = 1;   // insert new key
         refmap.erase(old_k);
         refmap[new_k] = 1;
@@ -268,7 +268,7 @@ static int test_lf_oscillation()
         // Erase to drop below 0.8
         for (int i = 0; i < erase_count; i++) {
             int64_t key = (int64_t)(round * erase_count + i);
-            myhash.erase(key);
+            (void)myhash.erase(key);
             refmap.erase(key);
         }
 
@@ -364,7 +364,7 @@ static int test_lf_oscillation_emhash8()
     for (int round = 0; round < oscillations; round++) {
         for (int i = 0; i < erase_count; i++) {
             int64_t key = (int64_t)(round * erase_count + i);
-            myhash.erase(key);
+            (void)myhash.erase(key);
             refmap.erase(key);
         }
 

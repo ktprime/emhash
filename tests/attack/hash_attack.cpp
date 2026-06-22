@@ -76,7 +76,7 @@ static int test_attack_correctness_const() {
 
     // Erase half
     for (int i = 0; i < N; i += 2) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
     for (int i = 0; i < N; i++) {
@@ -195,7 +195,7 @@ template <typename Hash> static double bench_erase_const(int N, const char* name
         m[i] = i;
     auto t0 = now_ms();
     for (int i = 0; i < N; i++)
-        m.erase(i);
+        (void)m.erase(i);
     auto t1 = now_ms();
     printf("  %-30s erase  N=%-7d → %.1f ms (%.0f ops/ms)\n", name, N, t1 - t0, N / (t1 - t0));
     return t1 - t0;
@@ -218,7 +218,7 @@ template <typename Hash> static double bench_mixed_const(int N, const char* name
         else if (op < 8)
             m.find(k); // 30% find
         else
-            m.erase(k); // 20% erase
+            (void)m.erase(k); // 20% erase
     }
     auto t1 = now_ms();
     printf("  %-30s mixed  N=%-7d → %.1f ms (%.0f ops/ms)\n", name, N, t1 - t0, N / (t1 - t0));

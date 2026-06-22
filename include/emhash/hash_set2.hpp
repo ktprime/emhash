@@ -39,13 +39,13 @@
 #pragma once
 
 #ifdef __has_include
-#  if __has_include("config.hpp")
-#    include "config.hpp"
-#  elif __has_include("emhash/config.hpp")
-#    include "emhash/config.hpp"
-#  endif
+#if __has_include("config.hpp")
+#include "config.hpp"
+#elif __has_include("emhash/config.hpp")
+#include "emhash/config.hpp"
+#endif
 #else
-#  include "config.hpp"
+#include "config.hpp"
 #endif
 
 #include <cstring>
@@ -60,13 +60,7 @@
 #include <iterator>
 #include <memory>
 
-#ifdef __has_include
-#if __has_include("wyhash.h")
-#include "wyhash.h"
-#endif
-#elif EMH_WY_HASH
-#include "wyhash.h"
-#endif
+// wyhash is now provided by config.hpp (emh_wyhash / wyhash alias)
 
 #ifdef EMH_ENTRY
 #undef EMH_ENTRY
@@ -77,7 +71,7 @@
 
 namespace emhash2 {
 
-/// A cache-fristd::endly hash table with open addressing, linear probing and power-of-two capacity
+/// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<KeyT>>
 class HashSet {
@@ -239,7 +233,7 @@ public:
     }
 
     HashSet(std::initializer_list<value_type> il, size_type n = 8) {
-        init(std::max((size_type)il.size(), n));
+        init(std::max(static_cast<size_type>(il.size()), n));
         for (auto begin = il.begin(); begin != il.end(); ++begin)
             insert(*begin);
     }
@@ -293,7 +287,7 @@ public:
         _loadlf = other._loadlf;
 
         if (std::is_trivially_copyable<KeyT>::value) {
-            memcpy((void*)_pairs, other._pairs, _num_buckets * sizeof(PairT));
+            memcpy(static_cast<void*>(_pairs), other._pairs, _num_buckets * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
@@ -359,11 +353,11 @@ public:
 
     const EqT& key_eq() const { return _eq; }
 
-    constexpr float max_load_factor() const { return (1 << 27) / (float)_loadlf; }
+    constexpr float max_load_factor() const { return (1 << 27) / static_cast<float>(_loadlf); }
 
     void max_load_factor(float value) {
         if (value < 0.999f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 27) / value);
+            _loadlf = static_cast<uint32_t>((1 << 27) / value);
     }
 
     constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
@@ -643,7 +637,7 @@ public:
 
     // no any optimize for position
     template <class... Args> iterator emplace_hint(const_iterator position, Args&&... args) {
-        (void)position; // unused parameter
+        static_cast<void>(position); // unused parameter
         return insert(std::forward<Args>(args)...);
     }
 
@@ -748,7 +742,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear() {
         if (_num_filled > _num_buckets / 4 && std::is_trivially_destructible<KeyT>::value)
-            memset((void*)_pairs, -1, sizeof(_pairs[0]) * _num_buckets);
+            memset(static_cast<void*>(_pairs), -1, sizeof(_pairs[0]) * _num_buckets);
         else
             clearkv();
 
@@ -808,7 +802,7 @@ private:
 #endif
 
         // assert(num_buckets > _num_filled);
-        auto new_pairs = (PairT*)alloc_bucket(num_buckets);
+        auto new_pairs = static_cast<PairT*>(alloc_bucket(num_buckets));
         auto old_num_filled = _num_filled;
         auto old_num_buckets = _num_buckets;
         auto old_pairs = _pairs;
@@ -819,12 +813,12 @@ private:
         _last_colls = num_buckets - 1;
 
         if (bInCacheLine) {
-            memset((void*)_pairs, (int)(uint32_t)(-1u), sizeof(_pairs[0]) * num_buckets);
+            memset(static_cast<void*>(_pairs), static_cast<int>(static_cast<uint32_t>(-1u)), sizeof(_pairs[0]) * num_buckets);
         } else {
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 _pairs[bucket].second = INACTIVE;
         }
-        memset((void*)(_pairs + num_buckets), 0, sizeof(_pairs[0]) * 2);
+        memset(static_cast<void*>(_pairs + num_buckets), 0, sizeof(_pairs[0]) * 2);
 
         // set all main bucket first
         for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
@@ -848,7 +842,7 @@ private:
             char buff[255] = {0};
             snprintf(buff, sizeof(buff),
                      "    _num_filled/aver_size/type/sizeof/collision/load_factor = %u/%.2lf/%s/%zd/%2.lf%%|%.2f",
-                     _num_filled, (double)_num_filled / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]),
+                     _num_filled, static_cast<double>(_num_filled) / mbucket, typeid(KeyT).name(), sizeof(_pairs[0]),
                      (collision * 100.0 / _num_filled), load_factor());
 #ifdef EMH_LOG
             static size_type ihashs = 0;
@@ -1050,7 +1044,7 @@ private:
             return bucket;
 
         constexpr auto linear_probe_length =
-            std::max((unsigned int)(128 / sizeof(PairT)) + 2, 4u); // cpu cache line 64 byte,2-3 cache line miss
+            std::max(static_cast<unsigned int>(128 / sizeof(PairT)) + 2, 4u); // cpu cache line 64 byte,2-3 cache line miss
         auto offset = 1u;
 
         for (; offset < linear_probe_length; offset++) {
@@ -1111,7 +1105,7 @@ private:
 #if __SIZEOF_INT128__
         __uint128_t r = key;
         r *= KC;
-        return (uint64_t)(r >> 64) + (uint64_t)r;
+        return static_cast<uint64_t>(r >> 64) + static_cast<uint64_t>(r);
 #elif _WIN64
         uint64_t high;
         return _umul128(key, KC, &high) + high;
@@ -1140,22 +1134,22 @@ private:
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType key) const {
 #ifdef EMH_INT_HASH
-        return (size_type)(hash64(key) & _mask);
+        return static_cast<size_type>(hash64(key) & _mask);
 #elif EMH_IDENTITY_HASH
-        return (size_type)((key + (key >> (sizeof(UType) * 4))) & _mask);
+        return static_cast<size_type>((key + (key >> (sizeof(UType) * 4))) & _mask);
 #elif EMH_WYHASH64
-        return (size_type)(wyhash64(key, KC) & _mask);
+        return static_cast<size_type>(wyhash64(key, KC) & _mask);
 #else
-        return (size_type)(_hasher(key) & _mask);
+        return static_cast<size_type>(_hasher(key) & _mask);
 #endif
     }
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const {
 #ifdef WYHASH_LITTLE_ENDIAN
-        return (size_type)(wyhash(key.data(), key.size(), key.size()) & _mask);
+        return static_cast<size_type>(wyhash(key.data(), key.size(), key.size()) & _mask);
 #else
-        return (size_type)(_hasher(key) & _mask);
+        return static_cast<size_type>(_hasher(key) & _mask);
 #endif
     }
 
@@ -1164,9 +1158,9 @@ private:
                                       size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const {
 #ifdef EMH_INT_HASH
-        return (size_type)((_hasher(key) * KC) & _mask);
+        return static_cast<size_type>((_hasher(key) * KC) & _mask);
 #else
-        return (size_type)(_hasher(key) & _mask);
+        return static_cast<size_type>(_hasher(key) & _mask);
 #endif
     }
 

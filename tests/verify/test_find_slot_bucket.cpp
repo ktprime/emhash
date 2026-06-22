@@ -98,7 +98,7 @@ static int test_erase_triggers_find_slot(const char* name, int n) {
     for (int round = 0; round < n; ++round) {
         auto it = m.begin();
         if (it == m.end()) break;
-        m.erase(it);
+        (void)m.erase(it);
     }
 
     auto t1 = std::chrono::steady_clock::now();
@@ -146,7 +146,7 @@ static int test_random_churn(const char* name, int iters, unsigned seed) {
             ref[k] = v;
             ++insert_count;
         } else if (op < 8) {
-            m.erase(k);
+            (void)m.erase(k);
             ref.erase(k);
             ++erase_count;
         } else {
@@ -211,7 +211,7 @@ static int test_erase_iter_const_hash(const char* name, int n) {
 
     int half = n / 2;
     for (int i = 0; i < half; ++i) {
-        m.erase(to_erase[i]);
+        (void)m.erase(to_erase[i]);
     }
     // Verify survivors.
     for (int i = half; i < n; ++i) {
@@ -253,7 +253,7 @@ static int test_concurrent_erase(const char* name, int n, int threads) {
     auto t0 = std::chrono::steady_clock::now();
 
     Map* m = new Map();
-    for (int i = 0; i < n; ++i) m->insert_unique(i, i);
+    for (int i = 0; i < n; ++i) (void)m->insert_unique(i, i);
 
     std::atomic<int> failures{0};
     std::vector<std::thread> ts;
@@ -342,7 +342,7 @@ static int test_set_random_churn(const char* name, int iters, unsigned seed) {
         if (op < 5) {
             if (refset.insert(k).second) s.insert(k);
         } else if (op < 8) {
-            s.erase(k);
+            (void)s.erase(k);
             refset.erase(k);
         } else {
             bool in_s = s.find(k) != s.end();

@@ -69,11 +69,11 @@
 
 // #define next_coll_bucket(bucket)  ((bucket + 1) & _main_mask + _bucket)
 #if EMH_HASH
-#define hash_main_bucket(key) (size_type)(_hasher(key) & _main_mask)
+#define hash_main_bucket(key) static_cast<size_type>(_hasher(key) & _main_mask)
 #define hash_coll_bucket(key) ((hash_inter(key) & _coll_mask) + _mains_buckets)
 #define next_coll_bucket(bucket) ((bucket) & _coll_mask) + _mains_buckets
 #else
-#define hash_main_bucket(key) (size_type)(hash_inter(key) & _main_mask)
+#define hash_main_bucket(key) static_cast<size_type>(hash_inter(key) & _main_mask)
 #define hash_coll_bucket(key) ((_hasher(key) & _coll_mask) + _mains_buckets)
 #define next_coll_bucket(bucket) ((bucket) & _coll_mask) + _mains_buckets
 #endif
@@ -88,7 +88,7 @@
 #define EMH_BUCKET(p, n) p[n].second
 
 namespace emhash3 {
-/// A cache-fristd::endly hash table with open addressing, linear probing and power-of-two capacity
+/// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<KeyT>>
 class HashSet {
@@ -270,7 +270,7 @@ public:
         _num_mains = other._num_mains;
 
         if (std::is_trivially_copyable<KeyT>::value) {
-            memcpy((void*)_pairs, other._pairs, _total_buckets * sizeof(PairT));
+            memcpy(static_cast<void*>(_pairs), other._pairs, _total_buckets * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
             for (size_type bucket = 0; bucket < _total_buckets; bucket++) {
@@ -297,11 +297,11 @@ public:
     HashSet(std::initializer_list<key_type> il, size_type n = 8, const HashT& hash = HashT(), const EqT& eq = EqT(),
             const AllocT& alloc = AllocT())
         : _alloc(alloc) {
-        (void)n; // unused parameter
+        static_cast<void>(n); // unused parameter
         init();
         _hasher = hash;
         _eq = eq;
-        reserve((size_type)il.size());
+        reserve(static_cast<size_type>(il.size()));
         for (auto begin = il.begin(); begin != il.end(); ++begin)
             insert(*begin);
     }
@@ -396,7 +396,7 @@ public:
 
     /// Returns average number of elements per bucket.
     float load_factor() const {
-        return _total_buckets ? ((float)size()) / _total_buckets : 0.0f;
+        return _total_buckets ? (static_cast<float>(size())) / _total_buckets : 0.0f;
         // return (_num_colls / static_cast<float>(_colls_buckets));
         // return (_num_mains / static_cast<float>(_mains_buckets + 1));
     }
@@ -405,11 +405,11 @@ public:
 
     const EqT& key_eq() const { return _eq; }
 
-    constexpr float max_load_factor() const { return (float)(1 << 13) / _loadlf; }
+    constexpr float max_load_factor() const { return static_cast<float>(1 << 13) / _loadlf; }
 
     void max_load_factor(float value) {
         if (value < 0.99f && value > 0.2f)
-            _loadlf = (uint32_t)((1 << 13) / value);
+            _loadlf = static_cast<uint32_t>((1 << 13) / value);
     }
 
     constexpr uint64_t max_size() const { return (1ull << (sizeof(_total_buckets) * 8 - 1)); }
@@ -600,7 +600,7 @@ public:
     }
 
     void insert(std::initializer_list<value_type> ilist) {
-        reserve((size_type)ilist.size() + _num_colls);
+        reserve(static_cast<size_type>(ilist.size()) + _num_colls);
         for (auto begin = ilist.begin(); begin != ilist.end(); ++begin) {
             insert(*begin);
         }
@@ -611,7 +611,7 @@ public:
         Iter citend = begin;
         reserve(end - begin + _num_colls);
         for (; begin != end; ++begin) {
-            if (try_insert_mainbucket(*begin) == (size_type)INACTIVE) {
+            if (try_insert_mainbucket(*begin) == static_cast<size_type>(INACTIVE)) {
                 std::swap(*begin, *citend++);
             }
         }
@@ -636,7 +636,7 @@ public:
         check_expand_need();
         auto bucket = find_unique_bucket(key);
         new_key(key, bucket, hash_main_bucket(key));
-        return (size_type)bucket;
+        return static_cast<size_type>(bucket);
     }
 
     // not
@@ -646,7 +646,7 @@ public:
 
     // no any optimize for position
     template <class... Args> iterator emplace_hint(const_iterator position, Args&&... args) {
-        (void)position; // unused parameter
+        static_cast<void>(position); // unused parameter
         return insert(std::forward<Args>(args)...).first;
     }
     std::pair<iterator, bool> try_emplace(const key_type& k) { return insert(k); }
@@ -678,7 +678,7 @@ public:
         const auto bucket = hash_coll_bucket(key);
         if (EMH_BUCKET(_pairs, bucket) == INACTIVE) {
             new_key(key, bucket, main_bucket);
-            return (size_type)bucket;
+            return static_cast<size_type>(bucket);
         }
 
         return INACTIVE;
@@ -759,7 +759,7 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear() {
         if (size() > _mains_buckets / 2 && std::is_trivially_destructible<KeyT>::value)
-            memset((void*)_pairs, -1, sizeof(_pairs[0]) * _total_buckets);
+            memset(static_cast<void*>(_pairs), -1, sizeof(_pairs[0]) * _total_buckets);
         else
             clearkv();
 
@@ -789,9 +789,9 @@ public:
         if (buckets >= max_size() || buckets < _num_colls)
             throw std::length_error("emhash3::HashSet: too many elements");
 
-        const auto num_buckets = (size_type)buckets;
+        const auto num_buckets = static_cast<size_type>(buckets);
         const auto main_bucket = num_buckets;
-        auto new_pairs = alloc_bucket((size_type)(2ull + num_buckets + main_bucket));
+        auto new_pairs = alloc_bucket(static_cast<size_type>(2ull + num_buckets + main_bucket));
         auto old_pairs = _pairs;
 
 #if EMH_REHASH_LOG
@@ -814,7 +814,7 @@ public:
         _num_colls = 0;
 
         if (sizeof(PairT) <= EMH_CACHE_LINE_SIZE / 2)
-            memset((void*)_pairs, (int)(uint32_t)(-1u), _total_buckets * sizeof(_pairs[0]));
+            memset(static_cast<void*>(_pairs), static_cast<int>(static_cast<uint32_t>(-1u)), _total_buckets * sizeof(_pairs[0]));
         else {
             for (size_type bucket = 0; bucket < _total_buckets; bucket++)
                 EMH_BUCKET(_pairs, bucket) = INACTIVE;
@@ -845,7 +845,7 @@ public:
                 if (next_bucket2 == INACTIVE) {
                     new (_pairs + bucket) PairT(std::move(old_pair));
                     old_pair.~PairT();
-                    next_bucket2 = (size_type)bucket;
+                    next_bucket2 = static_cast<size_type>(bucket);
                     _num_colls++;
                 } else {
                     // move collision bucket to head for better cache performance
@@ -895,7 +895,7 @@ public:
 #if EMH_REHASH_LOG
         auto diff = old_num_colls + old_num_mains - _num_colls - _num_mains;
         if (diff != 0) {
-            printf("%d %d | %d %d diff = %ld\n", old_num_colls, old_num_mains, _num_colls, _num_mains, (long)diff);
+            printf("%d %d | %d %d diff = %ld\n", old_num_colls, old_num_mains, _num_colls, _num_mains, static_cast<long>(diff));
             assert(diff == 0);
         }
 #endif
@@ -913,14 +913,14 @@ private:
 
         const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
         if (next_bucket == bucket)
-            return eqkey ? (size_type)bucket : INACTIVE;
+            return eqkey ? static_cast<size_type>(bucket) : INACTIVE;
         else if (eqkey) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (std::is_trivial<KeyT>::value)
                 std::swap(EMH_KEY(_pairs, bucket), EMH_KEY(_pairs, next_bucket));
             else
                 EMH_KEY(_pairs, bucket) = EMH_KEY(_pairs, next_bucket);
-            EMH_BUCKET(_pairs, bucket) = (size_type)((nbucket == next_bucket) ? bucket : nbucket);
+            EMH_BUCKET(_pairs, bucket) = static_cast<size_type>((nbucket == next_bucket) ? bucket : nbucket);
             return next_bucket;
         } else if (EMH_UNLIKELY(bucket != hash_coll_bucket(EMH_KEY(_pairs, bucket))))
             return INACTIVE;
@@ -929,7 +929,7 @@ private:
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
-                EMH_BUCKET(_pairs, prev_bucket) = (size_type)((nbucket == next_bucket) ? prev_bucket : nbucket);
+                EMH_BUCKET(_pairs, prev_bucket) = static_cast<size_type>((nbucket == next_bucket) ? prev_bucket : nbucket);
                 return next_bucket;
             }
 
@@ -957,9 +957,9 @@ private:
             return next_bucket;
         }
 
-        const auto prev_bucket = find_prev_bucket((size_type)main_bucket, (size_type)bucket);
-        EMH_BUCKET(_pairs, prev_bucket) = (size_type)((bucket == next_bucket) ? prev_bucket : next_bucket);
-        return (size_type)bucket;
+        const auto prev_bucket = find_prev_bucket(static_cast<size_type>(main_bucket), static_cast<size_type>(bucket));
+        EMH_BUCKET(_pairs, prev_bucket) = static_cast<size_type>((bucket == next_bucket) ? prev_bucket : next_bucket);
+        return static_cast<size_type>(bucket);
     }
 
     // Find the bucket with this key, or return bucket size
@@ -981,7 +981,7 @@ private:
         if (next_bucket == INACTIVE)
             return _total_buckets;
         else if (_eq(key, EMH_KEY(_pairs, bucket)))
-            return (size_type)bucket;
+            return static_cast<size_type>(bucket);
         else if (next_bucket == bucket)
             return _total_buckets;
 
@@ -1008,7 +1008,7 @@ private:
         _pairs[bucket].~PairT();
         EMH_BUCKET(_pairs, new_bucket) = (next_bucket == bucket) ? new_bucket : next_bucket;
         EMH_BUCKET(_pairs, bucket) = INACTIVE;
-        return (size_type)bucket;
+        return static_cast<size_type>(bucket);
     }
 
     /*
@@ -1023,12 +1023,12 @@ private:
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE || _eq(key, bucket_key))
-            return (size_type)bucket;
+            return static_cast<size_type>(bucket);
 
         // check current bucket_key is in main bucket or not
         const auto main_bucket = hash_coll_bucket(bucket_key);
         if (main_bucket != bucket)
-            return reset_coll_bucket((size_type)main_bucket, (size_type)bucket);
+            return reset_coll_bucket(static_cast<size_type>(main_bucket), static_cast<size_type>(bucket));
         else if (next_bucket == bucket)
             return EMH_BUCKET(_pairs, next_bucket) = find_empty_bucket(next_bucket);
 
@@ -1037,7 +1037,7 @@ private:
             if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
 #if EMH_LRU_SET
                 std::swap(EMH_KEY(_pairs, bucket), EMH_KEY(_pairs, next_bucket));
-                return (size_type)bucket;
+                return static_cast<size_type>(bucket);
 #else
                 return next_bucket;
 #endif
@@ -1058,7 +1058,7 @@ private:
     size_type find_empty_bucket(size_type bucket_from) const {
         const auto bucket = ++bucket_from;
         if (EMH_BUCKET(_pairs, bucket) == INACTIVE)
-            return (size_type)bucket;
+            return static_cast<size_type>(bucket);
 
         bucket_from = next_coll_bucket(bucket_from + 1);
         if (EMH_BUCKET(_pairs, bucket_from) == INACTIVE)
@@ -1114,12 +1114,12 @@ private:
         const auto bucket = hash_coll_bucket(key);
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
         if (next_bucket == INACTIVE)
-            return (size_type)bucket;
+            return static_cast<size_type>(bucket);
 
         // check current bucket_key is in main bucket or not
         const auto main_bucket = hash_coll_bucket(EMH_KEY(_pairs, bucket));
         if (main_bucket != bucket)
-            return reset_coll_bucket((size_type)main_bucket, (size_type)bucket);
+            return reset_coll_bucket(static_cast<size_type>(main_bucket), static_cast<size_type>(bucket));
         else if (next_bucket != bucket)
             next_bucket = find_last_bucket(next_bucket);
 
@@ -1132,7 +1132,7 @@ private:
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         __uint128_t r = key;
         r *= k;
-        return (uint32_t)(r >> 64) + (uint32_t)r;
+        return static_cast<uint32_t>(r >> 64) + static_cast<uint32_t>(r);
 #elif _WIN64
         uint64_t high;
         constexpr uint64_t k = UINT64_C(11400714819323198485);
@@ -1161,20 +1161,20 @@ private:
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
     inline size_type hash_inter(const UType key) const {
 #ifndef EMH_INT_HASH
-        return (size_type)hash64((uint64_t)key);
+        return static_cast<size_type>(hash64(static_cast<uint64_t>(key)));
 #elif EMH_IDENTITY_HASH
         return key + (key >> (sizeof(UType) * 4));
 #else
-        return (size_type)_hasher(key);
+        return static_cast<size_type>(_hasher(key));
 #endif
     }
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
     inline size_type hash_inter(const UType& key) const {
 #ifndef EMH_INT_HASH
-        return (size_type)(_hasher(key) * 11400714819323198485ull);
+        return static_cast<size_type>(_hasher(key) * 11400714819323198485ull);
 #else
-        return (size_type)_hasher(key);
+        return static_cast<size_type>(_hasher(key));
 #endif
     }
 

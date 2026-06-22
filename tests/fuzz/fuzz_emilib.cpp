@@ -111,7 +111,7 @@ static void fuzz_hashmap(const std::vector<Op>& ops) {
             case OP_RESERVE: {
                 size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
                 if (cap < 1000000) {
-                    em.reserve(cap);
+                    (void)em.reserve(cap);
                     ref.reserve(cap);
                 }
                 break;
@@ -119,15 +119,15 @@ static void fuzz_hashmap(const std::vector<Op>& ops) {
             case OP_INSERT_OR_ASSIGN: {
                 int v = op.value;
                 em.insert_or_assign(op.key, std::move(v));
-                ref[op.key] = op.value;
+                    ref[op.key] = op.value;
                 break;
             }
             case OP_ERASE_ITERATOR: {
                 auto em_it = em.find(op.key);
                 auto ref_it = ref.find(op.key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
+                    (void)em.erase(em_it);
+                        ref.erase(ref_it);
                 }
                 break;
             }
@@ -217,7 +217,7 @@ void fuzz_hashmap<emilib::HashMap<int, int>, false>(const std::vector<Op>& ops) 
             case OP_RESERVE: {
                 size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
                 if (cap < 1000000) {
-                    em.reserve(cap);
+                    (void)em.reserve(cap);
                     ref.reserve(cap);
                 }
                 break;
@@ -225,15 +225,15 @@ void fuzz_hashmap<emilib::HashMap<int, int>, false>(const std::vector<Op>& ops) 
             case OP_INSERT_OR_ASSIGN: {
                 int v = op.value;
                 em.insert_or_assign(op.key, std::move(v));
-                ref[op.key] = op.value;
+                    ref[op.key] = op.value;
                 break;
             }
             case OP_ERASE_ITERATOR: {
                 auto em_it = em.find(op.key);
                 auto ref_it = ref.find(op.key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
+                    (void)em.erase(em_it);
+                        ref.erase(ref_it);
                 }
                 break;
             }
@@ -284,7 +284,7 @@ static void fuzz_high_load(const std::vector<Op>& ops) {
                 break;
             }
             case 1: {
-                em.erase(op.key);
+                (void)em.erase(op.key);
                 ref.erase(op.key);
                 break;
             }
@@ -324,7 +324,7 @@ void fuzz_high_load<emilib::HashMap<int, int>>(const std::vector<Op>& ops) {
                 break;
             }
             case 1: {
-                em.erase(op.key);
+                (void)em.erase(op.key);
                 ref.erase(op.key);
                 break;
             }
@@ -394,15 +394,15 @@ static void fuzz_churn(const uint8_t* data, size_t size) {
                 auto em_it = em.find(key);
                 auto ref_it = ref.find(key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
+                    (void)em.erase(em_it);
+                        ref.erase(ref_it);
                 }
                 break;
             }
             case 5: { // insert_or_assign
                 int v = value;
                 em.insert_or_assign(key, std::move(v));
-                ref[key] = value;
+                    ref[key] = value;
                 break;
             }
         }
@@ -463,15 +463,15 @@ void fuzz_churn<emilib::HashMap<int, int>, false>(const uint8_t* data, size_t si
                 auto em_it = em.find(key);
                 auto ref_it = ref.find(key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
-                    ref.erase(ref_it);
+                    (void)em.erase(em_it);
+                        ref.erase(ref_it);
                 }
                 break;
             }
             case 5: {
                 int v = value;
                 em.insert_or_assign(key, std::move(v));
-                ref[key] = value;
+                    ref[key] = value;
                 break;
             }
         }
@@ -508,7 +508,7 @@ static void fuzz_string_hashmap(const uint8_t* data, size_t size) {
 
         switch (op) {
             case 0: { em.insert({key, value}); ref.insert({key, value}); break; }
-            case 1: { em.erase(key); ref.erase(key); break; }
+            case 1: { (void)em.erase(key); ref.erase(key); break; }
             case 2: {
                 auto em_it = em.find(key);
                 auto ref_it = ref.find(key);
@@ -556,14 +556,14 @@ static void fuzz_boundary(const uint8_t* data, size_t size) {
     assert(em.count(1) == 1);
 
     // Erase single element
-    em.erase(1);
+    (void)em.erase(1);
     assert(em.size() == 0);
     assert(em.empty());
 
     // Reserve edge cases
-    em.reserve(0);
-    em.reserve(1);
-    em.reserve(100);
+    (void)em.reserve(0);
+    (void)em.reserve(1);
+    (void)em.reserve(100);
     assert(em.size() == 0);
 
     // Insert after reserve
@@ -615,13 +615,13 @@ void fuzz_boundary<emilib::HashMap<int, int>, false>(const uint8_t* data, size_t
     assert(em.find(1)->second == 100);
     assert(em.count(1) == 1);
 
-    em.erase(1);
+    (void)em.erase(1);
     assert(em.size() == 0);
     assert(em.empty());
 
-    em.reserve(0);
-    em.reserve(1);
-    em.reserve(100);
+    (void)em.reserve(0);
+    (void)em.reserve(1);
+    (void)em.reserve(100);
     assert(em.size() == 0);
 
     for (int i = 0; i < 50; i++) em[i] = i * 10;
@@ -825,7 +825,7 @@ static void fuzz_insert_unique(const uint8_t* data, size_t size) {
             case 1: { // erase some keys
                 if (next_key > 5) {
                     int erase_key = next_key - 5;
-                    em.erase(erase_key);
+                    (void)em.erase(erase_key);
                 }
                 break;
             }

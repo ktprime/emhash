@@ -852,14 +852,14 @@ public:
         if (buckets > max_size() || buckets < _num_filled)
             throw std::length_error("emilib2::HashMap: too many elements");
 
-        const auto num_buckets = (size_t)buckets;
-        const auto* new_data = (char*)malloc(pairs_size + state_size * sizeof(_states[0]) +
-                                             (state_size / OFFSET_STEP) * sizeof(_offset[0]));
+        const auto num_buckets = static_cast<size_t>(buckets);
+        auto* new_data = static_cast<char*>(malloc(pairs_size + state_size * sizeof(_states[0]) +
+                                             (state_size / OFFSET_STEP) * sizeof(_offset[0])));
         auto old_states = _states;
 
-        auto* new_pairs = (decltype(_pairs))new_data;
-        _states = (decltype(_states))(new_data + pairs_size);
-        _offset = (decltype(_offset))(_states + state_size);
+        auto* new_pairs = reinterpret_cast<decltype(_pairs)>(new_data);
+        _states = reinterpret_cast<decltype(_states)>(new_data + pairs_size);
+        _offset = reinterpret_cast<decltype(_offset)>(_states + state_size);
 
         auto old_num_filled = _num_filled;
         auto old_pairs = _pairs;
@@ -972,7 +972,7 @@ private:
         size_t offset = 0, max_offset = 0;
 
         if (1) {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
@@ -992,7 +992,7 @@ private:
 
         do {
             next_bucket = get_next_bucket(next_bucket, ++offset);
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
             if (maskf) {
                 prefetch_heap_block((char*)&_pairs[next_bucket]);
@@ -1028,7 +1028,7 @@ private:
         size_t hole = chole;
 
         do {
-            const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
             auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             // 1. find filled
@@ -1073,7 +1073,7 @@ private:
         const auto vec = _mm256_loadu_si256((__m256i const *)&_states[next_bucket]);
         return _mm256_movemask_epi8(_mm256_cmpgt_epi8(simd2_filled, vec));
 #else
-        const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+        const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
         return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_sentinel, vec));
 #endif
     }
@@ -1083,7 +1083,7 @@ private:
         const auto vec = _mm256_loadu_si256((__m256i const*)&_states[next_bucket]);
         return (size_t)_mm256_movemask_epi8(_mm256_cmpgt_epi8(vec, simd2_delete));
 #else
-        const auto vec = LOAD_UEPI8((decltype(&simd_empty))(&_states[next_bucket]));
+        const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
         return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete));
 #endif
     }

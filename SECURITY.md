@@ -12,7 +12,13 @@
 emhash is a header-only hash table library. Most security concerns relate to:
 
 - **Hash collision attacks**: emhash7/8 do not limit probe sequence length by default, making them potentially vulnerable to hash flooding DoS when accepting untrusted input. For mitigation options, see [docs/usage_notes.md](docs/usage_notes.md). The `emilib` variants (e.g., `emilib2ss`) provide `EMH_SAFE_PSL` compile-time options to cap probe lengths. `EMH_HIGH_LOAD` is a separate feature for high load factor support, not a flood protection mechanism.
-- **Memory safety**: Use AddressSanitizer (`-fsanitize=address`) and UndefinedBehaviorSanitizer (`-fsanitize=undefined`) to detect issues.
+- **Memory safety**: Use AddressSanitizer (`-fsanitize=address`), UndefinedBehaviorSanitizer (`-fsanitize=undefined`), and (on Clang) MemorySanitizer (`-fsanitize=memory`) to detect issues. The project ships a ready-to-use aggregate test:
+
+  ```bash
+  ./tests/scripts/run_sanitizers.sh all      # Linux/macOS with g++/clang++
+  cmake -S tests -B build_asan -DEMHASH_SANITIZER=address  # Windows MSVC (ASan)
+  cmake --build build_asan --config Debug
+  ```
 
 To report a security vulnerability:
 

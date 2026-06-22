@@ -73,7 +73,7 @@ int main()
         auto it = m.find(i);
         CHECK(it != m.end() && it->second == i * 2, "negative key find");
     }
-    m.erase(-1);
+    (void)m.erase(-1);
     CHECK(m.find(-1) == m.end(), "after erase -1");
     CHECK(m.find(-2) != m.end(), "find -2 not affected");
     printf("  INACTIVE key: OK\n");

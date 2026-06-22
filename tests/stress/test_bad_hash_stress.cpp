@@ -141,7 +141,7 @@ bool test_erase_reinsert(const char* name, int num_keys, int timeout_ms = 30000)
 
     // Erase half
     for (int i = 0; i < num_keys; i += 2) {
-        map.erase(i);
+        (void)map.erase(i);
     }
 
     // Reinsert erased keys with different values

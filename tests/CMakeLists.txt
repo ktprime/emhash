@@ -13,11 +13,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # source files, not in the library headers which we intentionally do not modify.)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -pedantic)
+    # Enable SSE2 for SIMD intrinsics (required for emilib hash maps)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "i386|i686|x86|AMD64|amd64|x86_64")
+        add_compile_options(-msse2)
+    endif()
     set(CMAKE_CXX_FLAGS_RELEASE "-O2 -flto=auto")
     set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+    # Optional sanitizer build (Linux/Clang only). Enable with
+    #   cmake -DEMHASH_SANITIZER=address  (or undefined, thread, memory)
+    if(DEFINED EMHASH_SANITIZER AND NOT EMHASH_SANITIZER STREQUAL "")
+        add_compile_options(-fsanitize=${EMHASH_SANITIZER} -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=${EMHASH_SANITIZER})
+        message(STATUS "emhash: sanitizer build enabled (-fsanitize=${EMHASH_SANITIZER})")
+    endif()
 else()
     set(CMAKE_CXX_FLAGS_RELEASE "/O2")
     set(CMAKE_CXX_FLAGS_DEBUG "/Od /Zi")
+    # MSVC supports AddressSanitizer on x64 since VS 2019 16.9.
+    # Enable with: cmake -DEMHASH_SANITIZER=address
+    if(DEFINED EMHASH_SANITIZER AND EMHASH_SANITIZER STREQUAL "address")
+        add_compile_options(/fsanitize=address /Zi)
+        add_link_options(/fsanitize=address)
+        message(STATUS "emhash: MSVC AddressSanitizer build enabled")
+    endif()
 endif()
 
 # Helper to register an emhash test executable
@@ -46,6 +64,7 @@ emhash_add_test(test_interface_combo verify/test_interface_combo.cpp)
 emhash_add_test(test_emhash5_verify verify/test_emhash5_verify.cpp)
 emhash_add_test(test_emhash_allocator verify/test_emhash_allocator.cpp)
 emhash_add_test(test_functional_edge verify/test_functional_edge.cpp)
+emhash_add_test(test_sanitizer_aggregate verify/test_sanitizer_aggregate.cpp)
 
 # Merged from test/ directory
 emhash_add_test(test_hashset_allocator verify/test_hashset_allocator.cpp)
@@ -86,6 +105,7 @@ emhash_add_test(test_bad_hash_stress stress/test_bad_hash_stress.cpp)
 # ============================================================================
 
 emhash_add_test(test_attack attack/hash_attack_all.cpp)
+emhash_add_test(test_collision_hardening attack/test_collision_hardening.cpp)
 target_compile_definitions(test_attack PRIVATE EMH_SAFE_PSL)
 
 emhash_add_test(hash_attack5 attack/hash_attack.cpp)

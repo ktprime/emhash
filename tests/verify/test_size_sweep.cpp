@@ -48,7 +48,7 @@ bool test_size_n(int N)
     // Erase odd keys
     int erased = 0;
     for (int i = 1; i < N; i += 2) {
-        map.erase(Key(i));
+        (void)map.erase(Key(i));
         erased++;
     }
     TEST_ASSERT((int)map.size() == N - erased, "size after erase odds");

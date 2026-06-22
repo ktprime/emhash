@@ -162,7 +162,7 @@ static void fuzz_extreme_hashmap(const std::vector<Op>& ops, float mlf = 0.8f) {
             case OP_RESERVE: {
                 size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
                 if (cap < 100000) {
-                    em.reserve(cap);
+                    (void)em.reserve(cap);
                 }
                 break;
             }
@@ -177,7 +177,7 @@ static void fuzz_extreme_hashmap(const std::vector<Op>& ops, float mlf = 0.8f) {
                 auto em_it = em.find(op.key);
                 auto ref_it = ref.find(op.key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
+                    (void)em.erase(em_it);
                     ref.erase(ref_it);
                 }
                 break;
@@ -201,7 +201,7 @@ static void fuzz_extreme_hashmap(const std::vector<Op>& ops, float mlf = 0.8f) {
             case OP_SHRINK: {
                 // shrink_to_fit or rehash to minimal
                 if (em.size() > 0)
-                    em.reserve(em.size());
+                    (void)em.reserve(em.size());
                 break;
             }
             case OP_SWAP: {
@@ -284,7 +284,7 @@ static void fuzz_extreme_hashset(const std::vector<Op>& ops) {
             }
             case OP_RESERVE: {
                 size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
-                if (cap < 100000) em.reserve(cap);
+                if (cap < 100000) (void)em.reserve(cap);
                 break;
             }
             case OP_INSERT_OR_ASSIGN: {
@@ -296,7 +296,7 @@ static void fuzz_extreme_hashset(const std::vector<Op>& ops) {
                 auto em_it = em.find(op.key);
                 auto ref_it = ref.find(op.key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
+                    (void)em.erase(em_it);
                     ref.erase(ref_it);
                 }
                 break;
@@ -316,7 +316,7 @@ static void fuzz_extreme_hashset(const std::vector<Op>& ops) {
                 break;
             }
             case OP_SHRINK: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
             case OP_SWAP: {
@@ -373,7 +373,7 @@ static void fuzz_emhash8_full_collision(const std::vector<Op>& ops) {
                 break;
             }
             case 4: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
             case 5: {
@@ -426,7 +426,7 @@ static void fuzz_emhash8_set_twobucket(const std::vector<Op>& ops) {
                 break;
             }
             case 4: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
             case 5: {
@@ -484,7 +484,7 @@ static void fuzz_churn(const std::vector<Op>& ops) {
                 break;
             }
             case 4: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
         }
@@ -542,7 +542,7 @@ static void fuzz_full_collision(const std::vector<Op>& ops) {
                 break;
             }
             case 4: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
             case 5: {

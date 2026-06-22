@@ -795,8 +795,8 @@ public:
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
         const auto state_size = (simd_bytes + num_buckets) * sizeof(State);
 
-        auto* new_state = (decltype(_states))malloc(state_size);
-        auto* new_pairs = (decltype(_pairs))malloc(pairs_size);
+        auto* new_state = static_cast<decltype(_states)>(malloc(state_size));
+        auto* new_pairs = static_cast<decltype(_pairs)>(malloc(pairs_size));
 
         auto old_num_filled = _num_filled;
         auto old_states = _states;
@@ -915,7 +915,7 @@ private:
         auto next_bucket = main_bucket;
 
         do {
-            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
             auto maskf = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
             if (maskf) {
                 prefetch_read((char*)&_pairs[next_bucket]);
@@ -953,7 +953,7 @@ private:
         size_t hole = chole;
 
         do {
-            const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[next_bucket]));
+            const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
 #if 1
             auto maskf = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
             // 1. find filled
@@ -997,12 +997,12 @@ private:
     }
 
     inline size_t empty_delete(size_t gbucket) const noexcept {
-        const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
+        const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[gbucket]));
         return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)));
     }
 
     inline size_t filled_mask(size_t gbucket) const noexcept {
-        const auto vec = LOAD_EPI8((decltype(&simd_empty))(&_states[gbucket]));
+        const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[gbucket]));
         return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete)));
     }
 

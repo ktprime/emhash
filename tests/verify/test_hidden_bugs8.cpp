@@ -100,7 +100,7 @@ int test_kickout_chain_integrity() {
     emhash8::HashMap<int, int, ControlledHash> m;
 
     // Pre-reserve to control table size
-    m.reserve(16);
+    (void)m.reserve(16);
 
     // Insert keys that will definitely collide and trigger kickout
     std::vector<int> keys;
@@ -309,7 +309,7 @@ int test_near_full_deadlock() {
     emhash8::HashMap<int, int, ConstHash> m;
 
     // Reserve small space and fill to near capacity
-    m.reserve(32);
+    (void)m.reserve(32);
 
     bool pass = true;
     auto start = std::chrono::steady_clock::now();
@@ -348,7 +348,7 @@ int test_pack_tail_safety() {
     printf("\n=== Test 6: EMH_PACK_TAIL memory safety ===\n");
 
     emhash8::HashMap<int, int> m;
-    m.reserve(64);
+    (void)m.reserve(64);
 
     for (int i = 0; i < 50; i++) {
         m.insert_unique(i, i);

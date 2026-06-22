@@ -1209,8 +1209,7 @@ public:
         {
             const auto inactive = INACTIVE;
             for (size_type i = 0; i < num_buckets; ++i) {
-                std::memcpy(reinterpret_cast<char*>(&_pairs[i]) + offsetof(PairT, bucket),
-                            &inactive, sizeof(inactive));
+                std::memcpy(&_pairs[i].bucket, &inactive, sizeof(inactive));
             }
         }
 

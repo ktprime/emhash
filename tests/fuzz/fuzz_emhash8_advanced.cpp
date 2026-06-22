@@ -132,7 +132,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         }
         case 6: { // reserve
             size_t cap = static_cast<size_t>(op.key & 0xFFFF);
-            em.reserve(cap);
+            (void)em.reserve(cap);
             ref.reserve(cap);
             break;
         }
@@ -148,7 +148,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             auto em_it = em.find(op.key);
             auto ref_it = ref.find(op.key);
             if (em_it != em.end() && ref_it != ref.end()) {
-                em.erase(em_it);
+                (void)em.erase(em_it);
                 ref.erase(ref_it);
             }
             break;

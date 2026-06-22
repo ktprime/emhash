@@ -168,7 +168,7 @@ static void test_rehash_under_load()
 
     // Erase 80K
     for (int i = 0; i < 80000; i++) {
-        m.erase(i);
+        (void)m.erase(i);
         ref.erase(i);
     }
     CHECK_EQ(m.size(), 20000, "after 80K erase");
@@ -208,7 +208,7 @@ static void test_string_churn()
     // Erase half
     for (int i = 0; i < 100000; i += 2) {
         snprintf(buf, sizeof(buf), "key_%d", i);
-        m.erase(std::string(buf));
+        (void)m.erase(std::string(buf));
         ref.erase(std::string(buf));
     }
     CHECK_EQ(m.size(), 50000, "after erase half");
@@ -328,7 +328,7 @@ static void test_inactive_heavy()
     CHECK(it != m.end() && it->second == 999, "-1 still findable after 10K inserts");
 
     // Erase -1, verify
-    m.erase(-1);
+    (void)m.erase(-1);
     CHECK(m.find(-1) == m.end(), "-1 erased");
 
     // Re-insert -1 with different value
@@ -336,9 +336,9 @@ static void test_inactive_heavy()
     CHECK_EQ(m.find(-1)->second, -999, "-1 re-inserted");
 
     // Delete all and verify -1 not false-positive
-    for (int i = 0; i < 10000; i++) m.erase(i);
+    for (int i = 0; i < 10000; i++) (void)m.erase(i);
     CHECK_EQ(m.find(-1)->second, -999, "-1 still there");
-    m.erase(-1);
+    (void)m.erase(-1);
     CHECK(m.find(-1) == m.end(), "-1 finally erased");
 
     // Empty map find(-1)

@@ -60,7 +60,7 @@ static void attack_known_hash(const char* name, int N) {
 
     // Baseline: insert N random keys for comparison
     HashMap baseline;
-    baseline.reserve(N);
+    (void)baseline.reserve(N);
     t0 = now_ms();
     for (int i = 0; i < N; i++)
         baseline[i] = i;
@@ -127,7 +127,7 @@ static void attack_adaptive_probing(const char* name) {
 
     // Baseline: insert same number of random keys
     HashMap baseline;
-    baseline.reserve(fill_count + attack_count);
+    (void)baseline.reserve(fill_count + attack_count);
     for (int i = 0; i < fill_count; i++)
         baseline[i] = i;
 
@@ -191,7 +191,7 @@ static void attack_multi_bucket(const char* name, int N, int target_buckets) {
 
     // Baseline
     HashMap baseline;
-    baseline.reserve(N + 1000);
+    (void)baseline.reserve(N + 1000);
     for (int i = 0; i < 1000; i++)
         baseline[i] = i;
 
@@ -247,7 +247,7 @@ static void attack_quadratic_proof(const char* name) {
 template<typename HashMap>
 static void baseline_normal(const char* name, int N) {
     HashMap map;
-    map.reserve(N);
+    (void)map.reserve(N);
 
     auto t0 = now_ms();
     for (int i = 0; i < N; i++)

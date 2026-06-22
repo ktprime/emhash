@@ -38,7 +38,7 @@ static void BM_Insert(benchmark::State& state) {
     auto keys = generate_keys(n);
     for (auto _ : state) {
         Map map;
-        map.reserve(n);
+        (void)map.reserve(n);
         for (int i = 0; i < n; i++) map.emplace(keys[i], i);
         benchmark::DoNotOptimize(map.size());
     }
@@ -53,7 +53,7 @@ static void BM_FindHit(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Map map;
-    map.reserve(n);
+    (void)map.reserve(n);
     for (int i = 0; i < n; i++) map.emplace(keys[i], i);
 
     for (auto _ : state) {
@@ -73,7 +73,7 @@ static void BM_FindMiss(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Map map;
-    map.reserve(n);
+    (void)map.reserve(n);
     for (int i = 0; i < n; i++) map.emplace(keys[i], i);
 
     for (auto _ : state) {
@@ -95,10 +95,10 @@ static void BM_Erase(benchmark::State& state) {
     for (auto _ : state) {
         state.PauseTiming();
         Map map;
-        map.reserve(n);
+        (void)map.reserve(n);
         for (int i = 0; i < n; i++) map.emplace(keys[i], i);
         state.ResumeTiming();
-        for (int i = 0; i < n; i++) map.erase(keys[i]);
+        for (int i = 0; i < n; i++) (void)map.erase(keys[i]);
         benchmark::DoNotOptimize(map.size());
     }
     state.SetItemsProcessed(state.iterations() * n);
@@ -112,7 +112,7 @@ static void BM_Iterate(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Map map;
-    map.reserve(n);
+    (void)map.reserve(n);
     for (int i = 0; i < n; i++) map.emplace(keys[i], i);
 
     volatile size_t sum = 0;
@@ -160,7 +160,7 @@ static void BM_SetInsert(benchmark::State& state) {
     auto keys = generate_keys(n);
     for (auto _ : state) {
         Set set;
-        set.reserve(n);
+        (void)set.reserve(n);
         for (int i = 0; i < n; i++) set.emplace(keys[i]);
         benchmark::DoNotOptimize(set.size());
     }
@@ -172,7 +172,7 @@ static void BM_SetFindHit(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Set set;
-    set.reserve(n);
+    (void)set.reserve(n);
     for (int i = 0; i < n; i++) set.emplace(keys[i]);
 
     for (auto _ : state) {

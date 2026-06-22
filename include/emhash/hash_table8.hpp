@@ -970,9 +970,10 @@ public:
 
     /// Remove all elements, keeping full capacity.
     void clear() noexcept {
+        const auto old_filled = _num_filled;
         clearkv();
 
-        if (_num_filled > 0)
+        if (old_filled > 0)
             memset(reinterpret_cast<char*>(_index), static_cast<int>(INACTIVE), sizeof(_index[0]) * _num_buckets);
 
         _last = _num_filled = 0;

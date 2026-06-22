@@ -148,7 +148,7 @@ static void fuzz_extreme_hashmap(const std::vector<Op>& ops, float mlf = 0.8f) {
             }
             case OP_RESERVE: {
                 size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
-                if (cap < 100000) em.reserve(cap);
+                if (cap < 100000) (void)em.reserve(cap);
                 break;
             }
             case OP_INSERT_OR_ASSIGN: {
@@ -162,7 +162,7 @@ static void fuzz_extreme_hashmap(const std::vector<Op>& ops, float mlf = 0.8f) {
                 auto em_it = em.find(op.key);
                 auto ref_it = ref.find(op.key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
+                    (void)em.erase(em_it);
                     ref.erase(ref_it);
                 }
                 break;
@@ -184,7 +184,7 @@ static void fuzz_extreme_hashmap(const std::vector<Op>& ops, float mlf = 0.8f) {
                 break;
             }
             case OP_SHRINK: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
             case OP_SWAP: {
@@ -263,7 +263,7 @@ static void fuzz_extreme_hashset(const std::vector<Op>& ops) {
             }
             case OP_RESERVE: {
                 size_t cap = static_cast<size_t>(op.key & 0x7FFFFFFF);
-                if (cap < 100000) em.reserve(cap);
+                if (cap < 100000) (void)em.reserve(cap);
                 break;
             }
             case OP_INSERT_OR_ASSIGN: {
@@ -275,7 +275,7 @@ static void fuzz_extreme_hashset(const std::vector<Op>& ops) {
                 auto em_it = em.find(op.key);
                 auto ref_it = ref.find(op.key);
                 if (em_it != em.end() && ref_it != ref.end()) {
-                    em.erase(em_it);
+                    (void)em.erase(em_it);
                     ref.erase(ref_it);
                 }
                 break;
@@ -295,7 +295,7 @@ static void fuzz_extreme_hashset(const std::vector<Op>& ops) {
                 break;
             }
             case OP_SHRINK: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
             case OP_SWAP: {
@@ -355,7 +355,7 @@ static void fuzz_churn(const std::vector<Op>& ops) {
                 break;
             }
             case 4: {
-                if (em.size() > 0) em.reserve(em.size());
+                if (em.size() > 0) (void)em.reserve(em.size());
                 break;
             }
         }
@@ -415,9 +415,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                 std::string key = std::to_string(op.key % 50);
                 switch (op.code % 4) {
                     case 0: em[key] = op.value; ref[key] = op.value; break;
-                    case 1: em.erase(key); ref.erase(key); break;
+                    case 1: (void)em.erase(key); ref.erase(key); break;
                     case 2: if ((em.find(key) != em.end()) != (ref.find(key) != ref.end())) EMH_TRAP(); break;
-                    case 3: if (em.size() > 0) em.reserve(em.size()); break;
+                    case 3: if (em.size() > 0) (void)em.reserve(em.size()); break;
                 }
                 if (em.size() != ref.size()) EMH_TRAP();
             }
@@ -430,9 +430,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                 std::string key = std::to_string(op.key % 50);
                 switch (op.code % 4) {
                     case 0: em[key] = op.value; ref[key] = op.value; break;
-                    case 1: em.erase(key); ref.erase(key); break;
+                    case 1: (void)em.erase(key); ref.erase(key); break;
                     case 2: if ((em.find(key) != em.end()) != (ref.find(key) != ref.end())) EMH_TRAP(); break;
-                    case 3: if (em.size() > 0) em.reserve(em.size()); break;
+                    case 3: if (em.size() > 0) (void)em.reserve(em.size()); break;
                 }
                 if (em.size() != ref.size()) EMH_TRAP();
             }
@@ -445,9 +445,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                 std::string key = std::to_string(op.key % 50);
                 switch (op.code % 4) {
                     case 0: em[key] = op.value; ref[key] = op.value; break;
-                    case 1: em.erase(key); ref.erase(key); break;
+                    case 1: (void)em.erase(key); ref.erase(key); break;
                     case 2: if ((em.find(key) != em.end()) != (ref.find(key) != ref.end())) EMH_TRAP(); break;
-                    case 3: if (em.size() > 0) em.reserve(em.size()); break;
+                    case 3: if (em.size() > 0) (void)em.reserve(em.size()); break;
                 }
                 if (em.size() != ref.size()) EMH_TRAP();
             }
@@ -461,9 +461,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                 std::string key = std::to_string(op.key % 50);
                 switch (op.code % 4) {
                     case 0: em[key] = op.value; ref[key] = op.value; break;
-                    case 1: em.erase(key); ref.erase(key); break;
+                    case 1: (void)em.erase(key); ref.erase(key); break;
                     case 2: if ((em.find(key) != em.end()) != (ref.find(key) != ref.end())) EMH_TRAP(); break;
-                    case 3: if (em.size() > 0) em.reserve(em.size()); break;
+                    case 3: if (em.size() > 0) (void)em.reserve(em.size()); break;
                 }
                 if (em.size() != ref.size()) EMH_TRAP();
             }
@@ -479,7 +479,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                     case 0: em.insert(key); ref.insert(key); break;
                     case 1: { size_t e = em.erase(key); size_t r = ref.erase(key); if (e != r) EMH_TRAP(); break; }
                     case 2: if (em.contains(key) != (ref.count(key) > 0)) EMH_TRAP(); break;
-                    case 3: if (em.size() > 0) em.reserve(em.size()); break;
+                    case 3: if (em.size() > 0) (void)em.reserve(em.size()); break;
                 }
                 if (em.size() != ref.size()) EMH_TRAP();
             }

@@ -41,7 +41,10 @@ install(TARGETS emhash
 )
 
 # Install headers preserving directory structure (emhash/ and emilib/)
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# Exclude sse2neon.h from install — it is a third-party ARM compatibility shim
+# that should not pollute the user's include directory root.
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        PATTERN "sse2neon.h" EXCLUDE)
 
 install(EXPORT emhash-targets
         FILE emhashTargets.cmake
