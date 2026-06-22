@@ -414,12 +414,25 @@ bool test_int64_double()
         TEST_ASSERT(map[i] == static_cast<double>(i) * 1.5, "int64-double value");
 
     // Large int64 keys
+    // On 32-bit platforms, size_type is 32-bit, so hash collisions may occur with INT64_MAX
+#if UINTPTR_MAX > 0xFFFFFFFFULL
     map[9223372036854775807LL] = 3.14159;
     TEST_ASSERT(map[9223372036854775807LL] == 3.14159, "int64-double max key");
+#else
+    // Use smaller keys on 32-bit platforms
+    map[2147483647LL] = 3.14159;
+    TEST_ASSERT(map[2147483647LL] == 3.14159, "int64-double large key (32-bit)");
+#endif
 
     // Negative int64 keys
+#if UINTPTR_MAX > 0xFFFFFFFFULL
     map[-9223372036854775807LL] = -2.71828;
     TEST_ASSERT(map[-9223372036854775807LL] == -2.71828, "int64-double min key");
+#else
+    // Use smaller keys on 32-bit platforms
+    map[-2147483647LL] = -2.71828;
+    TEST_ASSERT(map[-2147483647LL] == -2.71828, "int64-double negative key (32-bit)");
+#endif
 
     return true;
 }
