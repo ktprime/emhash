@@ -52,9 +52,14 @@ static int g_pass = 0, g_fail = 0;
 
 // Helper: convert int to key/value
 template<typename T>
-T make_kv(int v) { return T(v); }
-template<>
-std::string make_kv<std::string>(int v) { return std::to_string(v); }
+T make_kv(int v) {
+    using U = std::remove_cv_t<T>;
+    if constexpr (std::is_same_v<U, std::string>) {
+        return std::to_string(v);
+    } else {
+        return T(v);
+    }
+}
 
 // ============================================================================
 // Bad hash functor for collision testing
@@ -208,7 +213,15 @@ bool test_iterator()
     // Verify all keys are accessible through iteration
     std::vector<bool> found(N, false);
     for (auto& p : map) {
-        int key = (int)p.first;
+        // Recover the integer index from the key (make_kv is the inverse for int/string)
+        int key = -1;
+        using KeyU = std::remove_cv_t<Key>;
+        if constexpr (std::is_integral_v<KeyU>) {
+            key = (int)p.first;
+        } else {
+            // string key produced by make_kv<std::string>(i) == std::to_string(i)
+            try { key = std::stoi(p.first); } catch (...) { key = -1; }
+        }
         if (key >= 0 && key < N) found[key] = true;
     }
     for (int i = 0; i < N; i++)
@@ -658,6 +671,21 @@ void run_string_int_tests(const char* name)
     RUN_TEST((test_string_int<MapType>));
 }
 
+// Run the full common test suite (CRUD/iterator/copy_move/reserve/edge/size_sweep/erase_patterns)
+// with string keys to ensure mainstream cases are covered by string keys, not just int keys.
+template<typename MapType>
+void run_string_full_tests(const char* name)
+{
+    printf("\n=== %s <string,int> full coverage ===\n", name);
+    RUN_TEST((test_basic_crud<MapType>));
+    RUN_TEST((test_iterator<MapType>));
+    RUN_TEST((test_copy_move<MapType>));
+    RUN_TEST((test_reserve_rehash_clear<MapType>));
+    RUN_TEST((test_edge_cases<MapType>));
+    RUN_TEST((test_size_sweep<MapType>));
+    RUN_TEST((test_erase_patterns<MapType>));
+}
+
 template<typename MapType>
 void run_bad_hash_tests(const char* name)
 {
@@ -679,6 +707,7 @@ int main()
     run_int_int_tests<emhash5::HashMap<int, int>>("emhash5::HashMap");
     run_int64_double_tests<emhash5::HashMap<int64_t, double>>("emhash5::HashMap");
     run_string_int_tests<emhash5::HashMap<std::string, int>>("emhash5::HashMap");
+    run_string_full_tests<emhash5::HashMap<std::string, int>>("emhash5::HashMap");
     run_bad_hash_tests<emhash5::HashMap<int, int, BadHash>>("emhash5::HashMap");
 
     // ===== emhash6::HashMap =====
@@ -686,6 +715,7 @@ int main()
     run_int_int_tests<emhash6::HashMap<int, int>>("emhash6::HashMap");
     run_int64_double_tests<emhash6::HashMap<int64_t, double>>("emhash6::HashMap");
     run_string_int_tests<emhash6::HashMap<std::string, int>>("emhash6::HashMap");
+    run_string_full_tests<emhash6::HashMap<std::string, int>>("emhash6::HashMap");
     run_bad_hash_tests<emhash6::HashMap<int, int, BadHash>>("emhash6::HashMap");
 
     // ===== emhash7::HashMap =====
@@ -693,6 +723,7 @@ int main()
     run_int_int_tests<emhash7::HashMap<int, int>>("emhash7::HashMap");
     run_int64_double_tests<emhash7::HashMap<int64_t, double>>("emhash7::HashMap");
     run_string_int_tests<emhash7::HashMap<std::string, int>>("emhash7::HashMap");
+    run_string_full_tests<emhash7::HashMap<std::string, int>>("emhash7::HashMap");
     run_bad_hash_tests<emhash7::HashMap<int, int, BadHash>>("emhash7::HashMap");
 
     // ===== emhash8::HashMap =====
@@ -700,6 +731,7 @@ int main()
     run_int_int_tests<emhash8::HashMap<int, int>>("emhash8::HashMap");
     run_int64_double_tests<emhash8::HashMap<int64_t, double>>("emhash8::HashMap");
     run_string_int_tests<emhash8::HashMap<std::string, int>>("emhash8::HashMap");
+    run_string_full_tests<emhash8::HashMap<std::string, int>>("emhash8::HashMap");
     run_bad_hash_tests<emhash8::HashMap<int, int, BadHash>>("emhash8::HashMap");
 
     // ===== emilib::HashMap (emilib2ss) =====

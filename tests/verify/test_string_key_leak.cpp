@@ -544,6 +544,8 @@ int main() {
 
     // Section 4: LeakTracker balance (insert + erase + clear)
     printf("\n--- Section 4: LeakTracker Constructor/Destructor Balance ---\n");
+    test_leak_tracker_balance<emhash5::HashMap<LeakTracker, int>>("emhash5");
+    test_leak_tracker_balance<emhash6::HashMap<LeakTracker, int>>("emhash6");
     test_leak_tracker_balance<emhash7::HashMap<LeakTracker, int>>("emhash7");
     test_leak_tracker_balance<emhash8::HashMap<LeakTracker, int>>("emhash8");
     test_leak_tracker_balance<emilib::HashMap<LeakTracker, int>>("emihmap1");
@@ -552,6 +554,8 @@ int main() {
 
     // Section 5: LeakTracker copy balance
     printf("\n--- Section 5: LeakTracker Copy Constructor/Destructor Balance ---\n");
+    test_leak_tracker_copy_balance<emhash5::HashMap<LeakTracker, int>>("emhash5");
+    test_leak_tracker_copy_balance<emhash6::HashMap<LeakTracker, int>>("emhash6");
     test_leak_tracker_copy_balance<emhash7::HashMap<LeakTracker, int>>("emhash7");
     test_leak_tracker_copy_balance<emhash8::HashMap<LeakTracker, int>>("emhash8");
     test_leak_tracker_copy_balance<emilib::HashMap<LeakTracker, int>>("emihmap1");
@@ -560,6 +564,8 @@ int main() {
 
     // Section 6: LeakTracker rehash balance
     printf("\n--- Section 6: LeakTracker Rehash Balance ---\n");
+    test_leak_tracker_rehash_balance<emhash5::HashMap<LeakTracker, int>>("emhash5");
+    test_leak_tracker_rehash_balance<emhash6::HashMap<LeakTracker, int>>("emhash6");
     test_leak_tracker_rehash_balance<emhash7::HashMap<LeakTracker, int>>("emhash7");
     test_leak_tracker_rehash_balance<emhash8::HashMap<LeakTracker, int>>("emhash8");
     test_leak_tracker_rehash_balance<emilib::HashMap<LeakTracker, int>>("emihmap1");
@@ -572,6 +578,8 @@ int main() {
 
     // Section 8: String key stress
     printf("\n--- Section 8: String Key Stress (5000 entries) ---\n");
+    test_string_key_stress<emhash5::HashMap<std::string, int>>("emhash5");
+    test_string_key_stress<emhash6::HashMap<std::string, int>>("emhash6");
     test_string_key_stress<emhash7::HashMap<std::string, int>>("emhash7");
     test_string_key_stress<emhash8::HashMap<std::string, int>>("emhash8");
     test_string_key_stress<emilib::HashMap<std::string, int>>("emihmap1");
@@ -586,6 +594,8 @@ int main() {
 
     // Section 10: Move semantics with string keys
     printf("\n--- Section 10: Move Semantics with String Keys ---\n");
+    test_string_key_move<emhash5::HashMap<std::string, int>>("emhash5");
+    test_string_key_move<emhash6::HashMap<std::string, int>>("emhash6");
     test_string_key_move<emhash7::HashMap<std::string, int>>("emhash7");
     test_string_key_move<emhash8::HashMap<std::string, int>>("emhash8");
     test_string_key_move<emilib::HashMap<std::string, int>>("emihmap1");
