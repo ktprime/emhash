@@ -623,8 +623,20 @@ public:
                     new (_pairs + bucket) PairT(opairs[bucket]);
             }
         }
-        memcpy(reinterpret_cast<char*>(_pairs + _num_buckets), opairs + _num_buckets,
-               PACK_SIZE * sizeof(PairT) + _num_buckets / 8 + BIT_PACK);
+
+        // Copy tail sentinels and bitmask
+        if (is_trivially_copyable()) {
+            memcpy(reinterpret_cast<char*>(_pairs + _num_buckets), opairs + _num_buckets,
+                   PACK_SIZE * sizeof(PairT) + _num_buckets / 8 + BIT_PACK);
+        } else {
+            // For non-trivially-copyable types, only init bucket field of tail sentinels
+            const size_type zero_bucket = 0;
+            for (size_type i = 0; i < PACK_SIZE; ++i)
+                std::memcpy(&_pairs[_num_buckets + i].bucket, &zero_bucket, sizeof(zero_bucket));
+            // Copy bitmask (trivially copyable bytes)
+            memcpy(reinterpret_cast<char*>(_bitmask), reinterpret_cast<char*>(rhs._bitmask),
+                   _num_buckets / 8 + BIT_PACK);
+        }
     }
 
     void swap(HashMap& rhs) noexcept {
@@ -1188,7 +1200,7 @@ public:
             // Reset empty buckets to INACTIVE after clearkv
             for (size_type bucket = 0; bucket <= _mask; ++bucket) {
                 if (EMH_EMPTY(_pairs, bucket))
-                    _pairs[bucket].second = INACTIVE;
+                    EMH_ADDR(_pairs, bucket) = INACTIVE;
             }
         } else if (_num_filled) {
             memset(reinterpret_cast<char*>(_bitmask), static_cast<int>(0xFFFFFFFF), (_mask + 1) / 8);
