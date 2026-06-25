@@ -803,8 +803,10 @@ public:
         _states = new_state;
         _pairs = new_pairs;
 
-        // fill last packet zero
-        memset((char*)(_pairs + pairs_size / sizeof(PairT) - 1), 0, sizeof(_pairs[0]));
+        // fill last packet zero (only for trivially-copyable types; non-trivial
+        // types skip this since tail sentinel is not destructed nor accessed)
+        if (is_trivially_copyable())
+            memset((char*)(_pairs + pairs_size / sizeof(PairT) - 1), 0, sizeof(_pairs[0]));
 
         clear_meta();
 

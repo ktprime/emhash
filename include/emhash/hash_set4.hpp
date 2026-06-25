@@ -412,8 +412,16 @@ public:
                     new (_pairs + bucket) PairT(opairs[bucket]);
             }
         }
-        memcpy(static_cast<void*>(_pairs + _num_buckets), opairs + _num_buckets,
-               2 * sizeof(PairT) + _num_buckets / 8 + sizeof(size_t));
+        // For non-trivially-copyable types, only copy bucket field (.second) of tail
+        // sentinels and bitmask separately (memcpy of whole PairT reads uninitialized key).
+        if (std::is_trivially_copyable<KeyT>::value) {
+            memcpy(static_cast<void*>(_pairs + _num_buckets), opairs + _num_buckets,
+                   2 * sizeof(PairT) + _num_buckets / 8 + sizeof(size_t));
+        } else {
+            _pairs[_num_buckets].second = opairs[_num_buckets].second;
+            _pairs[_num_buckets + 1].second = opairs[_num_buckets + 1].second;
+            memcpy(_bitmask, other._bitmask, _num_buckets / 8 + sizeof(size_t));
+        }
     }
 
     inline void swap(HashSet& other) noexcept {
@@ -873,12 +881,16 @@ private:
         _num_buckets = num_buckets;
         _last = 0;
 
-        if (bInCacheLine)
+        if (bInCacheLine && std::is_trivially_copyable<KeyT>::value)
             memset(static_cast<void*>(new_pairs), static_cast<int>(INACTIVE), sizeof(_pairs[0]) * num_buckets);
         else
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 new_pairs[bucket].second = INACTIVE;
-        memset(static_cast<void*>(new_pairs + num_buckets), 0, sizeof(PairT) * 2);
+        // Only init bucket field (.second) of tail sentinels for non-trivially-copyable types
+        if (std::is_trivially_copyable<KeyT>::value)
+            memset(static_cast<void*>(new_pairs + num_buckets), 0, sizeof(PairT) * 2);
+        else
+            new_pairs[num_buckets].second = new_pairs[num_buckets + 1].second = 0;
 
         // set bit mask
         _bitmask = decltype(_bitmask)(new_pairs + 2 + num_buckets);

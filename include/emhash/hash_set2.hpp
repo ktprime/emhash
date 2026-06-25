@@ -815,14 +815,19 @@ private:
         _pairs = new_pairs;
         _last_colls = num_buckets - 1;
 
-        if (bInCacheLine) {
+        if (bInCacheLine && std::is_trivially_copyable<KeyT>::value) {
             memset(static_cast<void*>(_pairs), static_cast<int>(static_cast<uint32_t>(-1u)),
                    sizeof(_pairs[0]) * num_buckets);
         } else {
             for (size_type bucket = 0; bucket < num_buckets; bucket++)
                 _pairs[bucket].second = INACTIVE;
         }
-        memset(static_cast<void*>(_pairs + num_buckets), 0, sizeof(_pairs[0]) * 2);
+        // Only init bucket field (.second) of tail sentinels for non-trivially-copyable types
+        // (memset of whole PairT would be UB for non-trivial KeyT like std::string).
+        if (std::is_trivially_copyable<KeyT>::value)
+            memset(static_cast<void*>(_pairs + num_buckets), 0, sizeof(_pairs[0]) * 2);
+        else
+            _pairs[num_buckets].second = _pairs[num_buckets + 1].second = 0;
 
         // set all main bucket first
         for (size_type src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {

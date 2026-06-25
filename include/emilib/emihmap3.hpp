@@ -813,8 +813,9 @@ public:
         _states = new_state;
         _pairs = new_pairs;
 
-        // fill last packet zero
-        memset((char*)(_pairs + num_buckets), 0, sizeof(_pairs[0]));
+        // fill last packet zero (only for trivially-copyable types)
+        if (is_trivially_copyable())
+            memset((char*)(_pairs + num_buckets), 0, sizeof(_pairs[0]));
         clear_meta();
 
 #if EMH_STATIS

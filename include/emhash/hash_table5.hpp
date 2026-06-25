@@ -519,14 +519,18 @@ public:
         else {
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
                 auto next_bucket = EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
-                if (static_cast<size_type>(next_bucket) >= 0)
+                if (static_cast<int>(next_bucket) >= 0)
                     new (_pairs + bucket) PairT(opairs[bucket]);
 #if EMH_HIGH_LOAD
                 else if (next_bucket != INACTIVE)
                     emh_prevet_set(_pairs, bucket, emh_prevet_get(opairs, bucket));
 #endif
             }
-            memcpy(reinterpret_cast<char*>(_pairs + _num_buckets), opairs + _num_buckets, sizeof(PairT) * 2);
+            // For non-trivially-copyable types, only init bucket field of tail sentinels
+            // (memcpy of whole PairT would read uninitialized std::string key — MSan UB)
+            const size_type zero_bucket = 0;
+            for (size_type i = 0; i < 2; ++i)
+                std::memcpy(&EMH_BUCKET(_pairs, _num_buckets + i), &zero_bucket, sizeof(zero_bucket));
         }
     }
 

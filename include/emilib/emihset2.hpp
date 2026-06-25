@@ -97,7 +97,19 @@ constexpr static uint8_t stat_bytes = sizeof(uint64_t) / sizeof(uint8_t);
 inline static uint32_t CTZ(uint64_t n) {
 #if defined(_MSC_VER)
     unsigned long index;
+#ifdef _WIN64
     _BitScanForward64(&index, n);
+#else
+    uint32_t lo = (uint32_t)n;
+    uint32_t hi = (uint32_t)(n >> 32);
+    if (lo != 0) {
+        _BitScanForward(&index, lo);
+    } else {
+        _BitScanForward(&index, hi);
+        index += 32;
+    }
+#endif
+
 #elif 1
     auto index = __builtin_ctzl(n);
 #endif
@@ -563,7 +575,9 @@ public:
         // find filled tombstone
         std::fill_n(_states + num_buckets + set_simd_bytes / 2, set_simd_bytes / 2, State::EEMPTY + 4);
         // fill last packet zero
-        memset(new_keys + num_buckets, 0, sizeof(new_keys[0]));
+        // Only init tail sentinel for trivially-copyable types
+        if (is_trivially_copyable())
+            memset(new_keys + num_buckets, 0, sizeof(new_keys[0]));
 
         _max_probe_length = -1;
         auto collision = 0;

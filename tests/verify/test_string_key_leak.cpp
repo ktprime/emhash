@@ -27,6 +27,8 @@
 #include "emilib/emihmap1.hpp"
 #include "emilib/emihmap2.hpp"
 #include "emilib/emihmap3.hpp"
+#include "emilib/emihset2.hpp"
+#include "emilib/emihset3.hpp"
 
 // ============================================================================
 // Test infrastructure
@@ -506,6 +508,108 @@ static void test_string_key_move(const char* name) {
 }
 
 // ============================================================================
+// Section 11: MSan Tail Sentinel Regression
+// Tests that clone() and rehash() do not read uninitialized memory when
+// KeyT/ValueT are non-trivially-copyable (e.g. std::string).
+// Under MSan these would report use-of-uninitialized-value; without MSan
+// they verify data integrity after clone/rehash.
+// ============================================================================
+
+template<typename SetType>
+static void test_set_msan_clone_rehash(const char* name) {
+    printf("  [%s] MSan clone/rehash with string keys...\n", name);
+    {
+        // Insert enough string keys to trigger at least one rehash
+        SetType s;
+        const int N = 500;
+        for (int i = 0; i < N; i++)
+            (void)s.insert("msan_key_" + std::to_string(i));
+        TEST_ASSERT(s.size() == N, "set should have N entries after rehash");
+
+        // Verify a sample of entries
+        bool all_found = true;
+        for (int i = 0; i < N; i += 37) {
+            if (s.count("msan_key_" + std::to_string(i)) == 0) {
+                all_found = false;
+                break;
+            }
+        }
+        TEST_ASSERT(all_found, "all sampled entries should be found after rehash");
+
+        // Copy constructor — exercises clone() tail sentinels memcpy
+        {
+            SetType s2(s);
+            TEST_ASSERT(s2.size() == N, "cloned set should have N entries");
+            bool clone_ok = true;
+            for (int i = 0; i < N; i += 53) {
+                if (s2.count("msan_key_" + std::to_string(i)) == 0) {
+                    clone_ok = false;
+                    break;
+                }
+            }
+            TEST_ASSERT(clone_ok, "cloned set entries should be intact");
+        }
+
+        // Erase + reinsert to trigger more rehash-like behavior
+        for (int i = 0; i < N / 2; i++)
+            (void)s.erase("msan_key_" + std::to_string(i));
+        TEST_ASSERT(s.size() == N - N / 2, "set should have N/2 entries after erase");
+        for (int i = 0; i < N / 2; i++)
+            (void)s.insert("msan_key_" + std::to_string(i));
+        TEST_ASSERT(s.size() == N, "set should have N entries after reinsert");
+    }
+    printf("  [%s] MSan clone/rehash with string keys: PASS\n", name);
+}
+
+template<typename MapType>
+static void test_map_msan_clone_rehash(const char* name) {
+    printf("  [%s] MSan clone/rehash with string keys...\n", name);
+    {
+        // Insert enough string keys to trigger at least one rehash
+        MapType m;
+        const int N = 500;
+        for (int i = 0; i < N; i++)
+            m["msan_key_" + std::to_string(i)] = i;
+        TEST_ASSERT(m.size() == N, "map should have N entries after rehash");
+
+        // Verify a sample of entries
+        bool all_found = true;
+        for (int i = 0; i < N; i += 37) {
+            auto it = m.find("msan_key_" + std::to_string(i));
+            if (it == m.end() || it->second != i) {
+                all_found = false;
+                break;
+            }
+        }
+        TEST_ASSERT(all_found, "all sampled entries should be found with correct values");
+
+        // Copy constructor — exercises clone() tail sentinels memcpy
+        {
+            MapType m2(m);
+            TEST_ASSERT(m2.size() == N, "cloned map should have N entries");
+            bool clone_ok = true;
+            for (int i = 0; i < N; i += 53) {
+                auto it = m2.find("msan_key_" + std::to_string(i));
+                if (it == m2.end() || it->second != i) {
+                    clone_ok = false;
+                    break;
+                }
+            }
+            TEST_ASSERT(clone_ok, "cloned map entries should be intact");
+        }
+
+        // Erase + reinsert
+        for (int i = 0; i < N / 2; i++)
+            (void)m.erase("msan_key_" + std::to_string(i));
+        TEST_ASSERT(m.size() == N - N / 2, "map should have N/2 entries after erase");
+        for (int i = 0; i < N / 2; i++)
+            m["msan_key_" + std::to_string(i)] = i;
+        TEST_ASSERT(m.size() == N, "map should have N entries after reinsert");
+    }
+    printf("  [%s] MSan clone/rehash with string keys: PASS\n", name);
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -601,6 +705,21 @@ int main() {
     test_string_key_move<emilib::HashMap<std::string, int>>("emihmap1");
     test_string_key_move<emilib2::HashMap<std::string, int>>("emihmap2");
     test_string_key_move<emilib3::HashMap<std::string, int>>("emihmap3");
+
+    // Section 11: MSan tail sentinel regression
+    printf("\n--- Section 11: MSan Tail Sentinel Regression ---\n");
+    test_set_msan_clone_rehash<emhash2::HashSet<std::string>>("emhash_set2");
+    test_set_msan_clone_rehash<emhash4::HashSet<std::string>>("emhash_set4");
+    test_set_msan_clone_rehash<emhash8::HashSet<std::string>>("emhash_set8");
+    test_set_msan_clone_rehash<emilib2::HashSet<std::string>>("emihset2");
+    test_set_msan_clone_rehash<emilib3::HashSet<std::string>>("emihset3");
+    test_map_msan_clone_rehash<emhash5::HashMap<std::string, int>>("emhash5");
+    test_map_msan_clone_rehash<emhash6::HashMap<std::string, int>>("emhash6");
+    test_map_msan_clone_rehash<emhash7::HashMap<std::string, int>>("emhash7");
+    test_map_msan_clone_rehash<emhash8::HashMap<std::string, int>>("emhash8");
+    test_map_msan_clone_rehash<emilib::HashMap<std::string, int>>("emihmap1");
+    test_map_msan_clone_rehash<emilib2::HashMap<std::string, int>>("emihmap2");
+    test_map_msan_clone_rehash<emilib3::HashMap<std::string, int>>("emihmap3");
 
     // Summary
     printf("\n=== Summary ===\n");
