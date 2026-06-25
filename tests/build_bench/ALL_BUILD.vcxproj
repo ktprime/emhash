@@ -1,0 +1,345 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{9EAB2FF3-D040-3CF3-A7EB-2CA63BBDF363}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Keyword>Win32Proj</Keyword>
+    <Platform>x64</Platform>
+    <ProjectName>ALL_BUILD</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\emhash\tests\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule D:/emhash/tests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -SD:/emhash/tests -BD:/emhash/tests/build_bench --check-stamp-file D:/emhash/tests/build_bench/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCXXInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeRCInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTest.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestTargets.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestUseLaunchers.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckCXXSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckIncludeFileCXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckLibraryExists.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\DartConfiguration.tcl.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent\CMakeLists.cmake.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FindGit.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageMessage.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindThreads.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeCXXCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeRCCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\emhash\tests\build_bench\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule D:/emhash/tests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -SD:/emhash/tests -BD:/emhash/tests/build_bench --check-stamp-file D:/emhash/tests/build_bench/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCXXInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeRCInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTest.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestTargets.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestUseLaunchers.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckCXXSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckIncludeFileCXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckLibraryExists.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\DartConfiguration.tcl.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent\CMakeLists.cmake.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FindGit.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageMessage.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindThreads.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeCXXCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeRCCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\emhash\tests\build_bench\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule D:/emhash/tests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -SD:/emhash/tests -BD:/emhash/tests/build_bench --check-stamp-file D:/emhash/tests/build_bench/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCXXInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeRCInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTest.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestTargets.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestUseLaunchers.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckCXXSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckIncludeFileCXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckLibraryExists.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\DartConfiguration.tcl.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent\CMakeLists.cmake.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FindGit.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageMessage.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindThreads.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeCXXCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeRCCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\emhash\tests\build_bench\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule D:/emhash/tests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -SD:/emhash/tests -BD:/emhash/tests/build_bench --check-stamp-file D:/emhash/tests/build_bench/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCXXInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeRCInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTest.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestTargets.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CTestUseLaunchers.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckCXXSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckIncludeFileCXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\CheckLibraryExists.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Compiler\MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\DartConfiguration.tcl.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FetchContent\CMakeLists.cmake.in;D:\Program Files\CMake\share\cmake-3.22\Modules\FindGit.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindPackageMessage.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\FindThreads.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC-CXX.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\Windows.cmake;D:\Program Files\CMake\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeCXXCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeRCCompiler.cmake;D:\emhash\tests\build_bench\CMakeFiles\3.22.6\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\emhash\tests\build_bench\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="D:\emhash\tests\build_bench\ZERO_CHECK.vcxproj">
+      <Project>{436A41BC-9685-3C88-9AF2-C28C5E84E240}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\debug_chain.vcxproj">
+      <Project>{374AAF1D-F2FA-39FD-9C7F-4298EE870E9E}</Project>
+      <Name>debug_chain</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\debug_set_erase.vcxproj">
+      <Project>{1861C118-145A-36C3-B1EC-02BFE13CFACF}</Project>
+      <Name>debug_set_erase</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\edge_test.vcxproj">
+      <Project>{415F57E1-BDA2-3C35-93CD-5AA47BBFF3CB}</Project>
+      <Name>edge_test</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\emhash_bench.vcxproj">
+      <Project>{AFA474DD-297E-3874-9414-F48DD00FE47E}</Project>
+      <Name>emhash_bench</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\fuzz_reproduce.vcxproj">
+      <Project>{7BAFB4AC-C163-3D2B-AAD1-B56E3BCF1A41}</Project>
+      <Name>fuzz_reproduce</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\hash_attack5.vcxproj">
+      <Project>{6969E3B3-6C1D-3B46-9141-42B77000B236}</Project>
+      <Name>hash_attack5</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\hash_attack7.vcxproj">
+      <Project>{31DFEE3B-A128-3608-92B4-FF3A092EEDD2}</Project>
+      <Name>hash_attack7</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\highload_test.vcxproj">
+      <Project>{CB332D54-824F-3071-9F1D-BDCBAC2EE436}</Project>
+      <Name>highload_test</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\min_repro.vcxproj">
+      <Project>{C4444E8D-2381-39EA-80AE-D78D1B766A9B}</Project>
+      <Name>min_repro</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\quick_test8.vcxproj">
+      <Project>{B8B5FDF9-0FE4-3D52-BB1B-BA193A78D766}</Project>
+      <Name>quick_test8</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\reproduce_crash.vcxproj">
+      <Project>{EC9D0DF1-40F5-3D01-9533-01166B45512C}</Project>
+      <Name>reproduce_crash</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\reproduce_emhash8_bug.vcxproj">
+      <Project>{FF973416-733E-36E2-A778-F656A2D3482A}</Project>
+      <Name>reproduce_emhash8_bug</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\stress_fix.vcxproj">
+      <Project>{31B354CF-B506-3B48-A6F1-4CEC12E01403}</Project>
+      <Name>stress_fix</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_attack.vcxproj">
+      <Project>{44B88231-3265-3491-B54D-C67B706B0184}</Project>
+      <Name>test_attack</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_bad_hash_stress.vcxproj">
+      <Project>{7AA9E1DC-013B-3460-9879-BDC94563BC77}</Project>
+      <Name>test_bad_hash_stress</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_collision_hardening.vcxproj">
+      <Project>{60764FFA-1AAD-3390-9836-15C1D1E298A4}</Project>
+      <Name>test_collision_hardening</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_debug.vcxproj">
+      <Project>{C052669A-CEEC-3B76-837F-F2DB6BA9D673}</Project>
+      <Name>test_debug</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_debug_find.vcxproj">
+      <Project>{B8C8A740-BD7F-32CE-AA54-EBA4508B3B15}</Project>
+      <Name>test_debug_find</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_emhash58.vcxproj">
+      <Project>{DFCBC3EF-BDD9-36B3-A161-435294322343}</Project>
+      <Name>test_emhash58</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_emhash5_hifi.vcxproj">
+      <Project>{AC3AF442-C0EA-3890-AC64-0BEEAD50B040}</Project>
+      <Name>test_emhash5_hifi</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_emhash5_stress.vcxproj">
+      <Project>{EF5BEA59-1B57-304D-A249-82CA33C81243}</Project>
+      <Name>test_emhash5_stress</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_emhash5_verify.vcxproj">
+      <Project>{C92C55BA-3CBE-3C7D-A98D-C7B23A8887AC}</Project>
+      <Name>test_emhash5_verify</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_emhash_allocator.vcxproj">
+      <Project>{4DF305AE-DB55-31C0-8CB4-8BC35FD2B0AC}</Project>
+      <Name>test_emhash_allocator</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_emilib_comprehensive.vcxproj">
+      <Project>{1D68F711-D8B0-3CE6-9ABB-1F542CE4CC4C}</Project>
+      <Name>test_emilib_comprehensive</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_extreme.vcxproj">
+      <Project>{571D87B0-5B85-30A6-9033-3AE6B9387865}</Project>
+      <Name>test_extreme</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_find_slot_bucket.vcxproj">
+      <Project>{BADD4D28-CC39-3D46-B420-5236BAF4E370}</Project>
+      <Name>test_find_slot_bucket</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_functional_edge.vcxproj">
+      <Project>{EDB2CF62-40E9-30F3-AF72-7EAA25D584B0}</Project>
+      <Name>test_functional_edge</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_hashmap_full_api.vcxproj">
+      <Project>{BE3E4BE7-5F47-3F62-91FD-38CF7F8DA678}</Project>
+      <Name>test_hashmap_full_api</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_hashset_allocator.vcxproj">
+      <Project>{BF4907A2-17D9-3FFC-9DB8-6DCB377E9F02}</Project>
+      <Name>test_hashset_allocator</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_hashset_full_api.vcxproj">
+      <Project>{66D5E7C3-AC13-31D2-BC87-C36ABE55779B}</Project>
+      <Name>test_hashset_full_api</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_hidden_bugs8.vcxproj">
+      <Project>{2B0BB005-EA55-3889-B504-1ECE42F47E57}</Project>
+      <Name>test_hidden_bugs8</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_interface_combo.vcxproj">
+      <Project>{A24532C5-A423-32E9-B712-9B41F18336BB}</Project>
+      <Name>test_interface_combo</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_merge_correctness.vcxproj">
+      <Project>{AC73D175-AB09-38FD-9707-31C11E90D771}</Project>
+      <Name>test_merge_correctness</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_probe_bug.vcxproj">
+      <Project>{1021DF9E-56B7-3AA3-B402-5BB0DB129E61}</Project>
+      <Name>test_probe_bug</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_probe_coverage.vcxproj">
+      <Project>{F657EC86-5BC5-3945-AB41-D1D5C0273AE2}</Project>
+      <Name>test_probe_coverage</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_repro_collision.vcxproj">
+      <Project>{87B832D2-AE5A-3F29-B0A6-4BADD2905516}</Project>
+      <Name>test_repro_collision</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_sanitizer_aggregate.vcxproj">
+      <Project>{A259E4AE-C3AC-368D-AA0D-245D6B089513}</Project>
+      <Name>test_sanitizer_aggregate</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_size_sweep.vcxproj">
+      <Project>{F8045825-F80B-38EC-B987-94651F5BB3D4}</Project>
+      <Name>test_size_sweep</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_special_key_types.vcxproj">
+      <Project>{C6F95BFB-D75F-3AA7-B89F-71AB5AD2C47A}</Project>
+      <Name>test_special_key_types</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_stress.vcxproj">
+      <Project>{CB78960E-9D6E-372F-8727-CDE1640914C4}</Project>
+      <Name>test_stress</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_string_key_leak.vcxproj">
+      <Project>{A233D04D-6E73-318A-A8FE-9BB1D3C19BBD}</Project>
+      <Name>test_string_key_leak</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\emhash\tests\build_bench\test_verify.vcxproj">
+      <Project>{9D00FF32-D0FE-33CC-8B08-74FDF8DB789B}</Project>
+      <Name>test_verify</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

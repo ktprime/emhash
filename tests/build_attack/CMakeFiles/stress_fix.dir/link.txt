@@ -1,0 +1,3 @@
+"D:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\stress_fix.dir/objects.a
+D:\PROGRA~1\mingw64\bin\ar.exe qc CMakeFiles\stress_fix.dir/objects.a @CMakeFiles\stress_fix.dir\objects1.rsp
+D:\PROGRA~1\mingw64\bin\G__~1.EXE -Wl,--whole-archive CMakeFiles\stress_fix.dir/objects.a -Wl,--no-whole-archive -o stress_fix.exe -Wl,--out-implib,libstress_fix.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\stress_fix.dir\linklibs.rsp

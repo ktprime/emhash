@@ -492,12 +492,36 @@ static inline uint64_t udb_splitmix64(uint64_t x)
   #include <arm_neon.h>
 #endif
 
+#include <stdint.h>
+
+// Windows SSE4.2 头文件
+#if _WIN32
+#include <nmmintrin.h>
+#endif
+
+// x86 SSE4.2 / GCC Clang
+#if defined(__SSE4_2__)
+#include <smmintrin.h>
+#endif
+
+// ARM64 CRC 内置函数
+#if defined(__aarch64__)
+// __crc32cd 接收 uint32_t crc, uint64_t data
+// __crc32cw 接收 uint32_t crc, uint32_t data
+#endif
+
 static inline uint64_t hashCRC32(uint64_t x)
 {
-#if __SSE4_2__ || _WIN32
-    return _mm_crc32_u64((uint64_t)(0-1), x);
+#if defined(__SSE4_2__) || _WIN32
+#  ifdef __x86_64__
+    return _mm_crc32_u64(0xFFFFFFFFULL, x);
+#  else
+    uint64_t crc = 0xFFFFFFFFU;
+    crc = _mm_crc32_u32(crc, (uint32_t)(x & 0xFFFFFFFFULL));
+    return ((int64_t)crc << 32) | _mm_crc32_u32(crc, (uint32_t)(x >> 32));
+#endif
 #elif defined(__aarch64__)
-    return __crc32cd(-1U, x);
+    return __crc32cd(0xFFFFFFFFU, x);
 #else
     return x;
 #endif

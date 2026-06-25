@@ -1,0 +1,1 @@
+/usr/bin/c++ -O2 -flto=auto CMakeFiles/test_emhash5_verify.dir/verify/test_emhash5_verify.cpp.o -o test_emhash5_verify 

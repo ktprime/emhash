@@ -521,7 +521,7 @@ static void test_set_msan_clone_rehash(const char* name) {
     {
         // Insert enough string keys to trigger at least one rehash
         SetType s;
-        const int N = 500;
+        const int N = 5000;
         for (int i = 0; i < N; i++)
             (void)s.insert("msan_key_" + std::to_string(i));
         TEST_ASSERT(s.size() == N, "set should have N entries after rehash");
@@ -567,7 +567,7 @@ static void test_map_msan_clone_rehash(const char* name) {
     {
         // Insert enough string keys to trigger at least one rehash
         MapType m;
-        const int N = 500;
+        const int N = 5000;
         for (int i = 0; i < N; i++)
             m["msan_key_" + std::to_string(i)] = i;
         TEST_ASSERT(m.size() == N, "map should have N entries after rehash");

@@ -1,0 +1,12 @@
+prefix=C:/Program Files (x86)/emhash_tests
+exec_prefix=${prefix}
+libdir=C:/Program Files (x86)/emhash_tests/lib
+includedir=C:/Program Files (x86)/emhash_tests/include
+
+Name: benchmark
+Description: Google microbenchmark framework
+Version: 1.9.4
+
+Libs: -L${libdir} -lbenchmark
+Libs.private: -lpthread 
+Cflags: -I${includedir}

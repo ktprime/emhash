@@ -1,0 +1,162 @@
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-MKDIR.RULE
+setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-src
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-build
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/tmp
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-mkdir
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-DOWNLOAD.RULE
+setlocal
+cd D:\emhash\tests\build_bench\_deps
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -P D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/tmp/googlebench-populate-gitclone.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-download
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-UPDATE.RULE
+setlocal
+cd D:\emhash\tests\build_bench\_deps\googlebench-src
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -P D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/tmp/googlebench-populate-gitupdate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-PATCH.RULE
+setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-patch
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-CONFIGURE.RULE
+setlocal
+cd D:\emhash\tests\build_bench\_deps\googlebench-build
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-configure
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-BUILD.RULE
+setlocal
+cd D:\emhash\tests\build_bench\_deps\googlebench-build
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-build
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-INSTALL.RULE
+setlocal
+cd D:\emhash\tests\build_bench\_deps\googlebench-build
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-install
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\43D3A5A90A47EDAD7941DDD86C4740AF\GOOGLEBENCH-POPULATE-TEST.RULE
+setlocal
+cd D:\emhash\tests\build_bench\_deps\googlebench-build
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-test
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\ABBE3C5985A8C164B1030D6594824611\GOOGLEBENCH-POPULATE-COMPLETE.RULE
+setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -E make_directory D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/Debug/googlebench-populate-complete
+if %errorlevel% neq 0 goto :cmEnd
+"D:\Program Files\CMake\bin\cmake.exe" -E touch D:/emhash/tests/build_bench/_deps/googlebench-subbuild/googlebench-populate-prefix/src/googlebench-populate-stamp/Debug/googlebench-populate-done
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKEFILES\CD26FBCB985D72F21928C38F84319F3E\GOOGLEBENCH-POPULATE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\EMHASH\TESTS\BUILD_BENCH\_DEPS\GOOGLEBENCH-SUBBUILD\CMAKELISTS.TXT
+setlocal
+"D:\Program Files\CMake\bin\cmake.exe" -SD:/emhash/tests/build_bench/_deps/googlebench-subbuild -BD:/emhash/tests/build_bench/_deps/googlebench-subbuild --check-stamp-file D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

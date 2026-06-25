@@ -1,0 +1,141 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark_api_internal.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark_name.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark_register.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark_runner.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\check.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\colorprint.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\commandlineflags.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\complexity.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\console_reporter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\counter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\csv_reporter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\json_reporter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\perf_counters.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\reporter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\statistics.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\string_util.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\sysinfo.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\timers.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\include\benchmark\benchmark.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\include\benchmark\export.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\arraysize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark_api_internal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark_register.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\benchmark_runner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\check.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\colorprint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\commandlineflags.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\complexity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\counter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\cycleclock.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\internal_macros.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\log.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\mutex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\perf_counters.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\re.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\statistics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\string_util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\thread_manager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\thread_timer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\timers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\emhash\tests\build_bench\_deps\googlebench-src\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{4A2CD14B-B3DD-3939-8F5D-7657FE6B1A2F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{DFEA3A19-77C5-3651-82CD-0EEC6D924B6D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

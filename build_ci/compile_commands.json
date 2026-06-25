@@ -1,0 +1,207 @@
+[
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_verify.dir/verify/test_all_maps.cpp.o -c /mnt/d/emhash/tests/verify/test_all_maps.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_all_maps.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/quick_test8.dir/verify/quick_test8.cpp.o -c /mnt/d/emhash/tests/verify/quick_test8.cpp",
+  "file": "/mnt/d/emhash/tests/verify/quick_test8.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_emhash58.dir/verify/test_emhash58.cpp.o -c /mnt/d/emhash/tests/verify/test_emhash58.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_emhash58.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_hidden_bugs8.dir/verify/test_hidden_bugs8.cpp.o -c /mnt/d/emhash/tests/verify/test_hidden_bugs8.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_hidden_bugs8.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_extreme.dir/verify/test_extreme.cpp.o -c /mnt/d/emhash/tests/verify/test_extreme.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_extreme.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_interface_combo.dir/verify/test_interface_combo.cpp.o -c /mnt/d/emhash/tests/verify/test_interface_combo.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_interface_combo.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_emhash5_verify.dir/verify/test_emhash5_verify.cpp.o -c /mnt/d/emhash/tests/verify/test_emhash5_verify.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_emhash5_verify.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_emhash_allocator.dir/verify/test_emhash_allocator.cpp.o -c /mnt/d/emhash/tests/verify/test_emhash_allocator.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_emhash_allocator.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_functional_edge.dir/verify/test_functional_edge.cpp.o -c /mnt/d/emhash/tests/verify/test_functional_edge.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_functional_edge.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_sanitizer_aggregate.dir/verify/test_sanitizer_aggregate.cpp.o -c /mnt/d/emhash/tests/verify/test_sanitizer_aggregate.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_sanitizer_aggregate.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_hashset_allocator.dir/verify/test_hashset_allocator.cpp.o -c /mnt/d/emhash/tests/verify/test_hashset_allocator.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_hashset_allocator.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_emilib_comprehensive.dir/verify/test_emilib_comprehensive.cpp.o -c /mnt/d/emhash/tests/verify/test_emilib_comprehensive.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_emilib_comprehensive.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_size_sweep.dir/verify/test_size_sweep.cpp.o -c /mnt/d/emhash/tests/verify/test_size_sweep.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_size_sweep.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_hashmap_full_api.dir/verify/test_hashmap_full_api.cpp.o -c /mnt/d/emhash/tests/verify/test_hashmap_full_api.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_hashmap_full_api.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_hashset_full_api.dir/verify/test_hashset_full_api.cpp.o -c /mnt/d/emhash/tests/verify/test_hashset_full_api.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_hashset_full_api.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_special_key_types.dir/verify/test_special_key_types.cpp.o -c /mnt/d/emhash/tests/verify/test_special_key_types.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_special_key_types.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_merge_correctness.dir/verify/test_merge_correctness.cpp.o -c /mnt/d/emhash/tests/verify/test_merge_correctness.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_merge_correctness.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/edge_test.dir/verify/edge_test.cpp.o -c /mnt/d/emhash/tests/verify/edge_test.cpp",
+  "file": "/mnt/d/emhash/tests/verify/edge_test.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_find_slot_bucket.dir/verify/test_find_slot_bucket.cpp.o -c /mnt/d/emhash/tests/verify/test_find_slot_bucket.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_find_slot_bucket.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_string_key_leak.dir/verify/test_string_key_leak.cpp.o -c /mnt/d/emhash/tests/verify/test_string_key_leak.cpp",
+  "file": "/mnt/d/emhash/tests/verify/test_string_key_leak.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_stress.dir/stress/stress_all_maps.cpp.o -c /mnt/d/emhash/tests/stress/stress_all_maps.cpp",
+  "file": "/mnt/d/emhash/tests/stress/stress_all_maps.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/stress_fix.dir/stress/stress_fix.cpp.o -c /mnt/d/emhash/tests/stress/stress_fix.cpp",
+  "file": "/mnt/d/emhash/tests/stress/stress_fix.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/highload_test.dir/stress/highload_test.cpp.o -c /mnt/d/emhash/tests/stress/highload_test.cpp",
+  "file": "/mnt/d/emhash/tests/stress/highload_test.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_emhash5_stress.dir/stress/test_emhash5_stress.cpp.o -c /mnt/d/emhash/tests/stress/test_emhash5_stress.cpp",
+  "file": "/mnt/d/emhash/tests/stress/test_emhash5_stress.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_emhash5_hifi.dir/stress/test_emhash5_hifi.cpp.o -c /mnt/d/emhash/tests/stress/test_emhash5_hifi.cpp",
+  "file": "/mnt/d/emhash/tests/stress/test_emhash5_hifi.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_bad_hash_stress.dir/stress/test_bad_hash_stress.cpp.o -c /mnt/d/emhash/tests/stress/test_bad_hash_stress.cpp",
+  "file": "/mnt/d/emhash/tests/stress/test_bad_hash_stress.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++ -DEMH_SAFE_PSL -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_attack.dir/attack/hash_attack_all.cpp.o -c /mnt/d/emhash/tests/attack/hash_attack_all.cpp",
+  "file": "/mnt/d/emhash/tests/attack/hash_attack_all.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_collision_hardening.dir/attack/test_collision_hardening.cpp.o -c /mnt/d/emhash/tests/attack/test_collision_hardening.cpp",
+  "file": "/mnt/d/emhash/tests/attack/test_collision_hardening.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++ -DEMH_SAFE_PSL -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/hash_attack5.dir/attack/hash_attack.cpp.o -c /mnt/d/emhash/tests/attack/hash_attack.cpp",
+  "file": "/mnt/d/emhash/tests/attack/hash_attack.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++ -DEMH_SAFE_PSL -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/hash_attack7.dir/attack/hash_attack7.cpp.o -c /mnt/d/emhash/tests/attack/hash_attack7.cpp",
+  "file": "/mnt/d/emhash/tests/attack/hash_attack7.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -g -O0 -std=gnu++17 -o CMakeFiles/test_debug.dir/debug/debug_all_maps.cpp.o -c /mnt/d/emhash/tests/debug/debug_all_maps.cpp",
+  "file": "/mnt/d/emhash/tests/debug/debug_all_maps.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/debug_chain.dir/debug/debug_chain.cpp.o -c /mnt/d/emhash/tests/debug/debug_chain.cpp",
+  "file": "/mnt/d/emhash/tests/debug/debug_chain.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/debug_set_erase.dir/debug/debug_set_erase.cpp.o -c /mnt/d/emhash/tests/debug/debug_set_erase.cpp",
+  "file": "/mnt/d/emhash/tests/debug/debug_set_erase.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/min_repro.dir/debug/min_repro.cpp.o -c /mnt/d/emhash/tests/debug/min_repro.cpp",
+  "file": "/mnt/d/emhash/tests/debug/min_repro.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/reproduce_crash.dir/debug/reproduce_crash.cpp.o -c /mnt/d/emhash/tests/debug/reproduce_crash.cpp",
+  "file": "/mnt/d/emhash/tests/debug/reproduce_crash.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/fuzz_reproduce.dir/debug/fuzz_reproduce.cpp.o -c /mnt/d/emhash/tests/debug/fuzz_reproduce.cpp",
+  "file": "/mnt/d/emhash/tests/debug/fuzz_reproduce.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_probe_bug.dir/debug/test_probe_bug.cpp.o -c /mnt/d/emhash/tests/debug/test_probe_bug.cpp",
+  "file": "/mnt/d/emhash/tests/debug/test_probe_bug.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_probe_coverage.dir/debug/test_probe_coverage.cpp.o -c /mnt/d/emhash/tests/debug/test_probe_coverage.cpp",
+  "file": "/mnt/d/emhash/tests/debug/test_probe_coverage.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_debug_find.dir/debug/test_debug_find.cpp.o -c /mnt/d/emhash/tests/debug/test_debug_find.cpp",
+  "file": "/mnt/d/emhash/tests/debug/test_debug_find.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/test_repro_collision.dir/debug/test_repro_collision.cpp.o -c /mnt/d/emhash/tests/debug/test_repro_collision.cpp",
+  "file": "/mnt/d/emhash/tests/debug/test_repro_collision.cpp"
+},
+{
+  "directory": "/mnt/d/emhash/build_ci",
+  "command": "/usr/bin/c++  -I/mnt/d/emhash/tests/../include -Wall -Wextra -pedantic -msse2 -std=gnu++17 -o CMakeFiles/reproduce_emhash8_bug.dir/fuzz/reproduce_emhash8_bug.cpp.o -c /mnt/d/emhash/tests/fuzz/reproduce_emhash8_bug.cpp",
+  "file": "/mnt/d/emhash/tests/fuzz/reproduce_emhash8_bug.cpp"
+}
+]

@@ -1141,7 +1141,7 @@ private:
         uint64_t high;
         constexpr uint64_t k = UINT64_C(11400714819323198485);
         return _umul128(key, k, &high) + high;
-#elif 0 // alternate: mul-hash
+#elif 1 // alternate: mul-hash
         uint64_t const r = key * UINT64_C(0xca4bcaa75ec3f625);
         return (r >> 32) + r;
 #elif 0 // alternate: MurmurHash3Mixer
@@ -1159,6 +1159,8 @@ private:
         x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
         x = x ^ (x >> 31);
         return x;
+#else
+        return n;
 #endif
     }
 

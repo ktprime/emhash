@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/quick_test8.dir/verify/quick_test8.cpp.o -o quick_test8 

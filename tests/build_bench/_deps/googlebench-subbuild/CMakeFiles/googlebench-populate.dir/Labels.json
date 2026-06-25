@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/googlebench-populate"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/cd26fbcb985d72f21928c38f84319f3e/googlebench-populate.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/abbe3c5985a8c164b1030d6594824611/googlebench-populate-complete.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-build.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-configure.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-download.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-install.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-mkdir.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-patch.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-test.rule"
+		},
+		{
+			"file" : "D:/emhash/tests/build_bench/_deps/googlebench-subbuild/CMakeFiles/43d3a5a90a47edad7941ddd86c4740af/googlebench-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"googlebench-populate"
+		],
+		"name" : "googlebench-populate"
+	}
+}

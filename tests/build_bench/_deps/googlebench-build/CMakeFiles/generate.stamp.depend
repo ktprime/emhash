@@ -1,0 +1,16 @@
+# CMake generation dependency list for this directory.
+D:/Program Files/CMake/share/cmake-3.22/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/CheckCXXCompilerFlag.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/CheckCXXSourceCompiles.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/CheckIncludeFileCXX.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/CheckLibraryExists.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/FindGit.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/FindPackageMessage.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/FindThreads.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/Internal/CheckCompilerFlag.cmake
+D:/Program Files/CMake/share/cmake-3.22/Modules/Internal/CheckSourceCompiles.cmake
+D:/emhash/tests/build_bench/_deps/googlebench-src/CMakeLists.txt
+D:/emhash/tests/build_bench/_deps/googlebench-src/cmake/AddCXXCompilerFlag.cmake
+D:/emhash/tests/build_bench/_deps/googlebench-src/cmake/CXXFeatureCheck.cmake
+D:/emhash/tests/build_bench/_deps/googlebench-src/cmake/GetGitVersion.cmake

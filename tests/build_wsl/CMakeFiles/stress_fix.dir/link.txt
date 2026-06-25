@@ -1,0 +1,1 @@
+/usr/bin/c++ -O2 -flto=auto CMakeFiles/stress_fix.dir/stress/stress_fix.cpp.o -o stress_fix 
