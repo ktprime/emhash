@@ -359,6 +359,9 @@ public:
 
     ~HashSet() noexcept {
         clear_data();
+        // destruct tail sentinel created in rehash()
+        if (need_explicit_dtor() && _num_buckets > 0)
+            _pairs[_num_buckets].~KeyT();
         _num_filled = 0;
         free(_states);
         free(_pairs);
@@ -378,7 +381,7 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy((char*)_pairs, other._pairs, _num_buckets * sizeof(_pairs[0]));
+            memcpy((char*)_pairs, other._pairs, (_num_buckets + 1) * sizeof(_pairs[0]));
         } else {
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new (_pairs + it.bucket()) PairT(*it);
@@ -710,9 +713,14 @@ public:
         _states = new_state;
         _pairs = new_pairs;
 
-        // fill last packet zero (only for trivially-copyable types)
-        if (is_trivially_copyable())
+        // fill last packet zero (tail sentinel for SIMD scan termination)
+        // Must be initialized for all types because find_filled_slot may return this position
+        if (is_trivially_copyable()) {
             memset((char*)(_pairs + num_buckets), 0, sizeof(_pairs[0]));
+        } else {
+            // Use placement new for non-trivial types to avoid UB
+            new (_pairs + num_buckets) KeyT();
+        }
         clear_meta();
 
 #if EMH_STATIS
@@ -740,6 +748,10 @@ public:
             printf("\t\t\tmax_probe_length/_max_probe_length = %d/%d, collsions = %d, collision = %.2f%%\n",
                    max_probe_length, _max_probe_length, collision, collision * 100.0f / _num_buckets);
 #endif
+
+        // destruct old tail sentinel if it was constructed
+        if (need_explicit_dtor() && old_buckets > 0)
+            old_pairs[old_buckets].~KeyT();
 
         free(old_states);
         free(old_pairs);
