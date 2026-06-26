@@ -258,8 +258,12 @@ public:
     }
 
     ~HashSet() {
-        if (need_explicit_dtor())
+        if (need_explicit_dtor()) {
             clear();
+            // destruct tail sentinel created in rehash()
+            if (_num_buckets > 0)
+                _keys[_num_buckets].~KeyT();
+        }
 
         _num_filled = 0;
         free(_states);
@@ -279,22 +283,28 @@ public:
             return;
         }
 
-        if (need_explicit_dtor()) {
-            clear();
-        }
+        clear(); // only destructs filled entries, not sentinel
 
-        if (other._num_buckets != _num_buckets) {
+        const bool bucket_changed = (other._num_buckets != _num_buckets);
+        if (bucket_changed) {
+            // No need to destruct sentinel: _num_buckets=0, reserve will reallocate
             _num_filled = _num_buckets = 0;
-            reserve(other._num_buckets / 2);
+            reserve(other._num_buckets / 2); // rehash creates new sentinel
+        } else if (need_explicit_dtor() && _num_buckets > 0) {
+            // Bucket count unchanged: destruct existing sentinel for reconstruction
+            _keys[_num_buckets].~KeyT();
         }
 
         if (is_trivially_copyable()) {
-            memcpy(_keys, other._keys, _num_buckets * sizeof(_keys[0]));
+            memcpy(_keys, other._keys, (_num_buckets + 1) * sizeof(_keys[0]));
         } else {
             for (auto it = other.cbegin(); it != other.cend(); ++it)
                 new (_keys + it.bucket()) KeyT(*it);
+            // Create sentinel only if bucket count unchanged (rehash already handled changed case)
+            if (!bucket_changed)
+                new (_keys + _num_buckets) KeyT();
         }
-        // assert(_num_buckets == other._num_buckets);
+
         _num_filled = other._num_filled;
         _max_probe_length = other._max_probe_length;
         memcpy(_states, other._states, (_num_buckets + set_simd_bytes) * sizeof(_states[0]));
@@ -556,7 +566,7 @@ public:
         auto new_keys = (KeyT*)(new_states + status_size);
 
         auto old_num_filled = _num_filled;
-        // auto old_num_buckets = _num_buckets;
+        auto old_num_buckets = _num_buckets;
         auto old_states = _states;
         auto old_keys = _keys;
 #if EMH_DUMP
@@ -574,10 +584,14 @@ public:
         std::fill_n(_states + num_buckets, set_simd_bytes / 2, State::EFILLED + 4);
         // find filled tombstone
         std::fill_n(_states + num_buckets + set_simd_bytes / 2, set_simd_bytes / 2, State::EEMPTY + 4);
-        // fill last packet zero
-        // Only init tail sentinel for trivially-copyable types
-        if (is_trivially_copyable())
+        // fill last packet zero (tail sentinel for SIMD scan termination)
+        // Must be initialized for all types because find_filled_slot may return this position
+        if (is_trivially_copyable()) {
             memset(new_keys + num_buckets, 0, sizeof(new_keys[0]));
+        } else {
+            // Use placement new for non-trivial types to avoid UB
+            new (new_keys + num_buckets) KeyT();
+        }
 
         _max_probe_length = -1;
         auto collision = 0;
@@ -596,6 +610,10 @@ public:
                 src_key.~KeyT();
             }
         }
+
+        // destruct old tail sentinel if it was constructed
+        if (need_explicit_dtor() && old_num_buckets > 0)
+            old_keys[old_num_buckets].~KeyT();
 
 #if EMH_DUMP
         if (_num_filled > 1000000)
