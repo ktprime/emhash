@@ -283,16 +283,11 @@ public:
             return;
         }
 
-        clear(); // only destructs filled entries, not sentinel
+        clear();
 
-        const bool bucket_changed = (other._num_buckets != _num_buckets);
-        if (bucket_changed) {
-            // No need to destruct sentinel: _num_buckets=0, reserve will reallocate
+        if (other._num_buckets != _num_buckets) {
             _num_filled = _num_buckets = 0;
             reserve(other._num_buckets / 2); // rehash creates new sentinel
-        } else if (need_explicit_dtor() && _num_buckets > 0) {
-            // Bucket count unchanged: destruct existing sentinel for reconstruction
-            _keys[_num_buckets].~KeyT();
         }
 
         if (is_trivially_copyable()) {
@@ -300,9 +295,7 @@ public:
         } else {
             for (auto it = other.cbegin(); it != other.cend(); ++it)
                 new (_keys + it.bucket()) KeyT(*it);
-            // Create sentinel only if bucket count unchanged (rehash already handled changed case)
-            if (!bucket_changed)
-                new (_keys + _num_buckets) KeyT();
+            // sentinel already exists (from rehash or unchanged buckets)
         }
 
         _num_filled = other._num_filled;
