@@ -86,6 +86,7 @@ emhash_add_test(test_find_slot_bucket verify/test_find_slot_bucket.cpp)
 target_link_libraries(test_find_slot_bucket PRIVATE Threads::Threads)
 
 emhash_add_test(test_string_key_leak verify/test_string_key_leak.cpp)
+emhash_add_test(test_sentinel_cleanup verify/test_sentinel_cleanup.cpp)
 
 # ============================================================================
 # Stress Tests
@@ -176,6 +177,7 @@ emhash_register_test(test_merge_correctness)
 emhash_register_test(edge_test)
 emhash_register_test(test_find_slot_bucket)
 emhash_register_test(test_string_key_leak)
+emhash_register_test(test_sentinel_cleanup)
 
 # Stress tests
 emhash_register_test(test_stress)

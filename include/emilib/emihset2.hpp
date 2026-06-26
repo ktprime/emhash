@@ -260,9 +260,6 @@ public:
     ~HashSet() {
         if (need_explicit_dtor()) {
             clear();
-            // destruct tail sentinel created in rehash()
-            if (_num_buckets > 0)
-                _keys[_num_buckets].~KeyT();
         }
 
         _num_filled = 0;
@@ -291,7 +288,7 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy(_keys, other._keys, (_num_buckets + 1) * sizeof(_keys[0]));
+            memcpy((char*)_keys, (const char*)other._keys, (_num_buckets + 1) * sizeof(_keys[0]));
         } else {
             for (auto it = other.cbegin(); it != other.cend(); ++it)
                 new (_keys + it.bucket()) KeyT(*it);
@@ -559,7 +556,6 @@ public:
         auto new_keys = (KeyT*)(new_states + status_size);
 
         auto old_num_filled = _num_filled;
-        auto old_num_buckets = _num_buckets;
         auto old_states = _states;
         auto old_keys = _keys;
 #if EMH_DUMP
@@ -578,16 +574,16 @@ public:
         // find filled tombstone
         std::fill_n(_states + num_buckets + set_simd_bytes / 2, set_simd_bytes / 2, State::EEMPTY + 4);
         // fill last packet zero (tail sentinel for SIMD scan termination)
-        // Must be initialized for all types because find_filled_slot may return this position
+        // Only the _states ESENTINEL marker is needed; key of the sentinel
+        // is never accessed, so no placement-new is required for non-trivial types.
         if (is_trivially_copyable()) {
-            memset(new_keys + num_buckets, 0, sizeof(new_keys[0]));
-        } else {
-            // Use placement new for non-trivial types to avoid UB
-            new (new_keys + num_buckets) KeyT();
+            memset((char*)(new_keys + num_buckets), 0, sizeof(new_keys[0]));
         }
 
         _max_probe_length = -1;
+#if EMH_DUMP
         auto collision = 0;
+#endif
 
         for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
             if (old_states[src_bucket] % 2 == State::EFILLED) {
@@ -595,7 +591,9 @@ public:
 
                 const auto key_hash = _hasher(src_key);
                 const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
+#if EMH_DUMP
                 collision += _states[key_hash & _mask] % 2 == State::EFILLED;
+#endif
 
                 _states[dst_bucket] = KEYHASH_MASK(key_hash);
                 new (_keys + dst_bucket) KeyT(std::move(src_key));
@@ -603,10 +601,6 @@ public:
                 src_key.~KeyT();
             }
         }
-
-        // destruct old tail sentinel if it was constructed
-        if (need_explicit_dtor() && old_num_buckets > 0)
-            old_keys[old_num_buckets].~KeyT();
 
 #if EMH_DUMP
         if (_num_filled > 1000000)

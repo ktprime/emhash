@@ -377,8 +377,6 @@ public:
     ~HashMap() noexcept {
         clear_data();
         _num_filled = 0;
-        if (need_explicit_dtor())
-            _pairs[_num_buckets].~PairT();
         free(_pairs);
     }
 
@@ -391,17 +389,13 @@ public:
         clear_data();
 
         if (other._num_buckets != _num_buckets) {
-            if (need_explicit_dtor() && _num_buckets > 0)
-                _pairs[_num_buckets].~PairT();
             _num_filled = _num_buckets = 0;
             rehash(other._num_buckets);
-            // rehash() created a default sentinel, keep it (no need to destruct/reconstruct)
         }
 
         if (is_trivially_copyable()) {
-            memcpy((char*)_pairs, other._pairs, (_num_buckets + 1) * sizeof(PairT));
+            memcpy((char*)_pairs, (const char*)other._pairs, (_num_buckets + 1) * sizeof(PairT));
         } else {
-            // Copy only filled entries, not the tail sentinel (it remains from rehash or existing)
             for (auto it = other.cbegin(); it.bucket() < _num_buckets; ++it)
                 new (_pairs + it.bucket()) PairT(*it);
         }
@@ -875,12 +869,10 @@ public:
         std::fill_n(_offset, num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
 
         {
-            // TODO: set last packet tombstone. not equal key h2
-            new (_pairs + num_buckets) PairT(KeyT(), ValueT());
-            // size_t main_bucket;
-            //_states[num_buckets] = hash_key2(main_bucket, _pairs[num_buckets].first) + 2; //iterator end tombstone:
-            if (old_buckets && need_explicit_dtor())
-                old_pairs[old_buckets].~PairT();
+            // Sentinel key/value are never accessed (only _states ESENTINEL
+            // controls iteration), so no placement-new needed for non-trivial types.
+            if (is_trivially_copyable())
+                memset((char*)(_pairs + num_buckets), 0, sizeof(PairT));
         }
 
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {

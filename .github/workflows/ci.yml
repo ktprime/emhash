@@ -90,6 +90,7 @@ jobs:
           $CXX $FLAGS verify/test_extreme.cpp -o test_extreme
           $CXX $FLAGS verify/test_hashset_allocator.cpp -o test_hashset_allocator
           $CXX $FLAGS verify/test_string_key_leak.cpp -o test_string_key_leak
+          $CXX $FLAGS verify/test_lifecycle_audit.cpp -o test_lifecycle_audit
           $CXX -std=c++17 -g -O0 $CXXFLAGS_EXTRA -I../include debug/debug_all_maps.cpp -o test_debug
           $CXX $FLAGS -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack
           $CXX $FLAGS stress/stress_all_maps.cpp -o test_stress
@@ -103,6 +104,7 @@ jobs:
           $TIMEOUT 120 ./test_extreme
           $TIMEOUT 60  ./test_hashset_allocator
           $TIMEOUT 120 ./test_string_key_leak
+          $TIMEOUT 300 ./test_lifecycle_audit
           $TIMEOUT 300 ./test_attack
           $TIMEOUT 300 ./test_stress
           $TIMEOUT 300 ./test_debug
@@ -186,6 +188,8 @@ jobs:
           $CXX $SAN verify/test_all_maps.cpp -o test_verify_asan
           $CXX $SAN verify/test_extreme.cpp -o test_extreme_asan
           $CXX $SAN verify/test_string_key_leak.cpp -o test_string_key_leak_asan
+          $CXX $SAN verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_asan
+          $CXX $SAN verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_asan
           $CXX $SAN stress/stress_fix.cpp -o test_stress_asan
           $CXX $SAN -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack_asan
         shell: bash
@@ -196,6 +200,7 @@ jobs:
           ./test_verify_asan
           ./test_extreme_asan
           ./test_string_key_leak_asan
+          ./test_sentinel_cleanup_asan
           ./test_stress_asan
           ./test_attack_asan
         shell: bash
@@ -477,6 +482,8 @@ jobs:
             -I../include verify/test_all_maps.cpp -o test_verify_msan
           clang++ -std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer \
             -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_msan
+          clang++ -std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer \
+            -I../include verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_msan
         shell: bash
 
       - name: Run with MSan
@@ -484,6 +491,7 @@ jobs:
           cd tests
           ./test_verify_msan
           ./test_string_key_leak_msan
+          ./test_sentinel_cleanup_msan
         shell: bash
 
   # ==========================================================================
@@ -508,6 +516,7 @@ jobs:
           g++ $COV verify/test_all_maps.cpp -o test_verify_cov
           g++ $COV verify/test_extreme.cpp -o test_extreme_cov
           g++ $COV verify/test_string_key_leak.cpp -o test_string_key_leak_cov
+          g++ $COV verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_cov
           g++ $COV verify/test_hashset_full_api.cpp -o test_hashset_cov
           g++ $COV verify/test_emilib_comprehensive.cpp -o test_emilib_cov
           g++ $COV stress/stress_fix.cpp -o test_stress_cov
@@ -521,6 +530,7 @@ jobs:
           ./test_verify_cov
           ./test_extreme_cov
           ./test_string_key_leak_cov
+          ./test_sentinel_cleanup_cov
           ./test_hashset_cov
           ./test_emilib_cov
           ./test_stress_cov
