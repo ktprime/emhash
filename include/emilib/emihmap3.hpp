@@ -817,7 +817,7 @@ public:
         // Only the _states ESENTINEL marker is needed; key/value of the sentinel
         // are never accessed, so no placement-new is required for non-trivial types.
         if (is_trivially_copyable())
-                memset((char*)(_pairs + num_buckets), 0, sizeof(_pairs[0]));
+            memset((char*)(_pairs + num_buckets), 0, sizeof(_pairs[0]));
         clear_meta();
 
 #if EMH_STATIS
