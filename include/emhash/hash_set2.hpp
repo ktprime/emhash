@@ -290,7 +290,7 @@ public:
         _loadlf = other._loadlf;
 
         if (std::is_trivially_copyable<KeyT>::value) {
-            memcpy(static_cast<void*>(_pairs), other._pairs, _num_buckets * sizeof(PairT));
+            memcpy(static_cast<void*>(_pairs), other._pairs, (_num_buckets + 2) * sizeof(PairT));
         } else {
             auto old_pairs = other._pairs;
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {

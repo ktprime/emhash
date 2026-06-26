@@ -338,6 +338,8 @@ public:
 
     ~HashMap() noexcept {
         clear_data();
+        if (need_explicit_dtor() && _num_buckets > 0)
+            _pairs[bucket_to_slot(_num_buckets)].~PairT();
         _num_filled = 0;
         free(_states);
         free(_pairs);
@@ -803,10 +805,13 @@ public:
         _states = new_state;
         _pairs = new_pairs;
 
-        // fill last packet zero (only for trivially-copyable types; non-trivial
-        // types skip this since tail sentinel is not destructed nor accessed)
-        if (is_trivially_copyable())
+        // fill last packet zero (tail sentinel for SIMD scan termination)
+        if (is_trivially_copyable()) {
             memset((char*)(_pairs + pairs_size / sizeof(PairT) - 1), 0, sizeof(_pairs[0]));
+        } else {
+            const auto last_slot = pairs_size / sizeof(PairT) - 1;
+            new (_pairs + last_slot) PairT(KeyT(), ValueT());
+        }
 
         clear_meta();
 
@@ -826,6 +831,11 @@ public:
                     src_pair.~PairT();
             }
         }
+
+        // destruct old tail sentinel if it was constructed
+        if (need_explicit_dtor() && old_buckets > 0)
+            old_pairs[bucket_to_slot(old_buckets)].~PairT();
+
         free(old_states);
         free(old_pairs);
     }
