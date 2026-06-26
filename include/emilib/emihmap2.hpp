@@ -397,9 +397,9 @@ public:
             rehash(other._num_buckets);
             // rehash() constructed a default sentinel at _pairs[_num_buckets];
             // destruct it so the copy section below can re-construct from other.
-            if (need_explicit_dtor())
+            if (need_explicit_dtor() && _num_buckets > 0)
                 _pairs[_num_buckets].~PairT();
-        } else if (need_explicit_dtor()) {
+        } else if (need_explicit_dtor() && _num_buckets > 0) {
             _pairs[_num_buckets].~PairT();
         }
 
