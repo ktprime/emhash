@@ -1669,11 +1669,15 @@ private:
     */
     template <typename K = KeyT> size_type find_or_allocate(const K& key) noexcept {
         const auto bucket = key_to_bucket(key);
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
+        if (static_cast<int>(next_bucket) < 0) {
+            return bucket;
+        }
+
         auto result = find_or_kickout(key, bucket);
         if (result != INACTIVE)
             return result;
 
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
         if (_eq(key, bucket_key))
             return bucket;
