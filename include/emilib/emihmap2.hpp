@@ -395,18 +395,14 @@ public:
                 _pairs[_num_buckets].~PairT();
             _num_filled = _num_buckets = 0;
             rehash(other._num_buckets);
-            // rehash() constructed a default sentinel at _pairs[_num_buckets];
-            // destruct it so the copy section below can re-construct from other.
-            if (need_explicit_dtor() && _num_buckets > 0)
-                _pairs[_num_buckets].~PairT();
-        } else if (need_explicit_dtor() && _num_buckets > 0) {
-            _pairs[_num_buckets].~PairT();
+            // rehash() created a default sentinel, keep it (no need to destruct/reconstruct)
         }
 
         if (is_trivially_copyable()) {
             memcpy((char*)_pairs, other._pairs, (_num_buckets + 1) * sizeof(PairT));
         } else {
-            for (auto it = other.cbegin(); it.bucket() <= _num_buckets; ++it)
+            // Copy only filled entries, not the tail sentinel (it remains from rehash or existing)
+            for (auto it = other.cbegin(); it.bucket() < _num_buckets; ++it)
                 new (_pairs + it.bucket()) PairT(*it);
         }
 
