@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/edge_test.dir/verify/edge_test.cpp.o -o edge_test 

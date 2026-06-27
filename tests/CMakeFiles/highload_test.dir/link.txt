@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/highload_test.dir/stress/highload_test.cpp.o -o highload_test 
