@@ -17,15 +17,23 @@
 
 # Build directories
 build/
+build_asan/
+build_ci/
 build_ci_check/
 build_ci_wsl/
+build_msan/
 build_test/
 build_tests/
+build_verify/
 vsbuild/
 bench/bin/
 tests/build/
+tests/build_attack/
 tests/build_bench/
+tests/build_check/
 tests/build_msvc/
+tests/build_wsl/
+tests/vsbuild/
 tests/cov_build/
 tests/coverage_html/
 tests/coverage.info

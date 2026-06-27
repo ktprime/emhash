@@ -1,3 +1,0 @@
-"D:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\test_hidden_bugs8.dir/objects.a
-D:\PROGRA~1\mingw64\bin\ar.exe qc CMakeFiles\test_hidden_bugs8.dir/objects.a @CMakeFiles\test_hidden_bugs8.dir\objects1.rsp
-D:\PROGRA~1\mingw64\bin\G__~1.EXE -Wl,--whole-archive CMakeFiles\test_hidden_bugs8.dir/objects.a -Wl,--no-whole-archive -o test_hidden_bugs8.exe -Wl,--out-implib,libtest_hidden_bugs8.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\test_hidden_bugs8.dir\linklibs.rsp

@@ -1,3 +1,0 @@
-"D:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\test_emhash_allocator.dir/objects.a
-D:\PROGRA~1\mingw64\bin\ar.exe qc CMakeFiles\test_emhash_allocator.dir/objects.a @CMakeFiles\test_emhash_allocator.dir\objects1.rsp
-D:\PROGRA~1\mingw64\bin\G__~1.EXE -Wl,--whole-archive CMakeFiles\test_emhash_allocator.dir/objects.a -Wl,--no-whole-archive -o test_emhash_allocator.exe -Wl,--out-implib,libtest_emhash_allocator.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\test_emhash_allocator.dir\linklibs.rsp

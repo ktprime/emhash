@@ -1,1 +1,0 @@
-/usr/bin/c++ -O2 -flto=auto CMakeFiles/test_emhash_allocator.dir/verify/test_emhash_allocator.cpp.o -o test_emhash_allocator 

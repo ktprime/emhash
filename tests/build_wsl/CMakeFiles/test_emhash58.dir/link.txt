@@ -1,1 +1,0 @@
-/usr/bin/c++ -O2 -flto=auto CMakeFiles/test_emhash58.dir/verify/test_emhash58.cpp.o -o test_emhash58 

@@ -1,3 +1,0 @@
-"D:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\test_extreme.dir/objects.a
-D:\PROGRA~1\mingw64\bin\ar.exe qc CMakeFiles\test_extreme.dir/objects.a @CMakeFiles\test_extreme.dir\objects1.rsp
-D:\PROGRA~1\mingw64\bin\G__~1.EXE -Wl,--whole-archive CMakeFiles\test_extreme.dir/objects.a -Wl,--no-whole-archive -o test_extreme.exe -Wl,--out-implib,libtest_extreme.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\test_extreme.dir\linklibs.rsp

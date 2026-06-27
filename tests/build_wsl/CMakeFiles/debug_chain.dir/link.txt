@@ -1,1 +1,0 @@
-/usr/bin/c++ -O2 -flto=auto CMakeFiles/debug_chain.dir/debug/debug_chain.cpp.o -o debug_chain 
