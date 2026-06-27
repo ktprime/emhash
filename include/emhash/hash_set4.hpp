@@ -1237,6 +1237,8 @@ private:
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     inline size_type hash_bucket(const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        EMH_MSAN_UNPOISON(key.data(), key.size());
 #ifdef WYHASH_LITTLE_ENDIAN
         return static_cast<size_type>(wyhash(key.data(), key.size(), key.size()));
 #else

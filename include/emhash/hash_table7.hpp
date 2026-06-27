@@ -527,7 +527,7 @@ public:
     }
 
     PairT* alloc_bucket(size_type num_buckets) {
-        if (num_buckets > max_size())
+        if (num_buckets <= 0 || num_buckets > max_size())
             throw std::length_error("emhash7::HashMap: allocation size overflow");
         auto count = alloc_count(num_buckets);
         auto* new_pairs = PairAllocTraits::allocate(_alloc, count);
@@ -1282,7 +1282,7 @@ public:
         while (buckets < required_buckets) {
             buckets *= 2;
             if (buckets > static_cast<uint64_t>(max_size()))
-                throw std::length_error("emhash7::HashMap: too many elements");
+                break;
         }
 
         auto num_buckets = static_cast<size_type>(buckets);
@@ -1718,6 +1718,8 @@ private:
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     EMH_INLINE size_type hash_key(const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WY_HASH
         return static_cast<size_type>(emh_wyhash(key.data(), key.size(), 0));
 #else

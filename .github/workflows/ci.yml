@@ -50,6 +50,8 @@ jobs:
 
       - name: Install coreutils + GCC on macOS
         if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_REQUIRE_TAP_TRUST: '1'
         run: |
           brew install coreutils
           BREW_PREFIX=$(brew --prefix)
@@ -201,6 +203,7 @@ jobs:
           ./test_extreme_asan
           ./test_string_key_leak_asan
           ./test_sentinel_cleanup_asan
+          ./test_lifecycle_audit_asan
           ./test_stress_asan
           ./test_attack_asan
         shell: bash
@@ -335,10 +338,12 @@ jobs:
           $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_all_maps.cpp -o test_verify_gcc
           $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_extreme.cpp -o test_extreme_gcc
           $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_gcc
+          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_gcc
           $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include stress/stress_all_maps.cpp -o test_stress_gcc
           ./test_verify_gcc
           ./test_extreme_gcc
           ./test_string_key_leak_gcc
+          ./test_lifecycle_audit_gcc
           ./test_stress_gcc
         shell: bash
 
@@ -415,6 +420,8 @@ jobs:
             -I../include verify/test_extreme.cpp -o test_extreme_32
           g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
             -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_32
+          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
+            -I../include verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_32
         shell: bash
 
       - name: Run 32-bit tests
@@ -423,6 +430,7 @@ jobs:
           ./test_verify_32
           ./test_extreme_32
           ./test_string_key_leak_32
+          ./test_lifecycle_audit_32
         shell: bash
 
   # ==========================================================================
@@ -470,27 +478,28 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install clang
+      - name: Install clang and libc++
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
 
       - name: Build with MSan
         run: |
           cd tests
-          clang++ -std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer \
-            -I../include verify/test_all_maps.cpp -o test_verify_msan
-          clang++ -std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer \
-            -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_msan
-          clang++ -std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer \
-            -I../include verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_msan
+          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++"
+          clang++ $MSAN_FLAGS -I../include verify/test_all_maps.cpp -o test_verify_msan
+          clang++ $MSAN_FLAGS -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_msan
+          clang++ $MSAN_FLAGS -I../include verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_msan
+          clang++ $MSAN_FLAGS -I../include verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_msan
         shell: bash
 
       - name: Run with MSan
         run: |
           cd tests
+          export MSAN_OPTIONS="suppressions=${{ github.workspace }}/.github/msan-suppressions.txt"
           ./test_verify_msan
           ./test_string_key_leak_msan
+          ./test_lifecycle_audit_msan
           ./test_sentinel_cleanup_msan
         shell: bash
 
@@ -517,6 +526,7 @@ jobs:
           g++ $COV verify/test_extreme.cpp -o test_extreme_cov
           g++ $COV verify/test_string_key_leak.cpp -o test_string_key_leak_cov
           g++ $COV verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_cov
+          g++ $COV verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
           g++ $COV verify/test_hashset_full_api.cpp -o test_hashset_cov
           g++ $COV verify/test_emilib_comprehensive.cpp -o test_emilib_cov
           g++ $COV stress/stress_fix.cpp -o test_stress_cov
@@ -531,6 +541,7 @@ jobs:
           ./test_extreme_cov
           ./test_string_key_leak_cov
           ./test_sentinel_cleanup_cov
+          ./test_lifecycle_audit_cov
           ./test_hashset_cov
           ./test_emilib_cov
           ./test_stress_cov

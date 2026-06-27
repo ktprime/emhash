@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
@@ -162,6 +163,10 @@ public:
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        if constexpr (std::is_same<UType, std::string>::value) {
+            EMH_MSAN_UNPOISON(key.data(), key.size());
+        }
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash) & _mask;
         return (int8_t)(size_t)(key_hash % MAP_BITS) + EFILLED;
@@ -835,13 +840,15 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : simd_bytes;
         while (buckets < required_buckets) {
             buckets *= 2;
+            if (buckets > max_size())
+                break;
         }
+
+        if (buckets > max_size() || buckets < _num_filled)
+            return;
 
         const auto pairs_size = (buckets + 1) * sizeof(PairT);
         const auto state_size = buckets + simd_bytes;
-        // assert(state_size % 8 == 0);
-        if (buckets > max_size() || buckets < _num_filled)
-            throw std::length_error("emilib2::HashMap: too many elements");
 
         const auto num_buckets = static_cast<size_t>(buckets);
         auto* new_data = static_cast<char*>(

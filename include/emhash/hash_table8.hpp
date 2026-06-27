@@ -1090,7 +1090,7 @@ public:
     }
 
     value_type* alloc_bucket(size_type num_buckets) {
-        if (num_buckets > max_size())
+        if (num_buckets <= 0 || num_buckets > max_size())
             throw std::length_error("emhash8::HashMap: allocation size overflow");
         auto* p = PairAllocTraits::allocate(_pair_allocator, num_buckets);
         if (p == nullptr)
@@ -1104,8 +1104,9 @@ public:
     }
 
     Index* alloc_index(size_type num_buckets) {
-        // Overflow guard: num_buckets + EAD must not wrap around.
-        if (num_buckets > max_size() || num_buckets + EAD < num_buckets)
+        // Overflow guard: num_buckets must be positive, fit in max_size,
+        // and num_buckets + EAD must not wrap around.
+        if (num_buckets <= 0 || num_buckets > max_size() || num_buckets + EAD < num_buckets)
             throw std::length_error("emhash8::HashMap: index size overflow");
         auto* p = IndexAllocTraits::allocate(_index_allocator, num_buckets + EAD);
         if (p == nullptr)
@@ -1177,7 +1178,7 @@ public:
         while (buckets < required_buckets) {
             buckets *= 2;
             if (buckets > static_cast<uint64_t>(max_size()))
-                throw std::length_error("emhash8::HashMap: too many elements");
+                break;
         }
 
 #if EMH_SAVE_MEM
@@ -1850,6 +1851,8 @@ private:
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     EMH_INLINE uint64_t hash_key(const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WYHASH_HASH
         return wyhashstr(key.data(), key.size());
 #else

@@ -1620,6 +1620,8 @@ private:
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
     inline uint64_t hash_key(const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WYHASH_HASH
         return wyhashstr(key.data(), key.size());
 #else

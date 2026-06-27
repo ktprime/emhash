@@ -517,8 +517,12 @@ public:
         if (is_trivially_copyable())
             memcpy(reinterpret_cast<char*>(_pairs), opairs, (static_cast<size_t>(_num_buckets) + 2u) * sizeof(PairT));
         else {
+            // Zero-fill all buckets first so MSan sees them as initialized.
+            // Occupied buckets will be overwritten by placement-new below.
+            memset(reinterpret_cast<char*>(_pairs), 0, static_cast<size_t>(_num_buckets) * sizeof(PairT));
             for (size_type bucket = 0; bucket < _num_buckets; bucket++) {
-                auto next_bucket = EMH_BUCKET(_pairs, bucket) = EMH_BUCKET(opairs, bucket);
+                auto next_bucket = EMH_BUCKET(opairs, bucket);
+                EMH_BUCKET(_pairs, bucket) = next_bucket;
                 if (static_cast<int>(next_bucket) >= 0)
                     new (_pairs + bucket) PairT(opairs[bucket]);
 #if EMH_HIGH_LOAD
@@ -1289,15 +1293,9 @@ public:
 
         while (buckets < required_buckets) {
             buckets *= 2;
+            if (buckets > max_size())
+                break;
         }
-
-        // no need alloc too many bucket for small key.
-        // if maybe fail set small load_factor and then call reserve() TODO:
-        // if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
-        //    buckets = 2ul << (sizeof(KeyT) * 8);
-
-        if (buckets > max_size() || buckets < static_cast<uint64_t>(_num_filled))
-            throw std::length_error("emhash5::HashMap: too many elements");
 
         auto num_buckets = static_cast<size_type>(buckets);
         auto old_num_filled = _num_filled;
@@ -1331,19 +1329,15 @@ public:
 #endif
             _pairs = reinterpret_cast<PairT*>(alloc_bucket(num_buckets));
 
-        if (need_explicit_dtor()) {
-            // For non-trivial types (e.g. std::string), only init the bucket field.
-            // memset on the entire entry is UB and may be optimized away by the compiler.
-            const auto inactive = INACTIVE;
-            for (size_type i = 0; i < num_buckets; ++i) {
-                std::memcpy(&EMH_BUCKET(_pairs, i), &inactive, sizeof(inactive));
-            }
-        } else {
-            memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
-                   sizeof(_pairs[0]) * static_cast<size_t>(num_buckets));
-        }
+        // Initialize all buckets: set every byte to INACTIVE so MSan sees them as
+        // initialized.  For non-trivial types, the key/value fields are dead bytes
+        // that will be overwritten by placement-new when the bucket is filled.
+        memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
+               sizeof(_pairs[0]) * static_cast<size_t>(num_buckets));
+
         // Initialize tail sentinels (bucket=0 so iterator stops)
         if (need_explicit_dtor()) {
+            // Only init the bucket field; key/value of sentinels are never read.
             const size_type zero_bucket = 0;
             for (size_type i = 0; i < 2; ++i)
                 std::memcpy(&EMH_BUCKET(_pairs, num_buckets + i), &zero_bucket, sizeof(zero_bucket));
@@ -1409,8 +1403,9 @@ public:
 
 private:
     PairT* alloc_bucket(size_type num_buckets) {
-        // Overflow guard: 2 + num_buckets must not wrap around.
-        if (static_cast<uint64_t>(num_buckets) > max_size() ||
+        // Unified overflow guard: num_buckets must be positive, fit in max_size,
+        // and 2 + num_buckets must not wrap around.
+        if (num_buckets <= 0 || static_cast<uint64_t>(num_buckets) > max_size() ||
             static_cast<uint64_t>(num_buckets) + 2 < static_cast<uint64_t>(num_buckets))
             throw std::length_error("emhash5::HashMap: allocation size overflow");
         auto* p = PairAllocTraits::allocate(_alloc, 2 + static_cast<size_t>(num_buckets));
@@ -1669,15 +1664,11 @@ private:
     */
     template <typename K = KeyT> size_type find_or_allocate(const K& key) noexcept {
         const auto bucket = key_to_bucket(key);
-        auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        if (static_cast<int>(next_bucket) < 0) {
-            return bucket;
-        }
-
         auto result = find_or_kickout(key, bucket);
         if (result != INACTIVE)
             return result;
 
+        auto next_bucket = EMH_BUCKET(_pairs, bucket);
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
         if (_eq(key, bucket_key))
             return bucket;
@@ -1909,6 +1900,8 @@ private:
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     EMH_INLINE size_type hash_key(const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WY_HASH
         return static_cast<size_type>(wyhash(key.data(), key.size(), 0));
 #else

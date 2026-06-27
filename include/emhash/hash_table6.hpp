@@ -1178,15 +1178,9 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : sizeof(size_t);
         while (buckets < required_buckets) {
             buckets *= 2;
+            if (buckets > max_size())
+                break;
         }
-
-        // no need alloc too many bucket for small key.
-        // if maybe fail set small load_factor and then call reserve() TODO:
-        // if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
-        //    buckets = 2ul << (sizeof(KeyT) * 8);
-
-        if (buckets > max_size() || buckets < _num_filled)
-            throw std::length_error("emhash6::HashMap: too many elements");
         // assert(num_buckets == (2 << CTZ(required_buckets)));
 
         auto num_buckets = static_cast<size_type>(buckets);
@@ -1730,6 +1724,8 @@ private:
 
     template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
     EMH_INLINE size_type hash_key(const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WY_HASH
         return static_cast<size_type>(wyhash(key.data(), key.size(), 0));
 #else
@@ -1752,7 +1748,7 @@ private:
     }
 
     PairT* alloc_bucket(uint64_t num_buckets) {
-        if (num_buckets > max_size())
+        if (num_buckets > max_size() || static_cast<int64_t>(num_buckets) <= 0)
             throw std::length_error("emhash6::HashMap: allocation size overflow");
         auto count = AllocPairCount(num_buckets);
         auto* p = PairAllocTraits::allocate(_alloc, count);

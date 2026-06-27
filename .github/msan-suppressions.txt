@@ -1,0 +1,15 @@
+# MSan suppression file for false positives in C++ standard library
+# These occur because the system's libc++/libstdc++ is not MSan-instrumented.
+# Suppress known false positive patterns in std::string and std::hash operations.
+
+# std::hash<std::string> reads SSO padding bytes
+interceptor_via:std::__1::__string_hash
+interceptor_via:std::__cxx11::_Hash_impl
+
+# std::string internal operations
+interceptor_via:std::__1::basic_string::__is_long
+interceptor_via:std::__1::basic_string::__get_pointer
+interceptor_via:std::__1::basic_string::data
+
+# std::cout / operator<<
+interceptor_via:std::__1::__put_character_sequence

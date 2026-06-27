@@ -63,6 +63,27 @@
 #define EMH_UNREACHABLE() ((void)0)
 #endif
 
+// MSan false-positive workaround for uninstrumented std::string.
+// When the C++ standard library is not MSan-instrumented (the common case),
+// std::string internals (SSO size field, data pointer) appear uninitialized
+// to MSan because the writes happen inside uninstrumented library code.
+// This macro marks the string object (and its heap data, if any) as initialized
+// before the hash map reads it, preventing false-positive use-of-uninitialized
+// reports. No-op when MSan is not active.
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer)
+#include <sanitizer/msan_interface.h>
+#define EMH_MSAN_UNPOISON(p, n) __msan_unpoison(p, n)
+#else
+#define EMH_MSAN_UNPOISON(p, n) ((void)0)
+#endif
+#elif defined(__SANITIZE_MEMORY__)
+#include <sanitizer/msan_interface.h>
+#define EMH_MSAN_UNPOISON(p, n) __msan_unpoison(p, n)
+#else
+#define EMH_MSAN_UNPOISON(p, n) ((void)0)
+#endif
+
 // Compatibility aliases (used by lru_time.hpp / lru_size.hpp)
 #ifndef EMHASH_LIKELY
 #define EMHASH_LIKELY(condition) EMH_LIKELY(condition)

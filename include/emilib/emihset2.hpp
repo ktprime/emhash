@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
@@ -92,9 +93,9 @@ constexpr static uint8_t set_simd_bytes = sizeof(set_simd_empty) / sizeof(uint8_
 constexpr static uint8_t stat_bits = sizeof(uint8_t) * 8;
 constexpr static uint8_t stat_bytes = sizeof(uint64_t) / sizeof(uint8_t);
 
-#ifndef EMILIB2_CTZ_DEFINED
-#define EMILIB2_CTZ_DEFINED
-inline static uint32_t CTZ(uint64_t n) {
+#ifndef EMILIB2_SET_CTZ_DEFINED
+#define EMILIB2_SET_CTZ_DEFINED
+inline static uint32_t set_CTZ(uint64_t n) {
 #if defined(_MSC_VER)
     unsigned long index;
 #ifdef _WIN64
@@ -374,7 +375,7 @@ public:
     std::pair<iterator, bool> insert(const KeyT& key) {
         check_expand_need();
         assert(_num_buckets);
-        const auto key_hash = _hasher(key);
+        const auto key_hash = compute_hash(key);
         const auto bucket = find_or_allocate(key, key_hash);
 
         if (_states[bucket] % 2 == State::EFILLED) {
@@ -390,7 +391,7 @@ public:
     std::pair<iterator, bool> insert(KeyT&& key) {
         check_expand_need();
 
-        const auto key_hash = _hasher(key);
+        const auto key_hash = compute_hash(key);
         const auto bucket = find_or_allocate(key, key_hash);
 
         if (_states[bucket] % 2 == State::EFILLED) {
@@ -427,7 +428,7 @@ public:
     void insert_unique(const KeyT& key) {
         check_expand_need();
 
-        const auto key_hash = _hasher(key);
+        const auto key_hash = compute_hash(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = KEYHASH_MASK(key_hash);
@@ -438,7 +439,7 @@ public:
     void insert_unique(KeyT&& key) {
         check_expand_need();
 
-        const auto key_hash = _hasher(key);
+        const auto key_hash = compute_hash(key);
         const auto bucket = find_empty_slot(key_hash & _mask, 0);
 
         _states[bucket] = KEYHASH_MASK(key_hash);
@@ -449,7 +450,7 @@ public:
     void insert_or_assign(const KeyT& key) {
         check_expand_need();
 
-        const auto key_hash = _hasher(key);
+        const auto key_hash = compute_hash(key);
         const auto bucket = find_or_allocate(key, key_hash);
 
         // Check if inserting a new value rather than overwriting an old entry
@@ -544,10 +545,12 @@ public:
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4;
         while (num_buckets < required_buckets) {
             num_buckets *= 2;
+            if (num_buckets > max_size())
+                break;
         }
 
         if (num_buckets > max_size() || num_buckets < _num_filled)
-            throw std::length_error("emilib2::HashSet: too many elements");
+            return;
 
         auto status_size = (set_simd_bytes + num_buckets) * sizeof(uint8_t);
         status_size += (8 - status_size % 8) % 8;
@@ -615,9 +618,18 @@ private:
     // Can we fit another element?
     void check_expand_need() { reserve(_num_filled); }
 
+    // Compute hash with MSan false-positive workaround for uninstrumented std::string
+    template <typename KeyLike> auto compute_hash(const KeyLike& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        if constexpr (std::is_same<KeyLike, std::string>::value) {
+            EMH_MSAN_UNPOISON(key.data(), key.size());
+        }
+        return _hasher(key);
+    }
+
     // Find the bucket with this key, or return (size_t)-1
     template <typename KeyLike> size_t find_filled_bucket(const KeyLike& key) const {
-        const auto key_hash = _hasher(key);
+        const auto key_hash = compute_hash(key);
         auto next_bucket = static_cast<size_t>(key_hash & _mask);
         const char keymask = KEYHASH_MASK(key_hash);
         const auto filled = SET1_EPI8(keymask);
@@ -628,7 +640,7 @@ private:
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
-                const auto fbucket = next_bucket + CTZ(maskf);
+                const auto fbucket = next_bucket + set_CTZ(maskf);
                 if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break; // overflow
                 else if (_eq(_keys[fbucket], key))
@@ -671,7 +683,7 @@ private:
 
             // 1. find filled
             while (maskf != 0) {
-                const auto fbucket = next_bucket + CTZ(maskf);
+                const auto fbucket = next_bucket + set_CTZ(maskf);
                 if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break;
                 else if (_eq(_keys[fbucket], key))
@@ -682,7 +694,7 @@ private:
             // 2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_empty));
             if (maske != 0) {
-                const auto ebucket = hole == static_cast<size_t>(-1) ? next_bucket + CTZ(maske) : hole;
+                const auto ebucket = hole == static_cast<size_t>(-1) ? next_bucket + set_CTZ(maske) : hole;
                 const int offset = (ebucket - bucket + _num_buckets) & _mask;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
@@ -693,7 +705,7 @@ private:
             if (hole == static_cast<size_t>(-1)) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_delete));
                 if (maskd != 0)
-                    hole = next_bucket + CTZ(maskd);
+                    hole = next_bucket + set_CTZ(maskd);
             }
 
             // 4. next round
@@ -726,7 +738,7 @@ private:
             maske &= EMPTY_MASK;
 
             if (EMH_LIKELY(maske != 0)) {
-                const auto probe = CTZ(maske) / stat_bits;
+                const auto probe = set_CTZ(maske) / stat_bits;
                 offset += probe;
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
@@ -754,7 +766,7 @@ private:
             maske = ~(maske | EFILLED_FIND);
 #endif
             if (EMH_LIKELY(maske != 0))
-                return next_bucket + CTZ(maske) / stat_bits;
+                return next_bucket + set_CTZ(maske) / stat_bits;
             next_bucket += stat_bytes;
         }
         return _num_buckets;

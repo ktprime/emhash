@@ -294,6 +294,98 @@ static void test_leak_tracker_copy_balance(const char* name) {
 }
 
 // ============================================================================
+// Section 5b: LeakTracker — Cross-bucket copy (catches sentinel leaks in clone())
+//
+// Bug history: emihmap1/emihmap3 clone() had a sentinel leak when copying
+// from a map with a different bucket count, because it zeroed _num_buckets
+// before rehash() ran — old sentinel was never destructed.
+// ============================================================================
+template<typename MapType>
+static void test_leak_tracker_cross_bucket_copy(const char* name) {
+    printf("  [%s] LeakTracker cross-bucket copy balance...\n", name);
+    {
+        LeakTracker::reset();
+        {
+            // Source: small map, mostly full
+            MapType src;
+            for (int i = 0; i < 50; i++)
+                src[LeakTracker("xs_" + std::to_string(i))] = i;
+            const size_t src_buckets = src.bucket_count();
+
+            // Destination: large map, then copy from small src
+            // — this forces the clone() branch where _num_buckets changes
+            {
+                MapType dst;
+                for (int i = 0; i < 1000; i++)
+                    dst[LeakTracker("xd_" + std::to_string(i))] = i;
+                TEST_ASSERT(static_cast<size_t>(dst.bucket_count()) > src_buckets, "dst should be larger than src");
+                dst = src;  // cross-bucket copy assign
+                TEST_ASSERT(dst.size() == 50, "after cross-bucket assign size should be 50");
+            }
+            // dst destroyed, all its 50 copied elements should be gone
+
+            // Now reverse: small dst copies from large src
+            {
+                MapType dst;
+                dst[LeakTracker("xd_empty")] = 0;  // single element
+                dst = src;  // small→large copy assign
+                TEST_ASSERT(dst.size() == 50, "small→large assign size should be 50");
+            }
+
+            // Chain of copies (catches cumulative leaks)
+            {
+                MapType a(src);
+                MapType b(a);
+                MapType c(b);
+                MapType d(c);
+                TEST_ASSERT(d.size() == 50, "deep-copied chain should have 50 entries");
+            }
+        }
+        TEST_ASSERT(LeakTracker::s_alive == 0, "all should be destructed after cross-bucket scope");
+        TEST_ASSERT(LeakTracker::s_constructed == LeakTracker::s_destructed,
+                    "constructor count should equal destructor count after cross-bucket copy");
+    }
+    printf("  [%s] LeakTracker cross-bucket copy balance: PASS\n", name);
+}
+
+// ============================================================================
+// Section 5c: LeakTracker — Empty / single-element copy edge cases
+// ============================================================================
+template<typename MapType>
+static void test_leak_tracker_empty_copy(const char* name) {
+    printf("  [%s] LeakTracker empty/single copy balance...\n", name);
+    {
+        LeakTracker::reset();
+        {
+            // Copy from empty map
+            MapType empty;
+            {
+                MapType dst = empty;
+                TEST_ASSERT(dst.size() == 0, "copy of empty should be empty");
+            }
+            // Copy from single-element map
+            MapType one;
+            one[LeakTracker("one")] = 42;
+            {
+                MapType dst = one;
+                TEST_ASSERT(dst.size() == 1, "copy of single should be single");
+            }
+            // Self-assignment
+            {
+                MapType dst = one;
+                const size_t size_before = dst.size();
+                dst = dst;  // self-assign
+                TEST_ASSERT(static_cast<size_t>(dst.size()) == size_before, "self-assign should preserve size");
+            }
+        }
+        TEST_ASSERT(LeakTracker::s_alive == 0, "all should be destructed after empty/single copy");
+        TEST_ASSERT(LeakTracker::s_constructed == LeakTracker::s_destructed,
+                    "constructor count should equal destructor count after empty/single copy");
+    }
+    printf("  [%s] LeakTracker empty/single copy balance: PASS\n", name);
+}
+
+// ============================================================================
 // Section 6: LeakTracker — Rehash Balance
 // ============================================================================
 
@@ -614,6 +706,8 @@ static void test_map_msan_clone_rehash(const char* name) {
 // ============================================================================
 
 int main() {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
     printf("=== String Key & Memory Leak Tests ===\n\n");
 
     // Section 1: String key basics
@@ -665,6 +759,26 @@ int main() {
     test_leak_tracker_copy_balance<emilib::HashMap<LeakTracker, int>>("emihmap1");
     test_leak_tracker_copy_balance<emilib2::HashMap<LeakTracker, int>>("emihmap2");
     test_leak_tracker_copy_balance<emilib3::HashMap<LeakTracker, int>>("emihmap3");
+
+    // Section 5b: LeakTracker cross-bucket copy
+    printf("\n--- Section 5b: LeakTracker Cross-Bucket Copy ---\n");
+    test_leak_tracker_cross_bucket_copy<emhash5::HashMap<LeakTracker, int>>("emhash5");
+    test_leak_tracker_cross_bucket_copy<emhash6::HashMap<LeakTracker, int>>("emhash6");
+    test_leak_tracker_cross_bucket_copy<emhash7::HashMap<LeakTracker, int>>("emhash7");
+    test_leak_tracker_cross_bucket_copy<emhash8::HashMap<LeakTracker, int>>("emhash8");
+    test_leak_tracker_cross_bucket_copy<emilib::HashMap<LeakTracker, int>>("emihmap1");
+    test_leak_tracker_cross_bucket_copy<emilib2::HashMap<LeakTracker, int>>("emihmap2");
+    test_leak_tracker_cross_bucket_copy<emilib3::HashMap<LeakTracker, int>>("emihmap3");
+
+    // Section 5c: LeakTracker empty/single copy
+    printf("\n--- Section 5c: LeakTracker Empty/Single Copy ---\n");
+    test_leak_tracker_empty_copy<emhash5::HashMap<LeakTracker, int>>("emhash5");
+    test_leak_tracker_empty_copy<emhash6::HashMap<LeakTracker, int>>("emhash6");
+    test_leak_tracker_empty_copy<emhash7::HashMap<LeakTracker, int>>("emhash7");
+    test_leak_tracker_empty_copy<emhash8::HashMap<LeakTracker, int>>("emhash8");
+    test_leak_tracker_empty_copy<emilib::HashMap<LeakTracker, int>>("emihmap1");
+    test_leak_tracker_empty_copy<emilib2::HashMap<LeakTracker, int>>("emihmap2");
+    test_leak_tracker_empty_copy<emilib3::HashMap<LeakTracker, int>>("emihmap3");
 
     // Section 6: LeakTracker rehash balance
     printf("\n--- Section 6: LeakTracker Rehash Balance ---\n");

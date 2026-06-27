@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include "emhash/config.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
@@ -132,6 +133,10 @@ public:
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+        EMH_MSAN_UNPOISON(&key, sizeof(key));
+        if constexpr (std::is_same<UType, std::string>::value) {
+            EMH_MSAN_UNPOISON(key.data(), key.size());
+        }
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
@@ -784,7 +789,12 @@ public:
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : simd_bytes;
         while (num_buckets < required_buckets) {
             num_buckets *= 2;
+            if (num_buckets > max_size())
+                break;
         }
+
+        if (num_buckets > max_size() || num_buckets < _num_filled)
+            return;
 
         const auto pairs_size = (1 + bucket_to_slot(num_buckets)) * sizeof(PairT);
         const auto state_size = (simd_bytes + num_buckets) * sizeof(State);
