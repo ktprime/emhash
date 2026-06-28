@@ -208,7 +208,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= (size_t)~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1);
+                _bmask &= (size_t) ~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1);
             } else {
                 _bmask = 0;
             }
@@ -286,7 +286,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= (size_t)~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1);
+                _bmask &= (size_t) ~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1);
             } else {
                 _bmask = 0;
             }

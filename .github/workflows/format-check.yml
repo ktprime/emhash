@@ -15,8 +15,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+      - name: Install clang-format-20
+        run: |
+          # clang-format-20 is not in Ubuntu 24.04 default repos; add LLVM apt repo
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | \
+            sudo gpg --dearmor --yes -o /usr/share/keyrings/apt.llvm.org.gpg
+          echo "deb [signed-by=/usr/share/keyrings/apt.llvm.org.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main" | \
+            sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-format-20
 
       - name: Check formatting
         run: |
@@ -25,7 +32,7 @@ jobs:
           find include \
             -type f \( -name '*.hpp' -o -name '*.h' \) \
             -not -name 'sse2neon.h' \
-            -print | xargs clang-format-18 --dry-run --Werror
+            -print | xargs clang-format-20 --dry-run --Werror
 
       - name: Show diff (if any)
         if: failure()
@@ -33,7 +40,7 @@ jobs:
           find include \
             -type f \( -name '*.hpp' -o -name '*.h' \) \
             -not -name 'sse2neon.h' \
-            -print | xargs clang-format-18 --dry-run
+            -print | xargs clang-format-20 --dry-run
 
   clang-tidy:
     name: clang-tidy (static analysis)

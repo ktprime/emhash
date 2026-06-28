@@ -1165,7 +1165,7 @@ public:
             return false;
 
 #if EMH_STATIS
-        // if (_num_filled > EMH_STATIS) dump_statics();
+            // if (_num_filled > EMH_STATIS) dump_statics();
 #endif
         rehash(required_buckets + 1);
         return true;
@@ -1240,8 +1240,8 @@ public:
         memset(reinterpret_cast<char*>(_bitmask) + mask_byte, 0, BIT_PACK);
         if (num_buckets < 8)
             _bitmask[0] = static_cast<uint8_t>((1u << num_buckets) - 1);
-        // pack last position to bit 0
-        /**************** -------------------------------- *************/
+            // pack last position to bit 0
+            /**************** -------------------------------- *************/
 
 #if EMH_REHASH_LOG
         auto collision = 0;

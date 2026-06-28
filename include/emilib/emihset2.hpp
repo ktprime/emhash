@@ -410,7 +410,9 @@ public:
     std::pair<iterator, bool> emplace(KeyT&& key) { return insert(std::move(key)); }
 
     template <class... Args> std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&...) { return insert(key); }
-    template <class... Args> std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&...) { return insert(std::move(key)); }
+    template <class... Args> std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&...) {
+        return insert(std::move(key));
+    }
 
     std::pair<iterator, bool> insert([[maybe_unused]] iterator it, const KeyT& key) { return insert(key); }
 
@@ -803,7 +805,8 @@ private:
     }
 
     size_t find_filled_slot(size_t next_bucket) const {
-        if (_num_buckets == 0) return 0;
+        if (_num_buckets == 0)
+            return 0;
         constexpr uint64_t EFILLED_FIND = 0xfefefefefefefefeull;
         while (next_bucket < _num_buckets) {
 #if EMH_X86
