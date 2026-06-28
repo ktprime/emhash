@@ -112,7 +112,7 @@ inline static uint32_t set_CTZ(uint64_t n) {
 #endif
 
 #elif 1
-    auto index = __builtin_ctzl(n);
+    auto index = __builtin_ctzll(n);
 #endif
 
     return static_cast<uint32_t>(index);
@@ -704,7 +704,7 @@ private:
 
             next_bucket += set_simd_bytes;
             if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
-                i += next_bucket - _num_buckets;
+                i -= set_simd_bytes; // consume the remaining budget before wrap
                 next_bucket = 0;
             }
 
