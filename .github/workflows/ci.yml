@@ -451,7 +451,8 @@ jobs:
       - name: Build 32-bit
         run: |
           cd tests
-          FLAGS="-m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon"
+          # -fsanitize=undefined catches 32-bit-specific UB (shift, truncation, alignment)
+          FLAGS="-m32 -std=c++17 -O1 -g -msse2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon -fsanitize=undefined -fno-sanitize-recover=undefined"
           g++ $FLAGS unit/test_crud.cpp -o test_crud_32
           g++ $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_32
           g++ $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_32
@@ -461,10 +462,20 @@ jobs:
       - name: Run 32-bit tests
         run: |
           cd tests
-          ./test_crud_32
-          ./test_edge_cases_32
-          ./test_string_key_leak_32
-          ./test_lifecycle_audit_32
+          # Run each test separately and capture exit codes so the log identifies
+          # which test crashes (SIGSEGV = 139). set +e so all tests run even if one fails.
+          set +e
+          overall=0
+          for t in test_crud_32 test_edge_cases_32 test_string_key_leak_32 test_lifecycle_audit_32; do
+            echo "=================================================================="
+            echo "Running ./$t ..."
+            echo "=================================================================="
+            ./$t
+            rc=$?
+            echo "::warning:: ./$t exited with code $rc"
+            if [ $rc -ne 0 ]; then overall=1; fi
+          done
+          exit $overall
         shell: bash
 
   # ==========================================================================
@@ -517,7 +528,11 @@ jobs:
       - name: Build with MSan
         run: |
           cd tests
-          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon"
+          # -include common/msan_unpoison.hpp: force-include the stream unpoisoner
+          # so std::cout/cerr are marked initialized before doctest writes to them.
+          # Without this, MSan reports false-positive use-of-uninitialized-value
+          # because the uninstrumented libc++ runtime sets up the iostream globals.
+          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include common/msan_unpoison.hpp"
           clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
           clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
           clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
