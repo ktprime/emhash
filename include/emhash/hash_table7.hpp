@@ -1276,9 +1276,8 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2u;
         while (buckets < required_buckets) {
             buckets *= 2;
-            if (buckets > static_cast<uint64_t>(max_size()))
-                break;
         }
+        assert (buckets < static_cast<uint64_t>(max_size()));
 
         auto num_buckets = static_cast<size_type>(buckets);
         auto old_num_filled = _num_filled;

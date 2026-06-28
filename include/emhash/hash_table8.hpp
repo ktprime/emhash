@@ -1165,9 +1165,8 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 4u;
         while (buckets < required_buckets) {
             buckets *= 2;
-            if (buckets > static_cast<uint64_t>(max_size()))
-                break;
         }
+        assert (buckets < static_cast<uint64_t>(max_size()));
 
 #if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))

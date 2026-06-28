@@ -31,12 +31,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/pre-commit.sh` — Git pre-commit hook for clang-format checking
 - `docs/examples/CMakeLists.txt` — CMake build for all examples + quick_bench
 - Method-level Doxygen for hash_table8.hpp core API (contains, try_get, try_set, insert_unique, set_get, erase)
+- `THIRDPARTY_LICENSES.md` — aggregated license summary for all `thirdparty/` dependencies
+- `docs/OPTIMIZATION_RECOMMENDATIONS.md` — engineering optimization roadmap (P0/P1/P2 with risk/ROI)
+- `tests/common/` — shared test infrastructure (doctest.h, hashers.hpp, maps.hpp, msan_unpoison.hpp, trackers.hpp, utilities.hpp)
+- MSan unpoison header (`tests/common/msan_unpoison.hpp`) injected via `-include` to suppress false positives from uninstrumented libc++ `std::cout`/`std::cerr`
+- `.github/msan-suppressions.txt` — explicit MSan suppression list
+- CI: 80% line coverage gate (lcov + bc) and 25% benchmark regression gate against `benchmark-baseline` artifact
 
 ### Changed
 - `dist/` added to `.gitignore` for amalgamated outputs
+- Test directory reorganized from `verify/` into `unit/` / `memory/` / `stress/` / `attack/` / `fuzz/` / `debug/` / `bench/` / `common/` / `archive/` categories for clearer separation of concerns
+- Test framework migrated to doctest with `TEST_CASE_TEMPLATE` parameterized over all hash map/set implementations
+- CI matrix tightened: removed C++20 job (kept C++17 and C++23); MSan test list now covers `unit/test_crud.cpp`, `memory/test_string_key_leak.cpp`, `memory/test_sanitizer.cpp`, `memory/test_lifecycle_audit.cpp`
+- Windows MSVC builds use explicit target lists instead of `.exe` globbing
+- CI configuration updated to reference new test file paths (`unit/`, `memory/`, `stress/`, `attack/`) instead of deprecated `verify/`
+- All compilation commands include `-Icommon` flag to resolve `doctest.h`
+- clang-format-18 enforcement tightened across `include/` (excluding `sse2neon.h`)
+- Renamed `index` parameter to `slot` in `hash_set8.hpp` and `hash_table8.hpp` to silence `-Wshadow`
+- Pragma-wrapped `size_t` typedefs in `emihmap`/`emihset` headers to silence `-Wshadow`/`-Wunneeded-internal-declaration`
+
+### Fixed
+- MSan use-of-uninitialized-value in `hash_table5.hpp` `at()` method (switched from `size_type` to `int` for negative comparisons in `find_or_kickout`)
+- MSan false positives caused by `std::cout`/`std::cerr` internal state set up by uninstrumented libc++ — resolved by injecting unpoison header via `-include`
+- Uninitialized bucket fields after `clear()` in `hash_table5/6/8` and `hash_set8` — buckets now reset to `INACTIVE` state
+- MSan UB from `memcpy`/`memset` of non-trivially copyable types (e.g., `std::string`) — bucket fields now initialized individually; `-Wclass-memaccess` resolved by casting pointers to `char*`
+- UB in `emilib/hash_set2/4` `bInCacheLine` flag — combined with `is_trivially_copyable<KeyT>` guard to avoid UB with non-trivial keys
+- Tail sentinels `memset`/`memcpy` without `is_trivially_copyable` guard — non-trivial types now only initialize `.second` field
+- Sentinel memory leak in `emihmap1`/`emihmap3` `clone()` when `_num_buckets` differed — old sentinel explicitly destructed before resetting `_num_buckets` to 0
+- 32-bit GCC crash from `__builtin_ctzl` on 64-bit masks — replaced with `__builtin_ctzll` throughout `emilib`/`emihset`
+- emilib2 `HashSet` `_erase` modulo-on-`State::EEMPTY` bug causing size mismatch and SIGSEGV on 32-bit — fixed by direct state comparison and leftward empty-state propagation
+- `-Wshadow` and `-Wunneeded-internal-declaration` warnings across 12 header files
+- clang-format-18 violations in `emihset2.hpp`, `emihmap2.hpp`, `hash_table6.hpp`
+- Tracked build artifacts removed from working tree and `.gitignore` hardened
+
+### Known Issues (tracked via `doctest::skip`)
+- `emhash6::HashMap::merge()` / `emhash7::HashMap::merge()` — key loss during rehash (under investigation)
+- `set merge` / `set erase_if` for `emilib2`/`emilib3` — runtime issue
+- `erase_if` predicate signature unification across map implementations
+- `emhash8::HashMap::insert_unique` key=0 deduplication failure — see `tests/fuzz/reproduce_emhash8_bug.cpp`
 
 ### Notes
-- All additions are non-breaking; no source code or public API changes
+- Source-level additions are non-breaking; the public API of existing hash map implementations is unchanged
+- `doctest::skip` markers are temporary; tracked in `docs/OPTIMIZATION_RECOMMENDATIONS.md` as P0.3
 
 ## [1.1.0] - 2026-06-13
 

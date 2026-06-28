@@ -110,9 +110,15 @@ dist/
 .vs/
 .vscode/
 .idea/
+.trae/
 *.suo
 *.user
 *.sln.docstates
+# Trae IDE shell integration artifact (auto-regenerated, do not track)
+TraeCN*
+
+# CTest temporary output
+/Testing/
 
 # Temporary files
 *.bak

@@ -795,8 +795,7 @@ public:
                 break;
         }
 
-        if (num_buckets > max_size() || num_buckets < _num_filled)
-            return;
+        assert (num_buckets < max_size() && num_buckets > _num_filled);
 
         const auto pairs_size = (1 + bucket_to_slot(num_buckets)) * sizeof(PairT);
         const auto state_size = (simd_bytes + num_buckets) * sizeof(State);

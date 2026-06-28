@@ -900,9 +900,6 @@ private:
             buckets *= 2;
         }
 
-        if (buckets > max_size() || buckets < _num_filled)
-            throw std::length_error("emhash4::HashSet: too many elements");
-
         const auto num_buckets = static_cast<size_type>(buckets);
 
         _mask = num_buckets - 1;

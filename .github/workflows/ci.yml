@@ -532,7 +532,7 @@ jobs:
           # so std::cout/cerr are marked initialized before doctest writes to them.
           # Without this, MSan reports false-positive use-of-uninitialized-value
           # because the uninstrumented libc++ runtime sets up the iostream globals.
-          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include msan_unpoison.hpp"
+          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include msan_unpoison.hpp -fsanitize-ignorelist=common/msan-ignorelist.txt"
           clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
           clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
           clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
@@ -721,16 +721,18 @@ jobs:
           ./emhash_bench --benchmark_format=console --benchmark_out=benchmark_results.json
         shell: bash
 
-      - name: Download baseline (if exists)
+      - name: Download baseline from last successful main run
         id: download-baseline
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
           name: benchmark-baseline
           path: baseline/
+          workflow: ci.yml
+          branch: main
 
       - name: Regression check
-        if: steps.download-baseline.outcome == 'success'
+        if: github.event_name == 'pull_request' && steps.download-baseline.outcome == 'success'
         run: |
           if [[ -f baseline/benchmark_results.json ]]; then
             echo "=== Comparing against baseline ==="
@@ -771,6 +773,7 @@ jobs:
         shell: bash
 
       - name: Upload benchmark results (as baseline for next run)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-baseline

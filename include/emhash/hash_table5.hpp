@@ -1293,9 +1293,8 @@ public:
 
         while (buckets < required_buckets) {
             buckets *= 2;
-            if (buckets > max_size())
-                break;
         }
+        assert (buckets < max_size());
 
         auto num_buckets = static_cast<size_type>(buckets);
         auto old_num_filled = _num_filled;

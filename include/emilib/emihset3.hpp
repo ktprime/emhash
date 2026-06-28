@@ -694,12 +694,9 @@ public:
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : simd_bytes;
         while (buckets < required_buckets) {
             buckets *= 2;
-            if (buckets > max_size())
-                break;
         }
 
-        if (buckets > max_size() || buckets < _num_filled)
-            return;
+        assert (buckets < max_size() && buckets < _num_filled);
 
         const auto num_buckets = static_cast<size_t>(buckets);
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
