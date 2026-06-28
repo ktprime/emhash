@@ -1179,7 +1179,7 @@ public:
         while (buckets < required_buckets) {
             buckets *= 2;
         }
-        assert (buckets < max_size());
+        assert(buckets < max_size());
         // assert(num_buckets == (2 << CTZ(required_buckets)));
 
         auto num_buckets = static_cast<size_type>(buckets);

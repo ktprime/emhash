@@ -846,7 +846,7 @@ public:
             buckets *= 2;
         }
 
-        assert (buckets < max_size() && buckets > _num_filled);
+        assert(buckets < max_size() && buckets > _num_filled);
 
         const auto pairs_size = (buckets + 1) * sizeof(PairT);
         const auto state_size = buckets + simd_bytes;

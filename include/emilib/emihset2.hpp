@@ -595,9 +595,12 @@ public:
         auto num_buckets = _num_filled > (1u << 16) ? (1u << 16) : 4;
         while (num_buckets < required_buckets) {
             num_buckets *= 2;
+            if (num_buckets > max_size())
+                break;
         }
 
-        assert (num_buckets < max_size() && num_buckets > _num_filled);
+        if (num_buckets > max_size() || num_buckets < _num_filled)
+            return;
 
         auto status_size = (set_simd_bytes + num_buckets) * sizeof(uint8_t);
         status_size += (8 - status_size % 8) % 8;

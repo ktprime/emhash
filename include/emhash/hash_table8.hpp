@@ -1166,7 +1166,7 @@ public:
         while (buckets < required_buckets) {
             buckets *= 2;
         }
-        assert (buckets < static_cast<uint64_t>(max_size()));
+        assert(buckets < static_cast<uint64_t>(max_size()));
 
 #if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
