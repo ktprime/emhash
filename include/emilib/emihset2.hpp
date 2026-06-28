@@ -125,6 +125,8 @@ private:
     using htype = HashSet<KeyT, HashT, EqT>;
 
 public:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
 #if EMH_SIZE_TYPE_BIT == 64
     using size_t = uint64_t;
 #elif EMH_SIZE_TYPE_BIT == 16
@@ -132,6 +134,7 @@ public:
 #else
     using size_t = uint32_t;
 #endif
+#pragma GCC diagnostic pop
 
     using value_type = KeyT;
     using reference = KeyT&;
@@ -818,11 +821,14 @@ private:
     }
 
 private:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
     enum State : uint8_t {
         EFILLED = 0, // Is set with key/value
         EDELETE = 3, // Is inside a search-chain, but is empty
         EEMPTY = 1,  // Never been touched empty
     };
+#pragma GCC diagnostic pop
 
     HashT _hasher;
     EqT _eq;

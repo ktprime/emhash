@@ -112,10 +112,12 @@ TEST_CASE_TEMPLATE("insert_or_assign", Map, AllIntMaps) {
     Map m;
 
     m[make_kv<K>(1)] = make_kv<V>(10);
-    m.insert_or_assign(make_kv<K>(1), make_kv<V>(111));
+    auto r = m.insert_or_assign(make_kv<K>(1), make_kv<V>(111));
+    CHECK_FALSE(r.second);  // key exists -> assignment, not insertion
     CHECK(m[make_kv<K>(1)] == make_kv<V>(111));
 
-    m.insert_or_assign(make_kv<K>(2), make_kv<V>(22));
+    auto r2 = m.insert_or_assign(make_kv<K>(2), make_kv<V>(22));
+    CHECK(r2.second);
     CHECK(m[make_kv<K>(2)] == make_kv<V>(22));
 }
 
@@ -136,7 +138,7 @@ TEST_CASE_TEMPLATE("erase by key and iterator", Map, AllIntMaps) {
 
     auto it = m.find(make_kv<K>(3));
     REQUIRE(it != m.end());
-    m.erase(it);
+    (void)m.erase(it);
     CHECK(m.count(make_kv<K>(3)) == 0);
     CHECK(m.size() == 1);
 }
@@ -150,7 +152,7 @@ TEST_CASE_TEMPLATE("erase all then empty", Map, AllIntMaps) {
     Map m;
     for (int i = 0; i < 10; ++i) m[make_kv<K>(i)] = make_kv<V>(i * 10);
     CHECK(m.size() == 10);
-    for (int i = 0; i < 10; ++i) m.erase(make_kv<K>(i));
+    for (int i = 0; i < 10; ++i) (void)m.erase(make_kv<K>(i));
     CHECK(m.empty());
 }
 

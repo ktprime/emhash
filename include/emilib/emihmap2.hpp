@@ -150,7 +150,10 @@ private:
     using PairT = std::pair<const KeyT, ValueT>;
 
 public:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
     using size_t = uint32_t; // intentionally shadows global size_t for 32-bit compact storage
+#pragma GCC diagnostic pop
     using value_type = PairT;
     using reference = PairT&;
     using const_reference = const PairT&;

@@ -496,7 +496,11 @@ DOCTEST_GCC_SUPPRESS_WARNING_POP
 // https://github.com/doctest/doctest/issues/126
 // https://github.com/doctest/doctest/issues/356
 #if DOCTEST_CLANG
+#if __cplusplus >= 202002L
+#include <version> // ciso646 removed in C++20; <version> defines _LIBCPP_VERSION
+#else
 #include <ciso646>
+#endif
 #endif // clang
 
 #ifdef _LIBCPP_VERSION

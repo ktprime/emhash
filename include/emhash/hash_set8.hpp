@@ -604,7 +604,7 @@ public:
         return {this, find_filled_slot(key)};
     }
 
-    KeyT& index(const uint32_t index) noexcept { return _pairs[index]; }
+    KeyT& index(const uint32_t slot) noexcept { return _pairs[slot]; }
 
     template <typename K = KeyT> bool contains(const K& key) const noexcept {
         return find_filled_slot(key) != _num_filled;

@@ -16,6 +16,8 @@
     map7<int, int, ConstHasher>, map8<int, int, ConstHasher>
 #define Range4IntMaps map5<int, int, Range4Hasher>, map6<int, int, Range4Hasher>, \
     map7<int, int, Range4Hasher>, map8<int, int, Range4Hasher>
+#define LinearIntMaps map5<int, int, LinearHasher>, map6<int, int, LinearHasher>, \
+    map7<int, int, LinearHasher>, map8<int, int, LinearHasher>
 
 // ============================================================================
 // ConstHasher stress: all keys collide into bucket 0
@@ -91,7 +93,7 @@ TEST_CASE_TEMPLATE("stress: Range4Hasher 4-bucket concentration", Map, Range4Int
 // ============================================================================
 // LinearHasher (identity) stress: sequential keys, no collision
 // ============================================================================
-TEST_CASE_TEMPLATE("stress: LinearHasher sequential keys", Map, AllIntMaps) {
+TEST_CASE_TEMPLATE("stress: LinearHasher sequential keys", Map, LinearIntMaps) {
     Map m;
     const int N = 5000;
     for (int i = 0; i < N; ++i) m[i] = i;

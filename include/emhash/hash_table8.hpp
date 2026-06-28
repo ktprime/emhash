@@ -618,9 +618,9 @@ public:
         return _pairs[slot].second;
     }
 
-    const ValueT& index(const uint32_t index) const noexcept { return _pairs[index].second; }
+    const ValueT& index(const uint32_t slot) const noexcept { return _pairs[slot].second; }
 
-    ValueT& index(const uint32_t index) noexcept { return _pairs[index].second; }
+    ValueT& index(const uint32_t slot) noexcept { return _pairs[slot].second; }
 
     /// @brief Check if a key exists in the map.
     /// @param key The key to search for.

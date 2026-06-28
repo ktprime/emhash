@@ -120,7 +120,10 @@ private:
     constexpr static uint8_t MXLOAD_FACTOR = 5; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
     using size_t = uint32_t;
+#pragma GCC diagnostic pop
     using value_type = PairT;
     using reference = PairT&;
     using const_reference = const PairT&;

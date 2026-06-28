@@ -68,6 +68,7 @@ enum State : int8_t {
     SENTINEL = 127,
     GROUP_INDEX = 15, //> 0
 };
+#define EMILIB3_STATE_DEFINED
 #endif
 
 #ifndef EMILIB3_LOAD_FACTOR_DEFINED
@@ -137,6 +138,8 @@ private:
     using PairT = const KeyT;
     constexpr static uint8_t MXLOAD_FACTOR = 6; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
 public:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
 #if EMH_SIZE_TYPE_BIT == 64
     using size_t = uint64_t;
 #elif EMH_SIZE_TYPE_BIT == 16
@@ -144,6 +147,7 @@ public:
 #else
     using size_t = uint32_t;
 #endif
+#pragma GCC diagnostic pop
 
     using value_type = PairT;
     using reference = PairT&;

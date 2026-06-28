@@ -789,14 +789,14 @@ public:
 
     template <typename K = KeyT> ValueT& at(const K& key) {
         const auto bucket = find_filled_key(key);
-        if (EMH_EMPTY(_pairs, bucket))
+        if (bucket == _num_buckets)
             throw std::out_of_range("emhash5::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
 
     template <typename K = KeyT> const ValueT& at(const K& key) const {
         const auto bucket = find_filled_key(key);
-        if (EMH_EMPTY(_pairs, bucket))
+        if (bucket == _num_buckets)
             throw std::out_of_range("emhash5::at(): key not found");
         return EMH_VAL(_pairs, bucket);
     }
