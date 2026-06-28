@@ -750,8 +750,9 @@ public:
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last;) {
             if (pred(*it))
-                erase(it);
-            ++it;
+                erase(it++);
+            else
+                ++it;
         }
         return old_size - size();
     }

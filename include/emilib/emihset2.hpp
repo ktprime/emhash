@@ -336,10 +336,8 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const { return _num_buckets ? _num_filled / static_cast<float>(_num_buckets) : 0.0f; }
 
-    float max_load_factor(float lf = 8.0f / 9) {
-        (void)lf;
-        return 7 / 8.0f;
-    }
+    float max_load_factor() const noexcept { return 7 / 8.0f; }
+    void max_load_factor(float) {}
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
@@ -408,6 +406,9 @@ public:
 
     std::pair<iterator, bool> emplace(KeyT&& key) { return insert(std::move(key)); }
 
+    template <class... Args> std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&...) { return insert(key); }
+    template <class... Args> std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&...) { return insert(std::move(key)); }
+
     std::pair<iterator, bool> insert([[maybe_unused]] iterator it, const KeyT& key) { return insert(key); }
 
     template <typename T> void insert(T beginc, T endc) {
@@ -425,7 +426,7 @@ public:
     }
 
     /// Same as above, but contains(key) MUST be false
-    void insert_unique(const KeyT& key) {
+    size_t insert_unique(const KeyT& key) {
         check_expand_need();
 
         const auto key_hash = compute_hash(key);
@@ -434,9 +435,10 @@ public:
         _states[bucket] = KEYHASH_MASK(key_hash);
         new (_keys + bucket) KeyT(key);
         _num_filled++;
+        return bucket;
     }
 
-    void insert_unique(KeyT&& key) {
+    size_t insert_unique(KeyT&& key) {
         check_expand_need();
 
         const auto key_hash = compute_hash(key);
@@ -445,6 +447,7 @@ public:
         _states[bucket] = KEYHASH_MASK(key_hash);
         new (_keys + bucket) KeyT(std::move(key));
         _num_filled++;
+        return bucket;
     }
 
     void insert_or_assign(const KeyT& key) {
@@ -506,6 +509,47 @@ public:
 #else
         return !(std::is_trivially_destructible<KeyT>::value);
 #endif
+    }
+
+    template <typename Con> bool operator==(const Con& rhs) const noexcept {
+        if (size() != rhs.size())
+            return false;
+
+        for (auto it = begin(), last = end(); it != last; ++it) {
+            auto oi = rhs.find(*it);
+            if (oi == rhs.end())
+                return false;
+        }
+        return true;
+    }
+    template <typename Con> bool operator!=(const Con& rhs) const noexcept { return !(*this == rhs); }
+
+    void merge(HashSet& rhs) noexcept {
+        if (empty()) {
+            *this = std::move(rhs);
+            return;
+        }
+
+        for (auto rit = rhs.begin(); rit != rhs.end();) {
+            auto fit = find(*rit);
+            if (fit == end()) {
+                insert_unique(*rit);
+                rit = rhs.erase(rit);
+            } else {
+                ++rit;
+            }
+        }
+    }
+
+    template <typename Pred> size_t erase_if(Pred pred) {
+        auto old_size = size();
+        for (auto it = begin(); it != end();) {
+            if (pred(*it))
+                it = erase(it);
+            else
+                ++it;
+        }
+        return old_size - size();
     }
 
     /// Remove all elements, keeping full capacity.
@@ -756,8 +800,9 @@ private:
     }
 
     size_t find_filled_slot(size_t next_bucket) const {
+        if (_num_buckets == 0) return 0;
         constexpr uint64_t EFILLED_FIND = 0xfefefefefefefefeull;
-        while (true) {
+        while (next_bucket < _num_buckets) {
 #if EMH_X86
             const auto maske = ~(*(uint64_t*)(_states + next_bucket) | EFILLED_FIND);
 #else

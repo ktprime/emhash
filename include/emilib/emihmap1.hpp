@@ -411,10 +411,8 @@ public:
         return _num_buckets ? static_cast<float>(_num_filled) / static_cast<float>(bucket_to_slot(_num_buckets)) : 0.0f;
     }
 
-    float max_load_factor(float lf = 7.0f / 8) noexcept {
-        (void)lf;
-        return static_cast<float>(MXLOAD_FACTOR) / (MXLOAD_FACTOR + 1);
-    }
+    float max_load_factor() const noexcept { return static_cast<float>(MXLOAD_FACTOR) / (MXLOAD_FACTOR + 1); }
+    void max_load_factor(float) noexcept {}
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
@@ -695,8 +693,9 @@ public:
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last;) {
             if (pred(*it))
-                erase(it);
-            ++it;
+                erase(it++);
+            else
+                ++it;
         }
         return old_size - size();
     }

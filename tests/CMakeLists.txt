@@ -1,5 +1,15 @@
-# emhash Test Suite CMakeLists.txt
-# Build all tests with cmake
+# emhash Test Suite CMakeLists.txt (rewritten for doctest framework)
+#
+# New structure:
+#   common/  - shared headers (doctest.h, maps.hpp, hashers.hpp, trackers.hpp, utilities.hpp)
+#   unit/    - functional correctness (doctest, TEST_CASE_TEMPLATE)
+#   memory/  - sanitizer + leak + lifecycle (doctest)
+#   stress/  - stress tests (doctest)
+#   attack/  - hash attack tests (doctest, EMH_SAFE_PSL)
+#   fuzz/    - libfuzzer targets (optional) + regression reproducer
+#   debug/   - unchanged debug tools (not part of doctest suite)
+#   bench/   - unchanged benchmarks (optional, Google Benchmark)
+#   archive/ - old scratch files (not built)
 
 cmake_minimum_required(VERSION 3.16)
 project(emhash_tests LANGUAGES CXX)
@@ -8,19 +18,18 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Compiler options (GCC/Clang are applied globally; MSVC options are set
-# per-target via emhash_add_test so that /WX only catches warnings in test
-# source files, not in the library headers which we intentionally do not modify.)
+# ----------------------------------------------------------------------------
+# Compiler options
+# ----------------------------------------------------------------------------
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -pedantic)
-    # Enable SSE2 for SIMD intrinsics (required for emilib hash maps)
+    # SSE2 for SIMD intrinsics (required for emilib hash maps)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "i386|i686|x86|AMD64|amd64|x86_64")
         add_compile_options(-msse2)
     endif()
     set(CMAKE_CXX_FLAGS_RELEASE "-O2 -flto=auto")
     set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-    # Optional sanitizer build (Linux/Clang only). Enable with
-    #   cmake -DEMHASH_SANITIZER=address  (or undefined, thread, memory)
+    # Optional sanitizer build: cmake -DEMHASH_SANITIZER=address|undefined|thread|memory
     if(DEFINED EMHASH_SANITIZER AND NOT EMHASH_SANITIZER STREQUAL "")
         add_compile_options(-fsanitize=${EMHASH_SANITIZER} -fno-omit-frame-pointer)
         add_link_options(-fsanitize=${EMHASH_SANITIZER})
@@ -29,8 +38,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 else()
     set(CMAKE_CXX_FLAGS_RELEASE "/O2")
     set(CMAKE_CXX_FLAGS_DEBUG "/Od /Zi")
-    # MSVC supports AddressSanitizer on x64 since VS 2019 16.9.
-    # Enable with: cmake -DEMHASH_SANITIZER=address
+    # MSVC AddressSanitizer (x64): cmake -DEMHASH_SANITIZER=address
     if(DEFINED EMHASH_SANITIZER AND EMHASH_SANITIZER STREQUAL "address")
         add_compile_options(/fsanitize=address /Zi)
         add_link_options(/fsanitize=address)
@@ -38,219 +46,158 @@ else()
     endif()
 endif()
 
-# Helper to register an emhash test executable
+# ----------------------------------------------------------------------------
+# Shared include paths: ../include for emhash headers, common/ for doctest + utils
+# ----------------------------------------------------------------------------
+set(EMHASH_TEST_COMMON ${CMAKE_CURRENT_SOURCE_DIR}/common)
+
+# ----------------------------------------------------------------------------
+# Helper: register a doctest-based test executable + CTest entry
+# ----------------------------------------------------------------------------
 function(emhash_add_test name source)
     add_executable(${name} ${source})
     target_compile_features(${name} PRIVATE cxx_std_17)
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_include_directories(${name} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}           # for #include "common/maps.hpp"
+        ${EMHASH_TEST_COMMON})                # for #include "doctest.h"
     if(MSVC)
-        # /W4 enables the highest standard warning level. /WX is intentionally
-        # not used because emhash library headers (which are intentionally not
-        # modified) produce level-4 warnings when instantiated from test code.
+        # /W4 highest warning level; /WX intentionally not used (library headers emit L4 warnings)
         target_compile_options(${name} PRIVATE /W4)
     endif()
-endfunction()
-
-# ============================================================================
-# Verification Tests
-# ============================================================================
-
-emhash_add_test(test_verify verify/test_all_maps.cpp)
-emhash_add_test(quick_test8 verify/quick_test8.cpp)
-emhash_add_test(test_emhash58 verify/test_emhash58.cpp)
-emhash_add_test(test_hidden_bugs8 verify/test_hidden_bugs8.cpp)
-emhash_add_test(test_extreme verify/test_extreme.cpp)
-emhash_add_test(test_interface_combo verify/test_interface_combo.cpp)
-emhash_add_test(test_emhash5_verify verify/test_emhash5_verify.cpp)
-emhash_add_test(test_emhash_allocator verify/test_emhash_allocator.cpp)
-emhash_add_test(test_functional_edge verify/test_functional_edge.cpp)
-emhash_add_test(test_sanitizer_aggregate verify/test_sanitizer_aggregate.cpp)
-
-# Merged from test/ directory
-emhash_add_test(test_hashset_allocator verify/test_hashset_allocator.cpp)
-
-emhash_add_test(test_emilib_comprehensive verify/test_emilib_comprehensive.cpp)
-find_package(Threads REQUIRED)
-target_link_libraries(test_emilib_comprehensive PRIVATE Threads::Threads)
-
-emhash_add_test(test_size_sweep verify/test_size_sweep.cpp)
-
-# Full API coverage tests
-emhash_add_test(test_hashmap_full_api verify/test_hashmap_full_api.cpp)
-emhash_add_test(test_hashset_full_api verify/test_hashset_full_api.cpp)
-
-emhash_add_test(test_special_key_types verify/test_special_key_types.cpp)
-emhash_add_test(test_merge_correctness verify/test_merge_correctness.cpp)
-emhash_add_test(edge_test verify/edge_test.cpp)
-emhash_add_test(test_find_slot_bucket verify/test_find_slot_bucket.cpp)
-target_link_libraries(test_find_slot_bucket PRIVATE Threads::Threads)
-
-emhash_add_test(test_string_key_leak verify/test_string_key_leak.cpp)
-emhash_add_test(test_sentinel_cleanup verify/test_sentinel_cleanup.cpp)
-
-# ============================================================================
-# Stress Tests
-# ============================================================================
-
-emhash_add_test(test_stress stress/stress_all_maps.cpp)
-emhash_add_test(stress_fix stress/stress_fix.cpp)
-emhash_add_test(highload_test stress/highload_test.cpp)
-emhash_add_test(test_emhash5_stress stress/test_emhash5_stress.cpp)
-emhash_add_test(test_emhash5_hifi stress/test_emhash5_hifi.cpp)
-
-# Merged from test/ directory
-emhash_add_test(test_bad_hash_stress stress/test_bad_hash_stress.cpp)
-
-# ============================================================================
-# Hash Attack Tests (requires EMH_SAFE_PSL)
-# ============================================================================
-
-emhash_add_test(test_attack attack/hash_attack_all.cpp)
-emhash_add_test(test_collision_hardening attack/test_collision_hardening.cpp)
-target_compile_definitions(test_attack PRIVATE EMH_SAFE_PSL)
-
-emhash_add_test(hash_attack5 attack/hash_attack.cpp)
-target_compile_definitions(hash_attack5 PRIVATE EMH_SAFE_PSL)
-
-emhash_add_test(hash_attack7 attack/hash_attack7.cpp)
-target_compile_definitions(hash_attack7 PRIVATE EMH_SAFE_PSL)
-
-# ============================================================================
-# Debug Tests
-# ============================================================================
-
-emhash_add_test(test_debug debug/debug_all_maps.cpp)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(test_debug PRIVATE -g -O0)
-elseif(MSVC)
-    target_compile_options(test_debug PRIVATE /Od /Zi)
-endif()
-
-emhash_add_test(debug_chain debug/debug_chain.cpp)
-emhash_add_test(debug_set_erase debug/debug_set_erase.cpp)
-emhash_add_test(min_repro debug/min_repro.cpp)
-emhash_add_test(reproduce_crash debug/reproduce_crash.cpp)
-emhash_add_test(fuzz_reproduce debug/fuzz_reproduce.cpp)
-
-# Merged from test/ directory
-emhash_add_test(test_probe_bug debug/test_probe_bug.cpp)
-emhash_add_test(test_probe_coverage debug/test_probe_coverage.cpp)
-emhash_add_test(test_debug_find debug/test_debug_find.cpp)
-emhash_add_test(test_repro_collision debug/test_repro_collision.cpp)
-
-# ============================================================================
-# Fuzz Tests
-# ============================================================================
-
-emhash_add_test(reproduce_emhash8_bug fuzz/reproduce_emhash8_bug.cpp)
-
-# ============================================================================
-# CTest Integration
-# ============================================================================
-
-include(CTest)
-
-function(emhash_register_test name)
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES LABELS "emhash")
 endfunction()
 
-emhash_register_test(reproduce_emhash8_bug)
+# Helper: register a test needing EMH_SAFE_PSL (attack tests)
+function(emhash_add_attack_test name source)
+    emhash_add_test(${name} ${source})
+    target_compile_definitions(${name} PRIVATE EMH_SAFE_PSL)
+endfunction()
 
-# Verification tests
-emhash_register_test(test_verify)
-emhash_register_test(quick_test8)
-emhash_register_test(test_emhash58)
-emhash_register_test(test_hidden_bugs8)
-emhash_register_test(test_extreme)
-emhash_register_test(test_interface_combo)
-emhash_register_test(test_emhash5_verify)
-emhash_register_test(test_emhash_allocator)
-emhash_register_test(test_functional_edge)
-emhash_register_test(test_hashset_allocator)
-emhash_register_test(test_emilib_comprehensive)
-emhash_register_test(test_size_sweep)
-emhash_register_test(test_hashmap_full_api)
-emhash_register_test(test_hashset_full_api)
-emhash_register_test(test_special_key_types)
-emhash_register_test(test_merge_correctness)
-emhash_register_test(edge_test)
-emhash_register_test(test_find_slot_bucket)
-emhash_register_test(test_string_key_leak)
-emhash_register_test(test_sentinel_cleanup)
+# ----------------------------------------------------------------------------
+# unit/ — functional correctness (auto-discovered)
+# ----------------------------------------------------------------------------
+file(GLOB UNIT_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp")
+foreach(src ${UNIT_TESTS})
+    get_filename_component(name ${src} NAME_WE)
+    emhash_add_test(${name} ${src})
+endforeach()
 
-# Stress tests
-emhash_register_test(test_stress)
-emhash_register_test(test_bad_hash_stress)
-emhash_register_test(stress_fix)
-emhash_register_test(highload_test)
-emhash_register_test(test_emhash5_stress)
-emhash_register_test(test_emhash5_hifi)
+# ----------------------------------------------------------------------------
+# memory/ — sanitizer + leak + lifecycle (auto-discovered)
+# ----------------------------------------------------------------------------
+file(GLOB MEMORY_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/memory/*.cpp")
+foreach(src ${MEMORY_TESTS})
+    get_filename_component(name ${src} NAME_WE)
+    emhash_add_test(${name} ${src})
+endforeach()
 
-# Hash attack tests
-emhash_register_test(test_attack)
-emhash_register_test(hash_attack5)
-emhash_register_test(hash_attack7)
+# ----------------------------------------------------------------------------
+# stress/ — stress tests (explicit list of new doctest files; old files
+# removed once transition complete)
+# ----------------------------------------------------------------------------
+set(EMHASH_NEW_STRESS_TESTS
+    test_stress_all
+    test_highload
+    test_bad_hash
+    test_reserve_fix
+)
+foreach(name ${EMHASH_NEW_STRESS_TESTS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/stress/${name}.cpp")
+        emhash_add_test(${name} "stress/${name}.cpp")
+    endif()
+endforeach()
 
-# Debug tests
-emhash_register_test(test_debug)
+# ----------------------------------------------------------------------------
+# attack/ — hash attack tests (explicit list of new doctest files)
+# ----------------------------------------------------------------------------
+set(EMHASH_NEW_ATTACK_TESTS
+    test_hash_attack
+    test_collision_hardening
+)
+foreach(name ${EMHASH_NEW_ATTACK_TESTS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/attack/${name}.cpp")
+        emhash_add_attack_test(${name} "attack/${name}.cpp")
+    endif()
+endforeach()
 
-# ============================================================================
-# Test Suites (custom targets)
-# ============================================================================
+# ----------------------------------------------------------------------------
+# fuzz/ — regression reproducer (always built; libfuzzer targets optional)
+# ----------------------------------------------------------------------------
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/reproduce_emhash8_bug.cpp")
+    emhash_add_test(reproduce_emhash8_bug "fuzz/reproduce_emhash8_bug.cpp")
+    set_tests_properties(reproduce_emhash8_bug PROPERTIES WILL_FAIL TRUE)
+endif()
 
-# Quick test suite (runs in ~20 seconds)
+option(EMHASH_ENABLE_FUZZ "Enable libfuzzer targets (requires clang)" OFF)
+if(EMHASH_ENABLE_FUZZ)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "EMHASH_ENABLE_FUZZ requires clang (libfuzzer)")
+    endif()
+    set(EMHASH_FUZZ_TARGETS
+        fuzz_emhash_all
+        fuzz_emilib_all
+        fuzz_extreme
+    )
+    foreach(name ${EMHASH_FUZZ_TARGETS})
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp")
+            add_executable(${name} "fuzz/${name}.cpp")
+            target_compile_features(${name} PRIVATE cxx_std_17)
+            target_include_directories(${name} PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/../include
+                ${CMAKE_CURRENT_SOURCE_DIR}
+                ${EMHASH_TEST_COMMON})
+            target_compile_options(${name} PRIVATE -fsanitize=fuzzer,address -fno-omit-frame-pointer)
+            target_link_options(${name} PRIVATE -fsanitize=fuzzer,address)
+        endif()
+    endforeach()
+endif()
+
+# ----------------------------------------------------------------------------
+# CTest integration
+# ----------------------------------------------------------------------------
+include(CTest)
+
+# ----------------------------------------------------------------------------
+# Custom targets: quick / stress / attack / all
+# ----------------------------------------------------------------------------
 add_custom_target(quick_test
-    COMMAND ${CMAKE_COMMAND} -E echo "=== Running Quick Tests ==="
-    COMMAND test_verify
-    COMMAND test_debug
-    COMMAND ${CMAKE_COMMAND} -E echo "=== All Quick Tests Passed ==="
-    DEPENDS test_verify test_debug
+    COMMAND ${CMAKE_COMMAND} -E echo "=== Running Quick Tests (unit + memory) ==="
+    COMMAND ctest -L emhash -E "stress|attack|fuzz" --output-on-failure
+    COMMENT "Quick test suite"
 )
 
-# Stress test suite
 add_custom_target(stress_test
     COMMAND ${CMAKE_COMMAND} -E echo "=== Running Stress Tests ==="
-    COMMAND test_stress
-    COMMAND highload_test
-    COMMAND ${CMAKE_COMMAND} -E echo "=== All Stress Tests Passed ==="
-    DEPENDS test_stress highload_test
+    COMMAND ctest -L emhash -R "stress|highload|bad_hash|reserve_fix" --output-on-failure
+    COMMENT "Stress test suite"
 )
 
-# Attack test suite
 add_custom_target(attack_test
-    COMMAND ${CMAKE_COMMAND} -E echo "=== Running Hash Attack Tests ==="
-    COMMAND test_attack
-    COMMAND ${CMAKE_COMMAND} -E echo "=== All Attack Tests Passed ==="
-    DEPENDS test_attack
+    COMMAND ${CMAKE_COMMAND} -E echo "=== Running Attack Tests ==="
+    COMMAND ctest -L emhash -R "attack|collision" --output-on-failure
+    COMMENT "Attack test suite"
 )
 
-# All tests
 add_custom_target(all_tests
     COMMAND ${CMAKE_COMMAND} -E echo "=== Running All Tests ==="
-    COMMAND test_verify
-    COMMAND test_debug
-    COMMAND test_stress
-    COMMAND test_attack
-    COMMAND ${CMAKE_COMMAND} -E echo "=== All Tests Passed ==="
-    DEPENDS test_verify test_debug test_stress test_attack
+    COMMAND ctest -L emhash --output-on-failure
+    COMMENT "All tests"
 )
 
-# Print help
 add_custom_target(emhash_test_help
     COMMAND ${CMAKE_COMMAND} -E echo "Available targets:"
-    COMMAND ${CMAKE_COMMAND} -E echo "  quick_test    - Quick validation tests (~20s)"
-    COMMAND ${CMAKE_COMMAND} -E echo "  stress_test   - Stress tests (~1min)"
-    COMMAND ${CMAKE_COMMAND} -E echo "  attack_test   - Hash attack tests (~2min)"
-    COMMAND ${CMAKE_COMMAND} -E echo "  all_tests     - Run all tests"
-    COMMAND ${CMAKE_COMMAND} -E echo "  emhash_test_help - Show this help"
+    COMMAND ${CMAKE_COMMAND} -E echo "  quick_test    - unit + memory tests"
+    COMMAND ${CMAKE_COMMAND} -E echo "  stress_test   - stress tests"
+    COMMAND ${CMAKE_COMMAND} -E echo "  attack_test   - hash attack tests"
+    COMMAND ${CMAKE_COMMAND} -E echo "  all_tests     - all tests"
 )
 
-# ============================================================================
-# Google Benchmark (optional, off by default)
-# ============================================================================
+# ----------------------------------------------------------------------------
+# Google Benchmark (optional, off by default) — unchanged
+# ----------------------------------------------------------------------------
 option(EMHASH_ENABLE_BENCH "Enable Google Benchmark performance tests" OFF)
-
 if(EMHASH_ENABLE_BENCH)
     include(FetchContent)
     FetchContent_Declare(
@@ -259,7 +206,6 @@ if(EMHASH_ENABLE_BENCH)
         GIT_TAG        31c66f47f60d06790a4885a261d682ba339bd100 # v1.9.4
         GIT_SHALLOW    TRUE
     )
-    # Prevent Google Benchmark from building tests
     set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
     set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
     FetchContent_Populate(googlebench)

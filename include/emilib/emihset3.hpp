@@ -479,9 +479,9 @@ public:
         }
 
         for (auto rit = rhs.begin(); rit != rhs.end();) {
-            auto fit = find(rit);
+            auto fit = find(*rit);
             if (fit.bucket() > _mask) {
-                insert_unique(rit);
+                insert_unique(*rit);
                 rhs.erase(rit++);
             } else {
                 ++rit;
@@ -620,8 +620,9 @@ public:
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last;) {
             if (pred(*it))
-                erase(it);
-            ++it;
+                erase(it++);
+            else
+                ++it;
         }
         return old_size - size();
     }

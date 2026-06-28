@@ -989,8 +989,8 @@ public:
 
         for (auto rit = rhs.begin(); rit != rhs.end();) {
             auto fit = find(rit->first);
-            if (fit.bucket() == _num_buckets) {
-                static_cast<void>(insert_unique(rit->first, std::move(rit->second)));
+            if (fit == end()) {
+                insert({rit->first, std::move(rit->second)});
                 rit = rhs.erase(rit);
             } else {
                 ++rit;

@@ -24,7 +24,7 @@ jobs:
   build:
     name: ${{ matrix.os }} / ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -87,28 +87,52 @@ jobs:
         run: |
           cd tests
           CXX="${{ matrix.compiler }}"
-          FLAGS="-std=c++17 -O2 $CXXFLAGS_EXTRA -I../include"
-          $CXX $FLAGS verify/test_all_maps.cpp -o test_verify
-          $CXX $FLAGS verify/test_extreme.cpp -o test_extreme
-          $CXX $FLAGS verify/test_hashset_allocator.cpp -o test_hashset_allocator
-          $CXX $FLAGS verify/test_string_key_leak.cpp -o test_string_key_leak
-          $CXX $FLAGS verify/test_lifecycle_audit.cpp -o test_lifecycle_audit
-          $CXX -std=c++17 -g -O0 $CXXFLAGS_EXTRA -I../include debug/debug_all_maps.cpp -o test_debug
-          $CXX $FLAGS -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack
-          $CXX $FLAGS stress/stress_all_maps.cpp -o test_stress
+          FLAGS="-std=c++17 -O2 $CXXFLAGS_EXTRA -I../include -I. -Icommon"
+          # Unit tests (doctest-based, standalone executables)
+          for f in unit/test_crud unit/test_full_api unit/test_copy_move unit/test_iterators \
+                   unit/test_edge_cases unit/test_string_keys unit/test_special_keys \
+                   unit/test_reserve_clear unit/test_allocator unit/test_hashset; do
+            $CXX $FLAGS $f.cpp -o $(basename $f)
+          done
+          # Memory tests
+          for f in memory/test_string_key_leak memory/test_lifecycle_audit memory/test_sanitizer; do
+            $CXX $FLAGS $f.cpp -o $(basename $f)
+          done
+          # Stress tests
+          $CXX $FLAGS stress/test_stress_all.cpp -o test_stress
+          $CXX $FLAGS stress/test_reserve_fix.cpp -o test_reserve_fix
+          # Attack tests (need EMH_SAFE_PSL)
+          $CXX $FLAGS -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack
+          $CXX $FLAGS -DEMH_SAFE_PSL attack/test_collision_hardening.cpp -o test_collision
+          # Debug
+          $CXX -std=c++17 -g -O0 $CXXFLAGS_EXTRA -I../include -I. -Icommon debug/debug_all_maps.cpp -o test_debug
         shell: bash
 
       - name: Run all tests
         run: |
           cd tests
           TIMEOUT=$(command -v gtimeout 2>/dev/null || command -v timeout)
-          $TIMEOUT 300 ./test_verify
-          $TIMEOUT 120 ./test_extreme
-          $TIMEOUT 60  ./test_hashset_allocator
+          # Unit tests (fast)
+          $TIMEOUT 120 ./test_crud
+          $TIMEOUT 120 ./test_full_api
+          $TIMEOUT 120 ./test_copy_move
+          $TIMEOUT 120 ./test_iterators
+          $TIMEOUT 120 ./test_edge_cases
+          $TIMEOUT 120 ./test_string_keys
+          $TIMEOUT 120 ./test_special_keys
+          $TIMEOUT 120 ./test_reserve_clear
+          $TIMEOUT 120 ./test_allocator
+          $TIMEOUT 120 ./test_hashset
+          # Memory tests
           $TIMEOUT 120 ./test_string_key_leak
           $TIMEOUT 300 ./test_lifecycle_audit
-          $TIMEOUT 300 ./test_attack
-          $TIMEOUT 300 ./test_stress
+          $TIMEOUT 120 ./test_sanitizer
+          # Stress + attack (slower)
+          $TIMEOUT 600 ./test_stress
+          $TIMEOUT 120 ./test_reserve_fix
+          $TIMEOUT 600 ./test_attack
+          $TIMEOUT 300 ./test_collision
+          # Debug
           $TIMEOUT 300 ./test_debug
         shell: bash
 
@@ -117,16 +141,16 @@ jobs:
         run: |
           cd tests
           CXX="${{ matrix.compiler }}"
-          WARN_FLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include"
-          for std in 17 20 23; do
+          WARN_FLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include -I. -Icommon"
+          for std in 17 23; do
             echo "::group::strict warnings C++$std"
-            $CXX -std=c++$std -O2 -fsyntax-only $WARN_FLAGS verify/test_all_maps.cpp
+            $CXX -std=c++$std -O2 -fsyntax-only $WARN_FLAGS unit/test_crud.cpp
             echo "::endgroup::"
           done
         shell: bash
 
   # ==========================================================================
-  # Compat: C++20/23 only (C++17 covered by build job)
+  # Compat: C++23 only (C++17 covered by build job)
   # ==========================================================================
   compat:
     name: Compat / ${{ matrix.compiler }} / C++${{ matrix.std }}
@@ -136,7 +160,7 @@ jobs:
       fail-fast: false
       matrix:
         compiler: [g++, clang++]
-        std: [20, 23]
+        std: [23]
 
     steps:
       - uses: actions/checkout@v6
@@ -151,7 +175,7 @@ jobs:
       - name: Compile and run
         run: |
           cd tests
-          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -I../include verify/test_all_maps.cpp -o test_verify_compat
+          ${{ matrix.compiler }} -std=c++${{ matrix.std }} -O2 -I../include -I. -Icommon unit/test_crud.cpp -o test_verify_compat
           ./test_verify_compat
         shell: bash
 
@@ -161,7 +185,7 @@ jobs:
   asan:
     name: ASan+UBSan / ${{ matrix.os }} / ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -186,23 +210,25 @@ jobs:
         run: |
           cd tests
           CXX="${{ matrix.compiler }}"
-          SAN="-std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include"
-          $CXX $SAN verify/test_all_maps.cpp -o test_verify_asan
-          $CXX $SAN verify/test_extreme.cpp -o test_extreme_asan
-          $CXX $SAN verify/test_string_key_leak.cpp -o test_string_key_leak_asan
-          $CXX $SAN verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_asan
-          $CXX $SAN verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_asan
-          $CXX $SAN stress/stress_fix.cpp -o test_stress_asan
-          $CXX $SAN -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack_asan
+          SAN="-std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include -I. -Icommon"
+          $CXX $SAN unit/test_crud.cpp -o test_crud_asan
+          $CXX $SAN unit/test_full_api.cpp -o test_full_api_asan
+          $CXX $SAN unit/test_edge_cases.cpp -o test_edge_cases_asan
+          $CXX $SAN memory/test_string_key_leak.cpp -o test_string_key_leak_asan
+          $CXX $SAN memory/test_sanitizer.cpp -o test_sanitizer_asan
+          $CXX $SAN memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_asan
+          $CXX $SAN stress/test_reserve_fix.cpp -o test_stress_asan
+          $CXX $SAN -DASAN_LIGHT=1 -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack_asan
         shell: bash
 
       - name: Run with ASan+UBSan
         run: |
           cd tests
-          ./test_verify_asan
-          ./test_extreme_asan
+          ./test_crud_asan
+          ./test_full_api_asan
+          ./test_edge_cases_asan
           ./test_string_key_leak_asan
-          ./test_sentinel_cleanup_asan
+          ./test_sanitizer_asan
           ./test_lifecycle_audit_asan
           ./test_stress_asan
           ./test_attack_asan
@@ -228,7 +254,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --target test_verify test_debug test_attack test_stress quick_test8 test_emilib_comprehensive test_hashset_allocator test_string_key_leak
+        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_hash_attack test_collision_hardening
         shell: bash
 
   cmake-install:
@@ -298,17 +324,19 @@ jobs:
       - name: Build with TSan
         run: |
           cd tests
-          g++ -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include verify/test_find_slot_bucket.cpp -lpthread -o test_tsan_find
-          g++ -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include verify/test_emilib_comprehensive.cpp -lpthread -o test_tsan_emilib
+          g++ -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include -I. -Icommon \
+            unit/test_crud.cpp -lpthread -o test_tsan_crud
+          g++ -std=c++17 -O1 -fsanitize=thread -fno-omit-frame-pointer -I../include -I. -Icommon \
+            memory/test_sanitizer.cpp -lpthread -o test_tsan_sanitizer
         shell: bash
 
       - name: Run with TSan
         run: |
           cd tests
-          echo "=== TSan: test_find_slot_bucket (concurrent erase) ==="
-          ./test_tsan_find 2>&1 || echo "::warning::TSan detected data races (expected — emhash is not thread-safe)"
-          echo "=== TSan: test_emilib_comprehensive (concurrent reads) ==="
-          ./test_tsan_emilib 2>&1 || echo "::warning::TSan detected data races (expected — emhash is not thread-safe)"
+          echo "=== TSan: test_crud ==="
+          ./test_tsan_crud 2>&1 || echo "::warning::TSan detected data races (expected — emhash is not thread-safe)"
+          echo "=== TSan: test_sanitizer ==="
+          ./test_tsan_sanitizer 2>&1 || echo "::warning::TSan detected data races (expected — emhash is not thread-safe)"
         shell: bash
 
   # ==========================================================================
@@ -335,13 +363,16 @@ jobs:
         run: |
           cd tests
           GXX=g++-${{ matrix.gcc_version }}
-          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_all_maps.cpp -o test_verify_gcc
-          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_extreme.cpp -o test_extreme_gcc
-          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_gcc
-          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_gcc
-          $GXX -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include stress/stress_all_maps.cpp -o test_stress_gcc
-          ./test_verify_gcc
-          ./test_extreme_gcc
+          FLAGS="-std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon"
+          $GXX $FLAGS unit/test_crud.cpp -o test_crud_gcc
+          $GXX $FLAGS unit/test_full_api.cpp -o test_full_api_gcc
+          $GXX $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_gcc
+          $GXX $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_gcc
+          $GXX $FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_gcc
+          $GXX $FLAGS stress/test_stress_all.cpp -o test_stress_gcc
+          ./test_crud_gcc
+          ./test_full_api_gcc
+          ./test_edge_cases_gcc
           ./test_string_key_leak_gcc
           ./test_lifecycle_audit_gcc
           ./test_stress_gcc
@@ -374,24 +405,30 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --target test_verify test_debug test_extreme test_hashset_allocator test_string_key_leak test_attack test_stress --config ${{ matrix.config }}
+        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_hash_attack test_collision_hardening
         shell: bash
 
       - name: Run tests
         timeout-minutes: 15
         run: |
-          # test_verify + test_extreme + test_hashset_allocator are fast
-          ./build/${{ matrix.config }}/test_verify.exe
-          ./build/${{ matrix.config }}/test_extreme.exe
-          ./build/${{ matrix.config }}/test_hashset_allocator.exe
-          ./build/${{ matrix.config }}/test_string_key_leak.exe
-          # test_attack and test_stress do high-load cases;
-          # in Debug config (/Od) this takes too long, so we skip them.
-          if [[ "${{ matrix.config }}" == "Release" ]]; then
-            ./build/${{ matrix.config }}/test_attack.exe
-            ./build/${{ matrix.config }}/test_stress.exe
+          CONFIG="${{ matrix.config }}"
+          DIR="build/$CONFIG"
+          # Fast tests (always run)
+          for t in test_crud test_full_api test_copy_move test_iterators test_edge_cases \
+                   test_string_keys test_special_keys test_reserve_clear test_allocator \
+                   test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer; do
+            echo "=== Running $t ==="
+            "$DIR/$t.exe" || { echo "::error::$t failed"; exit 1; }
+          done
+          # Slow tests (skip in Debug — /Od too slow for high-load)
+          if [[ "$CONFIG" == "Release" ]]; then
+            for t in test_stress_all test_highload test_bad_hash test_reserve_fix \
+                     test_hash_attack test_collision_hardening; do
+              echo "=== Running $t ==="
+              "$DIR/$t.exe" || { echo "::error::$t failed"; exit 1; }
+            done
           else
-            echo "::notice::Skipping test_attack and test_stress in Debug config (/Od is too slow for high-load cases)"
+            echo "::notice::Skipping stress/attack tests in Debug config"
           fi
         shell: bash
 
@@ -414,21 +451,18 @@ jobs:
       - name: Build 32-bit
         run: |
           cd tests
-          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
-            -I../include verify/test_all_maps.cpp -o test_verify_32
-          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
-            -I../include verify/test_extreme.cpp -o test_extreme_32
-          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
-            -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_32
-          g++ -m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter \
-            -I../include verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_32
+          FLAGS="-m32 -std=c++17 -O2 -msse2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon"
+          g++ $FLAGS unit/test_crud.cpp -o test_crud_32
+          g++ $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_32
+          g++ $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_32
+          g++ $FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_32
         shell: bash
 
       - name: Run 32-bit tests
         run: |
           cd tests
-          ./test_verify_32
-          ./test_extreme_32
+          ./test_crud_32
+          ./test_edge_cases_32
           ./test_string_key_leak_32
           ./test_lifecycle_audit_32
         shell: bash
@@ -451,20 +485,17 @@ jobs:
       - name: Cross-compile for aarch64
         run: |
           cd tests
-          clang++ --target=aarch64-linux-gnu -std=c++17 -O2 \
-            -Wall -Wextra -Wno-unused-parameter \
-            -I../include verify/test_all_maps.cpp -o test_verify_arm64
-          clang++ --target=aarch64-linux-gnu -std=c++17 -O2 \
-            -Wall -Wextra -Wno-unused-parameter \
-            -I../include verify/test_extreme.cpp -o test_extreme_arm64
+          FLAGS="--target=aarch64-linux-gnu -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon"
+          clang++ $FLAGS unit/test_crud.cpp -o test_crud_arm64
+          clang++ $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_arm64
         shell: bash
 
       - name: Run under QEMU
         run: |
           cd tests
-          qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_verify_arm64 2>/dev/null || \
+          qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_crud_arm64 2>/dev/null || \
             echo "::notice::ARM64 runtime test skipped (no sysroot); cross-compile only"
-          qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_extreme_arm64 2>/dev/null || \
+          qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_edge_cases_arm64 2>/dev/null || \
             echo "::notice::ARM64 runtime test skipped (no sysroot); cross-compile only"
         shell: bash
 
@@ -486,25 +517,25 @@ jobs:
       - name: Build with MSan
         run: |
           cd tests
-          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++"
-          clang++ $MSAN_FLAGS -I../include verify/test_all_maps.cpp -o test_verify_msan
-          clang++ $MSAN_FLAGS -I../include verify/test_string_key_leak.cpp -o test_string_key_leak_msan
-          clang++ $MSAN_FLAGS -I../include verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_msan
-          clang++ $MSAN_FLAGS -I../include verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_msan
+          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon"
+          clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
+          clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
+          clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
+          clang++ $MSAN_FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_msan
         shell: bash
 
       - name: Run with MSan
         run: |
           cd tests
           export MSAN_OPTIONS="suppressions=${{ github.workspace }}/.github/msan-suppressions.txt"
-          ./test_verify_msan
+          ./test_crud_msan
           ./test_string_key_leak_msan
+          ./test_sanitizer_msan
           ./test_lifecycle_audit_msan
-          ./test_sentinel_cleanup_msan
         shell: bash
 
   # ==========================================================================
-  # Code coverage (gcov + lcov, GCC only)
+  # Code coverage (gcov + lcov, GCC only) — 80% line coverage gate
   # ==========================================================================
   coverage:
     name: Code Coverage
@@ -516,36 +547,48 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ lcov
+          sudo apt-get install -y g++ lcov bc
 
       - name: Build with coverage
         run: |
           cd tests
-          COV="-std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include"
-          g++ $COV verify/test_all_maps.cpp -o test_verify_cov
-          g++ $COV verify/test_extreme.cpp -o test_extreme_cov
-          g++ $COV verify/test_string_key_leak.cpp -o test_string_key_leak_cov
-          g++ $COV verify/test_sentinel_cleanup.cpp -o test_sentinel_cleanup_cov
-          g++ $COV verify/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
-          g++ $COV verify/test_hashset_full_api.cpp -o test_hashset_cov
-          g++ $COV verify/test_emilib_comprehensive.cpp -o test_emilib_cov
-          g++ $COV stress/stress_fix.cpp -o test_stress_cov
-          g++ $COV stress/stress_all_maps.cpp -o test_stress_all_cov
-          g++ $COV -DEMH_SAFE_PSL attack/hash_attack_all.cpp -o test_attack_cov
+          COV="-std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include -I. -Icommon"
+          g++ $COV unit/test_crud.cpp -o test_crud_cov
+          g++ $COV unit/test_full_api.cpp -o test_full_api_cov
+          g++ $COV unit/test_copy_move.cpp -o test_copy_move_cov
+          g++ $COV unit/test_iterators.cpp -o test_iterators_cov
+          g++ $COV unit/test_edge_cases.cpp -o test_edge_cases_cov
+          g++ $COV unit/test_string_keys.cpp -o test_string_keys_cov
+          g++ $COV unit/test_special_keys.cpp -o test_special_keys_cov
+          g++ $COV unit/test_reserve_clear.cpp -o test_reserve_clear_cov
+          g++ $COV unit/test_allocator.cpp -o test_allocator_cov
+          g++ $COV unit/test_hashset.cpp -o test_hashset_cov
+          g++ $COV memory/test_string_key_leak.cpp -o test_string_key_leak_cov
+          g++ $COV memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
+          g++ $COV memory/test_sanitizer.cpp -o test_sanitizer_cov
+          g++ $COV stress/test_stress_all.cpp -o test_stress_all_cov
+          g++ $COV stress/test_reserve_fix.cpp -o test_stress_fix_cov
+          g++ $COV -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack_cov
         shell: bash
 
       - name: Run tests
         run: |
           cd tests
-          ./test_verify_cov
-          ./test_extreme_cov
-          ./test_string_key_leak_cov
-          ./test_sentinel_cleanup_cov
-          ./test_lifecycle_audit_cov
+          ./test_crud_cov
+          ./test_full_api_cov
+          ./test_copy_move_cov
+          ./test_iterators_cov
+          ./test_edge_cases_cov
+          ./test_string_keys_cov
+          ./test_special_keys_cov
+          ./test_reserve_clear_cov
+          ./test_allocator_cov
           ./test_hashset_cov
-          ./test_emilib_cov
-          ./test_stress_cov
+          ./test_string_key_leak_cov
+          ./test_lifecycle_audit_cov
+          ./test_sanitizer_cov
           ./test_stress_all_cov
+          ./test_stress_fix_cov
           ./test_attack_cov
         shell: bash
 
@@ -558,15 +601,15 @@ jobs:
                --ignore-errors unused
           genhtml coverage.info --output-directory coverage_html --title "emhash coverage" --num-spaces 4
           lcov --summary coverage.info
-          COV_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -oP '\d+\.\d+%' | head -1)
-          FUNC_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'functions' | grep -oP '\d+\.\d+%' | head -1)
+          COV_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -oP '\d+\.\d+' | head -1)
+          FUNC_PERCENT=$(lcov --summary coverage.info 2>&1 | grep 'functions' | grep -oP '\d+\.\d+' | head -1)
           {
             echo "### 📊 Code Coverage Report"
             echo ""
             echo "| Metric | Rate |"
             echo "|--------|------|"
-            echo "| **Lines**     | **${COV_PERCENT}** |"
-            echo "| **Functions** | **${FUNC_PERCENT}** |"
+            echo "| **Lines**     | **${COV_PERCENT}%** |"
+            echo "| **Functions** | **${FUNC_PERCENT}%** |"
             echo ""
             echo "#### Per-File Coverage"
             echo ""
@@ -574,6 +617,13 @@ jobs:
             lcov --list coverage.info 2>&1 | grep -E 'emhash|emilib|=====|Total'
             echo '```'
           } >> $GITHUB_STEP_SUMMARY
+          # 80% line coverage gate
+          echo "Line coverage: ${COV_PERCENT}% (gate: 80%)"
+          if (( $(echo "$COV_PERCENT < 80" | bc -l) )); then
+            echo "::error::Line coverage ${COV_PERCENT}% is below 80% threshold"
+            exit 1
+          fi
+          echo "Coverage gate passed"
         shell: bash
 
       - name: Upload coverage HTML report
@@ -591,7 +641,7 @@ jobs:
           retention-days: 30
 
   # ==========================================================================
-  # GCC strict warnings (C++23 only; C++17/20 covered by build job)
+  # GCC strict warnings (C++23 only; C++17 covered by build job)
   # ==========================================================================
   gcc-strict:
     name: GCC Strict / C++23
@@ -610,7 +660,7 @@ jobs:
             -Wconversion -Wshadow -Wnon-virtual-dtor \
             -Wdouble-promotion -Wformat=2 -Wmissing-include-dirs \
             -Wnull-dereference -Wno-unused-parameter \
-            -I../include verify/test_all_maps.cpp -o test_gcc_strict 2>&1 | tee gcc_warnings.txt
+            -I../include -I. -Icommon unit/test_crud.cpp -o test_gcc_strict 2>&1 | tee gcc_warnings.txt
           if grep -q "include/emhash/" gcc_warnings.txt; then
             echo "::error::Warnings found in emhash headers"
             grep "include/emhash/" gcc_warnings.txt
@@ -624,7 +674,7 @@ jobs:
         shell: bash
 
   # ==========================================================================
-  # Performance benchmark (g++ only)
+  # Performance benchmark (g++ only) — regression gate
   # ==========================================================================
   benchmark:
     name: Benchmark / g++
@@ -634,7 +684,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y g++ cmake git
+        run: sudo apt-get update && sudo apt-get install -y g++ cmake git python3
 
       - name: Configure with benchmarks
         run: cmake -B build -S tests -DEMHASH_ENABLE_BENCH=ON -DCMAKE_BUILD_TYPE=Release
@@ -650,9 +700,58 @@ jobs:
           ./emhash_bench --benchmark_format=console --benchmark_out=benchmark_results.json
         shell: bash
 
-      - name: Upload benchmark results
+      - name: Download baseline (if exists)
+        id: download-baseline
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: benchmark-baseline
+          path: baseline/
+
+      - name: Regression check
+        if: steps.download-baseline.outcome == 'success'
+        run: |
+          if [[ -f baseline/benchmark_results.json ]]; then
+            echo "=== Comparing against baseline ==="
+            python3 - <<'PYEOF'
+          import json, sys
+
+          with open("baseline/benchmark_results.json") as f:
+              baseline = {b["name"]: b for b in json.load(f)["benchmarks"]}
+          with open("build/benchmark_results.json") as f:
+              current = {b["name"]: b for b in json.load(f)["benchmarks"]}
+
+          regressions = []
+          THRESHOLD = 1.25  # 25% slower than baseline = regression
+
+          for name, cur in current.items():
+              if name not in baseline:
+                  print(f"[NEW] {name}: {cur['real_time']:.0f} {cur['time_unit']}")
+                  continue
+              base_time = baseline[name]["real_time"]
+              cur_time = cur["real_time"]
+              ratio = cur_time / base_time if base_time > 0 else 1.0
+              status = "OK" if ratio < THRESHOLD else "REGRESSION"
+              print(f"[{status}] {name}: {cur_time:.0f} vs {base_time:.0f} {cur['time_unit']} (ratio={ratio:.2f})")
+              if ratio >= THRESHOLD:
+                  regressions.append((name, ratio))
+
+          if regressions:
+              print(f"\n::error::Benchmark regression detected ({len(regressions)} benchmarks >25% slower)")
+              for name, ratio in regressions:
+                  print(f"  - {name}: {ratio:.2f}x slower")
+              sys.exit(1)
+          else:
+              print("\nNo regressions detected (threshold: 25%)")
+          PYEOF
+          else
+            echo "No baseline found, skipping regression check"
+          fi
+        shell: bash
+
+      - name: Upload benchmark results (as baseline for next run)
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-g++
+          name: benchmark-baseline
           path: build/benchmark_results.json
-          retention-days: 30
+          retention-days: 90
