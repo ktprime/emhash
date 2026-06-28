@@ -500,12 +500,14 @@ public:
     void _erase(size_t bucket) {
         if (need_explicit_dtor())
             _keys[bucket].~KeyT();
-        auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
-        if (state == State::EEMPTY) {
+        _states[bucket] = State::EDELETE;
+        _num_filled -= 1;
+        // Propagate empty state leftward only if next bucket is empty,
+        // so that lookup probes still reach elements stored after erased slots.
+        if (_states[bucket + 1] == State::EEMPTY) {
             while (bucket > 0 && _states[--bucket] == State::EDELETE)
                 _states[bucket] = State::EEMPTY;
         }
-        _num_filled -= 1;
     }
 
     static constexpr bool need_explicit_dtor() {
@@ -704,7 +706,7 @@ private:
 
             next_bucket += set_simd_bytes;
             if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {
-                i -= set_simd_bytes; // consume the remaining budget before wrap
+                i += next_bucket - _num_buckets;
                 next_bucket = 0;
             }
 
