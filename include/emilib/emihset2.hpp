@@ -502,7 +502,7 @@ public:
             _keys[bucket].~KeyT();
         auto state = _states[bucket] = (_states[bucket + 1] % 4) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
         if (state == State::EEMPTY) {
-            while (bucket > 1 && _states[--bucket] == State::EDELETE)
+            while (bucket > 0 && _states[--bucket] == State::EDELETE)
                 _states[bucket] = State::EEMPTY;
         }
         _num_filled -= 1;
@@ -560,10 +560,9 @@ public:
     /// Remove all elements, keeping full capacity.
     void clear() {
         if (need_explicit_dtor()) {
-            for (size_t bucket = 0; _num_filled; ++bucket) {
+            for (size_t bucket = 0; bucket < _num_buckets; ++bucket) {
                 if (_states[bucket] % 2 == State::EFILLED) {
                     _keys[bucket].~KeyT();
-                    _num_filled--;
                 }
                 _states[bucket] = State::EEMPTY;
             }

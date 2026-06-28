@@ -528,11 +528,11 @@ jobs:
       - name: Build with MSan
         run: |
           cd tests
-          # -include common/msan_unpoison.hpp: force-include the stream unpoisoner
+          # -include msan_unpoison.hpp: force-include the stream unpoisoner
           # so std::cout/cerr are marked initialized before doctest writes to them.
           # Without this, MSan reports false-positive use-of-uninitialized-value
           # because the uninstrumented libc++ runtime sets up the iostream globals.
-          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include common/msan_unpoison.hpp"
+          MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include msan_unpoison.hpp"
           clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
           clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
           clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
@@ -543,10 +543,16 @@ jobs:
         run: |
           cd tests
           export MSAN_OPTIONS="suppressions=${{ github.workspace }}/.github/msan-suppressions.txt"
-          ./test_crud_msan
-          ./test_string_key_leak_msan
-          ./test_sanitizer_msan
-          ./test_lifecycle_audit_msan
+          set +e
+          overall=0
+          for t in test_crud_msan test_string_key_leak_msan test_sanitizer_msan test_lifecycle_audit_msan; do
+            echo "=== Running ./$t ==="
+            ./$t
+            rc=$?
+            echo "::warning:: ./$t exited with code $rc"
+            if [ $rc -ne 0 ]; then overall=1; fi
+          done
+          exit $overall
         shell: bash
 
   # ==========================================================================
