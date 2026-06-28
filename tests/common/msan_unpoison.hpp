@@ -16,9 +16,11 @@
 
 namespace emhash_test {
 
-// Global constructor: runs after std::ios_base::Init from <iostream>
-// (defined earlier in this TU), so std::cout/cerr/clog are already live.
-struct MsanStreamUnpoisoner {
+// Global constructor: runs after std::ios_base::Init from <iostream>.
+// libc++ marks its std::ios_base::Init with init_priority(101); use 102
+// to guarantee MsanStreamUnpoisoner is constructed after the streams are
+// fully initialized, then unpoison their live state.
+struct __attribute__((init_priority(102))) MsanStreamUnpoisoner {
     MsanStreamUnpoisoner() {
         // Unpoison the stream objects themselves (format flags, sentry, etc.)
         __msan_unpoison(&std::cout, sizeof(std::cout));
