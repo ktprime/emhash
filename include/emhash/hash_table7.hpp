@@ -526,17 +526,12 @@ public:
         return static_cast<size_type>((AllocSize(num_buckets) + sizeof(PairT) - 1) / sizeof(PairT));
     }
 
-    PairT* alloc_bucket(size_type num_buckets) {
-        if (num_buckets <= 0 || num_buckets > max_size())
-            throw std::length_error("emhash7::HashMap: allocation size overflow");
+    PairT* alloc_bucket(size_type num_buckets) noexcept {
         auto count = alloc_count(num_buckets);
-        auto* new_pairs = PairAllocTraits::allocate(_alloc, count);
-        if (new_pairs == nullptr)
-            throw std::bad_alloc();
-        return new_pairs;
+        return PairAllocTraits::allocate(_alloc, count);
     }
 
-    void dealloc_bucket(PairT* pairs, size_type num_buckets) {
+    void dealloc_bucket(PairT* pairs, size_type num_buckets) noexcept {
         if (pairs) {
             auto count = alloc_count(num_buckets);
             PairAllocTraits::deallocate(_alloc, pairs, count);
@@ -1253,10 +1248,10 @@ public:
         _num_filled = 0;
     }
 
-    void shrink_to_fit() { rehash(_num_filled + 1); }
+    void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
 
     /// Make room for this many elements
-    [[nodiscard]] bool reserve(uint64_t num_elems) {
+    [[nodiscard]] bool reserve(uint64_t num_elems) noexcept {
         const auto required_buckets = (num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
@@ -1274,7 +1269,7 @@ public:
         return true;
     }
 
-    void rehash(uint64_t required_buckets) {
+    void rehash(uint64_t required_buckets) noexcept {
         if (required_buckets < _num_filled)
             return;
 
@@ -1314,23 +1309,18 @@ public:
         if (num_buckets < 8 * sizeof(_bitmask[0]))
             _bitmask[0] = static_cast<bit_type>((1u << num_buckets) - 1);
 
-        try {
-            for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket--) {
-                if (obmask[src_bucket / MASK_BIT] & (1 << (src_bucket % MASK_BIT)))
-                    continue;
+        for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket--) {
+            if (obmask[src_bucket / MASK_BIT] & (1 << (src_bucket % MASK_BIT)))
+                continue;
 
-                auto& key = EMH_KEY(old_pairs, src_bucket);
-                const auto bucket = find_unique_bucket(key);
-                EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
-                if (need_explicit_dtor())
-                    old_pairs[src_bucket].~PairT();
+            auto& key = EMH_KEY(old_pairs, src_bucket);
+            const auto bucket = find_unique_bucket(key);
+            EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket);
+            if (need_explicit_dtor())
+                old_pairs[src_bucket].~PairT();
 
-                if (src_bucket == 0)
-                    break;
-            }
-        } catch (...) {
-            dealloc_bucket(old_pairs, old_num_buckets);
-            throw;
+            if (src_bucket == 0)
+                break;
         }
 
 #if EMH_REHASH_LOG
@@ -1355,7 +1345,7 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(_num_filled); }
+    inline bool check_expand_need() noexcept { return reserve(_num_filled); }
 
     void clear_bucket(size_type bucket) {
         emh_cls(bucket);

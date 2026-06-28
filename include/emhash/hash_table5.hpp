@@ -1242,7 +1242,7 @@ public:
         _first = _num_buckets;
     }
 
-    void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4) {
+    void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4) noexcept {
 #if EMH_SMALL_SIZE
         if (_pairs == reinterpret_cast<PairT*>(_small))
             return;
@@ -1252,7 +1252,7 @@ public:
     }
 
     /// Make room for this many elements
-    [[nodiscard]] bool reserve(uint64_t num_elems) {
+    [[nodiscard]] bool reserve(uint64_t num_elems) noexcept {
 #if EMH_HIGH_LOAD < 1000
         const auto required_buckets = (num_elems * _mlf >> 27);
         if (EMH_LIKELY(required_buckets < static_cast<uint64_t>(_mask)))
@@ -1282,7 +1282,7 @@ public:
         return true;
     }
 
-    void rehash(uint64_t required_buckets) {
+    void rehash(uint64_t required_buckets) noexcept {
         if (required_buckets < static_cast<uint64_t>(_num_filled))
             return;
 
@@ -1350,32 +1350,24 @@ public:
             reset_bucket(hash_main(0));
 #endif
 
-        try {
-            for (size_type src_bucket = old_buckets - 1; _num_filled < old_num_filled; src_bucket--) {
-                if (EMH_EMPTY(old_pairs, src_bucket))
-                    continue;
+        for (size_type src_bucket = old_buckets - 1; _num_filled < old_num_filled; src_bucket--) {
+            if (EMH_EMPTY(old_pairs, src_bucket))
+                continue;
 #if EMH_REHASH_LOG
-                else if (src_bucket != EMH_BUCKET(old_pairs, src_bucket))
-                    collision++;
+            else if (src_bucket != EMH_BUCKET(old_pairs, src_bucket))
+                collision++;
 #endif
 
-                const auto& key = EMH_KEY(old_pairs, src_bucket);
-                const auto bucket = find_unique_bucket(key);
-                new (_pairs + bucket) PairT(std::move(old_pairs[src_bucket]));
-                _num_filled++;
-                EMH_BUCKET(_pairs, bucket) = bucket;
-                if (need_explicit_dtor())
-                    old_pairs[src_bucket].~PairT();
+            const auto& key = EMH_KEY(old_pairs, src_bucket);
+            const auto bucket = find_unique_bucket(key);
+            new (_pairs + bucket) PairT(std::move(old_pairs[src_bucket]));
+            _num_filled++;
+            EMH_BUCKET(_pairs, bucket) = bucket;
+            if (need_explicit_dtor())
+                old_pairs[src_bucket].~PairT();
 
-                if (src_bucket == 0)
-                    break;
-            }
-        } catch (...) {
-#if EMH_SMALL_SIZE
-            if (old_pairs != reinterpret_cast<PairT*>(_small))
-#endif
-                dealloc_bucket(old_pairs, old_buckets);
-            throw;
+            if (src_bucket == 0)
+                break;
         }
 
 #if EMH_REHASH_LOG
@@ -1402,19 +1394,11 @@ public:
     }
 
 private:
-    PairT* alloc_bucket(size_type num_buckets) {
-        // Unified overflow guard: num_buckets must be positive, fit in max_size,
-        // and 2 + num_buckets must not wrap around.
-        if (num_buckets <= 0 || static_cast<uint64_t>(num_buckets) > max_size() ||
-            static_cast<uint64_t>(num_buckets) + 2 < static_cast<uint64_t>(num_buckets))
-            throw std::length_error("emhash5::HashMap: allocation size overflow");
-        auto* p = PairAllocTraits::allocate(_alloc, 2 + static_cast<size_t>(num_buckets));
-        if (p == nullptr)
-            throw std::bad_alloc();
-        return p;
+    PairT* alloc_bucket(size_type num_buckets) noexcept {
+        return PairAllocTraits::allocate(_alloc, 2 + static_cast<size_t>(num_buckets));
     }
 
-    void dealloc_bucket(PairT* pairs, size_type num_buckets) {
+    void dealloc_bucket(PairT* pairs, size_type num_buckets) noexcept {
         if (pairs)
             PairAllocTraits::deallocate(_alloc, pairs, 2 + static_cast<size_t>(num_buckets));
     }
@@ -1481,7 +1465,7 @@ private:
 #endif
 
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(static_cast<uint64_t>(_num_filled)); }
+    inline bool check_expand_need() noexcept { return reserve(static_cast<uint64_t>(_num_filled)); }
 
     void clear_bucket(size_type bucket, bool bclear = true) noexcept {
         if (need_explicit_dtor()) {

@@ -974,7 +974,7 @@ public:
         memset(reinterpret_cast<char*>(_index + num_buckets), 0, sizeof(_index[0]) * EAD);
     }
 
-    void rehash(uint64_t required_buckets) {
+    void rehash(uint64_t required_buckets) noexcept {
         if (required_buckets < _num_filled)
             return;
 
@@ -983,7 +983,7 @@ public:
             buckets *= 2;
         }
         if (buckets > static_cast<uint64_t>(max_size()) || buckets < _num_filled)
-            throw std::length_error("emhash8::HashSet: too many elements");
+            return;
 
 #if EMH_SAVE_MEM
         if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
@@ -1055,7 +1055,7 @@ public:
 
 private:
     // Can we fit another element?
-    bool check_expand_need() { return reserve(_num_filled, false); }
+    bool check_expand_need() noexcept { return reserve(_num_filled, false); }
 
     static void prefetch_heap_block(char* ctrl) {
         // Prefetch the heap-allocated memory region to resolve potential TLB

@@ -1089,32 +1089,20 @@ public:
         return true;
     }
 
-    value_type* alloc_bucket(size_type num_buckets) {
-        if (num_buckets <= 0 || num_buckets > max_size())
-            throw std::length_error("emhash8::HashMap: allocation size overflow");
-        auto* p = PairAllocTraits::allocate(_pair_allocator, num_buckets);
-        if (p == nullptr)
-            throw std::bad_alloc();
-        return p;
+    value_type* alloc_bucket(size_type num_buckets) noexcept {
+        return PairAllocTraits::allocate(_pair_allocator, num_buckets);
     }
 
-    void dealloc_bucket(value_type* ptr, size_type num_buckets) {
+    void dealloc_bucket(value_type* ptr, size_type num_buckets) noexcept {
         if (ptr)
             PairAllocTraits::deallocate(_pair_allocator, ptr, num_buckets);
     }
 
-    Index* alloc_index(size_type num_buckets) {
-        // Overflow guard: num_buckets must be positive, fit in max_size,
-        // and num_buckets + EAD must not wrap around.
-        if (num_buckets <= 0 || num_buckets > max_size() || num_buckets + EAD < num_buckets)
-            throw std::length_error("emhash8::HashMap: index size overflow");
-        auto* p = IndexAllocTraits::allocate(_index_allocator, num_buckets + EAD);
-        if (p == nullptr)
-            throw std::bad_alloc();
-        return p;
+    Index* alloc_index(size_type num_buckets) noexcept {
+        return IndexAllocTraits::allocate(_index_allocator, num_buckets + EAD);
     }
 
-    void dealloc_index(Index* ptr, size_type num_buckets) {
+    void dealloc_index(Index* ptr, size_type num_buckets) noexcept {
         if (ptr)
             IndexAllocTraits::deallocate(_index_allocator, ptr, num_buckets + EAD);
     }
@@ -1251,7 +1239,7 @@ public:
 
 private:
     // Can we fit another element?
-    bool check_expand_need() { return reserve(_num_filled, false); }
+    bool check_expand_need() noexcept { return reserve(_num_filled, false); }
 
     // Prefetch for read operations (find)
     static void prefetch_read(char* ctrl) {

@@ -1156,10 +1156,10 @@ public:
 #endif
     }
 
-    void shrink_to_fit() { rehash(_num_filled + 1); }
+    void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
 
     /// Make room for this many elements
-    [[nodiscard]] bool reserve(uint64_t num_elems) {
+    [[nodiscard]] bool reserve(uint64_t num_elems) noexcept {
         const size_t required_buckets = static_cast<size_t>(static_cast<uint64_t>(num_elems * _mlf >> 27) + 1);
         if (EMH_LIKELY(required_buckets <= _mask))
             return false;
@@ -1172,7 +1172,7 @@ public:
     }
 
     /// three ways may incr rehash: bad hash function, load_factor is high, or need shrink
-    void rehash(uint64_t required_buckets) {
+    void rehash(uint64_t required_buckets) noexcept {
         if (required_buckets < _num_filled)
             return;
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : sizeof(size_t);
@@ -1246,27 +1246,22 @@ public:
 #if EMH_REHASH_LOG
         auto collision = 0;
 #endif
-        try {
-            for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket--) {
-                if (EMH_EMPTY(old_pairs, src_bucket))
-                    continue;
+        for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket--) {
+            if (EMH_EMPTY(old_pairs, src_bucket))
+                continue;
 
-                auto&& key = EMH_KEY(old_pairs, src_bucket);
-                const auto bucket = find_unique_bucket(key);
-                EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
+            auto&& key = EMH_KEY(old_pairs, src_bucket);
+            const auto bucket = find_unique_bucket(key);
+            EMH_NEW(std::move(key), std::move(EMH_VAL(old_pairs, src_bucket)), bucket / 2, bucket);
 #if EMH_REHASH_LOG
-                if (bucket / 2 != hash_main(bucket / 2))
-                    collision++;
+            if (bucket / 2 != hash_main(bucket / 2))
+                collision++;
 #endif
-                if (need_explicit_dtor())
-                    old_pairs[src_bucket].~PairT();
+            if (need_explicit_dtor())
+                old_pairs[src_bucket].~PairT();
 
-                if (src_bucket == 0)
-                    break;
-            }
-        } catch (...) {
-            dealloc_bucket(old_pairs, old_mask + 1);
-            throw;
+            if (src_bucket == 0)
+                break;
         }
 
 #if EMH_REHASH_LOG
@@ -1298,7 +1293,7 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() {
+    inline bool check_expand_need() noexcept {
 #if EMH_SAFE_HASH > 1
         if (EMH_UNLIKELY(_num_main * 3 < _num_filled) && _num_filled > 100 && _hash_inter == 0) {
             rehash(_num_filled);
@@ -1747,17 +1742,12 @@ private:
         return static_cast<size_type>((bytes + sizeof(PairT) - 1) / sizeof(PairT));
     }
 
-    PairT* alloc_bucket(uint64_t num_buckets) {
-        if (num_buckets > max_size() || static_cast<int64_t>(num_buckets) <= 0)
-            throw std::length_error("emhash6::HashMap: allocation size overflow");
+    PairT* alloc_bucket(uint64_t num_buckets) noexcept {
         auto count = AllocPairCount(num_buckets);
-        auto* p = PairAllocTraits::allocate(_alloc, count);
-        if (p == nullptr)
-            throw std::bad_alloc();
-        return p;
+        return PairAllocTraits::allocate(_alloc, count);
     }
 
-    void dealloc_bucket(PairT* ptr, uint64_t num_buckets) {
+    void dealloc_bucket(PairT* ptr, uint64_t num_buckets) noexcept {
         if (ptr) {
             auto count = AllocPairCount(num_buckets);
             PairAllocTraits::deallocate(_alloc, ptr, count);
