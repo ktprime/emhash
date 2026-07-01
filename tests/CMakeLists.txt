@@ -195,6 +195,29 @@ add_custom_target(emhash_test_help
 )
 
 # ----------------------------------------------------------------------------
+# Debug targets (not part of CTest)
+# ----------------------------------------------------------------------------
+add_executable(debug_merge_msvc debug/debug_merge_msvc.cpp)
+target_compile_features(debug_merge_msvc PRIVATE cxx_std_17)
+target_include_directories(debug_merge_msvc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+add_executable(debug_merge_trace debug/debug_merge_trace.cpp)
+target_compile_features(debug_merge_trace PRIVATE cxx_std_17)
+target_include_directories(debug_merge_trace PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+add_executable(debug_merge_trace2 debug/debug_merge_trace2.cpp)
+target_compile_features(debug_merge_trace2 PRIVATE cxx_std_17)
+target_include_directories(debug_merge_trace2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+add_executable(debug_erase_if debug/debug_erase_if.cpp)
+target_compile_features(debug_erase_if PRIVATE cxx_std_17)
+target_include_directories(debug_erase_if PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+add_executable(debug_erase_simple debug/debug_erase_simple.cpp)
+target_compile_features(debug_erase_simple PRIVATE cxx_std_17)
+target_include_directories(debug_erase_simple PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+# ----------------------------------------------------------------------------
 # Google Benchmark (optional, off by default) — unchanged
 # ----------------------------------------------------------------------------
 option(EMHASH_ENABLE_BENCH "Enable Google Benchmark performance tests" OFF)

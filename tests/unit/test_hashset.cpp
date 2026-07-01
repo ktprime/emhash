@@ -185,7 +185,7 @@ TEST_CASE_TEMPLATE("set insert_unique", Set, AllIntSets) {
     CHECK(s.contains(4));
 }
 
-TEST_CASE_TEMPLATE("set merge" * doctest::skip("TODO: fix merge bug in emhash6/7"), Set, AllIntSets) {
+TEST_CASE_TEMPLATE("set merge", Set, AllIntSets) {
     Set a, b;
     for (int i = 0; i < 20; ++i) a.insert(i);
     for (int i = 10; i < 30; ++i) b.insert(i);

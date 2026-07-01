@@ -119,6 +119,32 @@ TEST_CASE_TEMPLATE("string key copy and move", Map, AllStringMaps) {
     CHECK(m3.at("25") == 25);
 }
 
+TEST_CASE_TEMPLATE("string key merge", Map, AllStringMaps) {
+    SUBCASE("overlap") {
+        Map a, b;
+        for (int i = 0; i < 20; ++i) a[std::to_string(i)] = i;
+        for (int i = 10; i < 30; ++i) b[std::to_string(i)] = i * 2;
+
+        a.merge(b);
+        CHECK(a.size() == 30);
+        for (int i = 0; i < 30; ++i) CHECK(a.contains(std::to_string(i)));
+        // overlap keys 10..19 stay in b
+        CHECK(b.size() == 10);
+        for (int i = 10; i < 20; ++i) CHECK(b.contains(std::to_string(i)));
+    }
+
+    SUBCASE("no overlap") {
+        Map c, d;
+        for (int i = 0; i < 10; ++i) c[std::to_string(i)] = i;
+        for (int i = 10; i < 20; ++i) d[std::to_string(i)] = i;
+
+        c.merge(d);
+        CHECK(c.size() == 20);
+        CHECK(d.empty());
+        for (int i = 0; i < 20; ++i) CHECK(c.contains(std::to_string(i)));
+    }
+}
+
 TEST_CASE_TEMPLATE("long string keys", Map, AllStringMaps) {
     Map m;
     std::string long_key(1000, 'x');

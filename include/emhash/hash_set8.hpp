@@ -688,7 +688,15 @@ public:
             do_insert(*first);
     }
 
+    /// @brief Insert a key without checking for duplicates.
+    /// @param key The key to insert.
+    /// @return The bucket index where the element was inserted.
+    /// @pre The key must NOT already exist in the set. Use contains() to verify
+    ///      if unsure. Violating this precondition creates a duplicate entry and
+    ///      corrupts the set's invariants.
+    /// @warning Same as HashMap::insert_unique — duplicate keys cause UB.
     template <typename K> size_type do_unique(K&& key) {
+        assert(!contains(key) && "insert_unique: key already exists (undefined behavior)");
         check_expand_need();
         const auto key_hash = hash_key(key);
         auto bucket = find_unique_bucket(key_hash);

@@ -128,6 +128,12 @@ TraeCN*
 *.gcno
 *.gcda
 
+# Root-level temporary scratch files (_*.py, _*.txt from git helper scripts)
+_*.py
+_*.txt
+_*.txtclear
+_*clear
+
 # Output files
 hash_attack_output.txt
 out7.txt

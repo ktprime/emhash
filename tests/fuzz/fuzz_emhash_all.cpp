@@ -27,8 +27,8 @@
 enum OpCode : uint8_t {
     OP_INSERT = 0, OP_ERASE = 1, OP_FIND = 2, OP_ACCESS = 3,
     OP_ITERATE = 4, OP_CLEAR = 5, OP_RESERVE = 6, OP_EMPLACE = 7,
-    OP_COUNT = 8, OP_CONTAINS = 9,
-    OP_MAX = 10
+    OP_COUNT = 8, OP_CONTAINS = 9, OP_INSERT_UNIQUE = 10,
+    OP_MAX = 11
 };
 
 struct Op { OpCode code; int32_t key; int32_t value; };
@@ -107,6 +107,14 @@ static void fuzz_map(const std::vector<Op>& ops) {
         case OP_CONTAINS:
             assert(m.contains(op.key) == (ref.count(op.key) > 0));
             break;
+        case OP_INSERT_UNIQUE: {
+            if (!m.contains(op.key)) {
+                m.insert_unique(op.key, op.value);
+                auto rr = ref.insert({op.key, op.value});
+                assert(rr.second);
+            }
+            break;
+        }
         default: break;
         }
     }
@@ -157,6 +165,14 @@ static void fuzz_set(const std::vector<Op>& ops) {
             size_t count = 0;
             for (auto it = s.begin(); it != s.end(); ++it) ++count;
             assert(count == s.size());
+            break;
+        }
+        case OP_INSERT_UNIQUE: {
+            if (!s.contains(op.key)) {
+                s.insert_unique(op.key);
+                auto rr = ref.insert(op.key);
+                assert(rr.second);
+            }
             break;
         }
         default: break;

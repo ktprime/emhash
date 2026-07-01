@@ -517,7 +517,7 @@ public:
 
         for (auto rit = rhs.begin(); rit != rhs.end();) {
             auto fit = find(rit->first);
-            if (fit.bucket() > _mask) {
+            if (fit == end()) {
                 insert_unique(rit->first, std::move(rit->second));
                 rhs.erase(rit++);
             } else {

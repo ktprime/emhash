@@ -79,7 +79,28 @@ TEST_CASE_TEMPLATE("insert_unique", Map, AllIntMaps) {
     CHECK(m.size() == 2);
 }
 
-TEST_CASE_TEMPLATE("merge two maps emhash" * doctest::skip("TODO: fix merge bug in emhash6/7"), Map, EmhashIntMaps) {
+TEST_CASE_TEMPLATE("insert_unique precondition", Map, AllIntMaps) {
+    Map m;
+    m[1] = 10;
+    m[2] = 20;
+
+    // Correct usage: key is guaranteed new
+    auto bucket = m.insert_unique(3, 30);
+    CHECK(bucket >= 0);
+    CHECK(m.at(3) == 30);
+    CHECK(m.size() == 3);
+
+    // insert_unique with a duplicate key is documented as UB.
+    // In debug builds (assertions enabled), this would abort.
+    // In release builds, we do NOT call it because it corrupts the map.
+    // Verify the existing state is still valid:
+    CHECK(m.contains(1));
+    CHECK(m.contains(2));
+    CHECK(m.contains(3));
+    CHECK(m.size() == 3);
+}
+
+TEST_CASE_TEMPLATE("merge two maps emhash", Map, EmhashIntMaps) {
     Map a, b;
     for (int i = 0; i < 20; ++i) a[i] = i;
     for (int i = 10; i < 30; ++i) b[i] = i * 2;
@@ -89,7 +110,7 @@ TEST_CASE_TEMPLATE("merge two maps emhash" * doctest::skip("TODO: fix merge bug 
     for (int i = 0; i < 30; ++i) CHECK(a.contains(i));
 }
 
-TEST_CASE_TEMPLATE("merge all maps" * doctest::skip("TODO: fix merge bug in emhash6/7"), Map, AllIntMaps) {
+TEST_CASE_TEMPLATE("merge all maps", Map, AllIntMaps) {
     Map a, b;
     for (int i = 0; i < 10; ++i) a[i] = i;
     for (int i = 10; i < 20; ++i) b[i] = i;

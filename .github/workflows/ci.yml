@@ -695,6 +695,31 @@ jobs:
         shell: bash
 
   # ==========================================================================
+  # clang-tidy static analysis (quality gate)
+  # Uses compile_commands.json from CMake build + full .clang-tidy config
+  # Phase 1: errors block, warnings informational
+  # ==========================================================================
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang-tidy-18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy-18
+
+      - name: Configure (generate compile_commands.json)
+        run: cmake -B tests/build -S tests
+        shell: bash
+
+      - name: Run clang-tidy
+        run: bash scripts/run_clang_tidy.sh --ci
+        shell: bash
+
+  # ==========================================================================
   # Performance benchmark (g++ only) — regression gate
   # ==========================================================================
   benchmark:

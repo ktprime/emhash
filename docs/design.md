@@ -67,7 +67,14 @@ emhash provides 4 different implementations, each with different focus:
 
 ### HashSet
 
-emhash also provides `HashSet` implementations:
+emhash also provides `HashSet` implementations. Note that HashSet and HashMap use **independent version numbering** — `hash_set2/3/4` are not derived from `hash_table2/3/4` (which don't exist). The mapping is:
+
+| HashSet | Underlying Design | Description |
+|---------|-------------------|-------------|
+| `hash_set2.hpp` | Open addressing with inline bucket linkage | Basic hash set |
+| `hash_set3.hpp` | Open addressing with inline bucket linkage | Alternative probing strategy |
+| `hash_set4.hpp` | Open addressing with inline bucket linkage | Enhanced version |
+| `hash_set8.hpp` | Separate index + dense key array | Fast iteration, complex key support |
 
 ```cpp
 #include "emhash/hash_set2.hpp"   // namespace emhash2

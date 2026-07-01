@@ -70,11 +70,15 @@ int main() {
         std::cout << "Step " << i << ": cmd=" << cmd;
         
         switch (cmd) {
-            case 0: {  // insert_unique
+            case 0: {  // insert_unique (precondition: key must not already exist)
                 std::cout << " (insert_unique key=" << op.key << " val=" << op.value << ")";
-                auto em_r = em.insert_unique(op.key, op.value);
-                auto ref_r = ref.insert({op.key, op.value});
-                std::cout << " em.bucket=" << em_r << " ref.inserted=" << ref_r.second;
+                if (!em.contains(op.key)) {
+                    auto em_r = em.insert_unique(op.key, op.value);
+                    auto ref_r = ref.insert({op.key, op.value});
+                    std::cout << " em.bucket=" << em_r << " ref.inserted=" << ref_r.second;
+                } else {
+                    std::cout << " SKIPPED (key exists)";
+                }
                 break;
             }
             case 1: {  // erase by key

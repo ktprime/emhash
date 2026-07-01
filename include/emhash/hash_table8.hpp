@@ -797,10 +797,15 @@ public:
     /// @param key The key to insert.
     /// @param val The value to insert.
     /// @return The bucket index where the element was inserted.
-    /// @pre The key must NOT already exist in the map.
-    /// @note 20-40% faster than insert() when uniqueness is guaranteed.
-    /// @warning Inserting a duplicate key causes undefined behavior.
+    /// @pre The key must NOT already exist in the map. Use contains() to verify
+    ///      if unsure. Violating this precondition creates a duplicate entry and
+    ///      corrupts the map's invariants (size, find, erase all break).
+    /// @note 20-40% faster than insert() when uniqueness is guaranteed by the caller.
+    /// @warning Inserting a duplicate key causes undefined behavior. In debug builds
+    ///          (assertions enabled), this is checked and will abort. In release builds,
+    ///          the violation is silent and catastrophic.
     template <typename K, typename V> size_type insert_unique(K&& key, V&& val) {
+        assert(!contains(key) && "insert_unique: key already exists (undefined behavior)");
         check_expand_need();
         const auto key_hash = hash_key(key);
         auto bucket = find_unique_bucket(key_hash);

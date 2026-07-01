@@ -880,7 +880,7 @@ public:
         for (auto rit = rhs.begin(); rit != rhs.end();) {
             auto fit = find(rit->first);
             if (fit == end()) {
-                insert({rit->first, std::move(rit->second)});
+                (void)insert_unique(rit->first, std::move(rit->second));
                 rit = rhs.erase(rit);
             } else {
                 ++rit;
@@ -1080,12 +1080,22 @@ public:
     /// Erase an element typedef an iterator.
     /// Returns an iterator to the next element (or end()).
     [[nodiscard]] iterator erase(iterator it) {
+        // Ensure _bmask is initialized before we modify _bitmask.
+        // If _from == -1 (lazy init), ++it would trigger init() AFTER
+        // clear_bucket() — loading _bmask from the already-updated
+        // _bitmask where the current bucket is empty, causing the
+        // lowest _bmask bit to be the NEXT element, which ++it then
+        // incorrectly clears. Pre-init makes ++it clear only the
+        // current bucket's bit.
+#ifndef EMH_ITER_SAFE
+        if (it._from == static_cast<size_type>(-1))
+            it.init();
+#endif
         const auto bucket = erase_bucket(it._bucket);
         clear_bucket(bucket);
         if (bucket == it._bucket) {
             return ++it;
         } else {
-            // erase main bucket as next
             it.clear(bucket);
             return it;
         }

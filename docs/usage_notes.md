@@ -258,15 +258,17 @@ map.reserve(expected_max_size);
 
 ## 9. Known Issues
 
-### emilib2ss may hang under extreme hash collisions
+### Some emilib2 variants may hang under extreme hash collisions
 
-`emilib2ss` (a variant of `emilib2::HashMap`) does not limit probe-sequence length when **all keys hash to the same bucket**. Under this crafted hash-collision attack, insertion/lookup can degenerate into a full table scan and appear to hang.
+Certain `emilib2` variants in `thirdparty/emilib/` (e.g., `emilib2ss`) do not limit probe-sequence length when **all keys hash to the same bucket**. Under this crafted hash-collision attack, insertion/lookup can degenerate into a full table scan and appear to hang.
+
+> **Note**: The main `include/emilib/emihmap2.hpp` is `emilib2::HashMap` (namespace `emilib2`). Variants like `emilib2ss`, `emilib2o`, `emilib2s` are experimental forks located in `thirdparty/emilib/` and are not part of the standard include path.
 
 **Affected scenario**:
 - An adversary supplies keys that all produce the same hash value, or
 - A pathological custom hash function maps many distinct keys to the same bucket.
 
 **Mitigation**:
-- Prefer `emilib2o` or `emilib2s` for untrusted input.
+- Prefer `emilib2o` or `emilib2s` (from `thirdparty/emilib/`) for untrusted input.
 - For adversarial workloads, use `emhash7` or enable `EMH_SAFE_PSL` on the emilib variants that support it.
 - Do not expose `emilib2ss` to unvalidated user-provided keys in security-sensitive contexts.

@@ -857,14 +857,14 @@ public:
     }
 
     void merge(HashMap& rhs) {
-        if (_num_filled == 0) {
+        if (empty()) {
             *this = std::move(rhs);
             return;
         }
 
         for (auto rit = rhs.begin(); rit != rhs.end();) {
             auto fit = find(rit->first);
-            if (fit.bucket() == _num_buckets) {
+            if (fit == end()) {
                 (void)insert_unique(rit->first, std::move(rit->second));
                 rit = rhs.erase(rit);
             } else {

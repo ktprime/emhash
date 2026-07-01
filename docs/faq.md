@@ -11,6 +11,23 @@
 | Fast lookup/erase with integer keys | **emhash5** or **emhash6** |
 | Small maps that should avoid heap allocation | **emhash5** with `EMH_SMALL_SIZE` |
 
+### What is the difference between emhash and emilib?
+
+| Aspect | emhash (5/6/7/8) | emilib (1/2/3) |
+|--------|-------------------|-----------------|
+| Collision resolution | Linked-bucket chains | Swiss-table-style byte probing |
+| SIMD usage | Limited (CTZ/bitmask) | Pervasive (H2 tag filtering, iteration) |
+| Best for | General purpose, high load factor | SIMD-friendly keys, read-heavy |
+| Load factor | Default 0.80, up to 0.999 | emihmap1: fixed 0.833; emihmap2/3: 0.25–0.999 |
+
+### Which emilib version should I use?
+
+| Scenario | Recommended Version |
+|----------|-------------------|
+| Fixed workloads, stable load factor, simplest structure | **emihmap1** |
+| Variable workloads, high load factor (up to 0.999) | **emihmap2** |
+| Balanced default, minimal metadata overhead | **emihmap3** |
+
 ### Is emhash thread-safe?
 
 No. emhash is **not thread-safe** for concurrent writes. However, concurrent **read-only** access (e.g., `find()`, `contains()`, `count()`) from multiple threads is safe as long as no thread is modifying the map.
@@ -88,7 +105,7 @@ std::unordered_map<uint64_t, uint32_t>  // same node size as <uint64_t, uint64_t
 
 ### Which C++ standards are supported?
 
-emhash requires **C++17 or later**. All versions (emhash5, emhash6, emhash7, emhash8) support C++17 and C++20.
+emhash requires **C++17 or later**. All versions (emhash5, emhash6, emhash7, emhash8) support C++17 and C++23.
 
 ### Which compilers are supported?
 
