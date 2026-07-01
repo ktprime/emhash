@@ -648,14 +648,14 @@ jobs:
         shell: bash
 
       - name: Upload coverage HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-html
           path: coverage_html/
           retention-days: 30
 
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-info
           path: coverage.info
@@ -774,7 +774,7 @@ jobs:
 
       - name: Upload benchmark results (as baseline for next run)
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-baseline
           path: build/benchmark_results.json
