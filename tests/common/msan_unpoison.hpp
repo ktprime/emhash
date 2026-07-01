@@ -20,7 +20,7 @@ namespace emhash_test {
 // libc++ marks its std::ios_base::Init with init_priority(101); use 102
 // to guarantee MsanStreamUnpoisoner is constructed after the streams are
 // fully initialized, then unpoison their live state.
-struct __attribute__((init_priority(102))) MsanStreamUnpoisoner {
+struct MsanStreamUnpoisoner {
     MsanStreamUnpoisoner() {
         // Unpoison the stream objects themselves (format flags, sentry, etc.)
         __msan_unpoison(&std::cout, sizeof(std::cout));
@@ -39,9 +39,11 @@ struct __attribute__((init_priority(102))) MsanStreamUnpoisoner {
 };
 
 // Static instance: constructed during global init, before main().
-// `inline` (C++17) guarantees exactly one instance across TUs when
-// this header is force-included into multiple TUs linked together.
-inline MsanStreamUnpoisoner msan_stream_unpoisoner;
+// `init_priority(102)` ensures this runs after libc++'s std::ios_base::Init
+// (which uses init_priority(101)). `init_priority` applies to the variable,
+// not the struct definition. `inline` (C++17) guarantees exactly one instance
+// across TUs when this header is force-included into multiple TUs.
+__attribute__((init_priority(102))) inline MsanStreamUnpoisoner msan_stream_unpoisoner;
 
 } // namespace emhash_test
 
