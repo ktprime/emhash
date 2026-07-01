@@ -723,7 +723,7 @@ jobs:
 
       - name: Download baseline from last successful main run
         id: download-baseline
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v21
         continue-on-error: true
         with:
           name: benchmark-baseline
