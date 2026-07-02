@@ -152,9 +152,12 @@ public:
             }
         }
 
+        // next() is called after erase(), which already cleared the current
+        // bucket's bit via it.erase(). We only need to find the next filled
+        // bucket without clearing any bit (unlike operator++ which must clear
+        // the current bit before advancing).
         iterator& next() {
             goto_next_element();
-            _bmask &= _bmask - 1;
             return *this;
         }
 
