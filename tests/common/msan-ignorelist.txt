@@ -17,6 +17,7 @@ fun:*__put_character_sequence*
 # TU and may inline the uninstrumented stream reads.
 fun:*printVersion*
 fun:*test_run_start*
+fun:*test_run_end*
 fun:*logTestStart*
 fun:*logTestEnd*
 
@@ -27,3 +28,4 @@ fun:*_Hash_impl*
 fun:*basic_string*__is_long*
 fun:*basic_string*__get_pointer*
 fun:*basic_string*data*
+fun:*basic_string*size*

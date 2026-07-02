@@ -3,13 +3,14 @@
 # Suppress known false positive patterns in std::string and std::hash operations.
 
 # std::hash<std::string> reads SSO padding bytes
-interceptor_via:std::__1::__string_hash
-interceptor_via:std::__cxx11::_Hash_impl
+interceptor_via:std::__1::__string_hash*
+interceptor_via:std::__cxx11::_Hash_impl*
 
 # std::string internal operations
-interceptor_via:std::__1::basic_string::__is_long
-interceptor_via:std::__1::basic_string::__get_pointer
-interceptor_via:std::__1::basic_string::data
+interceptor_via:std::__1::basic_string::__is_long*
+interceptor_via:std::__1::basic_string::__get_pointer*
+interceptor_via:std::__1::basic_string::data*
+interceptor_via:std::__1::basic_string::size*
 
 # iostream false positives are handled via the compile-time MSan ignorelist
 # (tests/common/msan-ignorelist.txt) because the uninstrumented libc++ locale
