@@ -584,6 +584,7 @@ jobs:
           g++ $COV unit/test_reserve_clear.cpp -o test_reserve_clear_cov
           g++ $COV unit/test_allocator.cpp -o test_allocator_cov
           g++ $COV unit/test_hashset.cpp -o test_hashset_cov
+          g++ $COV unit/test_api_coverage.cpp -o test_api_coverage_cov
           g++ $COV memory/test_string_key_leak.cpp -o test_string_key_leak_cov
           g++ $COV memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
           g++ $COV memory/test_sanitizer.cpp -o test_sanitizer_cov
@@ -605,6 +606,7 @@ jobs:
           ./test_reserve_clear_cov
           ./test_allocator_cov
           ./test_hashset_cov
+          ./test_api_coverage_cov
           ./test_string_key_leak_cov
           ./test_lifecycle_audit_cov
           ./test_sanitizer_cov
