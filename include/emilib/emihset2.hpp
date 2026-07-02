@@ -60,7 +60,7 @@
 
 namespace emilib2 {
 
-#define KEYHASH_MASK(key_hash) ((uint8_t)(key_hash >> 24) << 1)
+#define KEYHASH_MASK(key_hash) (static_cast<uint8_t>(key_hash >> 24) << 1)
 
 #ifndef AVX2_EHASH
 const static auto set_simd_empty = _mm_set1_epi8(1);
@@ -101,8 +101,8 @@ inline static uint32_t set_CTZ(uint64_t n) {
 #ifdef _WIN64
     _BitScanForward64(&index, n);
 #else
-    uint32_t lo = (uint32_t)n;
-    uint32_t hi = (uint32_t)(n >> 32);
+    uint32_t lo = static_cast<uint32_t>(n);
+    uint32_t hi = static_cast<uint32_t>(n >> 32);
     if (lo != 0) {
         _BitScanForward(&index, lo);
     } else {
@@ -292,7 +292,7 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy((char*)_keys, (const char*)other._keys, (_num_buckets + 1) * sizeof(_keys[0]));
+            memcpy(reinterpret_cast<char*>(_keys), reinterpret_cast<const char*>(other._keys), (_num_buckets + 1) * sizeof(_keys[0]));
         } else {
             for (auto it = other.cbegin(); it != other.cend(); ++it)
                 new (_keys + it.bucket()) KeyT(*it);
@@ -605,8 +605,8 @@ public:
         auto status_size = (set_simd_bytes + num_buckets) * sizeof(uint8_t);
         status_size += (8 - status_size % 8) % 8;
 
-        auto new_states = (uint8_t*)malloc(status_size + (num_buckets + 1) * sizeof(KeyT));
-        auto new_keys = (KeyT*)(new_states + status_size);
+        auto new_states = static_cast<uint8_t*>(malloc(status_size + (num_buckets + 1) * sizeof(KeyT)));
+        auto new_keys = reinterpret_cast<KeyT*>(new_states + status_size);
 
         auto old_num_filled = _num_filled;
         auto old_states = _states;
@@ -630,7 +630,7 @@ public:
         // Only the _states ESENTINEL marker is needed; key of the sentinel
         // is never accessed, so no placement-new is required for non-trivial types.
         if (is_trivially_copyable()) {
-            memset((char*)(new_keys + num_buckets), 0, sizeof(new_keys[0]));
+            memset(reinterpret_cast<char*>(new_keys + num_buckets), 0, sizeof(new_keys[0]));
         }
 
         _max_probe_length = -1;
@@ -686,7 +686,7 @@ private:
         int i = _max_probe_length;
 
         for (;;) {
-            const auto vec = LOADU_EPI8((decltype(&set_simd_empty))((char*)_states + next_bucket));
+            const auto vec = LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
@@ -721,14 +721,14 @@ private:
     // In the latter case, the bucket is expected to be filled.
     template <typename KeyLike> size_t find_or_allocate(const KeyLike& key, uint64_t key_hash) {
         size_t hole = static_cast<size_t>(-1);
-        const char keymask = (char)KEYHASH_MASK(key_hash);
+        const char keymask = static_cast<char>(KEYHASH_MASK(key_hash));
         const auto filled = SET1_EPI8(keymask);
         const auto bucket = static_cast<size_t>(key_hash & _mask);
         const auto round = bucket + _max_probe_length;
         auto next_bucket = bucket, i = bucket;
 
         for (;;) {
-            const auto vec = LOADU_EPI8((decltype(&set_simd_empty))((char*)_states + next_bucket));
+            const auto vec = LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             // 1. find filled
@@ -780,7 +780,7 @@ private:
 
         while (true) {
 #if EMH_X86
-            auto maske = *(uint64_t*)(_states + next_bucket);
+            auto maske = *reinterpret_cast<uint64_t*>(_states + next_bucket);
 #else
             uint64_t maske;
             memcpy(&maske, _states + next_bucket, sizeof(maske));
@@ -811,7 +811,7 @@ private:
         constexpr uint64_t EFILLED_FIND = 0xfefefefefefefefeull;
         while (next_bucket < _num_buckets) {
 #if EMH_X86
-            const auto maske = ~(*(uint64_t*)(_states + next_bucket) | EFILLED_FIND);
+            const auto maske = ~(*reinterpret_cast<uint64_t*>(_states + next_bucket) | EFILLED_FIND);
 #else
             uint64_t maske;
             memcpy(&maske, _states + next_bucket, sizeof(maske));

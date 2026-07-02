@@ -137,7 +137,7 @@ inline static uint32_t CTZ(size_t n) {
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
 
-    return (uint32_t)index;
+    return static_cast<uint32_t>(index);
 }
 #endif
 
@@ -172,14 +172,14 @@ public:
         }
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash) & _mask;
-        return (int8_t)(size_t)(key_hash % MAP_BITS) + EFILLED;
+        return static_cast<int8_t>(static_cast<size_t>(key_hash % MAP_BITS)) + EFILLED;
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash) & _mask;
-        return (int8_t)((size_t)key_hash % MAP_BITS) + EFILLED;
+        return static_cast<int8_t>(static_cast<size_t>(key_hash) % MAP_BITS) + EFILLED;
     }
 
     class const_iterator;
@@ -208,7 +208,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= (size_t)~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1);
+                _bmask &= static_cast<size_t>(~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1));
             } else {
                 _bmask = 0;
             }
@@ -286,7 +286,7 @@ public:
             const auto bucket_count = _map->bucket_count();
             if (_bucket < bucket_count) {
                 _bmask = _map->filled_mask(_from);
-                _bmask &= (size_t)~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1);
+                _bmask &= static_cast<size_t>(~((1ul << (_bucket % EMH_ITERATOR_BITS)) - 1));
             } else {
                 _bmask = 0;
             }
@@ -340,7 +340,7 @@ public:
     // ------------------------------------------------------------------------
 
     explicit HashMap(size_t n = 4, float lf = EMH_DEFAULT_LOAD_FACTOR) {
-        _mlf = (uint32_t)((1 << 28) / lf);
+        _mlf = static_cast<uint32_t>((1 << 28) / lf);
         rehash(n);
     }
 
@@ -357,13 +357,13 @@ public:
     }
 
     HashMap(std::initializer_list<value_type> il) {
-        rehash((size_t)il.size());
+        rehash(static_cast<size_t>(il.size()));
         for (auto it = il.begin(); it != il.end(); ++it)
             insert(*it);
     }
 
     template <class InputIt> HashMap(InputIt first, InputIt last, size_t bucket_count = 4) {
-        rehash((size_t)std::distance(first, last) + bucket_count);
+        rehash(static_cast<size_t>(std::distance(first, last)) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
     }
@@ -402,7 +402,7 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy((char*)_pairs, (const char*)other._pairs, (_num_buckets + 1) * sizeof(PairT));
+            memcpy(reinterpret_cast<char*>(_pairs), reinterpret_cast<const char*>(other._pairs), (_num_buckets + 1) * sizeof(PairT));
         } else {
             for (auto it = other.cbegin(); it.bucket() < _num_buckets; ++it)
                 new (_pairs + it.bucket()) PairT(*it);
@@ -455,7 +455,7 @@ public:
     inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }
     inline constexpr void max_load_factor(float mlf) noexcept {
         if (mlf <= max_load_factor() && mlf > min_load_factor())
-            _mlf = (uint32_t)((1 << 28) / mlf);
+                _mlf = static_cast<uint32_t>((1 << 28) / mlf);
     }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
@@ -607,13 +607,13 @@ public:
     }
 
     template <typename K, typename V> size_t insert_unique(K&& key, V&& val) noexcept {
-        const size_t required_buckets = static_cast<size_t>((uint64_t)_num_filled * _mlf >> 28);
+        const auto required_buckets = static_cast<size_t>(static_cast<uint64_t>(_num_filled) * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_heap_block((char*)&_pairs[main_bucket]);
+        prefetch_heap_block(reinterpret_cast<char*>(&_pairs[main_bucket]));
         const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
 
         set_states(bucket, key_h2);
@@ -803,7 +803,7 @@ public:
     void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
 
     bool reserve(size_t num_elems) {
-        const size_t required_buckets = static_cast<size_t>((uint64_t)num_elems * _mlf >> 28);
+        const size_t required_buckets = static_cast<size_t>(static_cast<uint64_t>(num_elems) * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
 
@@ -820,9 +820,9 @@ public:
         size_t total = 0, sums = 0, sumo = 0;
         for (size_t i = 0; i < 256; i++) {
             if (off[i] != EMPTY_OFFSET) {
-                total += (size_t)off[i];
-                sums += (size_t)off[i] * (i + 1);
-                sumo += (size_t)off[i] * (i + 2);
+                total += static_cast<size_t>(off[i]);
+                sums += static_cast<size_t>(off[i]) * (i + 1);
+                sumo += static_cast<size_t>(off[i]) * (i + 2);
                 printf("\n%3d %8d %.3lf %.3lf", i, off[i], 1.0 * off[i] / off_groups, 100.0 * total / off_groups);
             }
         }
@@ -880,7 +880,7 @@ public:
             // Sentinel key/value are never accessed (only _states ESENTINEL
             // controls iteration), so no placement-new needed for non-trivial types.
             if (is_trivially_copyable())
-                memset((char*)(_pairs + num_buckets), 0, sizeof(PairT));
+                memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT));
         }
 
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
@@ -908,9 +908,9 @@ private:
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(_MSC_VER)
-        _mm_prefetch((const char*)ctrl);
+        _mm_prefetch(reinterpret_cast<const char*>(ctrl));
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -929,7 +929,7 @@ private:
         assert(off / 128 < 128);
         _offset[main_bucket / OFFSET_STEP] = off <= 128 ? off : 128 + off / 128;
 #else
-        _offset[main_bucket / OFFSET_STEP] = (uint8_t)off;
+        _offset[main_bucket / OFFSET_STEP] = static_cast<uint8_t>(off);
 #endif
     }
 
@@ -963,16 +963,16 @@ private:
         const auto key_h2 = hash_key2(main_bucket, key);
 
         // const auto filled = SET1_EPI8(key_h2);
-        const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
+        const auto filled = SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
 
         auto next_bucket = main_bucket;
         size_t offset = 0, max_offset = 0;
 
         if (1) {
             const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
-            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
             if (maskf) {
-                prefetch_heap_block((char*)&_pairs[next_bucket]);
+                prefetch_heap_block(reinterpret_cast<char*>(&_pairs[next_bucket]));
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
@@ -980,7 +980,7 @@ private:
                 } while (maskf &= maskf - 1);
             }
 
-            const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
             if (maske)
                 return _num_buckets;
             else if (0 == (max_offset = get_offset(main_bucket)))
@@ -990,9 +990,9 @@ private:
         do {
             next_bucket = get_next_bucket(next_bucket, ++offset);
             const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
-            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
             if (maskf) {
-                prefetch_heap_block((char*)&_pairs[next_bucket]);
+                prefetch_heap_block(reinterpret_cast<char*>(&_pairs[next_bucket]));
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     if (_eq(_pairs[fbucket].first, key))
@@ -1000,7 +1000,7 @@ private:
                 } while (maskf &= maskf - 1);
             }
 #if 0
-            const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+            const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
             if (maske != 0)
                 break;
 #endif
@@ -1012,21 +1012,21 @@ private:
     // Find the main_bucket with this key, or return a good empty main_bucket to place the key in.
     // In the later case, the main_bucket is expected to be filled.
     template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
-        const size_t required_buckets = static_cast<size_t>((uint64_t)_num_filled * _mlf >> 28);
+        const auto required_buckets = static_cast<size_t>(static_cast<uint64_t>(_num_filled) * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_heap_block((char*)&_pairs[main_bucket]);
-        const auto filled = SET1_EPI32(0x01010101u * (uint8_t)key_h2);
+        prefetch_heap_block(reinterpret_cast<char*>(&_pairs[main_bucket]));
+        const auto filled = SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
         auto next_bucket = main_bucket, offset = 0u;
         constexpr size_t chole = static_cast<size_t>(-1);
         size_t hole = chole;
 
         do {
             const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
-            auto maskf = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
+            auto maskf = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
 
             // 1. find filled
             while (maskf) {
@@ -1040,13 +1040,13 @@ private:
 
             if (hole == chole) {
                 // 2. find empty
-                const auto maske = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty));
+                const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
                 if (maske) {
                     const auto ebucket = next_bucket + CTZ(maske);
                     set_states(ebucket, key_h2);
                     return ebucket;
                 }
-                const auto maskd = (size_t)MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete));
+                const auto maskd = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_delete)));
                 if (maskd)
                     hole = next_bucket + CTZ(maskd);
             }
@@ -1071,17 +1071,17 @@ private:
         return _mm256_movemask_epi8(_mm256_cmpgt_epi8(simd2_filled, vec));
 #else
         const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
-        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(simd_sentinel, vec));
+        return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_sentinel, vec)));
 #endif
     }
 
     inline size_t filled_mask(size_t next_bucket) const noexcept {
 #if EMH_ITERATOR_BITS == 32
         const auto vec = _mm256_loadu_si256((__m256i const*)&_states[next_bucket]);
-        return (size_t)_mm256_movemask_epi8(_mm256_cmpgt_epi8(vec, simd2_delete));
+        return static_cast<size_t>(_mm256_movemask_epi8(_mm256_cmpgt_epi8(vec, simd2_delete)));
 #else
         const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
-        return (size_t)MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete));
+        return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete)));
 #endif
     }
 
@@ -1090,7 +1090,7 @@ private:
             const auto maske = empty_delete(next_bucket);
             if (maske) {
                 const auto ebucket = CTZ(maske) + next_bucket;
-                prefetch_heap_block((char*)&_pairs[ebucket]);
+                prefetch_heap_block(reinterpret_cast<char*>(&_pairs[ebucket]));
                 if (offset > get_offset(main_bucket))
                     set_offset(main_bucket, offset);
                 return ebucket;
@@ -1120,7 +1120,7 @@ private:
     size_t _num_buckets = 0;
     size_t _mask = 0;
     size_t _num_filled = 0;
-    uint32_t _mlf = (uint32_t)((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
+    uint32_t _mlf = static_cast<uint32_t>((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
 };
 
 } // namespace emilib2

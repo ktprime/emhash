@@ -366,7 +366,7 @@ public:
 
         if (is_trivially_copyable()) {
             const auto pairs_size = (1 + bucket_to_slot(_num_buckets)) * sizeof(PairT);
-            memcpy((char*)_pairs, (const char*)other._pairs, pairs_size);
+            memcpy(reinterpret_cast<char*>(_pairs), reinterpret_cast<const char*>(other._pairs), pairs_size);
         } else {
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new (_pairs + bucket_to_slot(it.bucket())) PairT(*it);
@@ -816,7 +816,7 @@ public:
         // Only the _states ESENTINEL marker is needed; key/value of the sentinel
         // are never accessed, so no placement-new is required for non-trivial types.
         if (is_trivially_copyable())
-            memset((char*)(_pairs + pairs_size / sizeof(PairT) - 1), 0, sizeof(_pairs[0]));
+            memset(reinterpret_cast<char*>(_pairs + pairs_size / sizeof(PairT) - 1), 0, sizeof(_pairs[0]));
 
         clear_meta();
 
@@ -849,7 +849,7 @@ private:
     inline static void prefetch_read(char* ctrl) {
 #ifndef EMH_NO_READ_PREFETCH
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -860,7 +860,7 @@ private:
     inline static void prefetch_write(char* ctrl) {
 #ifndef EMH_NO_WRITE_PREFETCH
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl), 1, 1);
 #endif
@@ -871,7 +871,7 @@ private:
     inline static void prefetch_heap_block(char* ctrl) {
 #ifndef EMH_NO_PREFETCH
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-        _mm_prefetch((const char*)ctrl, _MM_HINT_T0);
+        _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
@@ -884,7 +884,7 @@ private:
     }
 
     inline size_t group_probe(size_t gbucket) const noexcept {
-        const auto offset = (uint8_t)_states[gbucket + group_index];
+        const auto offset = static_cast<uint8_t>(_states[gbucket + group_index]);
 #if EMH_SAFE_PSL
         if (EMH_UNLIKELY(offset > 128))
             return static_cast<size_t>(offset - 127) * 128;
@@ -929,7 +929,7 @@ private:
             const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
             auto maskf = static_cast<uint32_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled))) & group_bmask;
             if (maskf) {
-                prefetch_read((char*)&_pairs[bucket_to_slot(next_bucket)]);
+                prefetch_read(reinterpret_cast<char*>(&_pairs[bucket_to_slot(next_bucket)]));
                 do {
                     const auto fbucket = next_bucket + CTZ(maskf);
                     const auto slot = bucket_to_slot(fbucket);
@@ -958,7 +958,7 @@ private:
         size_t hole = chole, offset = 0u;
 
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_write((char*)&_pairs[bucket_to_slot(main_bucket)]);
+        prefetch_write(reinterpret_cast<char*>(&_pairs[bucket_to_slot(main_bucket)]));
         const auto filled = SET1_EPI8(key_h2);
         auto next_bucket = main_bucket;
 
@@ -1019,7 +1019,7 @@ private:
             const auto maske = empty_delete(next_bucket) & group_bmask;
             if (maske != 0) {
                 const auto probe = CTZ(maske) + next_bucket;
-                prefetch_write((char*)&_pairs[probe]);
+                prefetch_write(reinterpret_cast<char*>(&_pairs[probe]));
                 set_group_probe(gbucket, offset); // bugs for unique
                 return probe;
             }
