@@ -631,3 +631,43 @@ TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {
     CHECK(dst.size() == 10);
     for (int i = 190; i < 200; ++i) CHECK(dst.at(make_kv<K>(i)) == i);
 }
+
+// ============================================================================
+// 19. erase_bucket main bucket promotion with trivially copyable types
+//     When is_trivially_copyable<KeyT,ValueT>() is true, erase_bucket uses
+//     operator= instead of swap to move data from next_bucket to main_bucket.
+//     This test forces hash collisions so deletion triggers that path.
+// ============================================================================
+struct CollisionHash {
+    size_t operator()(int k) const noexcept { return static_cast<size_t>(k) / 4; }
+};
+
+TEST_CASE_TEMPLATE("erase main bucket promotion trivially copyable",
+    Map, map5<int, int, CollisionHash>, map6<int, int, CollisionHash>, map7<int, int, CollisionHash>) {
+    // keys 0,1,2,3 all hash to bucket 0; key 0 occupies main bucket.
+    Map m;
+    for (int i = 0; i < 4; ++i) m[i] = i * 100;
+    CHECK(m.size() == 4);
+
+    // Erase main bucket key (key 0) — triggers is_trivially_copyable() == true
+    // path: EMH_PKV(_pairs, bucket) = EMH_PKV(_pairs, next_bucket)
+    m.erase(0);
+    CHECK(m.size() == 3);
+    CHECK_FALSE(m.contains(0));
+    CHECK(m.at(1) == 100);
+    CHECK(m.at(2) == 200);
+    CHECK(m.at(3) == 300);
+
+    // Erase another main-bucket key in a different collision chain
+    // keys 4,5,6,7 all hash to bucket 1
+    for (int i = 4; i < 8; ++i) m[i] = i * 100;
+    m.erase(4);
+    CHECK_FALSE(m.contains(4));
+    CHECK(m.at(5) == 500);
+
+    // Erase all remaining to stress the promotion path repeatedly
+    for (int i = 1; i < 8; ++i) {
+        if (i != 4) m.erase(i);
+    }
+    CHECK(m.empty());
+}
