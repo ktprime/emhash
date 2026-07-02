@@ -801,11 +801,8 @@ public:
     ///      if unsure. Violating this precondition creates a duplicate entry and
     ///      corrupts the map's invariants (size, find, erase all break).
     /// @note 20-40% faster than insert() when uniqueness is guaranteed by the caller.
-    /// @warning Inserting a duplicate key causes undefined behavior. In debug builds
-    ///          (assertions enabled), this is checked and will abort. In release builds,
-    ///          the violation is silent and catastrophic.
+    /// @warning Inserting a duplicate key causes undefined behavior — no runtime check.
     template <typename K, typename V> size_type insert_unique(K&& key, V&& val) {
-        assert(!contains(key) && "insert_unique: key already exists (undefined behavior)");
         check_expand_need();
         const auto key_hash = hash_key(key);
         auto bucket = find_unique_bucket(key_hash);

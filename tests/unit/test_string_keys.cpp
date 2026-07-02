@@ -143,6 +143,22 @@ TEST_CASE_TEMPLATE("string key merge", Map, AllStringMaps) {
         CHECK(d.empty());
         for (int i = 0; i < 20; ++i) CHECK(c.contains(std::to_string(i)));
     }
+
+    SUBCASE("large scale 500 keys") {
+        Map a, b;
+        const int N = 500;
+        for (int i = 0; i < N; ++i) a[std::to_string(i)] = i;
+        for (int i = N / 2; i < N + N / 2; ++i) b[std::to_string(i)] = i * 3;
+
+        a.merge(b);
+        CHECK(a.size() == N + N / 2);
+        CHECK(b.size() == N / 2);
+        for (int i = 0; i < N + N / 2; ++i) CHECK(a.contains(std::to_string(i)));
+        for (int i = N / 2; i < N; ++i) {
+            CHECK(b.contains(std::to_string(i)));
+            CHECK(a.at(std::to_string(i)) == i);
+        }
+    }
 }
 
 TEST_CASE_TEMPLATE("long string keys", Map, AllStringMaps) {
