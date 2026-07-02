@@ -615,6 +615,25 @@ TEST_CASE_TEMPLATE("copy assign low load factor to empty", Map, EmhashIntMaps) {
     for (int i = 0; i < 5; ++i) CHECK(dst.at(make_kv<K>(i)) == i);
 }
 
+TEST_CASE_TEMPLATE("copy construct low load factor with elements", Map, EmhashIntMaps) {
+    // Coverage: copy constructor low load factor branch with non-empty map.
+    // When rhs.load_factor() <= EMH_MIN_LOAD_FACTOR (0.25), copy ctor calls
+    // init() then inserts elements via insert_unique loop.
+    // Need: load_factor <= 0.25 AND elements > 0 to trigger loop body.
+    using K = typename Map::key_type;
+    Map src;
+    src.reserve(200);  // large bucket count
+    for (int i = 0; i < 3; ++i) src[make_kv<K>(i)] = i * 100;
+    CHECK(src.load_factor() < 0.25f);  // 3/200 = 0.015 <= 0.25
+    CHECK(src.size() == 3);
+
+    Map dst(src);  // copy constructor - triggers low-load branch with 3 elements
+
+    CHECK(dst.size() == 3);
+    for (int i = 0; i < 3; ++i) CHECK(dst.at(make_kv<K>(i)) == i * 100);
+    CHECK(dst.load_factor() > src.load_factor());  // dst should have fewer buckets
+}
+
 TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {
     using K = typename Map::key_type;
     // Another way to get low load factor: insert many, erase most.
