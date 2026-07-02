@@ -46,7 +46,7 @@ TEST_CASE_TEMPLATE("insert_or_assign", Map, AllIntMaps) {
     CHECK(it2->second == 100);
 }
 
-TEST_CASE_TEMPLATE("erase_if predicate" * doctest::skip("TODO: fix erase_if bug in emilib"), Map, AllIntMaps) {
+TEST_CASE_TEMPLATE("erase_if predicate", Map, AllIntMaps) {
     Map m;
     for (int i = 0; i < 100; ++i) m[i] = i;
     auto erased = m.erase_if([](const auto& kv) { return kv.second % 2 == 0; });

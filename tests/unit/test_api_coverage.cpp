@@ -477,3 +477,74 @@ TEST_CASE_TEMPLATE("clear and reuse after erase", Map, AllIntMaps) {
     CHECK(m.size() == 500);
     for (int i = 1000; i < 1500; ++i) CHECK(m.at(make_kv<K>(i)) == make_kv<V>(i));
 }
+
+// ============================================================================
+// 17. erase_if coverage (was previously skipped due to emhash6/7 erase bug,
+//     now fixed. emilib uses erase(it++) which is safe — _erase doesn't move
+//     data between buckets.)
+// ============================================================================
+TEST_CASE_TEMPLATE("erase_if removes even values", Map, AllIntMaps) {
+    using K = typename Map::key_type;
+    Map m;
+    const int N = 200;
+    for (int i = 0; i < N; ++i) m[make_kv<K>(i)] = i;
+
+    auto erased = m.erase_if([](const auto& kv) { return kv.second % 2 == 0; });
+    CHECK(erased == N / 2);
+    CHECK(m.size() == N / 2);
+    for (int i = 1; i < N; i += 2) CHECK(m.contains(make_kv<K>(i)));
+    for (int i = 0; i < N; i += 2) CHECK_FALSE(m.contains(make_kv<K>(i)));
+}
+
+TEST_CASE_TEMPLATE("erase_if removes none", Map, AllIntMaps) {
+    using K = typename Map::key_type;
+    Map m;
+    for (int i = 0; i < 50; ++i) m[make_kv<K>(i)] = i;
+    auto erased = m.erase_if([](const auto&) { return false; });
+    CHECK(erased == 0);
+    CHECK(m.size() == 50);
+}
+
+TEST_CASE_TEMPLATE("erase_if removes all", Map, AllIntMaps) {
+    using K = typename Map::key_type;
+    Map m;
+    for (int i = 0; i < 50; ++i) m[make_kv<K>(i)] = i;
+    auto erased = m.erase_if([](const auto&) { return true; });
+    CHECK(erased == 50);
+    CHECK(m.empty());
+}
+
+TEST_CASE_TEMPLATE("erase_if large scale stress", Map, AllIntMaps) {
+    using K = typename Map::key_type;
+    Map m;
+    const int N = 1000;
+    for (int i = 0; i < N; ++i) m[make_kv<K>(i)] = i;
+
+    // Erase multiples of 3
+    auto erased = m.erase_if([](const auto& kv) { return kv.second % 3 == 0; });
+    CHECK(erased == (N + 2) / 3);
+    CHECK(m.size() == N - (N + 2) / 3);
+    for (int i = 0; i < N; ++i) {
+        if (i % 3 == 0) CHECK_FALSE(m.contains(make_kv<K>(i)));
+        else CHECK(m.contains(make_kv<K>(i)));
+    }
+
+    // Erase remaining multiples of 5
+    erased = m.erase_if([](const auto& kv) { return kv.second % 5 == 0; });
+    CHECK(m.size() == N - (N + 2) / 3 - erased);
+    // Re-insert some
+    for (int i = 0; i < N; i += 3) m[make_kv<K>(i)] = i;
+    CHECK(m.size() == N - erased);
+}
+
+TEST_CASE_TEMPLATE("erase_if return value and idempotency", Map, AllIntMaps) {
+    using K = typename Map::key_type;
+    Map m;
+    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
+
+    auto e1 = m.erase_if([](const auto& kv) { return kv.second < 50; });
+    CHECK(e1 == 50);
+    auto e2 = m.erase_if([](const auto& kv) { return kv.second < 50; });
+    CHECK(e2 == 0);
+    CHECK(m.size() == 50);
+}

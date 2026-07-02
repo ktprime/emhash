@@ -196,7 +196,7 @@ TEST_CASE_TEMPLATE("set merge", Set, AllIntSets) {
     for (int i = 0; i < 30; ++i) CHECK(a.contains(i));
 }
 
-TEST_CASE_TEMPLATE("set erase_if" * doctest::skip("TODO: fix erase_if bug in emilib"), Set, AllIntSets) {
+TEST_CASE_TEMPLATE("set erase_if", Set, AllIntSets) {
     Set s;
     for (int i = 0; i < 100; ++i) s.insert(i);
 
