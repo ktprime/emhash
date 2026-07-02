@@ -196,6 +196,32 @@ TEST_CASE_TEMPLATE("set merge", Set, AllIntSets) {
     for (int i = 0; i < 30; ++i) CHECK(a.contains(i));
 }
 
+TEST_CASE_TEMPLATE("set merge empty dst", Set, AllIntSets) {
+    // Coverage: merge on empty set triggers *this = std::move(rhs)
+    Set a;  // empty
+    Set b;
+    for (int i = 0; i < 20; ++i) b.insert(i);
+    CHECK(a.empty());
+    CHECK(b.size() == 20);
+
+    a.merge(b);
+    CHECK(a.size() == 20);
+    CHECK(b.empty());  // b was moved
+    for (int i = 0; i < 20; ++i) CHECK(a.contains(i));
+}
+
+TEST_CASE_TEMPLATE("set copy from empty", Set, AllIntSets) {
+    // Coverage: copy/clone from empty source triggers clear() or equivalent
+    Set a;
+    for (int i = 0; i < 10; ++i) a.insert(i);
+    CHECK(a.size() == 10);
+
+    Set b;  // empty
+    a = b;  // copy from empty
+    CHECK(a.empty());
+    CHECK(b.empty());
+}
+
 TEST_CASE_TEMPLATE("set erase_if", Set, AllIntSets) {
     Set s;
     for (int i = 0; i < 100; ++i) s.insert(i);
