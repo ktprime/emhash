@@ -396,7 +396,8 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy(reinterpret_cast<char*>(_pairs), reinterpret_cast<const char*>(other._pairs), (_num_buckets + 1) * sizeof(_pairs[0]));
+            memcpy(reinterpret_cast<char*>(_pairs), reinterpret_cast<const char*>(other._pairs),
+                   (_num_buckets + 1) * sizeof(_pairs[0]));
         } else {
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
                 new (_pairs + it.bucket()) PairT(*it);

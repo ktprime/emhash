@@ -292,7 +292,8 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy(reinterpret_cast<char*>(_keys), reinterpret_cast<const char*>(other._keys), (_num_buckets + 1) * sizeof(_keys[0]));
+            memcpy(reinterpret_cast<char*>(_keys), reinterpret_cast<const char*>(other._keys),
+                   (_num_buckets + 1) * sizeof(_keys[0]));
         } else {
             for (auto it = other.cbegin(); it != other.cend(); ++it)
                 new (_keys + it.bucket()) KeyT(*it);
@@ -686,7 +687,8 @@ private:
         int i = _max_probe_length;
 
         for (;;) {
-            const auto vec = LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
+            const auto vec =
+                LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
@@ -728,7 +730,8 @@ private:
         auto next_bucket = bucket, i = bucket;
 
         for (;;) {
-            const auto vec = LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
+            const auto vec =
+                LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             // 1. find filled

@@ -402,7 +402,8 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy(reinterpret_cast<char*>(_pairs), reinterpret_cast<const char*>(other._pairs), (_num_buckets + 1) * sizeof(PairT));
+            memcpy(reinterpret_cast<char*>(_pairs), reinterpret_cast<const char*>(other._pairs),
+                   (_num_buckets + 1) * sizeof(PairT));
         } else {
             for (auto it = other.cbegin(); it.bucket() < _num_buckets; ++it)
                 new (_pairs + it.bucket()) PairT(*it);
@@ -455,7 +456,7 @@ public:
     inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }
     inline constexpr void max_load_factor(float mlf) noexcept {
         if (mlf <= max_load_factor() && mlf > min_load_factor())
-                _mlf = static_cast<uint32_t>((1 << 28) / mlf);
+            _mlf = static_cast<uint32_t>((1 << 28) / mlf);
     }
 
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
