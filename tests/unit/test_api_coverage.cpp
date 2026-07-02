@@ -642,9 +642,11 @@ struct CollisionHash {
     size_t operator()(int k) const noexcept { return static_cast<size_t>(k) / 4; }
 };
 
-TEST_CASE_TEMPLATE("erase main bucket promotion trivially copyable",
+TEST_CASE_TEMPLATE("erase_key main bucket promotion trivially copyable",
     Map, map5<int, int, CollisionHash>, map6<int, int, CollisionHash>, map7<int, int, CollisionHash>) {
     // keys 0,1,2,3 all hash to bucket 0; key 0 occupies main bucket.
+    // erase(key) calls erase_key() which has its own is_trivially_copyable()
+    // branch (operator= for trivially copyable, swap otherwise).
     Map m;
     for (int i = 0; i < 4; ++i) m[i] = i * 100;
     CHECK(m.size() == 4);
@@ -668,6 +670,43 @@ TEST_CASE_TEMPLATE("erase main bucket promotion trivially copyable",
     // Erase all remaining to stress the promotion path repeatedly
     for (int i = 1; i < 8; ++i) {
         if (i != 4) m.erase(i);
+    }
+    CHECK(m.empty());
+}
+
+TEST_CASE_TEMPLATE("erase_bucket via iterator main bucket promotion trivially copyable",
+    Map, map5<int, int, CollisionHash>, map6<int, int, CollisionHash>, map7<int, int, CollisionHash>) {
+    // erase(iterator) calls erase_bucket() which has a SEPARATE
+    // is_trivially_copyable() branch from erase_key().
+    // This test forces hash collisions and erases via iterator to cover
+    // the operator= path in erase_bucket (hash_table7 line 1416).
+    Map m;
+    for (int i = 0; i < 4; ++i) m[i] = i * 100;
+    CHECK(m.size() == 4);
+
+    // Find key 0 (main bucket) and erase via iterator
+    auto it = m.find(0);
+    CHECK(it != m.end());
+    m.erase(it);
+    CHECK(m.size() == 3);
+    CHECK_FALSE(m.contains(0));
+    CHECK(m.at(1) == 100);
+    CHECK(m.at(2) == 200);
+    CHECK(m.at(3) == 300);
+
+    // Add more collisions (keys 4,5,6,7 hash to bucket 1) and erase via iterator
+    for (int i = 4; i < 8; ++i) m[i] = i * 100;
+    it = m.find(4);
+    CHECK(it != m.end());
+    m.erase(it);
+    CHECK_FALSE(m.contains(4));
+    CHECK(m.at(5) == 500);
+
+    // Erase remaining main-bucket keys via iterator
+    for (int i = 1; i < 8; ++i) {
+        if (i == 4) continue;
+        auto it2 = m.find(i);
+        if (it2 != m.end()) m.erase(it2);
     }
     CHECK(m.empty());
 }
