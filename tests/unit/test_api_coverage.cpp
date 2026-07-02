@@ -710,3 +710,21 @@ TEST_CASE_TEMPLATE("erase_bucket via iterator main bucket promotion trivially co
     }
     CHECK(m.empty());
 }
+
+// ============================================================================
+// 20. iterator::init() on end() position (bucket >= bucket_count)
+//     Covers the _bmask = 0 branch in emilib/emhash iterator init()
+// ============================================================================
+TEST_CASE_TEMPLATE("iterator init on end covers _bmask=0 branch", Map,
+    imap2<int, int>, imap3<int, int>, map6<int, int>, map7<int, int>) {
+    Map m;
+    for (int i = 0; i < 10; ++i) m[i] = i * 10;
+    CHECK(m.size() == 10);
+
+    // end() iterator has _bucket = bucket_count, so init() should set _bmask = 0
+    auto it = m.end();
+    it.init();  // explicitly call init() to trigger _bmask = 0 branch for coverage
+
+    // Iterator still points to end position after init()
+    CHECK(it == m.end());
+}
