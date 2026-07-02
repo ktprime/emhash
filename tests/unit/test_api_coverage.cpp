@@ -393,6 +393,31 @@ TEST_CASE_TEMPLATE("reserve and rehash", Map, AllIntMaps) {
     CHECK(m.bucket_count() == bc_after_reserve);
 }
 
+TEST_CASE_TEMPLATE("rehash zero on empty map", Map, AllIntMaps) {
+    Map m;
+    CHECK(m.empty());
+    m.rehash(0);  // must not crash; allocates minimum buckets
+    CHECK(m.empty());
+    // Map remains usable after rehash(0)
+    using K = typename Map::key_type;
+    m[make_kv<K>(1)] = 10;
+    CHECK(m.size() == 1);
+    CHECK(m.at(make_kv<K>(1)) == 10);
+}
+
+TEST_CASE_TEMPLATE("rehash zero on non-empty map is no-op", Map, AllIntMaps) {
+    using K = typename Map::key_type;
+    Map m;
+    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
+    auto bc_before = m.bucket_count();
+    auto size_before = m.size();
+
+    m.rehash(0);  // 0 < _num_filled, so returns immediately
+    CHECK(m.size() == size_before);
+    CHECK(m.bucket_count() == bc_before);
+    for (int i = 0; i < 100; ++i) CHECK(m.at(make_kv<K>(i)) == i);
+}
+
 // ============================================================================
 // 14. insert_unique at high load factor (trigger rehash path)
 // ============================================================================
