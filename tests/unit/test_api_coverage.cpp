@@ -573,3 +573,61 @@ TEST_CASE_TEMPLATE("erase_if return value and idempotency", Map, AllIntMaps) {
     CHECK(e2 == 0);
     CHECK(m.size() == 50);
 }
+
+// ============================================================================
+// 18. operator= with low load factor (emhash5/6/7/8 only)
+//     When rhs.load_factor() < EMH_MIN_LOAD_FACTOR (0.25), operator= takes
+//     a special path: clear + dealloc + rehash + insert_unique, instead of
+//     bulk-copying buckets. This test forces that path.
+// ============================================================================
+TEST_CASE_TEMPLATE("copy assign low load factor", Map, EmhashIntMaps) {
+    using K = typename Map::key_type;
+    Map src;
+    // reserve far more buckets than needed so load_factor << 0.25
+    src.reserve(2000);
+    for (int i = 0; i < 10; ++i) src[make_kv<K>(i)] = i;
+    CHECK(src.load_factor() < 0.25f);
+
+    Map dst;
+    for (int i = 500; i < 510; ++i) dst[make_kv<K>(i)] = i;  // pre-fill dst
+    CHECK(dst.size() == 10);
+
+    dst = src;  // triggers low-load-factor branch in emhash5/6/7/8
+
+    CHECK(dst.size() == 10);
+    for (int i = 0; i < 10; ++i) {
+        CHECK(dst.at(make_kv<K>(i)) == i);
+        CHECK_FALSE(dst.contains(make_kv<K>(500 + i)));
+    }
+}
+
+TEST_CASE_TEMPLATE("copy assign low load factor to empty", Map, EmhashIntMaps) {
+    using K = typename Map::key_type;
+    Map src;
+    src.reserve(2000);
+    for (int i = 0; i < 5; ++i) src[make_kv<K>(i)] = i;
+    CHECK(src.load_factor() < 0.25f);
+
+    Map dst;
+    dst = src;  // low-load branch with empty dst
+
+    CHECK(dst.size() == 5);
+    for (int i = 0; i < 5; ++i) CHECK(dst.at(make_kv<K>(i)) == i);
+}
+
+TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {
+    using K = typename Map::key_type;
+    // Another way to get low load factor: insert many, erase most.
+    // erase() doesn't shrink buckets, so load_factor drops.
+    Map src;
+    for (int i = 0; i < 200; ++i) src[make_kv<K>(i)] = i;
+    for (int i = 0; i < 190; ++i) src.erase(make_kv<K>(i));
+    CHECK(src.size() == 10);
+    CHECK(src.load_factor() < 0.25f);
+
+    Map dst;
+    dst = src;
+
+    CHECK(dst.size() == 10);
+    for (int i = 190; i < 200; ++i) CHECK(dst.at(make_kv<K>(i)) == i);
+}
