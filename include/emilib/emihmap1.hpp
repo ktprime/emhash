@@ -898,9 +898,7 @@ private:
 #endif
     }
 
-    inline void set_states(size_t ebucket, int8_t key_h2) noexcept {
-        _states[ebucket] = key_h2;
-    }
+    inline void set_states(size_t ebucket, int8_t key_h2) noexcept { _states[ebucket] = key_h2; }
 
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept {
 #if EMH_PSL_LINEAR == 0

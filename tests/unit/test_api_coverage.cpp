@@ -61,8 +61,10 @@ TEST_CASE_TEMPLATE("operator== different insertion order", Map, AllIntMaps) {
     // Equal maps must compare equal regardless of insertion order.
     Map a;
     Map b;
-    for (int i = 0; i < 50; ++i) a[make_kv<K>(i)] = make_kv<V>(i * 2);
-    for (int i = 49; i >= 0; --i) b[make_kv<K>(i)] = make_kv<V>(i * 2);
+    for (int i = 0; i < 50; ++i)
+        a[make_kv<K>(i)] = make_kv<V>(i * 2);
+    for (int i = 49; i >= 0; --i)
+        b[make_kv<K>(i)] = make_kv<V>(i * 2);
     CHECK(a == b);
 }
 
@@ -86,11 +88,7 @@ TEST_CASE_TEMPLATE("at throws out_of_range", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("initializer_list constructor", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
-    Map m{
-        {make_kv<K>(1), make_kv<V>(10)},
-        {make_kv<K>(2), make_kv<V>(20)},
-        {make_kv<K>(3), make_kv<V>(30)}
-    };
+    Map m{{make_kv<K>(1), make_kv<V>(10)}, {make_kv<K>(2), make_kv<V>(20)}, {make_kv<K>(3), make_kv<V>(30)}};
     CHECK(m.size() == 3);
     CHECK(m.at(make_kv<K>(2)) == make_kv<V>(20));
 }
@@ -99,10 +97,7 @@ TEST_CASE_TEMPLATE("range constructor from vector", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     std::vector<std::pair<K, V>> src{
-        {make_kv<K>(1), make_kv<V>(10)},
-        {make_kv<K>(2), make_kv<V>(20)},
-        {make_kv<K>(3), make_kv<V>(30)}
-    };
+        {make_kv<K>(1), make_kv<V>(10)}, {make_kv<K>(2), make_kv<V>(20)}, {make_kv<K>(3), make_kv<V>(30)}};
     Map m(src.begin(), src.end());
     CHECK(m.size() == 3);
     CHECK(m.contains(make_kv<K>(3)));
@@ -112,10 +107,7 @@ TEST_CASE_TEMPLATE("insert range", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     std::vector<std::pair<K, V>> src{
-        {make_kv<K>(10), make_kv<V>(100)},
-        {make_kv<K>(20), make_kv<V>(200)},
-        {make_kv<K>(30), make_kv<V>(300)}
-    };
+        {make_kv<K>(10), make_kv<V>(100)}, {make_kv<K>(20), make_kv<V>(200)}, {make_kv<K>(30), make_kv<V>(300)}};
     Map m;
     m.insert(src.begin(), src.end());
     CHECK(m.size() == 3);
@@ -126,10 +118,7 @@ TEST_CASE_TEMPLATE("insert initializer_list", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    m.insert({
-        {make_kv<K>(100), make_kv<V>(1)},
-        {make_kv<K>(200), make_kv<V>(2)}
-    });
+    m.insert({{make_kv<K>(100), make_kv<V>(1)}, {make_kv<K>(200), make_kv<V>(2)}});
     CHECK(m.size() == 2);
     CHECK(m.contains(make_kv<K>(200)));
 }
@@ -143,9 +132,7 @@ struct Point2D {
 };
 
 struct PointHash {
-    size_t operator()(const Point2D& p) const {
-        return static_cast<size_t>(static_cast<uint64_t>(p.x) * 31 + p.y);
-    }
+    size_t operator()(const Point2D& p) const { return static_cast<size_t>(static_cast<uint64_t>(p.x) * 31 + p.y); }
 };
 
 // Only emhash5/8 support custom hasher via alias template
@@ -154,7 +141,7 @@ TEST_CASE("custom key type with custom hash (emhash5/8)") {
     PM m;
     m[{1, 2}] = 10;
     m[{3, 4}] = 20;
-    m[{1, 2}] = 99;  // overwrite
+    m[{1, 2}] = 99; // overwrite
 
     CHECK(m.size() == 2);
     CHECK(m.at({1, 2}) == 99);
@@ -172,15 +159,15 @@ TEST_CASE("custom key type with custom hash (emhash5/8)") {
 // ============================================================================
 // 5. int -> std::string value type (all 7 impls)
 // ============================================================================
-#define IntStrMaps map5<int, std::string>, map6<int, std::string>, \
-    map7<int, std::string>, map8<int, std::string>, \
-    imap1<int, std::string>, imap2<int, std::string>, imap3<int, std::string>
+#define IntStrMaps                                                                                                     \
+    map5<int, std::string>, map6<int, std::string>, map7<int, std::string>, map8<int, std::string>,                    \
+        imap1<int, std::string>, imap2<int, std::string>, imap3<int, std::string>
 
 TEST_CASE_TEMPLATE("int->string value CRUD", Map, IntStrMaps) {
     Map m;
     m[1] = "hello";
     m[2] = "world";
-    m[3] = std::string(64, 'x');  // long string (out of SSO buffer)
+    m[3] = std::string(64, 'x'); // long string (out of SSO buffer)
 
     CHECK(m.size() == 3);
     CHECK(m.at(1) == "hello");
@@ -206,7 +193,8 @@ TEST_CASE_TEMPLATE("int->string value CRUD", Map, IntStrMaps) {
 
 TEST_CASE_TEMPLATE("int->string copy and move", Map, IntStrMaps) {
     Map m;
-    for (int i = 0; i < 100; ++i) m[i] = std::string("val") + std::to_string(i);
+    for (int i = 0; i < 100; ++i)
+        m[i] = std::string("val") + std::to_string(i);
 
     Map copy = m;
     CHECK(copy.size() == 100);
@@ -220,17 +208,18 @@ TEST_CASE_TEMPLATE("int->string copy and move", Map, IntStrMaps) {
 // ============================================================================
 // 6. erase by range (first, last) — only map8 + emilib1/2/3 support this overload
 // ============================================================================
-TEST_CASE_TEMPLATE("erase range", Map,
-    map8<int,int>, imap1<int,int>, imap2<int,int>, imap3<int,int>) {
+TEST_CASE_TEMPLATE("erase range", Map, map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>) {
     using K = typename Map::key_type;
     Map m;
-    for (int i = 0; i < 20; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 20; ++i)
+        m[make_kv<K>(i)] = i;
 
     // erase first 5 elements via iterator range (use const_iterator for portability)
     const Map& cm = m;
     auto first = cm.begin();
     auto last = first;
-    for (int i = 0; i < 5; ++i) ++last;
+    for (int i = 0; i < 5; ++i)
+        ++last;
     m.erase(first, last);
 
     CHECK(m.size() == 15);
@@ -239,8 +228,7 @@ TEST_CASE_TEMPLATE("erase range", Map,
 // ============================================================================
 // 7. emplace_hint (emhash5/8 only — emhash6/7 have ambiguous overloads, emilib lacks this)
 // ============================================================================
-TEST_CASE_TEMPLATE("emplace_hint", Map,
-    map5<int,int>, map8<int,int>) {
+TEST_CASE_TEMPLATE("emplace_hint", Map, map5<int, int>, map8<int, int>) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
@@ -290,7 +278,7 @@ TEST_CASE_TEMPLATE("INT_MAX and SIZE_MAX key boundaries", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    K maxKey = std::numeric_limits<K>::max(); // NOLINT(readability-identifier-naming)
+    K maxKey = std::numeric_limits<K>::max();    // NOLINT(readability-identifier-naming)
     K minKey = std::numeric_limits<K>::is_signed // NOLINT(readability-identifier-naming)
                    ? std::numeric_limits<K>::min()
                    : K{0};
@@ -332,14 +320,17 @@ TEST_CASE_TEMPLATE("non-member swap (ADL)", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("rehash then iterate consistency", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
-    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 100; ++i)
+        m[make_kv<K>(i)] = i;
 
     // Force rehash by inserting many more
-    for (int i = 100; i < 1000; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 100; i < 1000; ++i)
+        m[make_kv<K>(i)] = i;
 
     // Iterate after rehash — count must match
     size_t count = 0;
-    for (auto it = m.begin(); it != m.end(); ++it) ++count;
+    for (auto it = m.begin(); it != m.end(); ++it)
+        ++count;
     CHECK(count == 1000);
 }
 
@@ -350,12 +341,14 @@ TEST_CASE_TEMPLATE("self merge safety", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 10; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 10; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i);
 
     // Self-merge: all keys exist, so nothing should change
     m.merge(m);
     CHECK(m.size() == 10);
-    for (int i = 0; i < 10; ++i) CHECK(m.contains(make_kv<K>(i)));
+    for (int i = 0; i < 10; ++i)
+        CHECK(m.contains(make_kv<K>(i)));
 }
 
 // ============================================================================
@@ -369,7 +362,8 @@ TEST_CASE_TEMPLATE("load_factor and bucket_count", Map, AllIntMaps) {
     CHECK(m.empty());
     CHECK(m.bucket_count() > 0);
 
-    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 100; ++i)
+        m[make_kv<K>(i)] = i;
     CHECK(m.size() == 100);
     CHECK(m.load_factor() > 0.0F);
     CHECK(m.load_factor() <= m.max_load_factor() + 0.01F);
@@ -380,7 +374,8 @@ TEST_CASE_TEMPLATE("max_load_factor setter (emhash only)", Map, EmhashIntMaps) {
     Map m;
     m.max_load_factor(0.99F);
     CHECK(m.max_load_factor() == doctest::Approx(0.99F).epsilon(0.01));
-    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 100; ++i)
+        m[make_kv<K>(i)] = i;
     CHECK(m.load_factor() <= m.max_load_factor() + 0.01F);
 }
 
@@ -391,7 +386,8 @@ TEST_CASE_TEMPLATE("reserve and rehash", Map, AllIntMaps) {
     auto bc_after_reserve = m.bucket_count();
     CHECK(bc_after_reserve >= 5000);
 
-    for (int i = 0; i < 1000; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 1000; ++i)
+        m[make_kv<K>(i)] = i;
     CHECK(m.size() == 1000);
     // reserve should have prevented multiple rehashes
     CHECK(m.bucket_count() == bc_after_reserve);
@@ -400,7 +396,7 @@ TEST_CASE_TEMPLATE("reserve and rehash", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("rehash zero on empty map", Map, AllIntMaps) {
     Map m;
     CHECK(m.empty());
-    m.rehash(0);  // must not crash; allocates minimum buckets
+    m.rehash(0); // must not crash; allocates minimum buckets
     CHECK(m.empty());
     // Map remains usable after rehash(0)
     using K = typename Map::key_type;
@@ -412,14 +408,16 @@ TEST_CASE_TEMPLATE("rehash zero on empty map", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("rehash zero on non-empty map is no-op", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
-    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 100; ++i)
+        m[make_kv<K>(i)] = i;
     auto bc_before = m.bucket_count();
     auto size_before = m.size();
 
-    m.rehash(0);  // 0 < _num_filled, so returns immediately
+    m.rehash(0); // 0 < _num_filled, so returns immediately
     CHECK(m.size() == size_before);
     CHECK(m.bucket_count() == bc_before);
-    for (int i = 0; i < 100; ++i) CHECK(m.at(make_kv<K>(i)) == i);
+    for (int i = 0; i < 100; ++i)
+        CHECK(m.at(make_kv<K>(i)) == i);
 }
 
 // ============================================================================
@@ -437,7 +435,8 @@ TEST_CASE_TEMPLATE("insert_unique high load", Map, AllIntMaps) {
         m.insert_unique(make_kv<K>(i), make_kv<V>(i * 2));
     }
     CHECK(m.size() == 90);
-    for (int i = 0; i < 90; ++i) CHECK(m.at(make_kv<K>(i)) == make_kv<V>(i * 2));
+    for (int i = 0; i < 90; ++i)
+        CHECK(m.at(make_kv<K>(i)) == make_kv<V>(i * 2));
 }
 
 // ============================================================================
@@ -449,7 +448,8 @@ TEST_CASE_TEMPLATE("erase iterator sequential completeness", Map, EmhashIntMaps)
     using K = typename Map::key_type;
     Map m;
     const int N = 200;
-    for (int i = 0; i < N; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < N; ++i)
+        m[make_kv<K>(i)] = i;
 
     // Erase all even keys via iterator-based erase_if pattern
     size_t erased = 0;
@@ -464,26 +464,33 @@ TEST_CASE_TEMPLATE("erase iterator sequential completeness", Map, EmhashIntMaps)
     CHECK(erased == N / 2);
     CHECK(m.size() == N / 2);
     // All odd keys must survive
-    for (int i = 1; i < N; i += 2) CHECK(m.contains(make_kv<K>(i)));
+    for (int i = 1; i < N; i += 2)
+        CHECK(m.contains(make_kv<K>(i)));
     // All even keys must be gone
-    for (int i = 0; i < N; i += 2) CHECK_FALSE(m.contains(make_kv<K>(i)));
+    for (int i = 0; i < N; i += 2)
+        CHECK_FALSE(m.contains(make_kv<K>(i)));
 }
 
 TEST_CASE_TEMPLATE("erase every other element by key", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
     const int N = 300;
-    for (int i = 0; i < N; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < N; ++i)
+        m[make_kv<K>(i)] = i;
 
     // Erase keys 0, 2, 4, ... by key (not iterator)
-    for (int i = 0; i < N; i += 2) m.erase(make_kv<K>(i));
+    for (int i = 0; i < N; i += 2)
+        m.erase(make_kv<K>(i));
     CHECK(m.size() == N / 2);
-    for (int i = 1; i < N; i += 2) CHECK(m.contains(make_kv<K>(i)));
+    for (int i = 1; i < N; i += 2)
+        CHECK(m.contains(make_kv<K>(i)));
 
     // Re-insert erased keys
-    for (int i = 0; i < N; i += 2) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < N; i += 2)
+        m[make_kv<K>(i)] = i;
     CHECK(m.size() == N);
-    for (int i = 0; i < N; ++i) CHECK(m.contains(make_kv<K>(i)));
+    for (int i = 0; i < N; ++i)
+        CHECK(m.contains(make_kv<K>(i)));
 }
 
 // ============================================================================
@@ -493,18 +500,22 @@ TEST_CASE_TEMPLATE("clear and reuse after erase", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 500; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 500; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i);
 
     // Erase half
-    for (int i = 0; i < 250; ++i) m.erase(make_kv<K>(i));
+    for (int i = 0; i < 250; ++i)
+        m.erase(make_kv<K>(i));
     CHECK(m.size() == 250);
 
     // Clear and refill with different keys
     m.clear();
     CHECK(m.empty());
-    for (int i = 1000; i < 1500; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 1000; i < 1500; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i);
     CHECK(m.size() == 500);
-    for (int i = 1000; i < 1500; ++i) CHECK(m.at(make_kv<K>(i)) == make_kv<V>(i));
+    for (int i = 1000; i < 1500; ++i)
+        CHECK(m.at(make_kv<K>(i)) == make_kv<V>(i));
 }
 
 // ============================================================================
@@ -516,19 +527,23 @@ TEST_CASE_TEMPLATE("erase_if removes even values", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
     const int N = 200;
-    for (int i = 0; i < N; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < N; ++i)
+        m[make_kv<K>(i)] = i;
 
     auto erased = m.erase_if([](const auto& kv) { return kv.second % 2 == 0; });
     CHECK(erased == N / 2);
     CHECK(m.size() == N / 2);
-    for (int i = 1; i < N; i += 2) CHECK(m.contains(make_kv<K>(i)));
-    for (int i = 0; i < N; i += 2) CHECK_FALSE(m.contains(make_kv<K>(i)));
+    for (int i = 1; i < N; i += 2)
+        CHECK(m.contains(make_kv<K>(i)));
+    for (int i = 0; i < N; i += 2)
+        CHECK_FALSE(m.contains(make_kv<K>(i)));
 }
 
 TEST_CASE_TEMPLATE("erase_if removes none", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
-    for (int i = 0; i < 50; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 50; ++i)
+        m[make_kv<K>(i)] = i;
     auto erased = m.erase_if([](const auto&) { return false; });
     CHECK(erased == 0);
     CHECK(m.size() == 50);
@@ -537,7 +552,8 @@ TEST_CASE_TEMPLATE("erase_if removes none", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("erase_if removes all", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
-    for (int i = 0; i < 50; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 50; ++i)
+        m[make_kv<K>(i)] = i;
     auto erased = m.erase_if([](const auto&) { return true; });
     CHECK(erased == 50);
     CHECK(m.empty());
@@ -547,29 +563,34 @@ TEST_CASE_TEMPLATE("erase_if large scale stress", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
     const int N = 1000;
-    for (int i = 0; i < N; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < N; ++i)
+        m[make_kv<K>(i)] = i;
 
     // Erase multiples of 3
     auto erased = m.erase_if([](const auto& kv) { return kv.second % 3 == 0; });
     CHECK(erased == (N + 2) / 3);
     CHECK(m.size() == N - (N + 2) / 3);
     for (int i = 0; i < N; ++i) {
-        if (i % 3 == 0) CHECK_FALSE(m.contains(make_kv<K>(i)));
-        else CHECK(m.contains(make_kv<K>(i)));
+        if (i % 3 == 0)
+            CHECK_FALSE(m.contains(make_kv<K>(i)));
+        else
+            CHECK(m.contains(make_kv<K>(i)));
     }
 
     // Erase remaining multiples of 5
     erased = m.erase_if([](const auto& kv) { return kv.second % 5 == 0; });
     CHECK(m.size() == N - (N + 2) / 3 - erased);
     // Re-insert some
-    for (int i = 0; i < N; i += 3) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < N; i += 3)
+        m[make_kv<K>(i)] = i;
     CHECK(m.size() == N - erased);
 }
 
 TEST_CASE_TEMPLATE("erase_if return value and idempotency", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
-    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
+    for (int i = 0; i < 100; ++i)
+        m[make_kv<K>(i)] = i;
 
     auto e1 = m.erase_if([](const auto& kv) { return kv.second < 50; });
     CHECK(e1 == 50);
@@ -589,14 +610,16 @@ TEST_CASE_TEMPLATE("copy assign low load factor", Map, EmhashIntMaps) {
     Map src;
     // reserve far more buckets than needed so load_factor << 0.25
     src.reserve(2000);
-    for (int i = 0; i < 10; ++i) src[make_kv<K>(i)] = i;
+    for (int i = 0; i < 10; ++i)
+        src[make_kv<K>(i)] = i;
     CHECK(src.load_factor() < 0.25F);
 
     Map dst;
-    for (int i = 500; i < 510; ++i) dst[make_kv<K>(i)] = i;  // pre-fill dst
+    for (int i = 500; i < 510; ++i)
+        dst[make_kv<K>(i)] = i; // pre-fill dst
     CHECK(dst.size() == 10);
 
-    dst = src;  // triggers low-load-factor branch in emhash5/6/7/8
+    dst = src; // triggers low-load-factor branch in emhash5/6/7/8
 
     CHECK(dst.size() == 10);
     for (int i = 0; i < 10; ++i) {
@@ -609,14 +632,16 @@ TEST_CASE_TEMPLATE("copy assign low load factor to empty", Map, EmhashIntMaps) {
     using K = typename Map::key_type;
     Map src;
     src.reserve(2000);
-    for (int i = 0; i < 5; ++i) src[make_kv<K>(i)] = i;
+    for (int i = 0; i < 5; ++i)
+        src[make_kv<K>(i)] = i;
     CHECK(src.load_factor() < 0.25F);
 
     Map dst;
-    dst = src;  // low-load branch with empty dst
+    dst = src; // low-load branch with empty dst
 
     CHECK(dst.size() == 5);
-    for (int i = 0; i < 5; ++i) CHECK(dst.at(make_kv<K>(i)) == i);
+    for (int i = 0; i < 5; ++i)
+        CHECK(dst.at(make_kv<K>(i)) == i);
 }
 
 TEST_CASE_TEMPLATE("copy construct low load factor with elements", Map, EmhashIntMaps) {
@@ -626,16 +651,18 @@ TEST_CASE_TEMPLATE("copy construct low load factor with elements", Map, EmhashIn
     // Need: load_factor <= 0.25 AND elements > 0 to trigger loop body.
     using K = typename Map::key_type;
     Map src;
-    src.reserve(200);  // large bucket count
-    for (int i = 0; i < 3; ++i) src[make_kv<K>(i)] = i * 100;
-    CHECK(src.load_factor() < 0.25F);  // 3/200 = 0.015 <= 0.25
+    src.reserve(200); // large bucket count
+    for (int i = 0; i < 3; ++i)
+        src[make_kv<K>(i)] = i * 100;
+    CHECK(src.load_factor() < 0.25F); // 3/200 = 0.015 <= 0.25
     CHECK(src.size() == 3);
 
-    Map dst(src);  // copy constructor - triggers low-load branch with 3 elements
+    Map dst(src); // copy constructor - triggers low-load branch with 3 elements
 
     CHECK(dst.size() == 3);
-    for (int i = 0; i < 3; ++i) CHECK(dst.at(make_kv<K>(i)) == i * 100);
-    CHECK(dst.load_factor() > src.load_factor());  // dst should have fewer buckets
+    for (int i = 0; i < 3; ++i)
+        CHECK(dst.at(make_kv<K>(i)) == i * 100);
+    CHECK(dst.load_factor() > src.load_factor()); // dst should have fewer buckets
 }
 
 TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {
@@ -643,8 +670,10 @@ TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {
     // Another way to get low load factor: insert many, erase most.
     // erase() doesn't shrink buckets, so load_factor drops.
     Map src;
-    for (int i = 0; i < 200; ++i) src[make_kv<K>(i)] = i;
-    for (int i = 0; i < 190; ++i) src.erase(make_kv<K>(i));
+    for (int i = 0; i < 200; ++i)
+        src[make_kv<K>(i)] = i;
+    for (int i = 0; i < 190; ++i)
+        src.erase(make_kv<K>(i));
     CHECK(src.size() == 10);
     CHECK(src.load_factor() < 0.25F);
 
@@ -652,7 +681,8 @@ TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {
     dst = src;
 
     CHECK(dst.size() == 10);
-    for (int i = 190; i < 200; ++i) CHECK(dst.at(make_kv<K>(i)) == i);
+    for (int i = 190; i < 200; ++i)
+        CHECK(dst.at(make_kv<K>(i)) == i);
 }
 
 // ============================================================================
@@ -665,13 +695,14 @@ struct CollisionHash {
     size_t operator()(int k) const noexcept { return static_cast<size_t>(k) / 4; }
 };
 
-TEST_CASE_TEMPLATE("erase_key main bucket promotion trivially copyable",
-    Map, map5<int, int, CollisionHash>, map6<int, int, CollisionHash>, map7<int, int, CollisionHash>) {
+TEST_CASE_TEMPLATE("erase_key main bucket promotion trivially copyable", Map, map5<int, int, CollisionHash>,
+                   map6<int, int, CollisionHash>, map7<int, int, CollisionHash>) {
     // keys 0,1,2,3 all hash to bucket 0; key 0 occupies main bucket.
     // erase(key) calls erase_key() which has its own is_trivially_copyable()
     // branch (operator= for trivially copyable, swap otherwise).
     Map m;
-    for (int i = 0; i < 4; ++i) m[i] = i * 100;
+    for (int i = 0; i < 4; ++i)
+        m[i] = i * 100;
     CHECK(m.size() == 4);
 
     // Erase main bucket key (key 0) — triggers is_trivially_copyable() == true
@@ -685,26 +716,29 @@ TEST_CASE_TEMPLATE("erase_key main bucket promotion trivially copyable",
 
     // Erase another main-bucket key in a different collision chain
     // keys 4,5,6,7 all hash to bucket 1
-    for (int i = 4; i < 8; ++i) m[i] = i * 100;
+    for (int i = 4; i < 8; ++i)
+        m[i] = i * 100;
     m.erase(4);
     CHECK_FALSE(m.contains(4));
     CHECK(m.at(5) == 500);
 
     // Erase all remaining to stress the promotion path repeatedly
     for (int i = 1; i < 8; ++i) {
-        if (i != 4) m.erase(i);
+        if (i != 4)
+            m.erase(i);
     }
     CHECK(m.empty());
 }
 
-TEST_CASE_TEMPLATE("erase_bucket via iterator main bucket promotion trivially copyable",
-    Map, map5<int, int, CollisionHash>, map6<int, int, CollisionHash>, map7<int, int, CollisionHash>) {
+TEST_CASE_TEMPLATE("erase_bucket via iterator main bucket promotion trivially copyable", Map,
+                   map5<int, int, CollisionHash>, map6<int, int, CollisionHash>, map7<int, int, CollisionHash>) {
     // erase(iterator) calls erase_bucket() which has a SEPARATE
     // is_trivially_copyable() branch from erase_key().
     // This test forces hash collisions and erases via iterator to cover
     // the operator= path in erase_bucket (hash_table7 line 1416).
     Map m;
-    for (int i = 0; i < 4; ++i) m[i] = i * 100;
+    for (int i = 0; i < 4; ++i)
+        m[i] = i * 100;
     CHECK(m.size() == 4);
 
     // Find key 0 (main bucket) and erase via iterator
@@ -718,7 +752,8 @@ TEST_CASE_TEMPLATE("erase_bucket via iterator main bucket promotion trivially co
     CHECK(m.at(3) == 300);
 
     // Add more collisions (keys 4,5,6,7 hash to bucket 1) and erase via iterator
-    for (int i = 4; i < 8; ++i) m[i] = i * 100;
+    for (int i = 4; i < 8; ++i)
+        m[i] = i * 100;
     it = m.find(4);
     CHECK(it != m.end());
     m.erase(it);
@@ -727,9 +762,11 @@ TEST_CASE_TEMPLATE("erase_bucket via iterator main bucket promotion trivially co
 
     // Erase remaining main-bucket keys via iterator
     for (int i = 1; i < 8; ++i) {
-        if (i == 4) continue;
+        if (i == 4)
+            continue;
         auto it2 = m.find(i);
-        if (it2 != m.end()) m.erase(it2);
+        if (it2 != m.end())
+            m.erase(it2);
     }
     CHECK(m.empty());
 }
@@ -738,15 +775,16 @@ TEST_CASE_TEMPLATE("erase_bucket via iterator main bucket promotion trivially co
 // 20. iterator::init() on end() position (bucket >= bucket_count)
 //     Covers the _bmask = 0 branch in emilib/emhash iterator init()
 // ============================================================================
-TEST_CASE_TEMPLATE("iterator init on end covers _bmask=0 branch", Map,
-    imap2<int, int>, imap3<int, int>, map6<int, int>, map7<int, int>) {
+TEST_CASE_TEMPLATE("iterator init on end covers _bmask=0 branch", Map, imap2<int, int>, imap3<int, int>, map6<int, int>,
+                   map7<int, int>) {
     Map m;
-    for (int i = 0; i < 10; ++i) m[i] = i * 10;
+    for (int i = 0; i < 10; ++i)
+        m[i] = i * 10;
     CHECK(m.size() == 10);
 
     // end() iterator has _bucket = bucket_count, so init() should set _bmask = 0
     auto it = m.end();
-    it.init();  // explicitly call init() to trigger _bmask = 0 branch for coverage
+    it.init(); // explicitly call init() to trigger _bmask = 0 branch for coverage
 
     // Iterator still points to end position after init()
     CHECK(it == m.end());

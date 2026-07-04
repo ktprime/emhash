@@ -20,13 +20,13 @@
 // ============================================================================
 // 1. 100% same-bucket collision (ConstHasher)
 // ============================================================================
-TEST_CASE_TEMPLATE("hardening: 100% same-bucket collision", Map,
-    map5<int,int,ConstHasher>, map6<int,int,ConstHasher>,
-    map7<int,int,ConstHasher>, map8<int,int,ConstHasher>) {
+TEST_CASE_TEMPLATE("hardening: 100% same-bucket collision", Map, map5<int, int, ConstHasher>,
+                   map6<int, int, ConstHasher>, map7<int, int, ConstHasher>, map8<int, int, ConstHasher>) {
     const int N = 8000;
     Map m;
 
-    for (int i = 0; i < N; ++i) (void)m.emplace(i, i);
+    for (int i = 0; i < N; ++i)
+        (void)m.emplace(i, i);
     CHECK(static_cast<int>(m.size()) == N);
 
     for (int i = 0; i < N; ++i) {
@@ -36,34 +36,41 @@ TEST_CASE_TEMPLATE("hardening: 100% same-bucket collision", Map,
     }
 
     // every-other erase + re-find
-    for (int i = 0; i < N; i += 2) m.erase(i);
+    for (int i = 0; i < N; i += 2)
+        m.erase(i);
     for (int i = 0; i < N; ++i) {
         auto it = m.find(i);
-        if (i & 1) { CHECK(it != m.end()); CHECK(it->second == i); }
-        else       CHECK(it == m.end());
+        if (i & 1) {
+            CHECK(it != m.end());
+            CHECK(it->second == i);
+        } else
+            CHECK(it == m.end());
     }
 
     // reinsert erased keys
-    for (int i = 0; i < N; i += 2) (void)m.emplace(i, i * 10);
+    for (int i = 0; i < N; i += 2)
+        (void)m.emplace(i, i * 10);
     CHECK(static_cast<int>(m.size()) == N);
     for (int i = 0; i < N; ++i) {
         auto it = m.find(i);
         CHECK(it != m.end());
-        if (i & 1) CHECK(it->second == i);
-        else       CHECK(it->second == i * 10);
+        if (i & 1)
+            CHECK(it->second == i);
+        else
+            CHECK(it->second == i * 10);
     }
 }
 
 // ============================================================================
 // 2. 4-bucket concentration (Range4Hasher)
 // ============================================================================
-TEST_CASE_TEMPLATE("hardening: 4-bucket concentration", Map,
-    map5<int,int,Range4Hasher>, map6<int,int,Range4Hasher>,
-    map7<int,int,Range4Hasher>, map8<int,int,Range4Hasher>) {
+TEST_CASE_TEMPLATE("hardening: 4-bucket concentration", Map, map5<int, int, Range4Hasher>, map6<int, int, Range4Hasher>,
+                   map7<int, int, Range4Hasher>, map8<int, int, Range4Hasher>) {
     const int N = 4000;
     Map m;
 
-    for (int i = 0; i < N; ++i) (void)m.emplace(i, i);
+    for (int i = 0; i < N; ++i)
+        (void)m.emplace(i, i);
     CHECK(static_cast<int>(m.size()) == N);
 
     for (int i = 0; i < N; ++i) {
@@ -74,8 +81,10 @@ TEST_CASE_TEMPLATE("hardening: 4-bucket concentration", Map,
 
     // erase + churn
     for (int round = 0; round < 3; ++round) {
-        for (int i = round; i < N; i += 3) m.erase(i);
-        for (int i = round; i < N; i += 3) (void)m.emplace(i, i + round);
+        for (int i = round; i < N; i += 3)
+            m.erase(i);
+        for (int i = round; i < N; i += 3)
+            (void)m.emplace(i, i + round);
     }
     CHECK(static_cast<int>(m.size()) == N);
 }
@@ -104,11 +113,14 @@ TEST_CASE("hardening: adaptive key craft (emhash5)") {
         CHECK(it->second == i);
     }
 
-    for (int i = 0; i < N; i += 2) m.erase(static_cast<int>(i * bc));
+    for (int i = 0; i < N; i += 2)
+        m.erase(static_cast<int>(i * bc));
     for (int i = 0; i < N; ++i) {
         auto it = m.find(static_cast<int>(i * bc));
-        if (i & 1) CHECK(it != m.end());
-        else       CHECK(it == m.end());
+        if (i & 1)
+            CHECK(it != m.end());
+        else
+            CHECK(it == m.end());
     }
 }
 

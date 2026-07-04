@@ -396,9 +396,7 @@ public:
     size_type bucket_count() const { return _mains_buckets; }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const {
-        return _total_buckets ? (static_cast<float>(size())) / _total_buckets : 0.0f;
-    }
+    float load_factor() const { return _total_buckets ? (static_cast<float>(size())) / _total_buckets : 0.0f; }
 
     const HashT& hash_function() const { return _hasher; }
 

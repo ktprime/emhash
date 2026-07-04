@@ -12,8 +12,9 @@
 // ============================================================================
 // Float key tests (NaN, -0.0/+0.0, infinity) — emhash5-8 only
 // ============================================================================
-#define FloatMaps map5<float, int>, map6<float, int>, map7<float, int>, map8<float, int>, \
-    imap1<float, int>, imap2<float, int>, imap3<float, int>
+#define FloatMaps                                                                                                      \
+    map5<float, int>, map6<float, int>, map7<float, int>, map8<float, int>, imap1<float, int>, imap2<float, int>,      \
+        imap3<float, int>
 
 TEST_CASE_TEMPLATE("float key basic + NaN + infinity", Map, FloatMaps) {
     Map m;
@@ -38,14 +39,10 @@ TEST_CASE_TEMPLATE("float key basic + NaN + infinity", Map, FloatMaps) {
 // ============================================================================
 // Move-only value type (std::unique_ptr<int>)
 // ============================================================================
-#define MoveMaps \
-    map5<int, std::unique_ptr<int>>, \
-    map6<int, std::unique_ptr<int>>, \
-    map7<int, std::unique_ptr<int>>, \
-    map8<int, std::unique_ptr<int>>, \
-    imap1<int, std::unique_ptr<int>>, \
-    imap2<int, std::unique_ptr<int>>, \
-    imap3<int, std::unique_ptr<int>>
+#define MoveMaps                                                                                                       \
+    map5<int, std::unique_ptr<int>>, map6<int, std::unique_ptr<int>>, map7<int, std::unique_ptr<int>>,                 \
+        map8<int, std::unique_ptr<int>>, imap1<int, std::unique_ptr<int>>, imap2<int, std::unique_ptr<int>>,           \
+        imap3<int, std::unique_ptr<int>>
 
 TEST_CASE_TEMPLATE("move-only value insert and move ctor", Map, MoveMaps) {
     Map m;
@@ -66,14 +63,21 @@ TEST_CASE_TEMPLATE("move-only value insert and move ctor", Map, MoveMaps) {
 struct LargeValue {
     char data[1024];
     int id;
-    LargeValue() : id(0) { for (auto& c : data) c = 0; }
-    explicit LargeValue(int v) : id(v) { for (auto& c : data) c = static_cast<char>(v); }
+    LargeValue() : id(0) {
+        for (auto& c : data)
+            c = 0;
+    }
+    explicit LargeValue(int v) : id(v) {
+        for (auto& c : data)
+            c = static_cast<char>(v);
+    }
     bool operator==(const LargeValue& o) const { return id == o.id; }
     bool operator!=(const LargeValue& o) const { return id != o.id; }
 };
 
-#define LargeMaps map5<int, LargeValue>, map6<int, LargeValue>, map7<int, LargeValue>, map8<int, LargeValue>, \
-    imap1<int, LargeValue>, imap2<int, LargeValue>, imap3<int, LargeValue>
+#define LargeMaps                                                                                                      \
+    map5<int, LargeValue>, map6<int, LargeValue>, map7<int, LargeValue>, map8<int, LargeValue>,                        \
+        imap1<int, LargeValue>, imap2<int, LargeValue>, imap3<int, LargeValue>
 
 TEST_CASE_TEMPLATE("large value type", Map, LargeMaps) {
     Map m;
@@ -90,26 +94,31 @@ TEST_CASE_TEMPLATE("large value type", Map, LargeMaps) {
 struct CountedDtor {
     static int s_count;
     int v;
-    CountedDtor() : v(0) { }
-    explicit CountedDtor(int x) : v(x) { }
+    CountedDtor() : v(0) {}
+    explicit CountedDtor(int x) : v(x) {}
     CountedDtor(const CountedDtor&) = default;
-    CountedDtor(CountedDtor&& o) noexcept : v(o.v) { }
+    CountedDtor(CountedDtor&& o) noexcept : v(o.v) {}
     CountedDtor& operator=(const CountedDtor&) = default;
-    CountedDtor& operator=(CountedDtor&& o) noexcept { v = o.v; return *this; }
+    CountedDtor& operator=(CountedDtor&& o) noexcept {
+        v = o.v;
+        return *this;
+    }
     ~CountedDtor() { s_count++; }
     bool operator==(const CountedDtor& o) const { return v == o.v; }
     bool operator!=(const CountedDtor& o) const { return v != o.v; }
 };
 int CountedDtor::s_count = 0;
 
-#define CountedMaps map5<int, CountedDtor>, map6<int, CountedDtor>, map7<int, CountedDtor>, map8<int, CountedDtor>, \
-    imap1<int, CountedDtor>, imap2<int, CountedDtor>, imap3<int, CountedDtor>
+#define CountedMaps                                                                                                    \
+    map5<int, CountedDtor>, map6<int, CountedDtor>, map7<int, CountedDtor>, map8<int, CountedDtor>,                    \
+        imap1<int, CountedDtor>, imap2<int, CountedDtor>, imap3<int, CountedDtor>
 
 TEST_CASE_TEMPLATE("non-trivial destructor value cleanup", Map, CountedMaps) {
     CountedDtor::s_count = 0;
     {
         Map m;
-        for (int i = 0; i < 100; ++i) m[i] = CountedDtor(i);
+        for (int i = 0; i < 100; ++i)
+            m[i] = CountedDtor(i);
         CHECK(m.size() == 100);
         m.clear();
         // clear should destruct all values

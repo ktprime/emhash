@@ -13,19 +13,26 @@
 #include <string>
 
 // String->String map type list for non-trivial key+value lifecycle stress.
-#define StringStringMaps map5<std::string, std::string>, map6<std::string, std::string>, \
-    map7<std::string, std::string>, map8<std::string, std::string>, \
-    imap1<std::string, std::string>, imap2<std::string, std::string>, \
-    imap3<std::string, std::string>
+#define StringStringMaps                                                                                               \
+    map5<std::string, std::string>, map6<std::string, std::string>, map7<std::string, std::string>,                    \
+        map8<std::string, std::string>, imap1<std::string, std::string>, imap2<std::string, std::string>,              \
+        imap3<std::string, std::string>
 
-static std::string K(int i) { return "k_" + std::to_string(i); } // NOLINT(readability-identifier-naming)
-static std::string V(int i) { return "v_" + std::to_string(i); } // NOLINT(readability-identifier-naming)
+static std::string K(int i) {
+    return "k_" + std::to_string(i);
+} // NOLINT(readability-identifier-naming)
+static std::string V(int i) {
+    return "v_" + std::to_string(i);
+} // NOLINT(readability-identifier-naming)
 
 // ============================================================================
 // 1. default ctor/dtor
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: default ctor/dtor", Map, StringStringMaps) {
-    { Map m; (void)m; }
+    {
+        Map m;
+        (void)m;
+    }
 }
 
 // ============================================================================
@@ -33,7 +40,8 @@ TEST_CASE_TEMPLATE("lifecycle: default ctor/dtor", Map, StringStringMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: insert + clear", Map, StringStringMaps) {
     Map m;
-    for (int i = 0; i < 50; ++i) m[K(i)] = V(i);
+    for (int i = 0; i < 50; ++i)
+        m[K(i)] = V(i);
     CHECK(m.size() == 50);
     CHECK(m[K(0)] == V(0));
     m.clear();
@@ -45,7 +53,8 @@ TEST_CASE_TEMPLATE("lifecycle: insert + clear", Map, StringStringMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: deep copy chain", Map, StringStringMaps) {
     Map src;
-    for (int i = 0; i < 20; ++i) src[K(i)] = V(i);
+    for (int i = 0; i < 20; ++i)
+        src[K(i)] = V(i);
     Map a(src);
     Map b(a); // NOLINT(performance-unnecessary-copy-initialization)
     Map c(b); // NOLINT(performance-unnecessary-copy-initialization)
@@ -58,7 +67,8 @@ TEST_CASE_TEMPLATE("lifecycle: deep copy chain", Map, StringStringMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: move ctor", Map, StringStringMaps) {
     Map src;
-    for (int i = 0; i < 20; ++i) src[K(i)] = V(i);
+    for (int i = 0; i < 20; ++i)
+        src[K(i)] = V(i);
     auto n = src.size();
     Map dst(std::move(src));
     CHECK(dst.size() == n);
@@ -70,9 +80,11 @@ TEST_CASE_TEMPLATE("lifecycle: move ctor", Map, StringStringMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: cross-size copy assign", Map, StringStringMaps) {
     Map small;
-    for (int i = 0; i < 5; ++i) small[K(i)] = V(i);
+    for (int i = 0; i < 5; ++i)
+        small[K(i)] = V(i);
     Map large;
-    for (int i = 0; i < 100; ++i) large[K(i)] = V(i);
+    for (int i = 0; i < 100; ++i)
+        large[K(i)] = V(i);
 
     Map dst1 = small;
     dst1 = large;
@@ -88,9 +100,11 @@ TEST_CASE_TEMPLATE("lifecycle: cross-size copy assign", Map, StringStringMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: move assign", Map, StringStringMaps) {
     Map src;
-    for (int i = 0; i < 20; ++i) src[K(i)] = V(i);
+    for (int i = 0; i < 20; ++i)
+        src[K(i)] = V(i);
     Map dst;
-    for (int i = 0; i < 5; ++i) dst[K(i)] = V(i);
+    for (int i = 0; i < 5; ++i)
+        dst[K(i)] = V(i);
     dst = std::move(src);
     CHECK(dst.size() == 20);
 }
@@ -100,7 +114,8 @@ TEST_CASE_TEMPLATE("lifecycle: move assign", Map, StringStringMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: self assignment", Map, StringStringMaps) {
     Map m;
-    for (int i = 0; i < 10; ++i) m[K(i)] = V(i);
+    for (int i = 0; i < 10; ++i)
+        m[K(i)] = V(i);
     auto n = m.size();
     m = m;
     CHECK(m.size() == n);
@@ -112,8 +127,10 @@ TEST_CASE_TEMPLATE("lifecycle: self assignment", Map, StringStringMaps) {
 TEST_CASE_TEMPLATE("lifecycle: churn", Map, StringStringMaps) {
     Map m;
     for (int round = 0; round < 5; ++round) {
-        for (int i = 0; i < 50; ++i) m[K(i)] = V(i);
-        for (int i = 0; i < 50; i += 2) m.erase(K(i));
+        for (int i = 0; i < 50; ++i)
+            m[K(i)] = V(i);
+        for (int i = 0; i < 50; i += 2)
+            m.erase(K(i));
     }
 }
 
@@ -123,7 +140,8 @@ TEST_CASE_TEMPLATE("lifecycle: churn", Map, StringStringMaps) {
 TEST_CASE_TEMPLATE("lifecycle: swap", Map, StringStringMaps) {
     Map a;
     Map b;
-    for (int i = 0; i < 10; ++i) a[K(i)] = V(i);
+    for (int i = 0; i < 10; ++i)
+        a[K(i)] = V(i);
     a.swap(b);
     CHECK(a.empty());
     CHECK(b.size() == 10);
@@ -135,7 +153,8 @@ TEST_CASE_TEMPLATE("lifecycle: swap", Map, StringStringMaps) {
 TEST_CASE_TEMPLATE("lifecycle: reserve + shrink", Map, StringStringMaps) {
     Map m;
     m.reserve(200);
-    for (int i = 0; i < 100; ++i) m[K(i)] = V(i);
+    for (int i = 0; i < 100; ++i)
+        m[K(i)] = V(i);
     m.shrink_to_fit();
     m.clear();
     m.reserve(500);
@@ -147,9 +166,11 @@ TEST_CASE_TEMPLATE("lifecycle: reserve + shrink", Map, StringStringMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: heavy rehash", Map, StringStringMaps) {
     Map m;
-    for (int i = 0; i < 200; ++i) m[K(i)] = V(i);
+    for (int i = 0; i < 200; ++i)
+        m[K(i)] = V(i);
     m.clear();
-    for (int i = 0; i < 200; ++i) m[K(i)] = V(i);
+    for (int i = 0; i < 200; ++i)
+        m[K(i)] = V(i);
     CHECK(m.size() == 200);
     CHECK(m[K(0)] == V(0));
 }

@@ -12,7 +12,8 @@ TEST_CASE_TEMPLATE("copy constructor deep copy", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = make_kv<V>(i * 10);
+    for (int i = 0; i < 100; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i * 10);
 
     Map m2(m);
     CHECK(m2.size() == m.size());
@@ -27,21 +28,23 @@ TEST_CASE_TEMPLATE("copy assignment", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 50; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 50; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i);
 
     Map m2;
     m2[make_kv<K>(999)] = make_kv<V>(1);
     m2 = m;
     CHECK(m2.size() == m.size());
     CHECK(m2[make_kv<K>(10)] == make_kv<V>(10));
-    CHECK_FALSE(m2.contains(make_kv<K>(999)));  // old content replaced
+    CHECK_FALSE(m2.contains(make_kv<K>(999))); // old content replaced
 }
 
 TEST_CASE_TEMPLATE("move constructor", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = make_kv<V>(i * 10);
+    for (int i = 0; i < 100; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i * 10);
 
     Map m2(std::move(m));
     CHECK(m2.size() == 100);
@@ -52,7 +55,8 @@ TEST_CASE_TEMPLATE("move assignment", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 80; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 80; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i);
 
     Map m2;
     m2[make_kv<K>(999)] = make_kv<V>(1);
@@ -66,10 +70,11 @@ TEST_CASE_TEMPLATE("self assignment", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 20; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 20; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i);
 
     Map& ref = m;
-    m = ref;            // copy self-assign
+    m = ref; // copy self-assign
     CHECK(m.size() == 20);
     CHECK(m[make_kv<K>(10)] == make_kv<V>(10));
 
@@ -83,7 +88,8 @@ TEST_CASE_TEMPLATE("swap member", Map, AllIntMaps) {
     using V = typename Map::mapped_type;
     Map a;
     Map b;
-    for (int i = 0; i < 30; ++i) a[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 30; ++i)
+        a[make_kv<K>(i)] = make_kv<V>(i);
     b[make_kv<K>(777)] = make_kv<V>(7);
 
     a.swap(b);
@@ -107,7 +113,8 @@ TEST_CASE_TEMPLATE("chained copy assign", Map, AllIntMaps) {
     Map a;
     Map b;
     Map c;
-    for (int i = 0; i < 10; ++i) a[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 10; ++i)
+        a[make_kv<K>(i)] = make_kv<V>(i);
     b = c = a;
     CHECK(b.size() == 10);
     CHECK(c.size() == 10);
