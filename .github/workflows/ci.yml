@@ -46,14 +46,14 @@ jobs:
         run: |
           package="${{ matrix.compiler }}"
           if [[ "$package" == "clang++" ]]; then package="clang"; fi
-          sudo apt-get update && sudo apt-get install -y "$package"
+          sudo apt-get update && sudo apt-get install -y "$package" ccache
 
       - name: Install coreutils + GCC on macOS
         if: runner.os == 'macOS'
         env:
           HOMEBREW_NO_REQUIRE_TAP_TRUST: '1'
         run: |
-          brew install coreutils
+          brew install coreutils ccache
           BREW_PREFIX=$(brew --prefix)
           echo "$BREW_PREFIX/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
           if [[ "${{ matrix.compiler }}" == "g++" ]]; then
@@ -72,6 +72,26 @@ jobs:
             echo "CXXFLAGS_EXTRA=" >> $GITHUB_ENV
           fi
 
+      - name: Configure ccache
+        run: |
+          export CCACHE_DIR=${{ github.workspace }}/.ccache
+          export CCACHE_COMPRESS=1
+          export CCACHE_MAXSIZE=500M
+          export CCACHE_HARDLINK=0
+          ccache --show-stats || true
+          echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
+          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('include/**/*.hpp', 'tests/**/*.cpp', 'tests/common/**/*.hpp') }}
+          restore-keys: ccache-${{ matrix.os }}-${{ matrix.compiler }}-
+
       - name: Show CPU info
         run: |
           echo "=== CPU Info ==="
@@ -86,7 +106,7 @@ jobs:
       - name: Build all tests
         run: |
           cd tests
-          CXX="${{ matrix.compiler }}"
+          CXX="ccache ${{ matrix.compiler }}"
           FLAGS="-std=c++17 -O2 $CXXFLAGS_EXTRA -I../include -I. -Icommon"
           # Unit tests (doctest-based, standalone executables)
           for f in unit/test_crud unit/test_full_api unit/test_copy_move unit/test_iterators \
@@ -142,7 +162,7 @@ jobs:
         if: runner.os != 'macOS' || matrix.compiler != 'g++'
         run: |
           cd tests
-          CXX="${{ matrix.compiler }}"
+          CXX="ccache ${{ matrix.compiler }}"
           WARN_FLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter -Werror -I../include -I. -Icommon"
           for std in 17 23; do
             echo "::group::strict warnings C++$std"
@@ -206,12 +226,31 @@ jobs:
         run: |
           package="${{ matrix.compiler }}"
           if [[ "$package" == "clang++" ]]; then package="clang"; fi
-          sudo apt-get update && sudo apt-get install -y "$package"
+          sudo apt-get update && sudo apt-get install -y "$package" ccache
+
+      - name: Configure ccache
+        run: |
+          export CCACHE_DIR=${{ github.workspace }}/.ccache
+          export CCACHE_COMPRESS=1
+          export CCACHE_MAXSIZE=500M
+          export CCACHE_HARDLINK=0
+          echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
+          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-asan-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('include/**/*.hpp', 'tests/**/*.cpp', 'tests/common/**/*.hpp') }}
+          restore-keys: ccache-asan-${{ matrix.os }}-${{ matrix.compiler }}-
 
       - name: Build with ASan+UBSan
         run: |
           cd tests
-          CXX="${{ matrix.compiler }}"
+          CXX="ccache ${{ matrix.compiler }}"
           SAN="-std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include -I. -Icommon"
           $CXX $SAN unit/test_crud.cpp -o test_crud_asan
           $CXX $SAN unit/test_full_api.cpp -o test_full_api_asan
@@ -527,7 +566,26 @@ jobs:
       - name: Install clang and libc++
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang libc++-dev libc++abi-dev
+          sudo apt-get install -y clang libc++-dev libc++abi-dev ccache
+
+      - name: Configure ccache
+        run: |
+          export CCACHE_DIR=${{ github.workspace }}/.ccache
+          export CCACHE_COMPRESS=1
+          export CCACHE_MAXSIZE=500M
+          export CCACHE_HARDLINK=0
+          echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
+          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-msan-${{ hashFiles('include/**/*.hpp', 'tests/**/*.cpp', 'tests/common/**/*.hpp') }}
+          restore-keys: ccache-msan-
 
       - name: Build with MSan
         run: |
@@ -537,10 +595,10 @@ jobs:
           # Without this, MSan reports false-positive use-of-uninitialized-value
           # because the uninstrumented libc++ runtime sets up the iostream globals.
           MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include msan_unpoison.hpp -fsanitize-ignorelist=common/msan-ignorelist.txt"
-          clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
-          clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
-          clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
-          clang++ $MSAN_FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_msan
+          ccache clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
+          ccache clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
+          ccache clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
+          ccache clang++ $MSAN_FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_msan
         shell: bash
 
       - name: Run with MSan
@@ -572,29 +630,50 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ lcov bc
+          sudo apt-get install -y g++ lcov bc ccache
+
+      - name: Configure ccache
+        run: |
+          export CCACHE_DIR=${{ github.workspace }}/.ccache
+          export CCACHE_COMPRESS=1
+          export CCACHE_MAXSIZE=500M
+          export CCACHE_HARDLINK=0
+          echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
+          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-coverage-${{ hashFiles('include/**/*.hpp', 'tests/**/*.cpp', 'tests/common/**/*.hpp') }}
+          restore-keys: ccache-coverage-
 
       - name: Build with coverage
         run: |
           cd tests
           COV="-std=c++17 -O0 -g --coverage -fprofile-arcs -ftest-coverage -I../include -I. -Icommon"
-          g++ $COV unit/test_crud.cpp -o test_crud_cov
-          g++ $COV unit/test_full_api.cpp -o test_full_api_cov
-          g++ $COV unit/test_copy_move.cpp -o test_copy_move_cov
-          g++ $COV unit/test_iterators.cpp -o test_iterators_cov
-          g++ $COV unit/test_edge_cases.cpp -o test_edge_cases_cov
-          g++ $COV unit/test_string_keys.cpp -o test_string_keys_cov
-          g++ $COV unit/test_special_keys.cpp -o test_special_keys_cov
-          g++ $COV unit/test_reserve_clear.cpp -o test_reserve_clear_cov
-          g++ $COV unit/test_allocator.cpp -o test_allocator_cov
-          g++ $COV unit/test_hashset.cpp -o test_hashset_cov
-          g++ $COV unit/test_api_coverage.cpp -o test_api_coverage_cov
-          g++ $COV memory/test_string_key_leak.cpp -o test_string_key_leak_cov
-          g++ $COV memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
-          g++ $COV memory/test_sanitizer.cpp -o test_sanitizer_cov
-          g++ $COV stress/test_stress_all.cpp -o test_stress_all_cov
-          g++ $COV stress/test_reserve_fix.cpp -o test_stress_fix_cov
-          g++ $COV -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack_cov
+          ccache g++ $COV unit/test_crud.cpp -o test_crud_cov
+          ccache g++ $COV unit/test_full_api.cpp -o test_full_api_cov
+          ccache g++ $COV unit/test_copy_move.cpp -o test_copy_move_cov
+          ccache g++ $COV unit/test_iterators.cpp -o test_iterators_cov
+          ccache g++ $COV unit/test_edge_cases.cpp -o test_edge_cases_cov
+          ccache g++ $COV unit/test_string_keys.cpp -o test_string_keys_cov
+          ccache g++ $COV unit/test_special_keys.cpp -o test_special_keys_cov
+          ccache g++ $COV unit/test_reserve_clear.cpp -o test_reserve_clear_cov
+          ccache g++ $COV unit/test_allocator.cpp -o test_allocator_cov
+          ccache g++ $COV unit/test_hashset.cpp -o test_hashset_cov
+          ccache g++ $COV unit/test_api_coverage.cpp -o test_api_coverage_cov
+          ccache g++ $COV memory/test_string_key_leak.cpp -o test_string_key_leak_cov
+          ccache g++ $COV memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
+          ccache g++ $COV memory/test_sanitizer.cpp -o test_sanitizer_cov
+          ccache g++ $COV stress/test_stress_all.cpp -o test_stress_all_cov
+          ccache g++ $COV stress/test_reserve_fix.cpp -o test_stress_fix_cov
+          ccache g++ $COV -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack_cov
+          # Known bug reproduction (expected to fail, run for coverage only)
+          ccache g++ $COV fuzz/reproduce_emhash8_bug.cpp -o test_reproduce_cov || true
         shell: bash
 
       - name: Run tests
@@ -617,6 +696,8 @@ jobs:
           ./test_stress_all_cov
           ./test_stress_fix_cov
           ./test_attack_cov
+          # Known bug reproduction (expected to fail)
+          ./test_reproduce_cov || true
         shell: bash
 
       - name: Generate coverage report

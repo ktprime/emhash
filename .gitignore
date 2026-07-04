@@ -27,29 +27,6 @@ build_tests/
 build_verify/
 vsbuild/
 bench/bin/
-tests/build/
-tests/build_asan/
-tests/build_attack/
-tests/build_bench/
-tests/build_check/
-tests/build_dbg/
-tests/build_msvc/
-tests/build_qa/
-tests/build_str/
-tests/build_verify/
-tests/build_wsl/
-tests/vsbuild/
-tests/cov_build/
-tests/coverage_html/
-tests/debug/
-tests/archive/
-tests/coverage.info
-tests/cov_*.txt
-tests/cov_run_log.txt
-tests/CMakeFiles/
-tests/.cache/
-tests/compile_commands.json
-tests/Makefile
 .cache/
 
 # CMake generated files (any location)
@@ -76,6 +53,31 @@ tests/*
 !tests/*.md
 !tests/CMakeLists.txt
 !tests/.gitignore
+# Re-ignore specific tests/ subdirectories and generated files
+# (must come after !tests/*/ to override the directory un-ignore)
+tests/build/
+tests/build_asan/
+tests/build_attack/
+tests/build_bench/
+tests/build_check/
+tests/build_dbg/
+tests/build_msvc/
+tests/build_qa/
+tests/build_str/
+tests/build_verify/
+tests/build_wsl/
+tests/vsbuild/
+tests/cov_build/
+tests/coverage_html/
+tests/debug/
+tests/archive/
+tests/coverage.info
+tests/cov_*.txt
+tests/cov_run_log.txt
+tests/CMakeFiles/
+tests/.cache/
+tests/compile_commands.json
+tests/Makefile
 # Fuzz test binaries and crash files (source .cpp files are tracked)
 tests/fuzz/bin/
 tests/fuzz/reproduce_bug

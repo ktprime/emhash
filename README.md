@@ -142,6 +142,23 @@ More examples: [docs/examples/](docs/examples/)
 
 ## Version Selection Guide
 
+### 30-Second Quick Guide
+
+Use this decision tree to pick the right version:
+
+```
+你的 key 是整数吗？
+  ├─ 是 → 追求极致性能？
+  │     ├─ 是 → emhash7 (高负载因子，无墓碑)
+  │     └─ 否 → emhash5 (内存高效，低探测)
+  │
+  └─ 否 → 编译器支持 SIMD 指令集？
+         ├─ 是 → emilib2 (SIMD 加速查找，最快)
+         └─ 否 → emhash8 (通用，快速迭代)
+```
+
+### Detailed Comparison
+
 | Version | Best For | Key Strengths | Weaknesses |
 |---------|----------|---------------|------------|
 | **emhash5** | Integer keys, fast lookup | Small-size optimization (`EMH_SMALL_SIZE`), lowest probe count | Slightly slower than emhash6 for high LF |
@@ -149,6 +166,22 @@ More examples: [docs/examples/](docs/examples/)
 | **emhash7** | Insert-heavy, mixed workloads | No tombstones, stable insert/erase, high load factor | Slightly slower erase than emhash5/6 |
 | **emhash8** | Iteration-heavy, large KV types | Dense pairs array, near-zero iteration time | Higher memory for separate index array |
 | **emilib1/2/3** | Swiss-table style SIMD-accelerated lookup | Group-level SIMD probing, very fast find | Higher memory overhead per bucket; **emilib2ss may hang under extreme hash collision attack** (all keys hashing to same bucket) — use emilib2o or emilib2s in such scenarios |
+
+### Feature Matrix
+
+| Feature | emhash5 | emhash6 | emhash7 | emhash8 | emilib1/2/3 |
+|---------|---------|---------|---------|---------|-------------|
+| Integer keys | ✅ | ✅ | ✅ | ✅ | ✅ |
+| String keys | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Custom types | ✅ | ✅ | ✅ | ✅ | ✅ |
+| High load factor (0.9+) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `try_get` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `try_set` | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `set_get` | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `shrink_to_fit` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Custom allocator | ✅ | ✅ | ✅ | ✅ | ❌ |
+| SIMD acceleration | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Fastest iteration | ❌ | ❌ | ❌ | ✅ | ❌ |
 
 See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
 
