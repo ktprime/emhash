@@ -77,12 +77,12 @@ jobs:
           export CCACHE_DIR=${{ github.workspace }}/.ccache
           export CCACHE_COMPRESS=1
           export CCACHE_MAXSIZE=500M
-          export CCACHE_HARDLINK=0
+          export CCACHE_NOHARDLINK=true
           ccache --show-stats || true
           echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
-          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+          echo "CCACHE_NOHARDLINK=true" >> $GITHUB_ENV
         shell: bash
 
       - name: Restore ccache
@@ -233,11 +233,11 @@ jobs:
           export CCACHE_DIR=${{ github.workspace }}/.ccache
           export CCACHE_COMPRESS=1
           export CCACHE_MAXSIZE=500M
-          export CCACHE_HARDLINK=0
+          export CCACHE_NOHARDLINK=true
           echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
-          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+          echo "CCACHE_NOHARDLINK=true" >> $GITHUB_ENV
         shell: bash
 
       - name: Restore ccache
@@ -573,11 +573,11 @@ jobs:
           export CCACHE_DIR=${{ github.workspace }}/.ccache
           export CCACHE_COMPRESS=1
           export CCACHE_MAXSIZE=500M
-          export CCACHE_HARDLINK=0
+          export CCACHE_NOHARDLINK=true
           echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
-          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+          echo "CCACHE_NOHARDLINK=true" >> $GITHUB_ENV
         shell: bash
 
       - name: Restore ccache
@@ -637,11 +637,11 @@ jobs:
           export CCACHE_DIR=${{ github.workspace }}/.ccache
           export CCACHE_COMPRESS=1
           export CCACHE_MAXSIZE=500M
-          export CCACHE_HARDLINK=0
+          export CCACHE_NOHARDLINK=true
           echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
-          echo "CCACHE_HARDLINK=0" >> $GITHUB_ENV
+          echo "CCACHE_NOHARDLINK=true" >> $GITHUB_ENV
         shell: bash
 
       - name: Restore ccache
