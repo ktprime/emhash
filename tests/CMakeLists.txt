@@ -23,10 +23,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ----------------------------------------------------------------------------
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -pedantic)
-    # SSE2 for SIMD intrinsics (required for emilib hash maps)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "i386|i686|x86|AMD64|amd64|x86_64")
-        add_compile_options(-msse2)
+    # SIMD level for x86 (emilib headers use SSE2 intrinsics).
+    # Configurable: cmake -DEMH_SIMD_LEVEL=AVX2|SSE2|NONE ...
+    set(EMH_SIMD_LEVEL "SSE2" CACHE STRING "SIMD level for x86 (NONE/SSE/SSE2/AVX/AVX2/AVX512)")
+    if(NOT EMH_SIMD_LEVEL STREQUAL "NONE")
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "i386|i686|x86|AMD64|amd64|x86_64")
+            string(TOLOWER "${EMH_SIMD_LEVEL}" _emh_simd_flag)
+            if(_emh_simd_flag STREQUAL "avx512")
+                set(_emh_simd_flag "avx512f")
+            endif()
+            add_compile_options(-m${_emh_simd_flag})
+            message(STATUS "emhash: SIMD enabled (-m${_emh_simd_flag})")
+        endif()
     endif()
+    unset(_emh_simd_flag)
     set(CMAKE_CXX_FLAGS_RELEASE "-O2 -flto=auto")
     set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
     # Optional sanitizer build: cmake -DEMHASH_SANITIZER=address|undefined|thread|memory
@@ -102,6 +112,7 @@ set(EMHASH_NEW_STRESS_TESTS
     test_highload
     test_bad_hash
     test_reserve_fix
+    test_million_stress
 )
 foreach(name ${EMHASH_NEW_STRESS_TESTS})
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/stress/${name}.cpp")

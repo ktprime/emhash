@@ -101,6 +101,7 @@ jobs:
           # Stress tests
           $CXX $FLAGS stress/test_stress_all.cpp -o test_stress
           $CXX $FLAGS stress/test_reserve_fix.cpp -o test_reserve_fix
+          $CXX $FLAGS stress/test_million_stress.cpp -o test_million
           # Attack tests (need EMH_SAFE_PSL)
           $CXX $FLAGS -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack
           $CXX $FLAGS -DEMH_SAFE_PSL attack/test_collision_hardening.cpp -o test_collision
@@ -130,6 +131,7 @@ jobs:
           # Stress + attack (slower)
           $TIMEOUT 600 ./test_stress
           $TIMEOUT 120 ./test_reserve_fix
+          $TIMEOUT 300 ./test_million
           $TIMEOUT 600 ./test_attack
           $TIMEOUT 300 ./test_collision
           # Debug
@@ -254,7 +256,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_hash_attack test_collision_hardening
+        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
         shell: bash
 
   cmake-install:
@@ -370,12 +372,14 @@ jobs:
           $GXX $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_gcc
           $GXX $FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_gcc
           $GXX $FLAGS stress/test_stress_all.cpp -o test_stress_gcc
+          $GXX $FLAGS stress/test_million_stress.cpp -o test_million_gcc
           ./test_crud_gcc
           ./test_full_api_gcc
           ./test_edge_cases_gcc
           ./test_string_key_leak_gcc
           ./test_lifecycle_audit_gcc
           ./test_stress_gcc
+          ./test_million_gcc
         shell: bash
 
   # ==========================================================================
@@ -405,7 +409,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_hash_attack test_collision_hardening
+        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
         shell: bash
 
       - name: Run tests
@@ -423,7 +427,7 @@ jobs:
           # Slow tests (skip in Debug — /Od too slow for high-load)
           if [[ "$CONFIG" == "Release" ]]; then
             for t in test_stress_all test_highload test_bad_hash test_reserve_fix \
-                     test_hash_attack test_collision_hardening; do
+                     test_million_stress test_hash_attack test_collision_hardening; do
               echo "=== Running $t ==="
               "$DIR/$t.exe" || { echo "::error::$t failed"; exit 1; }
             done

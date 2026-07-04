@@ -17,13 +17,23 @@ option(WITH_BENCHMARKS "Build benchmarks." OFF)
 option(WITH_EXAMPLES "Build examples." ON)
 option(WITH_TESTS "Build tests." OFF)
 
+# SIMD optimization level for x86 (emilib headers use SSE2 intrinsics;
+# emhash8 uses _mm_prefetch). Setting NONE disables intrinsics entirely.
+# Options: NONE, SSE, SSE2, AVX, AVX2, AVX512 (default: SSE2)
+set(EMH_SIMD_LEVEL "SSE2" CACHE STRING "SIMD level for x86 (NONE/SSE/SSE2/AVX/AVX2/AVX512)")
+set_property(CACHE EMH_SIMD_LEVEL PROPERTY STRINGS NONE SSE SSE2 AVX AVX2 AVX512)
+
 message("------------ Options -------------")
 message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message("  CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 message("  CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR} ")
 message("  CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message("  EMH_SIMD_LEVEL: ${EMH_SIMD_LEVEL}")
 
 add_library(emhash INTERFACE)
+# ALIAS target so in-tree consumers (examples, tests) can use the same
+# emhash::emhash name that find_package consumers use after install.
+add_library(emhash::emhash ALIAS emhash)
 
 target_include_directories(
      emhash INTERFACE
@@ -32,6 +42,20 @@ target_include_directories(
 )
 
 target_compile_features(emhash INTERFACE cxx_std_17)
+
+# Propagate SIMD flag to consumers on x86/x86_64 so the intrinsics in
+# the headers compile out-of-the-box after find_package(emhash).
+if(NOT EMH_SIMD_LEVEL STREQUAL "NONE")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"
+       AND CMAKE_SYSTEM_PROCESSOR MATCHES "i386|i686|x86|AMD64|amd64|x86_64|i[3-6]86")
+        string(TOLOWER "${EMH_SIMD_LEVEL}" _emh_simd_flag)
+        if(_emh_simd_flag STREQUAL "avx512")
+            set(_emh_simd_flag "avx512f")
+        endif()
+        target_compile_options(emhash INTERFACE -m${_emh_simd_flag})
+    endif()
+endif()
+unset(_emh_simd_flag)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
