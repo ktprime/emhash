@@ -402,13 +402,13 @@ public:
     HashMap(std::initializer_list<value_type> ilist) noexcept {
         init(static_cast<size_type>(ilist.size()));
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <class InputIt> HashMap(InputIt first, InputIt last, size_type bucket_count = 4) noexcept {
         init(static_cast<size_type>(std::distance(first, last)) + bucket_count);
         for (; first != last; ++first)
-            emplace(*first);
+            (void)emplace(*first);
     }
 
     explicit HashMap(const AllocT& alloc) noexcept : _alloc(PairAlloc(alloc)) { init(2, EMH_DEFAULT_LOAD_FACTOR); }
@@ -1025,13 +1025,13 @@ public:
     void insert(std::initializer_list<value_type> ilist) {
         reserve(ilist.size() + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <typename Iter> void insert(Iter first, Iter last) {
         reserve(std::distance(first, last) + _num_filled);
         for (; first != last; ++first)
-            emplace(*first);
+            (void)emplace(*first);
     }
 
     // Returns a pointer to the value if key is at bucket, otherwise nullptr.
@@ -1147,7 +1147,7 @@ public:
     /// return 0 if not erase
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    [[nodiscard]] size_type erase(const KeyT& key) {
+    size_type erase(const KeyT& key) {
         const auto bucket = erase_key(key);
         if (bucket == INACTIVE)
             return 0;
@@ -1157,7 +1157,7 @@ public:
     }
 
     // iterator erase(const_iterator begin_it, const_iterator end_it)
-    [[nodiscard]] iterator erase(const_iterator cit) {
+    iterator erase(const_iterator cit) {
         const auto bucket = erase_bucket(cit._bucket);
         clear_bucket(bucket);
 
@@ -1171,7 +1171,7 @@ public:
         clear_bucket(bucket);
     }
 
-    template <typename Pred> [[nodiscard]] size_type erase_if(Pred pred) {
+    template <typename Pred> size_type erase_if(Pred pred) {
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last;) {
             if (pred(*it))
@@ -1251,7 +1251,7 @@ public:
     }
 
     /// Make room for this many elements
-    [[nodiscard]] bool reserve(uint64_t num_elems) noexcept {
+    bool reserve(uint64_t num_elems) noexcept {
 #if EMH_HIGH_LOAD < 1000
         const auto required_buckets = (num_elems * _mlf >> 27);
         if (EMH_LIKELY(required_buckets < static_cast<uint64_t>(_mask)))

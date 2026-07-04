@@ -256,13 +256,13 @@ public:
     HashMap(std::initializer_list<value_type> ilist) {
         init(static_cast<size_type>(ilist.size()));
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <class InputIt> HashMap(InputIt first, InputIt last, size_type bucket_count = 4) {
         init(static_cast<size_type>(std::distance(first, last)) + bucket_count);
         for (; first != last; ++first)
-            emplace(*first);
+            (void)emplace(*first);
     }
 
     explicit HashMap(const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) { init(2); }
@@ -785,7 +785,7 @@ public:
     void insert(std::initializer_list<value_type> ilist) {
         reserve(ilist.size() + _num_filled, false);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     /// @brief Insert a key-value pair without checking for duplicates.
@@ -892,7 +892,7 @@ public:
     /// @return 1 if the element was erased, 0 if the key was not found.
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    [[nodiscard]] size_type erase(const KeyT& key) {
+    size_type erase(const KeyT& key) {
         const auto key_hash = hash_key(key);
         const auto sbucket = find_filled_bucket(key, key_hash);
         if (sbucket == INACTIVE)
@@ -904,7 +904,7 @@ public:
     }
 
     // iterator erase(const_iterator begin_it, const_iterator end_it)
-    [[nodiscard]] iterator erase(const const_iterator& cit) {
+    iterator erase(const const_iterator& cit) {
         const auto slot = static_cast<size_type>(cit.kv_ - _pairs);
         size_type main_bucket;
         const auto sbucket = find_slot_bucket(slot, main_bucket);
@@ -913,7 +913,7 @@ public:
     }
 
     // only last >= first
-    [[nodiscard]] iterator erase(const_iterator first, const_iterator last) {
+    iterator erase(const_iterator first, const_iterator last) {
         auto esize = static_cast<long>(last.kv_ - first.kv_);
         auto tsize = static_cast<long>((_pairs + _num_filled) - last.kv_); // last to tail size
         auto next = first;
@@ -931,7 +931,7 @@ public:
         return {this, size_type(next.kv_ - _pairs)};
     }
 
-    template <typename Pred> [[nodiscard]] size_type erase_if(Pred pred) {
+    template <typename Pred> size_type erase_if(Pred pred) {
         auto old_size = size();
         for (auto it = begin(); it != end();) {
             if (pred(*it))

@@ -26,7 +26,7 @@ TEST_CASE_TEMPLATE("hardening: 100% same-bucket collision", Map,
     const int N = 8000;
     Map m;
 
-    for (int i = 0; i < N; ++i) m.emplace(i, i);
+    for (int i = 0; i < N; ++i) (void)m.emplace(i, i);
     CHECK(static_cast<int>(m.size()) == N);
 
     for (int i = 0; i < N; ++i) {
@@ -44,7 +44,7 @@ TEST_CASE_TEMPLATE("hardening: 100% same-bucket collision", Map,
     }
 
     // reinsert erased keys
-    for (int i = 0; i < N; i += 2) m.emplace(i, i * 10);
+    for (int i = 0; i < N; i += 2) (void)m.emplace(i, i * 10);
     CHECK(static_cast<int>(m.size()) == N);
     for (int i = 0; i < N; ++i) {
         auto it = m.find(i);
@@ -63,7 +63,7 @@ TEST_CASE_TEMPLATE("hardening: 4-bucket concentration", Map,
     const int N = 4000;
     Map m;
 
-    for (int i = 0; i < N; ++i) m.emplace(i, i);
+    for (int i = 0; i < N; ++i) (void)m.emplace(i, i);
     CHECK(static_cast<int>(m.size()) == N);
 
     for (int i = 0; i < N; ++i) {
@@ -75,7 +75,7 @@ TEST_CASE_TEMPLATE("hardening: 4-bucket concentration", Map,
     // erase + churn
     for (int round = 0; round < 3; ++round) {
         for (int i = round; i < N; i += 3) m.erase(i);
-        for (int i = round; i < N; i += 3) m.emplace(i, i + round);
+        for (int i = round; i < N; i += 3) (void)m.emplace(i, i + round);
     }
     CHECK(static_cast<int>(m.size()) == N);
 }
@@ -94,7 +94,7 @@ TEST_CASE("hardening: adaptive key craft (emhash5)") {
     // forcing them to share the same hash slot.
     const auto bc = m.bucket_count();
     for (int i = 0; i < N; ++i) {
-        m.emplace(static_cast<int>(i * bc), i);
+        (void)m.emplace(static_cast<int>(i * bc), i);
     }
     CHECK(static_cast<int>(m.size()) == N);
 
@@ -118,13 +118,13 @@ TEST_CASE("hardening: adaptive key craft (emhash5)") {
 TEST_CASE_TEMPLATE("hardening: random key baseline", Map, AllIntMaps) {
     const int N = 5000;
     Map m;
-    std::mt19937_64 rng(0xDEADBEEFu);
+    std::mt19937_64 rng(0xDEADBEEFU);
     std::unordered_set<int> keys;
 
     for (int i = 0; i < N; ++i) {
         int k = static_cast<int>(rng());
         keys.insert(k);
-        m.emplace(k, i);
+        (void)m.emplace(k, i);
     }
     CHECK(m.size() == keys.size());
 

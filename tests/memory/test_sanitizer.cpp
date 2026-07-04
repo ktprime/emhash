@@ -27,27 +27,27 @@
 // ============================================================================
 TEST_CASE_TEMPLATE("sanitizer: clear resets state", Map, AllIntMaps) {
     Map m;
-    for (int i = 0; i < 1000; ++i) m.emplace(i, i * 2);
+    for (int i = 0; i < 1000; ++i) (void)m.emplace(i, i * 2);
     CHECK(m.size() == 1000);
     m.clear();
     CHECK(m.empty());
 
-    for (int i = 0; i < 1000; ++i) m.emplace(i, i + 1);
+    for (int i = 0; i < 1000; ++i) (void)m.emplace(i, i + 1);
     CHECK(m.size() == 1000);
     for (int i = 0; i < 1000; ++i) CHECK(m.find(i) != m.end());
     m.clear();
-    for (int i = 0; i < 1000; ++i) m.emplace(i, i - 1);
+    for (int i = 0; i < 1000; ++i) (void)m.emplace(i, i - 1);
     CHECK(m.size() == 1000);
 }
 
 TEST_CASE_TEMPLATE("sanitizer: clear resets state (string keys)", Map, AllStringMaps) {
     Map m;
-    for (int i = 0; i < 256; ++i) m.emplace(std::to_string(i), i);
+    for (int i = 0; i < 256; ++i) (void)m.emplace(std::to_string(i), i);
     CHECK(m.size() == 256);
     m.clear();
     CHECK(m.empty());
 
-    for (int i = 0; i < 256; ++i) m.emplace(std::string("k_") + std::to_string(i), i);
+    for (int i = 0; i < 256; ++i) (void)m.emplace(std::string("k_") + std::to_string(i), i);
     CHECK(m.size() == 256);
     for (int i = 0; i < 256; ++i)
         CHECK(m.find(std::string("k_") + std::to_string(i)) != m.end());
@@ -59,7 +59,7 @@ TEST_CASE_TEMPLATE("sanitizer: clear resets state (string keys)", Map, AllString
 TEST_CASE_TEMPLATE("sanitizer: erase + reinsert cycle", Map, AllIntMaps) {
     Map m;
     for (int round = 0; round < 10; ++round) {
-        for (int i = 0; i < 500; ++i) m.emplace(i, i);
+        for (int i = 0; i < 500; ++i) (void)m.emplace(i, i);
         for (int i = 0; i < 500; i += 2) m.erase(i);
         for (int i = 0; i < 500; ++i) {
             if (i & 1) CHECK(m.find(i) != m.end());
@@ -74,9 +74,9 @@ TEST_CASE_TEMPLATE("sanitizer: erase + reinsert cycle", Map, AllIntMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("sanitizer: string key reuse after clear", Map, AllStringMaps) {
     Map m;
-    for (int i = 0; i < 256; ++i) m.emplace(std::to_string(i), i);
+    for (int i = 0; i < 256; ++i) (void)m.emplace(std::to_string(i), i);
     m.clear();
-    for (int i = 0; i < 256; ++i) m.emplace(std::string("v2_") + std::to_string(i), i * 2);
+    for (int i = 0; i < 256; ++i) (void)m.emplace(std::string("v2_") + std::to_string(i), i * 2);
     CHECK(m.size() == 256);
     for (int i = 0; i < 256; ++i)
         CHECK(m.find(std::string("v2_") + std::to_string(i)) != m.end());
@@ -91,7 +91,7 @@ TEST_CASE_TEMPLATE("sanitizer: bucket count boundaries", Map, AllIntMaps) {
     for (int n : sizes) {
         Map m;
         m.reserve(static_cast<size_t>(n));
-        for (int i = 0; i < n; ++i) m.emplace(i, i + 1);
+        for (int i = 0; i < n; ++i) (void)m.emplace(i, i + 1);
         CHECK(static_cast<int>(m.size()) == n);
         for (int i = 0; i < n; ++i) {
             auto it = m.find(i);
@@ -107,7 +107,7 @@ TEST_CASE_TEMPLATE("sanitizer: bucket count boundaries", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("sanitizer: high load factor", Map, AllIntMaps) {
     Map m;
     m.max_load_factor(0.95F);
-    for (int i = 0; i < 50000; ++i) m.emplace(i, i);
+    for (int i = 0; i < 50000; ++i) (void)m.emplace(i, i);
     CHECK(m.size() == 50000);
     for (int i = 0; i < 50000; i += 7) CHECK(m.find(i) != m.end());
 }
@@ -124,7 +124,7 @@ TEST_CASE("sanitizer: cross-implementation consistency emhash5 vs emilib1") {
     for (int i = 0; i < 5000; ++i) keys.push_back(static_cast<int>(rng()));
 
     A a; B b;
-    for (int k : keys) { a.emplace(k, k * 3); b.emplace(k, k * 3); }
+    for (int k : keys) { (void)a.emplace(k, k * 3); (void)b.emplace(k, k * 3); }
     CHECK(a.size() == b.size());
     for (int k : keys) {
         auto ita = a.find(k);
@@ -155,7 +155,7 @@ TEST_CASE("sanitizer: cross-implementation consistency emhash8 vs emhash5") {
 // ============================================================================
 TEST_CASE_TEMPLATE("sanitizer: copy/move no leak (string keys)", Map, AllStringMaps) {
     Map src;
-    for (int i = 0; i < 2000; ++i) src.emplace(std::to_string(i), i);
+    for (int i = 0; i < 2000; ++i) (void)src.emplace(std::to_string(i), i);
 
     Map copy = src;
     CHECK(copy.size() == src.size());
@@ -178,7 +178,7 @@ TEST_CASE_TEMPLATE("sanitizer: collision attack (clustered keys)", Map, AllIntMa
     Map m;
     m.reserve(8192);
     const int N = 4096;
-    for (int i = 0; i < N; ++i) m.emplace(i * 4093, i);
+    for (int i = 0; i < N; ++i) (void)m.emplace(i * 4093, i);
     CHECK(static_cast<int>(m.size()) == N);
     for (int i = 0; i < N; ++i) {
         auto it = m.find(i * 4093);

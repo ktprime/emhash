@@ -243,7 +243,7 @@ public:
     template <class InputIt> HashSet(InputIt first, InputIt last, size_type bucket_count = 4) {
         init(std::distance(first, last) + bucket_count, default_load_factor);
         for (; first != last; ++first)
-            emplace(*first);
+            (void)emplace(*first);
     }
 
     HashSet& operator=(const HashSet& other) {

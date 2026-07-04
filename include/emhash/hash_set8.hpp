@@ -266,7 +266,7 @@ public:
     HashSet(std::initializer_list<value_type> ilist) {
         init(static_cast<size_type>(ilist.size()));
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <class InputIt> HashSet(InputIt begin, InputIt last, size_type bucket_count = 4) {
@@ -676,7 +676,7 @@ public:
     void insert(std::initializer_list<value_type> ilist) {
         reserve(ilist.size() + _num_filled, false);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <typename Iter> void insert(Iter first, Iter last) {

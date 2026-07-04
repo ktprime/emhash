@@ -594,7 +594,7 @@ public:
     void insert(std::initializer_list<value_type> ilist) noexcept {
         rehash(static_cast<size_t>(ilist.size()) + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <typename K, typename V> size_t insert_unique(K&& key, V&& val) noexcept {

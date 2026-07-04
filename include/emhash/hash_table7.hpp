@@ -562,13 +562,13 @@ public:
     HashMap(std::initializer_list<value_type> ilist) {
         init(static_cast<size_type>(ilist.size()));
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <class InputIt> HashMap(InputIt first, InputIt last, size_type bucket_count = 4) {
         init(static_cast<size_type>(std::distance(first, last)) + bucket_count);
         for (; first != last; ++first)
-            emplace(*first);
+            (void)emplace(*first);
     }
 
     HashMap& operator=(const HashMap& rhs) {
@@ -1076,7 +1076,7 @@ public:
     void insert(std::initializer_list<value_type> ilist) {
         reserve(ilist.size() + _num_filled);
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
-            do_insert(*it);
+            (void)do_insert(*it);
     }
 
     template <typename Iter> void insert(Iter first, Iter last) {
@@ -1162,7 +1162,7 @@ public:
     // -------------------------------------------------------
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    template <typename Key = KeyT> [[nodiscard]] size_type erase(const Key& key) {
+    template <typename Key = KeyT> size_type erase(const Key& key) {
         const auto bucket = erase_key(key);
         if (bucket == INACTIVE)
             return 0;
@@ -1172,14 +1172,14 @@ public:
     }
 
     // iterator erase const_iterator
-    [[nodiscard]] iterator erase(const_iterator cit) {
+    iterator erase(const_iterator cit) {
         iterator it(cit);
         return erase(it);
     }
 
     /// Erase an element typedef an iterator.
     /// Returns an iterator to the next element (or end()).
-    [[nodiscard]] iterator erase(iterator it) {
+    iterator erase(iterator it) {
         // Ensure _bmask is initialized before we modify _bitmask.
         // If _from == -1 (lazy init), ++it would trigger init() AFTER
         // clear_bucket() — loading _bmask from the already-updated
@@ -1207,7 +1207,7 @@ public:
         clear_bucket(bucket);
     }
 
-    template <typename Pred> [[nodiscard]] size_type erase_if(Pred pred) {
+    template <typename Pred> size_type erase_if(Pred pred) {
         auto old_size = size();
         for (auto it = begin(), last = end(); it != last;) {
             if (pred(*it))
@@ -1261,7 +1261,7 @@ public:
     void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
 
     /// Make room for this many elements
-    [[nodiscard]] bool reserve(uint64_t num_elems) noexcept {
+    bool reserve(uint64_t num_elems) noexcept {
         const auto required_buckets = (num_elems * _mlf >> 28);
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
