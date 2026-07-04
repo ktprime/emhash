@@ -67,6 +67,18 @@ cp include/emhash/hash_table7.hpp /your/project/emhash/
 # Option B: Clone and include
 git clone https://github.com/ktprime/emhash.git
 # Then add -I/path/to/emhash/include to your compiler flags
+
+# Option C: CMake FetchContent (no install needed)
+# Add to your CMakeLists.txt:
+#   include(FetchContent)
+#   FetchContent_Declare(emhash GIT_REPOSITORY https://github.com/ktprime/emhash.git GIT_TAG v1.1.0)
+#   FetchContent_MakeAvailable(emhash)
+#   target_link_libraries(your_target PRIVATE emhash::emhash)
+
+# Option D: CMake find_package (after install)
+# cmake -B build -DCMAKE_PREFIX_PATH=/path/to/emhash-install
+# In CMakeLists.txt: find_package(emhash REQUIRED CONFIG)
+#   target_link_libraries(your_target PRIVATE emhash::emhash)
 ```
 
 ```cpp

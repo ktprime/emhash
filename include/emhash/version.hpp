@@ -1,8 +1,8 @@
 #pragma once
 
 // emhash version macros
-// Generated from VERSION file at repo root.
-// https://github.com/ktprime/emhash
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2019-2026 Huang Yuanbing bailuzhou@163.com
 
 #define EMHASH_VERSION_MAJOR 1
 #define EMHASH_VERSION_MINOR 1

@@ -173,6 +173,103 @@ g++ -DEMH_HIGH_LOAD=123456 -O3 -std=c++17 your_app.cpp
 emhash7::HashMap<int, int> map(1024, 0.95f);  // 95% load factor
 ```
 
+## Compile-Time Macros
+
+### 19. High Load Factor (`EMH_HIGH_LOAD`)
+
+Enables load factors up to **0.999** in emhash5/8 (emhash6/7 support it natively via `max_load_factor()`).
+
+```bash
+# Enable high load factor mode (value controls the rehash threshold)
+g++ -DEMH_HIGH_LOAD=123456 -O3 -std=c++17 your_app.cpp
+```
+
+```cpp
+emhash5::HashMap<int, int> map(1024, 0.999f);  // Requires -DEMH_HIGH_LOAD
+emhash7::HashMap<int, int> map(1024, 0.999f);  // Works natively
+```
+
+> **Trade-off**: Higher load factor saves memory but slightly increases probe length on lookup.
+
+### 20. Small-Size Optimization (`EMH_SMALL_SIZE`)
+
+emhash5 can avoid heap allocation for very small maps by using a stack-allocated buffer.
+
+```bash
+# Use stack buffer for maps with ≤ N buckets (default: off)
+g++ -DEMH_SMALL_SIZE=16 -O3 -std=c++17 your_app.cpp
+```
+
+Best for maps that are usually empty or contain only a few elements.
+
+### 21. Integer Hash Mixing (`EMH_INT_HASH`)
+
+By default, `std::hash<int>` is the identity function, which can cause clustering with sequential keys (0, 1, 2, ...) in power-of-2 bucket tables. `EMH_INT_HASH` enables golden-ratio bit mixing.
+
+```bash
+# 1 = golden-ratio mixing (recommended for sequential keys)
+# 2 = murmur-style mixing
+# 3 = splitmix64 mixing
+g++ -DEMH_INT_HASH=1 -O3 -std=c++17 your_app.cpp
+```
+
+### 22. Bucket Index Layout (`EMH_BUCKET_INDEX`)
+
+Controls the memory layout of the `entry` struct in emhash5/6 (affects cache behavior):
+
+| Value | Layout | Best For |
+|-------|--------|----------|
+| `0` (default) | `{bucket, {key, value}}` | General use |
+| `1` | `{value, bucket, key}` | Key-heavy workloads (default for emhash6) |
+| `2` | `{{key, value}, bucket}` | Value-heavy workloads |
+
+```bash
+g++ -DEMH_BUCKET_INDEX=2 -O3 -std=c++17 your_app.cpp
+```
+
+### 23. Size Type Width (`EMH_SIZE_TYPE_16BIT` / `EMH_SIZE_TYPE_64BIT`)
+
+Controls the `size_type` used for bucket indices:
+
+| Macro | `size_type` | Max Buckets | Memory Savings |
+|-------|-------------|-------------|----------------|
+| (default) | `uint32_t` | ~4 billion | — |
+| `EMH_SIZE_TYPE_16BIT` | `uint16_t` | ~65K | 2 bytes/entry |
+| `EMH_SIZE_TYPE_64BIT` | `uint64_t` | ~18 quintillion | -4 bytes/entry |
+
+```bash
+# For small maps (< 65K elements), use 16-bit indices to save memory
+g++ -DEMH_SIZE_TYPE_16BIT -O3 -std=c++17 your_app.cpp
+```
+
+### 24. LRU Mode (`EMH_LRU_SET`)
+
+Enables LRU-style access ordering on emhash5/7/8 hash sets.
+
+```bash
+g++ -DEMH_LRU_SET=1 -O3 -std=c++17 your_app.cpp
+```
+
+See also the dedicated LRU implementations: `emhash/lru_size.hpp` and `emhash/lru_time.hpp`.
+
+### 25. SIMD Level (`EMH_SIMD_LEVEL`)
+
+Controls the SIMD instruction set used by emilib (CMake option):
+
+```bash
+# Via CMake
+cmake -DEMH_SIMD_LEVEL=AVX2 ...
+
+# Via compiler flag (non-CMake build)
+g++ -mavx2 -O3 -std=c++17 your_app.cpp
+```
+
+| Level | emilib Support |
+|-------|---------------|
+| `SSE2` (default) | All emilib versions |
+| `AVX2` | emilib2/3 wider SIMD |
+| `NONE` | Disables SIMD intrinsics (portability fallback) |
+
 ## Anti-Patterns to Avoid
 
 ### 16. Don't Rehash in Hot Loops

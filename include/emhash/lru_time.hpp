@@ -1,11 +1,7 @@
-// By Huang Yuanbing 2019-2024
-// bailuzhou@163.com
-// version 2.1.1
-
-// LICENSE:
-//   This software is dual-licensed to the public domain and under the following
-//   license: you are granted a perpetual, irrevocable license to copy, modify,
-//   publish, and distribute this file as you see fit.
+// emhash LRU cache (time-based eviction)
+// https://github.com/ktprime/emhash
+// SPDX-License-Identifier: Unlicense OR MIT-0
+// Copyright (c) 2019-2026 Huang Yuanbing bailuzhou@163.com
 
 // From
 // NUMBER OF PROBES / LOOKUP       Successful            Unsuccessful
