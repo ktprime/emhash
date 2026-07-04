@@ -89,7 +89,6 @@ public:
     using htype = HashSet<KeyT, HashT, EqT, AllocT, Policy>;
     using value_type = KeyT;
     using key_type = const KeyT;
-    // using dPolicy = Policy;
 
 #if defined(EMH_SMALL_TYPE)
     using size_type = uint16_t;
@@ -612,8 +611,6 @@ public:
 
     template <typename K = KeyT> size_type count(const K& key) const noexcept {
         return find_filled_slot(key) == _num_filled ? 0 : 1;
-        // return find_sorted_bucket(key) == END ? 0 : 1;
-        // return find_hash_bucket(key) == END ? 0 : 1;
     }
 
     template <typename K = KeyT> std::pair<iterator, iterator> equal_range(const K& key) {
@@ -915,7 +912,6 @@ public:
             dump_statics();
 #endif
 
-        // assert(required_buckets < max_size());
         rehash(required_buckets + 2);
         return true;
     }
@@ -1273,8 +1269,6 @@ private:
             const auto& okey = _pairs[slot + i];
             if (_eq(key, okey))
                 return slot + i;
-            //            else if (okey > key)
-            //                return END;
         }
 
         return END;

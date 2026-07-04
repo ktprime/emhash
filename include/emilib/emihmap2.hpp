@@ -963,7 +963,6 @@ private:
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
 
-        // const auto filled = SET1_EPI8(key_h2);
         const auto filled = SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
 
         auto next_bucket = main_bucket;

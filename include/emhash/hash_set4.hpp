@@ -1037,8 +1037,6 @@ private:
         const auto& bucket_key = _pairs[bucket].first;
         if (next_bucket == INACTIVE)
             return _num_buckets;
-        //        else if (bucket != (hash_bucket(bucket_key) & _mask))
-        //            return _num_buckets;
         else if (_eq(key, bucket_key))
             return bucket;
         else if (next_bucket == bucket)
@@ -1117,7 +1115,6 @@ private:
         }
 
         // find a new empty and link it to tail
-        //        auto find_bucket = next_bucket > main_bucket + 8 ? main_bucket + 2 : next_bucket;
         const auto new_bucket = find_empty_bucket(bucket);
         return _pairs[next_bucket].second = new_bucket;
     }
@@ -1129,8 +1126,7 @@ private:
         if (_pairs[++bucket_from].second == INACTIVE)
             return bucket_from;
 
-        // fibonacci an2 = an1 + an0 --> 1, 2, 3, 5, 8, 13, 21 ...
-        //        for (size_type last = 2, slot = 3; ; slot += last, last = slot - last) {
+        // fibonacci probing: 1, 2, 3, 5, 8, 13, 21 ...
         for (size_type last = 2, slot = 2;; slot += ++last) {
             const auto bucket1 = (bucket_from + slot) & _mask;
             if (_pairs[bucket1].second == INACTIVE)
@@ -1162,8 +1158,6 @@ private:
         memcpy(&bmask, start, sizeof(bmask));
         bmask >>= boset;
 #else
-        // const auto boset = bucket_from % SIZE_BIT;
-        // auto* const start = (size_t*)_bitmask + bucket_from / SIZE_BIT;
         size_t bmask;
         memcpy(&bmask, start + 0, sizeof(bmask));
         bmask >>= boset;

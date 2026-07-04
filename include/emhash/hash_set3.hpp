@@ -398,8 +398,6 @@ public:
     /// Returns average number of elements per bucket.
     float load_factor() const {
         return _total_buckets ? (static_cast<float>(size())) / _total_buckets : 0.0f;
-        // return (_num_colls / static_cast<float>(_colls_buckets));
-        // return (_num_mains / static_cast<float>(_mains_buckets + 1));
     }
 
     const HashT& hash_function() const { return _hasher; }
@@ -578,7 +576,6 @@ public:
     void del_key(size_type bucket, const KeyT& key) {
         const auto main_bucket = hash_main_bucket(key);
         auto& bucket_size = EMH_BUCKET(_pairs, main_bucket);
-        // assert(bucket_size != INACTIVE);
 
         bucket_size -= 2;
         _num_colls -= 1;
@@ -655,7 +652,6 @@ public:
         return insert_unique(std::forward<Args>(args)...);
     }
 
-    // for private:
     size_type try_insert_mainbucket(const KeyT& key) {
         const auto main_bucket = hash_main_bucket(key);
         auto& bucket_size = EMH_BUCKET(_pairs, main_bucket);
@@ -725,7 +721,6 @@ public:
             return ++it;
         }
 
-        // assert(it->first == EMH_KEY(_pairs, it._bucket));
         const auto bucket = erase_bucket(it._bucket);
         del_key(bucket, EMH_KEY(_pairs, bucket));
         if (empty())
@@ -769,7 +764,6 @@ public:
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
-        // auto required_buckets = (size_type)(((uint64_t)num_elems * _mlf) >> 13);
         const auto required_buckets = num_elems * 10 / 8 + 2;
         if (EMH_LIKELY(required_buckets < _colls_buckets))
             return false;
@@ -864,7 +858,6 @@ public:
             auto& old_pair = old_pairs[src_bucket];
 
             auto next_bucket = EMH_BUCKET(_pairs, new_main_bucket);
-            // assert(next_bucket != INACTIVE);
             // check current bucket_key is in main bucket or not
             if (next_bucket != new_main_bucket)
                 next_bucket = find_last_bucket(next_bucket);

@@ -76,7 +76,6 @@ template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::e
           typename AllocT = std::allocator<KeyT>>
 class HashSet {
 public:
-    // if constexpr (sizeof(KeyT) <= 4 && std::is_integral<KeyT>::value)
 #if EMH_SIZE_TYPE_BIT == 64
     using size_type = uint64_t;
 #elif EMH_SIZE_TYPE_BIT == 16
@@ -380,12 +379,9 @@ public:
             }
 
             const auto node = _pairs[bucket].first;
-            //            if (bucket == hash_bucket(node))
-            //                key++;
 
             if (node->expire < min_key && node->expire > 0) {
                 min_key = node->expire;
-                //                if (min_key <= key) break;
             }
         }
         return min_key;
@@ -439,7 +435,6 @@ public:
         const auto& node = _pairs[bucket].first;
         // check current bucket_key is in main bucket or not
         const auto main_bucket = hash_bucket(node);
-        // assert(main_bucket == hash_bucket(_pairs[next_bucket].first));
         if (main_bucket != bucket)
             return INACTIVE;
         else if (next_bucket == main_bucket && node->expire != key)
@@ -845,7 +840,6 @@ private:
         num_buckets += num_buckets / 5 + 5;
 #endif
 
-        // assert(num_buckets > _num_filled);
         auto new_pairs = static_cast<PairT*>(alloc_bucket(num_buckets));
         auto old_num_filled = _num_filled;
         auto old_num_buckets = _num_buckets;
@@ -1115,7 +1109,6 @@ private:
                 if (INACTIVE == _pairs[_last_colls].second || INACTIVE == _pairs[++_last_colls].second)
                     return _last_colls++;
                 _last_colls &= _mask;
-                // auto tail = (_num_buckets / 2 + _last_colls) & _mask;
                 auto tail = _num_buckets - _last_colls;
                 if (INACTIVE == _pairs[tail].second || INACTIVE == _pairs[--tail].second)
                     return tail;

@@ -179,7 +179,6 @@ public:
 #endif
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        // return hash_253_map[static_cast<uint8_t>(key_hash)];//static_cast<int8_t>((key_hash % 253) + EFILLED);
         return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
     }
 
@@ -832,7 +831,6 @@ public:
         auto collision = 0;
 #endif
 
-        // for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
             if (old_states[src_bucket] >= State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
@@ -923,7 +921,6 @@ private:
         size_t offset = 0;
         const auto key_h2 = hash_key2(main_bucket, key);
         const auto filled = SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
-        //        const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
 
         do {

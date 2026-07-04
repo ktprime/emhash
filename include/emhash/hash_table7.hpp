@@ -1456,8 +1456,6 @@ private:
 
         prefetch_heap_block(reinterpret_cast<char*>(&_pairs[bucket]));
         auto next_bucket = bucket;
-        //        else if (bucket != (hash_key(bucket_key) & _mask))
-        //            return _num_buckets;
 
         while (true) {
             if (_eq(key, EMH_KEY(_pairs, next_bucket)))
@@ -1472,10 +1470,12 @@ private:
         return _num_buckets;
     }
 
-    // kick out bucket and find empty to occupy
-    // it will break the original link and relink again.
-    // before: main_bucket-->prev_bucket --> bucket   --> next_bucket
-    // after : main_bucket-->prev_bucket --> (removed)--> new_bucket--> next_bucket
+    // Relocate a "guest" bucket (occupying another key's main position) to an
+    // empty slot, freeing the main bucket for its rightful owner. Adapted from
+    // Lua's table design so the chain head always sits at its hash position.
+    //
+    // before: kmain --> ... --> prev --> kbucket --> next
+    // after : kmain --> ... --> prev --> new_bucket --> next , kbucket freed
     size_type kickout_bucket(const size_type kmain, const size_type kbucket) {
         const auto next_bucket = EMH_BUCKET(_pairs, kbucket);
         const auto new_bucket = find_empty_bucket(next_bucket, kbucket);
@@ -1492,13 +1492,14 @@ private:
         return kbucket;
     }
 
-    /*
-    ** inserts a new key into a hash table; first check whether key's main
-    ** bucket/position is free. If not, check whether colliding node/bucket is in its main
-    ** position or not: if it is not, move colliding bucket to an empty place and
-    ** put new key in its main position; otherwise (colliding bucket is in its main
-    ** position), new key goes to an empty position. ***/
-
+    // Core insert/lookup dispatcher using separate chaining with kickout:
+    //  1. If the main bucket is empty, use it directly.
+    //  2. If it holds a guest (key whose hash maps elsewhere), kick the guest
+    //     out and claim the main bucket.
+    //  3. Otherwise walk the collision chain: return the matching bucket, or
+    //     append a new empty slot at the chain tail for a fresh insertion.
+    // isempty is set to false if the key already exists, true if a new slot
+    // was allocated.
     template <typename K = KeyT> size_type find_or_allocate(const K& key, bool& isempty) {
         const auto bucket = hash_key(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);

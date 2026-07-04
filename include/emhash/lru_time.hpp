@@ -346,7 +346,6 @@ public:
     bool check_timeout(uint32_t bucket) {
         // check only main bucket
         if (IS_TIMEOUT(_pairs, bucket) || hash_bucket(EMH_KEY(_pairs, bucket)) == bucket) {
-            //_pairs[bucket].~PairT();
             clear_bucket(bucket);
             return true;
         }
@@ -711,7 +710,7 @@ public:
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE) {
             NEW_KVALUE(key, std::move(ValueT()), bucket);
         } else {
-            // TODO:replace the key
+            // Bucket holds a timed-out entry: replace its key and reset value.
             if (IS_TIMEOUT(_pairs, bucket)) {
                 EMH_KEY(_pairs, bucket) = key;
                 EMH_VAL(_pairs, bucket) = ValueT();
@@ -1042,7 +1041,7 @@ private:
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE || NEXT_BUCKET(_pairs, ++bucket) == INACTIVE)
             return bucket;
 
-        // for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+        // fibonacci probing: 1, 2, 3, 5, 8, 13, 21 ...
         for (uint32_t last = 1, slot = 4;; slot += ++last) {
             auto bucket1 = (bucket_from + slot) & _mask;
             if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE || NEXT_BUCKET(_pairs, ++bucket1) == INACTIVE)

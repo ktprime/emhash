@@ -698,11 +698,9 @@ private:
                 maskf &= maskf - 1;
             }
 
-            //            if (_max_probe_length >= set_simd_bytes) {
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_empty));
             if (maske != 0)
                 break;
-            //            }
 
             next_bucket += set_simd_bytes;
             if (EMH_UNLIKELY(next_bucket >= _num_buckets)) {

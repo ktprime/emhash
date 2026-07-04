@@ -116,7 +116,6 @@ public:
     using value_type = std::pair<KeyT, ValueT>;
     using key_type = const KeyT;
     using mapped_type = ValueT;
-    // using dPolicy = Policy;
 
 #if defined(EMH_SMALL_TYPE)
     using size_type = uint16_t;
@@ -460,7 +459,6 @@ public:
     void max_load_factor(float mlf) {
         if (mlf <= 0.999f && mlf > EMH_MIN_LOAD_FACTOR) {
             _mlf = static_cast<uint32_t>((1 << 28) / mlf);
-            // if (_num_buckets > 0) rehash(_num_buckets);
         }
     }
 
@@ -631,8 +629,6 @@ public:
 
     template <typename K = KeyT> size_type count(const K& key) const noexcept {
         return find_filled_slot(key) == _num_filled ? 0 : 1;
-        // return find_sorted_bucket(key) == END ? 0 : 1;
-        // return find_hash_bucket(key) == END ? 0 : 1;
     }
 
     template <typename K = KeyT> std::pair<iterator, iterator> equal_range(const K& key) {
@@ -1085,7 +1081,6 @@ public:
             dump_statics();
 #endif
 
-        // assert(required_buckets < max_size());
         rehash(required_buckets + 2);
         return true;
     }
@@ -1483,20 +1478,19 @@ private:
             const auto& okey = _pairs[slot + i].first;
             if (_eq(key, okey))
                 return slot + i;
-            //            else if (okey > key)
-            //                return END;
         }
 
         return END;
     }
 #endif
 
-    // kick out bucket and find empty to occupy
-    // it will break the original link and relink again.
-    // before: main_bucket --> prev_bucket --> bucket --> next_bucket(maybe none exist)
-    // after : main_bucket --> prev_bucket   (kickout)    next_bucket <-- new_bucket(bucket)
-    //                           \|/                                         ^
-    //                           -|------------------------------------------|
+    // Relocate a "guest" bucket (occupying another key's main position) to an
+    // empty slot. The split-index design stores the slot index separately, so
+    // kickout only rewires the _index[] links — the dense _pairs[] array is
+    // untouched, preserving iterator stability.
+    //
+    // before: kmain --> ... --> prev --> bucket --> next
+    // after : kmain --> ... --> prev --> new_bucket --> next , bucket freed
     size_type kickout_bucket(const size_type kmain, const size_type bucket) noexcept {
         const auto next_bucket = _index[bucket].next;
         const auto new_bucket = find_empty_bucket(next_bucket, 2);
@@ -1511,13 +1505,13 @@ private:
         return bucket;
     }
 
-    /*
-     ** inserts a new key into a hash table; first, check whether key's main
-     ** bucket/position is free. If not, check whether colliding node/bucket is in its main
-     ** position or not: if it is not, move colliding bucket to an empty place and
-     ** put new key in its main position; otherwise (colliding bucket is in its main
-     ** position), new key goes to an empty position.
-     */
+    // Core insert/lookup dispatcher using split-index chaining with kickout:
+    //  1. If the main bucket is empty (INACTIVE), use it directly.
+    //  2. If the main bucket holds the matching key, return it.
+    //  3. If the main bucket holds a guest (key whose hash maps elsewhere),
+    //     kick the guest out and claim the main bucket.
+    //  4. Otherwise walk the collision chain: return the matching bucket, or
+    //     append a new empty slot at the chain tail for a fresh insertion.
     template <typename K = KeyT> size_type find_or_allocate(const K& key, uint64_t key_hash) noexcept {
         const auto bucket = size_type(key_hash & _mask);
         const auto& idx = _index[bucket];

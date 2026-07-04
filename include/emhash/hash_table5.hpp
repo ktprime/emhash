@@ -1034,8 +1034,8 @@ public:
             emplace(*first);
     }
 
-    // assert(bucket < _num_buckets)
-    ValueT* find_hint(const KeyT& key, size_t bucket) {
+    // Returns a pointer to the value if key is at bucket, otherwise nullptr.
+    ValueT* find_hint(const KeyT& key, size_type bucket) {
         if (!EMH_EMPTY(_pairs, bucket) && EMH_KEY(_pairs, bucket) == key)
             return &EMH_VAL(_pairs, bucket);
         return nullptr;
@@ -1212,7 +1212,6 @@ public:
         if constexpr (std::is_integral<KeyT>::value) {
             auto& key = EMH_KEY(_pairs, bucket);
             key = KeyT(0 - 2);
-            //            if (bucket != _zero_index)                 return;
             while (key_to_bucket(key) == bucket)
                 key += 1610612741;
         }
@@ -1277,7 +1276,6 @@ public:
             dump_statics();
 #endif
 
-        // assert(required_buckets < max_size());
         rehash(required_buckets + 2);
         return true;
     }
@@ -1501,9 +1499,7 @@ private:
             EMH_PKV(_pairs, bucket) = std::move(EMH_PKV(_pairs, next_bucket));
             EMH_BUCKET(_pairs, bucket) = (nbucket == next_bucket) ? bucket : nbucket;
             return next_bucket;
-        } /* else if (EMH_UNLIKELY(bucket != hash_main(bucket)))
-             return INACTIVE;
-         */
+        }
 
         auto prev_bucket = bucket;
         while (true) {
@@ -1565,7 +1561,9 @@ private:
         return find_hash_bucket(key, main_bucket);
     }
 
-    // Find the bucket with this key, or return bucket size
+    // Traverse the collision chain starting at the main bucket to find key.
+    // Each bucket stores the next link in its slot field; a self-loop marks
+    // the chain tail. Returns _num_buckets if the key is not found.
     template <typename K = KeyT> size_type find_hash_bucket(const K& key, size_type bucket) const noexcept {
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
 
@@ -1576,8 +1574,6 @@ private:
 
         if (next_bucket == bucket)
             return _num_buckets;
-        //        else if (key_to_bucket(EMH_KEY(_pairs, bucket)) != bucket)
-        //            return _num_buckets;
 
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
@@ -1592,14 +1588,16 @@ private:
 #endif
             next_bucket = nbucket;
         }
-
-        return 0;
     }
 
-    // kick out bucket and find empty to occupy
-    // it will break the original link and relink again.
-    // before: main_bucket-->prev_bucket --> kbucket   --> next_bucket
-    // after : main_bucket-->prev_bucket --> (removed)--> new_bucket(kbucket)--> next_bucket
+    // Relocate a "guest" bucket (one that doesn't sit at its own main position)
+    // to make room for the key whose main position it occupies. This is the
+    // "kickout" step adapted from Lua's table design: it guarantees the chain
+    // head always lives at its hash-computed main bucket, so lookups hit on
+    // the first probe.
+    //
+    // before: kmain --> ... --> prev --> kbucket --> next
+    // after : kmain --> ... --> prev --> new_bucket --> next , kbucket freed
     size_type kickout_bucket(const size_type kmain, const size_type kbucket) noexcept {
         const auto next_bucket = EMH_BUCKET(_pairs, kbucket);
         const auto new_bucket = find_empty_bucket(next_bucket, 2);
@@ -1616,10 +1614,9 @@ private:
         return kbucket;
     }
 
-    /*
-    ** Common helper: check if bucket is empty or needs kickout.
-    ** Returns bucket if ready to use, or INACTIVE if further processing needed.
-    */
+    // Check if the main bucket is empty (ready for insertion) or occupied by
+    // a guest that should be kicked out. Returns the bucket if ready, INACTIVE
+    // if the caller must walk the chain to find/append.
     template <typename K = KeyT> size_type find_or_kickout(const K& key, size_type bucket) noexcept {
         (void)key;
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
@@ -1638,13 +1635,12 @@ private:
         return INACTIVE;
     }
 
-    /*
-    ** inserts a new key into a hash table; first, check whether key's main
-    ** bucket/position is free. If not, check whether colliding node/bucket is in its main
-    ** position or not: if it is not, move colliding bucket to an empty place and
-    ** put new key in its main position; otherwise (colliding bucket is in its main
-    ** position), new key goes to an empty position.
-    */
+    // Core insert/lookup dispatcher using separate chaining with kickout:
+    //  1. If the main bucket is empty, use it directly.
+    //  2. If the main bucket holds a guest (key whose hash maps elsewhere),
+    //     kick the guest to an empty slot and claim the main bucket.
+    //  3. Otherwise walk the collision chain: return the bucket if the key
+    //     matches, or append a new empty slot at the chain tail if not found.
     template <typename K = KeyT> size_type find_or_allocate(const K& key) noexcept {
         const auto bucket = key_to_bucket(key);
         auto result = find_or_kickout(key, bucket);
@@ -1719,21 +1715,18 @@ private:
         return EMH_BUCKET(_pairs, next_bucket) = find_unique_empty(next_bucket);
     }
 
-    /***
-      Different probing techniques usually provide a trade-off between memory locality and avoidance of clustering.
-    Since Robin Hood hashing is relatively resilient to clustering (both primary and secondary), linear probing the most
-    cache-friendly alternative is typically used.
-
-        It's the core algorithm of this hash map with highly optimization/benchmark.
-    normally linear probing is inefficient with high load factor, it use a new 3-way linear
-    probing strategy to search empty slot. from benchmark even the load factor > 0.9, it's more 2-3 times faster than
-    one-way search strategy.
-
-    1. linear or quadratic probing a few cache line for less cache miss from input slot "bucket_from".
-    2. the first  search  slot from member variant "_last", init with 0
-    3. the second search slot from calculated pos "(_num_filled + _last) & _mask", it's like a rand value
-    */
-    // key is not in this map. Find a place to put it.
+    /// 3-way empty-slot search for collision resolution.
+    ///
+    /// Linear probing alone degrades badly at high load factors. This function
+    /// uses a 3-way strategy that stays fast even above 90% load:
+    ///   1. **Local bidirectional probing** — search ±N slots around the
+    ///      collision point. Keeps chain members in the same cache line as
+    ///      their head, minimizing cache misses during chain walks.
+    ///   2. **Roaming cursor (`_last`)** — a monotonically advancing cursor
+    ///      that scans the table from where the last empty slot was found,
+    ///      amortizing probe length across insertions.
+    ///   3. **Mid-point cursor** — a second probe at `(_mask/4 + _last)`,
+    ///      providing a pseudo-random jump to escape local clustering.
     EMH_INLINE size_type find_empty_bucket(const size_type bucket_from, uint32_t csize) noexcept {
 #if EMH_HIGH_LOAD
         if (_ehead)

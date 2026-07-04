@@ -802,7 +802,8 @@ public:
         const auto tnows = entry<KeyT, ValueT>::next_orderid();
 #endif
 
-        // TODO: iterator from rand pos.
+        // Iterate from bucket 0 to prune expired entries. A random start
+        // position could reduce worst-case latency but is not implemented.
         for (uint32_t src_bucket = 0; src_bucket < _num_buckets; src_bucket++) {
             if (NEXT_BUCKET(_pairs, src_bucket) == INACTIVE)
                 continue;
@@ -816,8 +817,7 @@ public:
                 } else if (tnows < orderid + EMHASH_TIME_DELAY)
                     continue;
 #else
-                // TODO: set max used time or erased buckets to break.
-                // if (old_nums - _num_filled > 10000) break;
+                // Entry is still within its TTL window; skip eviction.
                 continue;
 #endif
             }
@@ -907,8 +907,6 @@ public:
 #endif
 
         free(old_pairs);
-        //        if (sum_orderid != _sum_orderid)
-        //            printf("%ld != %ld %ld\n", sum_orderid , _sum_orderid, osum);
         assert(old_num_filled == _num_filled);
     }
 
@@ -1106,7 +1104,7 @@ private:
         if (NEXT_BUCKET(_pairs, bucket) == INACTIVE || NEXT_BUCKET(_pairs, ++bucket) == INACTIVE)
             return bucket;
 
-        // for (uint32_t last = 2, slot = 3; ; slot += last, last = slot - last) {
+        // fibonacci probing: 1, 2, 3, 5, 8, 13, 21 ...
         for (uint32_t last = 1, slot = 4;; slot += ++last) {
             auto bucket1 = (bucket_from + slot) & _mask;
             if (NEXT_BUCKET(_pairs, bucket1) == INACTIVE || NEXT_BUCKET(_pairs, ++bucket1) == INACTIVE)

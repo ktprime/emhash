@@ -1174,9 +1174,6 @@ public:
         if (EMH_LIKELY(required_buckets <= _mask))
             return false;
 
-#if EMH_STATIS
-        // if (_num_filled > EMH_STATIS) dump_statics();
-#endif
         rehash(required_buckets + 1);
         return true;
     }
@@ -1190,10 +1187,8 @@ public:
             buckets *= 2;
         }
         assert(buckets < max_size());
-        // assert(num_buckets == (2 << CTZ(required_buckets)));
 
         auto num_buckets = static_cast<size_type>(buckets);
-        // assert(num_buckets > _num_filled);
         auto old_num_filled = _num_filled;
         auto old_mask = _mask;
         auto* new_pairs = alloc_bucket(num_buckets);
@@ -1317,7 +1312,6 @@ private:
         if constexpr (std::is_integral<KeyT>::value) {
             auto& key = EMH_KEY(_pairs, bucket);
             key++;
-            //            if (bucket != _zero_index) return;
             while ((hash_key(key) & _mask) == bucket)
                 key += 1610612741;
         }
@@ -1466,12 +1460,6 @@ private:
                 return bucket;
             else if (next_bucket % 2 > 0)
                 return _num_buckets;
-            //            else if (next_bucket == bucket * 2)
-            //                return _num_buckets;
-            //            else if (next_bucket != bucket * 2 + 1)
-            //                return _num_buckets;
-            //            else if (hash_main(bucket) != bucket)
-            //                return _num_buckets;
         } else {
             if (next_bucket % 2 > 0)
                 return _num_buckets;
@@ -1771,10 +1759,6 @@ private:
     size_type _mask;
     size_type _num_filled;
     uint32_t _mlf;
-
-#if EMH_FIND_HIT
-//    size_type _zero_index;
-#endif
 
 #if EMH_SAFE_HASH
     size_type _num_main;

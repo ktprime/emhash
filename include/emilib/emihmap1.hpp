@@ -373,7 +373,6 @@ public:
         }
 
         const auto state_size = (simd_bytes + _num_buckets) * sizeof(State);
-        // assert(_num_buckets == other._num_buckets);
         _num_filled = other._num_filled;
         memcpy(_states, other._states, state_size);
     }
@@ -820,7 +819,6 @@ public:
 
         clear_meta();
 
-        // for (size_t src_bucket = 0; _num_filled < old_num_filled; src_bucket++) {
         for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
             if (old_states[src_bucket] >= State::EFILLED && src_bucket % simd_bytes < slot_size) {
                 auto& src_pair = old_pairs[bucket_to_slot(src_bucket)];
@@ -901,7 +899,6 @@ private:
     }
 
     inline void set_states(size_t ebucket, int8_t key_h2) noexcept {
-        // assert(_states[ebucket] < EFILLED && key_h2 <= EFILLED);
         _states[ebucket] = key_h2;
     }
 
