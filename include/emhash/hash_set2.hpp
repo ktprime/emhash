@@ -287,7 +287,7 @@ public:
         _num_filled = other._num_filled;
         _last_colls = other._last_colls;
         _mask = other._mask;
-        _loadlf = other._loadlf;
+        _mlf = other._mlf;
 
         if (std::is_trivially_copyable<KeyT>::value) {
             memcpy(static_cast<void*>(_pairs), other._pairs, (_num_buckets + 2) * sizeof(PairT));
@@ -310,7 +310,7 @@ public:
         std::swap(_num_buckets, other._num_buckets);
         std::swap(_num_filled, other._num_filled);
         std::swap(_mask, other._mask);
-        std::swap(_loadlf, other._loadlf);
+        std::swap(_mlf, other._mlf);
         std::swap(_last_colls, other._last_colls);
     }
 
@@ -356,11 +356,11 @@ public:
 
     const EqT& key_eq() const { return _eq; }
 
-    constexpr float max_load_factor() const { return (1 << 27) / static_cast<float>(_loadlf); }
+    constexpr float max_load_factor() const { return (1 << 27) / static_cast<float>(_mlf); }
 
     void max_load_factor(float value) {
         if (value < 0.999f && value > 0.2f)
-            _loadlf = static_cast<uint32_t>((1 << 27) / value);
+            _mlf = static_cast<uint32_t>((1 << 27) / value);
     }
 
     constexpr uint64_t max_size() const { return (1ull << (sizeof(_num_buckets) * 8 - 1)); }
@@ -798,7 +798,7 @@ public:
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
-        const auto required_buckets = num_elems * _loadlf >> 27;
+        const auto required_buckets = num_elems * _mlf >> 27;
         if (EMH_LIKELY(required_buckets < _num_buckets))
             return false;
         else if (_num_filled < 16 && _num_filled < _num_buckets)
@@ -1222,7 +1222,7 @@ private:
     HashT _hasher;
     EqT _eq;
     PairAlloc _alloc;
-    uint32_t _loadlf;
+    uint32_t _mlf;
     size_type _mask;
 
     size_type _num_filled;

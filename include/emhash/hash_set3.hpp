@@ -259,7 +259,7 @@ public:
 
     void clone(const HashSet& other) {
         _hasher = other._hasher;
-        _loadlf = other._loadlf;
+        _mlf = other._mlf;
         _main_mask = other._main_mask;
         _coll_mask = other._coll_mask;
 
@@ -346,7 +346,7 @@ public:
     void swap(HashSet& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
-        std::swap(_loadlf, other._loadlf);
+        std::swap(_mlf, other._mlf);
         std::swap(_main_mask, other._main_mask);
         std::swap(_coll_mask, other._coll_mask);
 
@@ -406,11 +406,11 @@ public:
 
     const EqT& key_eq() const { return _eq; }
 
-    constexpr float max_load_factor() const { return static_cast<float>(1 << 13) / _loadlf; }
+    constexpr float max_load_factor() const { return static_cast<float>(1 << 13) / _mlf; }
 
     void max_load_factor(float value) {
         if (value < 0.99f && value > 0.2f)
-            _loadlf = static_cast<uint32_t>((1 << 13) / value);
+            _mlf = static_cast<uint32_t>((1 << 13) / value);
     }
 
     constexpr uint64_t max_size() const { return (1ull << (sizeof(_total_buckets) * 8 - 1)); }
@@ -769,7 +769,7 @@ public:
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
-        // auto required_buckets = (size_type)(((uint64_t)num_elems * _loadlf) >> 13);
+        // auto required_buckets = (size_type)(((uint64_t)num_elems * _mlf) >> 13);
         const auto required_buckets = num_elems * 10 / 8 + 2;
         if (EMH_LIKELY(required_buckets < _colls_buckets))
             return false;
@@ -1188,7 +1188,7 @@ private:
     // the first cache line packed
     HashT _hasher;
     EqT _eq;
-    uint32_t _loadlf;
+    uint32_t _mlf;
     size_type _main_mask;
     size_type _coll_mask;
 
