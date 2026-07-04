@@ -113,8 +113,7 @@ class HashMap {
 
 public:
     using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT, Policy>;
-    using value_type = std::pair<KeyT, ValueT>; // TODO set to const KeyT
-    //    using value_type = std::pair<const KeyT, ValueT>; //TODO set to const KeyT
+    using value_type = std::pair<KeyT, ValueT>;
     using key_type = const KeyT;
     using mapped_type = ValueT;
     // using dPolicy = Policy;
@@ -912,15 +911,15 @@ public:
     [[nodiscard]] iterator erase(const const_iterator& cit) {
         const auto slot = static_cast<size_type>(cit.kv_ - _pairs);
         size_type main_bucket;
-        const auto sbucket = find_slot_bucket(slot, main_bucket); // TODO
+        const auto sbucket = find_slot_bucket(slot, main_bucket);
         erase_slot(sbucket, main_bucket);
         return {this, slot};
     }
 
     // only last >= first
     [[nodiscard]] iterator erase(const_iterator first, const_iterator last) {
-        auto esize = long(last.kv_ - first.kv_);
-        auto tsize = long((_pairs + _num_filled) - last.kv_); // last to tail size
+        auto esize = static_cast<long>(last.kv_ - first.kv_);
+        auto tsize = static_cast<long>((_pairs + _num_filled) - last.kv_); // last to tail size
         auto next = first;
         while (tsize-- > 0) {
             if (esize-- <= 0)
@@ -1200,7 +1199,7 @@ public:
 #ifdef EMH_SORT
         std::sort(_pairs, _pairs + _num_filled, [this](const value_type& l, const value_type& r) {
             const auto hashl = hash_key(l.first), hashr = hash_key(r.first);
-            auto diff = int64_t((hashl & _mask) - (hashr & _mask));
+            auto diff = static_cast<int64_t>((hashl & _mask) - (hashr & _mask));
             if (diff != 0)
                 return diff < 0;
             return hashl < hashr;
@@ -1226,7 +1225,7 @@ public:
             char buff[255] = {0};
             snprintf(buff, sizeof(buff),
                      "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
-                     _num_filled, double(_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(),
+                     _num_filled, static_cast<double>(_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(),
                      sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / _num_buckets);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0;
@@ -1287,7 +1286,7 @@ private:
 
     size_type slot_to_bucket(const size_type slot) const noexcept {
         size_type main_bucket;
-        return find_slot_bucket(slot, main_bucket); // TODO
+        return find_slot_bucket(slot, main_bucket);
     }
 
     // very slow
@@ -1460,7 +1459,7 @@ private:
     size_type find_sorted_bucket(const KeyT& key) const noexcept {
         const auto key_hash = hash_key(key);
         const auto bucket = size_type(key_hash & _mask);
-        const auto slots = static_cast<int>(_index[bucket].next); // TODO
+        const auto slots = static_cast<int>(_index[bucket].next);
         if (slots < 0 /**|| key < _pairs[slot].first*/)
             return END;
 

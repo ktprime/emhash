@@ -858,7 +858,7 @@ public:
         int bsize = snprintf(buff, 1024, "============== buckets size ratio ========\n");
 
         miss += _num_buckets - _num_filled;
-        for (int i = 1, factorial = 1; i < int(sizeof(buckets) / sizeof(buckets[0])); i++) {
+        for (int i = 1, factorial = 1; i < static_cast<int>(sizeof(buckets) / sizeof(buckets[0])); i++) {
             double poisson = fk / factorial;
             factorial *= i;
             fk *= lf;

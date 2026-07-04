@@ -118,7 +118,7 @@ public:
     using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
     using PairAllocTraits = std::allocator_traits<PairAlloc>;
     static constexpr bool bInCacheLine = sizeof(PairT) < 64 * 2 / 3;
-    static constexpr uint32_t INACTIVE = ~uint32_t(0);
+    static constexpr uint32_t INACTIVE = ~static_cast<uint32_t>(0);
 
     using value_type = KeyT;
     using reference = KeyT&;
@@ -138,7 +138,7 @@ public:
         iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
         iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) {
             _from = size_type(0);
-            _bmask = size_t(0);
+            _bmask = static_cast<size_t>(0);
         }
 
         void init() {
@@ -148,7 +148,7 @@ public:
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
-                _bmask = size_t(0);
+                _bmask = static_cast<size_t>(0);
             }
         }
 
@@ -223,7 +223,7 @@ public:
         const_iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
         const_iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) {
             _from = size_type(0);
-            _bmask = size_t(0);
+            _bmask = static_cast<size_t>(0);
         }
 
         void init() {
@@ -233,7 +233,7 @@ public:
                 _bmask |= (1ull << _bucket % SIZE_BIT) - 1;
                 _bmask = ~_bmask;
             } else {
-                _bmask = size_t(0);
+                _bmask = static_cast<size_t>(0);
             }
         }
 
@@ -913,7 +913,6 @@ private:
 
         const auto num_byte = num_buckets / 8;
         auto new_pairs = alloc_bucket(num_buckets);
-        // TODO: throwOverflowError
         auto old_num_filled = _num_filled;
         auto old_pairs = _pairs;
         auto old_num_buckets = _num_buckets;

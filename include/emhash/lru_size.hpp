@@ -796,7 +796,7 @@ public:
 #if EMHASH_REHASH_LOG || EMHASH_USE_LOG
         const auto ts = clock();
 #endif
-        const auto medium_id = uint32_t(_sum_orderid / _num_filled);
+        const auto medium_id = static_cast<uint32_t>(_sum_orderid / _num_filled);
 
 #if EMHASH_TIME_DELAY
         const auto tnows = entry<KeyT, ValueT>::next_orderid();

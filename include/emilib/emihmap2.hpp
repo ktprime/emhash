@@ -450,7 +450,7 @@ public:
     size_t bucket_count() const noexcept { return _num_buckets; }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const noexcept { return _num_buckets ? float(_num_filled) / float(_num_buckets) : 0.0f; }
+    float load_factor() const noexcept { return _num_buckets ? static_cast<float>(_num_filled) / static_cast<float>(_num_buckets) : 0.0f; }
 
     inline constexpr float max_load_factor() const { return EMH_MAX_LOAD_FACTOR; }
     inline constexpr float min_load_factor() const { return EMH_MIN_LOAD_FACTOR; }

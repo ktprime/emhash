@@ -762,7 +762,7 @@ public:
             return;
         printf(
             "    _num_filled/bucket_size/packed collision/cache_miss/hit_find = %u/%.2lf/%d/ %.2lf%%/%.2lf%%/%.2lf\n",
-            _num_filled, _num_filled * 1.0 / sumb, int(sizeof(PairT)), (collision * 100.0 / _num_filled),
+            _num_filled, _num_filled * 1.0 / sumb, static_cast<int>(sizeof(PairT)), (collision * 100.0 / _num_filled),
             (collision - steps[0]) * 100.0 / _num_filled, finds * 1.0 / _num_filled);
         assert(sumc == collision);
         assert(sumn == _num_filled);
@@ -1375,7 +1375,7 @@ public:
             char buff[255] = {0};
             snprintf(buff, sizeof(buff),
                      "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
-                     _num_filled, double(_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(),
+                     _num_filled, static_cast<double>(_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(),
                      sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / omask);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0;

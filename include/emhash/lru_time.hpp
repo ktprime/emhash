@@ -858,7 +858,7 @@ public:
             auto mbucket = _num_filled;
             char buff[255] = {0};
             snprintf(buff, sizeof(buff), "    _num_filled/aver_size/K.V/pack/ = %u/%2.lf/%s.%s/%zd", _num_filled,
-                     double(_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
+                     static_cast<double>(_num_filled) / mbucket, typeid(KeyT).name(), typeid(ValueT).name(), sizeof(_pairs[0]));
 #if EMHASH_USER_LOG
             static uint32_t ihashs = 0;
             FDLOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
