@@ -81,7 +81,8 @@ TEST_CASE_TEMPLATE("self assignment", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("swap member", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
-    Map a, b;
+    Map a;
+    Map b;
     for (int i = 0; i < 30; ++i) a[make_kv<K>(i)] = make_kv<V>(i);
     b[make_kv<K>(777)] = make_kv<V>(7);
 
@@ -103,7 +104,9 @@ TEST_CASE_TEMPLATE("copy of empty map", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("chained copy assign", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
-    Map a, b, c;
+    Map a;
+    Map b;
+    Map c;
     for (int i = 0; i < 10; ++i) a[make_kv<K>(i)] = make_kv<V>(i);
     b = c = a;
     CHECK(b.size() == 10);

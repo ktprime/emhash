@@ -18,8 +18,8 @@
     imap1<std::string, std::string>, imap2<std::string, std::string>, \
     imap3<std::string, std::string>
 
-static std::string K(int i) { return "k_" + std::to_string(i); }
-static std::string V(int i) { return "v_" + std::to_string(i); }
+static std::string K(int i) { return "k_" + std::to_string(i); } // NOLINT(readability-identifier-naming)
+static std::string V(int i) { return "v_" + std::to_string(i); } // NOLINT(readability-identifier-naming)
 
 // ============================================================================
 // 1. default ctor/dtor
@@ -47,8 +47,8 @@ TEST_CASE_TEMPLATE("lifecycle: deep copy chain", Map, StringStringMaps) {
     Map src;
     for (int i = 0; i < 20; ++i) src[K(i)] = V(i);
     Map a(src);
-    Map b(a);
-    Map c(b);
+    Map b(a); // NOLINT(performance-unnecessary-copy-initialization)
+    Map c(b); // NOLINT(performance-unnecessary-copy-initialization)
     CHECK(c.size() == 20);
     CHECK(c[K(0)] == V(0));
 }
@@ -121,7 +121,8 @@ TEST_CASE_TEMPLATE("lifecycle: churn", Map, StringStringMaps) {
 // 9. swap
 // ============================================================================
 TEST_CASE_TEMPLATE("lifecycle: swap", Map, StringStringMaps) {
-    Map a, b;
+    Map a;
+    Map b;
     for (int i = 0; i < 10; ++i) a[K(i)] = V(i);
     a.swap(b);
     CHECK(a.empty());

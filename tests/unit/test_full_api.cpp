@@ -100,7 +100,8 @@ TEST_CASE_TEMPLATE("insert_unique precondition", Map, AllIntMaps) {
 }
 
 TEST_CASE_TEMPLATE("merge two maps emhash", Map, EmhashIntMaps) {
-    Map a, b;
+    Map a;
+    Map b;
     for (int i = 0; i < 20; ++i) a[i] = i;
     for (int i = 10; i < 30; ++i) b[i] = i * 2;
 
@@ -110,7 +111,8 @@ TEST_CASE_TEMPLATE("merge two maps emhash", Map, EmhashIntMaps) {
 }
 
 TEST_CASE_TEMPLATE("merge all maps", Map, AllIntMaps) {
-    Map a, b;
+    Map a;
+    Map b;
     for (int i = 0; i < 10; ++i) a[i] = i;
     for (int i = 10; i < 20; ++i) b[i] = i;
 
@@ -120,7 +122,8 @@ TEST_CASE_TEMPLATE("merge all maps", Map, AllIntMaps) {
 }
 
 TEST_CASE_TEMPLATE("merge large scale no overlap", Map, AllIntMaps) {
-    Map a, b;
+    Map a;
+    Map b;
     const int N = 1000;
     for (int i = 0; i < N; ++i) a[i] = i;
     for (int i = N; i < 2 * N; ++i) b[i] = i;
@@ -132,7 +135,8 @@ TEST_CASE_TEMPLATE("merge large scale no overlap", Map, AllIntMaps) {
 }
 
 TEST_CASE_TEMPLATE("merge large scale 50% overlap", Map, AllIntMaps) {
-    Map a, b;
+    Map a;
+    Map b;
     const int N = 1000;
     for (int i = 0; i < N; ++i) a[i] = i;
     for (int i = N / 2; i < N + N / 2; ++i) b[i] = i * 10;
@@ -146,7 +150,8 @@ TEST_CASE_TEMPLATE("merge large scale 50% overlap", Map, AllIntMaps) {
 }
 
 TEST_CASE_TEMPLATE("merge into empty moves all", Map, AllIntMaps) {
-    Map a, b;
+    Map a;
+    Map b;
     const int N = 500;
     for (int i = 0; i < N; ++i) b[i] = i * 2;
 

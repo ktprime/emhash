@@ -97,7 +97,7 @@ TEST_CASE_TEMPLATE("load_factor and max_load_factor", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    CHECK(m.max_load_factor() > 0.0f);
+    CHECK(m.max_load_factor() > 0.0F);
     for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
     CHECK(m.load_factor() <= m.max_load_factor());
 }

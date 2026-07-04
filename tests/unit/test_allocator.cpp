@@ -91,7 +91,7 @@ using MapWithAlloc = MapT<K, V, std::hash<K>, std::equal_to<K>, Alloc>;
 // Tests: tracking allocator records allocations
 // ============================================================================
 TEST_CASE("tracking allocator: counts alloc/dealloc on emhash5-8") {
-    auto run = [](auto map_template) {
+    auto run = [](auto map_template) { // NOLINT(performance-unnecessary-value-param)
         using Map = decltype(map_template);
         AllocStats stats;
         {
@@ -144,7 +144,7 @@ TEST_CASE("PMR allocator: monotonic buffer works on emhash5") {
     using PmrAlloc = std::pmr::polymorphic_allocator<std::pair<const int, int>>;
 
     emhash5::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc>
-        m(2, 0.8f, PmrAlloc{&pool});
+        m(2, 0.8F, PmrAlloc{&pool});
 
     for (int i = 0; i < 1000; ++i) m[i] = i;
     CHECK(m.size() == 1000);
@@ -217,7 +217,7 @@ TEST_CASE("hash set PMR allocator (emhash8)") {
     std::pmr::monotonic_buffer_resource pool(buffer, sizeof(buffer));
 
     emhash8::HashSet<int, std::hash<int>, std::equal_to<int>, PmrAlloc>
-        s(2, 0.8f, PmrAlloc{&pool});
+        s(2, 0.8F, PmrAlloc{&pool});
 
     for (int i = 0; i < 500; ++i) s.insert(i);
     CHECK(s.size() == 500);

@@ -17,16 +17,16 @@
 
 TEST_CASE_TEMPLATE("float key basic + NaN + infinity", Map, FloatMaps) {
     Map m;
-    m[1.0f] = 10;
-    m[2.5f] = 25;
-    CHECK(m.contains(1.0f));
-    CHECK(m.at(1.0f) == 10);
+    m[1.0F] = 10;
+    m[2.5F] = 25;
+    CHECK(m.contains(1.0F));
+    CHECK(m.at(1.0F) == 10);
 
     // -0.0 and +0.0 are equal (IEEE 754)
-    m[-0.0f] = 100;
-    m[+0.0f] = 200;
-    CHECK(m.contains(0.0f));
-    CHECK(m.at(0.0f) == 200);
+    m[-0.0F] = 100;
+    m[+0.0F] = 200;
+    CHECK(m.contains(0.0F));
+    CHECK(m.at(0.0F) == 200);
 
     // Infinity
     float inf = std::numeric_limits<float>::infinity();
@@ -66,8 +66,8 @@ TEST_CASE_TEMPLATE("move-only value insert and move ctor", Map, MoveMaps) {
 struct LargeValue {
     char data[1024];
     int id;
-    LargeValue() : id(0) { for (int i = 0; i < 1024; ++i) data[i] = 0; }
-    explicit LargeValue(int v) : id(v) { for (int i = 0; i < 1024; ++i) data[i] = static_cast<char>(v); }
+    LargeValue() : id(0) { for (auto& c : data) c = 0; }
+    explicit LargeValue(int v) : id(v) { for (auto& c : data) c = static_cast<char>(v); }
     bool operator==(const LargeValue& o) const { return id == o.id; }
     bool operator!=(const LargeValue& o) const { return id != o.id; }
 };
@@ -92,9 +92,9 @@ struct CountedDtor {
     int v;
     CountedDtor() : v(0) { }
     explicit CountedDtor(int x) : v(x) { }
-    CountedDtor(const CountedDtor& o) : v(o.v) { }
+    CountedDtor(const CountedDtor&) = default;
     CountedDtor(CountedDtor&& o) noexcept : v(o.v) { }
-    CountedDtor& operator=(const CountedDtor& o) { v = o.v; return *this; }
+    CountedDtor& operator=(const CountedDtor&) = default;
     CountedDtor& operator=(CountedDtor&& o) noexcept { v = o.v; return *this; }
     ~CountedDtor() { s_count++; }
     bool operator==(const CountedDtor& o) const { return v == o.v; }

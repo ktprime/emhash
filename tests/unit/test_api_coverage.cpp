@@ -29,7 +29,8 @@
 TEST_CASE_TEMPLATE("operator== and != basic equality", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
-    Map a, b;
+    Map a;
+    Map b;
     CHECK(a == b);
     CHECK_FALSE(a != b);
 
@@ -45,7 +46,8 @@ TEST_CASE_TEMPLATE("operator== and != basic equality", Map, AllIntMaps) {
     CHECK(a != b);
 
     // different key set, same size -> not equal
-    Map c, d;
+    Map c;
+    Map d;
     c[make_kv<K>(1)] = make_kv<V>(1);
     c[make_kv<K>(2)] = make_kv<V>(2);
     d[make_kv<K>(1)] = make_kv<V>(1);
@@ -57,7 +59,8 @@ TEST_CASE_TEMPLATE("operator== different insertion order", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     // Equal maps must compare equal regardless of insertion order.
-    Map a, b;
+    Map a;
+    Map b;
     for (int i = 0; i < 50; ++i) a[make_kv<K>(i)] = make_kv<V>(i * 2);
     for (int i = 49; i >= 0; --i) b[make_kv<K>(i)] = make_kv<V>(i * 2);
     CHECK(a == b);
@@ -287,8 +290,8 @@ TEST_CASE_TEMPLATE("INT_MAX and SIZE_MAX key boundaries", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    K maxKey = std::numeric_limits<K>::max();
-    K minKey = std::numeric_limits<K>::is_signed
+    K maxKey = std::numeric_limits<K>::max(); // NOLINT(readability-identifier-naming)
+    K minKey = std::numeric_limits<K>::is_signed // NOLINT(readability-identifier-naming)
                    ? std::numeric_limits<K>::min()
                    : K{0};
 
@@ -309,7 +312,8 @@ TEST_CASE_TEMPLATE("INT_MAX and SIZE_MAX key boundaries", Map, AllIntMaps) {
 TEST_CASE_TEMPLATE("non-member swap (ADL)", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
-    Map a, b;
+    Map a;
+    Map b;
     a[make_kv<K>(1)] = make_kv<V>(10);
     a[make_kv<K>(2)] = make_kv<V>(20);
     b[make_kv<K>(3)] = make_kv<V>(30);
@@ -367,17 +371,17 @@ TEST_CASE_TEMPLATE("load_factor and bucket_count", Map, AllIntMaps) {
 
     for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
     CHECK(m.size() == 100);
-    CHECK(m.load_factor() > 0.0f);
-    CHECK(m.load_factor() <= m.max_load_factor() + 0.01f);
+    CHECK(m.load_factor() > 0.0F);
+    CHECK(m.load_factor() <= m.max_load_factor() + 0.01F);
 }
 
 TEST_CASE_TEMPLATE("max_load_factor setter (emhash only)", Map, EmhashIntMaps) {
     using K = typename Map::key_type;
     Map m;
-    m.max_load_factor(0.99f);
-    CHECK(m.max_load_factor() == doctest::Approx(0.99f).epsilon(0.01));
+    m.max_load_factor(0.99F);
+    CHECK(m.max_load_factor() == doctest::Approx(0.99F).epsilon(0.01));
     for (int i = 0; i < 100; ++i) m[make_kv<K>(i)] = i;
-    CHECK(m.load_factor() <= m.max_load_factor() + 0.01f);
+    CHECK(m.load_factor() <= m.max_load_factor() + 0.01F);
 }
 
 TEST_CASE_TEMPLATE("reserve and rehash", Map, AllIntMaps) {
@@ -425,7 +429,7 @@ TEST_CASE_TEMPLATE("insert_unique high load", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    m.max_load_factor(0.9f);
+    m.max_load_factor(0.9F);
     m.reserve(100);
 
     // Fill to near capacity using insert_unique (keys guaranteed unique)
@@ -586,7 +590,7 @@ TEST_CASE_TEMPLATE("copy assign low load factor", Map, EmhashIntMaps) {
     // reserve far more buckets than needed so load_factor << 0.25
     src.reserve(2000);
     for (int i = 0; i < 10; ++i) src[make_kv<K>(i)] = i;
-    CHECK(src.load_factor() < 0.25f);
+    CHECK(src.load_factor() < 0.25F);
 
     Map dst;
     for (int i = 500; i < 510; ++i) dst[make_kv<K>(i)] = i;  // pre-fill dst
@@ -606,7 +610,7 @@ TEST_CASE_TEMPLATE("copy assign low load factor to empty", Map, EmhashIntMaps) {
     Map src;
     src.reserve(2000);
     for (int i = 0; i < 5; ++i) src[make_kv<K>(i)] = i;
-    CHECK(src.load_factor() < 0.25f);
+    CHECK(src.load_factor() < 0.25F);
 
     Map dst;
     dst = src;  // low-load branch with empty dst
@@ -624,7 +628,7 @@ TEST_CASE_TEMPLATE("copy construct low load factor with elements", Map, EmhashIn
     Map src;
     src.reserve(200);  // large bucket count
     for (int i = 0; i < 3; ++i) src[make_kv<K>(i)] = i * 100;
-    CHECK(src.load_factor() < 0.25f);  // 3/200 = 0.015 <= 0.25
+    CHECK(src.load_factor() < 0.25F);  // 3/200 = 0.015 <= 0.25
     CHECK(src.size() == 3);
 
     Map dst(src);  // copy constructor - triggers low-load branch with 3 elements
@@ -642,7 +646,7 @@ TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {
     for (int i = 0; i < 200; ++i) src[make_kv<K>(i)] = i;
     for (int i = 0; i < 190; ++i) src.erase(make_kv<K>(i));
     CHECK(src.size() == 10);
-    CHECK(src.load_factor() < 0.25f);
+    CHECK(src.load_factor() < 0.25F);
 
     Map dst;
     dst = src;

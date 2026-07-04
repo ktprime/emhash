@@ -44,7 +44,7 @@ TEST_CASE_TEMPLATE("string key iteration", Map, AllStringMaps) {
         try {
             int idx = std::stoi(p.first);
             if (idx >= 0 && idx < 50) found[idx] = true;
-        } catch (...) {}
+        } catch (...) {} // NOLINT(bugprone-empty-catch)
         ++count;
     }
     CHECK(count == 50);
@@ -53,8 +53,8 @@ TEST_CASE_TEMPLATE("string key iteration", Map, AllStringMaps) {
 
 TEST_CASE_TEMPLATE("string key size sweep", Map, AllStringMaps) {
     // Test multiple sizes to exercise rehash boundaries
-    const int sizes[] = {1, 7, 63, 255, 1023, 4095};
-    for (int N : sizes) {
+    const int sizes[] = {1, 7, 63, 255, 1023, 4095}; // NOLINT(readability-identifier-naming)
+    for (int N : sizes) { // NOLINT(readability-identifier-naming)
         Map m;
         for (int i = 0; i < N; ++i) m[std::to_string(i)] = i;
         CHECK(m.size() == static_cast<size_t>(N));
@@ -121,7 +121,8 @@ TEST_CASE_TEMPLATE("string key copy and move", Map, AllStringMaps) {
 
 TEST_CASE_TEMPLATE("string key merge", Map, AllStringMaps) {
     SUBCASE("overlap") {
-        Map a, b;
+        Map a;
+        Map b;
         for (int i = 0; i < 20; ++i) a[std::to_string(i)] = i;
         for (int i = 10; i < 30; ++i) b[std::to_string(i)] = i * 2;
 
@@ -134,7 +135,8 @@ TEST_CASE_TEMPLATE("string key merge", Map, AllStringMaps) {
     }
 
     SUBCASE("no overlap") {
-        Map c, d;
+        Map c;
+        Map d;
         for (int i = 0; i < 10; ++i) c[std::to_string(i)] = i;
         for (int i = 10; i < 20; ++i) d[std::to_string(i)] = i;
 
@@ -145,7 +147,8 @@ TEST_CASE_TEMPLATE("string key merge", Map, AllStringMaps) {
     }
 
     SUBCASE("large scale 500 keys") {
-        Map a, b;
+        Map a;
+        Map b;
         const int N = 500;
         for (int i = 0; i < N; ++i) a[std::to_string(i)] = i;
         for (int i = N / 2; i < N + N / 2; ++i) b[std::to_string(i)] = i * 3;

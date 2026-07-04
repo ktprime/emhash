@@ -86,7 +86,7 @@ TEST_CASE_TEMPLATE("sanitizer: string key reuse after clear", Map, AllStringMaps
 // 4. bucket-count boundaries (power-of-two masking risk).
 // ============================================================================
 TEST_CASE_TEMPLATE("sanitizer: bucket count boundaries", Map, AllIntMaps) {
-    const int sizes[] = {1, 2, 3, 7, 15, 16, 17, 31, 32, 63, 64, 127, 128,
+    const int sizes[] = {1, 2, 3, 7, 15, 16, 17, 31, 32, 63, 64, 127, 128, // NOLINT(readability-identifier-naming)
                          255, 256, 1023, 1024, 4095, 4096};
     for (int n : sizes) {
         Map m;
@@ -106,7 +106,7 @@ TEST_CASE_TEMPLATE("sanitizer: bucket count boundaries", Map, AllIntMaps) {
 // ============================================================================
 TEST_CASE_TEMPLATE("sanitizer: high load factor", Map, AllIntMaps) {
     Map m;
-    m.max_load_factor(0.95f);
+    m.max_load_factor(0.95F);
     for (int i = 0; i < 50000; ++i) m.emplace(i, i);
     CHECK(m.size() == 50000);
     for (int i = 0; i < 50000; i += 7) CHECK(m.find(i) != m.end());
@@ -118,8 +118,9 @@ TEST_CASE_TEMPLATE("sanitizer: high load factor", Map, AllIntMaps) {
 TEST_CASE("sanitizer: cross-implementation consistency emhash5 vs emilib1") {
     using A = map5<int, int>;
     using B = imap1<int, int>;
-    std::mt19937_64 rng(0xC0FFEEu);
+    std::mt19937_64 rng(0xC0FFEEU); // NOLINT(cert-msc32-c,cert-msc51-cpp)
     std::vector<int> keys;
+    keys.reserve(5000);
     for (int i = 0; i < 5000; ++i) keys.push_back(static_cast<int>(rng()));
 
     A a; B b;
@@ -136,8 +137,9 @@ TEST_CASE("sanitizer: cross-implementation consistency emhash5 vs emilib1") {
 TEST_CASE("sanitizer: cross-implementation consistency emhash8 vs emhash5") {
     using A = map8<int, int>;
     using B = map5<int, int>;
-    std::mt19937_64 rng(0xBEEFu);
+    std::mt19937_64 rng(0xBEEFU); // NOLINT(cert-msc32-c,cert-msc51-cpp)
     std::vector<int> keys;
+    keys.reserve(3000);
     for (int i = 0; i < 3000; ++i) keys.push_back(static_cast<int>(rng()));
 
     A a; B b;
@@ -165,7 +167,7 @@ TEST_CASE_TEMPLATE("sanitizer: copy/move no leak (string keys)", Map, AllStringM
 
     Map mv = std::move(copy);
     CHECK(mv.size() == 2000);
-    CHECK(copy.empty());
+    CHECK(copy.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 // ============================================================================

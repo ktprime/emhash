@@ -40,7 +40,7 @@ TEST_CASE_TEMPLATE("LeakTracker balance: copy ctor + assign", Map, AllStringMaps
         for (int i = 0; i < 100; ++i)
             m[LeakTracker("ck_" + std::to_string(i))] = i;
 
-        { Map m2(m); CHECK(m2.size() == 100); }
+        { Map m2(m); CHECK(m2.size() == 100); } // NOLINT(performance-unnecessary-copy-initialization)
         { Map m3; m3[LeakTracker("temp")] = 0; m3 = m; CHECK(m3.size() == 100); }
     }
     CHECK(LeakTracker::s_alive == 0);
@@ -72,7 +72,7 @@ TEST_CASE_TEMPLATE("LeakTracker balance: cross-bucket copy", Map, AllStringMaps)
             CHECK(dst.size() == 50);
         }
 
-        { Map a(src); Map b(a); Map c(b); CHECK(c.size() == 50); }
+        { Map a(src); Map b(a); Map c(b); CHECK(c.size() == 50); } // NOLINT(performance-unnecessary-copy-initialization)
     }
     CHECK(LeakTracker::s_alive == 0);
     CHECK(LeakTracker::s_constructed == LeakTracker::s_destructed);
@@ -85,13 +85,13 @@ TEST_CASE_TEMPLATE("LeakTracker balance: empty + single copy", Map, AllStringMap
     LeakTracker::reset();
     {
         Map empty;
-        { Map dst = empty; CHECK(dst.size() == 0); }
+        { Map dst = empty; CHECK(dst.size() == 0); } // NOLINT(performance-unnecessary-copy-initialization)
 
         Map one;
         one[LeakTracker("one")] = 42;
-        { Map dst = one; CHECK(dst.size() == 1); }
+        { Map dst = one; CHECK(dst.size() == 1); } // NOLINT(performance-unnecessary-copy-initialization)
 
-        { Map dst = one; dst = dst; CHECK(dst.size() == 1); }
+        { Map dst = one; dst = dst; CHECK(dst.size() == 1); } // NOLINT(performance-unnecessary-copy-initialization)
     }
     CHECK(LeakTracker::s_alive == 0);
     CHECK(LeakTracker::s_constructed == LeakTracker::s_destructed);

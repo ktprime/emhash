@@ -52,7 +52,7 @@ TEST_CASE_TEMPLATE("iteration visits all keys", Map, AllIntMaps) {
         if constexpr (std::is_integral_v<K>) {
             idx = static_cast<int>(p.first);
         } else {
-            try { idx = std::stoi(p.first); } catch (...) {}
+            try { idx = std::stoi(p.first); } catch (...) {} // NOLINT(bugprone-empty-catch)
         }
         if (idx >= 0 && idx < N) found[idx] = true;
     }

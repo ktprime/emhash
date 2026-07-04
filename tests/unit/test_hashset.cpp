@@ -126,7 +126,8 @@ TEST_CASE_TEMPLATE("set move ctor and assign", Set, AllIntSets) {
 }
 
 TEST_CASE_TEMPLATE("set swap", Set, AllIntSets) {
-    Set a, b;
+    Set a;
+    Set b;
     for (int i = 0; i < 10; ++i) a.insert(i);
     for (int i = 100; i < 110; ++i) b.insert(i);
 
@@ -163,10 +164,10 @@ TEST_CASE_TEMPLATE("set load factor and bucket count", Set, AllIntSets) {
 
     CHECK(s.bucket_count() > 0);
     float lf = s.load_factor();
-    CHECK(lf >= 0.0f);
-    CHECK(lf < 1.0f);
+    CHECK(lf >= 0.0F);
+    CHECK(lf < 1.0F);
     float max_lf = s.max_load_factor();
-    CHECK(max_lf > 0.0f);
+    CHECK(max_lf > 0.0F);
     (void)lf; (void)max_lf;
 }
 
@@ -186,7 +187,8 @@ TEST_CASE_TEMPLATE("set insert_unique", Set, AllIntSets) {
 }
 
 TEST_CASE_TEMPLATE("set merge", Set, AllIntSets) {
-    Set a, b;
+    Set a;
+    Set b;
     for (int i = 0; i < 20; ++i) a.insert(i);
     for (int i = 10; i < 30; ++i) b.insert(i);
 
