@@ -53,8 +53,7 @@ static size_t identity_int(int key) {
 }
 
 // Benchmark function
-template<typename HashFunc>
-double benchmark_hash(HashFunc func, size_t iterations) {
+template <typename HashFunc> double benchmark_hash(HashFunc func, size_t iterations) {
     std::mt19937 rng(42);
     std::uniform_int_distribution<int> dist(0, 1000000);
 
@@ -75,8 +74,7 @@ double benchmark_hash(HashFunc func, size_t iterations) {
 }
 
 // Benchmark with sequential keys (better cache locality)
-template<typename HashFunc>
-double benchmark_hash_sequential(HashFunc func, size_t iterations) {
+template <typename HashFunc> double benchmark_hash_sequential(HashFunc func, size_t iterations) {
     // Warmup
     for (size_t i = 0; i < 10000; i++) {
         g_hash_result = func(static_cast<int>(i));
@@ -93,8 +91,7 @@ double benchmark_hash_sequential(HashFunc func, size_t iterations) {
 }
 
 // Benchmark with repeated same key (worst case for identity hash)
-template<typename HashFunc>
-double benchmark_hash_samekey(HashFunc func, size_t iterations) {
+template <typename HashFunc> double benchmark_hash_samekey(HashFunc func, size_t iterations) {
     const int key = 12345;
 
     // Warmup
@@ -126,17 +123,13 @@ int main() {
     double time_mul = benchmark_hash(mulshift_int, iterations);
     double time_id = benchmark_hash(identity_int, iterations);
 
-    std::cout << "std::hash<int> | " << time_std << " | "
-              << iterations / time_std / 1000 << " | 1.00x\n";
-    std::cout << "wyhash64       | " << time_wy << " | "
-              << iterations / time_wy / 1000 << " | "
-              << time_std / time_wy << "x\n";
-    std::cout << "mul-shift      | " << time_mul << " | "
-              << iterations / time_mul / 1000 << " | "
+    std::cout << "std::hash<int> | " << time_std << " | " << iterations / time_std / 1000 << " | 1.00x\n";
+    std::cout << "wyhash64       | " << time_wy << " | " << iterations / time_wy / 1000 << " | " << time_std / time_wy
+              << "x\n";
+    std::cout << "mul-shift      | " << time_mul << " | " << iterations / time_mul / 1000 << " | "
               << time_std / time_mul << "x\n";
-    std::cout << "identity       | " << time_id << " | "
-              << iterations / time_id / 1000 << " | "
-              << time_std / time_id << "x\n";
+    std::cout << "identity       | " << time_id << " | " << iterations / time_id / 1000 << " | " << time_std / time_id
+              << "x\n";
 
     std::cout << "\nTest 2: Sequential keys (i=0,1,2,...)\n";
     std::cout << "Hash Function | Time (ms) | Speedup vs std::hash\n";

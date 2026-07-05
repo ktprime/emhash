@@ -818,7 +818,10 @@ public:
         }
 
         auto new_pairs = static_cast<PairT*>(malloc((2 + num_buckets) * sizeof(PairT)));
+        if (!new_pairs)
+            throw std::bad_alloc();
         auto old_num_filled = _num_filled;
+        const auto old_num_buckets = _num_buckets;
         auto old_pairs = _pairs;
         _pairs = new_pairs;
 
@@ -834,7 +837,7 @@ public:
         _pairs[_num_buckets + 0].timeout = _pairs[_num_buckets + 1].timeout = INACTIVE;
 
         auto now_ts = nowts();
-        for (uint32_t src_bucket = 0; old_num_filled > 0; src_bucket++) {
+        for (uint32_t src_bucket = 0; old_num_filled > 0 && src_bucket < old_num_buckets; src_bucket++) {
             if (NEXT_BUCKET(old_pairs, src_bucket) == INACTIVE)
                 continue;
 

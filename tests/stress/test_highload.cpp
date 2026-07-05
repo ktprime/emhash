@@ -19,14 +19,17 @@ TEST_CASE_TEMPLATE("stress: LF=0.999 oscillation", Map, AllIntMaps) {
         m.max_load_factor(0.99f);
         m.reserve(static_cast<size_t>(N));
 
-        for (int i = 0; i < N; ++i) m[i] = i;
+        for (int i = 0; i < N; ++i)
+            m[i] = i;
         CHECK(m.size() == static_cast<size_t>(N));
 
         // erase 1% and refill — oscillates near rehash threshold
-        for (int i = 0; i < N; i += 100) m.erase(i);
+        for (int i = 0; i < N; i += 100)
+            m.erase(i);
         CHECK(m.size() == static_cast<size_t>(N - (N / 100)));
 
-        for (int i = 0; i < N; i += 100) m[i] = i;
+        for (int i = 0; i < N; i += 100)
+            m[i] = i;
         CHECK(m.size() == static_cast<size_t>(N));
 
         // verify all keys

@@ -20,13 +20,34 @@ struct LeakTracker {
 
     std::string data;
 
-    LeakTracker() : data("default") { s_alive++; s_constructed++; }
-    explicit LeakTracker(const std::string& s) : data(s) { s_alive++; s_constructed++; }
-    LeakTracker(const LeakTracker& o) : data(o.data) { s_alive++; s_constructed++; }
-    LeakTracker(LeakTracker&& o) noexcept : data(std::move(o.data)) { s_alive++; s_constructed++; }
-    LeakTracker& operator=(const LeakTracker& o) { data = o.data; return *this; }
-    LeakTracker& operator=(LeakTracker&& o) noexcept { data = std::move(o.data); return *this; }
-    ~LeakTracker() { s_alive--; s_destructed++; }
+    LeakTracker() : data("default") {
+        s_alive++;
+        s_constructed++;
+    }
+    explicit LeakTracker(const std::string& s) : data(s) {
+        s_alive++;
+        s_constructed++;
+    }
+    LeakTracker(const LeakTracker& o) : data(o.data) {
+        s_alive++;
+        s_constructed++;
+    }
+    LeakTracker(LeakTracker&& o) noexcept : data(std::move(o.data)) {
+        s_alive++;
+        s_constructed++;
+    }
+    LeakTracker& operator=(const LeakTracker& o) {
+        data = o.data;
+        return *this;
+    }
+    LeakTracker& operator=(LeakTracker&& o) noexcept {
+        data = std::move(o.data);
+        return *this;
+    }
+    ~LeakTracker() {
+        s_alive--;
+        s_destructed++;
+    }
 
     bool operator==(const LeakTracker& o) const { return data == o.data; }
     bool operator!=(const LeakTracker& o) const { return data != o.data; }
@@ -38,10 +59,7 @@ inline int LeakTracker::s_constructed = 0;
 inline int LeakTracker::s_destructed = 0;
 
 namespace std {
-template <>
-struct hash<LeakTracker> {
-    std::size_t operator()(const LeakTracker& t) const {
-        return std::hash<std::string>()(t.data);
-    }
+template <> struct hash<LeakTracker> {
+    std::size_t operator()(const LeakTracker& t) const { return std::hash<std::string>()(t.data); }
 };
 } // namespace std

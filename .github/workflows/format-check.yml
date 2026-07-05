@@ -27,17 +27,21 @@ jobs:
 
       - name: Check formatting
         run: |
-          # Only check include directory (our own header-only library)
-          # Exclude third-party sse2neon.h
-          find include \
-            -type f \( -name '*.hpp' -o -name '*.h' \) \
+          # Check our own headers and tests
+          # Exclude third-party sse2neon.h, doctest.h and build directories
+          find include tests \
+            -type f \( -name '*.hpp' -o -name '*.h' -o -name '*.cpp' \) \
             -not -name 'sse2neon.h' \
-            -print | xargs clang-format-20 --dry-run --Werror
+            -not -name 'doctest.h' \
+            -not -path '*/build*' \
+            -print0 | xargs -0 clang-format-20 --dry-run --Werror
 
       - name: Show diff (if any)
         if: failure()
         run: |
-          find include \
-            -type f \( -name '*.hpp' -o -name '*.h' \) \
+          find include tests \
+            -type f \( -name '*.hpp' -o -name '*.h' -o -name '*.cpp' \) \
             -not -name 'sse2neon.h' \
-            -print | xargs clang-format-20 --dry-run
+            -not -name 'doctest.h' \
+            -not -path '*/build*' \
+            -print0 | xargs -0 clang-format-20 --dry-run

@@ -42,7 +42,7 @@
 #elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) ||       \
     defined(_M_X64)
 #include <x86intrin.h>
-#elif defined(__ARM_ARCH) || defined(__aarch64__) || defined(__arm__)
+#elif defined(__ARM_ARCH__) || defined(__aarch64__) || defined(__arm__)
 #include "sse2neon.h"
 #endif
 
@@ -235,11 +235,7 @@ public:
 
     HashSet(const HashSet& other) { clone(other); }
 
-    HashSet(HashSet&& other) {
-        if (this != &other) {
-            swap(other);
-        }
-    }
+    HashSet(HashSet&& other) noexcept { swap(other); }
 
     HashSet(std::initializer_list<KeyT> il) {
         reserve(il.size());
@@ -292,7 +288,8 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy(reinterpret_cast<char*>(_keys), reinterpret_cast<const char*>(other._keys), (_num_buckets + 1) * sizeof(_keys[0]));
+            memcpy(reinterpret_cast<char*>(_keys), reinterpret_cast<const char*>(other._keys),
+                   (_num_buckets + 1) * sizeof(_keys[0]));
         } else {
             for (auto it = other.cbegin(); it != other.cend(); ++it)
                 new (_keys + it.bucket()) KeyT(*it);
@@ -357,14 +354,14 @@ public:
 
     template <typename KeyLike> size_t count(const KeyLike& k) const { return find_filled_bucket(k) != _num_buckets; }
 
-    template <typename KeyLike> KeyT* try_get(const KeyLike& k) {
-        auto bucket = find_filled_bucket(k);
+    template <typename K = KeyT> KeyT* try_get(const K& key) noexcept {
+        auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &_keys[bucket];
     }
 
     /// Const version of the above
-    template <typename KeyLike> const KeyT* try_get(const KeyLike& k) const {
-        auto bucket = find_filled_bucket(k);
+    template <typename K = KeyT> const KeyT* try_get(const K& key) const noexcept {
+        auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &_keys[bucket];
     }
 
@@ -532,6 +529,8 @@ public:
     template <typename Con> bool operator!=(const Con& rhs) const noexcept { return !(*this == rhs); }
 
     void merge(HashSet& rhs) noexcept {
+        if (this == &rhs)
+            return;
         if (empty()) {
             *this = std::move(rhs);
             return;
@@ -686,7 +685,8 @@ private:
         int i = _max_probe_length;
 
         for (;;) {
-            const auto vec = LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
+            const auto vec =
+                LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
@@ -726,7 +726,8 @@ private:
         auto next_bucket = bucket, i = bucket;
 
         for (;;) {
-            const auto vec = LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
+            const auto vec =
+                LOADU_EPI8(reinterpret_cast<decltype(&set_simd_empty)>(reinterpret_cast<char*>(_states) + next_bucket));
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             // 1. find filled

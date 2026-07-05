@@ -5,13 +5,12 @@
 
 // Hack to access private members for debugging
 namespace emilib2 {
-    template<typename K>
-    struct DebugHashSet : HashSet<K> {
-        uint8_t* get_states() { return this->_states; }
-        std::string* get_keys() { return this->_keys; }
-        size_t get_num_buckets() { return this->_num_buckets; }
-    };
-}
+template <typename K> struct DebugHashSet : HashSet<K> {
+    uint8_t* get_states() { return this->_states; }
+    std::string* get_keys() { return this->_keys; }
+    size_t get_num_buckets() { return this->_num_buckets; }
+};
+} // namespace emilib2
 
 int main() {
     printf("=== Bucket 22 Analysis ===\n");

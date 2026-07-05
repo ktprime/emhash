@@ -16,7 +16,7 @@
 #include <unordered_map>
 #include <vector>
 
-static constexpr int TRIALS = 200;  // keep CI fast
+static constexpr int TRIALS = 200; // keep CI fast
 
 // ============================================================================
 // 1. reserve(1) + 20 inserts (stress tiny-table kickout path)
@@ -66,9 +66,16 @@ TEST_CASE_TEMPLATE("stress: high load factor random ops", Map, AllIntMaps) {
         for (int i = 0; i < 100; ++i) {
             int k = dist(rng);
             int op = rng() % 3;
-            if (op == 0) { m[k] = i; oracle[k] = i; }
-            else if (op == 1) { CHECK(m.count(k) == oracle.count(k)); }
-            else { auto me = m.erase(k); auto oe = oracle.erase(k); CHECK(me == oe); }
+            if (op == 0) {
+                m[k] = i;
+                oracle[k] = i;
+            } else if (op == 1) {
+                CHECK(m.count(k) == oracle.count(k));
+            } else {
+                auto me = m.erase(k);
+                auto oe = oracle.erase(k);
+                CHECK(me == oe);
+            }
         }
         CHECK(m.size() == oracle.size());
     }
@@ -112,7 +119,8 @@ TEST_CASE_TEMPLATE("stress: rehash stress", Map, AllIntMaps) {
         Map m;
         for (int cycle = 0; cycle < 5; ++cycle) {
             m.reserve(100 * (cycle + 1));
-            for (int i = 0; i < 100 * (cycle + 1); ++i) m[i + cycle * 1000] = i;
+            for (int i = 0; i < 100 * (cycle + 1); ++i)
+                m[i + cycle * 1000] = i;
             CHECK(m.size() == static_cast<size_t>(100 * (cycle + 1)));
             m.clear();
         }
@@ -133,10 +141,18 @@ TEST_CASE_TEMPLATE("stress: interleaved mixed workload", Map, AllIntMaps) {
         for (int i = 0; i < 1000; ++i) {
             int k = dist(rng);
             int op = rng() % 4;
-            if (op == 0) { m[k] = i; oracle[k] = i; }
-            else if (op == 1) { CHECK(m.count(k) == oracle.count(k)); }
-            else if (op == 2) { CHECK(m.erase(k) == oracle.erase(k)); }
-            else { auto it = m.find(k); auto ot = oracle.find(k); CHECK((it == m.end()) == (ot == oracle.end())); }
+            if (op == 0) {
+                m[k] = i;
+                oracle[k] = i;
+            } else if (op == 1) {
+                CHECK(m.count(k) == oracle.count(k));
+            } else if (op == 2) {
+                CHECK(m.erase(k) == oracle.erase(k));
+            } else {
+                auto it = m.find(k);
+                auto ot = oracle.find(k);
+                CHECK((it == m.end()) == (ot == oracle.end()));
+            }
         }
         CHECK(m.size() == oracle.size());
     }

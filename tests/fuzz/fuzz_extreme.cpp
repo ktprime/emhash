@@ -22,8 +22,7 @@
 // ============================================================================
 // Extreme scenario 1: reserve(1) + random inserts (tiny-table kickout)
 // ============================================================================
-template <typename MapT>
-static void fuzz_reserve1(const uint8_t* data, size_t size) {
+template <typename MapT> static void fuzz_reserve1(const uint8_t* data, size_t size) {
     MapT m;
     m.reserve(1);
     std::unordered_map<int, int> ref;
@@ -49,8 +48,7 @@ static void fuzz_reserve1(const uint8_t* data, size_t size) {
 // ============================================================================
 // Extreme scenario 2: high load factor + collision-heavy keys
 // ============================================================================
-template <typename MapT>
-static void fuzz_high_lf(const uint8_t* data, size_t size) {
+template <typename MapT> static void fuzz_high_lf(const uint8_t* data, size_t size) {
     MapT m;
     m.max_load_factor(0.99f);
     m.reserve(64);
@@ -63,7 +61,7 @@ static void fuzz_high_lf(const uint8_t* data, size_t size) {
         int32_t raw;
         memcpy(&raw, data + i, 4);
         i += 4;
-        int key = raw * 64;  // force collision
+        int key = raw * 64; // force collision
         m[key] = ops;
         ref[key] = ops;
         ++ops;
@@ -79,8 +77,7 @@ static void fuzz_high_lf(const uint8_t* data, size_t size) {
 // ============================================================================
 // Extreme scenario 3: rapid churn (insert + erase cycle)
 // ============================================================================
-template <typename MapT>
-static void fuzz_churn(const uint8_t* data, size_t size) {
+template <typename MapT> static void fuzz_churn(const uint8_t* data, size_t size) {
     MapT m;
     std::unordered_map<int, int> ref;
 
@@ -92,13 +89,13 @@ static void fuzz_churn(const uint8_t* data, size_t size) {
         memcpy(&key, data + i + 1, 4);
         i += 5;
 
-        if (action == 0) {          // insert
+        if (action == 0) { // insert
             m[key] = ops;
             ref[key] = ops;
-        } else if (action == 1) {   // erase
+        } else if (action == 1) { // erase
             m.erase(key);
             ref.erase(key);
-        } else {                    // find
+        } else { // find
             auto eit = m.find(key);
             auto rit = ref.find(key);
             assert((eit == m.end()) == (rit == ref.end()));
@@ -112,7 +109,8 @@ static void fuzz_churn(const uint8_t* data, size_t size) {
 // libfuzzer entry: cycle through extreme scenarios + all implementations
 // ============================================================================
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-    if (size < 9) return 0;
+    if (size < 9)
+        return 0;
 
     uint8_t scenario = data[0] % 3;
     uint8_t impl = data[1] % 7;
@@ -122,31 +120,74 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     // Dispatch: scenario × implementation (selector = scenario*7 + impl, 0..20)
     int selector = scenario * 7 + impl;
     switch (selector) {
-        // Scenario 0: reserve(1) — impls 0..6
-        case 0:  fuzz_reserve1<emhash5::HashMap<int, int>>(payload, payload_size); break;
-        case 1:  fuzz_reserve1<emhash6::HashMap<int, int>>(payload, payload_size); break;
-        case 2:  fuzz_reserve1<emhash7::HashMap<int, int>>(payload, payload_size); break;
-        case 3:  fuzz_reserve1<emhash8::HashMap<int, int>>(payload, payload_size); break;
-        case 4:  fuzz_reserve1<emilib::HashMap<int, int>>(payload, payload_size); break;
-        case 5:  fuzz_reserve1<emilib2::HashMap<int, int>>(payload, payload_size); break;
-        case 6:  fuzz_reserve1<emilib3::HashMap<int, int>>(payload, payload_size); break;
-        // Scenario 1: high LF — impls 0..6
-        case 7:  fuzz_high_lf<emhash5::HashMap<int, int>>(payload, payload_size); break;
-        case 8:  fuzz_high_lf<emhash6::HashMap<int, int>>(payload, payload_size); break;
-        case 9:  fuzz_high_lf<emhash7::HashMap<int, int>>(payload, payload_size); break;
-        case 10: fuzz_high_lf<emhash8::HashMap<int, int>>(payload, payload_size); break;
-        case 11: fuzz_high_lf<emilib::HashMap<int, int>>(payload, payload_size); break;
-        case 12: fuzz_high_lf<emilib2::HashMap<int, int>>(payload, payload_size); break;
-        case 13: fuzz_high_lf<emilib3::HashMap<int, int>>(payload, payload_size); break;
-        // Scenario 2: churn — impls 0..6
-        case 14: fuzz_churn<emhash5::HashMap<int, int>>(payload, payload_size); break;
-        case 15: fuzz_churn<emhash6::HashMap<int, int>>(payload, payload_size); break;
-        case 16: fuzz_churn<emhash7::HashMap<int, int>>(payload, payload_size); break;
-        case 17: fuzz_churn<emhash8::HashMap<int, int>>(payload, payload_size); break;
-        case 18: fuzz_churn<emilib::HashMap<int, int>>(payload, payload_size); break;
-        case 19: fuzz_churn<emilib2::HashMap<int, int>>(payload, payload_size); break;
-        case 20: fuzz_churn<emilib3::HashMap<int, int>>(payload, payload_size); break;
-        default: break;
+    // Scenario 0: reserve(1) — impls 0..6
+    case 0:
+        fuzz_reserve1<emhash5::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 1:
+        fuzz_reserve1<emhash6::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 2:
+        fuzz_reserve1<emhash7::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 3:
+        fuzz_reserve1<emhash8::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 4:
+        fuzz_reserve1<emilib::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 5:
+        fuzz_reserve1<emilib2::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 6:
+        fuzz_reserve1<emilib3::HashMap<int, int>>(payload, payload_size);
+        break;
+    // Scenario 1: high LF — impls 0..6
+    case 7:
+        fuzz_high_lf<emhash5::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 8:
+        fuzz_high_lf<emhash6::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 9:
+        fuzz_high_lf<emhash7::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 10:
+        fuzz_high_lf<emhash8::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 11:
+        fuzz_high_lf<emilib::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 12:
+        fuzz_high_lf<emilib2::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 13:
+        fuzz_high_lf<emilib3::HashMap<int, int>>(payload, payload_size);
+        break;
+    // Scenario 2: churn — impls 0..6
+    case 14:
+        fuzz_churn<emhash5::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 15:
+        fuzz_churn<emhash6::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 16:
+        fuzz_churn<emhash7::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 17:
+        fuzz_churn<emhash8::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 18:
+        fuzz_churn<emilib::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 19:
+        fuzz_churn<emilib2::HashMap<int, int>>(payload, payload_size);
+        break;
+    case 20:
+        fuzz_churn<emilib3::HashMap<int, int>>(payload, payload_size);
+        break;
+    default:
+        break;
     }
     return 0;
 }

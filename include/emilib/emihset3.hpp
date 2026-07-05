@@ -39,8 +39,8 @@
 #elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) ||       \
     defined(_M_X64)
 #include <x86intrin.h>
-#elif defined(__ARM_ARCH) || defined(__aarch64__) || defined(__arm__)
-#include "sse2neon.h"
+#elif defined(__ARM_ARCH__) || defined(__aarch64__) || defined(__arm__)
+#include <sse2neon.h>
 #endif
 
 #undef EMH_LIKELY
@@ -333,12 +333,7 @@ public:
 
     HashSet(const HashSet& other) { clone(other); }
 
-    HashSet(HashSet&& other) {
-        rehash(1);
-        if (this != &other) {
-            swap(other);
-        }
-    }
+    HashSet(HashSet&& other) noexcept { swap(other); }
 
     HashSet(std::initializer_list<value_type> il) {
         rehash(static_cast<size_t>(il.size()));
@@ -465,6 +460,16 @@ public:
         return find_filled_bucket(key) != _num_buckets;
     }
 
+    template <typename K = KeyT> KeyT* try_get(const K& key) noexcept {
+        auto bucket = find_filled_bucket(key);
+        return bucket == _num_buckets ? nullptr : &_pairs[bucket];
+    }
+
+    template <typename K = KeyT> const KeyT* try_get(const K& key) const noexcept {
+        auto bucket = find_filled_bucket(key);
+        return bucket == _num_buckets ? nullptr : &_pairs[bucket];
+    }
+
     template <typename Con> bool operator==(const Con& rhs) const noexcept {
         if (size() != rhs.size())
             return false;
@@ -480,6 +485,8 @@ public:
     template <typename Con> bool operator!=(const Con& rhs) const { return !(*this == rhs); }
 
     void merge(HashSet& rhs) noexcept {
+        if (this == &rhs)
+            return;
         if (empty()) {
             *this = std::move(rhs);
             return;
@@ -933,7 +940,7 @@ private:
     }
 
     size_t find_filled_slot(size_t next_bucket) const noexcept {
-        if (EMH_UNLIKELY(_num_filled) == 0)
+        if (EMH_UNLIKELY(_num_filled == 0))
             return _num_buckets;
         // next_bucket -= next_bucket % simd_bytes;
         while (true) {

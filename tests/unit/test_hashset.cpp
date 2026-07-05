@@ -177,13 +177,11 @@ TEST_CASE_TEMPLATE("set load factor and bucket count", Set, AllIntSets) {
         s.insert(i);
 
     CHECK(s.bucket_count() > 0);
-    float lf = s.load_factor();
-    CHECK(lf >= 0.0F);
-    CHECK(lf < 1.0F);
     float max_lf = s.max_load_factor();
     CHECK(max_lf > 0.0F);
-    (void)lf;
-    (void)max_lf;
+    float lf = s.load_factor();
+    CHECK(lf > 0.0F);
+    CHECK(lf <= max_lf);
 }
 
 // ============================================================================
@@ -259,6 +257,49 @@ TEST_CASE_TEMPLATE("set erase_if", Set, AllIntSets) {
         else
             CHECK(s.contains(i));
     }
+}
+
+// try_get is only available on emilib sets (emhash sets lack this API)
+#define TryGetIntSets iset2<int>, iset3<int>
+
+TEST_CASE_TEMPLATE("set try_get returns pointer or nullptr", Set, TryGetIntSets) {
+    Set s;
+    s.insert(1);
+    s.insert(2);
+    s.insert(3);
+
+    // existing key -> pointer to key
+    auto* p = s.try_get(1);
+    REQUIRE(p != nullptr);
+    CHECK(*p == 1);
+
+    // missing key -> nullptr
+    auto* p2 = s.try_get(999);
+    CHECK(p2 == nullptr);
+
+    // const version
+    const auto& cs = s;
+    const auto* cp = cs.try_get(2);
+    REQUIRE(cp != nullptr);
+    CHECK(*cp == 2);
+
+    const auto* cp2 = cs.try_get(999);
+    CHECK(cp2 == nullptr);
+}
+
+#define TryGetStringSets iset2<std::string>, iset3<std::string>
+
+TEST_CASE_TEMPLATE("set try_get with string keys", Set, TryGetStringSets) {
+    Set s;
+    s.insert("hello");
+    s.insert("world");
+
+    auto* p = s.try_get("hello");
+    REQUIRE(p != nullptr);
+    CHECK(*p == "hello");
+
+    auto* p2 = s.try_get("nonexistent");
+    CHECK(p2 == nullptr);
 }
 
 TEST_CASE_TEMPLATE("set shrink_to_fit", Set, AllIntSets) {

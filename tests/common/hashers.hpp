@@ -29,16 +29,13 @@ struct BadStringHasher {
 };
 
 // Generic colliding hash templated on key type
-template <typename K>
-struct CollidingHash;
+template <typename K> struct CollidingHash;
 
-template <>
-struct CollidingHash<int> {
+template <> struct CollidingHash<int> {
     std::size_t operator()(int k) const { return static_cast<std::size_t>(k) % 4; }
 };
 
-template <>
-struct CollidingHash<std::string> {
+template <> struct CollidingHash<std::string> {
     std::size_t operator()(const std::string& s) const { return s.size() % 4; }
 };
 

@@ -30,11 +30,14 @@ struct MsanStreamUnpoisoner {
         // Unpoison the streambufs. A generous bound (1 KB) covers the
         // internal state of std::filebuf / std::stringbuf on all platforms.
         auto* cout_buf = std::cout.rdbuf();
-        if (cout_buf) __msan_unpoison(cout_buf, 1024);
+        if (cout_buf)
+            __msan_unpoison(cout_buf, 1024);
         auto* cerr_buf = std::cerr.rdbuf();
-        if (cerr_buf) __msan_unpoison(cerr_buf, 1024);
+        if (cerr_buf)
+            __msan_unpoison(cerr_buf, 1024);
         auto* clog_buf = std::clog.rdbuf();
-        if (clog_buf) __msan_unpoison(clog_buf, 1024);
+        if (clog_buf)
+            __msan_unpoison(clog_buf, 1024);
     }
 };
 

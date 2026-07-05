@@ -64,7 +64,7 @@ TEST_CASE_TEMPLATE("duplicate insert does not overwrite", Map, AllIntMaps) {
     CHECK_FALSE(r.second);
     CHECK(m[make_kv<K>(1)] == make_kv<V>(10));
 
-    m[make_kv<K>(1)] = make_kv<V>(30);  // operator[] overwrites
+    m[make_kv<K>(1)] = make_kv<V>(30); // operator[] overwrites
     CHECK(m[make_kv<K>(1)] == make_kv<V>(30));
 }
 

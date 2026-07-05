@@ -20,11 +20,10 @@ volatile size_t g_result = 0;
 // Timer helper
 class Timer {
     clock_t start_;
+
 public:
     Timer() : start_(clock()) {}
-    double elapsed_ms() const {
-        return (double)(clock() - start_) * 1000.0 / CLOCKS_PER_SEC;
-    }
+    double elapsed_ms() const { return (double)(clock() - start_) * 1000.0 / CLOCKS_PER_SEC; }
 };
 
 // Generate test data
@@ -55,8 +54,7 @@ std::vector<int> generate_sparse_keys(size_t n, int step = 1000) {
 }
 
 // Benchmark: insert
-template<typename Map>
-double bench_insert(Map& map, const std::vector<int>& keys) {
+template <typename Map> double bench_insert(Map& map, const std::vector<int>& keys) {
     Timer t;
     for (int k : keys) {
         map.insert({k, k * 2});
@@ -65,8 +63,7 @@ double bench_insert(Map& map, const std::vector<int>& keys) {
 }
 
 // Benchmark: find (hit)
-template<typename Map>
-double bench_find_hit(Map& map, const std::vector<int>& keys) {
+template <typename Map> double bench_find_hit(Map& map, const std::vector<int>& keys) {
     size_t sum = 0;
     Timer t;
     for (int k : keys) {
@@ -80,8 +77,7 @@ double bench_find_hit(Map& map, const std::vector<int>& keys) {
 }
 
 // Benchmark: find (miss)
-template<typename Map>
-double bench_find_miss(Map& map, const std::vector<int>& keys) {
+template <typename Map> double bench_find_miss(Map& map, const std::vector<int>& keys) {
     size_t sum = 0;
     Timer t;
     for (int k : keys) {
@@ -95,8 +91,7 @@ double bench_find_miss(Map& map, const std::vector<int>& keys) {
 }
 
 // Benchmark: erase
-template<typename Map>
-double bench_erase(Map& map, const std::vector<int>& keys) {
+template <typename Map> double bench_erase(Map& map, const std::vector<int>& keys) {
     Timer t;
     for (int k : keys) {
         map.erase(k);
@@ -105,8 +100,7 @@ double bench_erase(Map& map, const std::vector<int>& keys) {
 }
 
 // Benchmark: mixed operations
-template<typename Map>
-double bench_mixed(Map& map, const std::vector<int>& keys) {
+template <typename Map> double bench_mixed(Map& map, const std::vector<int>& keys) {
     Timer t;
     size_t sum = 0;
     for (size_t i = 0; i < keys.size(); i++) {
@@ -115,7 +109,8 @@ double bench_mixed(Map& map, const std::vector<int>& keys) {
             map.insert({k, k});
         } else if (i % 4 == 1) {
             auto it = map.find(k);
-            if (it != map.end()) sum += it->second;
+            if (it != map.end())
+                sum += it->second;
         } else if (i % 4 == 2) {
             map.erase(k);
         } else {

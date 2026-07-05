@@ -47,7 +47,8 @@ TEST_CASE_TEMPLATE("stress: reserve(1) crash sequence", Map, AllIntMaps) {
 
         m.erase(dist(rng));
 
-        for (auto it = m.begin(); it != m.end(); ++it) (void)it->first;
+        for (auto it = m.begin(); it != m.end(); ++it)
+            (void)it->first;
         m.count(dist(rng));
 
         m.insert({dist(rng), dist(rng)});

@@ -75,6 +75,10 @@ namespace emhash2 {
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<KeyT>>
 class HashSet {
+    static_assert(std::is_invocable_v<HashT, const KeyT&>, "HashT must be callable with const KeyT&");
+    static_assert(std::is_invocable_v<EqT, const KeyT&, const KeyT&>,
+                  "EqT must be callable with (const KeyT&, const KeyT&)");
+
 public:
 #if EMH_SIZE_TYPE_BIT == 64
     using size_type = uint64_t;

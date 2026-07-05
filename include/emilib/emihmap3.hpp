@@ -40,7 +40,7 @@
 #elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) ||       \
     defined(_M_X64)
 #include <x86intrin.h>
-#elif defined(__ARM_ARCH) || defined(__aarch64__) || defined(__arm__)
+#elif defined(__ARM_ARCH__) || defined(__aarch64__) || defined(__arm__)
 #include <sse2neon.h>
 #endif
 
@@ -341,12 +341,7 @@ public:
         clone(other);
     }
 
-    HashMap(HashMap&& other) {
-        rehash(1);
-        if (this != &other) {
-            swap(other);
-        }
-    }
+    HashMap(HashMap&& other) noexcept { swap(other); }
 
     HashMap(std::initializer_list<value_type> il) {
         rehash(static_cast<size_t>(il.size()));
@@ -487,14 +482,34 @@ public:
         return _pairs[bucket].second;
     }
 
-    template <typename K> ValueT* try_get(const K& key) noexcept {
+    template <typename K = KeyT> ValueT* try_get(const K& key) noexcept {
         auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
     }
 
-    template <typename K> ValueT* try_get(const K& key) const noexcept {
+    template <typename K = KeyT> const ValueT* try_get(const K& key) const noexcept {
         auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
+    }
+
+    /// set value if key exists
+    template <typename K = KeyT>
+    bool try_set(const K& key, const ValueT& val) noexcept(std::is_nothrow_copy_assignable<ValueT>::value) {
+        const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            return false;
+        _pairs[bucket].second = val;
+        return true;
+    }
+
+    /// set value if key exists (move)
+    template <typename K = KeyT>
+    bool try_set(const K& key, ValueT&& val) noexcept(std::is_nothrow_move_assignable<ValueT>::value) {
+        const auto bucket = find_filled_bucket(key);
+        if (bucket == _num_buckets)
+            return false;
+        _pairs[bucket].second = std::move(val);
+        return true;
     }
 
     template <typename Con> bool operator==(const Con& rhs) const noexcept {
@@ -512,6 +527,8 @@ public:
     template <typename Con> bool operator!=(const Con& rhs) const noexcept { return !(*this == rhs); }
 
     void merge(HashMap& rhs) noexcept {
+        if (this == &rhs)
+            return;
         if (empty()) {
             *this = std::move(rhs);
             return;
@@ -1035,7 +1052,7 @@ private:
     }
 
     size_t find_filled_slot(size_t next_bucket) const noexcept {
-        if (EMH_UNLIKELY(_num_filled) == 0)
+        if (EMH_UNLIKELY(_num_filled == 0))
             return _num_buckets;
         // next_bucket -= next_bucket % simd_bytes;
         while (true) {

@@ -12,12 +12,14 @@
 #include <random>
 
 // Type lists with bad hashers (only emhash5-8 used for determinism)
-#define ConstIntMaps map5<int, int, ConstHasher>, map6<int, int, ConstHasher>, \
-    map7<int, int, ConstHasher>, map8<int, int, ConstHasher>
-#define Range4IntMaps map5<int, int, Range4Hasher>, map6<int, int, Range4Hasher>, \
-    map7<int, int, Range4Hasher>, map8<int, int, Range4Hasher>
-#define LinearIntMaps map5<int, int, LinearHasher>, map6<int, int, LinearHasher>, \
-    map7<int, int, LinearHasher>, map8<int, int, LinearHasher>
+#define ConstIntMaps                                                                                                   \
+    map5<int, int, ConstHasher>, map6<int, int, ConstHasher>, map7<int, int, ConstHasher>, map8<int, int, ConstHasher>
+#define Range4IntMaps                                                                                                  \
+    map5<int, int, Range4Hasher>, map6<int, int, Range4Hasher>, map7<int, int, Range4Hasher>,                          \
+        map8<int, int, Range4Hasher>
+#define LinearIntMaps                                                                                                  \
+    map5<int, int, LinearHasher>, map6<int, int, LinearHasher>, map7<int, int, LinearHasher>,                          \
+        map8<int, int, LinearHasher>
 
 // ============================================================================
 // ConstHasher stress: all keys collide into bucket 0
@@ -43,14 +45,21 @@ TEST_CASE_TEMPLATE("stress: ConstHasher all-collision", Map, ConstIntMaps) {
         // erase half
         int erased = 0;
         for (auto& [k, v] : oracle) {
-            if (erased % 2 == 0) { m.erase(k); }
+            if (erased % 2 == 0) {
+                m.erase(k);
+            }
             ++erased;
         }
         // verify remaining
         erased = 0;
         for (auto& [k, v] : oracle) {
-            if (erased % 2 == 0) { CHECK(m.find(k) == m.end()); }
-            else { auto it = m.find(k); CHECK(it != m.end()); CHECK(it->second == v); }
+            if (erased % 2 == 0) {
+                CHECK(m.find(k) == m.end());
+            } else {
+                auto it = m.find(k);
+                CHECK(it != m.end());
+                CHECK(it->second == v);
+            }
             ++erased;
         }
     }
@@ -80,7 +89,8 @@ TEST_CASE_TEMPLATE("stress: Range4Hasher 4-bucket concentration", Map, Range4Int
 
     // churn: erase + reinsert
     std::vector<int> keys_to_erase;
-    for (auto& [k, v] : oracle) keys_to_erase.push_back(k);
+    for (auto& [k, v] : oracle)
+        keys_to_erase.push_back(k);
     for (int i = 0; i < static_cast<int>(keys_to_erase.size()) / 2; ++i) {
         m.erase(keys_to_erase[i]);
     }
@@ -96,16 +106,20 @@ TEST_CASE_TEMPLATE("stress: Range4Hasher 4-bucket concentration", Map, Range4Int
 TEST_CASE_TEMPLATE("stress: LinearHasher sequential keys", Map, LinearIntMaps) {
     Map m;
     const int N = 5000;
-    for (int i = 0; i < N; ++i) m[i] = i;
+    for (int i = 0; i < N; ++i)
+        m[i] = i;
     CHECK(m.size() == static_cast<size_t>(N));
 
     for (int i = 0; i < N; ++i) {
         CHECK(m[i] == i);
     }
 
-    for (int i = 0; i < N; i += 3) m.erase(i);
+    for (int i = 0; i < N; i += 3)
+        m.erase(i);
     for (int i = 0; i < N; ++i) {
-        if (i % 3 == 0) CHECK(m.find(i) == m.end());
-        else CHECK(m.find(i) != m.end());
+        if (i % 3 == 0)
+            CHECK(m.find(i) == m.end());
+        else
+            CHECK(m.find(i) != m.end());
     }
 }

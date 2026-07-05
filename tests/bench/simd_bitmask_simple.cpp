@@ -21,13 +21,15 @@ static size_t find_empty_uint8(const uint8_t* bitmask, size_t bucket_from, size_
     memcpy(&bmask, align, sizeof(bmask));
     bmask >>= boset;
 
-    if (bmask != 0) return bucket_from + __builtin_ctzll(bmask);
+    if (bmask != 0)
+        return bucket_from + __builtin_ctzll(bmask);
 
     const size_t qmask = (num_buckets - 1) / 64;
     size_t last = (bucket_from / 64 + 1) & qmask;
     for (int i = 0; i < 100; i++) {
         const auto bmask2 = *((size_t*)bitmask + last);
-        if (bmask2 != 0) return last * 64 + __builtin_ctzll(bmask2);
+        if (bmask2 != 0)
+            return last * 64 + __builtin_ctzll(bmask2);
         last = (last + 1) & qmask;
     }
     return 0;
@@ -39,12 +41,14 @@ static size_t find_empty_uint64(const uint64_t* bitmask, size_t bucket_from, siz
     const auto boset = bucket_from % 64;
     auto bmask = bitmask[idx] >> boset;
 
-    if (bmask != 0) return bucket_from + __builtin_ctzll(bmask);
+    if (bmask != 0)
+        return bucket_from + __builtin_ctzll(bmask);
 
     const size_t num_blocks = num_buckets / 64;
     size_t last = (idx + 1) % num_blocks;
     for (int i = 0; i < 100; i++) {
-        if (bitmask[last] != 0) return last * 64 + __builtin_ctzll(bitmask[last]);
+        if (bitmask[last] != 0)
+            return last * 64 + __builtin_ctzll(bitmask[last]);
         last = (last + 1) % num_blocks;
     }
     return 0;
@@ -58,7 +62,8 @@ static size_t find_empty_avx2(const uint8_t* bitmask, size_t bucket_from, size_t
     if (_mm256_testz_si256(vec, vec) == 0) {
         const uint64_t* blocks = (const uint64_t*)(bitmask + block_idx * 32);
         for (int i = 0; i < 4; i++) {
-            if (blocks[i] != 0) return block_idx * 256 + i * 64 + __builtin_ctzll(blocks[i]);
+            if (blocks[i] != 0)
+                return block_idx * 256 + i * 64 + __builtin_ctzll(blocks[i]);
         }
     }
 
@@ -69,7 +74,8 @@ static size_t find_empty_avx2(const uint8_t* bitmask, size_t bucket_from, size_t
         if (_mm256_testz_si256(v, v) == 0) {
             const uint64_t* blocks = (const uint64_t*)(bitmask + last * 32);
             for (int j = 0; j < 4; j++) {
-                if (blocks[j] != 0) return last * 256 + j * 64 + __builtin_ctzll(blocks[j]);
+                if (blocks[j] != 0)
+                    return last * 256 + j * 64 + __builtin_ctzll(blocks[j]);
             }
         }
         last = (last + 1) % num_blocks;
@@ -99,7 +105,7 @@ int main() {
     std::cout << "=== SIMD Bitmask Performance Test ===\n\n";
 
     const size_t num_buckets = 1 << 20; // 1M buckets
-    const size_t iterations = 50000000;  // 50M iterations
+    const size_t iterations = 50000000; // 50M iterations
 
     double load_factors[] = {0.80, 0.90, 0.95, 0.99};
 
@@ -148,11 +154,7 @@ int main() {
         double speedup64 = time8 / time64;
         double speedup_avx2 = time8 / timeavx;
 
-        std::cout << lf * 100 << "% | "
-                  << time8 << " | "
-                  << time64 << " | "
-                  << timeavx << " | "
-                  << speedup64 << "x | "
+        std::cout << lf * 100 << "% | " << time8 << " | " << time64 << " | " << timeavx << " | " << speedup64 << "x | "
                   << speedup_avx2 << "x\n";
     }
 

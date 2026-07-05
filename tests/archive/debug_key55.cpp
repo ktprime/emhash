@@ -13,8 +13,7 @@ int main() {
             printf("Insert key_55: success=%d, size=%zu\n", result.second, s1.size());
             // Check if bucket is valid
             if (!result.second) {
-                printf("  bucket=%zu, bucket_count=%zu\n",
-                       result.first.bucket(), s1.bucket_count());
+                printf("  bucket=%zu, bucket_count=%zu\n", result.first.bucket(), s1.bucket_count());
             }
         }
     }

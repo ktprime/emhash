@@ -102,6 +102,9 @@ class HashMap {
                   "KeyT must be copy-constructible or move-constructible");
     static_assert(std::is_copy_constructible<ValueT>::value || std::is_move_constructible<ValueT>::value,
                   "ValueT must be copy-constructible or move-constructible");
+    static_assert(std::is_invocable_v<HashT, const KeyT&>, "HashT must be callable with const KeyT&");
+    static_assert(std::is_invocable_v<EqT, const KeyT&, const KeyT&>,
+                  "EqT must be callable with (const KeyT&, const KeyT&)");
 
 #ifndef EMH_DEFAULT_LOAD_FACTOR
     constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.80f;

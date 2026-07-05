@@ -25,21 +25,22 @@
 static std::vector<int> generate_keys(int n) {
     std::mt19937 rng(42);
     std::vector<int> keys(n);
-    for (int i = 0; i < n; i++) keys[i] = rng();
+    for (int i = 0; i < n; i++)
+        keys[i] = rng();
     return keys;
 }
 
 // ============================================================================
 // Benchmark template: insert
 // ============================================================================
-template <typename Map>
-static void BM_Insert(benchmark::State& state) {
+template <typename Map> static void BM_Insert(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     for (auto _ : state) {
         Map map;
         (void)map.reserve(n);
-        for (int i = 0; i < n; i++) map.emplace(keys[i], i);
+        for (int i = 0; i < n; i++)
+            map.emplace(keys[i], i);
         benchmark::DoNotOptimize(map.size());
     }
     state.SetItemsProcessed(state.iterations() * n);
@@ -48,13 +49,13 @@ static void BM_Insert(benchmark::State& state) {
 // ============================================================================
 // Benchmark template: find (hit)
 // ============================================================================
-template <typename Map>
-static void BM_FindHit(benchmark::State& state) {
+template <typename Map> static void BM_FindHit(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Map map;
     (void)map.reserve(n);
-    for (int i = 0; i < n; i++) map.emplace(keys[i], i);
+    for (int i = 0; i < n; i++)
+        map.emplace(keys[i], i);
 
     for (auto _ : state) {
         for (int i = 0; i < n; i++) {
@@ -68,13 +69,13 @@ static void BM_FindHit(benchmark::State& state) {
 // ============================================================================
 // Benchmark template: find (miss)
 // ============================================================================
-template <typename Map>
-static void BM_FindMiss(benchmark::State& state) {
+template <typename Map> static void BM_FindMiss(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Map map;
     (void)map.reserve(n);
-    for (int i = 0; i < n; i++) map.emplace(keys[i], i);
+    for (int i = 0; i < n; i++)
+        map.emplace(keys[i], i);
 
     for (auto _ : state) {
         for (int i = 0; i < n; i++) {
@@ -88,17 +89,18 @@ static void BM_FindMiss(benchmark::State& state) {
 // ============================================================================
 // Benchmark template: erase
 // ============================================================================
-template <typename Map>
-static void BM_Erase(benchmark::State& state) {
+template <typename Map> static void BM_Erase(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     for (auto _ : state) {
         state.PauseTiming();
         Map map;
         (void)map.reserve(n);
-        for (int i = 0; i < n; i++) map.emplace(keys[i], i);
+        for (int i = 0; i < n; i++)
+            map.emplace(keys[i], i);
         state.ResumeTiming();
-        for (int i = 0; i < n; i++) (void)map.erase(keys[i]);
+        for (int i = 0; i < n; i++)
+            (void)map.erase(keys[i]);
         benchmark::DoNotOptimize(map.size());
     }
     state.SetItemsProcessed(state.iterations() * n);
@@ -107,18 +109,19 @@ static void BM_Erase(benchmark::State& state) {
 // ============================================================================
 // Benchmark template: iterate
 // ============================================================================
-template <typename Map>
-static void BM_Iterate(benchmark::State& state) {
+template <typename Map> static void BM_Iterate(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Map map;
     (void)map.reserve(n);
-    for (int i = 0; i < n; i++) map.emplace(keys[i], i);
+    for (int i = 0; i < n; i++)
+        map.emplace(keys[i], i);
 
     volatile size_t sum = 0;
     for (auto _ : state) {
         size_t s = 0;
-        for (auto& kv : map) s += kv.second;
+        for (auto& kv : map)
+            s += kv.second;
         sum = s;
     }
     benchmark::DoNotOptimize(sum);
@@ -128,11 +131,11 @@ static void BM_Iterate(benchmark::State& state) {
 // ============================================================================
 // Register benchmarks for all HashMap versions
 // ============================================================================
-#define BENCH_MAP(MapType, Name)                              \
-    BENCHMARK_TEMPLATE(BM_Insert, MapType)->Arg(100000);      \
-    BENCHMARK_TEMPLATE(BM_FindHit, MapType)->Arg(100000);    \
-    BENCHMARK_TEMPLATE(BM_FindMiss, MapType)->Arg(100000);   \
-    BENCHMARK_TEMPLATE(BM_Erase, MapType)->Arg(100000);      \
+#define BENCH_MAP(MapType, Name)                                                                                       \
+    BENCHMARK_TEMPLATE(BM_Insert, MapType)->Arg(100000);                                                               \
+    BENCHMARK_TEMPLATE(BM_FindHit, MapType)->Arg(100000);                                                              \
+    BENCHMARK_TEMPLATE(BM_FindMiss, MapType)->Arg(100000);                                                             \
+    BENCHMARK_TEMPLATE(BM_Erase, MapType)->Arg(100000);                                                                \
     BENCHMARK_TEMPLATE(BM_Iterate, MapType)->Arg(100000);
 
 using Map5 = emhash5::HashMap<int, int>;
@@ -154,26 +157,26 @@ BENCH_MAP(HMap3, emilib3)
 // ============================================================================
 // HashSet benchmarks
 // ============================================================================
-template <typename Set>
-static void BM_SetInsert(benchmark::State& state) {
+template <typename Set> static void BM_SetInsert(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     for (auto _ : state) {
         Set set;
         (void)set.reserve(n);
-        for (int i = 0; i < n; i++) set.emplace(keys[i]);
+        for (int i = 0; i < n; i++)
+            set.emplace(keys[i]);
         benchmark::DoNotOptimize(set.size());
     }
     state.SetItemsProcessed(state.iterations() * n);
 }
 
-template <typename Set>
-static void BM_SetFindHit(benchmark::State& state) {
+template <typename Set> static void BM_SetFindHit(benchmark::State& state) {
     const int n = state.range(0);
     auto keys = generate_keys(n);
     Set set;
     (void)set.reserve(n);
-    for (int i = 0; i < n; i++) set.emplace(keys[i]);
+    for (int i = 0; i < n; i++)
+        set.emplace(keys[i]);
 
     for (auto _ : state) {
         for (int i = 0; i < n; i++) {

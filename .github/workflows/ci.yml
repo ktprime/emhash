@@ -254,6 +254,14 @@ jobs:
           SAN="-std=c++17 -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -I../include -I. -Icommon"
           $CXX $SAN unit/test_crud.cpp -o test_crud_asan
           $CXX $SAN unit/test_full_api.cpp -o test_full_api_asan
+          $CXX $SAN unit/test_api_coverage.cpp -o test_api_coverage_asan
+          $CXX $SAN unit/test_copy_move.cpp -o test_copy_move_asan
+          $CXX $SAN unit/test_iterators.cpp -o test_iterators_asan
+          $CXX $SAN unit/test_hashset.cpp -o test_hashset_asan
+          $CXX $SAN unit/test_allocator.cpp -o test_allocator_asan
+          $CXX $SAN unit/test_string_keys.cpp -o test_string_keys_asan
+          $CXX $SAN unit/test_special_keys.cpp -o test_special_keys_asan
+          $CXX $SAN unit/test_reserve_clear.cpp -o test_reserve_clear_asan
           $CXX $SAN unit/test_edge_cases.cpp -o test_edge_cases_asan
           $CXX $SAN memory/test_string_key_leak.cpp -o test_string_key_leak_asan
           $CXX $SAN memory/test_sanitizer.cpp -o test_sanitizer_asan
@@ -267,6 +275,14 @@ jobs:
           cd tests
           ./test_crud_asan
           ./test_full_api_asan
+          ./test_api_coverage_asan
+          ./test_copy_move_asan
+          ./test_iterators_asan
+          ./test_hashset_asan
+          ./test_allocator_asan
+          ./test_string_keys_asan
+          ./test_special_keys_asan
+          ./test_reserve_clear_asan
           ./test_edge_cases_asan
           ./test_string_key_leak_asan
           ./test_sanitizer_asan
@@ -857,7 +873,7 @@ jobs:
               current = {b["name"]: b for b in json.load(f)["benchmarks"]}
 
           regressions = []
-          THRESHOLD = 1.25  # 25% slower than baseline = regression
+          THRESHOLD = 1.20  # 20% slower than baseline = regression
 
           for name, cur in current.items():
               if name not in baseline:
@@ -872,12 +888,12 @@ jobs:
                   regressions.append((name, ratio))
 
           if regressions:
-              print(f"\n::error::Benchmark regression detected ({len(regressions)} benchmarks >25% slower)")
+              print(f"\n::error::Benchmark regression detected ({len(regressions)} benchmarks >20% slower)")
               for name, ratio in regressions:
                   print(f"  - {name}: {ratio:.2f}x slower")
               sys.exit(1)
           else:
-              print("\nNo regressions detected (threshold: 25%)")
+              print("\nNo regressions detected (threshold: 10%)")
           PYEOF
           else
             echo "No baseline found, skipping regression check"

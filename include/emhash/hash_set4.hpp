@@ -103,6 +103,10 @@ static inline uint32_t CTZ(size_t n) {
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<KeyT>>
 class HashSet {
+    static_assert(std::is_invocable_v<HashT, const KeyT&>, "HashT must be callable with const KeyT&");
+    static_assert(std::is_invocable_v<EqT, const KeyT&, const KeyT&>,
+                  "EqT must be callable with (const KeyT&, const KeyT&)");
+
 public:
 #if EMH_SIZE_TYPE_BIT == 64
     using size_type = uint64_t;
@@ -134,7 +138,8 @@ public:
         using pointer = value_type*;
         using reference = value_type&;
 
-        iterator(const const_iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
+        explicit iterator(const const_iterator& it)
+            : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
         iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
         iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) {
             _from = size_type(0);

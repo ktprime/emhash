@@ -270,6 +270,73 @@ g++ -mavx2 -O3 -std=c++17 your_app.cpp
 | `AVX2` | emilib2/3 wider SIMD |
 | `NONE` | Disables SIMD intrinsics (portability fallback) |
 
+## Profile-Guided Optimization (PGO)
+
+PGO uses runtime profiling data to guide the compiler's inlining, branch prediction, and code layout decisions. For template-heavy libraries like emhash, PGO can yield **5–15%** additional speedup on top of `-O2`/`-O3`.
+
+### GCC PGO Workflow
+
+```bash
+# Step 1: Instrumented build
+g++ -O2 -fprofile-generate=./pgo_data -std=c++17 your_app.cpp
+
+# Step 2: Run representative workload (the more realistic, the better)
+./a.out  # feeds profile data into ./pgo_data/
+
+# Step 3: Optimized build using profile data
+g++ -O2 -fprofile-use=./pgo_data -std=c++17 your_app.cpp
+```
+
+### Clang PGO Workflow
+
+```bash
+# Step 1: Instrumented build
+clang++ -O2 -fprofile-instr-generate=./pgo_data/default.profraw -std=c++17 your_app.cpp
+
+# Step 2: Run representative workload
+./a.out  # produces default.profraw
+
+# Step 3: Merge raw profile data
+llvm-profdata merge ./pgo_data/default.profraw -o ./pgo_data/default.profdata
+
+# Step 4: Optimized build using profile data
+clang++ -O2 -fprofile-instr-use=./pgo_data/default.profdata -std=c++17 your_app.cpp
+```
+
+### MSVC PGO Workflow
+
+```bash
+# Step 1: Instrumented build
+cl /O2 /GL /c your_app.cpp /DPROFILE_INSTRUMENTATION
+link /LTCG /GENPROFILE your_app.obj
+
+# Step 2: Run representative workload
+your_app.exe  # produces .pgc file
+
+# Step 3: Optimized build using profile data
+link /LTCG /USEPROFILE your_app.obj
+```
+
+> **Tips**: Use a realistic workload that covers your typical insert/find/erase mix. A workload that only does inserts won't help the optimizer for find/erase paths.
+
+## Link-Time Optimization (LTO)
+
+LTO enables cross-module inlining and dead code elimination. For header-only libraries, LTO ensures the compiler can see and optimize the full call chain.
+
+```bash
+# GCC (auto-detects parallelism)
+g++ -O2 -flto=auto -std=c++17 your_app.cpp
+
+# Clang
+clang++ -O2 -flto=thin -std=c++17 your_app.cpp
+
+# MSVC (whole-program optimization)
+cl /O2 /GL your_app.cpp
+link /LTCG your_app.obj
+```
+
+> **Combining PGO + LTO**: For maximum performance, use both together. PGO provides profile data while LTO enables whole-program visibility. Typical combined gain: 10–20% over plain `-O2`.
+
 ## Anti-Patterns to Avoid
 
 ### 16. Don't Rehash in Hot Loops

@@ -156,6 +156,8 @@ More examples: [docs/examples/](docs/examples/)
 
 ### 30-Second Quick Guide
 
+> **If you're not sure which version to use, start with `emhash7`** — it has the best all-around performance with no tombstones and native high load factor support.
+
 Use this decision tree to pick the right version:
 
 ```

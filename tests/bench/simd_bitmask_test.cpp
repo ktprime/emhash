@@ -73,7 +73,8 @@ static size_t find_empty_avx2(const uint8_t* bitmask, size_t bucket_from, size_t
         const uint64_t* blocks = (const uint64_t*)(bitmask + block_idx * 32);
         for (int i = offset / 64; i < 4; i++) {
             uint64_t shifted = blocks[i] >> (offset % 64);
-            if (i > offset / 64) shifted = blocks[i];
+            if (i > offset / 64)
+                shifted = blocks[i];
             if (shifted != 0) {
                 return block_idx * 256 + i * 64 + __builtin_ctzll(shifted);
             }
@@ -118,9 +119,8 @@ static std::vector<uint8_t> generate_bitmask(size_t num_buckets, double load_fac
     return bitmask;
 }
 
-template<typename Func>
-double benchmark_find(Func func, const std::vector<uint8_t>& bitmask8,
-                      const std::vector<uint64_t>& bitmask64,
+template <typename Func>
+double benchmark_find(Func func, const std::vector<uint8_t>& bitmask8, const std::vector<uint64_t>& bitmask64,
                       size_t num_buckets, size_t iterations) {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -146,13 +146,13 @@ int main() {
     };
 
     TestCase cases[] = {
-        {1 << 16, 0.80},  // 64K, LF=0.80 (easy)
-        {1 << 16, 0.90},  // 64K, LF=0.90 (medium)
-        {1 << 16, 0.95},  // 64K, LF=0.95 (hard)
-        {1 << 16, 0.99},  // 64K, LF=0.99 (extreme)
-        {1 << 20, 0.80},  // 1M, LF=0.80
-        {1 << 20, 0.95},  // 1M, LF=0.95
-        {1 << 20, 0.99},  // 1M, LF=0.99
+        {1 << 16, 0.80}, // 64K, LF=0.80 (easy)
+        {1 << 16, 0.90}, // 64K, LF=0.90 (medium)
+        {1 << 16, 0.95}, // 64K, LF=0.95 (hard)
+        {1 << 16, 0.99}, // 64K, LF=0.99 (extreme)
+        {1 << 20, 0.80}, // 1M, LF=0.80
+        {1 << 20, 0.95}, // 1M, LF=0.95
+        {1 << 20, 0.99}, // 1M, LF=0.99
     };
 
     std::cout << "Load Factor | Size | uint8_t (ns) | uint64_t (ns) | AVX2 (ns) | uint64 vs uint8 | AVX2 vs uint8\n";
@@ -166,19 +166,19 @@ int main() {
         const size_t iterations = 10000000; // 10M iterations
 
         // Benchmark uint8_t
-        auto t8 = benchmark_find([](const uint8_t* b8, const uint64_t* b64, size_t from, size_t n) {
-            return find_empty_uint8(b8, from, n);
-        }, bitmask8, bitmask64, tc.num_buckets, iterations);
+        auto t8 = benchmark_find(
+            [](const uint8_t* b8, const uint64_t* b64, size_t from, size_t n) { return find_empty_uint8(b8, from, n); },
+            bitmask8, bitmask64, tc.num_buckets, iterations);
 
         // Benchmark uint64_t
-        auto t64 = benchmark_find([](const uint8_t* b8, const uint64_t* b64, size_t from, size_t n) {
-            return find_empty_uint64(b64, from, n);
-        }, bitmask8, bitmask64, tc.num_buckets, iterations);
+        auto t64 = benchmark_find([](const uint8_t* b8, const uint64_t* b64, size_t from,
+                                     size_t n) { return find_empty_uint64(b64, from, n); },
+                                  bitmask8, bitmask64, tc.num_buckets, iterations);
 
 #ifdef __AVX2__
-        auto tavx2 = benchmark_find([](const uint8_t* b8, const uint64_t* b64, size_t from, size_t n) {
-            return find_empty_avx2(b8, from, n);
-        }, bitmask8, bitmask64, tc.num_buckets, iterations);
+        auto tavx2 = benchmark_find(
+            [](const uint8_t* b8, const uint64_t* b64, size_t from, size_t n) { return find_empty_avx2(b8, from, n); },
+            bitmask8, bitmask64, tc.num_buckets, iterations);
 #else
         double tavx2 = 0;
 #endif
@@ -186,13 +186,9 @@ int main() {
         double speedup64 = t8 / t64;
         double speedup_avx2 = t8 / tavx2;
 
-        std::cout << tc.load_factor * 100 << "% | "
-                  << (tc.num_buckets >= 1<<20 ? "1M" : "64K") << " | "
-                  << t8 * 1000 << " | "
-                  << t64 * 1000 << " | "
-                  << tavx2 * 1000 << " | "
-                  << speedup64 << "x | "
-                  << speedup_avx2 << "x\n";
+        std::cout << tc.load_factor * 100 << "% | " << (tc.num_buckets >= 1 << 20 ? "1M" : "64K") << " | " << t8 * 1000
+                  << " | " << t64 * 1000 << " | " << tavx2 * 1000 << " | " << speedup64 << "x | " << speedup_avx2
+                  << "x\n";
     }
 
     std::cout << "\n=== Analysis ===\n";

@@ -49,11 +49,11 @@ TEST_CASE_TEMPLATE("operator[] default construct and overwrite", Map, AllIntMaps
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    m[make_kv<K>(1)];            // default-construct value
+    m[make_kv<K>(1)]; // default-construct value
     CHECK(m.size() == 1);
     CHECK(m[make_kv<K>(1)] == V{});
 
-    m[make_kv<K>(1)] = make_kv<V>(42);  // overwrite
+    m[make_kv<K>(1)] = make_kv<V>(42); // overwrite
     CHECK(m[make_kv<K>(1)] == make_kv<V>(42));
 }
 
@@ -85,7 +85,7 @@ TEST_CASE_TEMPLATE("insert pair and duplicate", Map, AllIntMaps) {
 
     auto r2 = m.insert({make_kv<K>(1), make_kv<V>(9999)});
     CHECK_FALSE(r2.second);
-    CHECK(m[make_kv<K>(1)] == make_kv<V>(10));  // no overwrite
+    CHECK(m[make_kv<K>(1)] == make_kv<V>(10)); // no overwrite
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ TEST_CASE_TEMPLATE("insert_or_assign", Map, AllIntMaps) {
 
     m[make_kv<K>(1)] = make_kv<V>(10);
     auto r = m.insert_or_assign(make_kv<K>(1), make_kv<V>(111));
-    CHECK_FALSE(r.second);  // key exists -> assignment, not insertion
+    CHECK_FALSE(r.second); // key exists -> assignment, not insertion
     CHECK(m[make_kv<K>(1)] == make_kv<V>(111));
 
     auto r2 = m.insert_or_assign(make_kv<K>(2), make_kv<V>(22));
@@ -134,7 +134,7 @@ TEST_CASE_TEMPLATE("erase by key and iterator", Map, AllIntMaps) {
 
     CHECK(m.erase(make_kv<K>(2)) == 1);
     CHECK(m.count(make_kv<K>(2)) == 0);
-    CHECK(m.erase(make_kv<K>(2)) == 0);  // erase missing
+    CHECK(m.erase(make_kv<K>(2)) == 0); // erase missing
 
     auto it = m.find(make_kv<K>(3));
     REQUIRE(it != m.end());
@@ -150,9 +150,11 @@ TEST_CASE_TEMPLATE("erase all then empty", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 10; ++i) m[make_kv<K>(i)] = make_kv<V>(i * 10);
+    for (int i = 0; i < 10; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i * 10);
     CHECK(m.size() == 10);
-    for (int i = 0; i < 10; ++i) (void)m.erase(make_kv<K>(i));
+    for (int i = 0; i < 10; ++i)
+        (void)m.erase(make_kv<K>(i));
     CHECK(m.empty());
 }
 
@@ -163,7 +165,8 @@ TEST_CASE_TEMPLATE("clear", Map, AllIntMaps) {
     using K = typename Map::key_type;
     using V = typename Map::mapped_type;
     Map m;
-    for (int i = 0; i < 5; ++i) m[make_kv<K>(i)] = make_kv<V>(i);
+    for (int i = 0; i < 5; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i);
     CHECK(m.size() == 5);
     m.clear();
     CHECK(m.empty());

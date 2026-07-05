@@ -13,8 +13,7 @@
 
 // Convert an int index into a key or value of type T.
 // std::string -> std::to_string(v); numeric types -> T(v).
-template <typename T>
-inline T make_kv(int v) {
+template <typename T> inline T make_kv(int v) {
     using U = std::remove_cv_t<T>;
     if constexpr (std::is_same_v<U, std::string>) {
         return std::to_string(v);
@@ -31,19 +30,22 @@ inline T make_kv(int v) {
 // Millisecond timestamp for performance baselines in attack tests.
 inline long long now_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()
-    ).count();
+               std::chrono::high_resolution_clock::now().time_since_epoch())
+        .count();
 }
 
 // Compare a map under test against a std::unordered_map oracle.
 // Returns true iff sizes match and every oracle key is found with equal value.
 template <typename MapT, typename K, typename V>
 inline bool oracle_equal(const MapT& m, const std::unordered_map<K, V>& ref) {
-    if (m.size() != ref.size()) return false;
+    if (m.size() != ref.size())
+        return false;
     for (const auto& kv : ref) {
         auto it = m.find(kv.first);
-        if (it == m.end()) return false;
-        if (!(it->second == kv.second)) return false;
+        if (it == m.end())
+            return false;
+        if (!(it->second == kv.second))
+            return false;
     }
     return true;
 }

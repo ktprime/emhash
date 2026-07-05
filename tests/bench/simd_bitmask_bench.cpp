@@ -209,9 +209,14 @@ static void BM_SingleFind(benchmark::State& state) {
     }
 }
 // Compare at different load factors and starting positions
-BENCHMARK(BM_SingleFind)->Args({80, 0, 0})->Args({80, 0, 1})
-                         ->Args({95, 0, 0})->Args({95, 0, 1})
-                         ->Args({99, 0, 0})->Args({99, 0, 1})
-                         ->Args({99, 32000, 0})->Args({99, 32000, 1});
+BENCHMARK(BM_SingleFind)
+    ->Args({80, 0, 0})
+    ->Args({80, 0, 1})
+    ->Args({95, 0, 0})
+    ->Args({95, 0, 1})
+    ->Args({99, 0, 0})
+    ->Args({99, 0, 1})
+    ->Args({99, 32000, 0})
+    ->Args({99, 32000, 1});
 
 BENCHMARK_MAIN();

@@ -12,17 +12,17 @@
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
-static std::vector<uint8_t> gen_random_input(std::mt19937& rng, size_t len)
-{
+static std::vector<uint8_t> gen_random_input(std::mt19937& rng, size_t len) {
     std::vector<uint8_t> buf(len);
-    for (auto& b : buf) b = (uint8_t)(rng() & 0xFF);
+    for (auto& b : buf)
+        b = (uint8_t)(rng() & 0xFF);
     return buf;
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
     int iterations = 1000;
-    if (argc > 1) iterations = std::atoi(argv[1]);
+    if (argc > 1)
+        iterations = std::atoi(argv[1]);
 
     std::random_device rd;
     std::mt19937 rng(rd());

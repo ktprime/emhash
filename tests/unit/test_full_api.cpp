@@ -53,10 +53,10 @@ TEST_CASE_TEMPLATE("erase_if predicate", Map, AllIntMaps) {
     for (int i = 0; i < 100; ++i)
         m[i] = i;
     auto erased = m.erase_if([](const auto& kv) { return kv.second % 2 == 0; });
+    CHECK(erased == 50);
     CHECK(m.size() == 50);
     for (int i = 1; i < 100; i += 2)
         CHECK(m.contains(i));
-    (void)erased;
 }
 
 TEST_CASE_TEMPLATE("shrink_to_fit", Map, AllIntMaps) {
@@ -180,6 +180,127 @@ TEST_CASE_TEMPLATE("merge into empty moves all", Map, AllIntMaps) {
     CHECK(b.empty());
     for (int i = 0; i < N; ++i)
         CHECK(a.at(i) == i * 2);
+}
+
+// ============================================================================
+// try_get, try_set, set_get extended API
+// ============================================================================
+
+// try_get is available on emhash8 + all emilib maps (emhash5/6/7 require EMH_EXT)
+#define TryGetMaps map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>
+
+TEST_CASE_TEMPLATE("try_get returns pointer or nullptr", Map, TryGetMaps) {
+    using K = typename Map::key_type;
+    using V = typename Map::mapped_type;
+    Map m;
+    m[make_kv<K>(1)] = make_kv<V>(10);
+    m[make_kv<K>(2)] = make_kv<V>(20);
+
+    // existing key -> pointer to value
+    auto* p = m.try_get(make_kv<K>(1));
+    REQUIRE(p != nullptr);
+    CHECK(*p == make_kv<V>(10));
+
+    // missing key -> nullptr
+    auto* p2 = m.try_get(make_kv<K>(999));
+    CHECK(p2 == nullptr);
+
+    // const version
+    const auto& cm = m;
+    const auto* cp = cm.try_get(make_kv<K>(2));
+    REQUIRE(cp != nullptr);
+    CHECK(*cp == make_kv<V>(20));
+
+    const auto* cp2 = cm.try_get(make_kv<K>(999));
+    CHECK(cp2 == nullptr);
+}
+
+TEST_CASE_TEMPLATE("try_get allows modification via pointer", Map, TryGetMaps) {
+    using K = typename Map::key_type;
+    using V = typename Map::mapped_type;
+    Map m;
+    m[make_kv<K>(1)] = make_kv<V>(10);
+
+    auto* p = m.try_get(make_kv<K>(1));
+    REQUIRE(p != nullptr);
+    *p = make_kv<V>(100);
+    CHECK(m.at(make_kv<K>(1)) == make_kv<V>(100));
+}
+
+// try_set is available on emhash8 + all emilib maps (emhash5 requires EMH_EXT)
+#define TrySetMaps map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>
+
+// set_get has different signatures: emhash5/8 returns ValueT, emilib returns bool with out-param.
+// Only emilib uses the three-argument (bool, ValueT&) form tested here.
+#define TrySetGetMaps imap1<int, int>, imap2<int, int>, imap3<int, int>
+
+TEST_CASE_TEMPLATE("try_set returns true on existing key", Map, TrySetMaps) {
+    using K = typename Map::key_type;
+    using V = typename Map::mapped_type;
+    Map m;
+    m[make_kv<K>(1)] = make_kv<V>(10);
+    m[make_kv<K>(2)] = make_kv<V>(20);
+
+    // try_set on existing key
+    bool r = m.try_set(make_kv<K>(1), make_kv<V>(99));
+    CHECK(r);
+    CHECK(m.at(make_kv<K>(1)) == make_kv<V>(99));
+
+    // try_set on missing key
+    bool r2 = m.try_set(make_kv<K>(999), make_kv<V>(42));
+    CHECK_FALSE(r2);
+    CHECK_FALSE(m.contains(make_kv<K>(999)));
+}
+
+TEST_CASE_TEMPLATE("try_set with move value", Map, TrySetMaps) {
+    using K = typename Map::key_type;
+    using V = typename Map::mapped_type;
+    Map m;
+    m[make_kv<K>(1)] = make_kv<V>(10);
+
+    V new_val = make_kv<V>(77);
+    bool r = m.try_set(make_kv<K>(1), std::move(new_val));
+    CHECK(r);
+    CHECK(m.at(make_kv<K>(1)) == make_kv<V>(77));
+}
+
+TEST_CASE_TEMPLATE("set_get inserts new or retrieves old", Map, TrySetGetMaps) {
+    using K = typename Map::key_type;
+    using V = typename Map::mapped_type;
+    Map m;
+
+    // new key -> inserts and returns true
+    V old_val = make_kv<V>(-1);
+    bool inserted = m.set_get(make_kv<K>(1), make_kv<V>(10), old_val);
+    CHECK(inserted);
+    CHECK(m.at(make_kv<K>(1)) == make_kv<V>(10));
+    // old_val is implementation-defined on new key insertion (left unchanged here)
+    CHECK(old_val == make_kv<V>(-1));
+
+    // existing key -> no insert, old_val receives current value, returns false
+    V old_val2 = make_kv<V>(-1);
+    bool inserted2 = m.set_get(make_kv<K>(1), make_kv<V>(99), old_val2);
+    CHECK_FALSE(inserted2);
+    CHECK(m.at(make_kv<K>(1)) == make_kv<V>(10)); // value unchanged
+    CHECK(old_val2 == make_kv<V>(10));            // old value captured
+}
+
+TEST_CASE_TEMPLATE("set_get with string values", Map, imap1<int, std::string>, imap2<int, std::string>,
+                   imap3<int, std::string>) {
+    Map m;
+    std::string old_val;
+
+    // new key
+    bool inserted = m.set_get(1, "hello", old_val);
+    CHECK(inserted);
+    CHECK(m.at(1) == "hello");
+
+    // existing key
+    std::string old_val2;
+    bool inserted2 = m.set_get(1, "world", old_val2);
+    CHECK_FALSE(inserted2);
+    CHECK(m.at(1) == "hello");
+    CHECK(old_val2 == "hello");
 }
 
 TEST_CASE_TEMPLATE("merge repeated stress", Map, AllIntMaps) {
