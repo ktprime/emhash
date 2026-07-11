@@ -521,8 +521,14 @@ public:
 
     HashMap(size_type bucket, float mlf, const AllocT& alloc) noexcept : _alloc(PairAlloc(alloc)) { init(bucket, mlf); }
 
+    // Bitmask size rounded up to EMH_MALIGN boundary (for front layout alignment)
+    static size_t bitmask_aligned_size(uint64_t num_buckets) {
+        const auto raw = (num_buckets + 7) / 8 + BIT_PACK;
+        return (raw + EMH_MALIGN - 1) & ~size_t(EMH_MALIGN - 1);
+    }
+
     static size_t AllocSize(uint64_t num_buckets) {
-        return (num_buckets + EPACK_SIZE) * sizeof(PairT) + (num_buckets + 7) / 8 + BIT_PACK;
+        return bitmask_aligned_size(num_buckets) + (num_buckets + EPACK_SIZE) * sizeof(PairT);
     }
 
     static size_type alloc_count(size_type num_buckets) {
@@ -543,7 +549,9 @@ public:
 
     HashMap(const HashMap& rhs) : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs = alloc_bucket(rhs._num_buckets);
+            auto* base = alloc_bucket(rhs._num_buckets);
+            _bitmask = reinterpret_cast<bit_type*>(base);
+            _pairs = reinterpret_cast<PairT*>(reinterpret_cast<uint8_t*>(base) + bitmask_aligned_size(rhs._num_buckets));
             clone(rhs);
         } else {
             init(rhs._num_filled + 2, rhs.max_load_factor());
@@ -583,8 +591,10 @@ public:
 
         if (rhs.load_factor() < EMH_MIN_LOAD_FACTOR) {
             clear();
-            dealloc_bucket(_pairs, _num_buckets);
+            dealloc_bucket(reinterpret_cast<PairT*>(_bitmask), _num_buckets);
             _pairs = nullptr;
+            _bitmask = nullptr;
+            _num_buckets = 0;
             rehash(rhs._num_filled + 2);
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 static_cast<void>(insert_unique(it->first, it->second));
@@ -595,8 +605,10 @@ public:
             clearkv();
 
         if (_num_buckets != rhs._num_buckets) {
-            dealloc_bucket(_pairs, _num_buckets);
-            _pairs = alloc_bucket(rhs._num_buckets);
+            dealloc_bucket(reinterpret_cast<PairT*>(_bitmask), _num_buckets);
+            auto* base = alloc_bucket(rhs._num_buckets);
+            _bitmask = reinterpret_cast<bit_type*>(base);
+            _pairs = reinterpret_cast<PairT*>(reinterpret_cast<uint8_t*>(base) + bitmask_aligned_size(rhs._num_buckets));
         }
 
         clone(rhs);
@@ -633,7 +645,7 @@ public:
                 it->~value_pair();
             }
         }
-        dealloc_bucket(_pairs, _num_buckets);
+        dealloc_bucket(reinterpret_cast<PairT*>(_bitmask), _num_buckets);
         _pairs = nullptr;
     }
 
@@ -646,11 +658,10 @@ public:
         _mlf = rhs._mlf;
         _num_buckets = rhs._num_buckets;
 
-        _bitmask = decltype(_bitmask)(_pairs + EPACK_SIZE + _num_buckets);
         auto* opairs = rhs._pairs;
 
         if (is_trivially_copyable())
-            memcpy(reinterpret_cast<char*>(_pairs), opairs, AllocSize(_num_buckets));
+            memcpy(reinterpret_cast<char*>(_bitmask), reinterpret_cast<char*>(rhs._bitmask), AllocSize(_num_buckets));
         else {
             // For non-trivially-copyable types, only init bucket field of tail sentinels
             // (memcpy of whole PairT would read uninitialized key — MSan UB).
@@ -1303,7 +1314,9 @@ public:
         _num_buckets = num_buckets;
         _mask = num_buckets - 1;
 
-        _pairs = alloc_bucket(_num_buckets);
+        auto* _alloc_base = alloc_bucket(_num_buckets);
+        _bitmask = reinterpret_cast<bit_type*>(_alloc_base);
+        _pairs = reinterpret_cast<PairT*>(reinterpret_cast<uint8_t*>(_alloc_base) + bitmask_aligned_size(_num_buckets));
         if (is_trivially_copyable()) {
             memset(reinterpret_cast<char*>(_pairs + _num_buckets), 0, sizeof(PairT) * EPACK_SIZE);
         } else {
@@ -1312,8 +1325,6 @@ public:
             for (size_type i = 0; i < EPACK_SIZE; ++i)
                 std::memcpy(&EMH_BUCKET(_pairs, _num_buckets + i), &zero_bucket, sizeof(zero_bucket));
         }
-
-        _bitmask = decltype(_bitmask)(_pairs + EPACK_SIZE + num_buckets);
 
         const auto mask_byte = (num_buckets + 7) / 8;
         memset(_bitmask, static_cast<unsigned char>(0xFF), mask_byte);
@@ -1351,7 +1362,7 @@ public:
         }
 #endif
 
-        dealloc_bucket(old_pairs, old_num_buckets);
+        dealloc_bucket(reinterpret_cast<PairT*>(obmask), old_num_buckets);
         assert(old_num_filled == _num_filled);
     }
 
