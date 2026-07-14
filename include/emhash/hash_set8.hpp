@@ -250,7 +250,11 @@ public:
         : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
           _index_allocator(IndexAllocTraits::select_on_container_copy_construction(rhs._index_allocator)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs_capacity = rhs._pairs_capacity;
+            // Match rebuild()'s allocation formula: max(num_buckets*mlf+4, num_filled+2)
+            const auto calc_capacity = static_cast<size_type>(static_cast<double>(rhs._num_buckets) *
+                                                              static_cast<double>(rhs.max_load_factor())) +
+                                       4;
+            _pairs_capacity = std::max(calc_capacity, rhs._num_filled + 2);
             _pairs = alloc_bucket(_pairs_capacity);
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
@@ -288,7 +292,11 @@ public:
 
     HashSet(const HashSet& rhs, const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs_capacity = rhs._pairs_capacity;
+            // Match rebuild()'s allocation formula: max(num_buckets*mlf+4, num_filled+2)
+            const auto calc_capacity = static_cast<size_type>(static_cast<double>(rhs._num_buckets) *
+                                                              static_cast<double>(rhs.max_load_factor())) +
+                                       4;
+            _pairs_capacity = std::max(calc_capacity, rhs._num_filled + 2);
             _pairs = alloc_bucket(_pairs_capacity);
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
@@ -330,7 +338,11 @@ public:
             dealloc_bucket(_pairs, _pairs_capacity);
             dealloc_index(_index, _num_buckets);
             _index = alloc_index(rhs._num_buckets);
-            _pairs_capacity = rhs._pairs_capacity;
+            // Match rebuild()'s allocation formula: max(num_buckets*mlf+4, num_filled+2)
+            const auto calc_capacity = static_cast<size_type>(static_cast<double>(rhs._num_buckets) *
+                                                              static_cast<double>(rhs.max_load_factor())) +
+                                       4;
+            _pairs_capacity = std::max(calc_capacity, rhs._num_filled + 2);
             _pairs = alloc_bucket(_pairs_capacity);
         }
 
@@ -375,7 +387,7 @@ public:
         //        _eq          = rhs._eq;
         _num_buckets = rhs._num_buckets;
         _num_filled = rhs._num_filled;
-        _pairs_capacity = rhs._pairs_capacity;
+        // _pairs_capacity is NOT overwritten - it was set by caller based on allocation size
         _mlf = rhs._mlf;
         _last = rhs._last;
         _mask = rhs._mask;

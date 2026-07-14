@@ -27,6 +27,11 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define EMH_LIKELY(condition) __builtin_expect(!!(condition), 1)
 #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
+#define EMH_ASSUME(cond)                                                                                               \
+    do {                                                                                                               \
+        if (!(cond))                                                                                                   \
+            __builtin_unreachable();                                                                                   \
+    } while (0)
 #elif defined(_MSC_VER) && (_MSC_VER >= 1920) && defined(EMH_FORCE_MSC_ASSUME)
 #include <intrin.h>
 #define EMH_LIKELY(condition) ((condition) ? ((void)__assume(condition), 1) : 0)
@@ -35,7 +40,11 @@
 #else
 #define EMH_LIKELY(condition) (condition)
 #define EMH_UNLIKELY(condition) (condition)
+#if defined(_MSC_VER)
+#define EMH_ASSUME(cond) __assume(cond)
+#else
 #define EMH_ASSUME(cond) ((void)0)
+#endif
 #endif
 
 // Compiler detection

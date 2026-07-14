@@ -18,6 +18,7 @@
 #include "emilib/emihmap1.hpp"
 #include "emilib/emihmap2.hpp"
 #include "emilib/emihmap3.hpp"
+#include "emilib/emihmap4.hpp"
 
 // emhash set headers
 #include "emhash/hash_set2.hpp"
@@ -47,6 +48,7 @@ template <typename K, typename V, typename H = std::hash<K>> using map8 = emhash
 template <typename K, typename V, typename H = std::hash<K>> using imap1 = emilib::HashMap<K, V, H>;
 template <typename K, typename V, typename H = std::hash<K>> using imap2 = emilib2::HashMap<K, V, H>;
 template <typename K, typename V, typename H = std::hash<K>> using imap3 = emilib3::HashMap<K, V, H>;
+template <typename K, typename V, typename H = std::hash<K>> using imap4 = emilib4::HashMap<K, V, H>;
 
 // ============================================================================
 // Unified set aliases (all HashSet<K, HashT, EqT>)
@@ -61,14 +63,15 @@ template <typename K, typename H = std::hash<K>> using iset3 = emilib3::HashSet<
 // Type lists for TEST_CASE_TEMPLATE
 // ============================================================================
 
-// All 7 map implementations with int->int
+// All 8 map implementations with int->int
 #define AllIntMaps                                                                                                     \
-    map5<int, int>, map6<int, int>, map7<int, int>, map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>
+    map5<int, int>, map6<int, int>, map7<int, int>, map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>, \
+        imap4<int, int>
 
-// All 7 map implementations with std::string->int (covers emilib gap)
+// All 8 map implementations with std::string->int (covers emilib gap)
 #define AllStringMaps                                                                                                  \
     map5<std::string, int>, map6<std::string, int>, map7<std::string, int>, map8<std::string, int>,                    \
-        imap1<std::string, int>, imap2<std::string, int>, imap3<std::string, int>
+        imap1<std::string, int>, imap2<std::string, int>, imap3<std::string, int>, imap4<std::string, int>
 
 // All 5 set implementations with int
 #define AllIntSets set2<int>, set4<int>, set8<int>, iset2<int>, iset3<int>

@@ -59,6 +59,15 @@
 #define EMH_UNLIKELY(condition) (condition)
 #endif
 
+// pointer restrict qualifier: _states/_pairs never alias each other
+#if defined(__GNUC__) || defined(__clang__)
+#define EMH_RESTRICT __restrict__
+#elif defined(_MSC_VER)
+#define EMH_RESTRICT __restrict
+#else
+#define EMH_RESTRICT
+#endif
+
 namespace emilib3 {
 
 #ifndef EMILIB3_STATE_DEFINED
@@ -921,18 +930,8 @@ private:
 
     inline void set_offset(size_t offset) noexcept { _max_probe_length = offset; }
 
-    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept {
-#if EMH_PSL_LINEAR == 0
-        if (offset < 7) // || _num_buckets < 32 * simd_bytes)
-            next_bucket += simd_bytes * offset;
-        else
-            next_bucket += ((_num_buckets / 8 / simd_bytes) | 1) * simd_bytes;
-#else
-        next_bucket += 3 * simd_bytes;
-        if (next_bucket >= _num_buckets)
-            next_bucket += simd_bytes;
-#endif
-        return next_bucket & _mask;
+    inline size_t get_next_bucket(size_t next_bucket, size_t /*offset*/) const noexcept {
+        return (next_bucket + simd_bytes) & _mask;
     }
 
     // Find the bucket with this key, or return (size_t)-1
@@ -955,7 +954,8 @@ private:
                 } while (maskf &= maskf - 1);
             }
 
-            if (group_mask(next_bucket) == State::EEMPTY)
+            const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
+            if (maske)
                 return _num_buckets;
             if (offset >= _max_probe_length)
                 return _num_buckets;
@@ -997,14 +997,18 @@ private:
 #endif
 
             if (hole == chole) {
-                // 2. find empty
-                const auto maskd = static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)));
-                if (group_mask(next_bucket) == State::EEMPTY) {
-                    hole = next_bucket + CTZ(maskd);
-                    set_states(hole, key_h2);
-                    return hole;
-                } else if (maskd != 0) {
-                    hole = next_bucket + CTZ(maskd);
+                // 2. find the first empty-or-deleted slot
+                const auto maskhole = static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)));
+                if (maskhole) {
+                    // if the group contains an empty slot we can stop here,
+                    // otherwise remember the first tombstone and keep probing
+                    const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
+                    if (maske) {
+                        const auto hbucket = next_bucket + CTZ(maskhole);
+                        set_states(hbucket, key_h2);
+                        return hbucket;
+                    }
+                    hole = next_bucket + CTZ(maskhole);
                 }
             }
 
@@ -1067,8 +1071,8 @@ private:
 private:
     HashT _hasher;
     EqT _eq;
-    int8_t* _states = nullptr;
-    PairT* _pairs = nullptr;
+    int8_t* EMH_RESTRICT _states = nullptr;
+    PairT* EMH_RESTRICT _pairs = nullptr;
     size_t _num_buckets = 0;
     size_t _mask = 0;
     size_t _num_filled = 0;
@@ -1077,3 +1081,5 @@ private:
 };
 
 } // namespace emilib3
+
+#undef EMH_RESTRICT

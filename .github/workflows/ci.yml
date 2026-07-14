@@ -111,7 +111,8 @@ jobs:
           # Unit tests (doctest-based, standalone executables)
           for f in unit/test_crud unit/test_full_api unit/test_copy_move unit/test_iterators \
                    unit/test_edge_cases unit/test_string_keys unit/test_special_keys \
-                   unit/test_reserve_clear unit/test_allocator unit/test_hashset; do
+                   unit/test_reserve_clear unit/test_allocator unit/test_hashset \
+                   unit/test_emihmap4; do
             $CXX $FLAGS $f.cpp -o $(basename $f)
           done
           # Memory tests
@@ -144,6 +145,7 @@ jobs:
           $TIMEOUT 120 ./test_reserve_clear
           $TIMEOUT 120 ./test_allocator
           $TIMEOUT 120 ./test_hashset
+          $TIMEOUT 120 ./test_emihmap4
           # Memory tests
           $TIMEOUT 120 ./test_string_key_leak
           $TIMEOUT 300 ./test_lifecycle_audit
@@ -228,6 +230,10 @@ jobs:
           if [[ "$package" == "clang++" ]]; then package="clang"; fi
           sudo apt-get update && sudo apt-get install -y "$package" ccache
 
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ccache
+
       - name: Configure ccache
         run: |
           export CCACHE_DIR=${{ github.workspace }}/.ccache
@@ -258,6 +264,7 @@ jobs:
           $CXX $SAN unit/test_copy_move.cpp -o test_copy_move_asan
           $CXX $SAN unit/test_iterators.cpp -o test_iterators_asan
           $CXX $SAN unit/test_hashset.cpp -o test_hashset_asan
+          $CXX $SAN unit/test_emihmap4.cpp -o test_emihmap4_asan
           $CXX $SAN unit/test_allocator.cpp -o test_allocator_asan
           $CXX $SAN unit/test_string_keys.cpp -o test_string_keys_asan
           $CXX $SAN unit/test_special_keys.cpp -o test_special_keys_asan
@@ -279,6 +286,7 @@ jobs:
           ./test_copy_move_asan
           ./test_iterators_asan
           ./test_hashset_asan
+          ./test_emihmap4_asan
           ./test_allocator_asan
           ./test_string_keys_asan
           ./test_special_keys_asan
@@ -311,7 +319,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
+        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_emihmap4 test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
         shell: bash
 
   cmake-install:
@@ -424,6 +432,7 @@ jobs:
           $GXX $FLAGS unit/test_crud.cpp -o test_crud_gcc
           $GXX $FLAGS unit/test_full_api.cpp -o test_full_api_gcc
           $GXX $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_gcc
+          $GXX $FLAGS unit/test_emihmap4.cpp -o test_emihmap4_gcc
           $GXX $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_gcc
           $GXX $FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_gcc
           $GXX $FLAGS stress/test_stress_all.cpp -o test_stress_gcc
@@ -431,6 +440,7 @@ jobs:
           ./test_crud_gcc
           ./test_full_api_gcc
           ./test_edge_cases_gcc
+          ./test_emihmap4_gcc
           ./test_string_key_leak_gcc
           ./test_lifecycle_audit_gcc
           ./test_stress_gcc
@@ -475,7 +485,7 @@ jobs:
           # Fast tests (always run)
           for t in test_crud test_full_api test_copy_move test_iterators test_edge_cases \
                    test_string_keys test_special_keys test_reserve_clear test_allocator \
-                   test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer; do
+                   test_hashset test_emihmap4 test_string_key_leak test_lifecycle_audit test_sanitizer; do
             echo "=== Running $t ==="
             "$DIR/$t.exe" || { echo "::error::$t failed"; exit 1; }
           done
@@ -514,6 +524,7 @@ jobs:
           FLAGS="-m32 -std=c++17 -O1 -g -msse2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon -fsanitize=undefined -fno-sanitize-recover=undefined"
           g++ $FLAGS unit/test_crud.cpp -o test_crud_32
           g++ $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_32
+          g++ $FLAGS unit/test_emihmap4.cpp -o test_emihmap4_32
           g++ $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_32
           g++ $FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_32
         shell: bash
@@ -525,7 +536,7 @@ jobs:
           # which test crashes (SIGSEGV = 139). set +e so all tests run even if one fails.
           set +e
           overall=0
-          for t in test_crud_32 test_edge_cases_32 test_string_key_leak_32 test_lifecycle_audit_32; do
+          for t in test_crud_32 test_edge_cases_32 test_emihmap4_32 test_string_key_leak_32 test_lifecycle_audit_32; do
             echo "=================================================================="
             echo "Running ./$t ..."
             echo "=================================================================="
@@ -558,6 +569,7 @@ jobs:
           FLAGS="--target=aarch64-linux-gnu -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon"
           clang++ $FLAGS unit/test_crud.cpp -o test_crud_arm64
           clang++ $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_arm64
+          clang++ $FLAGS unit/test_emihmap4.cpp -o test_emihmap4_arm64
         shell: bash
 
       - name: Run under QEMU
@@ -566,6 +578,8 @@ jobs:
           qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_crud_arm64 2>/dev/null || \
             echo "::notice::ARM64 runtime test skipped (no sysroot); cross-compile only"
           qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_edge_cases_arm64 2>/dev/null || \
+            echo "::notice::ARM64 runtime test skipped (no sysroot); cross-compile only"
+          qemu-aarch64 -L /usr/aarch64-linux-gnu ./test_emihmap4_arm64 2>/dev/null || \
             echo "::notice::ARM64 runtime test skipped (no sysroot); cross-compile only"
         shell: bash
 
@@ -612,6 +626,7 @@ jobs:
           # because the uninstrumented libc++ runtime sets up the iostream globals.
           MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include msan_unpoison.hpp -fsanitize-ignorelist=common/msan-ignorelist.txt"
           ccache clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
+          ccache clang++ $MSAN_FLAGS unit/test_emihmap4.cpp -o test_emihmap4_msan
           ccache clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
           ccache clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
           ccache clang++ $MSAN_FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_msan
@@ -623,7 +638,7 @@ jobs:
           export MSAN_OPTIONS="suppressions=${{ github.workspace }}/.github/msan-suppressions.txt"
           set +e
           overall=0
-          for t in test_crud_msan test_string_key_leak_msan test_sanitizer_msan test_lifecycle_audit_msan; do
+          for t in test_crud_msan test_emihmap4_msan test_string_key_leak_msan test_sanitizer_msan test_lifecycle_audit_msan; do
             echo "=== Running ./$t ==="
             ./$t
             rc=$?
@@ -681,6 +696,7 @@ jobs:
           ccache g++ $COV unit/test_reserve_clear.cpp -o test_reserve_clear_cov
           ccache g++ $COV unit/test_allocator.cpp -o test_allocator_cov
           ccache g++ $COV unit/test_hashset.cpp -o test_hashset_cov
+          ccache g++ $COV unit/test_emihmap4.cpp -o test_emihmap4_cov
           ccache g++ $COV unit/test_api_coverage.cpp -o test_api_coverage_cov
           ccache g++ $COV memory/test_string_key_leak.cpp -o test_string_key_leak_cov
           ccache g++ $COV memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
@@ -705,6 +721,7 @@ jobs:
           ./test_reserve_clear_cov
           ./test_allocator_cov
           ./test_hashset_cov
+          ./test_emihmap4_cov
           ./test_api_coverage_cov
           ./test_string_key_leak_cov
           ./test_lifecycle_audit_cov

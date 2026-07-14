@@ -551,7 +551,8 @@ public:
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             auto* base = alloc_bucket(rhs._num_buckets);
             _bitmask = reinterpret_cast<bit_type*>(base);
-            _pairs = reinterpret_cast<PairT*>(reinterpret_cast<uint8_t*>(base) + bitmask_aligned_size(rhs._num_buckets));
+            _pairs =
+                reinterpret_cast<PairT*>(reinterpret_cast<uint8_t*>(base) + bitmask_aligned_size(rhs._num_buckets));
             clone(rhs);
         } else {
             init(rhs._num_filled + 2, rhs.max_load_factor());
@@ -608,7 +609,8 @@ public:
             dealloc_bucket(reinterpret_cast<PairT*>(_bitmask), _num_buckets);
             auto* base = alloc_bucket(rhs._num_buckets);
             _bitmask = reinterpret_cast<bit_type*>(base);
-            _pairs = reinterpret_cast<PairT*>(reinterpret_cast<uint8_t*>(base) + bitmask_aligned_size(rhs._num_buckets));
+            _pairs =
+                reinterpret_cast<PairT*>(reinterpret_cast<uint8_t*>(base) + bitmask_aligned_size(rhs._num_buckets));
         }
 
         clone(rhs);
