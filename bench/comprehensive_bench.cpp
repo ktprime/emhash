@@ -31,6 +31,7 @@
 #include "emilib/emihmap1.hpp"
 #include "emilib/emihmap2.hpp"
 #include "emilib/emihmap3.hpp"
+#include "emilib/emihmap4.hpp"
 
 #include "martin/robin_hood.h"
 
@@ -97,7 +98,7 @@ struct BenchmarkResults {
 
     void calculate_relative() {
         if (results.empty()) return;
-        double best_time = results[0].time_ms;
+        [[maybe_unused]] double best_time = results[0].time_ms;
         for (auto& r : results) {
             r.throughput = r.operations / (r.time_ms / 1000.0);
         }
@@ -286,6 +287,7 @@ static TestResult test_find_hit_100(const std::vector<int>& keys) {
                 count++;
             }
         }
+        (void)count;
         times.push_back(timer.elapsed_ms());
     }
 
@@ -336,6 +338,7 @@ static TestResult test_find_hit_50(const std::vector<int>& keys) {
                 count++;
             }
         }
+        (void)count;
         times.push_back(timer.elapsed_ms());
     }
 
@@ -382,6 +385,7 @@ static TestResult test_find_hit_0(const std::vector<int>& keys) {
                 count++;
             }
         }
+        (void)count;
         times.push_back(timer.elapsed_ms());
     }
 
@@ -456,6 +460,7 @@ static TestResult test_iterate(const std::vector<int>& keys) {
                 sum += kv.second;
             }
         }
+        (void)sum;
         times.push_back(timer.elapsed_ms());
     }
 
@@ -564,6 +569,7 @@ static TestResult test_mixed_operations(const std::vector<int>& keys) {
                 count++;
             }
         }
+        (void)count;
 
         // Erase phase
         for (size_t i = 0; i < n / 2; ++i) {
@@ -656,6 +662,7 @@ static TestResult test_small_map(const std::vector<int>& /* unused */) {
         do { TestResult r = TEST_FUNC<emilib::HashMap<int, int>>(KEYS); r.hash_map_name = "emilib1"; bench_result.results.push_back(r); } while(0); \
         do { TestResult r = TEST_FUNC<emilib2::HashMap<int, int>>(KEYS); r.hash_map_name = "emilib2"; bench_result.results.push_back(r); } while(0); \
         do { TestResult r = TEST_FUNC<emilib3::HashMap<int, int>>(KEYS); r.hash_map_name = "emilib3"; bench_result.results.push_back(r); } while(0); \
+        do { TestResult r = TEST_FUNC<emilib4::HashMap<int, int>>(KEYS); r.hash_map_name = "emilib4"; bench_result.results.push_back(r); } while(0); \
         do { TestResult r = TEST_FUNC<robin_hood::unordered_map<int, int>>(KEYS); r.hash_map_name = "robin_hood"; bench_result.results.push_back(r); } while(0); \
         RUN_OPTIONAL_CXX17(TEST_FUNC, KEYS, bench_result); \
         RUN_OPTIONAL_BOOST(TEST_FUNC, KEYS, bench_result); \

@@ -1225,11 +1225,11 @@ static int benchHashSet(int n)
 
 static void high_load()
 {
-    size_t maxSize = 1U << 28;
+    [[maybe_unused]] size_t maxSize = 1U << 28;
     size_t numReps = 100;
 
     //std::random_device rd;
-    auto dis = std::uniform_int_distribution<uint32_t>{0, (1U << 31) - 1};
+    [[maybe_unused]] auto dis = std::uniform_int_distribution<uint32_t>{0, (1U << 31) - 1};
 
     for (size_t rep = 0; rep < numReps; ++rep) {
 #if 0
@@ -1400,7 +1400,7 @@ int main(int argc, char* argv[])
             high_load();
 
         else if (cmd == 'd') {
-            for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][++j]) {
+            for (char c = argv[i][1], j = 1; c != '\0'; c = argv[i][(int)++j]) {
                 if (c >= '2' && c <= '9') {
                     std::string hash_name("emhash");
                     hash_name += c;

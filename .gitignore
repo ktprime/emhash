@@ -70,7 +70,6 @@ tests/vsbuild/
 tests/cov_build/
 tests/coverage_html/
 tests/debug/
-tests/archive/
 tests/coverage.info
 tests/cov_*.txt
 tests/cov_run_log.txt

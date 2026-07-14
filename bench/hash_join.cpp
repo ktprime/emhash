@@ -1,3 +1,4 @@
+#pragma GCC diagnostic ignored "-Wunused-result"
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 #define _SILENCE_CXX20_CISO646_REMOVED_WARNING
 #include <boost/unordered/unordered_flat_map.hpp>
