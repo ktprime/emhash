@@ -108,6 +108,10 @@ public:
 
     constexpr static size_type INACTIVE = size_type(-1);
     constexpr static size_type EAD = 2;
+    // Extra slots reserved beyond _num_filled to avoid immediate rehash on next insert
+    constexpr static size_type RESERVE_SLOTS = 2;
+    // Extra capacity buffer for pairs allocation (prevents frequent realloc on growth)
+    constexpr static size_type PAIRS_CAPACITY_BUFFER = 4;
 
     struct Index {
         size_type next;
@@ -244,7 +248,9 @@ public:
         rehash(bucket);
     }
 
-    explicit HashSet(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, mlf); }
+    explicit HashSet(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) {
+        init(bucket, mlf);
+    }
 
     HashSet(const HashSet& rhs)
         : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
@@ -255,7 +261,7 @@ public:
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
         } else {
-            init(rhs._num_filled + 2, rhs.max_load_factor());
+            init(rhs._num_filled + RESERVE_SLOTS, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(*it);
         }
@@ -279,7 +285,9 @@ public:
             emplace(*begin);
     }
 
-    explicit HashSet(const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) { init(2); }
+    explicit HashSet(const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) {
+        init(2);
+    }
 
     HashSet(size_type bucket, float mlf, const allocator_type& alloc)
         : _pair_allocator(alloc), _index_allocator(alloc) {
@@ -293,7 +301,7 @@ public:
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
         } else {
-            init(rhs._num_filled + 2, rhs.max_load_factor());
+            init(rhs._num_filled + RESERVE_SLOTS, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(*it);
         }
@@ -318,7 +326,7 @@ public:
             dealloc_bucket(_pairs, _pairs_capacity);
             _pairs = nullptr;
             _pairs_capacity = 0;
-            rehash(rhs._num_filled + 2);
+            rehash(rhs._num_filled + RESERVE_SLOTS);
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 insert_unique(*it);
             return *this;
@@ -359,7 +367,9 @@ public:
         return true;
     }
 
-    template <typename Con> bool operator!=(const Con& rhs) const { return !(*this == rhs); }
+    template <typename Con> bool operator!=(const Con& rhs) const {
+        return !(*this == rhs);
+    }
 
     ~HashSet() noexcept {
         clearkv();
@@ -416,8 +426,12 @@ public:
     }
 
     // -------------------------------------------------------------
-    iterator first() const { return {this, 0}; }
-    iterator last() const { return {this, _num_filled - 1}; }
+    iterator first() const {
+        return {this, 0};
+    }
+    iterator last() const {
+        return {this, _num_filled - 1};
+    }
 
     // no exception if empty
     value_type& front() {
@@ -446,25 +460,55 @@ public:
         erase(last());
     }
 
-    constexpr iterator begin() { return first(); }
-    constexpr const_iterator cbegin() const { return first(); }
-    constexpr const_iterator begin() const { return first(); }
+    constexpr iterator begin() {
+        return first();
+    }
+    constexpr const_iterator cbegin() const {
+        return first();
+    }
+    constexpr const_iterator begin() const {
+        return first();
+    }
 
-    constexpr iterator end() { return {this, _num_filled}; }
-    constexpr const_iterator cend() const { return {this, _num_filled}; }
-    constexpr const_iterator end() const { return cend(); }
+    constexpr iterator end() {
+        return {this, _num_filled};
+    }
+    constexpr const_iterator cend() const {
+        return {this, _num_filled};
+    }
+    constexpr const_iterator end() const {
+        return cend();
+    }
 
-    const value_type* values() const { return _pairs; }
-    const Index* index() const { return _index; }
+    const value_type* values() const noexcept {
+        return _pairs;
+    }
+    const Index* index() const noexcept {
+        return _index;
+    }
 
-    size_type size() const { return _num_filled; }
-    bool empty() const { return _num_filled == 0; }
-    size_type bucket_count() const { return _num_buckets; }
-    float load_factor() const { return static_cast<float>(_num_filled) / (static_cast<float>(_mask) + 1.0f); }
+    size_type size() const noexcept {
+        return _num_filled;
+    }
+    bool empty() const noexcept {
+        return _num_filled == 0;
+    }
+    size_type bucket_count() const noexcept {
+        return _num_buckets;
+    }
+    float load_factor() const noexcept {
+        return static_cast<float>(_num_filled) / (static_cast<float>(_mask) + 1.0f);
+    }
 
-    const HashT& hash_function() const { return _hasher; }
-    const EqT& key_eq() const { return _eq; }
-    allocator_type get_allocator() const { return allocator_type(_pair_allocator); }
+    const HashT& hash_function() const noexcept {
+        return _hasher;
+    }
+    const EqT& key_eq() const noexcept {
+        return _eq;
+    }
+    allocator_type get_allocator() const noexcept {
+        return allocator_type(_pair_allocator);
+    }
 
     void max_load_factor(float mlf) {
         if (mlf < 0.992f && mlf > EMH_MIN_LOAD_FACTOR) {
@@ -474,9 +518,15 @@ public:
         }
     }
 
-    constexpr float max_load_factor() const { return (1 << 27) / static_cast<float>(_mlf); }
-    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
-    constexpr uint64_t max_bucket_count() const { return max_size(); }
+    constexpr float max_load_factor() const noexcept {
+        return (1 << 27) / static_cast<float>(_mlf);
+    }
+    constexpr uint64_t max_size() const noexcept {
+        return 1ull << (sizeof(_num_buckets) * 8 - 1);
+    }
+    constexpr uint64_t max_bucket_count() const noexcept {
+        return max_size();
+    }
 
 #if EMH_STATIS
     // Returns the bucket number where the element with key k is located.
@@ -601,13 +651,17 @@ public:
 #endif
 
     // ------------------------------------------------------------
-    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_slot(key)}; }
+    template <typename K = KeyT> iterator find(const K& key) noexcept {
+        return {this, find_filled_slot(key)};
+    }
 
     template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
         return {this, find_filled_slot(key)};
     }
 
-    KeyT& index(const uint32_t slot) noexcept { return _pairs[slot]; }
+    KeyT& index(const uint32_t slot) noexcept {
+        return _pairs[slot];
+    }
 
     template <typename K = KeyT> bool contains(const K& key) const noexcept {
         return find_filled_slot(key) != _num_filled;
@@ -704,9 +758,13 @@ public:
         return bucket;
     }
 
-    size_type insert_unique(value_type&& value) { return do_unique(std::move(value)); }
+    size_type insert_unique(value_type&& value) {
+        return do_unique(std::move(value));
+    }
 
-    size_type insert_unique(const value_type& value) { return do_unique(value); }
+    size_type insert_unique(const value_type& value) {
+        return do_unique(value);
+    }
 
     template <class... Args> std::pair<iterator, bool> emplace(Args&&... args) {
         check_expand_need();
@@ -916,11 +974,13 @@ public:
             dump_statics();
 #endif
 
-        rehash(required_buckets + 2);
+        rehash(required_buckets + RESERVE_SLOTS);
         return true;
     }
 
-    value_type* alloc_bucket(size_type num_buckets) { return PairAllocTraits::allocate(_pair_allocator, num_buckets); }
+    value_type* alloc_bucket(size_type num_buckets) {
+        return PairAllocTraits::allocate(_pair_allocator, num_buckets);
+    }
 
     void dealloc_bucket(value_type* ptr, size_type num_buckets) {
         if (ptr)
@@ -957,9 +1017,10 @@ public:
 
     void rebuild(size_type num_buckets, size_type required_buckets, size_type old_num_buckets) noexcept {
         dealloc_index(_index, old_num_buckets);
-        const auto need_size = std::max(
-            static_cast<size_type>(static_cast<double>(num_buckets) * static_cast<double>(max_load_factor())) + 4,
-            required_buckets + 2);
+        const auto need_size =
+            std::max(static_cast<size_type>(static_cast<double>(num_buckets) * static_cast<double>(max_load_factor())) +
+                         PAIRS_CAPACITY_BUFFER,
+                     required_buckets + RESERVE_SLOTS);
         auto new_pairs = alloc_bucket(need_size);
         if (is_trivially_copyable()) {
             if (_pairs)
@@ -1062,7 +1123,9 @@ public:
 
 private:
     // Can we fit another element?
-    bool check_expand_need() noexcept { return reserve(_num_filled, false); }
+    bool check_expand_need() noexcept {
+        return reserve(_num_filled, false);
+    }
 
     static void prefetch_heap_block(char* ctrl) {
         // Prefetch the heap-allocated memory region to resolve potential TLB
@@ -1468,7 +1531,9 @@ private:
         }
     }
 
-    size_type hash_bucket(const KeyT& key) const noexcept { return static_cast<size_type>(hash_key(key)) & _mask; }
+    size_type hash_bucket(const KeyT& key) const noexcept {
+        return static_cast<size_type>(hash_key(key)) & _mask;
+    }
 
     size_type hash_main(const size_type bucket) const noexcept {
         const auto slot = _index[bucket].slot & _mask;
