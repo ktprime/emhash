@@ -62,16 +62,14 @@ namespace emilib4 {
 // ─── EBO helper for stateless Hash/Pred ────────────────────────────
 
 namespace detail {
-template <typename T, int Tag, bool = std::is_empty<T>::value && !std::is_final<T>::value>
-struct ebo : private T {
+template <typename T, int Tag, bool = std::is_empty<T>::value && !std::is_final<T>::value> struct ebo : private T {
     ebo() = default;
     template <typename U> explicit ebo(U&& v) : T(std::forward<U>(v)) {}
     T& get() noexcept { return *this; }
     const T& get() const noexcept { return *this; }
 };
 
-template <typename T, int Tag>
-struct ebo<T, Tag, false> {
+template <typename T, int Tag> struct ebo<T, Tag, false> {
     ebo() = default;
     template <typename U> explicit ebo(U&& v) : val(std::forward<U>(v)) {}
     T& get() noexcept { return val; }
@@ -175,9 +173,7 @@ struct group15 {
         m[pos] = reduced_hash(hash);
     }
 
-    void set_sentinel() {
-        m[N - 1] = sentinel_;
-    }
+    void set_sentinel() { m[N - 1] = sentinel_; }
 
     bool is_sentinel(int pos) const {
         assert(pos < N);
@@ -189,9 +185,7 @@ struct group15 {
         m[pos] = available_;
     }
 
-    static void reset(uint8_t* pc) {
-        *pc = available_;
-    }
+    static void reset(uint8_t* pc) { *pc = available_; }
 
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
     int match(size_t hash) const {
@@ -206,9 +200,7 @@ struct group15 {
                0x7FFF;
     }
 
-    int match_occupied() const {
-        return (~match_available()) & 0x7FFF;
-    }
+    int match_occupied() const { return (~match_available()) & 0x7FFF; }
 #else
     // Non-SIMD fallback: branchless byte comparisons for fast matching
     int match(size_t hash) const {
@@ -226,9 +218,7 @@ struct group15 {
         return mask;
     }
 
-    int match_occupied() const {
-        return (~match_available()) & 0x7FFF;
-    }
+    int match_occupied() const { return (~match_available()) & 0x7FFF; }
 #endif
 
     bool is_not_overflowed(size_t hash) const {
@@ -236,9 +226,7 @@ struct group15 {
         return !(m[N] & shift[hash % 8]);
     }
 
-    void mark_overflow(size_t hash) {
-        m[N] |= static_cast<uint8_t>(1 << (hash % 8));
-    }
+    void mark_overflow(size_t hash) { m[N] |= static_cast<uint8_t>(1 << (hash % 8)); }
 
     static bool maybe_caused_overflow(uint8_t* pc) {
         auto pos = reinterpret_cast<uintptr_t>(pc) % sizeof(group15);
@@ -251,13 +239,9 @@ struct group15 {
         return m[pos] != available_;
     }
 
-    static bool is_occupied(uint8_t* pc) noexcept {
-        return *pc != available_;
-    }
+    static bool is_occupied(uint8_t* pc) noexcept { return *pc != available_; }
 
-    static bool is_sentinel(uint8_t* pc) noexcept {
-        return *pc == sentinel_;
-    }
+    static bool is_sentinel(uint8_t* pc) noexcept { return *pc == sentinel_; }
 
     // reduced_hash: map hash byte to [2..255], avoiding 0 (available) and 1 (sentinel)
     static uint8_t reduced_hash(size_t hash) {
@@ -341,13 +325,9 @@ struct pow2_size_policy {
         return sizeof(size_t) * 8 - bits;
     }
 
-    static inline size_t size(size_t size_index) {
-        return size_t(1) << (sizeof(size_t) * 8 - size_index);
-    }
+    static inline size_t size(size_t size_index) { return size_t(1) << (sizeof(size_t) * 8 - size_index); }
 
-    static constexpr size_t min_size() {
-        return 2;
-    }
+    static constexpr size_t min_size() { return 2; }
 
     static inline size_t position(size_t hash, size_t size_index) {
         return size_index < sizeof(size_t) * 8 ? (hash >> size_index) : 0;
@@ -755,9 +735,7 @@ public:
         } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         return false;
     }
-    template <typename K = KeyT> size_t count(const K& key) const noexcept {
-        return contains(key);
-    }
+    template <typename K = KeyT> size_t count(const K& key) const noexcept { return contains(key); }
 
     template <typename K = KeyT> ValueT& at(const K& key) {
         auto loc = find_locator(key);
@@ -779,7 +757,9 @@ public:
 
     // ─── insert ───────────────────────────────────────────────────────
 
-    EMH_INLINE std::pair<iterator, bool> insert(const value_type& value) { return do_insert(value.first, value.second); }
+    EMH_INLINE std::pair<iterator, bool> insert(const value_type& value) {
+        return do_insert(value.first, value.second);
+    }
     EMH_INLINE std::pair<iterator, bool> insert(value_type&& value) { return do_insert(std::move(value)); }
 
     template <typename K, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) {
@@ -805,7 +785,9 @@ public:
         return do_insert(std::move(const_cast<KeyT&>(value.first)), std::move(value.second));
     }
 
-    EMH_INLINE std::pair<iterator, bool> do_insert(const value_type& value) { return do_insert(value.first, value.second); }
+    EMH_INLINE std::pair<iterator, bool> do_insert(const value_type& value) {
+        return do_insert(value.first, value.second);
+    }
 
     template <class... Args> std::pair<iterator, bool> emplace(Args&&... args) {
         return do_insert(std::forward<Args>(args)...);
@@ -1086,8 +1068,7 @@ private:
         return find_locator_at(key, position_for(hash), hash);
     }
 
-    template <typename K>
-    locator find_locator_at(const K& key, size_t pos0, size_t hash) const noexcept {
+    template <typename K> locator find_locator_at(const K& key, size_t pos0, size_t hash) const noexcept {
         auto* pairs = _pairs;
         auto* groups = _groups;
         quadratic_prober pb(pos0);
@@ -1132,9 +1113,7 @@ private:
 
     // ─── erase ────────────────────────────────────────────────────────
 
-    void erase_bucket(size_t bucket) noexcept {
-        erase_at(&_groups[bucket / N].m[bucket % N], _pairs + bucket);
-    }
+    void erase_bucket(size_t bucket) noexcept { erase_at(&_groups[bucket / N].m[bucket % N], _pairs + bucket); }
 
     // Fast erase with both pc and p known (no redundant pointer arithmetic)
     EMH_INLINE void erase_at(uint8_t* pc, PairT* p) noexcept {
@@ -1179,8 +1158,8 @@ private:
 
     // Dummy groups for empty containers: avoids _groups==nullptr checks in hot paths
     static group15* dummy_groups() {
-        static constexpr typename group_type::dummy_group_type
-            storage[2] = {typename group_type::dummy_group_type(), typename group_type::dummy_group_type()};
+        static constexpr typename group_type::dummy_group_type storage[2] = {typename group_type::dummy_group_type(),
+                                                                             typename group_type::dummy_group_type()};
         return reinterpret_cast<group15*>(const_cast<typename group_type::dummy_group_type*>(storage));
     }
 
@@ -1366,8 +1345,8 @@ private:
                     auto& src = old_pairs[old_slot];
                     auto h = hash_for(src.first);
                     auto p0 = position_for(h);
-                    auto loc = find_empty_slot_and_insert(p0, h);
-                    transfer_element(loc, src);
+                    auto slot_loc = find_empty_slot_and_insert(p0, h);
+                    transfer_element(slot_loc, src);
                     if (need_explicit_dtor())
                         src.~PairT();
                     _num_filled++;
@@ -1403,7 +1382,7 @@ private:
     detail::ebo<EqT, 1> _eq_base;
 
     group15* _groups = dummy_groups(); // derived pointer into _pairs allocation
-    PairT* _pairs = nullptr;    // base allocation pointer
+    PairT* _pairs = nullptr;           // base allocation pointer
     size_t _num_filled = 0;
     size_t _max_load = 0;
     size_t _groups_size_index = sizeof(size_t) * 8;
