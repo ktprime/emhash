@@ -112,7 +112,7 @@ jobs:
           for f in unit/test_crud unit/test_full_api unit/test_copy_move unit/test_iterators \
                    unit/test_edge_cases unit/test_string_keys unit/test_special_keys \
                    unit/test_reserve_clear unit/test_allocator unit/test_hashset \
-                   unit/test_emihmap4; do
+                   unit/test_emihmap4 unit/test_small_data; do
             $CXX $FLAGS $f.cpp -o $(basename $f)
           done
           # Memory tests
@@ -146,6 +146,7 @@ jobs:
           $TIMEOUT 120 ./test_allocator
           $TIMEOUT 120 ./test_hashset
           $TIMEOUT 120 ./test_emihmap4
+          $TIMEOUT 120 ./test_small_data
           # Memory tests
           $TIMEOUT 120 ./test_string_key_leak
           $TIMEOUT 300 ./test_lifecycle_audit
@@ -265,6 +266,7 @@ jobs:
           $CXX $SAN unit/test_iterators.cpp -o test_iterators_asan
           $CXX $SAN unit/test_hashset.cpp -o test_hashset_asan
           $CXX $SAN unit/test_emihmap4.cpp -o test_emihmap4_asan
+          $CXX $SAN unit/test_small_data.cpp -o test_small_data_asan
           $CXX $SAN unit/test_allocator.cpp -o test_allocator_asan
           $CXX $SAN unit/test_string_keys.cpp -o test_string_keys_asan
           $CXX $SAN unit/test_special_keys.cpp -o test_special_keys_asan
@@ -287,6 +289,7 @@ jobs:
           ./test_iterators_asan
           ./test_hashset_asan
           ./test_emihmap4_asan
+          ./test_small_data_asan
           ./test_allocator_asan
           ./test_string_keys_asan
           ./test_special_keys_asan
@@ -319,7 +322,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_emihmap4 test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
+        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_emihmap4 test_small_data test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
         shell: bash
 
   cmake-install:
@@ -474,7 +477,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
+        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_emihmap4 test_small_data test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
         shell: bash
 
       - name: Run tests
@@ -485,7 +488,7 @@ jobs:
           # Fast tests (always run)
           for t in test_crud test_full_api test_copy_move test_iterators test_edge_cases \
                    test_string_keys test_special_keys test_reserve_clear test_allocator \
-                   test_hashset test_emihmap4 test_string_key_leak test_lifecycle_audit test_sanitizer; do
+                   test_hashset test_emihmap4 test_small_data test_string_key_leak test_lifecycle_audit test_sanitizer; do
             echo "=== Running $t ==="
             "$DIR/$t.exe" || { echo "::error::$t failed"; exit 1; }
           done
@@ -697,6 +700,7 @@ jobs:
           ccache g++ $COV unit/test_allocator.cpp -o test_allocator_cov
           ccache g++ $COV unit/test_hashset.cpp -o test_hashset_cov
           ccache g++ $COV unit/test_emihmap4.cpp -o test_emihmap4_cov
+          ccache g++ $COV unit/test_small_data.cpp -o test_small_data_cov
           ccache g++ $COV unit/test_api_coverage.cpp -o test_api_coverage_cov
           ccache g++ $COV memory/test_string_key_leak.cpp -o test_string_key_leak_cov
           ccache g++ $COV memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
@@ -722,6 +726,7 @@ jobs:
           ./test_allocator_cov
           ./test_hashset_cov
           ./test_emihmap4_cov
+          ./test_small_data_cov
           ./test_api_coverage_cov
           ./test_string_key_leak_cov
           ./test_lifecycle_audit_cov
