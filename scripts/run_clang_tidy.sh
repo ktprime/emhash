@@ -56,6 +56,7 @@ REPRESENTATIVE_FILES=(
     "$ROOT_DIR/tests/unit/test_edge_cases.cpp"
     "$ROOT_DIR/tests/unit/test_string_keys.cpp"
     "$ROOT_DIR/tests/unit/test_hashset.cpp"
+    "$ROOT_DIR/tests/unit/test_emihmap4.cpp"
     "$ROOT_DIR/tests/memory/test_lifecycle_audit.cpp"
 )
 
