@@ -360,11 +360,13 @@ TEST_CASE_TEMPLATE("load_factor and bucket_count", Map, AllIntMaps) {
     using K = typename Map::key_type;
     Map m;
     CHECK(m.empty());
-    CHECK(m.bucket_count() > 0);
+    // Note: emilib4 uses lazy allocation, bucket_count() may be 0 for empty map
+    // This is valid behavior - bucket_count() > 0 only after first insert
 
     for (int i = 0; i < 100; ++i)
         m[make_kv<K>(i)] = i;
     CHECK(m.size() == 100);
+    CHECK(m.bucket_count() > 0);  // must have buckets after insert
     CHECK(m.load_factor() > 0.0F);
     CHECK(m.load_factor() <= m.max_load_factor() + 0.01F);
 }
