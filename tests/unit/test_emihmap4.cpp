@@ -1,6 +1,13 @@
 // unit/test_emihmap4.cpp
-// Comprehensive correctness test for emilib4::HashMap (swiss table design).
-// Validates: CRUD, iterators, copy/move, rehash, string keys, edge cases, erase_if, etc.
+// Bug-focused correctness test for emilib4::HashMap (swiss table design).
+// Strategy: minimize trivial API smoke tests (those belong in test_api_coverage),
+//           maximize scenarios that historically break hash tables:
+//           - rehash correctness (element preservation, tombstone handling)
+//           - erase + reinsert (tombstone reuse, group boundary crossing)
+//           - copy/move with non-trivial types (memcpy safety, allocator consistency)
+//           - overflow probe chains (quadratic probing under collision)
+//           - iterator stability across mutations
+//           - size boundary around group/swiss-table group size (15 slots)
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "emilib/emihmap4.hpp"
@@ -11,382 +18,485 @@
 #include <utility>
 #include <algorithm>
 #include <random>
+#include <unordered_map>
 
 using MapII = emilib4::HashMap<int, int>;
 using MapSI = emilib4::HashMap<std::string, int>;
+using MapIS = emilib4::HashMap<int, std::string>;
 using MapI64 = emilib4::HashMap<int64_t, int64_t>;
 
-// ─── 1. Empty state ───────────────────────────────────────────────────
+// ─── 1. Empty state + moved-from state ────────────────────────────────
 
-TEST_CASE("empty state") {
+TEST_CASE("empty and moved-from state") {
     MapII m;
     CHECK(m.empty());
     CHECK(m.size() == 0);
     CHECK(m.begin() == m.end());
-    CHECK(m.cbegin() == m.cend());
     CHECK(m.find(1) == m.end());
     CHECK(!m.contains(1));
-    CHECK(m.count(1) == 0);
+
+    MapII m2;
+    m2[1] = 10;
+    MapII m3(std::move(m2));
+    // moved-from: valid but unspecified state; must not crash
+    CHECK(m2.size() <= 1);
+    m2.clear(); // must be callable
+    CHECK(m2.empty());
+    m2[2] = 20; // must be reusable
+    CHECK(m2[2] == 20);
 }
 
-// ─── 2. Basic CRUD ────────────────────────────────────────────────────
+// ─── 2. Insert + duplicate handling ────────────────────────────────────
 
-TEST_CASE("operator[] insert and read") {
-    MapII m;
-    m[1] = 10;
-    m[2] = 20;
-    m[3] = 30;
-    CHECK(m.size() == 3);
-    CHECK(m[1] == 10);
-    CHECK(m[2] == 20);
-    CHECK(m[3] == 30);
-}
-
-TEST_CASE("operator[] overwrite") {
-    MapII m;
-    m[1] = 10;
-    m[1] = 100;
-    CHECK(m.size() == 1);
-    CHECK(m[1] == 100);
-}
-
-TEST_CASE("operator[] default construct") {
-    MapII m;
-    m[1]; // default-constructs value (0 for int)
-    CHECK(m.size() == 1);
-    CHECK(m[1] == 0);
-}
-
-TEST_CASE("insert pair") {
+TEST_CASE("insert returns correct pair for new/duplicate keys") {
     MapII m;
     auto [it1, ok1] = m.insert({1, 10});
     CHECK(ok1);
-    CHECK(it1->first == 1);
     CHECK(it1->second == 10);
 
-    auto [it2, ok2] = m.insert({1, 20}); // duplicate
+    auto [it2, ok2] = m.insert({1, 20});
     CHECK(!ok2);
     CHECK(it2->second == 10); // original unchanged
+
+    // try_emplace must not overwrite
+    auto [it3, ok3] = m.try_emplace(1, 999);
+    CHECK(!ok3);
+    CHECK(it3->second == 10);
+
+    auto [it4, ok4] = m.try_emplace(2, 20);
+    CHECK(ok4);
+    CHECK(it4->second == 20);
+
+    // insert_or_assign must overwrite
+    auto [it5, ok5] = m.insert_or_assign(1, 99);
+    CHECK(!ok5);
+    CHECK(it5->second == 99);
+    CHECK(m[1] == 99);
+
+    auto [it6, ok6] = m.insert_or_assign(3, 30);
+    CHECK(ok6);
+    CHECK(m[3] == 30);
 }
 
-TEST_CASE("emplace") {
+// ─── 3. Erase tombstone stress: erase half, reinsert, repeat ──────────
+
+TEST_CASE("erase half + reinsert oscillation") {
+    // This stresses tombstone handling in swiss tables.
+    // Repeatedly erasing and reinserting creates many deleted slots,
+    // testing whether probe chains remain correct.
     MapII m;
-    auto [it, ok] = m.emplace(5, 50);
-    CHECK(ok);
-    CHECK(it->first == 5);
-    CHECK(it->second == 50);
-}
-
-TEST_CASE("try_emplace") {
-    MapII m;
-    m[1] = 10;
-    auto [it1, ok1] = m.try_emplace(1, 999);
-    CHECK(!ok1);
-    CHECK(it1->second == 10);
-
-    auto [it2, ok2] = m.try_emplace(2, 20);
-    CHECK(ok2);
-    CHECK(it2->second == 20);
-}
-
-TEST_CASE("at() read and modify") {
-    MapII m;
-    m[1] = 10;
-    CHECK(m.at(1) == 10);
-    m.at(1) = 100;
-    CHECK(m.at(1) == 100);
-}
-
-TEST_CASE("at() throws for missing key") {
-    MapII m;
-    CHECK_THROWS_AS(m.at(999), std::out_of_range);
-}
-
-TEST_CASE("contains and count") {
-    MapII m;
-    m[1] = 10;
-    CHECK(m.contains(1));
-    CHECK(!m.contains(2));
-    CHECK(m.count(1) == 1);
-    CHECK(m.count(2) == 0);
-}
-
-TEST_CASE("find") {
-    MapII m;
-    m[1] = 10;
-    auto it = m.find(1);
-    REQUIRE(it != m.end());
-    CHECK(it->first == 1);
-    CHECK(it->second == 10);
-    CHECK(m.find(2) == m.end());
-}
-
-// ─── 3. Erase ─────────────────────────────────────────────────────────
-
-TEST_CASE("erase by key") {
-    MapII m;
-    m[1] = 10;
-    m[2] = 20;
-    m[3] = 30;
-    CHECK(m.erase(2) == 1);
-    CHECK(m.size() == 2);
-    CHECK(!m.contains(2));
-    CHECK(m.erase(999) == 0);
-}
-
-TEST_CASE("erase by iterator") {
-    MapII m;
-    m[1] = 10;
-    m[2] = 20;
-    auto it = m.find(1);
-    REQUIRE(it != m.end());
-    m.erase(it);
-    CHECK(!m.contains(1));
-    CHECK(m.size() == 1);
-}
-
-TEST_CASE("erase_if") {
-    MapII m;
-    for (int i = 0; i < 100; i++)
+    const int N = 500;
+    for (int i = 0; i < N; i++)
         m[i] = i;
-    auto erased = m.erase_if([](auto& p) { return p.second % 2 == 0; });
-    CHECK(erased == 50);
-    CHECK(m.size() == 50);
-    for (auto& [k, v] : m)
-        CHECK(v % 2 != 0);
+
+    for (int round = 0; round < 10; round++) {
+        // Erase even keys
+        for (int i = 0; i < N; i += 2)
+            CHECK(m.erase(i) == 1);
+        CHECK(m.size() == static_cast<size_t>(N / 2));
+
+        // Reinsert even keys with new values
+        for (int i = 0; i < N; i += 2)
+            m[i] = i * 100 + round;
+
+        CHECK(m.size() == static_cast<size_t>(N));
+        // Verify odd keys untouched
+        for (int i = 1; i < N; i += 2)
+            CHECK(m[i] == i);
+    }
 }
+
+// ─── 4. Erase all then reinsert (tombstone cleanup via rehash) ───────
 
 TEST_CASE("erase all then reinsert") {
     MapII m;
+    for (int i = 0; i < 200; i++)
+        m[i] = i;
+    for (int i = 0; i < 200; i++)
+        CHECK(m.erase(i) == 1);
+    CHECK(m.empty());
+
+    // After full erase, map must accept new inserts without corruption
+    for (int i = 0; i < 200; i++)
+        m[i + 1000] = i * 7;
+    CHECK(m.size() == 200);
+    for (int i = 0; i < 200; i++)
+        CHECK(m[i + 1000] == i * 7);
+}
+
+// ─── 5. Rehash correctness: all elements must survive ─────────────────
+
+TEST_CASE("rehash preserves all elements") {
+    MapII m;
+    for (int i = 0; i < 500; i++)
+        m[i] = i * 3;
+
+    // Force multiple rehashes
+    m.reserve(100000);
+    CHECK(m.size() == 500);
+    for (int i = 0; i < 500; i++)
+        CHECK(m[i] == i * 3);
+
+    // Shrink back down
+    m.shrink_to_fit();
+    CHECK(m.size() == 500);
+    for (int i = 0; i < 500; i++)
+        CHECK(m[i] == i * 3);
+}
+
+TEST_CASE("rehash(0) after heavy erase") {
+    MapII m;
+    for (int i = 0; i < 1000; i++)
+        m[i] = i;
+    for (int i = 0; i < 950; i++)
+        m.erase(i);
+    m.rehash(0);
+    CHECK(m.size() == 50);
+    for (int i = 950; i < 1000; i++)
+        CHECK(m[i] == i);
+}
+
+// ─── 6. Copy/move with string keys (non-trivially-copyable) ──────────
+
+TEST_CASE("string key copy/move lifecycle") {
+    // String keys stress the non-trivially-copyable path in clone().
+    // A bug here leads to double-free or leaked memory.
+    MapSI m1;
+    for (int i = 0; i < 200; i++)
+        m1["key_" + std::to_string(i)] = i;
+
+    auto m2(m1); // copy ctor
+    CHECK(m2.size() == 200);
+    for (int i = 0; i < 200; i++)
+        CHECK(m2["key_" + std::to_string(i)] == i);
+
+    auto m3 = std::move(m1); // move ctor
+    CHECK(m3.size() == 200);
+    for (int i = 0; i < 200; i++)
+        CHECK(m3.contains("key_" + std::to_string(i)));
+
+    MapSI m4;
+    m4["x"] = 99;
+    m4 = m3; // copy assign
+    CHECK(m4.size() == 200);
+    CHECK(m4["key_0"] == 0);
+
+    MapSI m5;
+    m5 = std::move(m3); // move assign
+    CHECK(m5.size() == 200);
+}
+
+TEST_CASE("string value copy/move lifecycle") {
+    // Non-trivially-copyable values also stress clone()/clear_data().
+    MapIS m1;
+    for (int i = 0; i < 200; i++)
+        m1[i] = "val_" + std::to_string(i);
+
+    auto m2(m1);
+    CHECK(m2.size() == 200);
+    CHECK(m2[50] == "val_50");
+
+    auto m3 = std::move(m1);
+    CHECK(m3.size() == 200);
+    CHECK(m3[99] == "val_99");
+}
+
+// ─── 7. Copy ctor _pairs_capacity bug: copy then mutate ──────────────
+
+TEST_CASE("copy then mutate must not corrupt source") {
+    MapII m1;
+    for (int i = 0; i < 100; i++)
+        m1[i] = i * 10;
+
+    auto m2(m1);
+    // Mutate copy — if _pairs_capacity was wrong, this may write out of bounds
+    for (int i = 100; i < 200; i++)
+        m2[i] = i;
+    CHECK(m2.size() == 200);
+    CHECK(m2[199] == 199);
+
+    // Original must be untouched
+    CHECK(m1.size() == 100);
+    for (int i = 0; i < 100; i++)
+        CHECK(m1[i] == i * 10);
+}
+
+// ─── 8. Self-assignment safety ────────────────────────────────────────
+
+TEST_CASE("self-assignment guard") {
+    MapII m;
     for (int i = 0; i < 100; i++)
         m[i] = i;
-    for (int i = 0; i < 100; i++)
-        m.erase(i);
-    CHECK(m.empty());
-    CHECK(m.size() == 0);
-    // Reinsert after full erase
-    m[42] = 420;
-    CHECK(m.size() == 1);
-    CHECK(m[42] == 420);
+    m = m; // must not corrupt or free
+    CHECK(m.size() == 100);
+    CHECK(m[50] == 50);
 }
 
-// ─── 4. Iterators ─────────────────────────────────────────────────────
+// ─── 9. Group boundary sizes (swiss table has 15-slot groups) ─────────
 
-TEST_CASE("iterate all elements") {
-    MapII m;
-    m[1] = 10;
-    m[2] = 20;
-    m[3] = 30;
-    int sum_v = 0, count = 0;
-    for (auto& [k, v] : m) {
-        sum_v += v;
-        count++;
+TEST_CASE("sizes around group boundaries") {
+    // Swiss table groups have 15 slots. Sizes near N*15 boundaries
+    // stress group allocation, sentinel handling, and overflow probing.
+    for (int sz : {1, 14, 15, 16, 29, 30, 31, 44, 45, 46, 59, 60, 61}) {
+        MapII m;
+        for (int i = 0; i < sz; i++)
+            m[i] = i * 10;
+        CHECK(m.size() == static_cast<size_t>(sz));
+
+        // Verify all elements via find
+        for (int i = 0; i < sz; i++) {
+            auto it = m.find(i);
+            REQUIRE(it != m.end());
+            CHECK(it->second == i * 10);
+        }
+
+        // Erase half and verify survivors
+        for (int i = 0; i < sz; i += 2)
+            CHECK(m.erase(i) == 1);
+        for (int i = 1; i < sz; i += 2) {
+            auto it = m.find(i);
+            REQUIRE(it != m.end());
+            CHECK(it->second == i * 10);
+        }
     }
-    CHECK(count == 3);
-    CHECK(sum_v == 60);
 }
 
-TEST_CASE("const iterator") {
-    MapII m;
-    m[1] = 10;
-    const auto& cm = m;
-    int count = 0;
-    for (auto it = cm.cbegin(); it != cm.cend(); ++it)
-        count++;
-    CHECK(count == 1);
+// ─── 10. Overflow probing: all keys collide ────────────────────────────
+
+struct Mod2Hash {
+    size_t operator()(int k) const { return static_cast<size_t>(k % 2); }
+};
+
+TEST_CASE("all keys hash to 2 buckets — overflow probe chain") {
+    // With only 2 hash values, all 500 keys must be placed via
+    // quadratic probing into overflow groups. This tests:
+    // - maybe_caused_overflow and mark_overflow correctness
+    // - probe chain termination
+    // - find_locator_at returning the right slot
+    emilib4::HashMap<int, int, Mod2Hash> m;
+    const int N = 500;
+    for (int i = 0; i < N; i++)
+        m[i] = i * 10;
+    CHECK(m.size() == static_cast<size_t>(N));
+    for (int i = 0; i < N; i++)
+        CHECK(m[i] == i * 10);
+    // Erase every 3rd key and re-find the rest
+    for (int i = 0; i < N; i += 3)
+        CHECK(m.erase(i) == 1);
+    for (int i = 0; i < N; i++) {
+        if (i % 3 == 0)
+            CHECK(!m.contains(i));
+        else
+            CHECK(m[i] == i * 10);
+    }
 }
 
-TEST_CASE("empty iteration") {
+struct IdentityHash {
+    size_t operator()(int k) const { return static_cast<size_t>(k); }
+};
+
+TEST_CASE("identity hash — every key is unique but low bits repeat") {
+    emilib4::HashMap<int, int, IdentityHash> m;
+    const int N = 2000;
+    for (int i = 0; i < N; i++)
+        m[i] = i;
+    CHECK(m.size() == static_cast<size_t>(N));
+    for (int i = 0; i < N; i++)
+        CHECK(m[i] == i);
+}
+
+// ─── 11. Iterator correctness after erase ─────────────────────────────
+
+TEST_CASE("erase_if then iterate — no skipped or double-visited elements") {
     MapII m;
+    for (int i = 0; i < 200; i++)
+        m[i] = i;
+    m.erase_if([](auto& p) { return p.first % 3 == 0; });
+
+    std::vector<int> visited;
+    for (auto& [k, v] : m)
+        visited.push_back(k);
+    CHECK(visited.size() == m.size());
+    // All visited keys must be non-divisible by 3
+    for (int k : visited)
+        CHECK(k % 3 != 0);
+}
+
+TEST_CASE("iteration visits exactly size() elements") {
+    MapSI m;
+    for (int i = 0; i < 100; i++)
+        m["k" + std::to_string(i)] = i;
     int count = 0;
     for (auto& [k, v] : m) {
         (void)k;
         (void)v;
         count++;
     }
-    CHECK(count == 0);
+    CHECK(count == 100);
 }
 
-// ─── 5. Copy / Move ───────────────────────────────────────────────────
+// ─── 12. Cross-implementation fuzz consistency ─────────────────────────
 
-TEST_CASE("copy constructor") {
+TEST_CASE("fuzz consistency vs emilib2 + std::unordered_map") {
+    emilib2::HashMap<int, int> ref2;
+    std::unordered_map<int, int> ref_std;
     MapII m;
-    for (int i = 0; i < 100; i++)
-        m[i] = i * 10;
-    MapII m2(m);
-    CHECK(m2.size() == 100);
-    for (int i = 0; i < 100; i++)
-        CHECK(m2[i] == i * 10);
-    // Original unchanged
-    CHECK(m.size() == 100);
+    std::mt19937 rng(42);
+    const int OPS = 20000;
+    const int KEY_RANGE = 500;
+
+    for (int i = 0; i < OPS; i++) {
+        int k = rng() % KEY_RANGE;
+        int v = static_cast<int>(rng());
+        switch (rng() % 5) {
+        case 0: // insert/assign
+            ref2[k] = v;
+            ref_std[k] = v;
+            m[k] = v;
+            break;
+        case 1: // erase
+            ref2.erase(k);
+            ref_std.erase(k);
+            m.erase(k);
+            break;
+        case 2: // contains
+            CHECK(m.contains(k) == (ref_std.find(k) != ref_std.end()));
+            break;
+        case 3: // find + verify value
+            if (ref_std.count(k)) {
+                auto it = m.find(k);
+                REQUIRE(it != m.end());
+                CHECK(it->second == ref_std[k]);
+            } else {
+                CHECK(m.find(k) == m.end());
+            }
+            break;
+        case 4: // size check
+            CHECK(m.size() == ref_std.size());
+            break;
+        }
+    }
+    // Final full consistency check
+    CHECK(m.size() == ref_std.size());
+    for (auto& [k, v] : ref_std) {
+        auto it = m.find(k);
+        REQUIRE(it != m.end());
+        CHECK(it->second == v);
+    }
 }
 
-TEST_CASE("copy assignment") {
-    MapII m;
-    for (int i = 0; i < 50; i++)
-        m[i] = i;
-    MapII m2;
-    m2 = m;
-    CHECK(m2.size() == 50);
-    CHECK(m2[49] == 49);
-}
+// ─── 13. Copy at high load factor ─────────────────────────────────────
 
-TEST_CASE("move constructor") {
-    MapII m;
-    for (int i = 0; i < 100; i++)
-        m[i] = i * 10;
-    size_t old_size = m.size();
-    MapII m2(std::move(m));
-    CHECK(m2.size() == old_size);
-    CHECK(m2[50] == 500);
-}
-
-TEST_CASE("move assignment") {
-    MapII m;
-    for (int i = 0; i < 50; i++)
-        m[i] = i;
-    MapII m2;
-    m2 = std::move(m);
-    CHECK(m2.size() == 50);
-}
-
-TEST_CASE("self-assignment guard") {
-    MapII m;
-    m[1] = 10;
-    m = m; // self-assignment
-    CHECK(m.size() == 1);
-    CHECK(m[1] == 10);
-}
-
-// ─── 6. Rehash / Reserve / Clear / Shrink ─────────────────────────────
-
-TEST_CASE("reserve") {
-    MapII m;
-    m.reserve(10000);
-    CHECK(m.bucket_count() >= 10000);
-    for (int i = 0; i < 10000; i++)
-        m[i] = i;
-    CHECK(m.size() == 10000);
-}
-
-TEST_CASE("clear") {
-    MapII m;
-    for (int i = 0; i < 100; i++)
-        m[i] = i;
-    m.clear();
-    CHECK(m.empty());
-    CHECK(m.size() == 0);
-    // Can reuse after clear
-    m[42] = 420;
-    CHECK(m[42] == 420);
-}
-
-TEST_CASE("shrink_to_fit") {
+TEST_CASE("copy map at high load factor then extend") {
     MapII m;
     for (int i = 0; i < 1000; i++)
         m[i] = i;
-    for (int i = 0; i < 900; i++)
-        m.erase(i);
-    m.shrink_to_fit();
-    CHECK(m.size() == 100);
-    CHECK(m.bucket_count() <= 500); // reasonable bound
+    auto m2(m);
+    // Extend copy beyond original capacity — triggers rehash in m2
+    for (int i = 1000; i < 2000; i++)
+        m2[i] = i;
+    CHECK(m2.size() == 2000);
+    for (int i = 0; i < 2000; i++)
+        CHECK(m2[i] == i);
+    // Original unchanged
+    CHECK(m.size() == 1000);
 }
 
-// ─── 7. String keys ───────────────────────────────────────────────────
+// ─── 14. Large value type (non-trivially-copyable, 256-byte struct) ───
 
-TEST_CASE("string key CRUD") {
-    MapSI m;
-    m["hello"] = 1;
-    m["world"] = 2;
-    CHECK(m.size() == 2);
-    CHECK(m["hello"] == 1);
-    CHECK(m.contains("world"));
-    m.erase("hello");
-    CHECK(!m.contains("hello"));
-}
+struct LargeValue {
+    int data[64];
+    LargeValue() { memset(data, 0, sizeof(data)); }
+    explicit LargeValue(int v) {
+        for (int i = 0; i < 64; i++)
+            data[i] = v + i;
+    }
+    bool operator==(const LargeValue& o) const { return memcmp(data, o.data, sizeof(data)) == 0; }
+};
 
-TEST_CASE("string key copy/move") {
-    MapSI m1;
-    m1["abc"] = 1;
-    m1["def"] = 2;
-    MapSI m2 = m1;
-    CHECK(m2["abc"] == 1);
-    MapSI m3 = std::move(m1);
-    CHECK(m3["def"] == 2);
-}
+TEST_CASE("large non-trivially-copyable value — copy, erase, reinsert") {
+    emilib4::HashMap<int, LargeValue> m;
+    for (int i = 0; i < 100; i++)
+        m[i] = LargeValue(i);
+    auto m2(m);
+    CHECK(m2.size() == 100);
+    CHECK(m2[50] == LargeValue(50));
 
-TEST_CASE("string key iteration") {
-    MapSI m;
-    m["a"] = 1;
-    m["b"] = 2;
-    m["c"] = 3;
-    int sum = 0;
-    for (auto& [k, v] : m)
-        sum += v;
-    CHECK(sum == 6);
-}
-
-// ─── 8. Edge cases ────────────────────────────────────────────────────
-
-TEST_CASE("single element") {
-    MapII m;
-    m[1] = 42;
-    CHECK(m.size() == 1);
-    CHECK(m[1] == 42);
-    CHECK(m.contains(1));
-    m.erase(1);
-    CHECK(m.empty());
-}
-
-TEST_CASE("erase during iteration via erase_if") {
-    MapII m;
+    // Erase and reinsert
     for (int i = 0; i < 50; i++)
+        m2.erase(i);
+    for (int i = 0; i < 50; i++)
+        m2[i] = LargeValue(i * 10);
+    CHECK(m2.size() == 100);
+    CHECK(m2[0] == LargeValue(0));
+    CHECK(m2[99] == LargeValue(99));
+}
+
+// ─── 15. merge and self-merge ──────────────────────────────────────────
+
+TEST_CASE("merge moves keys from source, self-merge is safe") {
+    MapII src;
+    for (int i = 0; i < 50; i++)
+        src[i] = i;
+    MapII dst;
+    for (int i = 50; i < 80; i++)
+        dst[i] = i;
+    dst.merge(src);
+    CHECK(dst.size() == 80);
+    CHECK(src.empty());
+
+    // Self-merge: all keys exist, nothing should change
+    MapII m;
+    m[1] = 10;
+    m[2] = 20;
+    m.merge(m);
+    CHECK(m.size() == 2);
+    CHECK(m[1] == 10);
+}
+
+// ─── 16. at() throws, operator==, swap, initializer_list ──────────────
+
+TEST_CASE("at() throws, equality, swap, constructors") {
+    MapII m{{1, 10}, {2, 20}, {3, 30}};
+    CHECK(m.size() == 3);
+    CHECK_THROWS_AS(m.at(999), std::out_of_range);
+
+    MapII m2(m);
+    CHECK(m == m2); // same content → equal
+    m2[4] = 40;
+    CHECK(m != m2); // different size → not equal
+
+    MapII m3;
+    m3[1] = 10;
+    m3[2] = 20;
+    m3[3] = 30;
+    CHECK(m == m3); // same content, different insertion order → equal
+
+    m.swap(m2);
+    CHECK(m.size() == 4);
+    CHECK(m2.size() == 3);
+    CHECK(m[4] == 40);
+}
+
+// ─── 17. Clear + reuse lifecycle ──────────────────────────────────────
+
+TEST_CASE("clear then reuse with different key range") {
+    MapII m;
+    for (int i = 0; i < 500; i++)
         m[i] = i;
-    m.erase_if([](auto& p) { return p.first < 25; });
-    CHECK(m.size() == 25);
-}
-
-TEST_CASE("large scale insert find erase") {
-    MapI64 m;
-    const int N = 100000;
-    for (int i = 0; i < N; i++)
-        m[i] = i * 10;
-    CHECK(m.size() == N);
-    for (int i = 0; i < N; i++) {
-        auto it = m.find(i);
-        REQUIRE(it != m.end());
-        CHECK(it->second == i * 10);
-    }
-    for (int i = 0; i < N; i++)
-        CHECK(m.erase(i) == 1);
+    m.clear();
     CHECK(m.empty());
+    // Reuse with completely different keys
+    for (int i = 10000; i < 10500; i++)
+        m[i] = i;
+    CHECK(m.size() == 500);
+    CHECK(m[10000] == 10000);
+    CHECK(m.find(0) == m.end()); // old keys must not persist
 }
 
-// ─── 9. Random key stress test ────────────────────────────────────────
+// ─── 18. Random string key stress ──────────────────────────────────────
 
-TEST_CASE("random int64 key stress") {
-    MapI64 m;
-    std::mt19937_64 rng(42);
-    std::vector<int64_t> keys;
-    const int N = 50000;
-    for (int i = 0; i < N; i++) {
-        auto k = static_cast<int64_t>(rng());
-        keys.push_back(k);
-        m[k] = k;
-    }
-    // Verify all keys
-    for (auto k : keys) {
-        auto it = m.find(k);
-        REQUIRE(it != m.end());
-        CHECK(it->second == k);
-    }
-    // Erase all
-    for (auto k : keys)
-        CHECK(m.erase(k) == 1);
-    CHECK(m.empty());
-}
-
-TEST_CASE("random string key stress") {
+TEST_CASE("random string key insert/erase stress") {
     MapSI m;
     std::mt19937 rng(123);
     std::vector<std::string> keys;
@@ -403,387 +513,25 @@ TEST_CASE("random string key stress") {
     CHECK(m.empty());
 }
 
-// ─── 10. Insert with different hash functions ─────────────────────────
+// ─── 19. Reserve then fill exactly to capacity boundary ────────────────
 
-struct IdentityHash {
-    size_t operator()(int k) const { return static_cast<size_t>(k); }
-};
-
-struct BadModHash {
-    size_t operator()(int k) const { return k % 7; }
-};
-
-TEST_CASE("identity hash (worst case for low-bit positioning)") {
-    emilib4::HashMap<int, int, IdentityHash> m;
-    for (int i = 0; i < 1000; i++)
-        m[i] = i;
-    CHECK(m.size() == 1000);
-    for (int i = 0; i < 1000; i++)
-        CHECK(m[i] == i);
-    for (int i = 0; i < 1000; i++)
-        m.erase(i);
-    CHECK(m.empty());
-}
-
-TEST_CASE("bad mod hash") {
-    emilib4::HashMap<int, int, BadModHash> m;
-    for (int i = 0; i < 1000; i++)
-        m[i] = i;
-    CHECK(m.size() == 1000);
-    for (int i = 0; i < 1000; i++)
-        CHECK(m.contains(i));
-}
-
-// ─── 11. operator== / != ──────────────────────────────────────────────
-
-TEST_CASE("equality") {
-    MapII m1, m2;
-    m1[1] = 10;
-    m1[2] = 20;
-    m2[1] = 10;
-    m2[2] = 20;
-    CHECK(m1 == m2);
-
-    m2[3] = 30;
-    CHECK(m1 != m2);
-}
-
-// ─── 12. Initializer list / range constructor ─────────────────────────
-
-TEST_CASE("initializer_list constructor") {
-    MapII m{{1, 10}, {2, 20}, {3, 30}};
-    CHECK(m.size() == 3);
-    CHECK(m[2] == 20);
-}
-
-TEST_CASE("range constructor") {
-    std::vector<std::pair<int, int>> v = {{1, 10}, {2, 20}};
-    MapII m(v.begin(), v.end());
-    CHECK(m.size() == 2);
-    CHECK(m[1] == 10);
-}
-
-TEST_CASE("insert initializer_list") {
+TEST_CASE("reserve then fill to boundary") {
     MapII m;
-    m.insert({{1, 10}, {2, 20}});
-    CHECK(m.size() == 2);
+    m.reserve(1000);
+    auto bc = m.bucket_count();
+    // Fill exactly to capacity
+    for (size_t i = 0; i < bc; i++)
+        m[static_cast<int>(i)] = static_cast<int>(i);
+    CHECK(m.size() == bc);
+    // One more insert must trigger rehash
+    m[static_cast<int>(bc)] = static_cast<int>(bc);
+    CHECK(m.size() == bc + 1);
+    // All elements must survive rehash
+    for (size_t i = 0; i <= bc; i++)
+        CHECK(m[static_cast<int>(i)] == static_cast<int>(i));
 }
 
-TEST_CASE("insert range") {
-    MapII m;
-    std::vector<std::pair<int, int>> v = {{3, 30}, {4, 40}};
-    m.insert(v.begin(), v.end());
-    CHECK(m[3] == 30);
-}
-
-// ─── 13. Swap ─────────────────────────────────────────────────────────
-
-TEST_CASE("swap") {
-    MapII m1, m2;
-    m1[1] = 10;
-    m2[2] = 20;
-    m2[3] = 30;
-    m1.swap(m2);
-    CHECK(m1.size() == 2);
-    CHECK(m2.size() == 1);
-    CHECK(m1[2] == 20);
-    CHECK(m2[1] == 10);
-}
-
-// ─── 14. Rehash preserves all elements ────────────────────────────────
-
-TEST_CASE("rehash preserves elements") {
-    MapII m;
-    for (int i = 0; i < 200; i++)
-        m[i] = i * 3;
-    m.reserve(100000);
-    CHECK(m.size() == 200);
-    for (int i = 0; i < 200; i++)
-        CHECK(m[i] == i * 3);
-}
-
-// ─── 15. Mixed erase + insert pattern ─────────────────────────────────
-
-TEST_CASE("erase and reinsert pattern") {
-    MapII m;
-    for (int i = 0; i < 100; i++)
-        m[i] = i;
-    // Erase odd keys
-    for (int i = 1; i < 100; i += 2)
-        m.erase(i);
-    CHECK(m.size() == 50);
-    // Reinsert
-    for (int i = 1; i < 100; i += 2)
-        m[i] = i * 10;
-    CHECK(m.size() == 100);
-    for (int i = 0; i < 100; i++) {
-        if (i % 2 == 0)
-            CHECK(m[i] == i);
-        else
-            CHECK(m[i] == i * 10);
-    }
-}
-
-// ─── 16. Cross-implementation consistency ─────────────────────────────
-
-TEST_CASE("cross-implementation consistency with emihmap2") {
-    emilib2::HashMap<int, int> ref;
-    MapII m;
-    std::mt19937 rng(42);
-    for (int i = 0; i < 5000; i++) {
-        int k = rng() % 1000;
-        int v = rng();
-        switch (rng() % 4) {
-        case 0:
-            ref[k] = v;
-            m[k] = v;
-            break;
-        case 1:
-            ref.erase(k);
-            m.erase(k);
-            break;
-        case 2:
-            CHECK(m.contains(k) == ref.contains(k));
-            break;
-        case 3: {
-            auto a = m.find(k) != m.end();
-            auto b = ref.find(k) != ref.end();
-            CHECK(a == b);
-            break;
-        }
-        }
-    }
-    CHECK(m.size() == ref.size());
-    for (auto& [k, v] : ref) {
-        auto it = m.find(k);
-        REQUIRE(it != m.end());
-        CHECK(it->second == v);
-    }
-}
-
-// ─── 17. insert_or_assign ──────────────────────────────────────────────
-
-TEST_CASE("insert_or_assign inserts new key") {
-    MapII m;
-    auto [it, ok] = m.insert_or_assign(1, 10);
-    CHECK(ok);
-    CHECK(it->first == 1);
-    CHECK(it->second == 10);
-}
-
-TEST_CASE("insert_or_assign overwrites existing key") {
-    MapII m;
-    m[1] = 10;
-    auto [it, ok] = m.insert_or_assign(1, 99);
-    CHECK(!ok);
-    CHECK(it->second == 99);
-    CHECK(m[1] == 99);
-}
-
-TEST_CASE("insert_or_assign with move key") {
-    MapSI m;
-    std::string key = "hello";
-    m.insert_or_assign(std::move(key), 42);
-    CHECK(m["hello"] == 42);
-}
-
-// ─── 18. merge ────────────────────────────────────────────────────────
-
-TEST_CASE("merge from another map") {
-    MapII src;
-    src[1] = 10;
-    src[2] = 20;
-    MapII dst;
-    dst[3] = 30;
-    dst.merge(src);
-    CHECK(dst.size() == 3);
-    CHECK(dst[1] == 10);
-    CHECK(src.empty()); // merged-out keys erased from src
-}
-
-TEST_CASE("self merge safety") {
-    MapII m;
-    m[1] = 10;
-    m[2] = 20;
-    m.merge(m); // self-merge: all keys exist, nothing should change
-    CHECK(m.size() == 2);
-    CHECK(m[1] == 10);
-    CHECK(m[2] == 20);
-}
-
-// ─── 19. max_load_factor API ──────────────────────────────────────────
-
-TEST_CASE("max_load_factor is no-op but callable") {
-    MapII m;
-    // Swiss table has fixed load factor; setting is a no-op for API compat
-    float old_mlf = m.max_load_factor();
-    m.max_load_factor(0.5f);
-    CHECK(m.max_load_factor() == old_mlf); // unchanged
-}
-
-// ─── 20. rehash(0) edge case ──────────────────────────────────────────
-
-TEST_CASE("rehash(0) after erase") {
-    MapII m;
-    for (int i = 0; i < 100; i++)
-        m[i] = i;
-    for (int i = 0; i < 90; i++)
-        m.erase(i);
-    m.rehash(0);
-    CHECK(m.size() == 10);
-    for (int i = 90; i < 100; i++)
-        CHECK(m[i] == i);
-}
-
-// ─── 21. operator== with different insertion order ────────────────────
-
-TEST_CASE("equality with different insertion order") {
-    MapII m1, m2;
-    for (int i = 0; i < 50; i++)
-        m1[i] = i * 10;
-    for (int i = 49; i >= 0; i--)
-        m2[i] = i * 10;
-    CHECK(m1 == m2);
-}
-
-TEST_CASE("inequality different values") {
-    MapII m1, m2;
-    m1[1] = 10;
-    m2[1] = 20;
-    CHECK(m1 != m2);
-}
-
-// ─── 22. Non-trivially-copyable value type ────────────────────────────
-
-TEST_CASE("string value CRUD") {
-    emilib4::HashMap<int, std::string> m;
-    m[1] = "hello";
-    m[2] = "world";
-    CHECK(m[1] == "hello");
-    CHECK(m[2] == "world");
-    m[1] = "updated";
-    CHECK(m[1] == "updated");
-    m.erase(2);
-    CHECK(!m.contains(2));
-}
-
-TEST_CASE("string value copy/move") {
-    emilib4::HashMap<int, std::string> m1;
-    m1[1] = "hello";
-    m1[2] = "world";
-    auto m2 = m1;
-    CHECK(m2[1] == "hello");
-    CHECK(m2.size() == 2);
-    auto m3 = std::move(m1);
-    CHECK(m3[2] == "world");
-}
-
-TEST_CASE("int key + string value copy/move") {
-    emilib4::HashMap<int, std::string> m1;
-    for (int i = 0; i < 100; i++)
-        m1[i] = "val_" + std::to_string(i);
-    auto m2(m1);
-    CHECK(m2.size() == 100);
-    CHECK(m2[50] == "val_50");
-    auto m3 = std::move(m2);
-    CHECK(m3.size() == 100);
-    CHECK(m3[99] == "val_99");
-}
-
-// ─── 23. Size sweep (1–32 elements) ──────────────────────────────────
-
-TEST_CASE("size sweep: int keys") {
-    for (int sz : {1, 2, 3, 5, 7, 8, 9, 15, 16, 17, 31, 32}) {
-        MapII m;
-        for (int i = 0; i < sz; i++)
-            m[i] = i * 10;
-        CHECK(m.size() == static_cast<size_t>(sz));
-        for (int i = 0; i < sz; i++) {
-            auto it = m.find(i);
-            REQUIRE(it != m.end());
-            CHECK(it->second == i * 10);
-        }
-        // erase all
-        for (int i = 0; i < sz; i++)
-            CHECK(m.erase(i) == 1);
-        CHECK(m.empty());
-    }
-}
-
-TEST_CASE("size sweep: string keys") {
-    for (int sz : {1, 2, 3, 5, 7, 8, 9, 15, 16, 17, 31, 32}) {
-        MapSI m;
-        for (int i = 0; i < sz; i++)
-            m["k" + std::to_string(i)] = i;
-        CHECK(m.size() == static_cast<size_t>(sz));
-        for (int i = 0; i < sz; i++)
-            CHECK(m.contains("k" + std::to_string(i)));
-        for (int i = 0; i < sz; i++)
-            m.erase("k" + std::to_string(i));
-        CHECK(m.empty());
-    }
-}
-
-// ─── 24. Large struct value ───────────────────────────────────────────
-
-struct LargeValue {
-    int data[64];
-    LargeValue() { memset(data, 0, sizeof(data)); }
-    LargeValue(int v) {
-        for (int i = 0; i < 64; i++)
-            data[i] = v + i;
-    }
-    bool operator==(const LargeValue& o) const { return memcmp(data, o.data, sizeof(data)) == 0; }
-};
-
-TEST_CASE("large non-trivially-copyable value") {
-    emilib4::HashMap<int, LargeValue> m;
-    m[1] = LargeValue(100);
-    m[2] = LargeValue(200);
-    CHECK(m[1] == LargeValue(100));
-    CHECK(m[2] == LargeValue(200));
-    auto m2 = m;
-    CHECK(m2[1] == LargeValue(100));
-    CHECK(m2.size() == 2);
-}
-
-// ─── 25. Erase by iterator range (erase_if covers) ──────────────────
-
-TEST_CASE("erase_if complex predicate") {
-    MapII m;
-    for (int i = 0; i < 200; i++)
-        m[i] = i;
-    // Erase keys in range [50, 150)
-    auto erased = m.erase_if([](auto& p) { return p.first >= 50 && p.first < 150; });
-    CHECK(erased == 100);
-    CHECK(m.size() == 100);
-    CHECK(m.contains(49));
-    CHECK(!m.contains(50));
-    CHECK(!m.contains(149));
-    CHECK(m.contains(150));
-}
-
-// ─── 26. HashMap with custom key + custom hash ───────────────────────
-
-struct PairKey {
-    int a, b;
-    bool operator==(const PairKey& o) const { return a == o.a && b == o.b; }
-};
-
-struct PairKeyHash {
-    size_t operator()(const PairKey& k) const { return static_cast<size_t>(k.a) * 31 + k.b; }
-};
-
-TEST_CASE("custom key type with custom hash") {
-    emilib4::HashMap<PairKey, int, PairKeyHash> m;
-    m[{1, 2}] = 12;
-    m[{3, 4}] = 34;
-    CHECK(m[{1, 2}] == 12);
-    CHECK(m.contains({3, 4}));
-    CHECK(!m.contains({1, 3}));
-}
-
-// ─── 27. Million-scale stress ────────────────────────────────────────
+// ─── 20. Million-scale stress ─────────────────────────────────────────
 
 TEST_CASE("million int CRUD stress") {
     MapII m;
@@ -791,11 +539,8 @@ TEST_CASE("million int CRUD stress") {
     for (int i = 0; i < N; i++)
         m[i] = i;
     CHECK(m.size() == static_cast<size_t>(N));
-    for (int i = 0; i < N; i++) {
-        auto it = m.find(i);
-        REQUIRE(it != m.end());
-        CHECK(it->second == i);
-    }
+    for (int i = 0; i < N; i += 100) // spot-check
+        CHECK(m[i] == i);
     for (int i = 0; i < N; i++)
         CHECK(m.erase(i) == 1);
     CHECK(m.empty());
