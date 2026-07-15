@@ -239,7 +239,7 @@ public:
         : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
           _index_allocator(IndexAllocTraits::select_on_container_copy_construction(rhs._index_allocator)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs_capacity = static_cast<size_type>(static_cast<float>(rhs._num_buckets) * rhs.max_load_factor()) + 4;
+            _pairs_capacity = rhs._pairs_capacity;
             _pairs = alloc_bucket(_pairs_capacity);
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
@@ -277,7 +277,7 @@ public:
 
     HashMap(const HashMap& rhs, const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
-            _pairs_capacity = static_cast<size_type>(static_cast<float>(rhs._num_buckets) * rhs.max_load_factor()) + 4;
+            _pairs_capacity = rhs._pairs_capacity;
             _pairs = alloc_bucket(_pairs_capacity);
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);

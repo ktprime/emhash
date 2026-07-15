@@ -1229,13 +1229,17 @@ private:
         _groups_size_index = size_index;
 
         // Single allocation: [elements...][align padding][groups...]
-        _pairs = static_cast<PairT*>(malloc(buffer_size(num_groups)));
+        auto buf_size = buffer_size(num_groups);
+        _pairs = static_cast<PairT*>(malloc(buf_size));
+        // Zero entire buffer to avoid MSan use-of-uninitialized-value.
+        // Cast to char* to avoid -Wclass-memaccess for non-trivially_copyable PairT.
+        memset(reinterpret_cast<char*>(_pairs), 0, buf_size);
 
         // Derive _groups from _pairs: advance past all element slots, align to sizeof(group15)=16
         auto p = reinterpret_cast<uintptr_t>(_pairs + num_groups * N - 1);
         _groups = reinterpret_cast<group15*>((p + sizeof(group15) - 1) & ~(sizeof(group15) - 1));
 
-        // Initialize groups
+        // Initialize groups (memset above already zeroed, but explicitly set for clarity)
         for (size_t i = 0; i < num_groups; i++)
             _groups[i].initialize();
         _groups[num_groups - 1].set_sentinel();

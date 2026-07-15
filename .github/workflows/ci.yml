@@ -638,15 +638,19 @@ jobs:
       - name: Run with MSan
         run: |
           cd tests
-          export MSAN_OPTIONS="suppressions=${{ github.workspace }}/.github/msan-suppressions.txt"
+          export MSAN_OPTIONS="suppressions=${{ github.workspace }}/.github/msan-suppressions.txt:halt_on_error=0:print_stats=1"
           set +e
           overall=0
           for t in test_crud_msan test_emihmap4_msan test_string_key_leak_msan test_sanitizer_msan test_lifecycle_audit_msan; do
             echo "=== Running ./$t ==="
-            ./$t
-            rc=$?
-            echo "::warning:: ./$t exited with code $rc"
-            if [ $rc -ne 0 ]; then overall=1; fi
+            ./$t 2>&1 | tee msan_${t}.log || true
+            rc=${PIPESTATUS[0]}
+            if [ $rc -ne 0 ]; then
+              echo "::error:: ./$t exited with code $rc"
+              overall=1
+            else
+              echo "::notice:: ./$t passed"
+            fi
           done
           exit $overall
         shell: bash
