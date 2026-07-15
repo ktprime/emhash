@@ -52,7 +52,7 @@ TEST_CASE("operator[] overwrite") {
 
 TEST_CASE("operator[] default construct") {
     MapII m;
-    m[1];  // default-constructs value (0 for int)
+    m[1]; // default-constructs value (0 for int)
     CHECK(m.size() == 1);
     CHECK(m[1] == 0);
 }
@@ -147,17 +147,21 @@ TEST_CASE("erase by iterator") {
 
 TEST_CASE("erase_if") {
     MapII m;
-    for (int i = 0; i < 100; i++) m[i] = i;
+    for (int i = 0; i < 100; i++)
+        m[i] = i;
     auto erased = m.erase_if([](auto& p) { return p.second % 2 == 0; });
     CHECK(erased == 50);
     CHECK(m.size() == 50);
-    for (auto& [k, v] : m) CHECK(v % 2 != 0);
+    for (auto& [k, v] : m)
+        CHECK(v % 2 != 0);
 }
 
 TEST_CASE("erase all then reinsert") {
     MapII m;
-    for (int i = 0; i < 100; i++) m[i] = i;
-    for (int i = 0; i < 100; i++) m.erase(i);
+    for (int i = 0; i < 100; i++)
+        m[i] = i;
+    for (int i = 0; i < 100; i++)
+        m.erase(i);
     CHECK(m.empty());
     CHECK(m.size() == 0);
     // Reinsert after full erase
@@ -174,7 +178,10 @@ TEST_CASE("iterate all elements") {
     m[2] = 20;
     m[3] = 30;
     int sum_v = 0, count = 0;
-    for (auto& [k, v] : m) { sum_v += v; count++; }
+    for (auto& [k, v] : m) {
+        sum_v += v;
+        count++;
+    }
     CHECK(count == 3);
     CHECK(sum_v == 60);
 }
@@ -184,14 +191,19 @@ TEST_CASE("const iterator") {
     m[1] = 10;
     const auto& cm = m;
     int count = 0;
-    for (auto it = cm.cbegin(); it != cm.cend(); ++it) count++;
+    for (auto it = cm.cbegin(); it != cm.cend(); ++it)
+        count++;
     CHECK(count == 1);
 }
 
 TEST_CASE("empty iteration") {
     MapII m;
     int count = 0;
-    for (auto& [k, v] : m) { (void)k; (void)v; count++; }
+    for (auto& [k, v] : m) {
+        (void)k;
+        (void)v;
+        count++;
+    }
     CHECK(count == 0);
 }
 
@@ -199,17 +211,20 @@ TEST_CASE("empty iteration") {
 
 TEST_CASE("copy constructor") {
     MapII m;
-    for (int i = 0; i < 100; i++) m[i] = i * 10;
+    for (int i = 0; i < 100; i++)
+        m[i] = i * 10;
     MapII m2(m);
     CHECK(m2.size() == 100);
-    for (int i = 0; i < 100; i++) CHECK(m2[i] == i * 10);
+    for (int i = 0; i < 100; i++)
+        CHECK(m2[i] == i * 10);
     // Original unchanged
     CHECK(m.size() == 100);
 }
 
 TEST_CASE("copy assignment") {
     MapII m;
-    for (int i = 0; i < 50; i++) m[i] = i;
+    for (int i = 0; i < 50; i++)
+        m[i] = i;
     MapII m2;
     m2 = m;
     CHECK(m2.size() == 50);
@@ -218,7 +233,8 @@ TEST_CASE("copy assignment") {
 
 TEST_CASE("move constructor") {
     MapII m;
-    for (int i = 0; i < 100; i++) m[i] = i * 10;
+    for (int i = 0; i < 100; i++)
+        m[i] = i * 10;
     size_t old_size = m.size();
     MapII m2(std::move(m));
     CHECK(m2.size() == old_size);
@@ -227,7 +243,8 @@ TEST_CASE("move constructor") {
 
 TEST_CASE("move assignment") {
     MapII m;
-    for (int i = 0; i < 50; i++) m[i] = i;
+    for (int i = 0; i < 50; i++)
+        m[i] = i;
     MapII m2;
     m2 = std::move(m);
     CHECK(m2.size() == 50);
@@ -247,13 +264,15 @@ TEST_CASE("reserve") {
     MapII m;
     m.reserve(10000);
     CHECK(m.bucket_count() >= 10000);
-    for (int i = 0; i < 10000; i++) m[i] = i;
+    for (int i = 0; i < 10000; i++)
+        m[i] = i;
     CHECK(m.size() == 10000);
 }
 
 TEST_CASE("clear") {
     MapII m;
-    for (int i = 0; i < 100; i++) m[i] = i;
+    for (int i = 0; i < 100; i++)
+        m[i] = i;
     m.clear();
     CHECK(m.empty());
     CHECK(m.size() == 0);
@@ -264,8 +283,10 @@ TEST_CASE("clear") {
 
 TEST_CASE("shrink_to_fit") {
     MapII m;
-    for (int i = 0; i < 1000; i++) m[i] = i;
-    for (int i = 0; i < 900; i++) m.erase(i);
+    for (int i = 0; i < 1000; i++)
+        m[i] = i;
+    for (int i = 0; i < 900; i++)
+        m.erase(i);
     m.shrink_to_fit();
     CHECK(m.size() == 100);
     CHECK(m.bucket_count() <= 500); // reasonable bound
@@ -296,9 +317,12 @@ TEST_CASE("string key copy/move") {
 
 TEST_CASE("string key iteration") {
     MapSI m;
-    m["a"] = 1; m["b"] = 2; m["c"] = 3;
+    m["a"] = 1;
+    m["b"] = 2;
+    m["c"] = 3;
     int sum = 0;
-    for (auto& [k, v] : m) sum += v;
+    for (auto& [k, v] : m)
+        sum += v;
     CHECK(sum == 6);
 }
 
@@ -316,7 +340,8 @@ TEST_CASE("single element") {
 
 TEST_CASE("erase during iteration via erase_if") {
     MapII m;
-    for (int i = 0; i < 50; i++) m[i] = i;
+    for (int i = 0; i < 50; i++)
+        m[i] = i;
     m.erase_if([](auto& p) { return p.first < 25; });
     CHECK(m.size() == 25);
 }
@@ -324,14 +349,16 @@ TEST_CASE("erase during iteration via erase_if") {
 TEST_CASE("large scale insert find erase") {
     MapI64 m;
     const int N = 100000;
-    for (int i = 0; i < N; i++) m[i] = i * 10;
+    for (int i = 0; i < N; i++)
+        m[i] = i * 10;
     CHECK(m.size() == N);
     for (int i = 0; i < N; i++) {
         auto it = m.find(i);
         REQUIRE(it != m.end());
         CHECK(it->second == i * 10);
     }
-    for (int i = 0; i < N; i++) CHECK(m.erase(i) == 1);
+    for (int i = 0; i < N; i++)
+        CHECK(m.erase(i) == 1);
     CHECK(m.empty());
 }
 
@@ -354,7 +381,8 @@ TEST_CASE("random int64 key stress") {
         CHECK(it->second == k);
     }
     // Erase all
-    for (auto k : keys) CHECK(m.erase(k) == 1);
+    for (auto k : keys)
+        CHECK(m.erase(k) == 1);
     CHECK(m.empty());
 }
 
@@ -368,8 +396,10 @@ TEST_CASE("random string key stress") {
         keys.push_back(s);
         m[s] = i;
     }
-    for (auto& k : keys) CHECK(m.contains(k));
-    for (auto& k : keys) m.erase(k);
+    for (auto& k : keys)
+        CHECK(m.contains(k));
+    for (auto& k : keys)
+        m.erase(k);
     CHECK(m.empty());
 }
 
@@ -385,26 +415,33 @@ struct BadModHash {
 
 TEST_CASE("identity hash (worst case for low-bit positioning)") {
     emilib4::HashMap<int, int, IdentityHash> m;
-    for (int i = 0; i < 1000; i++) m[i] = i;
+    for (int i = 0; i < 1000; i++)
+        m[i] = i;
     CHECK(m.size() == 1000);
-    for (int i = 0; i < 1000; i++) CHECK(m[i] == i);
-    for (int i = 0; i < 1000; i++) m.erase(i);
+    for (int i = 0; i < 1000; i++)
+        CHECK(m[i] == i);
+    for (int i = 0; i < 1000; i++)
+        m.erase(i);
     CHECK(m.empty());
 }
 
 TEST_CASE("bad mod hash") {
     emilib4::HashMap<int, int, BadModHash> m;
-    for (int i = 0; i < 1000; i++) m[i] = i;
+    for (int i = 0; i < 1000; i++)
+        m[i] = i;
     CHECK(m.size() == 1000);
-    for (int i = 0; i < 1000; i++) CHECK(m.contains(i));
+    for (int i = 0; i < 1000; i++)
+        CHECK(m.contains(i));
 }
 
 // ─── 11. operator== / != ──────────────────────────────────────────────
 
 TEST_CASE("equality") {
     MapII m1, m2;
-    m1[1] = 10; m1[2] = 20;
-    m2[1] = 10; m2[2] = 20;
+    m1[1] = 10;
+    m1[2] = 20;
+    m2[1] = 10;
+    m2[2] = 20;
     CHECK(m1 == m2);
 
     m2[3] = 30;
@@ -457,22 +494,27 @@ TEST_CASE("swap") {
 
 TEST_CASE("rehash preserves elements") {
     MapII m;
-    for (int i = 0; i < 200; i++) m[i] = i * 3;
+    for (int i = 0; i < 200; i++)
+        m[i] = i * 3;
     m.reserve(100000);
     CHECK(m.size() == 200);
-    for (int i = 0; i < 200; i++) CHECK(m[i] == i * 3);
+    for (int i = 0; i < 200; i++)
+        CHECK(m[i] == i * 3);
 }
 
 // ─── 15. Mixed erase + insert pattern ─────────────────────────────────
 
 TEST_CASE("erase and reinsert pattern") {
     MapII m;
-    for (int i = 0; i < 100; i++) m[i] = i;
+    for (int i = 0; i < 100; i++)
+        m[i] = i;
     // Erase odd keys
-    for (int i = 1; i < 100; i += 2) m.erase(i);
+    for (int i = 1; i < 100; i += 2)
+        m.erase(i);
     CHECK(m.size() == 50);
     // Reinsert
-    for (int i = 1; i < 100; i += 2) m[i] = i * 10;
+    for (int i = 1; i < 100; i += 2)
+        m[i] = i * 10;
     CHECK(m.size() == 100);
     for (int i = 0; i < 100; i++) {
         if (i % 2 == 0)
@@ -492,10 +534,23 @@ TEST_CASE("cross-implementation consistency with emihmap2") {
         int k = rng() % 1000;
         int v = rng();
         switch (rng() % 4) {
-        case 0: ref[k] = v; m[k] = v; break;
-        case 1: ref.erase(k); m.erase(k); break;
-        case 2: CHECK(m.contains(k) == ref.contains(k)); break;
-        case 3: { auto a = m.find(k) != m.end(); auto b = ref.find(k) != ref.end(); CHECK(a == b); break; }
+        case 0:
+            ref[k] = v;
+            m[k] = v;
+            break;
+        case 1:
+            ref.erase(k);
+            m.erase(k);
+            break;
+        case 2:
+            CHECK(m.contains(k) == ref.contains(k));
+            break;
+        case 3: {
+            auto a = m.find(k) != m.end();
+            auto b = ref.find(k) != ref.end();
+            CHECK(a == b);
+            break;
+        }
         }
     }
     CHECK(m.size() == ref.size());

@@ -12,7 +12,8 @@
 // ============================================================================
 // 1. Basic snapshot fields (always available)
 // ============================================================================
-TEST_CASE_TEMPLATE("runtime_stats basic snapshot fields", Map, map5<int, int>, map6<int, int>, map7<int, int>, map8<int, int>) {
+TEST_CASE_TEMPLATE("runtime_stats basic snapshot fields", Map, map5<int, int>, map6<int, int>, map7<int, int>,
+                   map8<int, int>) {
     Map m;
     auto s = m.runtime_stats();
     CHECK(s.num_filled == 0);
@@ -78,8 +79,8 @@ TEST_CASE("erase_count tracks erasures") {
 TEST_CASE("find_count tracks lookups") {
     emhash8::HashMap<int, int> m;
     m[1] = 10;
-    (void)m.find(1);  // hit
-    (void)m.find(2);  // miss
+    (void)m.find(1); // hit
+    (void)m.find(2); // miss
 
     auto s = m.runtime_stats();
     CHECK(s.find_count >= 2);
@@ -149,7 +150,7 @@ TEST_CASE("average probe distance is reasonable") {
     auto s = m.runtime_stats();
     if (s.insert_count > 0) {
         double avg = static_cast<double>(s.total_insert_probe) / s.insert_count;
-        CHECK(avg < 10.0);  // with a good hash, avg probe should be small
+        CHECK(avg < 10.0); // with a good hash, avg probe should be small
     }
 }
 
