@@ -7,6 +7,14 @@
 
 #pragma once
 
+// Prefetch control: martinus/unordered_dense experiments show that __builtin_prefetch
+// in find hot paths hurts performance on modern CPUs because hardware speculation
+// already issues the loads. Define EMH_ENABLE_PREFETCH to re-enable if needed.
+#ifndef EMH_ENABLE_PREFETCH
+#define EMH_NO_READ_PREFETCH
+#define EMH_NO_WRITE_PREFETCH
+#endif
+
 #if defined(_MSC_VER) && defined(_M_X64)
 #include <intrin.h>
 #endif

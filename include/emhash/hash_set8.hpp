@@ -1072,12 +1072,14 @@ private:
     static void prefetch_heap_block(char* ctrl) {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
+#ifndef EMH_NO_READ_PREFETCH
 #if defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl), 0, 1);
 #elif _WIN32 && defined(_M_ARM64)
         __prefetch(static_cast<const char*>(ctrl));
 #elif _WIN32
         _mm_prefetch(static_cast<const char*>(ctrl), _MM_HINT_T0);
+#endif
 #endif
     }
 

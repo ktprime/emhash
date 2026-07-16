@@ -1252,10 +1252,12 @@ public:
     static void prefetch_heap_block(char* ctrl) {
         // Prefetch the heap-allocated memory region to resolve potential TLB
         // misses.  This is intended to overlap with execution of calculating the hash for a key.
+#ifndef EMH_NO_READ_PREFETCH
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch(static_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
+#endif
 #endif
     }
 

@@ -1586,10 +1586,12 @@ private:
             if (nbucket == next_bucket)
                 return _num_buckets;
 
+#ifndef EMH_NO_READ_PREFETCH
 #if defined(__GNUC__) || defined(__clang__)
             __builtin_prefetch(&_pairs[nbucket], 0, 1);
 #elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
             _mm_prefetch(reinterpret_cast<const char*>(&_pairs[nbucket]), _MM_HINT_T0);
+#endif
 #endif
             next_bucket = nbucket;
         }
@@ -1683,10 +1685,12 @@ private:
             if (nbucket == next_bucket)
                 break;
 
+#ifndef EMH_NO_READ_PREFETCH
 #if defined(__GNUC__) || defined(__clang__)
             __builtin_prefetch(&_pairs[nbucket], 0, 1);
 #elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
             _mm_prefetch(reinterpret_cast<const char*>(&_pairs[nbucket]), _MM_HINT_T0);
+#endif
 #endif
             next_bucket = nbucket;
         }
