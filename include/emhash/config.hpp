@@ -167,6 +167,7 @@ static EMH_INLINE uint64_t wyr4(const uint8_t* p) {
 }
 
 static EMH_INLINE uint64_t wyr3(const uint8_t* p, size_t k) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return ((static_cast<uint64_t>(p[0]) << 16) | (static_cast<uint64_t>(p[k >> 1]) << 8)) | p[k - 1];
 }
 
