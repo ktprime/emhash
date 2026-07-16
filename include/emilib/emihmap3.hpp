@@ -897,7 +897,9 @@ private:
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
-#endif // EMH_NO_READ_PREFETCH
+#else
+        (void)ctrl;
+#endif
     }
 
     // Prefetch for write operations (insert/erase)
@@ -908,7 +910,9 @@ private:
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl), 1, 1);
 #endif
-#endif // EMH_NO_WRITE_PREFETCH
+#else
+        (void)ctrl;
+#endif
     }
 
     // Legacy function for backward compatibility
@@ -921,7 +925,9 @@ private:
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
-#endif // EMH_NO_PREFETCH
+#else
+        (void)ctrl;
+#endif
     }
 
     inline int8_t group_mask(size_t gbucket) const noexcept { return _states[gbucket + simd_bytes - 1]; }

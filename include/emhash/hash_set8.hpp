@@ -1080,6 +1080,8 @@ private:
 #elif _WIN32
         _mm_prefetch(static_cast<const char*>(ctrl), _MM_HINT_T0);
 #endif
+#else
+        (void)ctrl;
 #endif
     }
 
@@ -1621,40 +1623,30 @@ public:
 #endif
 
 private:
-    template <typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline uint64_t hash_key(const UType key) const {
+    template <typename K> inline uint64_t hash_key(const K& key) const {
+        if constexpr (std::is_integral<K>::value) {
 #if EMH_INT_HASH
-        return hash64(key);
+            return hash64(key);
 #else
-        return _hasher(key);
+            return _hasher(key);
 #endif
-    }
-
-    template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, uint32_t>::type = 0>
-    inline uint64_t hash_key(const UType& key) const {
-        EMH_MSAN_UNPOISON(&key, sizeof(key));
-        EMH_MSAN_UNPOISON(key.data(), key.size());
+        } else if constexpr (std::is_same<K, std::string>::value) {
+            EMH_MSAN_UNPOISON(&key, sizeof(key));
+            EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WYHASH_HASH
-        return wyhashstr(key.data(), key.size());
+            return wyhashstr(key.data(), key.size());
 #else
-        return _hasher(key);
+            return _hasher(key);
 #endif
-    }
-
-    template <typename UType,
-              typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
-                                      uint32_t>::type = 0>
-    inline uint64_t hash_key(const UType& key) const {
-        return _hasher(key);
+        } else {
+            return _hasher(key);
+        }
     }
 
 private:
     Index* _index;
     value_type* _pairs;
 
-    HashT _hasher;
-    EqT _eq;
-    uint32_t _mlf;
     size_type _mask;
     size_type _num_buckets;
     size_type _num_filled;
@@ -1664,6 +1656,9 @@ private:
 #endif
     size_type _etail;
     size_type _pairs_capacity;
+    uint32_t _mlf;
+    HashT _hasher;
+    EqT _eq;
     PairAlloc _pair_allocator;
     IndexAlloc _index_allocator;
 };

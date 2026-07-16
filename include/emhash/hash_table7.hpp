@@ -1258,6 +1258,8 @@ public:
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
+#else
+        (void)ctrl;
 #endif
     }
 
@@ -1733,33 +1735,26 @@ private:
     }
 #endif
 
-    template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    EMH_INLINE size_type hash_key(const UType key) const {
+    template <typename K> EMH_INLINE size_type hash_key(const K& key) const {
+        if constexpr (std::is_integral<K>::value) {
 #if EMH_INT_HASH
-        return static_cast<size_type>(hash64(key));
+            return static_cast<size_type>(hash64(key));
 #elif EMH_IDENTITY_HASH
-        return static_cast<size_type>(key + (key >> 24));
+            return static_cast<size_type>(key + (key >> 24));
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
-    }
-
-    template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    EMH_INLINE size_type hash_key(const UType& key) const {
-        EMH_MSAN_UNPOISON(&key, sizeof(key));
-        EMH_MSAN_UNPOISON(key.data(), key.size());
+        } else if constexpr (std::is_same<K, std::string>::value) {
+            EMH_MSAN_UNPOISON(&key, sizeof(key));
+            EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WY_HASH
-        return static_cast<size_type>(emh_wyhash(key.data(), key.size(), 0));
+            return static_cast<size_type>(emh_wyhash(key.data(), key.size(), 0));
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
-    }
-
-    template <typename UType,
-              typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
-                                      size_type>::type = 0>
-    EMH_INLINE size_type hash_key(const UType& key) const {
-        return static_cast<size_type>(_hasher(key));
+        } else {
+            return static_cast<size_type>(_hasher(key));
+        }
     }
 
     // Safe inline replacements for EMH_SET/EMH_CLS/EMH_EMPTY macros:
@@ -1776,14 +1771,13 @@ private:
     using bit_type = uint8_t; // uint8_t uint16_t, uint32_t.
     bit_type* _bitmask;
     PairT* _pairs;
+    size_type _mask;
+    size_type _num_buckets;
+    size_type _num_filled;
+    uint32_t _mlf;
     HashT _hasher;
     EqT _eq;
     PairAlloc _alloc;
-    size_type _mask;
-    size_type _num_buckets;
-
-    size_type _num_filled;
-    uint32_t _mlf;
 
 private:
     static constexpr uint32_t BIT_PACK = sizeof(uint64_t);
