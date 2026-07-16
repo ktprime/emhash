@@ -318,6 +318,13 @@ public:
     using PairT = entry<KeyT, ValueT>;
 #endif
 
+    // Bitmask front layout requires EMH_MALIGN-aligned _pairs pointer.
+    // alloc_bucket returns alignof(PairT)-aligned memory; bitmask_aligned_size
+    // rounds up to EMH_MALIGN. If alignof(PairT) > EMH_MALIGN, _pairs may be
+    // misaligned. This static_assert catches that at compile time.
+    static_assert(alignof(PairT) <= EMH_MALIGN,
+                  "PairT alignment exceeds EMH_MALIGN; increase EMH_MALIGN or use a type with smaller alignment");
+
     using key_type = KeyT;
     using val_type = ValueT;
     using mapped_type = ValueT;

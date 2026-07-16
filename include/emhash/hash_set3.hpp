@@ -71,11 +71,11 @@
 #if EMH_HASH
 #define hash_main_bucket(key) static_cast<size_type>(_hasher(key) & _main_mask)
 #define hash_coll_bucket(key) ((hash_inter(key) & _coll_mask) + _mains_buckets)
-#define next_coll_bucket(bucket) ((bucket) & _coll_mask) + _mains_buckets
+#define next_coll_bucket(bucket) ((bucket)&_coll_mask) + _mains_buckets
 #else
 #define hash_main_bucket(key) static_cast<size_type>(hash_inter(key) & _main_mask)
 #define hash_coll_bucket(key) ((_hasher(key) & _coll_mask) + _mains_buckets)
-#define next_coll_bucket(bucket) ((bucket) & _coll_mask) + _mains_buckets
+#define next_coll_bucket(bucket) ((bucket)&_coll_mask) + _mains_buckets
 #endif
 
 // Ensure cache line size is at least 32 bytes
@@ -211,7 +211,9 @@ public:
 
     // ------------------------------------------------------------------------
 
-    PairT* alloc_bucket(size_type num_buckets) { return PairAllocTraits::allocate(_alloc, num_buckets); }
+    PairT* alloc_bucket(size_type num_buckets) {
+        return PairAllocTraits::allocate(_alloc, num_buckets);
+    }
 
     void dealloc_bucket(PairT* ptr, size_type num_buckets) {
         if (ptr)
@@ -231,7 +233,9 @@ public:
         max_load_factor(0.9f);
     }
 
-    allocator_type get_allocator() const { return allocator_type(_alloc); }
+    allocator_type get_allocator() const {
+        return allocator_type(_alloc);
+    }
 
     explicit HashSet(size_type bucket = 4, const HashT& hash = HashT(), const EqT& eq = EqT(),
                      const AllocT& alloc = AllocT())
@@ -380,40 +384,68 @@ public:
         return {this, bucket};
     }
 
-    const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const {
+        return cbegin();
+    }
 
-    iterator end() { return {this, _total_buckets}; }
+    iterator end() {
+        return {this, _total_buckets};
+    }
 
-    const_iterator cend() const { return {this, _total_buckets}; }
+    const_iterator cend() const {
+        return {this, _total_buckets};
+    }
 
-    const_iterator end() const { return cend(); }
+    const_iterator end() const {
+        return cend();
+    }
 
-    size_type size() const { return _num_colls + _num_mains; }
+    size_type size() const {
+        return _num_colls + _num_mains;
+    }
 
-    bool empty() const { return size() == 0; }
+    bool empty() const {
+        return size() == 0;
+    }
 
     // Returns the number of buckets.
-    size_type bucket_count() const { return _mains_buckets; }
+    size_type bucket_count() const {
+        return _mains_buckets;
+    }
 
     /// Returns average number of elements per bucket.
-    float load_factor() const { return _total_buckets ? (static_cast<float>(size())) / _total_buckets : 0.0f; }
+    float load_factor() const {
+        return _total_buckets ? (static_cast<float>(size())) / _total_buckets : 0.0f;
+    }
 
-    const HashT& hash_function() const { return _hasher; }
+    const HashT& hash_function() const {
+        return _hasher;
+    }
 
-    const EqT& key_eq() const { return _eq; }
+    const EqT& key_eq() const {
+        return _eq;
+    }
 
-    constexpr float max_load_factor() const { return static_cast<float>(1 << 13) / _mlf; }
+    constexpr float max_load_factor() const {
+        return static_cast<float>(1 << 13) / _mlf;
+    }
 
     void max_load_factor(float value) {
         if (value < 0.99f && value > 0.2f)
             _mlf = static_cast<uint32_t>((1 << 13) / value);
     }
 
-    constexpr uint64_t max_size() const { return (1ull << (sizeof(_total_buckets) * 8 - 1)); }
-    constexpr uint64_t max_bucket_count() const { return max_size(); }
+    constexpr uint64_t max_size() const {
+        return (1ull << (sizeof(_total_buckets) * 8 - 1));
+    }
+    constexpr uint64_t max_bucket_count() const {
+        return max_size();
+    }
 
     // Returns the bucket number where the element with key k is located.
-    size_type bucket(const KeyT& key) const { return hash_main_bucket(key); }
+    size_type bucket(const KeyT& key) const {
+        return hash_main_bucket(key);
+    }
 
     // Returns the number of elements in bucket n.
     size_type bucket_size(const size_type bucket) const {
@@ -514,13 +546,21 @@ public:
 
     // ------------------------------------------------------------
 
-    iterator find(const KeyT& key) { return {this, find_colls_bucket(key)}; }
+    iterator find(const KeyT& key) {
+        return {this, find_colls_bucket(key)};
+    }
 
-    const_iterator find(const KeyT& key) const { return {this, find_colls_bucket(key)}; }
+    const_iterator find(const KeyT& key) const {
+        return {this, find_colls_bucket(key)};
+    }
 
-    bool contains(const KeyT& key) const { return find_colls_bucket(key) != _total_buckets; }
+    bool contains(const KeyT& key) const {
+        return find_colls_bucket(key) != _total_buckets;
+    }
 
-    size_type count(const KeyT& key) const { return find_colls_bucket(key) == _total_buckets ? 0 : 1; }
+    size_type count(const KeyT& key) const {
+        return find_colls_bucket(key) == _total_buckets ? 0 : 1;
+    }
 
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
@@ -645,7 +685,9 @@ public:
         static_cast<void>(position); // unused parameter
         return insert(std::forward<Args>(args)...).first;
     }
-    std::pair<iterator, bool> try_emplace(const key_type& k) { return insert(k); }
+    std::pair<iterator, bool> try_emplace(const key_type& k) {
+        return insert(k);
+    }
     template <class... Args> inline std::pair<iterator, bool> emplace_unique(Args&&... args) {
         return insert_unique(std::forward<Args>(args)...);
     }
@@ -897,7 +939,9 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(_num_colls); }
+    inline bool check_expand_need() {
+        return reserve(_num_colls);
+    }
 
     size_type erase_key(const KeyT& key) {
         const auto bucket = hash_coll_bucket(key);

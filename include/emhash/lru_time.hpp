@@ -532,13 +532,21 @@ public:
 
     // ------------------------------------------------------------
 
-    iterator find(const KeyT& key) noexcept { return {this, find_filled_bucket(key)}; }
+    iterator find(const KeyT& key) noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
-    const_iterator find(const KeyT& key) const noexcept { return {this, find_filled_bucket(key)}; }
+    const_iterator find(const KeyT& key) const noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
-    bool contains(const KeyT& key) const noexcept { return find_filled_bucket(key) != _num_buckets; }
+    bool contains(const KeyT& key) const noexcept {
+        return find_filled_bucket(key) != _num_buckets;
+    }
 
-    size_type count(const KeyT& key) const noexcept { return find_filled_bucket(key) == _num_buckets ? 0 : 1; }
+    size_type count(const KeyT& key) const noexcept {
+        return find_filled_bucket(key) == _num_buckets ? 0 : 1;
+    }
 
     std::pair<iterator, iterator> equal_range(const KeyT& key) {
         const auto found = find(key);
@@ -633,7 +641,9 @@ public:
         return {{this, bucket}, found};
     }
 
-    inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p) { return insert(p.first, p.second); }
+    inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p) {
+        return insert(p.first, p.second);
+    }
 
     inline std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p) {
         return insert(std::move(p.first), std::move(p.second));
@@ -671,7 +681,9 @@ public:
         return insert_unique(std::move(p.first), std::move(p.second));
     }
 
-    inline uint32_t insert_unique(std::pair<KeyT, ValueT>& p) { return insert_unique(p.first, p.second); }
+    inline uint32_t insert_unique(std::pair<KeyT, ValueT>& p) {
+        return insert_unique(p.first, p.second);
+    }
 
     template <class... Args> inline std::pair<iterator, bool> emplace(Args&&... args) {
         return insert(std::forward<Args>(args)...);
@@ -796,7 +808,9 @@ public:
         _num_filled = 0;
     }
 
-    void shrink_to_fit() { rehash(_num_filled); }
+    void shrink_to_fit() {
+        rehash(_num_filled);
+    }
 
     /// Make room for this many elements
     bool reserve(uint32_t num_elems) {
@@ -873,7 +887,9 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(_num_filled); }
+    inline bool check_expand_need() {
+        return reserve(_num_filled);
+    }
 
     void clear_bucket(uint32_t bucket) {
         if (is_notrivially())

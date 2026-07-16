@@ -529,13 +529,17 @@ public:
 
     // ------------------------------------------------------------
 
-    iterator find(const KeyT& key) noexcept { return {this, find_filled_bucket(key)}; }
+    iterator find(const KeyT& key) noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
     const_iterator find(const KeyT& key) const noexcept {
         return {this, const_cast<lru_cache&>(*this).find_filled_bucket(key)};
     }
 
-    bool contains(const KeyT& key) const noexcept { return find_filled_bucket(key) != _num_buckets; }
+    bool contains(const KeyT& key) const noexcept {
+        return find_filled_bucket(key) != _num_buckets;
+    }
 
     size_type count(const KeyT& key) const noexcept {
         return const_cast<lru_cache&>(*this).find_filled_bucket(key) == _num_buckets ? 0 : 1;
@@ -606,7 +610,9 @@ public:
         return {{this, bucket}, found};
     }
 
-    inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p) { return insert(p.first, p.second); }
+    inline std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT>& p) {
+        return insert(p.first, p.second);
+    }
 
     inline std::pair<iterator, bool> insert(std::pair<KeyT, ValueT>&& p) {
         return insert(std::move(p.first), std::move(p.second));
@@ -644,7 +650,9 @@ public:
         return insert_unique(std::move(p.first), std::move(p.second));
     }
 
-    inline uint32_t insert_unique(std::pair<KeyT, ValueT>& p) { return insert_unique(p.first, p.second); }
+    inline uint32_t insert_unique(std::pair<KeyT, ValueT>& p) {
+        return insert_unique(p.first, p.second);
+    }
 
     template <class... Args> inline std::pair<iterator, bool> emplace(Args&&... args) {
         return insert(std::forward<Args>(args)...);
@@ -749,7 +757,9 @@ public:
         _sum_orderid = 0;
     }
 
-    inline void update_sum_orderid(int32_t incr) { _sum_orderid += incr; }
+    inline void update_sum_orderid(int32_t incr) {
+        _sum_orderid += incr;
+    }
 
     // #define EMHASH_LRU_TIME 2
     inline uint32_t incid() {
@@ -766,7 +776,9 @@ public:
         _sum_orderid += delta;
     }
 
-    void shrink_to_fit() { rehash(_num_filled); }
+    void shrink_to_fit() {
+        rehash(_num_filled);
+    }
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) {
@@ -911,7 +923,9 @@ public:
 
 private:
     // Can we fit another element?
-    inline bool check_expand_need() { return reserve(_num_filled); }
+    inline bool check_expand_need() {
+        return reserve(_num_filled);
+    }
 
     void clear_bucket(uint32_t bucket) {
         update_sum_orderid(0 - static_cast<int>(_pairs[bucket].orderid));
