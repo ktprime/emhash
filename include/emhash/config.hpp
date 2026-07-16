@@ -187,25 +187,53 @@ static EMH_INLINE uint64_t emh_wyhash(const void* key, size_t len, uint64_t seed
     uint64_t a = 0, b = 0;
 
     if (len <= 16) {
-        if (len >= 4) {
-            auto half = (len >> 3) << 2;
-            a = (wyr4(p) << 32U) | wyr4(p + half);
-            b = (wyr4(p + len - 4) << 32U) | wyr4(p + len - 4 - half);
+        if (len >= 8) {
+            // Two 8-byte reads (may overlap) — faster than four 4-byte reads + shifts
+            a = wyr8(p);
+            b = wyr8(p + len - 8);
+        } else if (len >= 4) {
+            // Two 4-byte reads — simpler than half-offset four-read approach
+            a = wyr4(p);
+            b = wyr4(p + len - 4);
         } else if (len > 0) {
             a = wyr3(p, len);
         }
     } else {
         size_t i = len;
-        if (i >= 48) {
+        if (i > 48) {
             uint64_t see1 = seed, see2 = seed;
-            do {
+            if (i > 96) {
+                // 6-lane 96-byte loop: double ILP vs 3-lane, uses 7 secrets
+                uint64_t see3 = seed, see4 = seed, see5 = seed;
+                do {
+                    seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
+                    see1 = wymix(wyr8(p + 16) ^ EMH_WYP[2], wyr8(p + 24) ^ see1);
+                    see2 = wymix(wyr8(p + 32) ^ EMH_WYP[3], wyr8(p + 40) ^ see2);
+                    see3 = wymix(wyr8(p + 48) ^ EMH_WYP[0], wyr8(p + 56) ^ see3);
+                    see4 = wymix(wyr8(p + 64) ^ EMH_WYP[1], wyr8(p + 72) ^ see4);
+                    see5 = wymix(wyr8(p + 80) ^ EMH_WYP[2], wyr8(p + 88) ^ see5);
+                    p += 96;
+                    i -= 96;
+                } while (i > 96);
+                seed ^= see3 ^ see4 ^ see5;
+            }
+            while (i > 48) {
                 seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
                 see1 = wymix(wyr8(p + 16) ^ EMH_WYP[2], wyr8(p + 24) ^ see1);
                 see2 = wymix(wyr8(p + 32) ^ EMH_WYP[3], wyr8(p + 40) ^ see2);
                 p += 48;
                 i -= 48;
-            } while (i >= 48);
+            }
             seed ^= see1 ^ see2;
+            while (i > 16) {
+                seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
+                i -= 16;
+                p += 16;
+            }
+            // Tail lane: independent of seed, can execute in parallel with
+            // the dependent mix chain above — single mix finishes the hash
+            auto tail = wymix(wyr8(p + i - 16) ^ EMH_WYP[2], wyr8(p + i - 8) ^ EMH_WYP[3]);
+            return wymix(EMH_WYP[1] ^ len, seed ^ tail);
         }
         while (i > 16) {
             seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
