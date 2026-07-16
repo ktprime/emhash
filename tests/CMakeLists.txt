@@ -138,7 +138,6 @@ endforeach()
 # ----------------------------------------------------------------------------
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/reproduce_emhash8_bug.cpp")
     emhash_add_test(reproduce_emhash8_bug "fuzz/reproduce_emhash8_bug.cpp")
-    set_tests_properties(reproduce_emhash8_bug PROPERTIES WILL_FAIL TRUE)
 endif()
 
 option(EMHASH_ENABLE_FUZZ "Enable libfuzzer targets (requires clang)" OFF)
