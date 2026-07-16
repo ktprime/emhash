@@ -304,9 +304,7 @@ public:
 
     // ------------------------------------------------------------------------
 
-    explicit HashMap(size_t n = 4) noexcept {
-        rehash(n);
-    }
+    explicit HashMap(size_t n = 4) noexcept { rehash(n); }
 
     HashMap(const HashMap& other) {
         rehash(1);
@@ -391,65 +389,39 @@ public:
 
     // -------------------------------------------------------------
 
-    iterator begin() noexcept {
-        return {this, find_filled_slot(0)};
-    }
+    iterator begin() noexcept { return {this, find_filled_slot(0)}; }
 
-    const_iterator cbegin() const noexcept {
-        return {this, find_filled_slot(0)};
-    }
+    const_iterator cbegin() const noexcept { return {this, find_filled_slot(0)}; }
 
-    const_iterator begin() const noexcept {
-        return cbegin();
-    }
+    const_iterator begin() const noexcept { return cbegin(); }
 
-    iterator end() noexcept {
-        return {this, _num_buckets, false};
-    }
+    iterator end() noexcept { return {this, _num_buckets, false}; }
 
-    const_iterator cend() const noexcept {
-        return {this, _num_buckets, false};
-    }
+    const_iterator cend() const noexcept { return {this, _num_buckets, false}; }
 
-    const_iterator end() const noexcept {
-        return cend();
-    }
+    const_iterator end() const noexcept { return cend(); }
 
-    size_t size() const noexcept {
-        return _num_filled;
-    }
+    size_t size() const noexcept { return _num_filled; }
 
-    bool empty() const noexcept {
-        return _num_filled == 0;
-    }
+    bool empty() const noexcept { return _num_filled == 0; }
 
     // Returns the number of buckets.
-    size_t bucket_count() const noexcept {
-        return _num_buckets;
-    }
+    size_t bucket_count() const noexcept { return _num_buckets; }
 
     /// Returns average number of elements per bucket.
     float load_factor() const noexcept {
         return _num_buckets ? static_cast<float>(_num_filled) / static_cast<float>(bucket_to_slot(_num_buckets)) : 0.0f;
     }
 
-    float max_load_factor() const noexcept {
-        return static_cast<float>(MXLOAD_FACTOR) / (MXLOAD_FACTOR + 1);
-    }
+    float max_load_factor() const noexcept { return static_cast<float>(MXLOAD_FACTOR) / (MXLOAD_FACTOR + 1); }
     void max_load_factor(float) noexcept {}
 
-    constexpr uint64_t max_size() const {
-        return 1ull << (sizeof(_num_buckets) * 8 - 1);
-    }
-    constexpr uint64_t max_bucket_count() const {
-        return max_size();
-    }
+    constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
+    constexpr uint64_t max_bucket_count() const { return max_size(); }
 
     // ------------------------------------------------------------
 
-    template <typename K = KeyT> iterator find(const K& key) noexcept {
-        return {this, find_filled_bucket(key)};
-    }
+    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
 
     template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
         return {this, find_filled_bucket(key)};
@@ -521,9 +493,7 @@ public:
         return true;
     }
 
-    template <typename Con> bool operator!=(const Con& rhs) const noexcept {
-        return !(*this == rhs);
-    }
+    template <typename Con> bool operator!=(const Con& rhs) const noexcept { return !(*this == rhs); }
 
     void merge(HashMap& rhs) noexcept {
         if (this == &rhs)
@@ -586,13 +556,9 @@ public:
         return do_insert(std::forward<Args>(args)...);
     }
 
-    std::pair<iterator, bool> insert(value_type&& value) noexcept {
-        return do_insert(std::move(value));
-    }
+    std::pair<iterator, bool> insert(value_type&& value) noexcept { return do_insert(std::move(value)); }
 
-    std::pair<iterator, bool> insert(const value_type& value) noexcept {
-        return do_insert(value);
-    }
+    std::pair<iterator, bool> insert(const value_type& value) noexcept { return do_insert(value); }
 
 #if 0
     iterator insert(iterator hint, const value_type& value) noexcept
@@ -713,13 +679,9 @@ public:
         return 1;
     }
 
-    void erase(const const_iterator& cit) noexcept {
-        _erase(cit._bucket);
-    }
+    void erase(const const_iterator& cit) noexcept { _erase(cit._bucket); }
 
-    void erase(iterator it) noexcept {
-        _erase(it._bucket);
-    }
+    void erase(iterator it) noexcept { _erase(it._bucket); }
 
     void _erase(size_t bucket) noexcept {
         _num_filled -= 1;
@@ -802,9 +764,7 @@ public:
         _num_filled = 0;
     }
 
-    void shrink_to_fit() {
-        rehash(_num_filled + _num_filled / MXLOAD_FACTOR + 1);
-    }
+    void shrink_to_fit() { rehash(_num_filled + _num_filled / MXLOAD_FACTOR + 1); }
 
     bool reserve(size_t num_elems) noexcept {
         size_t required_buckets = num_elems + num_elems / MXLOAD_FACTOR;
@@ -897,9 +857,7 @@ public:
 
 private:
     // Can we fit another element?
-    inline void check_expand_need() {
-        reserve(_num_filled);
-    }
+    inline void check_expand_need() { reserve(_num_filled); }
 
     // Prefetch for read operations (find)
     inline static void prefetch_read(char* ctrl) {
@@ -956,9 +914,7 @@ private:
 #endif
     }
 
-    inline void set_states(size_t ebucket, int8_t key_h2) noexcept {
-        _states[ebucket] = key_h2;
-    }
+    inline void set_states(size_t ebucket, int8_t key_h2) noexcept { _states[ebucket] = key_h2; }
 
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept {
 #if EMH_PSL_LINEAR == 0

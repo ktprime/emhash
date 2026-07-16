@@ -173,9 +173,7 @@ struct group15 {
         m[pos] = reduced_hash(hash);
     }
 
-    void set_sentinel() {
-        m[N - 1] = sentinel_;
-    }
+    void set_sentinel() { m[N - 1] = sentinel_; }
 
     bool is_sentinel(int pos) const {
         assert(pos < N);
@@ -187,9 +185,7 @@ struct group15 {
         m[pos] = available_;
     }
 
-    static void reset(uint8_t* pc) {
-        *pc = available_;
-    }
+    static void reset(uint8_t* pc) { *pc = available_; }
 
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
     int match(size_t hash) const {
@@ -204,9 +200,7 @@ struct group15 {
                0x7FFF;
     }
 
-    int match_occupied() const {
-        return (~match_available()) & 0x7FFF;
-    }
+    int match_occupied() const { return (~match_available()) & 0x7FFF; }
 #else
     // Non-SIMD fallback: branchless byte comparisons for fast matching
     int match(size_t hash) const {
@@ -224,9 +218,7 @@ struct group15 {
         return mask;
     }
 
-    int match_occupied() const {
-        return (~match_available()) & 0x7FFF;
-    }
+    int match_occupied() const { return (~match_available()) & 0x7FFF; }
 #endif
 
     bool is_not_overflowed(size_t hash) const {
@@ -234,9 +226,7 @@ struct group15 {
         return !(m[N] & shift[hash % 8]);
     }
 
-    void mark_overflow(size_t hash) {
-        m[N] |= static_cast<uint8_t>(1 << (hash % 8));
-    }
+    void mark_overflow(size_t hash) { m[N] |= static_cast<uint8_t>(1 << (hash % 8)); }
 
     static bool maybe_caused_overflow(uint8_t* pc) {
         auto pos = reinterpret_cast<uintptr_t>(pc) % sizeof(group15);
@@ -249,13 +239,9 @@ struct group15 {
         return m[pos] != available_;
     }
 
-    static bool is_occupied(uint8_t* pc) noexcept {
-        return *pc != available_;
-    }
+    static bool is_occupied(uint8_t* pc) noexcept { return *pc != available_; }
 
-    static bool is_sentinel(uint8_t* pc) noexcept {
-        return *pc == sentinel_;
-    }
+    static bool is_sentinel(uint8_t* pc) noexcept { return *pc == sentinel_; }
 
     // reduced_hash: map hash byte to [2..255], avoiding 0 (available) and 1 (sentinel)
     static uint8_t reduced_hash(size_t hash) {
@@ -339,13 +325,9 @@ struct pow2_size_policy {
         return sizeof(size_t) * 8 - bits;
     }
 
-    static inline size_t size(size_t size_index) {
-        return size_t(1) << (sizeof(size_t) * 8 - size_index);
-    }
+    static inline size_t size(size_t size_index) { return size_t(1) << (sizeof(size_t) * 8 - size_index); }
 
-    static constexpr size_t min_size() {
-        return 2;
-    }
+    static constexpr size_t min_size() { return 2; }
 
     static inline size_t position(size_t hash, size_t size_index) {
         return size_index < sizeof(size_t) * 8 ? (hash >> size_index) : 0;
