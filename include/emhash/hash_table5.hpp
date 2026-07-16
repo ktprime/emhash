@@ -384,7 +384,9 @@ public:
         rehash(static_cast<uint64_t>(bucket));
     }
 
-    explicit HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) noexcept { init(bucket, mlf); }
+    explicit HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) noexcept {
+        init(bucket, mlf);
+    }
 
     HashMap(const HashMap& rhs) : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
@@ -414,9 +416,13 @@ public:
             (void)emplace(*first);
     }
 
-    explicit HashMap(const AllocT& alloc) noexcept : _alloc(PairAlloc(alloc)) { init(2, EMH_DEFAULT_LOAD_FACTOR); }
+    explicit HashMap(const AllocT& alloc) noexcept : _alloc(PairAlloc(alloc)) {
+        init(2, EMH_DEFAULT_LOAD_FACTOR);
+    }
 
-    HashMap(size_type bucket, float mlf, const AllocT& alloc) noexcept : _alloc(PairAlloc(alloc)) { init(bucket, mlf); }
+    HashMap(size_type bucket, float mlf, const AllocT& alloc) noexcept : _alloc(PairAlloc(alloc)) {
+        init(bucket, mlf);
+    }
 
     HashMap& operator=(const HashMap& rhs) {
         if (this == &rhs)
@@ -491,7 +497,9 @@ public:
         return true;
     }
 
-    template <typename Con> bool operator!=(const Con& rhs) const { return !(*this == rhs); }
+    template <typename Con> bool operator!=(const Con& rhs) const {
+        return !(*this == rhs);
+    }
 
     ~HashMap() noexcept {
         clearkv();
@@ -623,31 +631,57 @@ public:
         }
         return {this, bucket};
     }
-    const_iterator begin() const noexcept { return cbegin(); }
+    const_iterator begin() const noexcept {
+        return cbegin();
+    }
 
-    iterator end() noexcept { return {this, _num_buckets}; }
-    const_iterator end() const noexcept { return cend(); }
-    const_iterator cend() const noexcept { return {this, _num_buckets}; }
+    iterator end() noexcept {
+        return {this, _num_buckets};
+    }
+    const_iterator end() const noexcept {
+        return cend();
+    }
+    const_iterator cend() const noexcept {
+        return {this, _num_buckets};
+    }
 
-    size_type size() const noexcept { return _num_filled; }
-    bool empty() const noexcept { return _num_filled == 0; }
-    size_type bucket_count() const noexcept { return _num_buckets; }
+    size_type size() const noexcept {
+        return _num_filled;
+    }
+    bool empty() const noexcept {
+        return _num_filled == 0;
+    }
+    size_type bucket_count() const noexcept {
+        return _num_buckets;
+    }
 
-    [[nodiscard]] HashT hash_function() const noexcept { return static_cast<const HashT&>(_hasher); }
-    [[nodiscard]] EqT key_eq() const noexcept { return static_cast<const EqT&>(_eq); }
-    [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
+    [[nodiscard]] HashT hash_function() const noexcept {
+        return static_cast<const HashT&>(_hasher);
+    }
+    [[nodiscard]] EqT key_eq() const noexcept {
+        return static_cast<const EqT&>(_eq);
+    }
+    [[nodiscard]] allocator_type get_allocator() const noexcept {
+        return allocator_type(_alloc);
+    }
 
     float load_factor() const noexcept {
         return _num_buckets ? static_cast<float>(_num_filled) / static_cast<float>(_num_buckets) : 0.0f;
     }
-    float max_load_factor() const noexcept { return static_cast<float>(1 << 27) / static_cast<float>(_mlf); }
+    float max_load_factor() const noexcept {
+        return static_cast<float>(1 << 27) / static_cast<float>(_mlf);
+    }
     void max_load_factor(float mlf) noexcept {
         if (mlf <= 0.999f && mlf > EMH_MIN_LOAD_FACTOR)
             _mlf = static_cast<uint32_t>((1 << 27) / mlf);
     }
 
-    [[nodiscard]] constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
-    [[nodiscard]] constexpr uint64_t max_bucket_count() const { return max_size(); }
+    [[nodiscard]] constexpr uint64_t max_size() const {
+        return 1ull << (sizeof(_num_buckets) * 8 - 1);
+    }
+    [[nodiscard]] constexpr uint64_t max_bucket_count() const {
+        return max_size();
+    }
 
 #if EMH_STATIS
     // Returns the bucket number where the element with key k is located.
@@ -774,7 +808,9 @@ public:
 #endif
 
     // ------------------------------------------------------------
-    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_key(key)}; }
+    template <typename K = KeyT> iterator find(const K& key) noexcept {
+        return {this, find_filled_key(key)};
+    }
 
     template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
         return {this, find_filled_key(key)};
@@ -1055,7 +1091,9 @@ public:
         return insert_unique(std::move(value.first), std::move(value.second));
     }
 
-    size_type insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
+    size_type insert_unique(const value_type& value) {
+        return insert_unique(value.first, value.second);
+    }
 
     template <class... Args> size_type emplace_unique(Args&&... args) {
         return insert_unique(std::forward<Args>(args)...);
@@ -1465,7 +1503,9 @@ private:
 #endif
 
     // Can we fit another element?
-    inline bool check_expand_need() noexcept { return reserve(static_cast<uint64_t>(_num_filled)); }
+    inline bool check_expand_need() noexcept {
+        return reserve(static_cast<uint64_t>(_num_filled));
+    }
 
     void clear_bucket(size_type bucket, bool bclear = true) noexcept {
         if (need_explicit_dtor()) {
@@ -1586,8 +1626,10 @@ private:
             if (nbucket == next_bucket)
                 return _num_buckets;
 
-#if !defined(_MSC_VER) && defined(__GNUC__)
+#if defined(__GNUC__) || defined(__clang__)
             __builtin_prefetch(&_pairs[nbucket], 0, 1);
+#elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
+            _mm_prefetch(reinterpret_cast<const char*>(&_pairs[nbucket]), _MM_HINT_T0);
 #endif
             next_bucket = nbucket;
         }
@@ -1681,8 +1723,10 @@ private:
             if (nbucket == next_bucket)
                 break;
 
-#if !defined(_MSC_VER) && defined(__GNUC__)
+#if defined(__GNUC__) || defined(__clang__)
             __builtin_prefetch(&_pairs[nbucket], 0, 1);
+#elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
+            _mm_prefetch(reinterpret_cast<const char*>(&_pairs[nbucket]), _MM_HINT_T0);
 #endif
             next_bucket = nbucket;
         }
