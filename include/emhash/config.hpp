@@ -174,7 +174,7 @@ static EMH_INLINE uint64_t wyr3(const uint8_t* p, size_t k) {
 } // namespace emhash_detail
 
 // Default secret parameters (same as wyhash v4.2)
-static const uint64_t emh_wyp[4] = {0x2d358dccaa6c78a5ull, 0x8bb84b93962eacc9ull, 0x4b33a62ed433d4a3ull,
+static const uint64_t EMH_WYP[4] = {0x2d358dccaa6c78a5ull, 0x8bb84b93962eacc9ull, 0x4b33a62ed433d4a3ull,
                                     0x4d5a2da51de1aa47ull};
 
 // Main wyhash function: hash arbitrary bytes with a seed.
@@ -183,7 +183,7 @@ static const uint64_t emh_wyp[4] = {0x2d358dccaa6c78a5ull, 0x8bb84b93962eacc9ull
 static EMH_INLINE uint64_t emh_wyhash(const void* key, size_t len, uint64_t seed) {
     using namespace emhash_detail;
     const uint8_t* p = static_cast<const uint8_t*>(key);
-    seed = wymix(seed ^ emh_wyp[0], emh_wyp[1]);
+    seed = wymix(seed ^ EMH_WYP[0], EMH_WYP[1]);
     uint64_t a = 0, b = 0;
 
     if (len <= 16) {
@@ -199,16 +199,16 @@ static EMH_INLINE uint64_t emh_wyhash(const void* key, size_t len, uint64_t seed
         if (i >= 48) {
             uint64_t see1 = seed, see2 = seed;
             do {
-                seed = wymix(wyr8(p) ^ emh_wyp[1], wyr8(p + 8) ^ seed);
-                see1 = wymix(wyr8(p + 16) ^ emh_wyp[2], wyr8(p + 24) ^ see1);
-                see2 = wymix(wyr8(p + 32) ^ emh_wyp[3], wyr8(p + 40) ^ see2);
+                seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
+                see1 = wymix(wyr8(p + 16) ^ EMH_WYP[2], wyr8(p + 24) ^ see1);
+                see2 = wymix(wyr8(p + 32) ^ EMH_WYP[3], wyr8(p + 40) ^ see2);
                 p += 48;
                 i -= 48;
             } while (i >= 48);
             seed ^= see1 ^ see2;
         }
         while (i > 16) {
-            seed = wymix(wyr8(p) ^ emh_wyp[1], wyr8(p + 8) ^ seed);
+            seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
             i -= 16;
             p += 16;
         }
@@ -216,10 +216,10 @@ static EMH_INLINE uint64_t emh_wyhash(const void* key, size_t len, uint64_t seed
         b = wyr8(p + i - 8);
     }
 
-    a ^= emh_wyp[1];
+    a ^= EMH_WYP[1];
     b ^= seed;
     emhash_detail::wymum(&a, &b);
-    return wymix(a ^ emh_wyp[0] ^ len, b ^ emh_wyp[1]);
+    return wymix(a ^ EMH_WYP[0] ^ len, b ^ EMH_WYP[1]);
 }
 
 // Backward-compatible alias: wyhash() maps to emh_wyhash()
