@@ -1725,35 +1725,28 @@ private:
 
     EMH_INLINE size_type hash_main(const size_type bucket) const { return hash_key(EMH_KEY(_pairs, bucket)) & _mask; }
 
-    template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    EMH_INLINE size_type hash_key(const UType key) const {
+    template <typename K> EMH_INLINE size_type hash_key(const K& key) const {
+        if constexpr (std::is_integral<K>::value) {
 #if EMH_INT_HASH
-        return static_cast<size_type>(hash64(key));
+            return static_cast<size_type>(hash64(key));
 #elif EMH_SAFE_HASH
-        return static_cast<size_type>(_hash_inter == 0 ? _hasher(key) : hash64(key));
+            return static_cast<size_type>(_hash_inter == 0 ? _hasher(key) : hash64(key));
 #elif EMH_IDENTITY_HASH
-        return static_cast<size_type>(key + (key >> 24));
+            return static_cast<size_type>(key + (key >> 24));
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
-    }
-
-    template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    EMH_INLINE size_type hash_key(const UType& key) const {
-        EMH_MSAN_UNPOISON(&key, sizeof(key));
-        EMH_MSAN_UNPOISON(key.data(), key.size());
+        } else if constexpr (std::is_same<K, std::string>::value) {
+            EMH_MSAN_UNPOISON(&key, sizeof(key));
+            EMH_MSAN_UNPOISON(key.data(), key.size());
 #if EMH_WY_HASH
-        return static_cast<size_type>(wyhash(key.data(), key.size(), 0));
+            return static_cast<size_type>(wyhash(key.data(), key.size(), 0));
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
-    }
-
-    template <typename UType,
-              typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
-                                      size_type>::type = 0>
-    EMH_INLINE size_type hash_key(const UType& key) const {
-        return static_cast<size_type>(_hasher(key));
+        } else {
+            return static_cast<size_type>(_hasher(key));
+        }
     }
 
     // 8 * 2 + 4 * 5 = 16 + 20 = 32
@@ -1777,12 +1770,12 @@ private:
 
     uint8_t* _bitmask;
     PairT* _pairs;
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _alloc;
     size_type _mask;
     size_type _num_filled;
     uint32_t _mlf;
+    HashT _hasher;
+    EqT _eq;
+    PairAlloc _alloc;
 
 #if EMH_SAFE_HASH
     size_type _num_main;

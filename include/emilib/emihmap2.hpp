@@ -165,7 +165,7 @@ public:
     using key_equal = EqT;
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
-    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+    EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         EMH_MSAN_UNPOISON(&key, sizeof(key));
         if constexpr (std::is_same<UType, std::string>::value) {
             EMH_MSAN_UNPOISON(key.data(), key.size());
@@ -176,10 +176,10 @@ public:
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
-    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+    EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash) & _mask;
-        return static_cast<int8_t>(static_cast<size_t>(key_hash) % MAP_BITS) + EFILLED;
+        return static_cast<int8_t>(static_cast<size_t>(key_hash % MAP_BITS)) + EFILLED;
     }
 
     class const_iterator;
@@ -441,10 +441,8 @@ public:
 
     bool empty() const noexcept { return _num_filled == 0; }
 
-    // Returns the number of buckets.
     size_t bucket_count() const noexcept { return _num_buckets; }
 
-    /// Returns average number of elements per bucket.
     float load_factor() const noexcept {
         return _num_buckets ? static_cast<float>(_num_filled) / static_cast<float>(_num_buckets) : 0.0f;
     }
@@ -461,13 +459,13 @@ public:
 
     // ------------------------------------------------------------
 
-    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
+    template <typename K = KeyT> EMH_INLINE iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
 
-    template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE const_iterator find(const K& key) const noexcept {
         return {this, find_filled_bucket(key)};
     }
 
-    template <typename K = KeyT> bool contains(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE bool contains(const K& key) const noexcept {
         return find_filled_bucket(key) != _num_buckets;
     }
 
@@ -499,7 +497,6 @@ public:
         return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
     }
 
-    /// set value if key exists
     template <typename K = KeyT>
     bool try_set(const K& key, const ValueT& val) noexcept(std::is_nothrow_copy_assignable<ValueT>::value) {
         const auto bucket = find_filled_bucket(key);
@@ -509,7 +506,6 @@ public:
         return true;
     }
 
-    /// set value if key exists (move)
     template <typename K = KeyT>
     bool try_set(const K& key, ValueT&& val) noexcept(std::is_nothrow_move_assignable<ValueT>::value) {
         const auto bucket = find_filled_bucket(key);
@@ -595,14 +591,6 @@ public:
     std::pair<iterator, bool> insert(value_type&& value) noexcept { return do_insert(std::move(value)); }
 
     std::pair<iterator, bool> insert(const value_type& value) noexcept { return do_insert(value); }
-
-#if 0
-    iterator insert(iterator hint, const value_type& value) noexcept
-    {
-        (void)hint;
-        return do_insert(value).first;
-    }
-#endif
 
     template <typename Iter> void insert(Iter beginc, Iter endc) noexcept {
         rehash(static_cast<size_t>(endc - beginc) + _num_filled);
@@ -716,8 +704,6 @@ public:
 
     // -------------------------------------------------------
 
-    /// Erase an element from the hash table.
-    /// return false if element was not found
     size_t erase(const KeyT& key) noexcept {
         auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
@@ -978,7 +964,7 @@ private:
     }
 
     // Find the main_bucket with this key, or return (size_t)-1
-    template <typename K> size_t find_filled_bucket(const K& key) const noexcept {
+    template <typename K> EMH_INLINE size_t find_filled_bucket(const K& key) const noexcept {
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
 

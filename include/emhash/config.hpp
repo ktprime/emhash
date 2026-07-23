@@ -243,10 +243,28 @@ static EMH_INLINE uint64_t emh_wyhash(const void* key, size_t len, uint64_t seed
             auto tail = wymix(wyr8(p + i - 16) ^ EMH_WYP[2], wyr8(p + i - 8) ^ EMH_WYP[3]);
             return wymix(EMH_WYP[1] ^ len, seed ^ tail);
         }
-        while (i > 16) {
-            seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
-            i -= 16;
-            p += 16;
+        // 2-lane 32-byte loop for 32-48B strings: two independent mix chains
+        // unlock ILP vs single-lane, reducing latency on short string keys.
+        if (i >= 32) {
+            uint64_t see1 = seed;
+            while (i > 32) {
+                seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
+                see1 = wymix(wyr8(p + 16) ^ EMH_WYP[2], wyr8(p + 24) ^ see1);
+                p += 32;
+                i -= 32;
+            }
+            if (i > 16) {
+                seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
+                i -= 16;
+                p += 16;
+            }
+            seed ^= see1;
+        } else {
+            while (i > 16) {
+                seed = wymix(wyr8(p) ^ EMH_WYP[1], wyr8(p + 8) ^ seed);
+                i -= 16;
+                p += 16;
+            }
         }
         a = wyr8(p + i - 16);
         b = wyr8(p + i - 8);

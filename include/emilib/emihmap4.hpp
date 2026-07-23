@@ -330,7 +330,7 @@ struct pow2_size_policy {
     static constexpr size_t min_size() { return 2; }
 
     static inline size_t position(size_t hash, size_t size_index) {
-        return size_index < sizeof(size_t) * 8 ? (hash >> size_index) : 0;
+        return hash >> size_index;
     }
 };
 
@@ -667,7 +667,7 @@ public:
 
     // ─── lookup ───────────────────────────────────────────────────────
 
-    template <typename K> iterator find(const K& key) noexcept {
+    template <typename K> EMH_INLINE iterator find(const K& key) noexcept {
         auto hash = hash_for(key);
         auto pos0 = position_for(hash);
         // Inline find loop to avoid template function call overhead
@@ -694,7 +694,7 @@ public:
         } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         return end();
     }
-    template <typename K> const_iterator find(const K& key) const noexcept {
+    template <typename K> EMH_INLINE const_iterator find(const K& key) const noexcept {
         auto hash = hash_for(key);
         auto pos0 = position_for(hash);
         auto* pairs = _pairs;
@@ -720,7 +720,7 @@ public:
         } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         return cend();
     }
-    template <typename K = KeyT> bool contains(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE bool contains(const K& key) const noexcept {
         auto hash = hash_for(key);
         auto pos0 = position_for(hash);
         auto* groups = _groups;
@@ -1076,7 +1076,7 @@ private:
         return find_locator_at(key, position_for(hash), hash);
     }
 
-    template <typename K> locator find_locator_at(const K& key, size_t pos0, size_t hash) const noexcept {
+    template <typename K> EMH_INLINE locator find_locator_at(const K& key, size_t pos0, size_t hash) const noexcept {
         auto* pairs = _pairs;
         auto* groups = _groups;
         quadratic_prober pb(pos0);
@@ -1288,8 +1288,10 @@ private:
             _groups_size_index = si;
             alloc_arrays(pow2_size_policy::size(si), si);
         } else {
-            _groups_size_index = sizeof(size_t) * 8;
-            _groups_size_mask = 0;
+            // Use a valid size_index (not sizeof(size_t)*8) so position() doesn't need a guard branch.
+            // dummy_groups() provides a sentinel-terminated group for safe probing.
+            _groups_size_index = sizeof(size_t) * 8 - 1;
+            _groups_size_mask = 1;
             _max_load = 0;
             _groups = dummy_groups();
             _pairs = nullptr;
@@ -1397,7 +1399,7 @@ private:
     PairT* _pairs = nullptr;           // base allocation pointer
     size_t _num_filled = 0;
     size_t _max_load = 0;
-    size_t _groups_size_index = sizeof(size_t) * 8;
+    size_t _groups_size_index = sizeof(size_t) * 8 - 1;
     size_t _groups_size_mask = 0;
 };
 

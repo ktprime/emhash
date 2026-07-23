@@ -1261,39 +1261,32 @@ private:
 #endif
     }
 
-    template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    inline size_type hash_bucket(const UType key) const {
+    template <typename K> inline size_type hash_bucket(const K& key) const {
+        if constexpr (std::is_integral<K>::value) {
 #ifdef EMH_INT_HASH
-        return static_cast<size_type>(hash64(key));
+            return static_cast<size_type>(hash64(key));
 #elif EMH_IDENTITY_HASH
-        return key + (key >> (sizeof(UType) * 4));
+            return key + (key >> (sizeof(K) * 4));
 #elif EMH_WYHASH64
-        return static_cast<size_type>(wyhash64(key, KC));
+            return static_cast<size_type>(wyhash64(key, KC));
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
-    }
-
-    template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    inline size_type hash_bucket(const UType& key) const {
-        EMH_MSAN_UNPOISON(&key, sizeof(key));
-        EMH_MSAN_UNPOISON(key.data(), key.size());
+        } else if constexpr (std::is_same<K, std::string>::value) {
+            EMH_MSAN_UNPOISON(&key, sizeof(key));
+            EMH_MSAN_UNPOISON(key.data(), key.size());
 #ifdef WYHASH_LITTLE_ENDIAN
-        return static_cast<size_type>(wyhash(key.data(), key.size(), key.size()));
+            return static_cast<size_type>(wyhash(key.data(), key.size(), key.size()));
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
-    }
-
-    template <typename UType,
-              typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
-                                      size_type>::type = 0>
-    inline size_type hash_bucket(const UType& key) const {
+        } else {
 #ifdef EMH_INT_HASH
-        return static_cast<size_type>(_hasher(key) * 11400714819323198485ull);
+            return static_cast<size_type>(_hasher(key) * 11400714819323198485ull);
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
+        }
     }
 
 private:

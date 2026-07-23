@@ -1178,39 +1178,32 @@ private:
 #endif
     }
 
-    template <typename UType, typename std::enable_if<std::is_integral<UType>::value, size_type>::type = 0>
-    inline size_type hash_bucket(const UType key) const {
+    template <typename K> inline size_type hash_bucket(const K& key) const {
+        if constexpr (std::is_integral<K>::value) {
 #ifdef EMH_INT_HASH
-        return static_cast<size_type>(hash64(key) & _mask);
+            return static_cast<size_type>(hash64(key) & _mask);
 #elif EMH_IDENTITY_HASH
-        return static_cast<size_type>((key + (key >> (sizeof(UType) * 4))) & _mask);
+            return static_cast<size_type>((key + (key >> (sizeof(K) * 4))) & _mask);
 #elif EMH_WYHASH64
-        return static_cast<size_type>(wyhash64(key, KC) & _mask);
+            return static_cast<size_type>(wyhash64(key, KC) & _mask);
 #else
-        return static_cast<size_type>(_hasher(key) & _mask);
+            return static_cast<size_type>(_hasher(key) & _mask);
 #endif
-    }
-
-    template <typename UType, typename std::enable_if<std::is_same<UType, std::string>::value, size_type>::type = 0>
-    inline size_type hash_bucket(const UType& key) const {
-        EMH_MSAN_UNPOISON(&key, sizeof(key));
-        EMH_MSAN_UNPOISON(key.data(), key.size());
+        } else if constexpr (std::is_same<K, std::string>::value) {
+            EMH_MSAN_UNPOISON(&key, sizeof(key));
+            EMH_MSAN_UNPOISON(key.data(), key.size());
 #ifdef WYHASH_LITTLE_ENDIAN
-        return static_cast<size_type>(wyhash(key.data(), key.size(), key.size()) & _mask);
+            return static_cast<size_type>(wyhash(key.data(), key.size(), key.size()) & _mask);
 #else
-        return static_cast<size_type>(_hasher(key) & _mask);
+            return static_cast<size_type>(_hasher(key) & _mask);
 #endif
-    }
-
-    template <typename UType,
-              typename std::enable_if<!std::is_integral<UType>::value && !std::is_same<UType, std::string>::value,
-                                      size_type>::type = 0>
-    inline size_type hash_bucket(const UType& key) const {
+        } else {
 #ifdef EMH_INT_HASH
-        return static_cast<size_type>((_hasher(key) * KC) & _mask);
+            return static_cast<size_type>((_hasher(key) * KC) & _mask);
 #else
-        return static_cast<size_type>(_hasher(key) & _mask);
+            return static_cast<size_type>(_hasher(key) & _mask);
 #endif
+        }
     }
 
 private:

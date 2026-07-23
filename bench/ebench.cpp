@@ -285,6 +285,13 @@ static std::map<std::string, std::map<std::string, int64_t>> once_func_hash_time
 
 static void check_func_result(const std::string& hash_name, const std::string& func, size_t sum, int64_t ts1,
                               int weigh = 1) {
+    // Compiler barrier: prevent optimizing away computations that feed into 'sum'
+#if defined(__GNUC__) || defined(__clang__)
+    asm volatile("" : "+r"(sum));
+#elif defined(_MSC_VER)
+    _ReadWriteBarrier();
+#endif
+
     if (func_result.find(func) == func_result.end()) {
         func_result[func] = sum;
     } else if ((int64_t)sum != func_result[func]) {
@@ -460,11 +467,14 @@ static void dump_all(std::map<std::string, std::map<std::string, int64_t>>& func
 template <class hash_type> static void iter_all(const hash_type& ht_hash, const std::string& hash_name) {
     auto ts1 = getus();
     size_t sum = 0;
-    for (const auto& _ : ht_hash)
-        sum += sum;
-
-    for (auto& _ : ht_hash)
-        sum += 2;
+    for (const auto& kv : ht_hash)
+#if KEY_INT
+        sum += kv.first;
+#elif KEY_CLA
+        sum += kv.first.lScore;
+#else
+        sum += kv.first.size();
+#endif
 
     for (auto it = ht_hash.begin(); it != ht_hash.end(); ++it)
 #if KEY_INT
@@ -904,29 +914,28 @@ template <class hash_type> static void insert_erase_high(const std::string& hash
 static uint8_t l1_cache[64 * 1024];
 #endif
 template <class hash_type>
-static void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, std::vector<keyType>& vList) {
+static void find_miss(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
     size_t sum = 0;
 
 #if KEY_STR
-    auto vl = vList;
     auto ts1 = getus();
-    shuffle(vl.begin(), vl.end());
-    for (auto& v : vl) {
-#if TTKey != 4
-        v[1] += v.size() % 128;
-        sum += ht_hash.count(v);
-        v[1] -= v.size() % 128;
-#else
-        std::string_view skey(v.data(), v.size() - 1);
-        sum += ht_hash.count(skey);
-#endif
+    for (auto& v : vList) {
+        // Keys with "miss_" prefix don't exist in the map (which has "key_" prefix)
+        auto miss_key = "miss_" + v;
+        sum += ht_hash.count(miss_key);
     }
 #else
+    // Generate keys guaranteed not in the map: use values above the data range
     auto ts1 = getus();
-    WyRand srng(vList.size() / 2);
-    for (int i = 2 * vList.size(); i > 0; i--) {
-        keyType v2 = srng();
-        sum += ht_hash.count(v2);
+    uint64_t offset = 0;
+    for (auto& v : vList) {
+#if KEY_INT
+        offset |= (uint64_t)v;
+#endif
+    }
+    offset = (offset + 1) * 2; // above max key
+    for (size_t i = 0; i < vList.size(); i++) {
+        sum += ht_hash.count((keyType)(offset + i));
     }
 #endif
 
@@ -935,34 +944,70 @@ static void find_hit_0(const hash_type& ht_hash, const std::string& hash_name, s
 }
 
 template <class hash_type>
-static void find_hit_50(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
-    auto vl = vList;
-    shuffle(vl.begin(), vl.end());
-
+static void update_value(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
+    // Pure in-place value update: all keys exist, only overwrite values
     auto ts1 = getus();
     size_t sum = 0;
-    for (const auto& v : vl) {
-#if FL1
-        if (sum % (1024 * 256) == 0)
-            memset(l1_cache, 0, sizeof(l1_cache));
-#endif
-        sum += ht_hash.count(v);
+    for (size_t i = 0; i < vList.size(); i++) {
+        ht_hash[vList[i]] = TO_VAL(i + 1);
+        sum += i;
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
 template <class hash_type>
-static void find_erase50(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
-    auto tmp = ht_hash;
+static void erase_by_iterator(hash_type& ht_hash, const std::string& hash_name) {
+    // Pure iterator-based deletion: erase all elements via iterator traversal
     auto ts1 = getus();
     size_t sum = 0;
-    for (const auto& v : vList) {
-        auto it = tmp.find(v);
-        if (it == tmp.end())
-            sum++;
+#if CXX17
+    for (auto it = ht_hash.begin(); it != ht_hash.end();) {
+        if constexpr (std::is_void_v<decltype(ht_hash.erase(it))>)
+            ht_hash.erase(it++);
         else
-            tmp.erase(it);
+            it = ht_hash.erase(it);
+        sum += 1;
     }
+#endif
+    check_func_result(hash_name, __FUNCTION__, sum, ts1);
+}
+
+template <class hash_type>
+static void find_mixed(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
+    // 50% hit + 50% miss: interleave existing keys with non-existing keys
+    auto ts1 = getus();
+    size_t sum = 0;
+#if KEY_INT
+    uint64_t offset = 0;
+    for (auto& v : vList) offset |= (uint64_t)v;
+    offset = (offset + 1) * 2;
+    for (size_t i = 0; i < vList.size(); i++) {
+        // even: hit (existing key), odd: miss (non-existing key)
+        if (i % 2 == 0)
+            sum += ht_hash.count(vList[i]);
+        else
+            sum += ht_hash.count((keyType)(offset + i));
+    }
+#elif KEY_CLA
+    for (size_t i = 0; i < vList.size(); i++) {
+        if (i % 2 == 0)
+            sum += ht_hash.count(vList[i]);
+        else {
+            auto miss_key = vList[i];
+            miss_key.lScore += vList.size() + 1;
+            sum += ht_hash.count(miss_key);
+        }
+    }
+#else
+    for (size_t i = 0; i < vList.size(); i++) {
+        if (i % 2 == 0)
+            sum += ht_hash.count(vList[i]);
+        else {
+            auto miss_key = "miss_" + vList[i];
+            sum += ht_hash.count(miss_key);
+        }
+    }
+#endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -984,43 +1029,24 @@ static void find_hit_100(const hash_type& ht_hash, const std::string& hash_name,
 }
 
 template <class hash_type>
-static void erase_50_find(const hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
+static void erase_all(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
     auto ts1 = getus();
     size_t sum = 0;
-    for (const auto& v : vList) {
-#ifndef SMAP
-        sum += ht_hash.count(v);
-#endif
-        sum += ht_hash.find(v) != ht_hash.end();
-    }
-    check_func_result(hash_name, __FUNCTION__, sum, ts1);
-}
+    // Phase 1: erase first half by key
+    size_t half = vList.size() / 2;
+    for (size_t i = 0; i < half; i++)
+        sum += ht_hash.erase(vList[i]);
 
-template <class hash_type>
-static void erase_50(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
-    auto tmp = ht_hash;
-    auto ts1 = getus();
-    size_t sum = 0;
-    for (const auto& v : vList)
-        sum += ht_hash.erase(v);
-
-    for (auto it = tmp.begin(); it != tmp.end();) {
-#if TTKey < 2
-        if (it->first % 4 < 2) {
-            it++;
-            continue;
-        }
-#endif
-
+    // Phase 2: erase remaining by iterator
 #if CXX17
-        if constexpr (std::is_void_v<decltype(tmp.erase(it))>)
-            tmp.erase(it++);
+    for (auto it = ht_hash.begin(); it != ht_hash.end();) {
+        if constexpr (std::is_void_v<decltype(ht_hash.erase(it))>)
+            ht_hash.erase(it++);
         else
-            it = tmp.erase(it);
+            it = ht_hash.erase(it);
         sum += 1;
-#endif
     }
-    sum += tmp.size();
+#endif
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
@@ -1156,8 +1182,6 @@ template <class hash_type> static void benOneHash(const std::string& hash_name, 
         printf("%s:size %zd\n", hash_name.data(), sizeof(hash_type));
 
     hash_type hash;
-    const uint32_t l1_size = (48 * 1024) / (sizeof(keyType) + sizeof(valueType));
-    // const uint32_t l2_size = (256 * 1024)   / (sizeof(keyType) + sizeof(valueType));
     const uint32_t l3_size = (16 * 1024 * 1024) / (sizeof(keyType) + sizeof(valueType));
 
     func_index = 0;
@@ -1171,42 +1195,30 @@ template <class hash_type> static void benOneHash(const std::string& hash_name, 
 #endif
 
     insert_cache_size<hash_type>(hash_name, oList, "insert_l3_cache", l3_size, l3_size + 1000);
-    insert_cache_size<hash_type>(hash_name, oList, "insert_l1_cache", l1_size, l1_size + 1000);
 
     insert_no_reserve<hash_type>(hash_name, oList);
     // insert_unique<hash_type>(hash, hash_name, oList);
     insert_hit<hash_type>(hash, hash_name, oList);
+    update_value<hash_type>(hash, hash_name, oList);
 
-    // insert_accident<hash_type>(hash, hash_name, oList);
     find_hit_100<hash_type>(hash, hash_name, oList);
+    find_miss<hash_type>(hash, hash_name, oList);
+    find_mixed<hash_type>(hash, hash_name, oList);
 
-    // modify half dataset from start
-    auto nList = oList;
-    for (size_t v = 0; v < nList.size() / 2; v++) {
-        auto& next = nList[v];
-#if KEY_INT
-        next += nList.size() / 2 - v * v;
-#elif KEY_CLA
-        next.lScore += nList.size() / 2 - v;
-#elif TTKey != 4
-        next[v % next.size()] += 1;
-#else
-        next = next.substr(0, next.size() - 1);
-#endif
-    }
-
-    // shuffle(nList.begin(), nList.end());
-    find_hit_50<hash_type>(hash, hash_name, nList);
-    find_hit_0<hash_type>(hash, hash_name, nList);
-
-    find_erase50<hash_type>(hash, hash_name, nList);
-    erase_50<hash_type>(hash, hash_name, nList);
-    erase_50_find<hash_type>(hash, hash_name, oList);
+    erase_all<hash_type>(hash, hash_name, oList);
     erase_50_reinsert<hash_type>(hash, hash_name, oList);
 
-    insert_find_erase<hash_type>(hash, hash_name, nList);
-    // insert_erase_first<hash_type>(hash_name, oList);
-    // insert_erase_continue<hash_type>(hash_name, oList);
+    // Rebuild hash for remaining tests
+    hash.clear();
+    for (const auto& v : oList) hash.emplace(v, TO_VAL(0));
+    erase_by_iterator<hash_type>(hash, hash_name);
+
+    // Rebuild hash for remaining tests
+    for (const auto& v : oList) hash.emplace(v, TO_VAL(0));
+    {
+        auto nList2 = oList;
+        insert_find_erase<hash_type>(hash, hash_name, nList2);
+    }
     insert_backtrace<hash_type>(hash_name, oList);
     iter_all<hash_type>(hash, hash_name);
 

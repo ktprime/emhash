@@ -166,7 +166,7 @@ public:
     using key_equal = EqT;
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
-    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+    EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         EMH_MSAN_UNPOISON(&key, sizeof(key));
         if constexpr (std::is_same<UType, std::string>::value) {
             EMH_MSAN_UNPOISON(key.data(), key.size());
@@ -178,7 +178,7 @@ public:
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
-    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+    EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
 
 #if __SIZEOF_INT128__ && 0
@@ -463,13 +463,13 @@ public:
 
     // ------------------------------------------------------------
 
-    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
+    template <typename K = KeyT> EMH_INLINE iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
 
-    template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE const_iterator find(const K& key) const noexcept {
         return {this, find_filled_bucket(key)};
     }
 
-    template <typename K = KeyT> bool contains(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE bool contains(const K& key) const noexcept {
         return find_filled_bucket(key) != _num_buckets;
     }
 
@@ -941,7 +941,7 @@ private:
     }
 
     // Find the bucket with this key, or return (size_t)-1
-    template <typename K> size_t find_filled_bucket(const K& key) const noexcept {
+    template <typename K> EMH_INLINE size_t find_filled_bucket(const K& key) const noexcept {
         size_t main_bucket;
         size_t offset = 0;
         const auto key_h2 = hash_key2(main_bucket, key);

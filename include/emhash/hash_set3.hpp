@@ -1155,24 +1155,22 @@ private:
 #endif
     }
 
-    template <typename UType, typename std::enable_if<std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline size_type hash_inter(const UType key) const {
+    template <typename K> inline size_type hash_inter(const K& key) const {
+        if constexpr (std::is_integral<K>::value) {
 #ifndef EMH_INT_HASH
-        return static_cast<size_type>(hash64(static_cast<uint64_t>(key)));
+            return static_cast<size_type>(hash64(static_cast<uint64_t>(key)));
 #elif EMH_IDENTITY_HASH
-        return key + (key >> (sizeof(UType) * 4));
+            return key + (key >> (sizeof(K) * 4));
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
-    }
-
-    template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, uint32_t>::type = 0>
-    inline size_type hash_inter(const UType& key) const {
+        } else {
 #ifndef EMH_INT_HASH
-        return static_cast<size_type>(_hasher(key) * 11400714819323198485ull);
+            return static_cast<size_type>(_hasher(key) * 11400714819323198485ull);
 #else
-        return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(key));
 #endif
+        }
     }
 
 private:
