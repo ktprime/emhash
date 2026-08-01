@@ -964,7 +964,9 @@ jobs:
         run: sudo apt-get install -y doxygen
 
       - name: Generate API documentation
-        run: doxygen Doxyfile
+        run: |
+          mkdir -p docs/api_generated
+          doxygen Doxyfile
 
       - name: Upload Doxygen XML
         uses: actions/upload-artifact@v7
