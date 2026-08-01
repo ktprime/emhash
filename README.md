@@ -190,14 +190,9 @@ Consider emilib2 (Swiss Table) if:
 
 | Feature | emhash5 | emhash6 | emhash7 | emhash8 | emilib1/2/3 | emilib4 |
 |---------|---------|---------|---------|---------|-------------|---------|
-| Integer keys | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| String keys | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Custom types | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | High load factor (0.9+) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `try_get` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `try_set` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
 | `set_get` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| `shrink_to_fit` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Custom allocator | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | SIMD acceleration | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | No tombstones | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
