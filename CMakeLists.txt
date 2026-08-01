@@ -112,45 +112,23 @@ if(WITH_BENCHMARKS)
         set(CMAKE_CXX_FLAGS "-DNDEBUG -march=native ${CMAKE_CXX_FLAGS}")
     endif()
 
-    add_executable(ebench ${PROJECT_SOURCE_DIR}/bench/ebench.cpp)
-    target_include_directories(ebench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(ebench PRIVATE ${BENCH_DEFS})
+    # Helper function to reduce boilerplate for benchmark targets
+    function(emhash_add_bench name source)
+        add_executable(${name} ${PROJECT_SOURCE_DIR}/bench/${source})
+        target_include_directories(${name} PRIVATE ${BENCH_INCLUDES})
+        target_compile_definitions(${name} PRIVATE ${BENCH_DEFS})
+    endfunction()
 
-    add_executable(sbench ${PROJECT_SOURCE_DIR}/bench/sbench.cpp)
-    target_include_directories(sbench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(sbench PRIVATE ${BENCH_DEFS})
-
-    add_executable(mbench ${PROJECT_SOURCE_DIR}/bench/martin_bench.cpp)
-    target_include_directories(mbench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(mbench PRIVATE ${BENCH_DEFS})
-
-    add_executable(cbench ${PROJECT_SOURCE_DIR}/bench/comprehensive_bench.cpp)
-    target_include_directories(cbench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(cbench PRIVATE ${BENCH_DEFS})
-
-    add_executable(bs ${PROJECT_SOURCE_DIR}/bench/bstring.cpp)
-    target_include_directories(bs PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(bs PRIVATE ${BENCH_DEFS})
-
-    add_executable(bi ${PROJECT_SOURCE_DIR}/bench/buint64.cpp)
-    target_include_directories(bi PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(bi PRIVATE ${BENCH_DEFS})
-
-    add_executable(fbench ${PROJECT_SOURCE_DIR}/bench/fbench.cpp)
-    target_include_directories(fbench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(fbench PRIVATE ${BENCH_DEFS})
-
-    add_executable(hbench ${PROJECT_SOURCE_DIR}/bench/hbench.cpp)
-    target_include_directories(hbench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(hbench PRIVATE ${BENCH_DEFS})
-
-    add_executable(zbench ${PROJECT_SOURCE_DIR}/bench/zhash_bench.cc)
-    target_include_directories(zbench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(zbench PRIVATE ${BENCH_DEFS})
-
-    add_executable(jbench ${PROJECT_SOURCE_DIR}/bench/hash_join2.cpp)
-    target_include_directories(jbench PRIVATE ${BENCH_INCLUDES})
-    target_compile_definitions(jbench PRIVATE ${BENCH_DEFS})
+    emhash_add_bench(ebench  ebench.cpp)
+    emhash_add_bench(sbench  sbench.cpp)
+    emhash_add_bench(mbench  martin_bench.cpp)
+    emhash_add_bench(cbench  comprehensive_bench.cpp)
+    emhash_add_bench(bs      bstring.cpp)
+    emhash_add_bench(bi      buint64.cpp)
+    emhash_add_bench(fbench  fbench.cpp)
+    emhash_add_bench(hbench  hbench.cpp)
+    emhash_add_bench(zbench  zhash_bench.cc)
+    emhash_add_bench(jbench  hash_join2.cpp)
     target_link_libraries(jbench PRIVATE OpenMP::OpenMP_CXX)
 endif()
 

@@ -72,15 +72,14 @@ function(emhash_add_test name source)
     target_compile_features(${name} PRIVATE cxx_std_17)
     target_include_directories(${name} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
-        ${
-    CMAKE_CURRENT_SOURCE_DIR}           # for #include "common/maps.hpp"
-        ${EMHASH_TEST_COMMON})                # for #include "doctest.h"
-#Link Threads for tests that use std::thread(test_complex_conditions, etc.)
+        ${CMAKE_CURRENT_SOURCE_DIR}        # for #include "common/maps.hpp"
+        ${EMHASH_TEST_COMMON})             # for #include "doctest.h"
+    # Link Threads for tests that use std::thread (test_complex_conditions, etc.)
     if(TARGET Threads::Threads)
         target_link_libraries(${name} PRIVATE Threads::Threads)
     endif()
     if(MSVC)
-#/ W4 highest warning level; / WX intentionally not used(library headers emit L4 warnings)
+        # /W4 highest warning level; /WX intentionally not used (library headers emit L4 warnings)
         target_compile_options(${name} PRIVATE /W4)
     endif()
     add_test(NAME ${name} COMMAND ${name})
@@ -125,13 +124,12 @@ set(EMHASH_NEW_STRESS_TESTS
 )
 foreach(name ${EMHASH_NEW_STRESS_TESTS})
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/stress/${name}.cpp")
-        emhash_add_test(${
-    name} "stress/${name}.cpp")
+        emhash_add_test(${name} "stress/${name}.cpp")
     endif()
 endforeach()
 
 #-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-#attack / — hash attack tests(explicit list of new doctest files)
+# attack — hash attack tests (explicit list of new doctest files)
 #-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 set(EMHASH_NEW_ATTACK_TESTS
     test_hash_attack
@@ -139,13 +137,12 @@ set(EMHASH_NEW_ATTACK_TESTS
 )
 foreach(name ${EMHASH_NEW_ATTACK_TESTS})
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/attack/${name}.cpp")
-        emhash_add_attack_test(${
-    name} "attack/${name}.cpp")
+        emhash_add_attack_test(${name} "attack/${name}.cpp")
     endif()
 endforeach()
 
 #-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-#fuzz / — regression reproducer(always built; libfuzzer targets optional)
+# fuzz — regression reproducer (always built; libfuzzer targets optional)
 #-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/reproduce_emhash8_bug.cpp")
     emhash_add_test(reproduce_emhash8_bug "fuzz/reproduce_emhash8_bug.cpp")
@@ -163,8 +160,7 @@ if(EMHASH_ENABLE_FUZZ)
     )
     foreach(name ${EMHASH_FUZZ_TARGETS})
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp")
-            add_executable(${
-    name} "fuzz/${name}.cpp")
+            add_executable(${name} "fuzz/${name}.cpp")
             target_compile_features(${name} PRIVATE cxx_std_17)
             target_include_directories(${name} PRIVATE
                 ${CMAKE_CURRENT_SOURCE_DIR}/../include
