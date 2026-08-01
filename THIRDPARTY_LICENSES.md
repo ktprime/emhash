@@ -50,7 +50,7 @@
 | w1hash | `thirdparty/w1hash.h` | MIT | — | Hash function |
 | lru_map | `thirdparty/lru_map.h` | MIT | — | LRU cache comparison |
 | pdqsort | `thirdparty/pdqsort.h` | MIT | https://github.com/orlp/pdqsort | Pattern-defeating quicksort |
-| sfc64 | `thirdparty/sfc64.h` | MIT | https://github.com/wunk的一个sfc64 | PRNG for benchmarks |
+| sfc64 | `thirdparty/sfc64.h` | MIT | https://github.com/wunk/sfc64 | PRNG for benchmarks |
 | ska_sort | `thirdparty/ska_sort.hpp` | MIT | https://github.com/skarupke/ska_sort | Radix sort |
 
 ## License Categories

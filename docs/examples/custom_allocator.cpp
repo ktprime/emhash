@@ -44,14 +44,15 @@ int main() {
     std::cout << "maps[0][2] = " << maps[0][2] << "\n";
 
     // Custom counting allocator
-    using CountMap = emhash8::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>;
+    // Note: emhash8::HashMap's value_type is std::pair<KeyT, ValueT> (not const KeyT), unlike std::unordered_map
+    using CountMap = emhash8::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<int, int>>>;
     CountMap cmap;
     cmap[1] = 10;
     cmap[2] = 20;
     cmap[3] = 30;
 
-    std::cout << "allocations: " << CountingAllocator<std::pair<const int, int>>::alloc_count << "\n";
-    std::cout << "deallocations: " << CountingAllocator<std::pair<const int, int>>::dealloc_count << "\n";
+    std::cout << "allocations: " << CountingAllocator<std::pair<int, int>>::alloc_count << "\n";
+    std::cout << "deallocations: " << CountingAllocator<std::pair<int, int>>::dealloc_count << "\n";
 
     return 0;
 }

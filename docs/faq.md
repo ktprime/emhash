@@ -18,7 +18,7 @@
 | Collision resolution | Linked-bucket chains | Swiss-table-style byte probing |
 | SIMD usage | Limited (CTZ/bitmask) | Pervasive (H2 tag filtering, iteration) |
 | Best for | General purpose, high load factor | SIMD-friendly keys, read-heavy |
-| Load factor | Default 0.80, up to 0.999 | emihmap1: fixed 0.833; emihmap2/3: 0.25–0.999 |
+| Load factor | Default 0.80, up to 0.999 | emihmap1: fixed 5/6 ≈ 0.833; emihmap2/3: 0.25–0.999; emihmap4: fixed 0.875 |
 
 ### Which emilib version should I use?
 

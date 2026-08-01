@@ -61,8 +61,8 @@ The API is largely compatible with `std::unordered_map`.
 |--------|-------------|
 | `insert_unique(key, val)` | Direct insert without lookup — faster when key is guaranteed unique |
 | `try_get(key)` | Returns `ValueT*` (`nullptr` if not found) — avoids exception overhead |
-| `try_set(key, val)` | Set value if key exists, do nothing if it doesn't. Returns `bool`. (emhash5/8 only) |
-| `set_get(key, val)` | Sets new value, returns old value (emhash5/8). Different signature in emilib: `set_get(key, val, oldv)` returns `bool` |
+| `try_set(key, val)` | Set value if key exists, do nothing if it doesn't. Returns `bool`. (emhash5/8, emilib1/2/3) |
+| `set_get(key, val)` | Sets new value, returns old value (emhash5/8). Different signature in emilib: `set_get(key, val, oldv)` returns `bool` (emilib1/2/3) |
 | `_erase(it)` | Erase by iterator returning void — slightly faster than `erase()` (emhash5/6/7 and emilib1/2/3) |
 | `shrink_to_fit()` | Releases unused memory |
 

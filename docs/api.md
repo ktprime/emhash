@@ -28,7 +28,7 @@ HashMap(std::initializer_list<value_type> il); // Initializer list
 | `operator[key]` | Insert or access element |
 | `at(key)` | Access element, throws `std::out_of_range` if not found |
 | `find(key)` | Find element, returns iterator |
-| `try_get(key)` | Find element, returns pointer to value (`nullptr` on failure) |
+| `try_get(key)` | Find element, returns pointer to value (`nullptr` on failure). Available in all versions (emhash5/6/7/8, emilib1/2/3/4) |
 | `contains(key)` | Check if key exists |
 | `count(key)` | Key occurrence count (0 or 1) |
 
@@ -39,16 +39,16 @@ HashMap(std::initializer_list<value_type> il); // Initializer list
 | `emplace(key, val)` | In-place construct insert |
 | `insert({key, val})` | Insert key-value pair |
 | `insert_unique(key, val)` | Direct insert (no existence check, best performance) |
-| `try_set(key, val)` | Set value if key exists, do nothing if it doesn't. Returns `bool`. (emhash5/8 only) |
+| `try_set(key, val)` | Set value if key exists, do nothing if it doesn't. Returns `bool`. (emhash5/8, emilib1/2/3) |
 | `set_get(key, val)` | Set new value, return old value (or default-constructed if key not found). Returns `ValueT`. (emhash5/8) |
 | `set_get(key, val, oldv)` | Set new value, write old value to `oldv`. Returns `true` if key existed. (emilib1/2/3) |
 | `erase(key)` / `erase(it)` | Delete element |
 | `_erase(it)` | Delete element by iterator, return void (emhash5/6/7 and emilib1/2/3, faster than `erase()`) |
-| `insert_or_assign(key, val)` | Insert or update value (all versions) |
-| `get_or_return_default(key)` | Get value or default-constructed (all versions) |
-| `erase_if(pred)` | Erase elements matching predicate (all versions) |
-| `equal_range(key)` | Get range of elements matching key (all versions) |
-| `merge(rhs)` | Merge another hash map (all versions) |
+| `insert_or_assign(key, val)` | Insert or update value (emhash5/6/7/8, emilib1/2/3/4) |
+| `get_or_return_default(key)` | Get value or default-constructed (emhash5/6/7/8 only) |
+| `erase_if(pred)` | Erase elements matching predicate (emhash5/6/7/8, emilib1/2/3/4) |
+| `equal_range(key)` | Get range of elements matching key (emhash5/6/7/8 only) |
+| `merge(rhs)` | Merge another hash map (emhash5/6/7/8 only) |
 | `clear()` | Clear all elements |
 
 ## Iterators

@@ -16,14 +16,12 @@ tests/
 │   ├── hashers.hpp  # ConstHasher / Range4Hasher / LinearHasher / CollidingHash
 │   ├── trackers.hpp # LeakTracker (constructor/destructor balance checker)
 │   └── utilities.hpp # make_kv / now_ms / oracle_equal
-├── unit/            # Functional correctness (10 files, doctest)
+├── unit/            # Functional correctness (doctest)
 ├── memory/          # Sanitizer + leak + lifecycle (3 files, doctest)
-├── stress/          # Stress tests (4 files, doctest)
+├── stress/          # Stress tests (doctest)
 ├── attack/          # Hash collision attack tests (2 files, doctest, EMH_SAFE_PSL)
-├── fuzz/            # libfuzzer targets (5 files, optional)
-├── debug/           # Debug tools (not part of doctest suite, unchanged)
-├── bench/           # Google Benchmark (optional, unchanged)
-├── archive/         # Old scratch files (not built)
+├── fuzz/            # libfuzzer targets (optional) + bug reproduction
+├── bench/           # Performance benchmarks (optional)
 ├── CMakeLists.txt
 └── README.md
 ```

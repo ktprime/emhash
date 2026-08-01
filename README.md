@@ -42,8 +42,8 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 |---------|-------------|
 | `insert_unique` | Direct insertion without lookup (performance boost) |
 | `try_get` | Returns pointer to value, `nullptr` if key not found |
-| `try_set` | Set value if key exists, do nothing if it doesn't (emhash5/8) |
-| `set_get` | Updates value and returns old value (emhash5/8) |
+| `try_set` | Set value if key exists, do nothing if it doesn't (emhash5/8, emilib1/2/3) |
+| `set_get` | Updates value and returns old value (emhash5/8, emilib1/2/3) |
 | `_erase` | Delete operation returning void (faster) |
 | **LRU Mode** | Enable LRU cache optimization with `EMH_LRU_SET` |
 
@@ -156,46 +156,52 @@ More examples: [docs/examples/](docs/examples/)
 
 ### 30-Second Quick Guide
 
-> **If you're not sure which version to use, start with `emhash7`** — it has the best all-around performance with no tombstones and native high load factor support.
+> **If you're not sure which version to use, start with `emhash7`** — no tombstones means stable performance under mixed insert/erase workloads, with native high load factor support (0.9+).
 
-Use this decision tree to pick the right version:
+Choose by your **primary workload pattern**, not key type:
 
 ```
-你的 key 是整数吗？
-  ├─ 是 → 追求极致性能？
-  │     ├─ 是 → emhash7 (高负载因子，无墓碑)
-  │     └─ 否 → emhash5 (内存高效，低探测)
-  │
-  └─ 否 → 编译器支持 SIMD 指令集？
-         ├─ 是 → emilib2 (SIMD 加速查找，最快)
-         └─ 否 → emhash8 (通用，快速迭代)
+What is your primary workload?
+  ├─ Mixed (insert + find + erase) → emhash7 (no tombstones, stable at high LF)
+  ├─ Find/erase-heavy →
+  │     ├─ Integer keys → emhash6 (bitmask-accelerated empty-slot search)
+  │     └─ String/large KV types → emhash8 (dense pairs, cache-friendly)
+  ├─ Iteration-heavy → emhash8 (dense pairs array, sequential scan)
+  └─ Small tables (< 1K elements) → emhash5 (small-size optimization)
+
+Consider emilib2 (Swiss Table) if:
+  - You need maximum find throughput at scale (1M+ elements) on GCC
+  - Your workload is read-heavy with minimal erase (tombstone accumulation degrades mixed workloads)
+  - Note: insert performance is significantly slower on Clang vs GCC
 ```
 
 ### Detailed Comparison
 
 | Version | Best For | Key Strengths | Weaknesses |
 |---------|----------|---------------|------------|
-| **emhash5** | Integer keys, fast lookup | Small-size optimization (`EMH_SMALL_SIZE`), lowest probe count | Slightly slower than emhash6 for high LF |
-| **emhash6** | Fast lookup/erase, integer keys | Fastest find/erase, linked-bucket with bitmask | More memory for metadata |
-| **emhash7** | Insert-heavy, mixed workloads | No tombstones, stable insert/erase, high load factor | Slightly slower erase than emhash5/6 |
-| **emhash8** | Iteration-heavy, large KV types | Dense pairs array, near-zero iteration time | Higher memory for separate index array |
-| **emilib1/2/3** | Swiss-table style SIMD-accelerated lookup | Group-level SIMD probing, very fast find | Higher memory overhead per bucket; **emilib2ss may hang under extreme hash collision attack** (all keys hashing to same bucket) — use emilib2o or emilib2s in such scenarios |
+| **emhash5** | Small tables, memory-constrained | Small-size optimization (`EMH_SMALL_SIZE`), 3-way hybrid probing | Slower than emhash6 at high load factor |
+| **emhash6** | Find/erase-heavy, integer keys | Bitmask-accelerated empty-slot search, fastest find/erase | Extra memory for bitmask array |
+| **emhash7** | General purpose, mixed workloads | No tombstones (chain repair on erase), stable at 0.9+ LF | Erase slightly slower than emhash5/6 |
+| **emhash8** | Iteration-heavy, large KV types | Split-index + dense pairs, sequential iteration, fast copy/move | Extra memory for separate index array |
+| **emilib2/3** | Read-heavy at scale (GCC) | SIMD group probing (16 buckets/cycle), excellent iteration | Tombstone accumulation under mixed workloads; insert slower on Clang; **emilib2ss may hang under extreme hash collision attack** — use emilib2o or emilib2s |
+| **emilib4** | Experimental Swiss-table variant | Fast insert on Clang, dense iteration | Tombstone accumulation (no backward shift); no `try_set`/`set_get`/`_erase`; fixed LF 0.875 |
 
 ### Feature Matrix
 
-| Feature | emhash5 | emhash6 | emhash7 | emhash8 | emilib1/2/3 |
-|---------|---------|---------|---------|---------|-------------|
-| Integer keys | ✅ | ✅ | ✅ | ✅ | ✅ |
-| String keys | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Custom types | ✅ | ✅ | ✅ | ✅ | ✅ |
-| High load factor (0.9+) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `try_get` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `try_set` | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `set_get` | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `shrink_to_fit` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Custom allocator | ✅ | ✅ | ✅ | ✅ | ❌ |
-| SIMD acceleration | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Fastest iteration | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Feature | emhash5 | emhash6 | emhash7 | emhash8 | emilib1/2/3 | emilib4 |
+|---------|---------|---------|---------|---------|-------------|---------|
+| Integer keys | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| String keys | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Custom types | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| High load factor (0.9+) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `try_get` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `try_set` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| `set_get` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| `shrink_to_fit` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Custom allocator | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| SIMD acceleration | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| No tombstones | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Dense pairs iteration | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
 
 See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
 
@@ -210,13 +216,11 @@ The test suite is in [`tests/`](tests/) and requires **no third-party dependenci
 ```bash
 cd tests
 
-# Build and run quick validation tests (247,268 assertions, ~5 seconds)
+# Build all tests
 cmake -B build && cmake --build build --config Release
-./build/Release/test_verify.exe        # Windows
-./build/test_verify                    # Linux/WSL
 
-# Or use the custom targets
-cmake --build build --target quick_test    # Quick validation
+# Run via custom targets
+cmake --build build --target quick_test    # Unit + memory tests (fast feedback)
 cmake --build build --target stress_test   # Stress tests
 cmake --build build --target attack_test   # Hash attack tests
 cmake --build build --target all_tests     # All tests
@@ -226,10 +230,10 @@ cmake --build build --target all_tests     # All tests
 
 | Category | Directory | Description |
 |----------|-----------|-------------|
-| Validation | `tests/verify/` | 247K+ assertions, full API coverage, special key types |
-| Stress | `tests/stress/` | 35K trials, high load factor, bad hash scenarios |
+| Unit | `tests/unit/` | CRUD, iterators, copy/move, edge cases, full API coverage |
+| Memory | `tests/memory/` | ASan/MSan/UBSan, leak detection, lifecycle audit |
+| Stress | `tests/stress/` | High load factor, bad hash, randomized stress |
 | Attack | `tests/attack/` | Hash collision attacks (constant/small-range/linear) |
-| Debug | `tests/debug/` | Debugging tools for chain corruption, probe bugs |
 | Fuzz | `tests/fuzz/` | LibFuzzer + ASan fuzzing (requires clang) |
 
 See [tests/README.md](tests/README.md) for detailed instructions.

@@ -39,6 +39,7 @@ if (auto it = scores.find("alice"); it != scores.end()) {
 | `emilib/emihmap1.hpp` | `emilib::HashMap` | SIMD-accelerated, inline probe depth |
 | `emilib/emihmap2.hpp` | `emilib2::HashMap` | SIMD-accelerated, high load factor |
 | `emilib/emihmap3.hpp` | `emilib3::HashMap` | SIMD-accelerated, balanced default |
+| `emilib/emihmap4.hpp` | `emilib4::HashMap` | Experimental Swiss-table variant |
 
 ### HashSet
 

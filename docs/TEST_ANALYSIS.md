@@ -71,21 +71,7 @@ This document organizes all test code in `tests/` directory, explaining the purp
 | `test_highload.cpp` | Stress | emhash5/8 | High load test: LF=0.999, oscillation test |
 | `test_reserve_fix.cpp` | Stress | emhash8 | Stress test: reserve(1) + random operations, verifies crash fix |
 
-### 2.4 debug/ — Boundary and Bug Tests
-
-| File | Type | Target | Description |
-|------|------|--------|-------------|
-| `debug_chain.cpp` | Debug | emhash8 chain | Debug `_index` chain corruption issues |
-| `debug_set_erase.cpp` | Debug | emhash8 HashSet | Debug erase_slot chain corruption |
-| `min_repro.cpp` | Debug | Crash reproduction | Minimal reproduction of specific crash scenarios |
-| `reproduce_crash.cpp` | Debug | emhash8 | Reproduce specific crash: reserve(1) + 0x68686868 key |
-| `fuzz_reproduce.cpp` | Debug | emhash8 | Reproduce fuzzer-discovered crash sequence |
-| `test_debug_find.cpp` | Debug | EMH_FIND_HIT | Test find_hit related bugs |
-| `test_probe_bug.cpp` | Bug | Probe mode | Test probe mode bugs |
-| `test_probe_coverage.cpp` | Coverage | Probe strategy | Verify coverage of different probe strategies |
-| `test_repro_collision.cpp` | Bug | Hash collision | Reproduce hash collision issues |
-
-### 2.5 attack/ — Hash Attack Tests
+### 2.4 attack/ — Hash Attack Tests
 
 | File | Type | Target | Description |
 |------|------|--------|-------------|
@@ -202,9 +188,9 @@ cmake --build . --target quick_test
 | Category | File Count | Location | Key Tests |
 |----------|------------|----------|-----------|
 | **Fuzzing** | 8 | tests/fuzz/ | fuzz_emhash_all, fuzz_extreme |
-| **Unit Tests** | 15+ | tests/verify/ | test_all_maps, test_emhash58, test_extreme |
+| **Unit Tests** | 15+ | tests/unit/ | test_crud, test_iterators, test_full_api |
 | **Stress Tests** | 6 | tests/stress/ | stress_all_maps, stress_fix |
-| **Bug Reproduction** | 12+ | tests/debug/ | debug_chain, reproduce_crash |
+| **Bug Reproduction** | 1 | tests/fuzz/ | reproduce_emhash8_bug |
 | **Performance Benchmarks** | 20+ | bench/ | ebench, martin_bench |
 | **Hash Attack** | 3 | tests/attack/ | hash_attack_all, hash_attack7 |
 
@@ -242,8 +228,7 @@ tests/
 ├── unit/      # Unit tests (CRUD, iterators, edge cases, etc.)
 ├── memory/    # Memory and sanitizer tests (leak, MSan, lifecycle)
 ├── stress/    # Stress tests (high load, bad hash, random ops)
-├── fuzz/      # Fuzzing tests
-├── debug/     # Debug and bug reproduction tools
+├── fuzz/      # Fuzzing tests + bug reproduction
 ├── attack/    # Hash attack and collision hardening tests
 ├── common/    # Shared test utilities (doctest.h, etc.)
 ├── scripts/   # Build scripts

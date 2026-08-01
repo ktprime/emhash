@@ -9,7 +9,7 @@
 | **emhash7** | Linked-bucket with separate bitmask, no tombstones | Native (0.80-0.999) |
 | **emhash8** | Separate index + dense pairs array, linked-bucket chains | With `EMH_HIGH_LOAD` |
 
-> In `emhash/hash_table5.hpp`, the optimized three-way linear probing strategy is still **2-3x faster** than traditional strategies even at load factors **> 0.9**.
+> In `emhash/hash_table5.hpp`, the three-way hybrid probing strategy maintains good performance even at load factors **> 0.9** by combining short-range linear probing, medium-range quadratic probing, and long-range bidirectional search.
 
 ## Memory Layout
 
@@ -100,11 +100,11 @@ emhash7::HashMap<Key, Val, Hash, Eq, MyAllocator> mymap;
 
 ## emilib Library: SIMD-Accelerated Hash Maps
 
-The emilib library provides three hash map implementations (`emihmap1`, `emihmap2`, `emihmap3`) that share a common design philosophy: **SIMD-accelerated open addressing with metadata-byte filtering**. Unlike emhash's linked-bucket approach, emilib uses Swiss-table-style byte-level metadata to enable vectorized lookups, achieving extremely fast search performance on modern CPUs.
+The emilib library provides four hash map implementations (`emihmap1`, `emihmap2`, `emihmap3`, `emihmap4`) that share a common design philosophy: **SIMD-accelerated open addressing with metadata-byte filtering**. Unlike emhash's linked-bucket approach, emilib uses Swiss-table-style byte-level metadata to enable vectorized lookups, achieving extremely fast search performance on modern CPUs.
 
 ### Common Design Foundation
 
-All three implementations share these core principles:
+All four implementations share these core principles:
 
 **1. Dual-Hash Metadata Encoding**
 
@@ -476,22 +476,22 @@ _erase(bucket):
 
 ### emilib Comparison Matrix
 
-| Feature | emihmap1 | emihmap2 | emihmap3 |
-|---------|----------|----------|----------|
-| **Namespace** | `emilib` | `emilib2` | `emilib3` |
-| **Probe tracking** | Inline (group trailer byte) | Separate `_offset[]` array | Global `_max_probe_length` |
-| **SIMD group utilization** | 15/16 slots (93.75%) | 16/16 slots (100%) | 15/16 slots (93.75%) |
-| **Early termination** | Per-group probe depth | Per-group offset + EEMPTY check | Group mask + global PSL |
-| **Erase optimization** | Group-aware EEMPTY/EDELETE | Backward deletion (optional) | Group-aware EEMPTY/EDELETE |
-| **Load factor** | Fixed 5/6 ≈ 0.833 | Configurable 0.25..0.999 | Configurable 0.25..0.999 |
-| **Extra memory** | None | `_offset[]` (~0.125 bytes/bucket) | None |
-| **Probing strategy** | Quadratic + jump | Linear / quadratic / jump | Quadratic + jump |
-| **SIMD width** | SSE2 / AVX2 | SSE2 / AVX2 / AVX-512 | SSE2 / AVX2 / AVX-512 |
-| **Metadata per bucket** | 1 byte | 1 byte | 1 byte |
+| Feature | emihmap1 | emihmap2 | emihmap3 | emihmap4 |
+|---------|----------|----------|----------|----------|
+| **Namespace** | `emilib` | `emilib2` | `emilib3` | `emilib4` |
+| **Probe tracking** | Inline (group trailer byte) | Separate `_offset[]` array | Global `_max_probe_length` | Quadratic probing |
+| **SIMD group utilization** | 15/16 slots (93.75%) | 16/16 slots (100%) | 15/16 slots (93.75%) | 16/16 slots (100%) |
+| **Early termination** | Per-group probe depth | Per-group offset + EEMPTY check | Group mask + global PSL | Group-level mask |
+| **Erase optimization** | Group-aware EEMPTY/EDELETE | Backward deletion (optional) | Group-aware EEMPTY/EDELETE | Tombstone (no backward shift) |
+| **Load factor** | Fixed 5/6 ≈ 0.833 | Configurable 0.25..0.999 | Configurable 0.25..0.999 | Fixed 0.875 |
+| **Extra memory** | None | `_offset[]` (~0.125 bytes/bucket) | None | None |
+| **Probing strategy** | Quadratic + jump | Linear / quadratic / jump | Quadratic + jump | Quadratic |
+| **SIMD width** | SSE2 / AVX2 | SSE2 / AVX2 / AVX-512 | SSE2 / AVX2 / AVX-512 | SSE2 / AVX2 |
+| **Metadata per bucket** | 1 byte | 1 byte | 1 byte | 1 byte |
 
 ### emilib vs emhash: Design Philosophy
 
-| Aspect | emhash (5/6/7/8) | emilib (1/2/3) |
+| Aspect | emhash (5/6/7/8) | emilib (1/2/3/4) |
 |--------|-------------------|-----------------|
 | **Collision resolution** | Linked-bucket chains | Swiss-table-style byte probing |
 | **Metadata** | Embedded in bucket struct | Separate `_states[]` byte array |
@@ -506,6 +506,7 @@ _erase(bucket):
 - **emihmap1** — Best for fixed workloads with stable load factors; simplest data structure with zero extra overhead
 - **emihmap2** — Best for variable workloads needing high load factors (up to 0.999); most sophisticated erase optimization; full SIMD group utilization
 - **emihmap3** — Best balanced option; minimal metadata with group-level early exit; good default choice for most SIMD-accelerated use cases
+- **emihmap4** — Experimental Swiss-table variant; fast insert on Clang but tombstone accumulation degrades mixed workloads; no `try_set`/`set_get`/`_erase`
 
 ### Usage
 
@@ -513,8 +514,10 @@ _erase(bucket):
 #include "emilib/emihmap1.hpp"  // namespace emilib
 #include "emilib/emihmap2.hpp"  // namespace emilib2
 #include "emilib/emihmap3.hpp"  // namespace emilib3
+#include "emilib/emihmap4.hpp"  // namespace emilib4
 
 emilib::HashMap<int, std::string> map1;
 emilib2::HashMap<int, std::string> map2;
 emilib3::HashMap<int, std::string> map3;
+emilib4::HashMap<int, std::string> map4;
 ```

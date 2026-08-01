@@ -30,10 +30,11 @@ g++ -std=c++17 -I../../include basic_map.cpp -o basic_map
 | `emhash/hash_table5.hpp` | `emhash5::HashMap<K,V>` | Three-way hybrid probing |
 | `emhash/hash_table6.hpp` | `emhash6::HashMap<K,V>` | Linked-bucket with bitmask |
 | `emhash/hash_table7.hpp` | `emhash7::HashMap<K,V>` | No-tombstone design |
-| `emhash/hash_table8.hpp` | `emhash8::HashMap<K,V>` | Latest version, recommended |
+| `emhash/hash_table8.hpp` | `emhash8::HashMap<K,V>` | Split-index + dense pairs, fast iteration |
 | `emhash/hash_set8.hpp` | `emhash8::HashSet<K>` | HashSet (latest) |
 | `emilib/emihmap1.hpp` | `emilib::HashMap<K,V>` | SIMD-accelerated, inline probe depth |
 | `emilib/emihmap2.hpp` | `emilib2::HashMap<K,V>` | SIMD-accelerated, high load factor |
 | `emilib/emihmap3.hpp` | `emilib3::HashMap<K,V>` | SIMD-accelerated, balanced default |
+| `emilib/emihmap4.hpp` | `emilib4::HashMap<K,V>` | Experimental Swiss-table variant |
 | `emhash/lru_size.hpp` | `emlru_size::lru_cache<K,V>` | LRU cache (size-based) |
 | `emhash/lru_time.hpp` | `emlru_time::lru_cache<K,V>` | LRU cache (time-based) |
