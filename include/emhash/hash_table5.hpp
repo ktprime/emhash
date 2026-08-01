@@ -1254,7 +1254,7 @@ public:
     }
 
     /// Make room for this many elements
-    bool reserve(uint64_t num_elems) noexcept {
+    bool reserve(uint64_t num_elems) {
 #if EMH_HIGH_LOAD < 1000
         const auto required_buckets = (num_elems * _mlf >> 27);
         if (EMH_LIKELY(required_buckets < static_cast<uint64_t>(_mask)))
@@ -1283,7 +1283,7 @@ public:
         return true;
     }
 
-    void rehash(uint64_t required_buckets) noexcept {
+    void rehash(uint64_t required_buckets) {
         if (required_buckets < static_cast<uint64_t>(_num_filled))
             return;
 
@@ -1304,45 +1304,58 @@ public:
 
 #if EMH_REHASH_LOG
         auto omask = _mask;
-        auto last = _last;
+        auto old_last = _last;
         size_type collision = 0;
 #endif
+
+        // Compute new mask/last BEFORE pack-tail adjustment
+        auto new_mask = num_buckets - 1;
+        auto new_last = num_buckets / 4;
+
+#if EMH_PACK_TAIL > 1 && EMH_PACK_TAIL <= 100
+        new_last = new_mask;
+        num_buckets += num_buckets * EMH_PACK_TAIL / 100; // add more 5-10%
+#endif
+        auto new_num_buckets = num_buckets;
+
+        // ALLOCATE NEW MEMORY FIRST — strong exception guarantee:
+        // If alloc_bucket throws bad_alloc, ALL member variables are still
+        // the old values, so the map remains in its previous valid state.
+        // This fixes the bug where rehash modified _mask/_num_buckets before
+        // allocation, leaving the map in an inconsistent state on OOM.
+        PairT* new_pairs;
+#if EMH_SMALL_SIZE
+        if (new_num_buckets <= EMH_SMALL_SIZE && old_pairs != reinterpret_cast<PairT*>(_small))
+            new_pairs = reinterpret_cast<PairT*>(_small);
+        else
+#endif
+            new_pairs = reinterpret_cast<PairT*>(alloc_bucket(new_num_buckets));
+
+        // Allocation succeeded — now safe to update member variables
 #if EMH_HIGH_LOAD
         _ehead = 0;
 #endif
-
         _num_filled = 0;
-        _mask = num_buckets - 1;
-        _last = num_buckets / 4;
+        _mask = new_mask;
+        _last = new_last;
         _first = 0;
-
-#if EMH_PACK_TAIL > 1 && EMH_PACK_TAIL <= 100
-        _last = _mask;
-        num_buckets += num_buckets * EMH_PACK_TAIL / 100; // add more 5-10%
-#endif
-        _num_buckets = num_buckets;
-
-#if EMH_SMALL_SIZE
-        if (num_buckets <= EMH_SMALL_SIZE && old_pairs != reinterpret_cast<PairT*>(_small))
-            _pairs = reinterpret_cast<PairT*>(_small);
-        else
-#endif
-            _pairs = reinterpret_cast<PairT*>(alloc_bucket(num_buckets));
+        _num_buckets = new_num_buckets;
+        _pairs = new_pairs;
 
         // Initialize all buckets: set every byte to INACTIVE so MSan sees them as
         // initialized.  For non-trivial types, the key/value fields are dead bytes
         // that will be overwritten by placement-new when the bucket is filled.
         memset(reinterpret_cast<char*>(_pairs), static_cast<int>(INACTIVE),
-               sizeof(_pairs[0]) * static_cast<size_t>(num_buckets));
+               sizeof(_pairs[0]) * static_cast<size_t>(_num_buckets));
 
         // Initialize tail sentinels (bucket=0 so iterator stops)
         if (need_explicit_dtor()) {
             // Only init the bucket field; key/value of sentinels are never read.
             const size_type zero_bucket = 0;
             for (size_type i = 0; i < 2; ++i)
-                std::memcpy(&EMH_BUCKET(_pairs, num_buckets + i), &zero_bucket, sizeof(zero_bucket));
+                std::memcpy(&EMH_BUCKET(_pairs, _num_buckets + i), &zero_bucket, sizeof(zero_bucket));
         } else {
-            memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT) * 2u);
+            memset(reinterpret_cast<char*>(_pairs + _num_buckets), 0, sizeof(PairT) * 2u);
         }
 
 #if EMH_FIND_HIT
@@ -1377,7 +1390,8 @@ public:
             snprintf(buff, sizeof(buff),
                      "    _num_filled/aver_size/K.V/pack/collision|last = %u/%.2lf/%s.%s/%zd|%.2lf%%,%.2lf%%",
                      _num_filled, static_cast<double>(_num_filled) / mbucket, typeid(KeyT).name(),
-                     typeid(ValueT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled, last * 100.0 / omask);
+                     typeid(ValueT).name(), sizeof(_pairs[0]), collision * 100.0 / _num_filled,
+                     old_last * 100.0 / omask);
 #ifdef EMH_LOG
             static uint32_t ihashs = 0;
             EMH_LOG() << "hash_nums = " << ihashs++ << "|" << __FUNCTION__ << "|" << buff << std::endl;
@@ -1394,7 +1408,7 @@ public:
     }
 
 private:
-    PairT* alloc_bucket(size_type num_buckets) noexcept {
+    PairT* alloc_bucket(size_type num_buckets) {
         return PairAllocTraits::allocate(_alloc, 2 + static_cast<size_t>(num_buckets));
     }
 
@@ -1465,7 +1479,7 @@ private:
 #endif
 
     // Can we fit another element?
-    inline bool check_expand_need() noexcept { return reserve(static_cast<uint64_t>(_num_filled)); }
+    inline bool check_expand_need() { return reserve(static_cast<uint64_t>(_num_filled)); }
 
     void clear_bucket(size_type bucket, bool bclear = true) noexcept {
         if (need_explicit_dtor()) {

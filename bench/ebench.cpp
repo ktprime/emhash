@@ -5,7 +5,7 @@
 #define TTVal 0
 #endif
 
-//#define  HAVE_INDIVI 1
+// #define  HAVE_INDIVI 1
 
 #pragma GCC diagnostic ignored "-Wunused-result"
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -83,11 +83,11 @@ std::map<std::string, std::string> maps = {
 #define RT 2 // 1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
 #endif
 
-//#define CUCKOO_HASHMAP     1
-//#define PHMAP_HASH         1
-//#define WY_HASH            1
+// #define CUCKOO_HASHMAP     1
+// #define PHMAP_HASH         1
+// #define WY_HASH            1
 
-//#define FL1                1
+// #define FL1                1
 
 #ifdef HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -99,27 +99,27 @@ std::map<std::string, std::string> maps = {
 #endif
 
 // feature of emhash
-//#define EMH_INT_HASH        1
-//#define EMH_BUCKET_INDEX    0
-//#define EMH_REHASH_LOG      1234567
+// #define EMH_INT_HASH        1
+// #define EMH_BUCKET_INDEX    0
+// #define EMH_REHASH_LOG      1234567
 
-//#define EMH_STATIS            123456
-//#define EMH_SAFE_HASH       1
-//#define EMH_IDENTITY_HASH   1
-//#define EMH_LRU_SET         1
-//#define EMH_SAFE_PSL 1
-//#define EMH_HIGH_LOAD       234567
-//#define EMH_PACK_TAIL         8
-//#define EMH_ITER_SAFE       1
-//#define EMH_ALIGN64         1
+// #define EMH_STATIS            123456
+// #define EMH_SAFE_HASH       1
+// #define EMH_IDENTITY_HASH   1
+// #define EMH_LRU_SET         1
+// #define EMH_SAFE_PSL 1
+// #define EMH_HIGH_LOAD       234567
+// #define EMH_PACK_TAIL         8
+// #define EMH_ITER_SAFE       1
+// #define EMH_ALIGN64         1
 #define EMH_FIND_HIT 1
-//#define EMH_SMALL_SIZE        12345
-//#define EMH_SMALL_SIZE      8
+// #define EMH_SMALL_SIZE        12345
+// #define EMH_SMALL_SIZE      8
 
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table7.hpp"
 #include "emhash/hash_table8.hpp"
-//#define EMH_HIGH_LOAD 12345
+// #define EMH_HIGH_LOAD 12345
 #include "emhash/hash_table5.hpp"
 
 #include "emilib/emihmap1.hpp"
@@ -955,8 +955,7 @@ static void update_value(hash_type& ht_hash, const std::string& hash_name, const
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
 
-template <class hash_type>
-static void erase_by_iterator(hash_type& ht_hash, const std::string& hash_name) {
+template <class hash_type> static void erase_by_iterator(hash_type& ht_hash, const std::string& hash_name) {
     // Pure iterator-based deletion: erase all elements via iterator traversal
     auto ts1 = getus();
     size_t sum = 0;
@@ -979,7 +978,8 @@ static void find_mixed(const hash_type& ht_hash, const std::string& hash_name, c
     size_t sum = 0;
 #if KEY_INT
     uint64_t offset = 0;
-    for (auto& v : vList) offset |= (uint64_t)v;
+    for (auto& v : vList)
+        offset |= (uint64_t)v;
     offset = (offset + 1) * 2;
     for (size_t i = 0; i < vList.size(); i++) {
         // even: hit (existing key), odd: miss (non-existing key)
@@ -1210,11 +1210,13 @@ template <class hash_type> static void benOneHash(const std::string& hash_name, 
 
     // Rebuild hash for remaining tests
     hash.clear();
-    for (const auto& v : oList) hash.emplace(v, TO_VAL(0));
+    for (const auto& v : oList)
+        hash.emplace(v, TO_VAL(0));
     erase_by_iterator<hash_type>(hash, hash_name);
 
     // Rebuild hash for remaining tests
-    for (const auto& v : oList) hash.emplace(v, TO_VAL(0));
+    for (const auto& v : oList)
+        hash.emplace(v, TO_VAL(0));
     {
         auto nList2 = oList;
         insert_find_erase<hash_type>(hash, hash_name, nList2);

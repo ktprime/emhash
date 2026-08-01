@@ -104,6 +104,10 @@ jobs:
         shell: bash
 
       - name: Build all tests
+        # NOTE: The canonical test list is in .github/test-list.sh (SSOT).
+        # If you add a new test, update that file first, then mirror here.
+        # Jobs that can source the file directly should do so; this job
+        # keeps the inline list for ccache compatibility.
         run: |
           cd tests
           CXX="ccache ${{ matrix.compiler }}"
@@ -123,6 +127,7 @@ jobs:
           $CXX $FLAGS stress/test_stress_all.cpp -o test_stress
           $CXX $FLAGS stress/test_reserve_fix.cpp -o test_reserve_fix
           $CXX $FLAGS stress/test_million_stress.cpp -o test_million
+          $CXX $FLAGS -pthread stress/test_complex_conditions.cpp -o test_complex
           # Attack tests (need EMH_SAFE_PSL)
           $CXX $FLAGS -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack
           $CXX $FLAGS -DEMH_SAFE_PSL attack/test_collision_hardening.cpp -o test_collision
@@ -156,6 +161,7 @@ jobs:
           $TIMEOUT 600 ./test_stress
           $TIMEOUT 120 ./test_reserve_fix
           $TIMEOUT 300 ./test_million
+          $TIMEOUT 300 ./test_complex
           $TIMEOUT 600 ./test_attack
           $TIMEOUT 300 ./test_collision
           # Debug
@@ -325,7 +331,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_stress_correctness test_small_data test_iterator_invalidation test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
+        run: cmake --build build --config Release --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_stress_correctness test_small_data test_iterator_invalidation test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_complex_conditions test_hash_attack test_collision_hardening
         shell: bash
 
   cmake-install:
@@ -480,7 +486,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_stress_correctness test_small_data test_iterator_invalidation test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_hash_attack test_collision_hardening
+        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_stress_correctness test_small_data test_iterator_invalidation test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_complex_conditions test_hash_attack test_collision_hardening
         shell: bash
 
       - name: Run tests
@@ -498,7 +504,7 @@ jobs:
           # Slow tests (skip in Debug — /Od too slow for high-load)
           if [[ "$CONFIG" == "Release" ]]; then
             for t in test_stress_all test_highload test_bad_hash test_reserve_fix \
-                     test_million_stress test_hash_attack test_collision_hardening; do
+                     test_million_stress test_complex_conditions test_hash_attack test_collision_hardening; do
               echo "=== Running $t ==="
               "$DIR/$t.exe" || { echo "::error::$t failed"; exit 1; }
             done
@@ -595,7 +601,7 @@ jobs:
   msan:
     name: MSan / Clang
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
@@ -633,6 +639,8 @@ jobs:
           MSAN_FLAGS="-std=c++17 -O1 -fsanitize=memory -fno-omit-frame-pointer -stdlib=libc++ -I../include -I. -Icommon -include msan_unpoison.hpp -fsanitize-ignorelist=common/msan-ignorelist.txt"
           ccache clang++ $MSAN_FLAGS unit/test_crud.cpp -o test_crud_msan
           ccache clang++ $MSAN_FLAGS unit/test_stress_correctness.cpp -o test_stress_correctness_msan
+          ccache clang++ $MSAN_FLAGS unit/test_string_keys.cpp -o test_string_keys_msan
+          ccache clang++ $MSAN_FLAGS unit/test_small_data.cpp -o test_small_data_msan
           ccache clang++ $MSAN_FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_msan
           ccache clang++ $MSAN_FLAGS memory/test_sanitizer.cpp -o test_sanitizer_msan
           ccache clang++ $MSAN_FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_msan
@@ -644,7 +652,7 @@ jobs:
           export MSAN_OPTIONS="suppressions=${{ github.workspace }}/.github/msan-suppressions.txt:halt_on_error=0:print_stats=1"
           set +e
           overall=0
-          for t in test_crud_msan test_stress_correctness_msan test_string_key_leak_msan test_sanitizer_msan test_lifecycle_audit_msan; do
+          for t in test_crud_msan test_stress_correctness_msan test_string_keys_msan test_small_data_msan test_string_key_leak_msan test_sanitizer_msan test_lifecycle_audit_msan; do
             echo "=== Running ./$t ==="
             ./$t 2>&1 | tee msan_${t}.log || true
             rc=${PIPESTATUS[0]}
@@ -715,6 +723,9 @@ jobs:
           ccache g++ $COV memory/test_sanitizer.cpp -o test_sanitizer_cov
           ccache g++ $COV stress/test_stress_all.cpp -o test_stress_all_cov
           ccache g++ $COV stress/test_reserve_fix.cpp -o test_stress_fix_cov
+          ccache g++ $COV stress/test_highload.cpp -o test_highload_cov
+          ccache g++ $COV stress/test_bad_hash.cpp -o test_bad_hash_cov
+          ccache g++ $COV -pthread stress/test_complex_conditions.cpp -o test_complex_cov
           ccache g++ $COV -DEMH_SAFE_PSL attack/test_hash_attack.cpp -o test_attack_cov
           # Known bug reproduction (expected to fail, run for coverage only)
           ccache g++ $COV fuzz/reproduce_emhash8_bug.cpp -o test_reproduce_cov || true
@@ -742,6 +753,9 @@ jobs:
           ./test_sanitizer_cov
           ./test_stress_all_cov
           ./test_stress_fix_cov
+          ./test_highload_cov
+          ./test_bad_hash_cov
+          ./test_complex_cov
           ./test_attack_cov
           # Known bug reproduction (expected to fail)
           ./test_reproduce_cov || true
@@ -924,7 +938,7 @@ jobs:
                   print(f"  - {name}: {ratio:.2f}x slower")
               sys.exit(1)
           else:
-              print("\nNo regressions detected (threshold: 10%)")
+              print("\nNo regressions detected (threshold: 20%)")
           PYEOF
           else
             echo "No baseline found, skipping regression check"
@@ -938,3 +952,32 @@ jobs:
           name: benchmark-baseline
           path: build/benchmark_results.json
           retention-days: 90
+
+  docs-build:
+    name: Doxygen API Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install doxygen
+        run: sudo apt-get install -y doxygen
+
+      - name: Generate API documentation
+        run: doxygen Doxyfile
+
+      - name: Upload Doxygen XML
+        uses: actions/upload-artifact@v7
+        with:
+          name: doxygen-xml
+          path: docs/api_generated/xml/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload Doxygen HTML
+        uses: actions/upload-artifact@v7
+        with:
+          name: doxygen-html
+          path: docs/api_generated/html/
+          retention-days: 30
+          if-no-files-found: error

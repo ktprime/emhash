@@ -5,6 +5,7 @@
 #include <benchmark/benchmark.h>
 
 #include <random>
+#include <string>
 #include <vector>
 
 #include "emhash/hash_table5.hpp"
@@ -200,5 +201,84 @@ BENCHMARK_TEMPLATE(BM_SetFindHit, Set2)->Arg(100000);
 BENCHMARK_TEMPLATE(BM_SetFindHit, Set3)->Arg(100000);
 BENCHMARK_TEMPLATE(BM_SetFindHit, Set4)->Arg(100000);
 BENCHMARK_TEMPLATE(BM_SetFindHit, Set8)->Arg(100000);
+
+// ============================================================================
+// Set FindMiss (gap: previously only FindHit was benchmarked for sets)
+// ============================================================================
+template <typename Set> static void BM_SetFindMiss(benchmark::State& state) {
+    const int n = state.range(0);
+    auto keys = generate_keys(n);
+    Set set;
+    (void)set.reserve(n);
+    for (int i = 0; i < n; i++)
+        set.emplace(keys[i]);
+
+    for (auto _ : state) {
+        for (int i = 0; i < n; i++) {
+            auto it = set.find(~keys[i]);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+}
+
+BENCHMARK_TEMPLATE(BM_SetFindMiss, Set2)->Arg(100000);
+BENCHMARK_TEMPLATE(BM_SetFindMiss, Set3)->Arg(100000);
+BENCHMARK_TEMPLATE(BM_SetFindMiss, Set4)->Arg(100000);
+BENCHMARK_TEMPLATE(BM_SetFindMiss, Set8)->Arg(100000);
+
+// ============================================================================
+// String key benchmarks (key scenario for real-world usage)
+// ============================================================================
+static std::vector<std::string> generate_string_keys(int n) {
+    std::mt19937 rng(42);
+    std::vector<std::string> keys(n);
+    for (int i = 0; i < n; i++)
+        keys[i] = "key_" + std::to_string(rng());
+    return keys;
+}
+
+template <typename Map> static void BM_StringFindHit(benchmark::State& state) {
+    const int n = state.range(0);
+    auto keys = generate_string_keys(n);
+    Map map;
+    (void)map.reserve(n);
+    for (int i = 0; i < n; i++)
+        map.emplace(keys[i], i);
+
+    for (auto _ : state) {
+        for (int i = 0; i < n; i++) {
+            auto it = map.find(keys[i]);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+}
+
+template <typename Map> static void BM_StringFindMiss(benchmark::State& state) {
+    const int n = state.range(0);
+    auto keys = generate_string_keys(n);
+    Map map;
+    (void)map.reserve(n);
+    for (int i = 0; i < n; i++)
+        map.emplace(keys[i], i);
+
+    for (auto _ : state) {
+        for (int i = 0; i < n; i++) {
+            auto it = map.find(keys[i] + "_miss");
+            benchmark::DoNotOptimize(it);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+}
+
+// String key benchmarks for emhash7/8 (primary production versions)
+using SMap7 = emhash7::HashMap<std::string, int>;
+using SMap8 = emhash8::HashMap<std::string, int>;
+
+BENCHMARK_TEMPLATE(BM_StringFindHit, SMap7)->Arg(100000);
+BENCHMARK_TEMPLATE(BM_StringFindHit, SMap8)->Arg(100000);
+BENCHMARK_TEMPLATE(BM_StringFindMiss, SMap7)->Arg(100000);
+BENCHMARK_TEMPLATE(BM_StringFindMiss, SMap8)->Arg(100000);
 
 BENCHMARK_MAIN();

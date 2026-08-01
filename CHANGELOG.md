@@ -25,18 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/mkdocs.yml` — MkDocs Material configuration for documentation site
 - Doxygen class-level documentation for `hash_table7.hpp` and `hash_table8.hpp`
 - Cross-links from README to new docs/adr/ and PERFORMANCE_TRACKING.md
-- `.github/workflows/deploy-docs.yml` — GitHub Pages auto-deploy for MkDocs documentation site
 - `docs/faq.md` — Frequently asked questions
 - `docs/migration_guide.md` — Migration guide from std::unordered_map
 - `scripts/pre-commit.sh` — Git pre-commit hook for clang-format checking
 - `docs/examples/CMakeLists.txt` — CMake build for all examples + quick_bench
-- Method-level Doxygen for hash_table8.hpp core API (contains, try_get, try_set, insert_unique, set_get, erase)
+- Method-level Doxygen for `hash_table8.hpp` core API (contains, try_get, try_set, insert_unique, set_get, erase)
 - `THIRDPARTY_LICENSES.md` — aggregated license summary for all `thirdparty/` dependencies
-- `docs/OPTIMIZATION_RECOMMENDATIONS.md` — engineering optimization roadmap (P0/P1/P2 with risk/ROI)
 - `tests/common/` — shared test infrastructure (doctest.h, hashers.hpp, maps.hpp, msan_unpoison.hpp, trackers.hpp, utilities.hpp)
 - MSan unpoison header (`tests/common/msan_unpoison.hpp`) injected via `-include` to suppress false positives from uninstrumented libc++ `std::cout`/`std::cerr`
 - `.github/msan-suppressions.txt` — explicit MSan suppression list
-- CI: 80% line coverage gate (lcov + bc) and 25% benchmark regression gate against `benchmark-baseline` artifact
+- CI: 80% line coverage gate (lcov + bc) and 20% benchmark regression gate against `benchmark-baseline` artifact
 
 ### Changed
 - `dist/` added to `.gitignore` for amalgamated outputs

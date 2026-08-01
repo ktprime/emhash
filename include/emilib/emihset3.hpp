@@ -778,7 +778,9 @@ private:
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl));
 #endif
-#endif // EMH_NO_READ_PREFETCH
+#else
+        (void)ctrl;
+#endif
     }
 
     // Prefetch for write operations (insert/erase)
@@ -789,7 +791,9 @@ private:
 #elif defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(static_cast<const void*>(ctrl), 1, 1);
 #endif
-#endif // EMH_NO_WRITE_PREFETCH
+#else
+        (void)ctrl;
+#endif
     }
 
     // Legacy function for backward compatibility

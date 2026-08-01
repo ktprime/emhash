@@ -1,0 +1,38 @@
+# Doxygen configuration for emhash API documentation
+# Generates XML (for moxygen/doxybook2) and HTML output.
+
+PROJECT_NAME           = "emhash"
+PROJECT_NUMBER         = $(EMHASH_VERSION)
+PROJECT_BRIEF          = "Fast and efficient hash map/set C++ template library"
+
+INPUT                  = include/
+RECURSIVE              = YES
+FILE_PATTERNS          = *.hpp *.h
+EXCLUDE_PATTERNS       = */sse2neon.h
+
+# Extract everything (including private)
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+
+# Output
+GENERATE_XML           = YES
+XML_OUTPUT             = docs/api_generated/xml
+GENERATE_HTML          = YES
+HTML_OUTPUT            = docs/api_generated/html
+GENERATE_LATEX         = NO
+
+# Don't generate diagrams (requires graphviz)
+HAVE_DOT               = NO
+
+# C++ specific
+OPTIMIZE_OUTPUT_FOR_C  = NO
+BUILTIN_STL_SUPPORT    = YES
+CPP_CLI_SUPPORT        = NO
+
+# Suppress warnings for undocumented members
+WARN_IF_UNDOCUMENTED   = NO
+WARN_NO_PARAMDOC       = NO
+
+# Quiet mode
+QUIET                  = YES

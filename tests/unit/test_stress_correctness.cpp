@@ -734,7 +734,7 @@ TEST_CASE_TEMPLATE("random string key insert/erase stress", Map, AllStringMaps) 
 TEST_CASE_TEMPLATE("reserve then fill to boundary", Map, AllIntMaps) {
     Map m;
     m.reserve(1000);
-    auto bc = m.bucket_count();
+    auto bc = static_cast<size_t>(m.bucket_count());
     // Fill exactly to capacity
     for (size_t i = 0; i < bc; i++)
         m[static_cast<int>(i)] = static_cast<int>(i);

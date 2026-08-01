@@ -26,7 +26,15 @@ nav:
   - Performance Tracking: performance_tracking.md
   - Test Analysis: test_analysis.md
   - Examples: examples/README.md
-  - Architecture Decisions: adr/README.md
+  - Architecture Decisions:
+      - Overview: adr/README.md
+      - ADR-001: C++17 Compatibility: adr/001-cpp17-compatibility.md
+      - ADR-002: SIMD Detection: adr/002-simd-detection.md
+      - ADR-003: Single Header Include: adr/003-single-header-include.md
+      - ADR-004: Open Addressing: adr/004-open-addressing.md
+      - ADR-005: Disable Prefetch: adr/005-disable-prefetch-by-default.md
+      - ADR-006: Bitmask Front Layout: adr/006-bitmask-front-layout-emhash6-7.md
+      - ADR-007: Swiss Table Experiment: adr/007-emihmap4-swiss-table-experiment.md
 
 markdown_extensions:
   - tables

@@ -24,6 +24,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
+// Main emihmap3 implementation with sandwich layout: states are contiguous at
+// the front of a single allocation, followed by pairs. This combines the fast
+// FindMiss of the original split-layout (contiguous states → SIMD scans hit no
+// pair data) with the single-malloc/single-free advantage of the flat layout.
+
 #pragma once
 
 #include "emhash/config.hpp"
@@ -34,6 +39,7 @@
 #include <iterator>
 #include <utility>
 #include <cassert>
+#include <new>
 
 #ifdef _WIN32
 #include <intrin.h>
@@ -96,31 +102,32 @@ const static auto simd_empty = _mm_set1_epi8(EEMPTY);
 const static auto simd_delete = _mm_set1_epi8(EDELETE);
 const static auto simd_filled = _mm_set1_epi8(EFILLED);
 
-#define SET1_EPI8 _mm_set1_epi8
-#define SET1_EPI32 _mm_set1_epi32
-#define LOAD_EPI8 _mm_loadu_si128
-#define MOVEMASK_EPI8 _mm_movemask_epi8
-#define CMPEQ_EPI8 _mm_cmpeq_epi8
-#define CMPGT_EPI8 _mm_cmpgt_epi8
+#define EM3_SET1_EPI8 _mm_set1_epi8
+#define EM3_SET1_EPI32 _mm_set1_epi32
+#define EM3_LOAD_EPI8 _mm_load_si128
+#define EM3_MOVEMASK_EPI8 _mm_movemask_epi8
+#define EM3_CMPEQ_EPI8 _mm_cmpeq_epi8
+#define EM3_CMPGT_EPI8 _mm_cmpgt_epi8
 #elif defined(AVX2_EHASH)
 const static auto simd_empty = _mm256_set1_epi8(EEMPTY);
 const static auto simd_delete = _mm256_set1_epi8(EDELETE);
 const static auto simd_filled = _mm256_set1_epi8(EFILLED);
 
-#define SET1_EPI8 _mm256_set1_epi8
-#define LOAD_EPI8 _mm256_loadu_si256
-#define MOVEMASK_EPI8 _mm256_movemask_epi8
-#define CMPEQ_EPI8 _mm256_cmpeq_epi8
-#define CMPGT_EPI8 _mm256_cmpgt_epi8
+#define EM3_SET1_EPI8 _mm256_set1_epi8
+#define EM3_LOAD_EPI8 _mm256_load_si256
+#define EM3_MOVEMASK_EPI8 _mm256_movemask_epi8
+#define EM3_CMPEQ_EPI8 _mm256_cmpeq_epi8
+#define EM3_CMPGT_EPI8 _mm256_cmpgt_epi8
 #elif defined(AVX512_EHASH)
 const static auto simd_empty = _mm512_set1_epi8(EEMPTY);
 const static auto simd_delete = _mm512_set1_epi8(EDELETE);
 const static auto simd_filled = _mm512_set1_epi8(EFILLED);
 
-#define SET1_EPI8 _mm512_set1_epi8
-#define LOAD_EPI8 _mm512_loadu_si512
-#define MOVEMASK_EPI8 _mm512_movemask_epi8 // avx512 error
-#define CMPEQ_EPI8 _mm512_test_epi8_mask
+#define EM3_SET1_EPI8 _mm512_set1_epi8
+#define EM3_LOAD_EPI8 _mm512_load_si512
+#define EM3_MOVEMASK_EPI8 _mm512_movemask_epi8
+#define EM3_CMPEQ_EPI8 _mm512_test_epi8_mask
+#define EM3_CMPGT_EPI8 _mm512_cmpgt_epi8
 #endif
 
 // find filled or empty
@@ -143,6 +150,7 @@ inline static uint32_t CTZ(size_t n) {
 #endif
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
+/// Sandwich layout: contiguous states at the front, pairs after, in a single malloc.
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
 class HashMap {
 private:
@@ -191,6 +199,12 @@ public:
         return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
     }
 
+    // Access helpers: direct array access into contiguous states/pairs
+    EMH_INLINE int8_t& state_at(size_t bucket) noexcept { return _states[bucket]; }
+    EMH_INLINE const int8_t& state_at(size_t bucket) const noexcept { return _states[bucket]; }
+    EMH_INLINE PairT& pair_at(size_t bucket) noexcept { return _pairs[bucket]; }
+    EMH_INLINE const PairT& pair_at(size_t bucket) const noexcept { return _pairs[bucket]; }
+
     class const_iterator;
     class iterator {
     public:
@@ -201,8 +215,7 @@ public:
         using reference = value_type&;
 
         iterator() {}
-        // iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
-        iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) {
+        iterator(htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) {
             _bmask = _from = static_cast<size_t>(-1);
         }
 
@@ -241,7 +254,7 @@ public:
         }
 
         reference operator*() const { return _map->_pairs[_bucket]; }
-        pointer operator->() const { return _map->_pairs + _bucket; }
+        pointer operator->() const { return &_map->_pairs[_bucket]; }
 
         bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
@@ -264,7 +277,7 @@ public:
         }
 
     public:
-        const htype* _map;
+        htype* _map;
         size_t _bmask = 0;
         size_t _bucket;
         size_t _from;
@@ -308,8 +321,8 @@ public:
             return old;
         }
 
-        reference operator*() const { return _map->_pairs[_bucket]; }
-        pointer operator->() const { return _map->_pairs + _bucket; }
+        reference operator*() const { return _map->pair_at(_bucket); }
+        pointer operator->() const { return &_map->pair_at(_bucket); }
 
         bool operator==(const iterator& rhs) const { return _bucket == rhs._bucket; }
         bool operator!=(const iterator& rhs) const { return _bucket != rhs._bucket; }
@@ -381,8 +394,7 @@ public:
     ~HashMap() noexcept {
         clear_data();
         _num_filled = 0;
-        free(_states);
-        free(_pairs);
+        free(_buffer);
     }
 
     void clone(const HashMap& other) {
@@ -399,23 +411,26 @@ public:
         }
 
         if (is_trivially_copyable()) {
-            memcpy(reinterpret_cast<char*>(_pairs), reinterpret_cast<const char*>(other._pairs),
-                   (_num_buckets + 1) * sizeof(_pairs[0]));
+            // Copy the entire buffer: states + sentinel + pairs + sentinel pair
+            const auto sz = buffer_size();
+            memcpy(_buffer, other._buffer, sz);
         } else {
+            // Copy states section (including sentinel)
+            memcpy(_states, other._states, _num_buckets + simd_bytes);
+            // Copy live pairs one by one
             for (auto it = other.cbegin(); it.bucket() != _num_buckets; ++it)
-                new (_pairs + it.bucket()) PairT(*it);
+                new (&pair_at(it.bucket())) PairT(*it);
         }
 
         _num_filled = other._num_filled;
         _max_probe_length = other._max_probe_length;
         _mlf = other._mlf;
-        const auto state_size = (simd_bytes + _num_buckets) * sizeof(_states[0]);
-        memcpy(_states, other._states, state_size);
     }
 
     void swap(HashMap& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
+        std::swap(_buffer, other._buffer);
         std::swap(_states, other._states);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
@@ -463,7 +478,9 @@ public:
 
     // ------------------------------------------------------------
 
-    template <typename K = KeyT> EMH_INLINE iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
+    template <typename K = KeyT> EMH_INLINE iterator find(const K& key) noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
     template <typename K = KeyT> EMH_INLINE const_iterator find(const K& key) const noexcept {
         return {this, find_filled_bucket(key)};
@@ -481,24 +498,24 @@ public:
         const auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
             throw std::out_of_range("emilib3::HashMap::at(): key not found");
-        return _pairs[bucket].second;
+        return pair_at(bucket).second;
     }
 
     template <typename K = KeyT> const ValueT& at(const K& key) const {
         const auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
             throw std::out_of_range("emilib3::HashMap::at(): key not found");
-        return _pairs[bucket].second;
+        return pair_at(bucket).second;
     }
 
     template <typename K = KeyT> ValueT* try_get(const K& key) noexcept {
         auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
+        return bucket == _num_buckets ? nullptr : &pair_at(bucket).second;
     }
 
     template <typename K = KeyT> const ValueT* try_get(const K& key) const noexcept {
         auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? nullptr : &_pairs[bucket].second;
+        return bucket == _num_buckets ? nullptr : &pair_at(bucket).second;
     }
 
     /// set value if key exists
@@ -507,7 +524,7 @@ public:
         const auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
             return false;
-        _pairs[bucket].second = val;
+        pair_at(bucket).second = val;
         return true;
     }
 
@@ -517,7 +534,7 @@ public:
         const auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
             return false;
-        _pairs[bucket].second = std::move(val);
+        pair_at(bucket).second = std::move(val);
         return true;
     }
 
@@ -564,7 +581,7 @@ public:
         const auto bucket = find_or_allocate(key, bempty);
 
         if (bempty) {
-            new (_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val));
+            new (&pair_at(bucket)) PairT(std::forward<K>(key), std::forward<V>(val));
             _num_filled++;
         }
         return {{this, bucket}, bempty};
@@ -574,7 +591,7 @@ public:
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
         if (bempty) {
-            new (_pairs + bucket) PairT(value);
+            new (&pair_at(bucket)) PairT(value);
             _num_filled++;
         }
         return {{this, bucket}, bempty};
@@ -584,7 +601,7 @@ public:
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
         if (bempty) {
-            new (_pairs + bucket) PairT(std::move(value));
+            new (&pair_at(bucket)) PairT(std::move(value));
             _num_filled++;
         }
         return {{this, bucket}, bempty};
@@ -633,11 +650,11 @@ public:
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_write(reinterpret_cast<char*>(&_pairs[main_bucket]));
+        prefetch_write(reinterpret_cast<char*>(&pair_at(main_bucket)));
         const auto bucket = find_empty_slot(main_bucket, 0);
 
         set_states(bucket, key_h2);
-        new (_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val));
+        new (&pair_at(bucket)) PairT(std::forward<K>(key), std::forward<V>(val));
         _num_filled++;
         return bucket;
     }
@@ -648,7 +665,7 @@ public:
         const auto bucket = find_empty_slot(main_bucket, 0);
 
         set_states(bucket, key_h2);
-        new (_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val));
+        new (&pair_at(bucket)) PairT(std::forward<K>(key), std::forward<V>(val));
         _num_filled++;
         return bucket;
     }
@@ -667,10 +684,10 @@ public:
 
         // Check if inserting a new val rather than overwriting an old entry
         if (bempty) {
-            new (_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val));
+            new (&pair_at(bucket)) PairT(std::forward<K>(key), std::forward<V>(val));
             _num_filled++;
         } else {
-            _pairs[bucket].second = std::forward<V>(val);
+            pair_at(bucket).second = std::forward<V>(val);
         }
 
         return {{this, bucket}, bempty};
@@ -681,10 +698,10 @@ public:
         const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bempty) {
-            new (_pairs + bucket) PairT(key, val);
+            new (&pair_at(bucket)) PairT(key, val);
             _num_filled++;
         } else {
-            oldv = _pairs[bucket].second;
+            oldv = pair_at(bucket).second;
         }
         return bempty;
     }
@@ -694,22 +711,22 @@ public:
         const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */
         if (bempty) {
-            new (_pairs + bucket) PairT(key, std::move(ValueT()));
+            new (&pair_at(bucket)) PairT(key, std::move(ValueT()));
             _num_filled++;
         }
 
-        return _pairs[bucket].second;
+        return pair_at(bucket).second;
     }
 
     ValueT& operator[](KeyT&& key) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         if (bempty) {
-            new (_pairs + bucket) PairT(std::move(key), std::move(ValueT()));
+            new (&pair_at(bucket)) PairT(std::move(key), std::move(ValueT()));
             _num_filled++;
         }
 
-        return _pairs[bucket].second;
+        return pair_at(bucket).second;
     }
 
     // -------------------------------------------------------
@@ -732,12 +749,12 @@ public:
     void _erase(size_t bucket) noexcept {
         _num_filled -= 1;
         if (need_explicit_dtor())
-            _pairs[bucket].~PairT();
+            pair_at(bucket).~PairT();
 #if 1
         const auto gbucket = bucket / simd_bytes * simd_bytes;
-        _states[bucket] = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
+        state_at(bucket) = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
 #else
-        _states[bucket] = State::EDELETE;
+        state_at(bucket) = State::EDELETE;
         if (EMH_UNLIKELY(_num_filled == 0))
             clear_meta();
 #endif
@@ -780,9 +797,8 @@ public:
     }
 
     void clear_meta() noexcept {
-        std::fill_n(_states, _num_buckets, State::EEMPTY);
-        // set filled tombstone
-        std::fill_n(_states + _num_buckets, simd_bytes, State::SENTINEL);
+        memset(_states, State::EEMPTY, _num_buckets);
+        memset(_states + _num_buckets, State::SENTINEL, simd_bytes);
         _num_filled = 0;
         _max_probe_length = 0;
     }
@@ -791,7 +807,7 @@ public:
         if (need_explicit_dtor() && _num_filled) {
             for (auto it = begin(); _num_filled; ++it) {
                 const auto bucket = it.bucket();
-                _pairs[bucket].~PairT();
+                pair_at(bucket).~PairT();
                 _num_filled -= 1;
             }
         }
@@ -829,16 +845,20 @@ public:
         assert(buckets <= max_size() && buckets > _num_filled);
 
         const auto num_buckets = static_cast<size_t>(buckets);
-        const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
-        const auto state_size = (simd_bytes + num_buckets) * sizeof(State);
+        // States: num_buckets bytes + simd_bytes sentinel bytes, rounded up to 64B boundary
+        const auto states_alloc = ((static_cast<size_t>(num_buckets) + simd_bytes + 63) / 64) * 64;
+        const auto pairs_size = (static_cast<size_t>(num_buckets) + 1) * sizeof(PairT);
+        const auto total_size = states_alloc + pairs_size;
 
-        auto* new_state = static_cast<decltype(_states)>(malloc(state_size));
-        auto* new_pairs = static_cast<decltype(_pairs)>(malloc(pairs_size));
+        auto* new_buffer = static_cast<char*>(malloc(total_size));
+        auto* new_states = reinterpret_cast<int8_t*>(new_buffer);
+        auto* new_pairs = reinterpret_cast<PairT*>(new_buffer + states_alloc);
 
         auto old_num_filled = _num_filled;
+        auto old_buffer = _buffer;
         auto old_states = _states;
         auto old_pairs = _pairs;
-        auto old_buckets = _num_buckets;
+        auto old_num_buckets = _num_buckets;
 #if EMH_STATIS
         auto max_probe_length = _max_probe_length;
 #endif
@@ -846,29 +866,31 @@ public:
         _num_filled = 0;
         _num_buckets = num_buckets;
         _mask = num_buckets - 1;
-        _states = new_state;
+        _buffer = new_buffer;
+        _states = new_states;
         _pairs = new_pairs;
 
-        // fill last packet zero (tail sentinel for SIMD scan termination)
-        // Only the _states ESENTINEL marker is needed; key/value of the sentinel
-        // are never accessed, so no placement-new is required for non-trivial types.
+        // Initialize states to EEMPTY and set sentinel group
+        memset(_states, State::EEMPTY, num_buckets);
+        memset(_states + num_buckets, State::SENTINEL, simd_bytes);
+
+        // Zero-initialize sentinel pair for trivially copyable types
         if (is_trivially_copyable())
-            memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(_pairs[0]));
-        clear_meta();
+            memset(reinterpret_cast<char*>(&_pairs[num_buckets]), 0, sizeof(PairT));
 
 #if EMH_STATIS
         auto collision = 0;
 #endif
 
-        for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
-            if (old_states[src_bucket] >= State::EFILLED) {
+        for (size_t src_bucket = old_num_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
+            if (old_states && old_states[src_bucket] >= State::EFILLED) {
                 auto& src_pair = old_pairs[src_bucket];
                 size_t main_bucket;
                 const auto key_h2 = hash_key2(main_bucket, src_pair.first);
                 const auto bucket = find_empty_slot(main_bucket, 0);
 
                 set_states(bucket, key_h2);
-                new (_pairs + bucket) PairT(std::move(src_pair));
+                new (&pair_at(bucket)) PairT(std::move(src_pair));
                 _num_filled++;
                 if (need_explicit_dtor())
                     src_pair.~PairT();
@@ -881,17 +903,23 @@ public:
                    max_probe_length, _max_probe_length, collision, collision * 100.0f / _num_buckets);
 #endif
 
-        free(old_states);
-        free(old_pairs);
+        free(old_buffer);
     }
 
 private:
+    // Compute total buffer size for the current _num_buckets (used by clone)
+    size_t buffer_size() const {
+        const auto states_alloc = ((static_cast<size_t>(_num_buckets) + simd_bytes + 63) / 64) * 64;
+        const auto pairs_size = (static_cast<size_t>(_num_buckets) + 1) * sizeof(PairT);
+        return states_alloc + pairs_size;
+    }
+
     // Can we fit another element?
     void check_expand_need() { reserve(_num_filled); }
 
     // Prefetch for read operations (find)
     static void prefetch_read(char* ctrl) {
-#ifndef EMH_NO_READ_PREFETCH
+#if !defined(EMH_NO_READ_PREFETCH) && (defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__))
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
@@ -904,7 +932,7 @@ private:
 
     // Prefetch for write operations (insert/erase)
     static void prefetch_write(char* ctrl) {
-#ifndef EMH_NO_WRITE_PREFETCH
+#if !defined(EMH_NO_WRITE_PREFETCH) && (defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__))
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
@@ -915,24 +943,9 @@ private:
 #endif
     }
 
-    // Legacy function for backward compatibility
-    static void prefetch_heap_block(char* ctrl) {
-#ifndef EMH_NO_PREFETCH
-#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-        _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
-#elif defined(_MSC_VER)
-        _mm_prefetch(reinterpret_cast<const char*>(ctrl));
-#elif defined(__GNUC__) || defined(__clang__)
-        __builtin_prefetch(static_cast<const void*>(ctrl));
-#endif
-#else
-        (void)ctrl;
-#endif
-    }
+    inline int8_t group_mask(size_t gbucket) const noexcept { return state_at(gbucket + simd_bytes - 1); }
 
-    inline int8_t group_mask(size_t gbucket) const noexcept { return _states[gbucket + simd_bytes - 1]; }
-
-    void set_states(size_t ebucket, int8_t key_h2) noexcept { _states[ebucket] = key_h2; }
+    void set_states(size_t ebucket, int8_t key_h2) noexcept { state_at(ebucket) = key_h2; }
 
     inline void set_offset(size_t offset) noexcept { _max_probe_length = offset; }
 
@@ -945,22 +958,23 @@ private:
         size_t main_bucket;
         size_t offset = 0;
         const auto key_h2 = hash_key2(main_bucket, key);
-        const auto filled = SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
+        const auto filled = EM3_SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
         auto next_bucket = main_bucket;
 
         do {
-            const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
-            auto maskf = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
+            const auto vec = EM3_LOAD_EPI8(reinterpret_cast<const decltype(&simd_empty)>(&_states[next_bucket]));
+            auto maskf = static_cast<size_t>(EM3_MOVEMASK_EPI8(EM3_CMPEQ_EPI8(vec, filled)));
             if (maskf) {
                 prefetch_read(reinterpret_cast<char*>(&_pairs[next_bucket]));
                 do {
-                    const auto fbucket = next_bucket + CTZ(maskf);
+                    const auto slot = CTZ(maskf);
+                    const auto fbucket = next_bucket + slot;
                     if (EMH_LIKELY(_eq(_pairs[fbucket].first, key)))
                         return fbucket;
                 } while (maskf &= maskf - 1);
             }
 
-            const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
+            const auto maske = static_cast<size_t>(EM3_MOVEMASK_EPI8(EM3_CMPEQ_EPI8(vec, simd_empty)));
             if (maske)
                 return _num_buckets;
             if (offset >= _max_probe_length)
@@ -980,20 +994,21 @@ private:
 
         size_t main_bucket;
         const auto key_h2 = hash_key2(main_bucket, key);
-        prefetch_write(reinterpret_cast<char*>(&_pairs[main_bucket]));
-        const auto filled = SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
+        prefetch_write(reinterpret_cast<char*>(&pair_at(main_bucket)));
+        const auto filled = EM3_SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
         auto next_bucket = main_bucket;
         size_t offset = 0u;
         constexpr size_t chole = static_cast<size_t>(-1);
         size_t hole = chole;
 
         do {
-            const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[next_bucket]));
+            const auto vec = EM3_LOAD_EPI8(reinterpret_cast<const decltype(&simd_empty)>(&_states[next_bucket]));
 #if 1
-            auto maskf = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled)));
+            auto maskf = static_cast<size_t>(EM3_MOVEMASK_EPI8(EM3_CMPEQ_EPI8(vec, filled)));
             // 1. find filled
             while (maskf != 0) {
-                const auto fbucket = next_bucket + CTZ(maskf);
+                const auto slot = CTZ(maskf);
+                const auto fbucket = next_bucket + slot;
                 if (_eq(_pairs[fbucket].first, key)) {
                     bnew = false;
                     return fbucket;
@@ -1004,13 +1019,14 @@ private:
 
             if (hole == chole) {
                 // 2. find the first empty-or-deleted slot
-                const auto maskhole = static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)));
+                const auto maskhole = static_cast<size_t>(EM3_MOVEMASK_EPI8(EM3_CMPGT_EPI8(simd_filled, vec)));
                 if (maskhole) {
                     // if the group contains an empty slot we can stop here,
                     // otherwise remember the first tombstone and keep probing
-                    const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
+                    const auto maske = static_cast<size_t>(EM3_MOVEMASK_EPI8(EM3_CMPEQ_EPI8(vec, simd_empty)));
                     if (maske) {
-                        const auto hbucket = next_bucket + CTZ(maskhole);
+                        const auto hslot = CTZ(maskhole);
+                        const auto hbucket = next_bucket + hslot;
                         set_states(hbucket, key_h2);
                         return hbucket;
                     }
@@ -1029,28 +1045,28 @@ private:
         }
 
         const auto ebucket = find_empty_slot(next_bucket, offset);
-        // prefetch_heap_block((char*)&_pairs[ebucket]);
         set_states(ebucket, key_h2);
 
         return ebucket;
     }
 
     inline size_t empty_delete(size_t gbucket) const noexcept {
-        const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[gbucket]));
-        return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(simd_filled, vec)));
+        const auto vec = EM3_LOAD_EPI8(reinterpret_cast<const decltype(&simd_empty)>(&_states[gbucket]));
+        return static_cast<size_t>(EM3_MOVEMASK_EPI8(EM3_CMPGT_EPI8(simd_filled, vec)));
     }
 
     inline size_t filled_mask(size_t gbucket) const noexcept {
-        const auto vec = LOAD_EPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[gbucket]));
-        return static_cast<size_t>(MOVEMASK_EPI8(CMPGT_EPI8(vec, simd_delete)));
+        const auto vec = EM3_LOAD_EPI8(reinterpret_cast<const decltype(&simd_empty)>(&_states[gbucket]));
+        return static_cast<size_t>(EM3_MOVEMASK_EPI8(EM3_CMPGT_EPI8(vec, simd_delete)));
     }
 
     size_t find_empty_slot(size_t next_bucket, size_t offset) noexcept {
         do {
             const auto maske = empty_delete(next_bucket);
             if (maske) {
-                const auto ebucket = CTZ(maske) + next_bucket;
-                prefetch_write(reinterpret_cast<char*>(&_pairs[ebucket]));
+                const auto slot = CTZ(maske);
+                const auto ebucket = next_bucket + slot;
+                prefetch_write(reinterpret_cast<char*>(&pair_at(ebucket)));
                 if (offset > _max_probe_length)
                     set_offset(offset);
                 return ebucket;
@@ -1077,8 +1093,9 @@ private:
 private:
     HashT _hasher;
     EqT _eq;
-    int8_t* EMH_RESTRICT _states = nullptr;
-    PairT* EMH_RESTRICT _pairs = nullptr;
+    char* _buffer = nullptr;                // single allocation base
+    int8_t* EMH_RESTRICT _states = nullptr; // points to _buffer (states at front)
+    PairT* EMH_RESTRICT _pairs = nullptr;   // points after states in _buffer
     size_t _num_buckets = 0;
     size_t _mask = 0;
     size_t _num_filled = 0;
@@ -1087,5 +1104,3 @@ private:
 };
 
 } // namespace emilib3
-
-#undef EMH_RESTRICT

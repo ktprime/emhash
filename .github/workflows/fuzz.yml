@@ -1,0 +1,63 @@
+name: Fuzz
+
+# Non-blocking scheduled fuzz testing using libFuzzer.
+# Runs weekly to catch edge-case inputs that unit tests miss.
+# Can also be triggered manually on PRs for targeted fuzzing.
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'  # Sunday 04:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    name: Fuzz / Clang / libFuzzer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: Build fuzz targets
+        run: |
+          cd tests
+          FLAGS="-std=c++17 -O1 -fsanitize=fuzzer,address -fno-omit-frame-pointer -I../include -I. -Icommon"
+          for target in fuzz_emhash_all fuzz_emilib_all fuzz_extreme; do
+            if [ -f "fuzz/${target}.cpp" ]; then
+              echo "=== Building ${target} ==="
+              clang++ $FLAGS fuzz/${target}.cpp -o ${target}
+            fi
+          done
+
+      - name: Run fuzz targets
+        run: |
+          cd tests
+          # Run each target for 120 seconds; -max_len limits input size
+          # to keep runtime bounded. Crashes (if any) are saved to
+          # crash-<target> artifacts.
+          for target in fuzz_emhash_all fuzz_emilib_all fuzz_extreme; do
+            if [ -f "./${target}" ]; then
+              echo "=== Fuzzing ${target} (120s) ==="
+              timeout 130 ./${target} -max_total_time=120 -max_len=256 2>&1 | tail -20 || true
+            fi
+          done
+
+      - name: Upload crash artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-crash-artifacts
+          path: |
+            tests/crash-*
+            tests/artifacts/
+          retention-days: 30
+          if-no-files-found: ignore

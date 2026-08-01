@@ -138,7 +138,7 @@ endif
 #	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) comprehensive_bench.cpp -o cbench
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
-	$(CXX) $(CXXFLAGS) -fno-rtti ebench.cpp -o ebench
+	$(CXX) $(CXXFLAGS) -fno-rtti -fpermissive ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) -fno-rtti sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) -fno-rtti hash_join.cpp -o join_hash
 	$(CXX) $(CXXFLAGS) -fno-rtti buint64.cpp -o bi

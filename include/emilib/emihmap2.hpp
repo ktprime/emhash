@@ -136,7 +136,6 @@ inline static uint32_t CTZ(size_t n) {
 #else
     auto index = __builtin_ctzl((unsigned long)n);
 #endif
-
     return static_cast<uint32_t>(index);
 }
 #endif
@@ -459,7 +458,9 @@ public:
 
     // ------------------------------------------------------------
 
-    template <typename K = KeyT> EMH_INLINE iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
+    template <typename K = KeyT> EMH_INLINE iterator find(const K& key) noexcept {
+        return {this, find_filled_bucket(key)};
+    }
 
     template <typename K = KeyT> EMH_INLINE const_iterator find(const K& key) const noexcept {
         return {this, find_filled_bucket(key)};
@@ -550,9 +551,6 @@ public:
 
     // -----------------------------------------------------
 
-    /// Returns a pair consisting of an iterator to the inserted element
-    /// (or to the element that prevented the insertion)
-    /// and a bool denoting whether the insertion took place.
     template <typename K, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
@@ -599,12 +597,10 @@ public:
     }
 
     template <class... Args> std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) noexcept {
-        // check_expand_need();
         return do_insert(key, std::forward<Args>(args)...);
     }
 
     template <class... Args> std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) noexcept {
-        // check_expand_need();
         return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
@@ -653,7 +649,6 @@ public:
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
 
-        // Check if inserting a new val rather than overwriting an old entry
         if (bempty) {
             new (_pairs + bucket) PairT(std::forward<K>(key), std::forward<V>(val));
             _num_filled++;
@@ -665,8 +660,6 @@ public:
     }
 
     bool set_get(const KeyT& key, const ValueT& val, ValueT& oldv) noexcept {
-        // check_expand_need();
-
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */
@@ -682,7 +675,6 @@ public:
     ValueT& operator[](const KeyT& key) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
-        /* Check if inserting a new value rather than overwriting an old entry */
         if (bempty) {
             new (_pairs + bucket) PairT(key, std::move(ValueT()));
             _num_filled++;
@@ -767,19 +759,11 @@ public:
     }
 
     static constexpr bool need_explicit_dtor() {
-#if __cplusplus >= 201402L || _MSC_VER > 1600
         return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
-#else
-        return !(std::is_trivially_destructible<KeyT>::value && std::is_trivially_destructible<ValueT>::value);
-#endif
     }
 
     static constexpr bool is_trivially_copyable() {
-#if __cplusplus >= 201402L || _MSC_VER > 1600
         return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
-#else
-        return (std::is_trivially_copyable<KeyT>::value && std::is_trivially_copyable<ValueT>::value);
-#endif
     }
 
     void clear_meta() noexcept {
@@ -798,7 +782,6 @@ public:
         }
     }
 
-    /// Remove all elements, keeping full capacity.
     void clear() noexcept {
         if (_num_filled) {
             clear_data();
