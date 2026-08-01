@@ -80,7 +80,7 @@ For emilib implementations, use `EMH_SAFE_PSL=1` to limit probe sequence length.
 
 1. **Open addressing** — single contiguous array, better cache locality
 2. **No per-element heap allocation** — `std::unordered_map` allocates a node per element
-3. **No tombstones** (emhash7) — no performance degradation from frequent erase
+3. **No tombstones** (all emhash versions) — no performance degradation from frequent erase
 4. **Smart collision resolution** — hybrid probing strategies
 
 ### Why is emhash8 iteration so fast?

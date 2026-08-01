@@ -6,8 +6,10 @@
 |---------|----------|----------------|
 | **emhash5** | Three-way hybrid: linear probing → quadratic probing → bidirectional search | With `EMH_HIGH_LOAD` |
 | **emhash6** | Linked-bucket with separate bitmask for fast empty-bucket search | Native (0.80-0.999 via `max_load_factor()`) |
-| **emhash7** | Linked-bucket with separate bitmask, no tombstones | Native (0.80-0.999) |
+| **emhash7** | Linked-bucket with separate bitmask, chain repair on erase | Native (0.80-0.999) |
 | **emhash8** | Separate index + dense pairs array, linked-bucket chains | With `EMH_HIGH_LOAD` |
+
+> All emhash versions (5/6/7/8) avoid tombstones — they repair the bucket chain or shift elements on erase. Only emilib variants use EDELETE tombstones (with optional backward deletion to clean them up).
 
 > In `emhash/hash_table5.hpp`, the three-way hybrid probing strategy maintains good performance even at load factors **> 0.9** by combining short-range linear probing, medium-range quadratic probing, and long-range bidirectional search.
 
@@ -55,7 +57,7 @@ emhash provides 4 different implementations, each with different focus:
 |----------------|--------|--------------------|------------|---------------|
 | **emhash5** | Inline `_pairs[]` | Three-way hybrid probing | 0.80 | Fast lookup/erase with integer keys, SBO support |
 | **emhash6** | Inline `_pairs[]` + `_bitmask` | Linked-bucket | 0.80 | Lookup/erase with integer keys, fast empty scan |
-| **emhash7** | Inline `_pairs[]` + `_bitmask` | Linked-bucket, no tombstones | 0.80 | High load factor (0.80-0.999), insert-intensive |
+| **emhash7** | Inline `_pairs[]` + `_bitmask` | Linked-bucket, chain repair | 0.80 | High load factor (0.80-0.999), insert-intensive |
 | **emhash8** | Separate `_index[]` + dense `_pairs[]` | Linked-bucket | 0.80 | Complex keys/values, extremely fast iteration |
 
 ### Selection Guide

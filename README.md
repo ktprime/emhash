@@ -181,7 +181,7 @@ Consider emilib2 (Swiss Table) if:
 |---------|----------|---------------|------------|
 | **emhash5** | Small tables, memory-constrained | Small-size optimization (`EMH_SMALL_SIZE`), 3-way hybrid probing | Slower than emhash6 at high load factor |
 | **emhash6** | Find/erase-heavy, integer keys | Bitmask-accelerated empty-slot search, fastest find/erase | Extra memory for bitmask array |
-| **emhash7** | General purpose, mixed workloads | No tombstones (chain repair on erase), stable at 0.9+ LF | Erase slightly slower than emhash5/6 |
+| **emhash7** | General purpose, mixed workloads | Chain repair on erase (no tombstones), stable at 0.9+ LF | Erase slightly slower than emhash5/6 |
 | **emhash8** | Iteration-heavy, large KV types | Split-index + dense pairs, sequential iteration, fast copy/move | Extra memory for separate index array |
 | **emilib2/3** | Read-heavy at scale (GCC) | SIMD group probing (16 buckets/cycle), excellent iteration | Tombstone accumulation under mixed workloads; insert slower on Clang; **emilib2ss may hang under extreme hash collision attack** — use emilib2o or emilib2s |
 | **emilib4** | Experimental Swiss-table variant | Fast insert on Clang, dense iteration | Tombstone accumulation (no backward shift); no `try_set`/`set_get`/`_erase`; fixed LF 0.875 |
@@ -200,7 +200,7 @@ Consider emilib2 (Swiss Table) if:
 | `shrink_to_fit` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Custom allocator | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | SIMD acceleration | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| No tombstones | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| No tombstones | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Dense pairs iteration | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
 
 See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
