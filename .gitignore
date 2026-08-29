@@ -18,16 +18,19 @@
 # Build directories
 build/
 build_asan/
+build_bm/
 build_ci/
 build_ci_check/
 build_ci_wsl/
 build_msan/
 build_test/
 build_tests/
+build_v/
 build_verify/
 vsbuild/
 bench/bin/
 .cache/
+build_log.txt
 
 # CMake generated files (any location)
 CMakeCache.txt
@@ -70,6 +73,7 @@ tests/vsbuild/
 tests/cov_build/
 tests/coverage_html/
 tests/debug/
+tests/Testing/
 tests/coverage.info
 tests/cov_*.txt
 tests/cov_run_log.txt
@@ -77,6 +81,8 @@ tests/CMakeFiles/
 tests/.cache/
 tests/compile_commands.json
 tests/Makefile
+# Benchmark result data (local runs)
+bench/results_*/
 # Fuzz test binaries and crash files (source .cpp files are tracked)
 tests/fuzz/bin/
 tests/fuzz/reproduce_bug
