@@ -20,8 +20,8 @@ int main() {
     printf("   inserted key=3, size=%zu\n", m.size());
 
     printf("3. Checking contains...\n");
-    printf("   contains(1)=%d contains(2)=%d contains(3)=%d contains(4)=%d\n",
-           m.contains(1), m.contains(2), m.contains(3), m.contains(4));
+    printf("   contains(1)=%d contains(2)=%d contains(3)=%d contains(4)=%d\n", m.contains(1), m.contains(2),
+           m.contains(3), m.contains(4));
 
     printf("4. Checking values...\n");
     printf("   m[1]=%lld m[2]=%lld m[3]=%lld\n", (long long)m[1], (long long)m[2], (long long)m[3]);
@@ -44,18 +44,21 @@ int main() {
 
     printf("8. Large insert (10000)...\n");
     Map m2;
-    for (int i = 0; i < 10000; i++) m2[i] = i * 10;
+    for (int i = 0; i < 10000; i++)
+        m2[i] = i * 10;
     printf("   size=%zu\n", m2.size());
 
     printf("9. Large find...\n");
     int found = 0;
     for (int i = 0; i < 10000; i++) {
-        if (m2.find(i) != m2.end()) found++;
+        if (m2.find(i) != m2.end())
+            found++;
     }
     printf("   found %d/10000\n", found);
 
     printf("10. Large erase...\n");
-    for (int i = 0; i < 10000; i++) m2.erase(i);
+    for (int i = 0; i < 10000; i++)
+        m2.erase(i);
     printf("   size=%zu empty=%d\n", m2.size(), m2.empty());
 
     printf("\nAll tests passed!\n");

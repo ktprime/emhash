@@ -16,24 +16,26 @@ volatile size_t g_sink = 0;
 
 // ─── emihmap4_opt find benchmark ─────────────────────────────────────
 
-__attribute__((noinline))
-size_t bench_emihmap4_find(emilib4_opt::HashMap<uint64_t, uint64_t>& m, const std::vector<uint64_t>& keys) {
+__attribute__((noinline)) size_t bench_emihmap4_find(emilib4_opt::HashMap<uint64_t, uint64_t>& m,
+                                                     const std::vector<uint64_t>& keys) {
     size_t sum = 0;
     for (auto& k : keys) {
         auto it = m.find(k);
-        if (it != m.end()) sum += it->second;
+        if (it != m.end())
+            sum += it->second;
     }
     return sum;
 }
 
 // ─── boost find benchmark ────────────────────────────────────────────
 
-__attribute__((noinline))
-size_t bench_boost_find(boost::unordered_flat_map<uint64_t, uint64_t>& m, const std::vector<uint64_t>& keys) {
+__attribute__((noinline)) size_t bench_boost_find(boost::unordered_flat_map<uint64_t, uint64_t>& m,
+                                                  const std::vector<uint64_t>& keys) {
     size_t sum = 0;
     for (auto& k : keys) {
         auto it = m.find(k);
-        if (it != m.end()) sum += it->second;
+        if (it != m.end())
+            sum += it->second;
     }
     return sum;
 }
@@ -42,13 +44,17 @@ int main() {
     // Setup
     const int N = 100000;
     std::vector<uint64_t> keys(N);
-    for (int i = 0; i < N; i++) keys[i] = i + 1;
+    for (int i = 0; i < N; i++)
+        keys[i] = i + 1;
 
     emilib4_opt::HashMap<uint64_t, uint64_t> em;
     boost::unordered_flat_map<uint64_t, uint64_t> bm;
     em.reserve(N);
     bm.reserve(N);
-    for (auto& k : keys) { em[k] = k; bm[k] = k; }
+    for (auto& k : keys) {
+        em[k] = k;
+        bm[k] = k;
+    }
 
     // Run
     g_sink = bench_emihmap4_find(em, keys);

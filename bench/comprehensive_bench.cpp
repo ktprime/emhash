@@ -281,7 +281,7 @@ static TestResult test_find_hit_100(const std::vector<int>& keys) {
 
     for (int iter = 0; iter < g_config.benchmark_iterations; ++iter) {
         ScopedTimer timer;
-        volatile size_t count = 0;
+        size_t count = 0;
         for (size_t i = 0; i < num_finds; ++i) {
             if (hmap.find(keys[i % n]) != hmap.end()) {
                 count++;
@@ -332,7 +332,7 @@ static TestResult test_find_hit_50(const std::vector<int>& keys) {
 
     for (int iter = 0; iter < g_config.benchmark_iterations; ++iter) {
         ScopedTimer timer;
-        volatile size_t count = 0;
+        size_t count = 0;
         for (size_t i = 0; i < num_finds; ++i) {
             if (hmap.find(find_keys[i]) != hmap.end()) {
                 count++;
@@ -379,13 +379,14 @@ static TestResult test_find_hit_0(const std::vector<int>& keys) {
 
     for (int iter = 0; iter < g_config.benchmark_iterations; ++iter) {
         ScopedTimer timer;
-        volatile size_t count = 0;
+        size_t count = 0;
         for (size_t i = 0; i < num_finds; ++i) {
             if (hmap.find(miss_keys[i]) != hmap.end()) {
                 count++;
             }
         }
-        (void)count;
+		if (count ==123)
+			puts("error\n");
         times.push_back(timer.elapsed_ms());
     }
 
@@ -454,13 +455,12 @@ static TestResult test_iterate(const std::vector<int>& keys) {
 
     for (int iter = 0; iter < g_config.benchmark_iterations; ++iter) {
         ScopedTimer timer;
-        volatile size_t sum = 0;
+        size_t sum = 0;
         for (size_t i = 0; i < num_iters; ++i) {
             for (const auto& kv : hmap) {
                 sum += kv.second;
             }
         }
-        (void)sum;
         times.push_back(timer.elapsed_ms());
     }
 
@@ -563,13 +563,14 @@ static TestResult test_mixed_operations(const std::vector<int>& keys) {
         }
 
         // Find phase
-        volatile size_t count = 0;
+        size_t count = 0;
         for (size_t i = 0; i < n * 2; ++i) {
             if (hmap.find(keys[i % n]) != hmap.end()) {
                 count++;
             }
         }
-        (void)count;
+		if (count ==123)
+			puts("error\n");
 
         // Erase phase
         for (size_t i = 0; i < n / 2; ++i) {

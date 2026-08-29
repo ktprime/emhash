@@ -10,7 +10,9 @@ int main() {
 
     printf("1. Small insert...\n");
     Map m;
-    m[1] = 10; m[2] = 20; m[3] = 30;
+    m[1] = 10;
+    m[2] = 20;
+    m[3] = 30;
     printf("   size=%zu cap=%zu\n", m.size(), m.bucket_count());
     printf("   OK\n");
 

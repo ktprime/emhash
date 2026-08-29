@@ -10,18 +10,19 @@
 #include "emilib/emihmap4.hpp"
 #include <boost/unordered/unordered_flat_map.hpp>
 
-template<typename Map>
-double bench_find_hit(const std::vector<int>& keys, size_t iters) {
+template <typename Map> double bench_find_hit(const std::vector<int>& keys, size_t iters) {
     Map m;
     m.reserve(keys.size() * 2);
-    for (auto k : keys) m[k] = k;
+    for (auto k : keys)
+        m[k] = k;
 
     size_t sum = 0;
     auto t0 = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < iters; ++i) {
         for (auto k : keys) {
             auto it = m.find(k);
-            if (it != m.end()) sum += it->second;
+            if (it != m.end())
+                sum += it->second;
         }
     }
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -30,18 +31,20 @@ double bench_find_hit(const std::vector<int>& keys, size_t iters) {
     return ns;
 }
 
-template<typename Map>
+template <typename Map>
 double bench_find_miss(const std::vector<int>& keys, const std::vector<int>& miss_keys, size_t iters) {
     Map m;
     m.reserve(keys.size() * 2);
-    for (auto k : keys) m[k] = k;
+    for (auto k : keys)
+        m[k] = k;
 
     size_t sum = 0;
     auto t0 = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < iters; ++i) {
         for (auto k : miss_keys) {
             auto it = m.find(k);
-            if (it != m.end()) sum += it->second;
+            if (it != m.end())
+                sum += it->second;
         }
     }
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -50,14 +53,14 @@ double bench_find_miss(const std::vector<int>& keys, const std::vector<int>& mis
     return ns;
 }
 
-template<typename Map>
-double bench_insert(const std::vector<int>& keys, size_t iters) {
+template <typename Map> double bench_insert(const std::vector<int>& keys, size_t iters) {
     size_t total = 0;
     auto t0 = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < iters; ++i) {
         Map m;
         m.reserve(keys.size());
-        for (auto k : keys) m[k] = k;
+        for (auto k : keys)
+            m[k] = k;
         total += m.size();
     }
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -71,10 +74,12 @@ int main() {
     const size_t N = 100000;
     std::vector<int> keys(N);
     std::uniform_int_distribution<int> dist(1, 100000000);
-    for (auto& k : keys) k = dist(rng);
+    for (auto& k : keys)
+        k = dist(rng);
 
     std::vector<int> miss_keys(N);
-    for (auto& k : miss_keys) k = dist(rng) + 200000000;
+    for (auto& k : miss_keys)
+        k = dist(rng) + 200000000;
 
     printf("=== emilib4::HashMap find HIT (N=%zu) ===\n", N);
     auto e4_hit = bench_find_hit<emilib4::HashMap<int, int>>(keys, 20);

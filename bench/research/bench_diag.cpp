@@ -15,16 +15,16 @@ int main() {
     for (auto N : {1000, 10000, 100000, 1000000, 10000000}) {
         emilib4::HashMap<KeyInt, ValInt> m4;
         m4.reserve(N);
-        for (int i = 0; i < N; i++) m4[i] = i;
+        for (int i = 0; i < N; i++)
+            m4[i] = i;
 
         boost::unordered_flat_map<KeyInt, ValInt> bm;
         bm.reserve(N);
-        for (int i = 0; i < N; i++) bm[i] = i;
+        for (int i = 0; i < N; i++)
+            bm[i] = i;
 
-        printf("  %8d %12zu %12zu %12.3f %12.3f\n",
-               N, m4.bucket_count(), bm.bucket_count(),
-               (double)m4.size() / m4.bucket_count(),
-               (double)bm.size() / bm.bucket_count());
+        printf("  %8d %12zu %12zu %12.3f %12.3f\n", N, m4.bucket_count(), bm.bucket_count(),
+               (double)m4.size() / m4.bucket_count(), (double)bm.size() / bm.bucket_count());
     }
 
     return 0;

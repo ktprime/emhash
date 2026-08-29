@@ -1295,8 +1295,12 @@ public:
         while (buckets < required_buckets) {
             buckets *= 2;
         }
-        assert(buckets < max_size());
-
+        if (buckets >= max_size() || buckets < static_cast<uint64_t>(_num_filled))
+            return;
+#if EMH_SAVE_MEM
+        if (sizeof(KeyT) < sizeof(size_type) && buckets >= (1ul << (2 * 8)))
+            buckets = 2ul << (sizeof(KeyT) * 8);
+#endif
         auto num_buckets = static_cast<size_type>(buckets);
         auto old_num_filled = _num_filled;
         auto* old_pairs = _pairs;
