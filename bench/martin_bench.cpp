@@ -185,7 +185,7 @@ static float max_lf = 7.0f / 8;
 
 static std::map<std::string_view, std::string_view> show_name = {
     {"emhash7", "emhash7"},
-    //   {"emhash8", "emhash8"},
+    {"emhash8", "emhash8"},
     //   {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
 
@@ -203,7 +203,7 @@ static std::map<std::string_view, std::string_view> show_name = {
 #endif
 
 #if HAVE_INDIVI
-    {"flat_u", "indivi_umap"},
+    //{"flat_u", "indivi_umap"},
     {"flat_w", "indivi_wmap"},
 #endif
 #if CK_HMAP
@@ -396,7 +396,7 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %s\n", map_name);
+    printf("    %20s:\n", map_name);
 
 #if X86_64 || __MAC__
     uint32_t maxn = 1000000;
@@ -427,7 +427,7 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                     else
                         hmap[static_cast<int>(rng())];
 
-                printf("        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
+                printf("\t\t        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
                 fflush(stdout);
 
                 // Record result for CSV/JSON output
@@ -492,7 +492,7 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                 printf(", clear %.3f", now2sec() - ts);
             }
         }
-        printf(" total %dM int time = %.2f s\n", int(maxn / 1000000), now2sec() - nows);
+        printf(" %dM, total %2.2f s\n", int(maxn / 1000000), now2sec() - nows);
         maxn *= 10;
     }
 }
@@ -501,7 +501,7 @@ template <typename HMAP, bool unique = false> static void bench_AccidentallyQuad
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     auto nows = now2sec();
     sfc64 rng(12345);
@@ -531,14 +531,14 @@ template <typename HMAP, bool unique = false> static void bench_AccidentallyQuad
     }
     assert(hmap.size() == map2.size());
 #endif
-    printf(" time %.2f s\n", now2sec() - nows);
+    printf(" time %2.2f s\n", now2sec() - nows);
 }
 
 template <typename HMAP> static void bench_InsertEraseBegin() {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %s", map_name);
+    printf("    %20s:", map_name);
 
     size_t max_n = 100000;
     auto nows = now2sec();
@@ -557,19 +557,19 @@ template <typename HMAP> static void bench_InsertEraseBegin() {
             hmap.emplace((int64_t)rng(), 0);
         }
 
-        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0),
+        printf("\n\t\t        %.2f loadf = %.2f mapsize = %d time %2.2f s", ((double)max_n / 1000000.0),
                hmap.load_factor(), (int)hmap.size(), now2sec() - starts);
         max_n *= 5;
     }
 
-    printf(" total (%.2f s)\n", now2sec() - nows);
+    printf(", total %2.2f s\n", now2sec() - nows);
 }
 
 template <typename HMAP> static void bench_InsertEraseContinue() {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %s", map_name);
+    printf("    %20s:", map_name);
 
     size_t max_n = 400000;
     auto nows = now2sec();
@@ -605,12 +605,12 @@ template <typename HMAP> static void bench_InsertEraseContinue() {
             hmap.emplace((int)rng(), 0);
         }
 
-        printf("\n        %.2lf cycles lf = %.2f mapsize = %d time %.2lf", ((double)max_n / 1000000.0),
+        printf("\n\t\t        %.2f loadf = %.2f mapsize = %d time %.2f", ((double)max_n / 1000000.0),
                hmap.load_factor(), (int)hmap.size(), now2sec() - starts);
         max_n *= 7;
     }
 
-    printf(" total (%.2f s)\n", now2sec() - nows);
+    printf(", total %2.2f s\n", now2sec() - nows);
 }
 
 template <typename T> struct as_bits_t { T value; };
@@ -648,7 +648,7 @@ template <typename HMAP> static void bench_randomInsertErase(HMAP& hmap) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     auto nows = now2sec();
     double erase1 = 0, erase2 = 0;
@@ -675,7 +675,7 @@ template <typename HMAP> static void bench_randomInsertErase(HMAP& hmap) {
                 hmap.emplace(rng(), 0);
                 hmap.erase(rng2());
             }
-            //            printf("    %8u %2d M cycles time %.3f s hmap size %8d loadf = %.2f\n",
+            //            printf("    %8u %2d M time %.3f s hmap size %8d loadf = %.2f\n",
             //                    maxn, int(min_n / 1000000), now2sec() - ts, (int)hmap.size(), hmap.load_factor());
             min_n *= 2;
             hmap.clear();
@@ -713,21 +713,21 @@ template <typename HMAP> static void bench_randomInsertErase(HMAP& hmap) {
                 map2.emplace(rng() & bitMask, 0);
                 map2.erase(rng() & bitMask);
             }
-            //            printf("    %02d bits  %2d M cycles time %.3f s hmap size %d loadf = %.2f\n",
+            //            printf("    %02d bits  %2d M time %.3f s hmap size %d loadf = %.2f\n",
             //                    int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts,
             //                    (int)map2.size(), map2.load_factor());
         }
         erase2 = now2sec() - nows;
     }
 
-    printf(" erase time = %.2lf:%.2lf, total = %.2lf s\n", erase1, erase2, erase1 + erase2);
+    printf(" erase time %.2f + %.2f, total %2.2f s\n", erase1, erase2, erase1 + erase2);
 }
 
 template <typename HMAP> static void bench_CreateInsert() {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     const std::array<size_t, 7> counts = {200, 2000, 2000, 20000, 200000, 2000000, 20000000};
 
@@ -765,7 +765,7 @@ template <typename HMAP> static void bench_CreateInsert() {
 
     assert(res);
     auto erase2 = now2sec() - nows;
-    printf(" CreateInsert/InsertCreate total time = %2.2f + %2.2f (%2.2f) s\n", erase1, erase2, erase1 + erase2);
+    printf(" CreateInsert/InsertCreate %2.2f + %2.2f, total %2.2f s\n", erase1, erase2, erase1 + erase2);
 }
 
 static inline uint32_t udb_hash32(uint32_t key) {
@@ -815,7 +815,7 @@ template <typename HMAP> static void bench_udb3() {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     const auto nows = now2sec();
     constexpr uint32_t n_cp = 11, N = 80000000, n0 = 10000000;
@@ -838,14 +838,14 @@ template <typename HMAP> static void bench_udb3() {
         }
     }
 
-    printf(" z[%d] = %d lf = %.2f total time = %.2lf\n", is_del, (int)z, h.load_factor(), now2sec() - nows);
+    printf(" z[%d] = %d loadf = %.2f, total %2.2f s\n", is_del, (int)z, h.load_factor(), now2sec() - nows);
 }
 
 template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
 #if X86_64 || __MAC__
     constexpr size_t const n = 50000000;
@@ -907,7 +907,7 @@ template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
     }
     //#endif
 
-    printf(" total time = %.2f s\n", now2sec() - nows);
+    printf(" time %2.2f s\n", now2sec() - nows);
 }
 
 #define CODE_FOR_NUCLEOTIDE(nucleotide) (" \0 \1\3  \2"[nucleotide & 0x7])
@@ -959,7 +959,7 @@ template <typename HMAP> static void bench_knucleotide() {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     HMAP hmap;
     state = RND;
@@ -978,7 +978,7 @@ template <typename HMAP> static void bench_knucleotide() {
     ans += kcount<HMAP>(poly, "GGTATT");
     ans += kcount<HMAP>(poly, "GGTA");
     ans += kcount<HMAP>(poly, "GGT");
-    printf(" ans = %d time = %.2f s\n", (int)ans, now2sec() - nows);
+    printf(" ans = %d time %2.2f s\n", (int)ans, now2sec() - nows);
 }
 
 class vec2 {
@@ -1069,7 +1069,7 @@ template <typename HMAP> static void bench_GameOfLife() {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     HMAP hmap;
     auto stastabilizing = now2sec();
@@ -1118,14 +1118,14 @@ template <typename HMAP> static void bench_GameOfLife() {
                      });
     }
 
-    printf(", grow = %.2f (total %.2f) s\n", now2sec() - grow, now2sec() - stastabilizing);
+    printf(", grow = %.2f, total %2.2f s\n", now2sec() - grow, now2sec() - stastabilizing);
 }
 
 template <typename HMAP> static void bench_copy(HMAP&) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     size_t result = 0;
     sfc64 rng(987);
@@ -1153,7 +1153,6 @@ template <typename HMAP> static void bench_copy(HMAP&) {
     }
     //    assert(result == 300019900);
     auto copyt = now2sec();
-    printf(" copy = %.2f", copyt - nows);
 
     mapForCopy = mapSource;
     HMAP m;
@@ -1164,14 +1163,12 @@ template <typename HMAP> static void bench_copy(HMAP&) {
             mapForCopy[rng()] = (int)rng();
     }
     //    assert(result == 600039800);
-    printf(", assign time = %.2f s, result = %zu\n", now2sec() - copyt, result);
+    printf("result = %d copy = %2.2f, assign = %2.2f s\n", int(result), copyt - nows, now2sec() - copyt);
 }
 
 template <typename HMAP> static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask) {
-    // printf("%s hmap = %s\n", __FUNCTION__, typeid(HMAP).name());
     MRNG rng(RND + 4);
 
-    // time measured part
     size_t verifier = 0;
     std::stringstream ss;
     ss << string_length << " bytes" << std::dec;
@@ -1203,7 +1200,7 @@ template <typename HMAP> static size_t runInsertEraseString(size_t max_n, size_t
 #endif
     }
 
-    //    printf("%4zd bytes time = %.2f, loadf = %.2f %d\n", string_length, now2sec() - ts, hmap.load_factor(),
+    //    printf("%4zd bytes time %.2f, loadf = %.2f %d\n", string_length, now2sec() - ts, hmap.load_factor(),
     //    (int)hmap.size());
     return verifier;
 }
@@ -1279,8 +1276,7 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
     }
 
     if (hmap.size() > 12)
-        printf("        %s time = %.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found,
-               hmap.load_factor());
+        printf("\t\t        %s time %2.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found, hmap.load_factor());
     return num_found;
 }
 
@@ -1288,7 +1284,7 @@ template <typename HMAP> static void bench_randomFindString(HMAP&) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %8s\n", map_name);
+    printf("    %20s\n", map_name);
 
     auto nows = now2sec();
     auto now1 = nows, now2 = nows;
@@ -1315,14 +1311,14 @@ template <typename HMAP> static void bench_randomFindString(HMAP&) {
         randomFindInternalString<HMAP>(0, 100, numInserts, numFindsPerInsert);
         now2 = now2sec();
     }
-    printf("total time = %.2f + %.2f = %.2f s\n", now1 - nows, now2 - now1, now2 - nows);
+    printf("\t\t\t%.2f + %.2f, total %2.2f s\n", now1 - nows, now2 - now1, now2 - nows);
 }
 
 template <typename HMAP> static void bench_randomEraseString(HMAP&) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     auto nows = now2sec();
     { runInsertEraseString<HMAP>(20000000, 7, 0xfffff); }
@@ -1333,7 +1329,7 @@ template <typename HMAP> static void bench_randomEraseString(HMAP&) {
     { runInsertEraseString<HMAP>(8000000, 200, 0x3ffff); }
     { runInsertEraseString<HMAP>(6000000, 1000, 0x7ffff); }
 
-    printf(" total time = %.2f s\n", now2sec() - nows);
+    printf("time %2.2f s\n", now2sec() - nows);
 }
 
 template <typename HMAP>
@@ -1389,7 +1385,7 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
     }
 
     if (hmap.size() == 0) {
-        printf("    %3u%% %016x time = %.2f s, %8d loadf = %.2f\n", uint32_t(numSequential * 100 / NumTotal),
+        printf("    %3u%% %016x time %2.2f s, %8d loadf = %.2f\n", uint32_t(numSequential * 100 / NumTotal),
                (int)bitMask, now2sec() - ts, (int)num_found, hmap.load_factor());
     }
 
@@ -1400,7 +1396,7 @@ template <typename HMAP> static void bench_IterateIntegers(HMAP& hmap) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     size_t const num_iters = 50000;
     uint64_t result = 0;
@@ -1449,7 +1445,7 @@ template <typename HMAP> static void bench_IterateIntegers(HMAP& hmap) {
         }
     }
     assert(result == 62498750000000ull + 20833333325000ull);
-    printf(", add/removing time = %.2f, %.2f|%d\n", (ts1 - ts), now2sec() - ts1, (int)result);
+    printf("result = %d, time add/removing = %.2f, %.2f\n", int(result), ts1 - ts, now2sec() - ts1);
 
     // Record result for CSV/JSON output
     if (g_config.output_format != OutputFormat::Text) {
@@ -1467,7 +1463,7 @@ template <typename HMAP> static void bench_randomFind(HMAP&, size_t numInserts, 
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s", map_name);
+    printf("    %20s:", map_name);
 
     static constexpr auto lower32bit = UINT64_C(0x00000000FFFFFFFF);
     static constexpr auto upper32bit = UINT64_C(0xFFFFFFFF00000000);
@@ -1495,7 +1491,7 @@ template <typename HMAP> static void bench_randomFind(HMAP&, size_t numInserts, 
 
     auto elapsed = now2sec() - ts;
     if (sum != 123)
-        printf(" nums = %zd total time = %.2f s\n", numInserts, elapsed);
+        printf(" nums = %zd, time %2.2f s\n", numInserts, elapsed);
 
     // Record result for CSV/JSON output
     if (g_config.output_format != OutputFormat::Text) {
@@ -2713,6 +2709,7 @@ static void runTest(int sflags, int eflags) {
         { bench_knucleotide<emilib::HashMap<uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<emilib2::HashMap<uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<emilib3::HashMap<uint64_t, uint32_t, hash_func>>(); }
+        { bench_knucleotide<emilib4::HashMap<uint64_t, uint32_t, hash_func>>(); }
 
 #if ET
         { bench_knucleotide<tsl::robin_map<uint64_t, uint32_t, hash_func>>(); }
@@ -2782,6 +2779,7 @@ static void runTest(int sflags, int eflags) {
         { bench_GameOfLife<emilib::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emilib2::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emilib3::HashMap<uint32_t, bool, hash_func>>(); }
+        { bench_GameOfLife<emilib4::HashMap<uint32_t, bool, hash_func>>(); }
 
 #if ET
         { bench_GameOfLife<tsl::robin_map<uint32_t, bool, hash_func>>(); }
@@ -2851,6 +2849,7 @@ static void runTest(int sflags, int eflags) {
         { bench_AccidentallyQuadratic<emilib::HashMap<int, int, hash_func>>(); }
         { bench_AccidentallyQuadratic<emilib2::HashMap<int, int, hash_func>>(); }
         { bench_AccidentallyQuadratic<emilib3::HashMap<int, int, hash_func>>(); }
+        { bench_AccidentallyQuadratic<emilib4::HashMap<int, int, hash_func>>(); }
 
 #if ET
         { bench_AccidentallyQuadratic<tsl::robin_map<int, int, hash_func>>(); }
@@ -3037,6 +3036,7 @@ static void runTest(int sflags, int eflags) {
         { bench_CreateInsert<emilib2::HashMap<int, int, hash_func>>(); }
         { bench_CreateInsert<emilib::HashMap<int, int, hash_func>>(); }
         { bench_CreateInsert<emilib3::HashMap<int, int, hash_func>>(); }
+        { bench_CreateInsert<emilib4::HashMap<int, int, hash_func>>(); }
 
 #if ET
         { bench_CreateInsert<tsl::robin_map<int, int, hash_func>>(); }
@@ -3099,6 +3099,7 @@ static void runTest(int sflags, int eflags) {
         { bench_udb3<emilib2::HashMap<uint32_t, uint32_t, hash_func>>(); }
         { bench_udb3<emilib::HashMap<uint32_t, uint32_t, hash_func>>(); }
         { bench_udb3<emilib3::HashMap<uint32_t, uint32_t, hash_func>>(); }
+        { bench_udb3<emilib4::HashMap<uint32_t, uint32_t, hash_func>>(); }
 
 #if ET
         { bench_udb3<tsl::robin_map<uint32_t, uint32_t, hash_func>>(); }
@@ -3113,7 +3114,7 @@ static void runTest(int sflags, int eflags) {
         { bench_udb3<emhash5::HashMap<uint32_t, uint32_t, hash_func>>(); }
     }
 
-    printf("\ntotal time = %.2f s\n", now2sec() - start);
+    printf("\ntime %2.2f s\n", now2sec() - start);
 }
 
 static void checkSet(const std::string_view& map_name) {
@@ -3260,6 +3261,8 @@ int main(int argc, char* argv[]) {
                     checkSet("emilib2");
                 else if (c == '3')
                     checkSet("emilib3");
+                else if (c == '4')
+                    checkSet("emilib4");
                 else if (c == 'j')
                     checkSet("jg");
                 else if (c == 'r')
@@ -3267,8 +3270,10 @@ int main(int argc, char* argv[]) {
                 else if (c == 'k') {
                     checkSet("HashMapTable");
                     checkSet("HashMapCell");
-                } else if (c == 'i')
-                    checkSet("indivi");
+                } else if (c == 'i') {
+                    checkSet("flat_u");
+                    checkSet("flat_w");
+                }
 #if QC_HASH
                 else if (c == 'q')
                     checkSet("qc");

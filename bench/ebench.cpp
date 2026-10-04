@@ -57,7 +57,7 @@ std::map<std::string, std::string> maps = {
 #ifdef ABSL_HMAP
     {"abslf", "absl_flat"},
 #endif
-//    {"martind", "martin_dense"},
+    {"martind", "martin_dense"},
 //    {"f14_value", "f14_value"},
 
 #if 0
@@ -1697,7 +1697,7 @@ int main(int argc, char* argv[]) {
                     else
                         maps[hash_name] = hash_name;
                 }
-                if (c >= '1' && c <= '3') {
+                if (c >= '1' && c <= '4') {
                     std::string hash_name("emilib");
                     hash_name += char(c);
                     if (maps.find(hash_name) != maps.end())
@@ -1709,7 +1709,10 @@ int main(int argc, char* argv[]) {
                 else if (c == 'b')
                     maps.erase("boostf");
                 else if (c == 'd')
-                    maps.erase("martind");
+                    if (maps.count("martind"))
+                        maps.erase("martind");
+                    else
+                        maps.emplace("martind", "martin_dense");
                 else if (c == 'p')
                     maps.erase("phmap");
                 else if (c == 't')

@@ -1729,16 +1729,32 @@ private:
 
     EMH_INLINE size_type hash_main(const size_type bucket) const { return hash_key(EMH_KEY(_pairs, bucket)) & _mask; }
 
+    // Final avalanche mix for user-provided hashes, which may be weak (e.g. std::hash is
+    // identity for integers on libstdc++), to prevent bucket clustering on low-entropy keys.
+    // Disabled by default; enable via -DEMH_FINAL_MIX.
+#ifdef EMH_FINAL_MIX
+    static uint64_t mix_hash(uint64_t h) {
+        h ^= h >> 33;
+        h *= UINT64_C(0xff51afd7ed558ccd);
+        h ^= h >> 33;
+        h *= UINT64_C(0xc4ceb9fe1a85ec53);
+        h ^= h >> 33;
+        return h;
+    }
+#else
+    static uint64_t mix_hash(uint64_t h) { return h; }
+#endif
+
     template <typename K> EMH_INLINE size_type hash_key(const K& key) const {
         if constexpr (std::is_integral<K>::value) {
 #if EMH_INT_HASH
             return static_cast<size_type>(hash64(key));
 #elif EMH_SAFE_HASH
-            return static_cast<size_type>(_hash_inter == 0 ? _hasher(key) : hash64(key));
+            return static_cast<size_type>(_hash_inter == 0 ? mix_hash(_hasher(key)) : hash64(key));
 #elif EMH_IDENTITY_HASH
             return static_cast<size_type>(key + (key >> 24));
 #else
-            return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(mix_hash(_hasher(key)));
 #endif
         } else if constexpr (std::is_same<K, std::string>::value) {
             EMH_MSAN_UNPOISON(&key, sizeof(key));
@@ -1746,10 +1762,10 @@ private:
 #if EMH_WY_HASH
             return static_cast<size_type>(wyhash(key.data(), key.size(), 0));
 #else
-            return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(mix_hash(_hasher(key)));
 #endif
         } else {
-            return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(mix_hash(_hasher(key)));
         }
     }
 
