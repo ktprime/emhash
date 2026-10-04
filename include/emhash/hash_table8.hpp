@@ -42,6 +42,7 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <cstdlib>
 #include <stdexcept>
 #include <type_traits>
@@ -59,6 +60,24 @@
 #include <intrin.h>
 #endif
 
+// Hash fixed-size (8 / 12 / 16 byte) trivially copyable keys by their raw bytes
+// with the built-in wyhash, which reads such keys as 4-byte words so a lookup
+// right after the key was written field by field avoids store-forwarding stalls
+// (146 -> 40 cycles for a 12-byte key; martinus/unordered_dense #311). The HashT
+// argument is ignored for such keys.
+//
+// ONLY enable when key equality is raw byte equality: a type whose operator==
+// ignores any byte (string_view-like handles, normalized structs) must not use
+// it. Off by default, matching EMH_INT_HASH / EMH_WYHASH_HASH; build with
+// -DEMH_POD_HASH=1 to enable.
+#ifndef EMH_POD_HASH
+#define EMH_POD_HASH 0
+#endif
+
+// Defined when this header provides hash()-precomputed lookup overloads
+// (find/contains/count/at/try_get/erase taking a key hash from map.hash(key)).
+#define EMH_HASH_LOOKUP 1
+
 #undef EMH_NEW
 #undef EMH_EMPTY
 #undef EMH_EQHASH
@@ -70,6 +89,64 @@
     _index[bucket] = {bucket, _num_filled++ | (static_cast<size_type>(key_hash) & ~_mask)}
 
 namespace emhash8 {
+
+// ---------------------------------------------------------------------------
+// Heterogeneous lookup support (std::string keys looked up as std::string_view
+// / const char* without constructing a temporary std::string)
+// ---------------------------------------------------------------------------
+
+// keys that hash and compare by CONTENT
+template <typename T> struct is_char_pointer : std::false_type {};
+template <> struct is_char_pointer<const char*> : std::true_type {};
+template <> struct is_char_pointer<char*> : std::true_type {};
+
+template <typename T> struct is_char_array : std::false_type {};
+template <size_t N> struct is_char_array<char[N]> : std::true_type {};
+template <size_t N> struct is_char_array<const char[N]> : std::true_type {};
+
+template <typename T>
+struct is_string_family
+    : std::bool_constant<std::is_same<T, std::string>::value || std::is_same<T, std::string_view>::value ||
+                         is_char_pointer<T>::value || is_char_array<T>::value> {};
+
+// the C++20 unordered-container convention: heterogeneous lookup is enabled
+// when BOTH the hasher and the equality carry is_transparent
+template <typename T, typename = void> struct has_is_transparent : std::false_type {};
+template <typename T> struct has_is_transparent<T, std::void_t<typename T::is_transparent>> : std::true_type {};
+
+// A transparent, avalanching hash for string-family keys. Pair it with
+// std::equal_to<> to get heterogeneous lookup out of the box:
+//   emhash8::HashMap<std::string, int, emhash8::string_hash, std::equal_to<>>
+// All three key forms hash the same bytes the same way, which is the
+// consistency contract the map's heterogeneous lookups rely on.
+// NB: with -DEMH_WYHASH_HASH=1 the map hashes string-family keys with its own
+// wyhashstr pipeline and never calls HashT for them, so this functor's value
+// may differ from map.hash(); the within-map consistency is what matters.
+struct string_hash {
+    using is_transparent = void;
+    size_t operator()(const char* s) const noexcept { return emh_wyhash(s, strlen(s), 0); }
+    size_t operator()(std::string_view sv) const noexcept { return emh_wyhash(sv.data(), sv.size(), 0); }
+    size_t operator()(const std::string& s) const noexcept { return emh_wyhash(s.data(), s.size(), 0); }
+};
+
+// A stand-in hasher that is never invoked: with EMH_POD_HASH, a fixed-size
+// (8/12/16 byte) trivially copyable key is hashed by its bytes inside hash_key()
+// and HashT is bypassed -- but the map still needs a well-formed, constructible
+// HashT member to hold, and std::hash<K> for such K usually is not one.
+struct pod_hash_stub {
+    template <typename T> constexpr size_t operator()(const T&) const noexcept { return 0; }
+};
+
+// The default hasher: std::hash, except with EMH_POD_HASH for fixed-size
+// trivially copyable keys, where only the stub above compiles.
+namespace detail_pod {
+template <typename KeyT>
+using default_hash_t =
+    std::conditional_t<EMH_POD_HASH && !std::is_integral<KeyT>::value && !std::is_same<KeyT, std::string>::value &&
+                           std::is_trivially_copyable<KeyT>::value &&
+                           (sizeof(KeyT) == 8 || sizeof(KeyT) == 12 || sizeof(KeyT) == 16),
+                       pod_hash_stub, std::hash<KeyT>>;
+} // namespace detail_pod
 
 struct DefaultPolicy {
     static constexpr float load_factor = 0.80f;
@@ -95,8 +172,9 @@ struct DefaultPolicy {
 ///
 /// @note Header-only: just `#include "emhash/hash_table8.hpp"` and use `emhash8::HashMap`.
 /// @note Not thread-safe. Concurrent read-only access is safe.
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
-          typename AllocT = std::allocator<std::pair<KeyT, ValueT>>, typename Policy = DefaultPolicy>
+template <typename KeyT, typename ValueT, typename HashT = detail_pod::default_hash_t<KeyT>,
+          typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>,
+          typename Policy = DefaultPolicy>
 class HashMap {
     static_assert(std::is_copy_constructible<KeyT>::value || std::is_move_constructible<KeyT>::value,
                   "KeyT must be copy-constructible or move-constructible");
@@ -226,6 +304,17 @@ public:
     using iterator = hashmap_iterator<false, htype>;
     using const_iterator = hashmap_iterator<true, htype>;
 
+    // A shared, never-written index for tables that have not allocated one of
+    // their own yet: every entry reads as an empty bucket, so a lookup on an
+    // empty table takes the usual `next < 0` early-out with no test of its own,
+    // and the map stays allocation-free until its first insert. Write paths all
+    // go through reserve()/rehash() first, which replaces _index before any
+    // entry is written, so the sentinel itself is never written.
+    static Index* empty_index() noexcept {
+        static Index s_empty_index[4] = {{INACTIVE, 0}, {INACTIVE, 0}, {INACTIVE, 0}, {INACTIVE, 0}};
+        return s_empty_index;
+    }
+
     void init(size_type bucket, float mlf = EMH_DEFAULT_LOAD_FACTOR) {
         _pairs = nullptr;
         _index = nullptr;
@@ -234,10 +323,19 @@ public:
         _pairs_capacity = 0;
         _mlf = static_cast<uint32_t>((1 << 28) / EMH_DEFAULT_LOAD_FACTOR);
         max_load_factor(mlf);
+        if (bucket == 0) {
+            _index = empty_index();
+            _last = 0;
+            _etail = INACTIVE;
+#if EMH_HIGH_LOAD
+            _ehead = 0;
+#endif
+            return;
+        }
         rehash(bucket);
     }
 
-    explicit HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, mlf); }
+    explicit HashMap(size_type bucket = 0, float mlf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, mlf); }
 
     HashMap(const HashMap& rhs)
         : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
@@ -248,7 +346,7 @@ public:
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
         } else {
-            init(rhs._num_filled + RESERVE_SLOTS, rhs.max_load_factor());
+            init(rhs._num_filled != 0 ? rhs._num_filled + RESERVE_SLOTS : 0, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 (void)insert_unique(it->first, it->second);
         }
@@ -286,7 +384,7 @@ public:
             _index = alloc_index(rhs._num_buckets);
             clone(rhs);
         } else {
-            init(rhs._num_filled + RESERVE_SLOTS, rhs.max_load_factor());
+            init(rhs._num_filled != 0 ? rhs._num_filled + RESERVE_SLOTS : 0, rhs.max_load_factor());
             for (auto it = rhs.begin(); it != rhs.end(); ++it)
                 (void)insert_unique(it->first, it->second);
         }
@@ -407,6 +505,12 @@ public:
         std::swap(_pair_allocator, rhs._pair_allocator);
         std::swap(_index_allocator, rhs._index_allocator);
     }
+
+    // ADL-findable swap, so generic code written as "using std::swap; swap(a, b);"
+    // resolves to this member-wise exchange instead of the generic std::swap --
+    // three move assignments, each of which hands the moved-from map a fresh
+    // allocation, where exchanging what two maps already own needs none.
+    friend void swap(HashMap& a, HashMap& b) noexcept { a.swap(b); }
 
     // -------------------------------------------------------------
     iterator first() { return iterator{this, 0}; }
@@ -607,6 +711,12 @@ public:
         return {this, find_filled_slot(key)};
     }
 
+    /// @brief Hash a key exactly as the map does.
+    ///
+    /// Feed the result to the `key_hash` overloads below: a caller that looks a
+    /// key up several times, or that already holds the hash, computes it once.
+    template <typename K = KeyT> [[nodiscard]] uint64_t hash(const K& key) const noexcept { return hash_key(key); }
+
     // it key is not found, throws std::out_of_range
     template <typename K = KeyT> ValueT& at(const K& key) {
         const auto slot = find_filled_slot(key);
@@ -621,6 +731,63 @@ public:
             throw std::out_of_range("emhash8::at(): key not found");
         return _pairs[slot].second;
     }
+
+    /// @name Lookups taking a precomputed hash
+    ///
+    /// @param key_hash MUST be the value `hash(key)` returned on this map (the
+    /// same hash pipeline). A stale, foreign, or key-mismatched value silently
+    /// breaks lookups -- it is a performance interface, not a safety one.
+    ///@{
+    template <typename K = KeyT> iterator find(const K& key, uint64_t key_hash) noexcept {
+        return {this, find_filled_slot(key, key_hash)};
+    }
+
+    template <typename K = KeyT> const_iterator find(const K& key, uint64_t key_hash) const noexcept {
+        return {this, find_filled_slot(key, key_hash)};
+    }
+
+    // it key is not found, throws std::out_of_range
+    template <typename K = KeyT> ValueT& at(const K& key, uint64_t key_hash) {
+        const auto slot = find_filled_slot(key, key_hash);
+        if (slot == _num_filled)
+            throw std::out_of_range("emhash8::at(): key not found");
+        return _pairs[slot].second;
+    }
+
+    template <typename K = KeyT> const ValueT& at(const K& key, uint64_t key_hash) const {
+        const auto slot = find_filled_slot(key, key_hash);
+        if (slot == _num_filled)
+            throw std::out_of_range("emhash8::at(): key not found");
+        return _pairs[slot].second;
+    }
+
+    template <typename K = KeyT> [[nodiscard]] bool contains(const K& key, uint64_t key_hash) const noexcept {
+        return find_filled_slot(key, key_hash) != _num_filled;
+    }
+
+    template <typename K = KeyT> size_type count(const K& key, uint64_t key_hash) const noexcept {
+        return find_filled_slot(key, key_hash) == _num_filled ? 0 : 1;
+    }
+
+    [[nodiscard]] bool try_get(const KeyT& key, ValueT& val, uint64_t key_hash) const noexcept {
+        const auto slot = find_filled_slot(key, key_hash);
+        const auto found = slot != _num_filled;
+        if (found) {
+            val = _pairs[slot].second;
+        }
+        return found;
+    }
+
+    [[nodiscard]] ValueT* try_get(const KeyT& key, uint64_t key_hash) noexcept {
+        const auto slot = find_filled_slot(key, key_hash);
+        return slot != _num_filled ? &_pairs[slot].second : nullptr;
+    }
+
+    [[nodiscard]] const ValueT* try_get(const KeyT& key, uint64_t key_hash) const noexcept {
+        const auto slot = find_filled_slot(key, key_hash);
+        return slot != _num_filled ? &_pairs[slot].second : nullptr;
+    }
+    ///@}
 
     const ValueT& index(const uint32_t slot) const noexcept { return _pairs[slot].second; }
 
@@ -661,6 +828,40 @@ public:
                 ++rit;
             }
         }
+    }
+
+private:
+    // SFINAE gate for heterogeneous overloads: enabled only when BOTH the hasher
+    // and the equality are transparent (the C++20 unordered-container
+    // convention), and only for key forms they actually accept.
+    template <typename K>
+    using hetero_enable = std::enable_if_t<has_is_transparent<HashT>::value && has_is_transparent<EqT>::value &&
+                                               std::is_invocable_v<const HashT&, const K&> &&
+                                               std::is_invocable_v<const EqT&, const K&, const KeyT&>,
+                                           int>;
+
+public:
+    /// Returns the matching ValueT or nullptr if k isn't found.
+    /// Heterogeneous form: enabled when the hasher and equality are transparent
+    /// (e.g. emhash8::string_hash + std::equal_to<>); looks up a std::string
+    /// map with std::string_view / const char* without constructing a temporary.
+    template <typename K, hetero_enable<K> = 0> [[nodiscard]] bool try_get(const K& key, ValueT& val) const noexcept {
+        const auto slot = find_filled_slot(key);
+        const auto found = slot != _num_filled;
+        if (found) {
+            val = _pairs[slot].second;
+        }
+        return found;
+    }
+
+    template <typename K, hetero_enable<K> = 0> [[nodiscard]] ValueT* try_get(const K& key) noexcept {
+        const auto slot = find_filled_slot(key);
+        return slot != _num_filled ? &_pairs[slot].second : nullptr;
+    }
+
+    template <typename K, hetero_enable<K> = 0> [[nodiscard]] const ValueT* try_get(const K& key) const noexcept {
+        const auto slot = find_filled_slot(key);
+        return slot != _num_filled ? &_pairs[slot].second : nullptr;
     }
 
     /// Returns the matching ValueT or nullptr if k isn't found.
@@ -910,6 +1111,43 @@ public:
         return 1;
     }
 
+    /// @brief Erase by key with a hash precomputed by hash(); see the lookup
+    ///        overloads above for the contract on @p key_hash.
+    size_type erase(const KeyT& key, uint64_t key_hash) {
+        const auto sbucket = find_filled_bucket(key, key_hash);
+        if (sbucket == INACTIVE)
+            return 0;
+
+        erase_slot(sbucket, static_cast<size_type>(key_hash & _mask));
+        return 1;
+    }
+
+    /// @brief Heterogeneous erase: looks up @p key of any form the transparent
+    ///        hasher and equality accept (e.g. std::string_view or const char*
+    ///        for std::string keys) without constructing a temporary KeyT.
+    ///        Requires HashT and EqT to be transparent (is_transparent), e.g.
+    ///        emhash8::string_hash + std::equal_to<>.
+    template <typename K, hetero_enable<K> = 0> size_type erase(const K& key) {
+        const auto key_hash = hash_key(key);
+        const auto sbucket = find_filled_bucket(key, key_hash);
+        if (sbucket == INACTIVE)
+            return 0;
+
+        erase_slot(sbucket, static_cast<size_type>(key_hash & _mask));
+        return 1;
+    }
+
+    /// @brief Heterogeneous erase with a hash precomputed by hash(key) of the
+    ///        SAME key form; see the overload above for the requirements.
+    template <typename K, hetero_enable<K> = 0> size_type erase(const K& key, uint64_t key_hash) {
+        const auto sbucket = find_filled_bucket(key, key_hash);
+        if (sbucket == INACTIVE)
+            return 0;
+
+        erase_slot(sbucket, static_cast<size_type>(key_hash & _mask));
+        return 1;
+    }
+
     // iterator erase(const_iterator begin_it, const_iterator end_it)
     iterator erase(const const_iterator& cit) {
         const auto slot = static_cast<size_type>(cit.kv_ - _pairs);
@@ -1106,7 +1344,7 @@ public:
     }
 
     void dealloc_index(Index* ptr, size_type num_buckets) noexcept {
-        if (ptr)
+        if (ptr && ptr != empty_index())
             IndexAllocTraits::deallocate(_index_allocator, ptr, num_buckets + EAD);
     }
 
@@ -1123,7 +1361,8 @@ public:
         _ehead = 0;
 #endif
 
-        memset(reinterpret_cast<char*>(_index), static_cast<int>(INACTIVE), sizeof(_index[0]) * _num_buckets);
+        if (_num_buckets != 0)
+            memset(reinterpret_cast<char*>(_index), static_cast<int>(INACTIVE), sizeof(_index[0]) * _num_buckets);
         for (size_type slot = 0; slot < _num_filled; ++slot) {
             const auto& key = _pairs[slot].first;
             const auto key_hash = hash_key(key);
@@ -1367,7 +1606,7 @@ private:
     }
 
     // Find the slot with this key, or return bucket size
-    size_type find_filled_bucket(const KeyT& key, uint64_t key_hash) const noexcept {
+    template <typename K = KeyT> size_type find_filled_bucket(const K& key, uint64_t key_hash) const noexcept {
         const auto bucket = size_type(key_hash & _mask);
         const auto& idx = _index[bucket];
         auto next_bucket = idx.next;
@@ -1402,7 +1641,10 @@ private:
 
     // Find the slot with this key, or return bucket size
     template <typename K = KeyT> size_type find_filled_slot(const K& key) const noexcept {
-        const auto key_hash = hash_key(key);
+        return find_filled_slot(key, hash_key(key));
+    }
+
+    template <typename K = KeyT> size_type find_filled_slot(const K& key, uint64_t key_hash) const noexcept {
         const auto bucket = size_type(key_hash & _mask);
         const auto& idx = _index[bucket];
         auto next_bucket = idx.next;
@@ -1860,23 +2102,71 @@ public:
 #endif
 
 private:
+    // Final avalanche mix for user-provided hashes, which may be weak (e.g. std::hash is
+    // identity for integers on libstdc++), to prevent bucket clustering on low-entropy keys.
+    // Bucket index and EMH_EQHASH fingerprint both come from the low bits of the hash, and
+    // the multiply + xor-shift folds guarantee full-avalanche low bits.
+    // Disabled by default; enable via -DEMH_FINAL_MIX.
+#ifdef EMH_FINAL_MIX
+    static uint64_t mix_hash(uint64_t h) {
+        h ^= h >> 33;
+        h *= UINT64_C(0xff51afd7ed558ccd);
+        h ^= h >> 33;
+        h *= UINT64_C(0xc4ceb9fe1a85ec53);
+        h ^= h >> 33;
+        return h;
+    }
+#else
+    static uint64_t mix_hash(uint64_t h) { return h; }
+#endif
+
     template <typename K> EMH_INLINE uint64_t hash_key(const K& key) const {
         if constexpr (std::is_integral<K>::value) {
 #if EMH_INT_HASH
             return hash64(key);
 #else
-            return _hasher(key);
+            return mix_hash(_hasher(key));
 #endif
-        } else if constexpr (std::is_same<K, std::string>::value) {
+        } else if constexpr (is_string_family<K>::value) {
+            // std::string, std::string_view, const char* and char arrays all
+            // take this content-hash branch, so every form of the same text
+            // hashes to the same value -- the consistency heterogeneous lookup
+            // needs. NB: these types must never fall into the POD branch below,
+            // which hashes raw bytes (a string_view's bytes include its
+            // pointer, a char*'s its address).
             EMH_MSAN_UNPOISON(&key, sizeof(key));
-            EMH_MSAN_UNPOISON(key.data(), key.size());
+            if constexpr (is_char_pointer<K>::value || is_char_array<K>::value) {
+                const char* const cstr = key;
+                const size_t len = strlen(cstr);
+                EMH_MSAN_UNPOISON(cstr, len);
+                (void)len;
 #if EMH_WYHASH_HASH
-            return wyhashstr(key.data(), key.size());
+                return wyhashstr(cstr, len);
 #else
-            return _hasher(key);
+                return mix_hash(_hasher(cstr));
 #endif
-        } else {
-            return _hasher(key);
+            } else {
+                EMH_MSAN_UNPOISON(key.data(), key.size());
+#if EMH_WYHASH_HASH
+                return wyhashstr(key.data(), key.size());
+#else
+                return mix_hash(_hasher(key));
+#endif
+            }
+        }
+#if EMH_POD_HASH
+        // A fixed-size trivially copyable key: hash its bytes with the built-in
+        // wyhash, whose compile-time-length path reads 4-byte words so a lookup
+        // of a key just written field by field store-forwards (see EMH_POD_HASH
+        // above for the byte-equality contract this relies on).
+        else if constexpr (std::is_trivially_copyable<K>::value &&
+                           (sizeof(K) == 8 || sizeof(K) == 12 || sizeof(K) == 16)) {
+            EMH_MSAN_UNPOISON(&key, sizeof(key));
+            return emh_wyhash(reinterpret_cast<const char*>(&key), sizeof(K), 0);
+        }
+#endif
+        else {
+            return mix_hash(_hasher(key));
         }
     }
 

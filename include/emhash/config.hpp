@@ -174,6 +174,20 @@ static EMH_INLINE uint64_t wyr4(const uint8_t* p) {
     return v;
 }
 
+// A 4-byte read the compiler may not fuse with its neighbour into one 8-byte read:
+// the empty asm makes the value opaque (clang otherwise turns
+// `r4(p) | r4(p + 4) << 32` back into r8(p)). A load spanning two of the stores
+// that just wrote a key cannot be forwarded from them and waits until both have
+// reached the cache, which serializes lookups of keys written field by field;
+// a 4-byte read lies inside one store either way.
+static EMH_INLINE uint64_t wyr4_unfused(const uint8_t* p) {
+    uint64_t v = wyr4(p);
+#if defined(__GNUC__) || defined(__clang__)
+    __asm__("" : "+r"(v));
+#endif
+    return v;
+}
+
 static EMH_INLINE uint64_t wyr3(const uint8_t* p, size_t k) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return ((static_cast<uint64_t>(p[0]) << 16) | (static_cast<uint64_t>(p[k >> 1]) << 8)) | p[k - 1];
@@ -196,9 +210,23 @@ static EMH_INLINE uint64_t emh_wyhash(const void* key, size_t len, uint64_t seed
 
     if (len <= 16) {
         if (len >= 8) {
-            // Two 8-byte reads (may overlap) — faster than four 4-byte reads + shifts
-            a = wyr8(p);
-            b = wyr8(p + len - 8);
+#if (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+            // A length known at compile time is a fixed-size key's (an 8/12/16-byte POD),
+            // which may have just been written field by field; read it as 4-byte words so
+            // no load spans two of those stores (store forwarding). A length only known at
+            // run time is a string's and keeps the two 8-byte reads. Both paths must give
+            // the same value -- which one runs depends on inlining -- and
+            // `r4 | r4 << 32 == r8` holds on little-endian only.
+            if (__builtin_constant_p(len) && len % 4 == 0) {
+                a = wyr4_unfused(p) | (wyr4_unfused(p + 4) << 32U);
+                b = wyr4_unfused(p + len - 8) | (wyr4_unfused(p + len - 4) << 32U);
+            } else
+#endif
+            {
+                // Two 8-byte reads (may overlap) — faster than four 4-byte reads + shifts
+                a = wyr8(p);
+                b = wyr8(p + len - 8);
+            }
         } else if (len >= 4) {
             // Two 4-byte reads — simpler than half-offset four-read approach
             a = wyr4(p);
