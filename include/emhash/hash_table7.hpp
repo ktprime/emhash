@@ -177,19 +177,34 @@ static_assert(EMH_MALIGN >= 16 && 0 == (EMH_MALIGN & (EMH_MALIGN - 1)));
 static_assert(static_cast<int>(INACTIVE) < 0, "INACTIVE must negative (to int)");
 #endif
 
+// Byte-swap a machine word so its bits read in little-endian order. The width
+// follows sizeof(size_t): on 32-bit targets a bswap64 would shift the low half
+// into the high half and the assignment would truncate to zero, so use bswap32.
+static inline size_t emh_bswap_word(size_t n) noexcept {
+#if defined(__GNUC__) || defined(__clang__)
+    return (sizeof(size_t) >= 8) ? static_cast<size_t>(__builtin_bswap64(n))
+                                 : static_cast<size_t>(__builtin_bswap32(static_cast<uint32_t>(n)));
+#elif defined(_MSC_VER)
+    return (sizeof(size_t) >= 8) ? static_cast<size_t>(_byteswap_uint64(n))
+                                 : static_cast<size_t>(_byteswap_ulong(static_cast<uint32_t>(n)));
+#else
+    return n;
+#endif
+}
+
 // count the leading zero bit
 static inline size_type CTZ(size_t n) {
 #if defined(__x86_64__) || defined(_WIN32) || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 
 #elif __BIG_ENDIAN__ || (__BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    n = __builtin_bswap64(n);
+    n = emh_bswap_word(n);
 #else
     // Portable endianness detection without strict aliasing violation
     uint32_t endianness = 0x12345678;
     unsigned char first_byte;
     std::memcpy(&first_byte, &endianness, 1);
     if (first_byte == 0x12)
-        n = __builtin_bswap64(n);
+        n = emh_bswap_word(n);
 #endif
 
 #ifdef _WIN32
@@ -1276,8 +1291,12 @@ public:
     void clear() {
         if (!need_explicit_dtor() && _num_filled) {
             memset(_bitmask, static_cast<int>(0xFFFFFFFF), (_num_buckets + 7) / 8);
+            // Bits [0, _num_buckets) must read empty (bit=1); the unused high
+            // bits of the last metadata byte are forced to filled (bit=0) so a
+            // ctz-based scan can never select an out-of-range bucket. The guard
+            // keeps the shift strictly below the bit_type width.
             if (_num_buckets < 8 * sizeof(_bitmask[0]))
-                _bitmask[0] = static_cast<bit_type>((1u << _num_buckets) - 1);
+                _bitmask[0] = static_cast<bit_type>((static_cast<size_t>(1) << _num_buckets) - 1);
         } else if (_num_filled)
             clearkv();
 
@@ -1310,6 +1329,11 @@ public:
         if (required_buckets < _num_filled)
             return;
 
+        // num_buckets is always a power of two (>= 2). The metadata layout
+        // relies on this: (num_buckets + 7) / 8 is exact for num_buckets >= 8,
+        // so no out-of-range bit is left "empty" (the {2,4} cases are fixed up
+        // by the num_buckets < 8 special case below). This keeps the ctz-based
+        // empty scan from ever selecting an out-of-range bucket.
         uint64_t buckets = _num_filled > (1u << 16) ? (1u << 16) : 2u;
         while (buckets < required_buckets) {
             buckets *= 2;
@@ -1348,8 +1372,12 @@ public:
         const auto mask_byte = (num_buckets + 7) / 8;
         memset(_bitmask, static_cast<unsigned char>(0xFF), mask_byte);
         memset(reinterpret_cast<char*>(_bitmask) + mask_byte, 0, BIT_PACK);
+        // Bits [0, num_buckets) read empty (bit=1); unused high bits of the last
+        // metadata byte are forced filled (bit=0) so a ctz-based scan can never
+        // select an out-of-range bucket. The guard keeps the shift below the
+        // bit_type width.
         if (num_buckets < 8 * sizeof(_bitmask[0]))
-            _bitmask[0] = static_cast<bit_type>((1u << num_buckets) - 1);
+            _bitmask[0] = static_cast<bit_type>((static_cast<size_t>(1) << num_buckets) - 1);
 
         for (size_type src_bucket = old_mask; _num_filled < old_num_filled; src_bucket--) {
             if (obmask[src_bucket / MASK_BIT] & (1 << (src_bucket % MASK_BIT)))
@@ -1587,27 +1615,23 @@ private:
     }
 
     // key is not in this map. Find a place to put it.
+    //
+    // The SWAR scan below loads sizeof(size_t) bytes starting at an arbitrary
+    // byte offset in _bitmask, so it can read up to sizeof(size_t)-1 bytes past
+    // the last meaningful metadata byte. The metadata region therefore reserves
+    // BIT_PACK extra bytes after the mask (see rehash()/clone()/clear()), kept
+    // zeroed: a zero byte reads as "filled" (bit=0), so the overrun is harmless
+    // and no out-of-range bucket can ever be returned as empty.
     size_type find_empty_bucket(const size_type bucket_from, const size_type main_bucket) {
         assert(_num_filled < _num_buckets); // must have empty slots
-#if EMH_ITER_SAFE
-        const auto boset = bucket_from % 8;
-        auto* const align = reinterpret_cast<uint8_t*>(_bitmask) + bucket_from / 8;
-        static_cast<void>(main_bucket);
-        size_t bmask;
-        memcpy(&bmask, align + 0, sizeof(bmask));
-        bmask >>= boset; // bmask |= ((size_t)align[8] << (SIZE_BIT - boset));
-        if (EMH_LIKELY(bmask != 0))
-            return bucket_from + CTZ(bmask);
-#else
         const auto boset = bucket_from % 8;
         auto* const align = reinterpret_cast<uint8_t*>(_bitmask) + bucket_from / 8;
         static_cast<void>(main_bucket);
         size_t bmask;
         memcpy(&bmask, align, sizeof(bmask));
-        bmask >>= boset;
+        bmask >>= boset; // drop bits below bucket_from
         if (EMH_LIKELY(bmask != 0))
             return bucket_from + CTZ(bmask);
-#endif
 
         const auto qmask = _mask / SIZE_BIT;
         auto& last = EMH_BUCKET(_pairs, _num_buckets);
@@ -1620,41 +1644,14 @@ private:
             const auto next1 = (qmask / 2 + last) & qmask;
             size_t bmask1;
             memcpy(&bmask1, _bitmask + next1 * sizeof(size_t), sizeof(bmask1));
-            if (bmask1 != 0) {
+            // next1 == last only when qmask == 0 (num_buckets <= SIZE_BIT); the
+            // word was just proven zero, so skip the redundant re-read.
+            if (next1 != last && bmask1 != 0) {
                 last = next1;
                 return next1 * SIZE_BIT + CTZ(bmask1);
             }
             last += 1;
         }
-    }
-
-    // key is not in this map. Find a place to put it.
-    size_type find_unique_empty(const size_type bucket_from) {
-        const auto boset = bucket_from % 8;
-        auto* const align = reinterpret_cast<uint8_t*>(_bitmask) + bucket_from / 8;
-
-#if EMH_ITER_SAFE
-        size_t bmask;
-        memcpy(&bmask, align + 0, sizeof(bmask));
-        bmask >>= boset;
-#else
-        size_t bmask;
-        memcpy(&bmask, align, sizeof(bmask));
-        bmask >>= boset;
-#endif
-        if (EMH_LIKELY(bmask != 0))
-            return bucket_from + CTZ(bmask);
-
-        const auto qmask = _mask / SIZE_BIT;
-        for (auto last = (bucket_from + _mask) & qmask;;) {
-            size_t bmask2;
-            memcpy(&bmask2, _bitmask + last * sizeof(size_t), sizeof(bmask2));
-            if (EMH_LIKELY(bmask2 != 0))
-                return last * SIZE_BIT + CTZ(bmask2);
-            last = (last + 1) & qmask;
-        }
-
-        return 0;
     }
 
     size_type find_last_bucket(size_type main_bucket) const {
@@ -1774,7 +1771,11 @@ private:
     }
 
 private:
-    using bit_type = uint8_t; // uint8_t uint16_t, uint32_t.
+    // 8-bit: find_empty_bucket's SWAR empty-scan reads one byte per 8 buckets and
+    // derives bucket_from/8 + bucket_from%8, so the mask element must stay 1 byte.
+    using bit_type = uint8_t;
+    static_assert(sizeof(bit_type) == 1,
+                  "find_empty_bucket SWAR scan assumes 8 bits per metadata byte; bit_type must be 1 byte");
     bit_type* _bitmask;
     PairT* _pairs;
     size_type _mask;
