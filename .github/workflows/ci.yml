@@ -114,9 +114,10 @@ jobs:
           FLAGS="-std=c++17 -O2 $CXXFLAGS_EXTRA -I../include -I. -Icommon"
           # Unit tests (doctest-based, standalone executables)
           for f in unit/test_crud unit/test_full_api unit/test_copy_move unit/test_iterators \
-                   unit/test_edge_cases unit/test_string_keys unit/test_special_keys \
-                   unit/test_reserve_clear unit/test_allocator unit/test_hashset \
-                   unit/test_stress_correctness unit/test_small_data unit/test_iterator_invalidation; do
+                   unit/test_iterator_invalidation unit/test_edge_cases unit/test_string_keys \
+                   unit/test_special_keys unit/test_reserve_clear unit/test_allocator unit/test_hashset \
+                   unit/test_stress_correctness unit/test_small_data unit/test_api_coverage \
+                   unit/test_ht8_optimizations unit/test_ht8_hetero; do
             $CXX $FLAGS $f.cpp -o $(basename $f)
           done
           # Memory tests

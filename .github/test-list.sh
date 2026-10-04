@@ -31,6 +31,8 @@ UNIT_TESTS=(
     test_stress_correctness
     test_small_data
     test_api_coverage
+    test_ht8_optimizations
+    test_ht8_hetero
 )
 
 # Memory tests — sanitizer + leak + lifecycle (doctest)
