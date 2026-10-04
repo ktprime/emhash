@@ -130,6 +130,10 @@ if(WITH_BENCHMARKS)
     emhash_add_bench(zbench  zhash_bench.cc)
     emhash_add_bench(jbench  hash_join2.cpp)
     target_link_libraries(jbench PRIVATE OpenMP::OpenMP_CXX)
+
+    # Canonical, reproducible benchmark harness + paired A/B comparison runner.
+    # Self-contained target; see bench/framework/README.md.
+    add_subdirectory(bench/framework)
 endif()
 
 if(WITH_EXAMPLES)
