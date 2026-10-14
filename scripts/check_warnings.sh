@@ -27,11 +27,13 @@ echo "Checking warnings with $CXX -std=$STANDARD ..."
 echo ""
 
 WARNING_COUNT=0
-for f in "$ROOT_DIR"/tests/verify/*.cpp "$ROOT_DIR"/tests/stress/*.cpp \
-         "$ROOT_DIR"/tests/attack/*.cpp "$ROOT_DIR"/tests/debug/*.cpp; do
+for f in "$ROOT_DIR"/tests/unit/*.cpp "$ROOT_DIR"/tests/memory/*.cpp \
+         "$ROOT_DIR"/tests/stress/*.cpp "$ROOT_DIR"/tests/attack/*.cpp; do
     rel="${f#$ROOT_DIR/}"
     echo "=== $rel ==="
-    warnings=$($CXX -std="$STANDARD" -O2 -Wall -Wextra -I"$ROOT_DIR/include" -c "$f" -o /dev/null 2>&1 | grep "warning:" || true)
+    warnings=$($CXX -std="$STANDARD" -O2 -Wall -Wextra \
+        -I"$ROOT_DIR/include" -I"$ROOT_DIR/tests" -I"$ROOT_DIR/tests/common" \
+        -c "$f" -o /dev/null 2>&1 | grep "warning:" || true)
     if [ -n "$warnings" ]; then
         echo "$warnings"
         WARNING_COUNT=$((WARNING_COUNT + $(echo "$warnings" | wc -l)))

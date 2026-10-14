@@ -48,6 +48,7 @@ HEADERS=(
     "emilib/emihmap1.hpp"
     "emilib/emihmap2.hpp"
     "emilib/emihmap3.hpp"
+    "emilib/emihmap4.hpp"
     "emilib/emihset2.hpp"
     "emilib/emihset3.hpp"
 )

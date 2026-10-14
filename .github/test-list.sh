@@ -58,7 +58,7 @@ ATTACK_TESTS=(
     test_collision_hardening
 )
 
-# Debug test — only in build job (depends on uncommitted scratch files)
+# Debug test — built in the build job only (kept out of sanitizer/coverage jobs)
 DEBUG_TESTS=(
     debug_all_maps
 )
