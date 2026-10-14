@@ -980,6 +980,19 @@ public:
         return {{this, bucket}, bempty};
     }
 
+    /// try_emplace core: constructs the mapped value in place from args.
+    /// Unlike do_insert(K&&, V&&) it accepts zero or multiple mapped-value
+    /// constructor arguments (issue #104). If the key already exists, no value
+    /// is constructed and the arguments are left untouched, as required by std.
+    template <typename K = KeyT, class... Args> std::pair<iterator, bool> do_try_emplace(K&& key, Args&&... args) {
+        const auto bucket = find_or_allocate(key);
+        const auto bempty = EMH_EMPTY(_pairs, bucket);
+        if (bempty) {
+            EMH_NEW(std::forward<K>(key), ValueT(std::forward<Args>(args)...), bucket);
+        }
+        return {{this, bucket}, bempty};
+    }
+
     template <typename K = KeyT, typename V> std::pair<iterator, bool> do_assign(K&& key, V&& val) {
         check_expand_need();
         const auto bucket = find_or_allocate(key);
@@ -1079,12 +1092,18 @@ public:
 
     template <class... Args> std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) {
         check_expand_need();
-        return do_insert(key, std::forward<Args>(args)...);
+        if constexpr (sizeof...(Args) == 1)
+            return do_insert(key, std::forward<Args>(args)...);
+        else
+            return do_try_emplace(key, std::forward<Args>(args)...);
     }
 
     template <class... Args> std::pair<iterator, bool> try_emplace(KeyT&& key, Args&&... args) {
         check_expand_need();
-        return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
+        if constexpr (sizeof...(Args) == 1)
+            return do_insert(std::forward<KeyT>(key), std::forward<Args>(args)...);
+        else
+            return do_try_emplace(std::forward<KeyT>(key), std::forward<Args>(args)...);
     }
 
     template <class... Args> iterator try_emplace(const_iterator hint, const KeyT& key, Args&&... args) {

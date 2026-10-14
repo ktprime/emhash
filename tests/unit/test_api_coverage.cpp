@@ -9,6 +9,7 @@
 //   - erase by range (first, last)
 //   - emplace_hint / equal_range
 //   - non-default-constructible value (emplace/try_emplace correctness)
+//   - try_emplace with zero/multiple mapped-value ctor args (issue #104)
 //   - INT_MAX / SIZE_MAX key boundaries
 //   - non-member swap (ADL)
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -269,6 +270,266 @@ TEST_CASE("emplace/try_emplace with non-default-constructible value (emhash5/8)"
     m8.try_emplace(2, 200);
     CHECK(m8.at(1).v == 100);
     CHECK(m8.at(2).v == 200);
+}
+
+// ============================================================================
+// 8b. try_emplace with zero / multiple mapped-value ctor args (issue #104)
+// ============================================================================
+struct MultiArg {
+    int v;
+    MultiArg() : v(0) {}
+    explicit MultiArg(int x) : v(x) {}
+    MultiArg(int x, int y) : v(x * 10 + y) {}
+    bool operator==(const MultiArg& o) const { return v == o.v; }
+};
+
+TEST_CASE("try_emplace with zero/multiple value ctor args (issue #104)") {
+    using M5 = emhash5::HashMap<int, MultiArg>;
+    using M6 = emhash6::HashMap<int, MultiArg>;
+    using M7 = emhash7::HashMap<int, MultiArg>;
+    using M8 = emhash8::HashMap<int, MultiArg>;
+
+    auto test_map = [](auto& m) {
+        // zero mapped-value ctor args -> value-initialized
+        auto [it0, ok0] = m.try_emplace(1);
+        CHECK(ok0);
+        CHECK(it0 != m.end());
+        CHECK(it0->second == MultiArg());
+
+        // one mapped-value arg (pre-existing fast path, unchanged)
+        auto [it1, ok1] = m.try_emplace(2, 5);
+        CHECK(ok1);
+        CHECK(it1->second == MultiArg(5));
+
+        // multiple mapped-value ctor args
+        auto [it2, ok2] = m.try_emplace(3, 2, 3);
+        CHECK(ok2);
+        CHECK(it2->second == MultiArg(2, 3));
+
+        // existing key: no overwrite on either key-forwarding overload
+        int lkey = 1;
+        auto [it3, ok3] = m.try_emplace(lkey, 9, 9);
+        CHECK_FALSE(ok3);
+        CHECK(it3->second == MultiArg());
+        auto [it4, ok4] = m.try_emplace(1, 9, 9);
+        CHECK_FALSE(ok4);
+        CHECK(it4->second == MultiArg());
+        CHECK(m.size() == 3);
+    };
+
+    M5 m5;
+    test_map(m5);
+    M6 m6;
+    test_map(m6);
+    M7 m7;
+    test_map(m7);
+    M8 m8;
+    test_map(m8);
+}
+
+// ============================================================================
+// 8c. try_emplace std-conformance: no value construction when key exists
+// ============================================================================
+struct CountedVal {
+    inline static int ctor_count = 0;
+    int v;
+    CountedVal() : v(0) { ++ctor_count; }
+    explicit CountedVal(int x) : v(x) { ++ctor_count; }
+    CountedVal(int x, int y) : v(x * 10 + y) { ++ctor_count; }
+    bool operator==(const CountedVal& o) const { return v == o.v; }
+};
+
+TEST_CASE("try_emplace does not construct value when key exists (issue #104 conformance)") {
+    using M5 = emhash5::HashMap<int, CountedVal>;
+    using M6 = emhash6::HashMap<int, CountedVal>;
+    using M7 = emhash7::HashMap<int, CountedVal>;
+    using M8 = emhash8::HashMap<int, CountedVal>;
+
+    auto test_map = [](auto& m) {
+        m.try_emplace(1, 5, 5);
+        CHECK(m.at(1) == CountedVal(5, 5));
+
+        // existing key + multiple args: no mapped-value ctor may run
+        CountedVal::ctor_count = 0;
+        auto [it1, ok1] = m.try_emplace(1, 9, 9);
+        CHECK_FALSE(ok1);
+        CHECK(CountedVal::ctor_count == 0);
+        CHECK(it1->second == CountedVal(5, 5));
+
+        // existing key + single arg (do_insert fast path): same guarantee
+        CountedVal::ctor_count = 0;
+        auto [it2, ok2] = m.try_emplace(1, 7);
+        CHECK_FALSE(ok2);
+        CHECK(CountedVal::ctor_count == 0);
+        CHECK(it2->second == CountedVal(5, 5));
+
+        // new key + multiple args: exactly one mapped-value ctor
+        CountedVal::ctor_count = 0;
+        auto [it3, ok3] = m.try_emplace(2, 3, 3);
+        CHECK(ok3);
+        CHECK(CountedVal::ctor_count == 1);
+        CHECK(it3->second == CountedVal(3, 3));
+
+        // new key + zero args: exactly one default ctor
+        CountedVal::ctor_count = 0;
+        auto [it4, ok4] = m.try_emplace(3);
+        CHECK(ok4);
+        CHECK(CountedVal::ctor_count == 1);
+        CHECK(it4->second == CountedVal());
+        CHECK(m.size() == 3);
+    };
+
+    M5 m5;
+    test_map(m5);
+    M6 m6;
+    test_map(m6);
+    M7 m7;
+    test_map(m7);
+    M8 m8;
+    test_map(m8);
+}
+
+// ============================================================================
+// 8d. try_emplace multi-arg across rehash / erase / reinsert cycles
+// ============================================================================
+TEST_CASE_TEMPLATE("try_emplace multi-arg across rehash and erase cycles", Map, emhash5::HashMap<int, MultiArg>,
+                   emhash6::HashMap<int, MultiArg>, emhash7::HashMap<int, MultiArg>, emhash8::HashMap<int, MultiArg>) {
+    Map m;
+
+    for (int i = 0; i < 1000; ++i) {
+        auto [it, ok] = m.try_emplace(i, i % 9, i % 7);
+        CHECK(ok);
+        CHECK(it != m.end());
+    }
+    CHECK(m.size() == 1000);
+    for (int i = 0; i < 1000; ++i)
+        CHECK(m.at(i) == MultiArg(i % 9, i % 7));
+
+    // erase half, reinsert with different ctor args
+    for (int i = 0; i < 1000; i += 2)
+        m.erase(i);
+    CHECK(m.size() == 500);
+    for (int i = 0; i < 1000; i += 2) {
+        auto [it, ok] = m.try_emplace(i, i % 8, i % 5);
+        CHECK(ok);
+        CHECK(it->second == MultiArg(i % 8, i % 5));
+    }
+
+    // remaining odd keys keep original values, multi-arg try_emplace must not overwrite
+    for (int i = 1; i < 1000; i += 2)
+        CHECK_FALSE(m.try_emplace(i, 0, 0).second);
+    for (int i = 1; i < 1000; i += 2)
+        CHECK(m.at(i) == MultiArg(i % 9, i % 7));
+    CHECK(m.size() == 1000);
+}
+
+// ============================================================================
+// 8e. try_emplace multi-arg with std::string keys and values (std::string(n, ch))
+// ============================================================================
+TEST_CASE_TEMPLATE("try_emplace multi-arg with string key/value", Map, emhash5::HashMap<std::string, std::string>,
+                   emhash6::HashMap<std::string, std::string>, emhash7::HashMap<std::string, std::string>,
+                   emhash8::HashMap<std::string, std::string>) {
+    Map m;
+
+    // std::string(count, ch) is a natural multi-arg mapped-value ctor
+    auto [it1, ok1] = m.try_emplace("alpha", 3, 'a');
+    CHECK(ok1);
+    CHECK(it1->first == "alpha");
+    CHECK(it1->second == "aaa");
+
+    // rvalue key overload with multiple value args (key moved in)
+    std::string key = "beta";
+    auto [it2, ok2] = m.try_emplace(std::move(key), 2, 'b');
+    CHECK(ok2);
+    CHECK(it2->first == "beta");
+    CHECK(it2->second == "bb");
+
+    // zero value args -> empty string
+    auto [it3, ok3] = m.try_emplace("gamma");
+    CHECK(ok3);
+    CHECK(it3->second.empty());
+
+    // growth across rehash with SSO-escaping values, rvalue keys
+    for (int i = 0; i < 200; ++i) {
+        auto [it, ok] = m.try_emplace("k" + std::to_string(i), 40, 'x');
+        CHECK(ok);
+        CHECK(it->second == std::string(40, 'x'));
+    }
+    CHECK(m.size() == 203);
+    CHECK(m.at("k0") == std::string(40, 'x'));
+    CHECK(m.at("k199") == std::string(40, 'x'));
+    CHECK(m.at("alpha") == "aaa");
+    CHECK(m.at("beta") == "bb");
+    CHECK(m.at("gamma").empty());
+
+    // existing keys untouched
+    CHECK_FALSE(m.try_emplace("alpha", 9, 'z').second);
+    CHECK(m.at("alpha") == "aaa");
+}
+
+// ============================================================================
+// 8f. try_emplace forwards move-only multi-arg constructor arguments
+// ============================================================================
+struct MoveVal {
+    std::unique_ptr<int> p;
+    int y = 0;
+    MoveVal() = default;
+    explicit MoveVal(std::unique_ptr<int> x) : p(std::move(x)) {}
+    MoveVal(std::unique_ptr<int> x, int yy) : p(std::move(x)), y(yy) {}
+};
+
+TEST_CASE_TEMPLATE("try_emplace forwards move-only multi-arg ctors", Map, emhash5::HashMap<int, MoveVal>,
+                   emhash6::HashMap<int, MoveVal>, emhash7::HashMap<int, MoveVal>, emhash8::HashMap<int, MoveVal>) {
+    Map m;
+
+    // two-arg move-only ctor
+    auto [it1, ok1] = m.try_emplace(1, std::make_unique<int>(7), 8);
+    CHECK(ok1);
+    CHECK(*it1->second.p == 7);
+    CHECK(it1->second.y == 8);
+
+    // single-arg move-only ctor
+    auto [it2, ok2] = m.try_emplace(2, std::make_unique<int>(42));
+    CHECK(ok2);
+    CHECK(*it2->second.p == 42);
+
+    // zero args -> default-constructed (null pointer)
+    auto [it3, ok3] = m.try_emplace(3);
+    CHECK(ok3);
+    CHECK_FALSE(static_cast<bool>(it3->second.p));
+
+    // existing key: move-only argument must NOT be consumed
+    auto raw = std::make_unique<int>(99);
+    auto [it4, ok4] = m.try_emplace(1, std::move(raw), 1);
+    CHECK_FALSE(ok4);
+    CHECK(raw != nullptr);
+    CHECK(*raw == 99);
+    CHECK(*m.at(1).p == 7);
+
+    // container move still works with move-only mapped type
+    Map m2 = std::move(m);
+    CHECK(*m2.at(2).p == 42);
+    CHECK_FALSE(static_cast<bool>(m2.at(3).p));
+}
+
+// ============================================================================
+// 8g. try_emplace hint overload with multi-arg (emhash5)
+// ============================================================================
+TEST_CASE("try_emplace hint overload with multi-arg (emhash5)") {
+    emhash5::HashMap<int, MultiArg> m;
+
+    auto it1 = m.try_emplace(m.end(), 1, 4, 2);
+    CHECK(it1->second == MultiArg(4, 2));
+
+    auto it2 = m.try_emplace(m.begin(), 2);
+    CHECK(it2->second == MultiArg());
+
+    // existing key via hint: no overwrite
+    auto it3 = m.try_emplace(m.begin(), 1, 9, 9);
+    CHECK(it3->second == MultiArg(4, 2));
+
+    CHECK(m.size() == 2);
+    CHECK(m.at(2) == MultiArg());
 }
 
 // ============================================================================
