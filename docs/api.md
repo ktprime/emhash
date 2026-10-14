@@ -37,6 +37,7 @@ HashMap(std::initializer_list<value_type> il); // Initializer list
 | Method | Description |
 |--------|-------------|
 | `emplace(key, val)` | In-place construct insert |
+| `try_emplace(key, args...)` | In-place construct only if key is absent; accepts zero or multiple mapped-value ctor args, no value construction when the key exists (emhash5/6/7/8, issue #104) |
 | `insert({key, val})` | Insert key-value pair |
 | `insert_unique(key, val)` | Direct insert (no existence check, best performance) |
 | `try_set(key, val)` | Set value if key exists, do nothing if it doesn't. Returns `bool`. (emhash5/8, emilib1/2/3) |
@@ -50,6 +51,28 @@ HashMap(std::initializer_list<value_type> il); // Initializer list
 | `equal_range(key)` | Get range of elements matching key (emhash5/6/7/8 only) |
 | `merge(rhs)` | Merge another hash map (emhash5/6/7/8 only) |
 | `clear()` | Clear all elements |
+
+## Heterogeneous String Lookup (emhash8)
+
+When both the hash and the equality types carry an `is_transparent` typedef
+(e.g. `emhash8::string_hash` + `std::equal_to<>`), the following overloads
+accept `std::string_view` and `const char*` directly for `std::string` keys —
+no temporary `std::string` is constructed:
+
+```cpp
+emhash8::HashMap<std::string, int, emhash8::string_hash> map;
+map.find(sv);        map.contains(sv);   map.count(sv);
+map.at(sv);          map.erase(sv);      map.try_get(sv);
+```
+
+All forms content-hash identically to the equivalent `std::string` key.
+
+## Other Functions
+
+| Method | Description |
+|--------|-------------|
+| `hash(key)` | Public per-key hash (emhash8 only; the `EMH_HASH_LOOKUP` feature marker documents the precomputed-hash lookup overloads — `find/contains/count/at/try_get/erase` taking `hash(key)` — which are always available in emhash8) |
+| `swap(a, b)` | ADL free-function swap (`swap(a.map, b.map)`) for emhash8::HashMap; all other containers provide the member `swap()` only |
 
 ## Iterators
 

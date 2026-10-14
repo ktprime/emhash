@@ -3,7 +3,7 @@
 > High-performance, memory-efficient C++ open addressing flat hash table
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![C++ Standard](https://img.shields.io/badge/C%2B%2B-17%2F20-blue.svg)](https://en.cppreference.com/)
+[![C++ Standard](https://img.shields.io/badge/C%2B%2B-17%2F20%2F23-blue.svg)](https://en.cppreference.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![CI](https://github.com/ktprime/emhash/actions/workflows/ci.yml/badge.svg)](https://github.com/ktprime/emhash/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/ktprime/emhash/releases)
@@ -19,6 +19,8 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 - [Version Selection Guide](#version-selection-guide)
 - [Testing](#testing)
 - [Documentation](#documentation)
+- [Contributing](#contributing)
+- [Versioning](#versioning)
 - [Third-Party Benchmarks](#third-party-benchmarks)
 - [License](#license)
 
@@ -45,12 +47,19 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 | `try_set` | Set value if key exists, do nothing if it doesn't (emhash5/8, emilib1/2/3) |
 | `set_get` | Updates value and returns old value (emhash5/8, emilib1/2/3) |
 | `_erase` | Delete operation returning void (faster) |
-| **LRU Mode** | Enable LRU cache optimization with `EMH_LRU_SET` |
+| Heterogeneous lookup | `find`/`contains`/`count`/`at`/`erase`/`try_get` accept `std::string_view` / `const char*` without building a temporary `std::string` (emhash8; requires transparent hash & equality) |
+| **LRU Mode** | Enable LRU cache optimization with `EMH_LRU_SET`, or use the dedicated [lru_size.hpp](include/emhash/lru_size.hpp) / [lru_time.hpp](include/emhash/lru_time.hpp) caches |
+
+### Recent emhash8 Optimizations (v1.1.0)
+- **Zero-cost default constructor**: empty maps share a static sentinel and allocate nothing until the first insert
+- **Heterogeneous string lookup**: see table above — enabled when both the hasher and the equality carry `is_transparent` (e.g. `emhash8::string_hash` + `std::equal_to<>`)
+- **`EMH_POD_HASH`**: opt-in byte-hash for fixed-size (8/12/16-byte) trivially-copyable keys via `-DEMH_POD_HASH=1`
+- **ADL `swap`**: free-function `swap(a, b)` for emhash8::HashMap (other containers use the member `swap()`)
 
 ### Platform Support
 - **Operating Systems**: Windows, Linux, macOS
 - **Processors**: x86_64, ARM64 (Apple M1/M2, AMD, Intel)
-- **Compilers**: GCC, Clang, MSVC (C++17/20)
+- **Compilers**: GCC, Clang, MSVC (C++17/20/23)
 
 ---
 
@@ -239,6 +248,7 @@ See [tests/README.md](tests/README.md) for detailed instructions.
 
 | Document | Description |
 |----------|-------------|
+| [Documentation Index](docs/index.md) | Quick links to all documentation pages |
 | [Test Suite](tests/README.md) | Test organization, build instructions, coverage matrix |
 | [Test Analysis & Coverage Report](docs/test_analysis.md) | Per-file coverage data, test classification, CI integration |
 | [Performance Overview](docs/performance.md) | Benchmark results, high load factor performance |
@@ -250,6 +260,24 @@ See [tests/README.md](tests/README.md) for detailed instructions.
 | [Migration Guide](docs/migration_guide.md) | Migrating from std::unordered_map |
 | [Performance Tracking](docs/performance_tracking.md) | Version-by-version benchmark history, regression policy |
 | [Architecture Decisions (ADR)](docs/adr/README.md) | Why we chose open addressing, header-only, emhash8 layout, etc. |
+
+---
+
+## Contributing
+
+Contributions are welcome. Before opening a pull request:
+
+1. **Add or update tests** for any behavior change — see [tests/README.md](tests/README.md) for the suite layout and build commands.
+2. **Format your code** with `clang-format` (LLVM style, see [.clang-format](.clang-format)); CI enforces this via `format-check.yml`. CMake files are excluded from formatting.
+3. **Run the test suite locally** — at minimum the `quick_test` target.
+4. CI gates your PR against: unit/memory/stress/attack tests (GCC, Clang, MSVC), sanitizer builds (ASan/UBSan/MSan), C++17/20/23 compatibility, an 80% line-coverage floor, clang-tidy, and a benchmark regression gate (20% threshold).
+
+---
+
+## Versioning
+
+- The library version lives in the [VERSION](VERSION) file (currently **1.1.0**); CMake reads it via `project(emhash VERSION ...)` and the vcpkg port reuses it.
+- Releases are tagged `vX.Y.Z`; the installed CMake package config uses `SameMajorVersion` compatibility.
 
 ---
 

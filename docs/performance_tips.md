@@ -112,7 +112,9 @@ emhash7::HashMap<int, int> map;  // OK for random keys
 
 ```bash
 # Compile with wyhash for faster string hashing
-g++ -DEMH_WY_HASH=1 -O3 -std=c++17 your_app.cpp
+# emhash5/6/7 use EMH_WY_HASH; emhash8 / hash_set8 use EMH_WYHASH_HASH
+g++ -DEMH_WY_HASH=1 -O3 -std=c++17 your_app.cpp          # emhash5/6/7
+g++ -DEMH_WYHASH_HASH=1 -O3 -std=c++17 your_app.cpp      # emhash8, hash_set8
 ```
 
 ### 11. Custom Hash: Avoid Poor Hash Functions

@@ -4,14 +4,15 @@
 
 ```
 bench/
-├── *.cpp          # Official benchmarks (built by CMake WITH_BENCHMARKS=ON)
-├── research/      # One-off investigation scripts (not built by CMake)
-└── README.md      # This file
+├── *.cpp           # Official benchmarks (built by CMake WITH_BENCHMARKS=ON)
+├── framework/      # Reproducible harness + paired A/B comparison tool (see framework/README.md)
+├── research/       # One-off investigation scripts (not built by CMake)
+└── README.md       # This file
 ```
 
 ## Official Benchmarks (CMake targets)
 
-Built via `cmake -DWITH_BENCHMARKS=ON ..`:
+Built via `cmake -B build -DWITH_BENCHMARKS=ON`:
 
 | Target        | Source                     | Description                          |
 |---------------|----------------------------|--------------------------------------|
@@ -26,16 +27,22 @@ Built via `cmake -DWITH_BENCHMARKS=ON ..`:
 | `zbench`      | zhash_bench.cc             | zhashmap comparison                  |
 | `jbench`      | hash_join2.cpp             | Hash join (OpenMP parallel)          |
 
+The `bench/framework/` subdirectory additionally provides `emhash_bench` — a
+zero-dependency, reproducible single-workload harness with a paired A/B runner
+(`ab.sh` / `ab.ps1`). See [framework/README.md](framework/README.md) for build
+and methodology details.
+
 ## Research Scripts (bench/research/)
 
-One-off investigation scripts not included in CMake build:
-- `bench_swiss_debug[2-4].cpp` — Swiss table debugging
-- `bench_diag*.cpp`, `bench_clang_diag.cpp` — Diagnostic benchmarks
+One-off investigation scripts not included in the CMake build:
+- `bench_swiss_debug*.cpp` — Swiss table debugging
+- `bench_diag*.cpp`, `bench_hash_diag.cpp`, `bench_clang_diag.cpp` — Diagnostic benchmarks
 - `find_asm_micro.cpp`, `find_clang_investigate.cpp` — Assembly-level find analysis
 - `find_prefetch_test.cpp` — Prefetch impact measurement
-- `microbench_emihmap4.cpp` — Micro-benchmark for emihmap4
+- `microbench_emihmap4.cpp`, `micro_udm.cpp` — Micro-benchmarks for single implementations
 
 To compile a research script manually:
+
 ```bash
 g++ -O3 -std=c++17 -I../include -I../thirdparty research/<script>.cpp -o /tmp/bench
 ```
@@ -43,6 +50,6 @@ g++ -O3 -std=c++17 -I../include -I../thirdparty research/<script>.cpp -o /tmp/be
 ## CI Benchmark Gate
 
 The CI `benchmark` job uses `tests/bench/emhash_bench.cpp` (Google Benchmark),
-which covers Insert/FindHit/FindMiss/Erase/Iterate for all emhash map/set types
-at 100K elements, plus string key and SetFindMiss scenarios.
+which covers Insert/FindHit/FindMiss/Erase/Iterate for all emhash map and set
+types at 100K elements, plus string key and SetFindMiss scenarios.
 Regression threshold: **20%** (see `.github/workflows/ci.yml`).

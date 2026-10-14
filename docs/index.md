@@ -5,11 +5,11 @@ A high-performance, header-only C++ hash table library with multiple implementat
 ## Features
 
 - **Header-only**: Single `#include`, no compilation needed
-- **Multiple implementations**: 4 emhash versions + 3 emilib SIMD-accelerated versions
+- **Multiple implementations**: 4 emhash versions + 4 emilib versions (3 SIMD-accelerated + 1 experimental Swiss table)
 - **Extremely fast**: 2-3x faster than `std::unordered_map` for most operations
 - **High load factor**: emhash7 supports load factors up to 0.999
 - **SIMD-accelerated**: emilib versions use SSE2/AVX2/AVX-512 for vectorized lookups
-- **Custom allocators**: All versions support custom allocators
+- **Custom allocators**: emhash5/6/7/8 support custom allocators
 - **C++17 compatible**: Requires C++17 or later
 
 ## Quick Start

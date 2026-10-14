@@ -1,4 +1,4 @@
-# emhash benchmark framework
+# emhash Benchmark Framework
 
 A small, zero-dependency benchmark harness and a paired A/B comparison tool for
 the emhash/emilib hash tables.
