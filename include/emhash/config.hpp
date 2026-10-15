@@ -1,6 +1,12 @@
 // emhash shared configuration macros
 // https://github.com/ktprime/emhash
 //
+// Macro boundary: this header owns only cross-implementation behavior macros
+// (prefetch, branch hints, inlining, hashing, sanitizer shims). Structural
+// macros that are private to one implementation (e.g. EMH_BUCKET_INDEX in
+// hash_table8.hpp, EMH_HIGH_LOAD in hash_table5.hpp) live in that header and
+// must not be moved here or relied upon by other implementations.
+//
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2019-2026 Huang Yuanbing & bailuzhou AT 163.com
