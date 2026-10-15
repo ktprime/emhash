@@ -272,6 +272,13 @@ Contributions are welcome. Before opening a pull request:
 3. **Run the test suite locally** — at minimum the `quick_test` target.
 4. CI gates your PR against: unit/memory/stress/attack tests (GCC, Clang, MSVC), sanitizer builds (ASan/UBSan/MSan), C++17/20/23 compatibility, an 80% line-coverage floor, clang-tidy, and a benchmark regression gate (20% threshold).
 
+### Development Conventions
+
+- **API contract**: all map implementations (emhash5-8 and emilib1-4) expose the same core surface; this is enforced at compile time by [tests/unit/test_api_contract.cpp](tests/unit/test_api_contract.cpp). Documented deviations (e.g. only emhash5 has `try_emplace(hint, ...)`) are asserted there too — flipping an assertion requires updating the documentation in the same PR.
+- **Performance evidence grading**: trust conclusions in this order — allocation counts > instruction counts (e.g. valgrind callgrind) > consistent multi-compiler / multi-scale trends > single-run wall-clock numbers. Single-point ns/op comparisons are not valid regression evidence; measurement noise on typical dev machines can exceed ±10-50%.
+- **Optimization acceptance**: an optimization lands only with interleaved A/B benchmark data showing it is faster; otherwise keep the simpler code.
+- **Cross-implementation sync**: API and conformance changes must be applied to all four hash_table implementations (5/6/7/8) in the same PR and covered by the contract test above.
+
 ---
 
 ## Versioning
