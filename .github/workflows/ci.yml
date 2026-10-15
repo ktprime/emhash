@@ -17,6 +17,21 @@ concurrency:
 
 jobs:
   # ==========================================================================
+  # Registration check: every tests/unit + tests/memory test must be compiled
+  # and run in all four comprehensive jobs; stress/attack must be referenced
+  # by windows-msvc. Catches "test added but never registered in CI" gaps.
+  # ==========================================================================
+  registration:
+    name: CI Lists / Registration Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check test registration
+        run: python3 scripts/check_ci_registration.py
+
+  # ==========================================================================
   # Core build + test (4 matrix: ubuntu/macos × g++/clang++)
   # Compiles all test binaries in one step, runs them in one step.
   # Strict warnings use -fsyntax-only (no codegen) for speed.
@@ -117,7 +132,7 @@ jobs:
                    unit/test_iterator_invalidation unit/test_edge_cases unit/test_string_keys \
                    unit/test_special_keys unit/test_reserve_clear unit/test_allocator unit/test_hashset \
                    unit/test_stress_correctness unit/test_small_data unit/test_api_coverage \
-                   unit/test_ht8_optimizations unit/test_ht8_hetero; do
+                   unit/test_api_contract unit/test_emilib_lifecycle unit/test_ht8_optimizations unit/test_ht8_hetero; do
             $CXX $FLAGS $f.cpp -o $(basename $f)
           done
           # Memory tests
@@ -154,6 +169,11 @@ jobs:
           $TIMEOUT 120 ./test_stress_correctness
           $TIMEOUT 120 ./test_small_data
           $TIMEOUT 120 ./test_iterator_invalidation
+          $TIMEOUT 120 ./test_api_contract
+          $TIMEOUT 120 ./test_emilib_lifecycle
+          $TIMEOUT 120 ./test_api_coverage
+          $TIMEOUT 120 ./test_ht8_optimizations
+          $TIMEOUT 120 ./test_ht8_hetero
           # Memory tests
           $TIMEOUT 120 ./test_string_key_leak
           $TIMEOUT 300 ./test_lifecycle_audit
@@ -270,6 +290,10 @@ jobs:
           $CXX $SAN unit/test_crud.cpp -o test_crud_asan
           $CXX $SAN unit/test_full_api.cpp -o test_full_api_asan
           $CXX $SAN unit/test_api_coverage.cpp -o test_api_coverage_asan
+          $CXX $SAN unit/test_api_contract.cpp -o test_api_contract_asan
+          $CXX $SAN unit/test_emilib_lifecycle.cpp -o test_emilib_lifecycle_asan
+          $CXX $SAN unit/test_ht8_optimizations.cpp -o test_ht8_optimizations_asan
+          $CXX $SAN unit/test_ht8_hetero.cpp -o test_ht8_hetero_asan
           $CXX $SAN unit/test_copy_move.cpp -o test_copy_move_asan
           $CXX $SAN unit/test_iterators.cpp -o test_iterators_asan
           $CXX $SAN unit/test_hashset.cpp -o test_hashset_asan
@@ -294,6 +318,10 @@ jobs:
           ./test_crud_asan
           ./test_full_api_asan
           ./test_api_coverage_asan
+          ./test_api_contract_asan
+          ./test_emilib_lifecycle_asan
+          ./test_ht8_optimizations_asan
+          ./test_ht8_hetero_asan
           ./test_copy_move_asan
           ./test_iterators_asan
           ./test_hashset_asan
@@ -487,7 +515,7 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_stress_correctness test_small_data test_iterator_invalidation test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_complex_conditions test_hash_attack test_collision_hardening
+        run: cmake --build build --config ${{ matrix.config }} --target test_crud test_full_api test_copy_move test_iterators test_edge_cases test_string_keys test_special_keys test_reserve_clear test_allocator test_hashset test_stress_correctness test_small_data test_api_contract test_emilib_lifecycle test_api_coverage test_ht8_optimizations test_ht8_hetero test_iterator_invalidation test_string_key_leak test_lifecycle_audit test_sanitizer test_stress_all test_highload test_bad_hash test_reserve_fix test_million_stress test_complex_conditions test_hash_attack test_collision_hardening
         shell: bash
 
       - name: Run tests
@@ -498,7 +526,7 @@ jobs:
           # Fast tests (always run)
           for t in test_crud test_full_api test_copy_move test_iterators test_edge_cases \
                    test_string_keys test_special_keys test_reserve_clear test_allocator \
-                   test_hashset test_stress_correctness test_small_data test_iterator_invalidation test_string_key_leak test_lifecycle_audit test_sanitizer; do
+                   test_hashset test_stress_correctness test_small_data test_iterator_invalidation test_api_contract test_emilib_lifecycle test_api_coverage test_ht8_optimizations test_ht8_hetero test_string_key_leak test_lifecycle_audit test_sanitizer; do
             echo "=== Running $t ==="
             "$DIR/$t.exe" || { echo "::error::$t failed"; exit 1; }
           done
@@ -719,6 +747,10 @@ jobs:
           ccache g++ $COV unit/test_small_data.cpp -o test_small_data_cov
           ccache g++ $COV unit/test_iterator_invalidation.cpp -o test_iterator_invalidation_cov
           ccache g++ $COV unit/test_api_coverage.cpp -o test_api_coverage_cov
+          ccache g++ $COV unit/test_api_contract.cpp -o test_api_contract_cov
+          ccache g++ $COV unit/test_emilib_lifecycle.cpp -o test_emilib_lifecycle_cov
+          ccache g++ $COV unit/test_ht8_optimizations.cpp -o test_ht8_optimizations_cov
+          ccache g++ $COV unit/test_ht8_hetero.cpp -o test_ht8_hetero_cov
           ccache g++ $COV memory/test_string_key_leak.cpp -o test_string_key_leak_cov
           ccache g++ $COV memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cov
           ccache g++ $COV memory/test_sanitizer.cpp -o test_sanitizer_cov
@@ -749,6 +781,10 @@ jobs:
           ./test_small_data_cov
           ./test_iterator_invalidation_cov
           ./test_api_coverage_cov
+          ./test_api_contract_cov
+          ./test_emilib_lifecycle_cov
+          ./test_ht8_optimizations_cov
+          ./test_ht8_hetero_cov
           ./test_string_key_leak_cov
           ./test_lifecycle_audit_cov
           ./test_sanitizer_cov
