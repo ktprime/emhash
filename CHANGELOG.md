@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-15
+
+### Added
+- Compile-time API contract test (`tests/unit/test_api_contract.cpp`) asserting the shared surface of all 8 map implementations and 5 sets, including the `try_emplace` zero/one/multi-argument forms (issue #104 guard) and pinned documented deviations
+- `scripts/check_ci_registration.py` plus a fast-forward CI `registration` job: every unit/memory test must be compiled and run in the build, asan, coverage and windows-msvc jobs
+- Heterogeneous lookup for `emhash8::HashMap`: transparent-hash overloads (`find`/`contains`/`count`/`at`/`erase`/`try_get`) accepting `string_view`/`char*` keys (find-hit ~43% faster than temporary-string construction)
+- `bench/framework` and `bench/emilib_bench` benchmark suites, A/B scenarios and a callgrind instruction probe for layout-noise-free regression evidence
+- README "Development Conventions": performance evidence grading, optimization acceptance rule, cross-implementation sync checklist
+
+### Changed
+- `hash_table8.hpp` optimizations (borrowed from martinus/unordered_dense): shared empty-index sentinel with lazy allocation (default construction 63ns → 0.4ns, zero allocations), ADL `swap`, opt-in `EMH_POD_HASH` byte-hashing for 8/12/16-byte trivially-copyable keys, precomputed-hash lookup path
+- CI: fixed 10 registration gaps — `test_ht8_optimizations`/`test_ht8_hetero` now run in asan and coverage jobs, `test_api_coverage` and both ht8 tests added to windows-msvc, three compiled-but-never-run tests now executed
+
+### Fixed
+- [#104](https://github.com/ktprime/emhash/issues/104): `HashMap::try_emplace` failed to compile with zero or multiple mapped-value constructor arguments on `hash_table5-8`; the value is now constructed in place from the argument pack and only when the key is absent
+- `hash_table7.hpp` hardening: CTZ byte-swap width matched to `sizeof(size_t)` (32-bit safe), power-of-two metadata invariants documented and asserted, dead code removed
+
+## [1.2.0] - 2026-07-15
+
 ### Added
 - `VERSION` file at repo root for build scripts to read the current version
 - `docs/adr/` directory with initial 4 ADRs (open addressing, emhash8 layout, no-tombstone emhash7, header-only)

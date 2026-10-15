@@ -6,7 +6,7 @@
 [![C++ Standard](https://img.shields.io/badge/C%2B%2B-17%2F20%2F23-blue.svg)](https://en.cppreference.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![CI](https://github.com/ktprime/emhash/actions/workflows/ci.yml/badge.svg)](https://github.com/ktprime/emhash/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/ktprime/emhash/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-green.svg)](https://github.com/ktprime/emhash/releases)
 
 emhash is a family of high-performance, **header-only** hash table implementations designed for maximum performance and memory efficiency. Through innovative collision resolution strategies and cache optimization techniques, emhash demonstrates exceptional performance across various benchmarks.
 
@@ -80,7 +80,7 @@ git clone https://github.com/ktprime/emhash.git
 # Option C: CMake FetchContent (no install needed)
 # Add to your CMakeLists.txt:
 #   include(FetchContent)
-#   FetchContent_Declare(emhash GIT_REPOSITORY https://github.com/ktprime/emhash.git GIT_TAG v1.1.0)
+#   FetchContent_Declare(emhash GIT_REPOSITORY https://github.com/ktprime/emhash.git GIT_TAG v1.3.0)
 #   FetchContent_MakeAvailable(emhash)
 #   target_link_libraries(your_target PRIVATE emhash::emhash)
 
@@ -283,7 +283,7 @@ Contributions are welcome. Before opening a pull request:
 
 ## Versioning
 
-- The library version lives in the [VERSION](VERSION) file (currently **1.1.0**); CMake reads it via `project(emhash VERSION ...)` and the vcpkg port reuses it.
+- The library version lives in the [VERSION](VERSION) file (currently **1.3.0**); CMake reads it via `project(emhash VERSION ...)` and the vcpkg port reuses it.
 - Releases are tagged `vX.Y.Z`; the installed CMake package config uses `SameMajorVersion` compatibility.
 
 ---
