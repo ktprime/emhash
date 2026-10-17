@@ -46,7 +46,7 @@ emhash is a family of high-performance, **header-only** hash table implementatio
 | `try_get` | Returns pointer to value, `nullptr` if key not found |
 | `try_set` | Set value if key exists, do nothing if it doesn't (emhash5/8, emilib1/2/3) |
 | `set_get` | Updates value and returns old value (emhash5/8, emilib1/2/3) |
-| `_erase` | Delete operation returning void (faster) |
+| `_erase` | Faster void-returning delete — iterator form in emhash5-7, key form in emilib1-3 (absent from emhash8/emilib4) |
 | Heterogeneous lookup | `find`/`contains`/`count`/`at`/`erase`/`try_get` accept `std::string_view` / `const char*` without building a temporary `std::string` (emhash8; requires transparent hash & equality) |
 | **LRU Mode** | Enable LRU cache optimization with `EMH_LRU_SET`, or use the dedicated [lru_size.hpp](include/emhash/lru_size.hpp) / [lru_time.hpp](include/emhash/lru_time.hpp) caches |
 
@@ -200,12 +200,70 @@ Consider emilib2 (Swiss Table) if:
 | Feature | emhash5 | emhash6 | emhash7 | emhash8 | emilib1/2/3 | emilib4 |
 |---------|---------|---------|---------|---------|-------------|---------|
 | High load factor (0.9+) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `try_set` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| `set_get` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| Custom allocator | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `try_set` | ⚠️² | ❌ | ❌ | ✅ | ✅ | ❌ |
+| `set_get` | ✅³ | ❌ | ❌ | ✅³ | ✅⁴ | ❌ |
+| `try_get` | ⚠️² | ⚠️² | ⚠️² | ✅⁵ | ✅⁶ | ✅⁶ |
+| `_erase` | ✅⁸ | ✅⁸ | ✅⁸ | ❌ | ✅⁸ | ❌ |
+| `erase(it)` returns iterator | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `insert_unique(value_type)` overload | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `hash_function()`/`key_eq()` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `emplace_hint` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `merge` | ✅ | ⚠️¹ | ⚠️¹ | ✅ | ✅ | ✅ |
+| Precomputed `hash(key)` lookup | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Heterogeneous erase/try_get (transparent hash) | ❌ | ❌ | ❌ | ✅⁷ | ❌ | ❌ |
 | SIMD acceleration | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | No tombstones | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Bidirectional iterator | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Dense pairs iteration | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+
+> API presence is enforced by [`tests/unit/test_api_contract.cpp`](tests/unit/test_api_contract.cpp) (compile-time contract) and audited against the headers at release time.
+>
+> Uniformly available on all map implementations (hence not listed above): `try_emplace` including the zero/multi value-arg forms (issue #104), `insert_or_assign`, `erase_if`, `contains`, `at`, `count`, `insert_unique`, `reserve`/`rehash`, `shrink_to_fit`, member `swap`, `operator==`/`operator!=`, custom allocator (`AllocT` as the trailing template parameter, allocator-extended constructors, `get_allocator`).
+>
+> ¹ `merge` exists on emhash6/7 but has a known key-loss bug during rehash (see [CHANGELOG](CHANGELOG.md) Known Issues).
+>
+> ² Available only when `EMH_EXT` is defined (off by default) — the `#ifdef EMH_EXT` block in emhash5-7 holds `try_get`/`try_set`.
+>
+> ³ Shape: `ValueT set_get(key, val)` (get-or-insert), plus a `bool set_get(key, val, old_out)` overload.
+>
+> ⁴ Shape: `bool set_get(key, val, old_out)` only (no 2-arg form).
+>
+> ⁵ Shape: `bool try_get(key, out&)`. Caution for integer keys: the precomputed-hash overload `try_get(key, uint64_t)` can make plain `try_get(1, out)` ambiguous in multi-header builds — prefer `find()`/`operator[]`.
+>
+> ⁶ Shape: `ValueT* try_get(key)` (returns nullptr when absent).
+>
+> ⁷ Requires a transparent hasher + equality (e.g. `emhash8::string_hash` + `std::equal_to<>`). emhash5-7 `find()` is an open template that only works heterogeneously with a transparent equality; they provide no heterogeneous `erase`/`try_get`.
+>
+> ⁸ Shape: emhash5-7 take `_erase(iterator)`, emilib1-3 take `_erase(key)` (emilib2 also has the iterator form). emhash8/emilib4 provide neither — use `erase()`.
+>
+> Hash sets (`emhash2/4/8::HashSet`, `emilib2/3::HashSet`) mirror the corresponding map structures; set API surface is covered by the same contract test.
+
+### Set Feature Matrix
+
+| Feature | emhash2 | emhash4 | emhash8 | emilib2 | emilib3 |
+|---------|---------|---------|---------|---------|---------|
+| High load factor (0.9+) | ✅¹⁰ | ✅ | ✅ | ❌¹⁰ | ✅ |
+| `emplace_hint` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `merge` | ✅ | ✅ | ✅ | ⚠️⁹ | ⚠️⁹ |
+| `erase_if` | ✅ | ✅ | ✅ | ⚠️⁹ | ⚠️⁹ |
+| `_erase` | ✅¹¹ | ✅¹¹ | ❌¹¹ | ✅¹¹ | ✅¹¹ |
+| `erase(it)` returns iterator | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `hash_function()`/`key_eq()` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Custom allocator | ✅ | ✅ | ✅ | ❌¹² | ❌¹² |
+| SIMD acceleration | ❌ | ❌ | ❌ | ✅ | ✅ |
+| No tombstones | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Bidirectional iterator | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Dense storage iteration | ❌ | ❌ | ✅ | ✅ | ✅ |
+
+> Uniformly available on all sets (hence not listed above): `insert`/`insert_unique`, `contains`, `count`, `try_emplace` (insert-if-absent), `reserve`/`rehash`, `shrink_to_fit`, member `swap`, `operator==`/`operator!=`.
+>
+> ⁹ Present but has a known runtime issue (see [CHANGELOG](CHANGELOG.md) Known Issues) — prefer per-element `erase()` until fixed.
+>
+> ¹⁰ emhash2 defaults to load factor 0.95; emilib2's `max_load_factor(float)` is a no-op (fixed at 7/8 = 0.875); emilib3 accepts up to 0.999. Note the emilib2 *map* does support a settable load factor — this divergence is set-only.
+>
+> ¹¹ hash_set8 provides no `_erase()`; use `erase()` instead. Shapes differ elsewhere: emhash2/4 take `_erase(iterator)`, emilib2/3 take `_erase(key)` (emilib2 has both).
+>
+> ¹² emilib *maps* support custom allocators; the emilib *sets* do not take an `AllocT` template parameter.
 
 See [Performance Overview](docs/performance.md) for detailed benchmark numbers.
 

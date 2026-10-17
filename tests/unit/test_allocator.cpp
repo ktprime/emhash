@@ -1,6 +1,6 @@
 // unit/test_allocator.cpp
-// Custom allocator support for emhash5/6/7/8 HashMap and emhash2/4/8 HashSet.
-// emilib maps/sets do NOT support custom AllocT, so they are excluded.
+// Custom allocator support for emhash5/6/7/8 HashMap, emhash2/4/8 HashSet and
+// emilib1-4 HashMap (emilib sets are still excluded — they take no AllocT).
 // Covers: tracking allocator (call counts), stateful allocator (tag propagation),
 //         PMR (monotonic_buffer_resource), string values with allocator, over-aligned values.
 // Source: verify/test_emhash_allocator.cpp (321 lines) + verify/test_hashset_allocator.cpp (215 lines).
@@ -109,6 +109,42 @@ TEST_CASE("tracking allocator: counts alloc/dealloc on emhash5-8") {
     run(emhash6::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>{});
     run(emhash7::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>{});
     run(emhash8::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>{});
+    // emilib1-4: single (or dual) raw blocks routed through the rebound allocator
+    run(emilib::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>{});
+    run(emilib2::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>{});
+    run(emilib3::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>{});
+    run(emilib4::HashMap<int, int, std::hash<int>, std::equal_to<int>, CountingAllocator<std::pair<const int, int>>>{});
+}
+
+TEST_CASE("stateful allocator: tag propagates on copy/move (emilib1-4)") {
+    using Alloc = StatefulAllocator<std::pair<const int, int>>;
+
+    auto run = [](auto map) {
+        using Map = decltype(map);
+        Map m1{Alloc{1}};
+        for (int i = 0; i < 100; ++i)
+            m1[i] = i;
+
+        Map m2(m1);
+        CHECK(m2.get_allocator().tag == 1);
+        CHECK(m2.size() == 100);
+
+        Map m3{Alloc{2}};
+        m3 = m1;
+        CHECK(m3.size() == 100);
+
+        Map m4(std::move(m1));
+        CHECK(m4.size() == 100);
+
+        Map m5{Alloc{3}};
+        m5 = std::move(m2);
+        CHECK(m5.size() == 100);
+    };
+
+    run(emilib::HashMap<int, int, std::hash<int>, std::equal_to<int>, Alloc>{});
+    run(emilib2::HashMap<int, int, std::hash<int>, std::equal_to<int>, Alloc>{});
+    run(emilib3::HashMap<int, int, std::hash<int>, std::equal_to<int>, Alloc>{});
+    run(emilib4::HashMap<int, int, std::hash<int>, std::equal_to<int>, Alloc>{});
 }
 
 TEST_CASE("stateful allocator: tag propagates on copy/move") {
@@ -149,6 +185,28 @@ TEST_CASE("PMR allocator: monotonic buffer works on emhash5") {
     CHECK(m[999] == 999);
 }
 
+TEST_CASE("PMR allocator: emilib maps (incl. emilib3 aligned-SIMD state bytes)") {
+    char buffer[1 << 16];
+    std::pmr::monotonic_buffer_resource pool(buffer, sizeof(buffer));
+    using PmrAlloc = std::pmr::polymorphic_allocator<std::pair<const int, int>>;
+
+    emilib::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m1(2, PmrAlloc{&pool});
+    emilib2::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m2(2, 0.8F, PmrAlloc{&pool});
+    emilib3::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m3(2, 0.8F, PmrAlloc{&pool});
+    emilib4::HashMap<int, int, std::hash<int>, std::equal_to<int>, PmrAlloc> m4(2, PmrAlloc{&pool});
+
+    for (int i = 0; i < 1000; ++i) {
+        m1[i] = i;
+        m2[i] = i;
+        m3[i] = i;
+        m4[i] = i;
+    }
+    CHECK(m1[999] == 999);
+    CHECK(m2[500] == 500);
+    CHECK(m3[999] == 999);
+    CHECK(m4[500] == 500);
+}
+
 TEST_CASE("string value with tracking allocator") {
     using Alloc = CountingAllocator<std::pair<const int, std::string>>;
     using M8 = emhash8::HashMap<int, std::string, std::hash<int>, std::equal_to<int>, Alloc>;
@@ -168,6 +226,34 @@ TEST_CASE("string value with tracking allocator") {
     }
     CHECK(stats.alloc_count > 0);
     CHECK(stats.dealloc_count > 0);
+}
+
+TEST_CASE("string value with tracking allocator (emilib1-4)") {
+    using Alloc = CountingAllocator<std::pair<const int, std::string>>;
+
+    auto run = [](auto map) {
+        using Map = decltype(map);
+        AllocStats stats;
+        {
+            Map m{typename Map::allocator_type{&stats}};
+            m[1] = "one";
+            m[2] = "two";
+            m.emplace(3, "three");
+            CHECK(m.size() == 3);
+            CHECK(m[1] == "one");
+            auto c(m); // copy exercises placement-new clone path for non-trivial values
+            CHECK(c[2] == "two");
+            Map mv(std::move(c));
+            CHECK(mv[3] == "three");
+        }
+        CHECK(stats.alloc_count > 0);
+        CHECK(stats.alloc_count == stats.dealloc_count);
+    };
+
+    run(emilib::HashMap<int, std::string, std::hash<int>, std::equal_to<int>, Alloc>{});
+    run(emilib2::HashMap<int, std::string, std::hash<int>, std::equal_to<int>, Alloc>{});
+    run(emilib3::HashMap<int, std::string, std::hash<int>, std::equal_to<int>, Alloc>{});
+    run(emilib4::HashMap<int, std::string, std::hash<int>, std::equal_to<int>, Alloc>{});
 }
 
 TEST_CASE("over-aligned value: allocator respects alignment") {

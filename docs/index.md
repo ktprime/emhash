@@ -9,7 +9,7 @@ A high-performance, header-only C++ hash table library with multiple implementat
 - **Extremely fast**: 2-3x faster than `std::unordered_map` for most operations
 - **High load factor**: emhash7 supports load factors up to 0.999
 - **SIMD-accelerated**: emilib versions use SSE2/AVX2/AVX-512 for vectorized lookups
-- **Custom allocators**: emhash5/6/7/8 support custom allocators
+- **Custom allocators**: all 8 map implementations (emhash5/6/7/8 and emilib1-4) support custom allocators via a trailing `AllocT` template parameter
 - **C++17 compatible**: Requires C++17 or later
 
 ## Quick Start

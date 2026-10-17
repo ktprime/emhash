@@ -425,17 +425,20 @@ constexpr static float EMH_DEFAULT_LOAD_FACTOR = 0.875f;
 constexpr static float EMH_MIN_LOAD_FACTOR = 0.25f;
 constexpr static float EMH_MAX_LOAD_FACTOR = 0.999f;
 
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
+          typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap {
 private:
-    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
     using PairT = std::pair<const KeyT, ValueT>;
     using group_type = group15;
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
 
-    // alloc_arrays uses malloc, which guarantees alignment of alignof(std::max_align_t)
-    // (typically 8 on 32-bit, 16 on 64-bit). If PairT requires stronger alignment,
-    // malloc would return a misaligned _pairs pointer (UB). _groups is manually
-    // aligned to 16 bytes via bitmask, so SIMD access is safe regardless.
+    // alloc_arrays obtains the block through AllocT (rebound to PairT), whose alignment contract
+    // is alignof(PairT). If PairT requires stronger alignment than the allocator provides, the
+    // _pairs pointer would be misaligned (UB). _groups is manually aligned to 16 bytes via
+    // bitmask after the pairs slots, so SIMD access is safe regardless.
     static_assert(alignof(PairT) <= alignof(std::max_align_t),
                   "PairT alignment exceeds std::max_align_t; use a type with smaller alignment or "
                   "switch alloc_arrays to aligned_alloc / ::operator new(size, align_val_t)");
@@ -450,6 +453,7 @@ public:
     using hasher = HashT;
     using key_equal = EqT;
     using size_type = size_t;
+    using allocator_type = AllocT;
 
     // ─── iterator (Boost-style compact: pc + p) ──────────────────────
 
@@ -611,9 +615,24 @@ public:
         rehash_impl(n);
     }
 
-    HashMap(const HashMap& other) : HashMap() { clone(other); }
+    explicit HashMap(const AllocT& alloc) : _alloc_base(alloc) { rehash_impl(0); }
+
+    HashMap(size_t n, const AllocT& alloc) : _alloc_base(alloc) { rehash_impl(n); }
+
+    HashMap(const HashMap& other)
+        : _alloc_base(PairAllocTraits::select_on_container_copy_construction(other._alloc_base.get())) {
+        rehash_impl(0);
+        clone(other);
+    }
+
+    HashMap(const HashMap& other, const AllocT& alloc) : _alloc_base(alloc) {
+        rehash_impl(0);
+        clone(other);
+    }
 
     HashMap(HashMap&& other) noexcept { swap(other); }
+
+    HashMap(HashMap&& other, const AllocT& alloc) noexcept : _alloc_base(alloc) { swap(other); }
 
     HashMap(std::initializer_list<value_type> il) : HashMap() {
         rehash_impl(il.size());
@@ -628,8 +647,11 @@ public:
     }
 
     HashMap& operator=(const HashMap& other) {
-        if (this != &other)
+        if (this != &other) {
+            if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
+                _alloc_base.get() = other._alloc_base.get();
             clone(other);
+        }
         return *this;
     }
 
@@ -644,8 +666,10 @@ public:
     ~HashMap() noexcept {
         clear_data();
         if (_pairs)
-            free(_pairs); // single free; _groups is derived from _pairs
+            PairAllocTraits::deallocate(_alloc_base.get(), _pairs, alloc_elems(_num_groups()));
     }
+
+    [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc_base.get()); }
 
     // ─── capacity ─────────────────────────────────────────────────────
 
@@ -971,6 +995,7 @@ public:
     void swap(HashMap& other) noexcept {
         std::swap(_hasher_base, other._hasher_base);
         std::swap(_eq_base, other._eq_base);
+        std::swap(_alloc_base, other._alloc_base);
         std::swap(_groups, other._groups);
         std::swap(_pairs, other._pairs);
         std::swap(_num_filled, other._num_filled);
@@ -1214,6 +1239,12 @@ private:
         return ((total + alignof(PairT) - 1) / alignof(PairT)) * alignof(PairT);
     }
 
+    // PairT element count covering the whole block; pure function of num_groups so
+    // deallocation reproduces the allocation size exactly.
+    static size_t alloc_elems(size_t num_groups) noexcept {
+        return (buffer_size(num_groups) + sizeof(PairT) - 1) / sizeof(PairT);
+    }
+
     void clear_data() noexcept {
         if (!need_explicit_dtor() || _num_filled == 0)
             return;
@@ -1239,7 +1270,7 @@ private:
         auto other_ng = other._num_groups();
         if (other_ng != _num_groups()) {
             if (_pairs)
-                free(_pairs); // single free
+                PairAllocTraits::deallocate(_alloc_base.get(), _pairs, alloc_elems(_num_groups()));
             _pairs = nullptr;
             _groups = dummy_groups();
             alloc_arrays(other_ng, other._groups_size_index);
@@ -1271,8 +1302,7 @@ private:
         _groups_size_index = size_index;
 
         // Single allocation: [elements...][align padding][groups...]
-        auto buf_size = buffer_size(num_groups);
-        _pairs = static_cast<PairT*>(malloc(buf_size));
+        _pairs = PairAllocTraits::allocate(_alloc_base.get(), alloc_elems(num_groups));
 
         // Derive _groups from _pairs: advance past all element slots, align to sizeof(group15)=16
         auto p = reinterpret_cast<uintptr_t>(_pairs + num_groups * N - 1);
@@ -1353,7 +1383,7 @@ private:
         }
 
         if (old_owns_data)
-            free(old_pairs); // single free
+            PairAllocTraits::deallocate(_alloc_base.get(), old_pairs, alloc_elems(old_num_groups));
     }
 
     // Insert new element into new arrays first, then transfer old elements.
@@ -1403,7 +1433,8 @@ private:
             }
         }
 
-        free(old_pairs);
+        if (old_pairs != nullptr)
+            PairAllocTraits::deallocate(_alloc_base.get(), old_pairs, alloc_elems(old_num_groups));
         return loc;
     }
 
@@ -1428,6 +1459,7 @@ private:
 
     detail::ebo<HashT, 0> _hasher_base;
     detail::ebo<EqT, 1> _eq_base;
+    detail::ebo<PairAlloc, 2> _alloc_base; // EBO: zero-size for empty allocators
 
     group15* _groups = dummy_groups(); // derived pointer into _pairs allocation
     PairT* _pairs = nullptr;           // base allocation pointer

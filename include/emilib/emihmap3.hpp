@@ -151,12 +151,18 @@ inline static uint32_t CTZ(size_t n) {
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 /// Sandwich layout: contiguous states at the front, pairs after, in a single malloc.
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
+          typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap {
 private:
-    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
 
     using PairT = std::pair<const KeyT, ValueT>;
+    // The block hosts SIMD-aligned state bytes at offset 0, so it is allocated through a
+    // max_align_t-rebound allocator (16B on mainstream targets) — the same alignment contract
+    // malloc provided before allocator support. PairT alignment (<= 16B) is covered too.
+    using RawAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<std::max_align_t>;
+    using RawAllocTraits = std::allocator_traits<RawAlloc>;
 
 public:
 #pragma GCC diagnostic push
@@ -172,6 +178,7 @@ public:
     using key_type = KeyT;
     using hasher = HashT;
     using key_equal = EqT;
+    using allocator_type = AllocT;
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
@@ -358,12 +365,28 @@ public:
         rehash(n);
     }
 
-    HashMap(const HashMap& other) {
+    explicit HashMap(const AllocT& alloc) : _alloc(alloc) { rehash(4); }
+
+    HashMap(size_t n, const AllocT& alloc) : _alloc(alloc) { rehash(n); }
+
+    HashMap(size_t n, float lf, const AllocT& alloc) : _alloc(alloc) {
+        _mlf = static_cast<uint32_t>((1 << 28) / lf);
+        rehash(n);
+    }
+
+    HashMap(const HashMap& other) : _alloc(RawAllocTraits::select_on_container_copy_construction(other._alloc)) {
+        rehash(1);
+        clone(other);
+    }
+
+    HashMap(const HashMap& other, const AllocT& alloc) : _alloc(alloc) {
         rehash(1);
         clone(other);
     }
 
     HashMap(HashMap&& other) noexcept { swap(other); }
+
+    HashMap(HashMap&& other, const AllocT& alloc) noexcept : _alloc(alloc) { swap(other); }
 
     HashMap(std::initializer_list<value_type> il) {
         rehash(static_cast<size_t>(il.size()));
@@ -378,8 +401,11 @@ public:
     }
 
     HashMap& operator=(const HashMap& other) {
-        if (this != &other)
+        if (this != &other) {
+            if constexpr (RawAllocTraits::propagate_on_container_copy_assignment::value)
+                _alloc = other._alloc;
             clone(other);
+        }
         return *this;
     }
 
@@ -394,8 +420,11 @@ public:
     ~HashMap() noexcept {
         clear_data();
         _num_filled = 0;
-        free(_buffer);
+        if (_buffer != nullptr)
+            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(_buffer), block_pair_elems(_num_buckets));
     }
+
+    [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
 
     void clone(const HashMap& other) {
         if (other.size() == 0) {
@@ -406,6 +435,15 @@ public:
         clear_data();
 
         if (other._num_buckets != _num_buckets) {
+            // Release the old block BEFORE zeroing _num_buckets: the deallocation element
+            // count is derived from it, so it must still hold the old capacity here.
+            if (_buffer != nullptr) {
+                RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(_buffer),
+                                           block_pair_elems(_num_buckets));
+                _buffer = nullptr;
+                _states = nullptr;
+                _pairs = nullptr;
+            }
             _num_filled = _num_buckets = 0;
             rehash(other._num_buckets);
         }
@@ -430,6 +468,7 @@ public:
     void swap(HashMap& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
+        std::swap(_alloc, other._alloc);
         std::swap(_buffer, other._buffer);
         std::swap(_states, other._states);
         std::swap(_pairs, other._pairs);
@@ -848,9 +887,8 @@ public:
         // States: num_buckets bytes + simd_bytes sentinel bytes, rounded up to 64B boundary
         const auto states_alloc = ((static_cast<size_t>(num_buckets) + simd_bytes + 63) / 64) * 64;
         const auto pairs_size = (static_cast<size_t>(num_buckets) + 1) * sizeof(PairT);
-        const auto total_size = states_alloc + pairs_size;
 
-        auto* new_buffer = static_cast<char*>(malloc(total_size));
+        auto* new_buffer = reinterpret_cast<char*>(RawAllocTraits::allocate(_alloc, block_pair_elems(num_buckets)));
         auto* new_states = reinterpret_cast<int8_t*>(new_buffer);
         auto* new_pairs = reinterpret_cast<PairT*>(new_buffer + states_alloc);
 
@@ -903,7 +941,20 @@ public:
                    max_probe_length, _max_probe_length, collision, collision * 100.0f / _num_buckets);
 #endif
 
-        free(old_buffer);
+        if (old_buffer != nullptr)
+            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(old_buffer), block_pair_elems(old_num_buckets));
+    }
+
+private:
+    // The single mixed block layout is [states (64B-rounded)][pairs (buckets+1)]. The whole block
+    // is allocated as max_align_t elements through the rebound allocator so the SIMD state bytes
+    // at offset 0 keep their 16B alignment regardless of the user allocator. The element count is
+    // a pure function of num_buckets so deallocation reproduces it exactly.
+    static uint64_t block_pair_elems(uint64_t num_buckets) noexcept {
+        const auto states_alloc = ((num_buckets + simd_bytes + 63) / 64) * 64;
+        const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
+        const auto total = states_alloc + pairs_size;
+        return (total + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t);
     }
 
 private:
@@ -1093,6 +1144,7 @@ private:
 private:
     HashT _hasher;
     EqT _eq;
+    RawAlloc _alloc;
     char* _buffer = nullptr;                // single allocation base
     int8_t* EMH_RESTRICT _states = nullptr; // points to _buffer (states at front)
     PairT* EMH_RESTRICT _pairs = nullptr;   // points after states in _buffer

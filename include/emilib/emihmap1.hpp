@@ -111,12 +111,17 @@ inline static uint32_t CTZ(uint32_t n) {
 }
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
+          typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap {
 private:
-    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
 
     using PairT = std::pair<const KeyT, ValueT>;
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
+    using StateAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<int8_t>;
+    using StateAllocTraits = std::allocator_traits<StateAlloc>;
     constexpr static uint8_t MXLOAD_FACTOR = 5; // max_load = LOAD_FACTOR / (LOAD_FACTOR + 1)
 
 public:
@@ -133,6 +138,7 @@ public:
     using key_type = KeyT;
     using hasher = HashT;
     using key_equal = EqT;
+    using allocator_type = AllocT;
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
@@ -306,12 +312,30 @@ public:
 
     explicit HashMap(size_t n = 4) noexcept { rehash(n); }
 
-    HashMap(const HashMap& other) {
+    explicit HashMap(const AllocT& alloc) noexcept : _alloc(alloc), _state_alloc(alloc) { rehash(4); }
+
+    HashMap(size_t n, const AllocT& alloc) noexcept : _alloc(alloc), _state_alloc(alloc) { rehash(n); }
+
+    HashMap(const HashMap& other)
+        : _alloc(PairAllocTraits::select_on_container_copy_construction(other._alloc)),
+          _state_alloc(StateAllocTraits::select_on_container_copy_construction(other._state_alloc)) {
+        rehash(1);
+        clone(other);
+    }
+
+    HashMap(const HashMap& other, const AllocT& alloc) : _alloc(alloc), _state_alloc(alloc) {
         rehash(1);
         clone(other);
     }
 
     HashMap(HashMap&& other) noexcept {
+        rehash(1);
+        if (this != &other) {
+            swap(other);
+        }
+    }
+
+    HashMap(HashMap&& other, const AllocT& alloc) noexcept : _alloc(alloc), _state_alloc(alloc) {
         rehash(1);
         if (this != &other) {
             swap(other);
@@ -331,8 +355,13 @@ public:
     }
 
     HashMap& operator=(const HashMap& other) {
-        if (this != &other)
+        if (this != &other) {
+            if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value) {
+                _alloc = other._alloc;
+                _state_alloc = other._state_alloc;
+            }
             clone(other);
+        }
         return *this;
     }
 
@@ -347,9 +376,13 @@ public:
     ~HashMap() noexcept {
         clear_data();
         _num_filled = 0;
-        free(_states);
-        free(_pairs);
+        if (_states != nullptr)
+            StateAllocTraits::deallocate(_state_alloc, _states, simd_bytes + _num_buckets);
+        if (_pairs != nullptr)
+            PairAllocTraits::deallocate(_alloc, _pairs, 1 + bucket_to_slot(_num_buckets));
     }
+
+    [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
 
     void clone(const HashMap& other) noexcept {
         if (other.size() == 0) {
@@ -360,6 +393,16 @@ public:
         clear_data();
 
         if (other._num_buckets != _num_buckets) {
+            // Release the old buffers BEFORE zeroing _num_buckets: deallocation element
+            // counts are derived from it, so it must still hold the old capacity here.
+            if (_states != nullptr) {
+                StateAllocTraits::deallocate(_state_alloc, _states, simd_bytes + _num_buckets);
+                _states = nullptr;
+            }
+            if (_pairs != nullptr) {
+                PairAllocTraits::deallocate(_alloc, _pairs, 1 + bucket_to_slot(_num_buckets));
+                _pairs = nullptr;
+            }
             _num_filled = _num_buckets = 0;
             rehash(other._num_buckets);
         }
@@ -380,6 +423,8 @@ public:
     void swap(HashMap& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
+        std::swap(_alloc, other._alloc);
+        std::swap(_state_alloc, other._state_alloc);
         std::swap(_states, other._states);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
@@ -798,10 +843,9 @@ public:
         assert(num_buckets < max_size() && num_buckets > _num_filled);
 
         const auto pairs_size = (1 + bucket_to_slot(num_buckets)) * sizeof(PairT);
-        const auto state_size = (simd_bytes + num_buckets) * sizeof(State);
 
-        auto* new_pairs = static_cast<decltype(_pairs)>(malloc(pairs_size));
-        auto* new_state = static_cast<decltype(_states)>(malloc(state_size));
+        auto* new_pairs = PairAllocTraits::allocate(_alloc, 1 + bucket_to_slot(num_buckets));
+        auto* new_state = StateAllocTraits::allocate(_state_alloc, simd_bytes + num_buckets);
 
         auto old_num_filled = _num_filled;
         auto old_states = _states;
@@ -838,8 +882,10 @@ public:
             }
         }
 
-        free(old_states);
-        free(old_pairs);
+        if (old_states != nullptr)
+            StateAllocTraits::deallocate(_state_alloc, old_states, simd_bytes + old_buckets);
+        if (old_pairs != nullptr)
+            PairAllocTraits::deallocate(_alloc, old_pairs, 1 + bucket_to_slot(old_buckets));
     }
 
 private:
@@ -1049,6 +1095,8 @@ private:
 private:
     HashT _hasher;
     EqT _eq;
+    PairAlloc _alloc;
+    StateAlloc _state_alloc;
     int8_t* _states = nullptr;
     PairT* _pairs = nullptr;
     size_t _num_buckets = 0;

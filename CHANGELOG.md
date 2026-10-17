@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Custom allocator support for `emilib1-4` maps (`emihmap1-4.hpp`): trailing `AllocT` template parameter (default `std::allocator<std::pair<KeyT, ValueT>>`), allocator-extended constructors (`(alloc)`, `(n, alloc)`, `(n, lf, alloc)` where applicable, `(map, alloc)` copy/move forms), `get_allocator()`, `select_on_container_copy_construction` and `propagate_on_container_copy_assignment` handling. Raw blocks are routed through the rebound allocator: emihmap1 splits pairs/states, emihmap2/4 keep the single pairs-first block as `PairT` elements, and emihmap3 allocates via a `max_align_t` rebound so its SIMD-aligned state bytes keep the 16-byte alignment malloc previously guaranteed
+
+### Fixed
+- `emihmap4.hpp`: `unchecked_emplace_with_rehash` and `clone` could `free(nullptr)`-style deallocate through the new allocator path without a null guard (harmless with `free`, UB with `allocator_traits::deallocate`)
+
 ## [1.3.0] - 2026-10-15
 
 ### Added

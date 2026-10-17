@@ -141,12 +141,15 @@ inline static uint32_t CTZ(size_t n) {
 #endif
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>>
+template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
+          typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 class HashMap {
 private:
-    using htype = HashMap<KeyT, ValueT, HashT, EqT>;
+    using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
 
     using PairT = std::pair<const KeyT, ValueT>;
+    using PairAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<PairT>;
+    using PairAllocTraits = std::allocator_traits<PairAlloc>;
 
 public:
 #pragma GCC diagnostic push
@@ -162,6 +165,7 @@ public:
     using key_type = KeyT;
     using hasher = HashT;
     using key_equal = EqT;
+    using allocator_type = AllocT;
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
     EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
@@ -343,12 +347,28 @@ public:
         rehash(n);
     }
 
-    HashMap(const HashMap& other) {
+    explicit HashMap(const AllocT& alloc) : _alloc(alloc) { rehash(4); }
+
+    HashMap(size_t n, const AllocT& alloc) : _alloc(alloc) { rehash(n); }
+
+    HashMap(size_t n, float lf, const AllocT& alloc) : _alloc(alloc) {
+        _mlf = static_cast<uint32_t>((1 << 28) / lf);
+        rehash(n);
+    }
+
+    HashMap(const HashMap& other) : _alloc(PairAllocTraits::select_on_container_copy_construction(other._alloc)) {
+        rehash(1);
+        clone(other);
+    }
+
+    HashMap(const HashMap& other, const AllocT& alloc) : _alloc(alloc) {
         rehash(1);
         clone(other);
     }
 
     HashMap(HashMap&& other) noexcept { swap(other); }
+
+    HashMap(HashMap&& other, const AllocT& alloc) noexcept : _alloc(alloc) { swap(other); }
 
     HashMap(std::initializer_list<value_type> il) {
         rehash(static_cast<size_t>(il.size()));
@@ -363,8 +383,11 @@ public:
     }
 
     HashMap& operator=(const HashMap& other) {
-        if (this != &other)
+        if (this != &other) {
+            if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
+                _alloc = other._alloc;
             clone(other);
+        }
         return *this;
     }
 
@@ -379,8 +402,11 @@ public:
     ~HashMap() noexcept {
         clear_data();
         _num_filled = 0;
-        free(_pairs);
+        if (_pairs != nullptr)
+            PairAllocTraits::deallocate(_alloc, _pairs, block_pair_elems(_num_buckets));
     }
+
+    [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
 
     void clone(const HashMap& other) {
         if (other.size() == 0) {
@@ -391,6 +417,14 @@ public:
         clear_data();
 
         if (other._num_buckets != _num_buckets) {
+            // Release the old block BEFORE zeroing _num_buckets: the deallocation element
+            // count is derived from it, so it must still hold the old capacity here.
+            if (_pairs != nullptr) {
+                PairAllocTraits::deallocate(_alloc, _pairs, block_pair_elems(_num_buckets));
+                _pairs = nullptr;
+                _states = nullptr;
+                _offset = nullptr;
+            }
             _num_filled = _num_buckets = 0;
             rehash(other._num_buckets);
         }
@@ -413,6 +447,7 @@ public:
     void swap(HashMap& other) noexcept {
         std::swap(_hasher, other._hasher);
         std::swap(_eq, other._eq);
+        std::swap(_alloc, other._alloc);
         std::swap(_states, other._states);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
@@ -841,8 +876,7 @@ public:
         const auto state_size = buckets + simd_bytes;
 
         const auto num_buckets = static_cast<size_t>(buckets);
-        auto* new_data = static_cast<char*>(
-            malloc(pairs_size + state_size * sizeof(_states[0]) + (state_size / OFFSET_STEP) * sizeof(_offset[0])));
+        auto* new_data = reinterpret_cast<char*>(PairAllocTraits::allocate(_alloc, block_pair_elems(num_buckets)));
         auto old_states = _states;
 
         auto* new_pairs = reinterpret_cast<decltype(_pairs)>(new_data);
@@ -886,10 +920,22 @@ public:
                     src_pair.~PairT();
             }
         }
-        free(old_pairs);
+        if (old_pairs != nullptr)
+            PairAllocTraits::deallocate(_alloc, old_pairs, block_pair_elems(old_buckets));
     }
 
 private:
+    // The single mixed block layout is [pairs (buckets+1)][states (buckets + simd_bytes)][offsets (state_size / OFFSET_STEP)].
+    // Pairs sit at offset 0 so allocating the whole block as PairT elements keeps alignof(PairT)
+    // for the pairs array; _states/_offset are byte arrays and need no alignment. The element
+    // count is a pure function of num_buckets so deallocation reproduces it exactly.
+    static uint64_t block_pair_elems(uint64_t num_buckets) noexcept {
+        const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
+        const auto state_size = num_buckets + simd_bytes;
+        const auto total = pairs_size + state_size * sizeof(_states[0]) + (state_size / OFFSET_STEP) * sizeof(_offset[0]);
+        return (total + sizeof(PairT) - 1) / sizeof(PairT);
+    }
+
     // Can we fit another element?
     void check_expand_need() { reserve(_num_filled); }
 
@@ -1102,6 +1148,7 @@ private:
 private:
     HashT _hasher;
     EqT _eq;
+    PairAlloc _alloc;
     int8_t* _states = nullptr;
     uint8_t* _offset = nullptr;
     PairT* _pairs = nullptr;
