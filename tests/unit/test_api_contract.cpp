@@ -66,7 +66,8 @@ EMH_COMPILES(has_hash_function, std::declval<const M&>().hash_function());
 EMH_COMPILES(has_key_eq, std::declval<const M&>().key_eq());
 EMH_COMPILES(has_gord, std::declval<const M&>().get_or_return_default(0));
 // specifically the pointer-returning try_get(key, uint64_t hash) overload
-EMH_COMPILES(has_try_get_hash, std::declval<M&>().try_get(std::declval<const typename M::key_type&>(), std::declval<uint64_t>()));
+EMH_COMPILES(has_try_get_hash,
+             std::declval<M&>().try_get(std::declval<const typename M::key_type&>(), std::declval<uint64_t>()));
 // raw-bucket _erase(size_t) — must be private (not callable from outside)
 EMH_COMPILES(has_raw_bucket_erase, std::declval<M&>()._erase(std::declval<size_t>()));
 // two-int insert: must NOT match the range-insert template (int is not an iterator)
@@ -81,8 +82,7 @@ struct erase_it_returns_iterator<M, std::void_t<decltype(std::declval<M&>().eras
     : std::is_same<decltype(std::declval<M&>().erase(std::declval<M&>().begin())), typename M::iterator> {};
 
 // iterator category: only emhash8 map/set expose bidirectional iterators
-template <typename M>
-using iter_category_t = typename std::iterator_traits<typename M::iterator>::iterator_category;
+template <typename M> using iter_category_t = typename std::iterator_traits<typename M::iterator>::iterator_category;
 template <typename M, typename = void> struct bidirectional_iterator : std::false_type {};
 template <typename M>
 struct bidirectional_iterator<M, std::void_t<iter_category_t<M>>>
@@ -275,7 +275,8 @@ TEST_CASE("API contract: extended deviations (try_set/set_get/try_get/hetero)") 
     };
     using HeteroMap4 = emilib4::HashMap<std::string, int, TransparentHash, std::equal_to<>>;
     static_assert(has_hetero_find<HeteroMap4>::value, "emilib4 find must work heterogeneously with a transparent hash");
-    static_assert(!has_hetero_erase<HeteroMap4>::value, "emilib4 has no heterogeneous erase (emhash8 only, documented)");
+    static_assert(!has_hetero_erase<HeteroMap4>::value,
+                  "emilib4 has no heterogeneous erase (emhash8 only, documented)");
 
     // get_or_return_default was removed from all map implementations (EMH_EXT
     // cleanup); LRU containers keep their own copy.

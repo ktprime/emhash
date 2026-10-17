@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Obsolete `include/emilib/emihmap1_opt.hpp` (namespace `emilib1_opt`, 1094 lines) and its manual benchmark `bench/bench_emihmap1_opt.cpp`: an undocumented experimental emihmap1 variant, registered in no CMake target and superseded by the allocator-aware `emihmap1.hpp`
 
 ### Fixed
+- `emihmap3.hpp`: the raw block was rebound through `std::max_align_t` to obtain SIMD-state alignment, but `max_align_t` is only 8B-aligned on MSVC/x64 (`long double == double`), so `polymorphic_allocator`/`std::allocator` handed back 8B-aligned blocks and the unconditionally used `_mm_load_si128` faulted (0xC0000005) on the first `rehash` under MSVC /O2 — `test_allocator` failed on 5 CI jobs. Rebind to an explicit `struct alignas(64) AlignedBlock` instead (sizeof == alignment, covers SSE2/AVX2/AVX512 state alignment on every compiler)
 - `emihmap4.hpp`: `unchecked_emplace_with_rehash` and `clone` could `free(nullptr)`-style deallocate through the new allocator path without a null guard (harmless with `free`, UB with `allocator_traits::deallocate`)
 
 ## [1.3.0] - 2026-10-15

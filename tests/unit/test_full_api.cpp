@@ -188,8 +188,7 @@ TEST_CASE_TEMPLATE("merge into empty moves all", Map, AllIntMaps) {
 
 // try_get: uniform — the former EMH_EXT gate was removed, all maps expose the pointer form
 #define TryGetMaps                                                                                                     \
-    map5<int, int>, map6<int, int>, map7<int, int>, map8<int, int>, imap1<int, int>, imap2<int, int>,                  \
-        imap3<int, int>
+    map5<int, int>, map6<int, int>, map7<int, int>, map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>
 
 TEST_CASE_TEMPLATE("try_get returns pointer or nullptr", Map, TryGetMaps) {
     using K = typename Map::key_type;

@@ -1,4 +1,4 @@
-// LICENSE:
+﻿// LICENSE:
 // version 1.2.0
 // https://github.com/ktprime/emhash/blob/master/include/emilib/emihmap3.hpp
 //
@@ -158,10 +158,14 @@ private:
     using htype = HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
 
     using PairT = std::pair<const KeyT, ValueT>;
-    // The block hosts SIMD-aligned state bytes at offset 0, so it is allocated through a
-    // max_align_t-rebound allocator (16B on mainstream targets) — the same alignment contract
-    // malloc provided before allocator support. PairT alignment (<= 16B) is covered too.
-    using RawAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<std::max_align_t>;
+    // The block hosts SIMD-aligned state bytes at offset 0, so it must be allocated through an
+    // explicitly over-aligned rebound type — the same alignment contract malloc provided before
+    // allocator support. std::max_align_t cannot be used here: it is only 8B-aligned on
+    // MSVC/x64 (long double == double), which made _mm_load_si128 fault on misaligned states.
+    // alignas(64) covers every simd_bytes variant (SSE2 16B / AVX2 32B / AVX512 64B);
+    // sizeof == alignment so the element count reproduces the block size exactly.
+    struct alignas(64) AlignedBlock {};
+    using RawAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<AlignedBlock>;
     using RawAllocTraits = std::allocator_traits<RawAlloc>;
 
 public:
@@ -421,7 +425,7 @@ public:
         clear_data();
         _num_filled = 0;
         if (_buffer != nullptr)
-            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(_buffer),
+            RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(_buffer),
                                        block_pair_elems(_num_buckets));
     }
 
@@ -439,7 +443,7 @@ public:
             // Release the old block BEFORE zeroing _num_buckets: the deallocation element
             // count is derived from it, so it must still hold the old capacity here.
             if (_buffer != nullptr) {
-                RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(_buffer),
+                RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(_buffer),
                                            block_pair_elems(_num_buckets));
                 _buffer = nullptr;
                 _states = nullptr;
@@ -957,7 +961,7 @@ public:
 #endif
 
         if (old_buffer != nullptr)
-            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(old_buffer),
+            RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(old_buffer),
                                        block_pair_elems(old_num_buckets));
     }
 
@@ -979,14 +983,14 @@ private:
     }
 
     // The single mixed block layout is [states (64B-rounded)][pairs (buckets+1)]. The whole block
-    // is allocated as max_align_t elements through the rebound allocator so the SIMD state bytes
-    // at offset 0 keep their 16B alignment regardless of the user allocator. The element count is
-    // a pure function of num_buckets so deallocation reproduces it exactly.
+    // is allocated as 64B-aligned AlignedBlock elements through the rebound allocator so the SIMD
+    // state bytes at offset 0 keep their alignment regardless of the user allocator. The element
+    // count is a pure function of num_buckets so deallocation reproduces it exactly.
     static uint64_t block_pair_elems(uint64_t num_buckets) noexcept {
         const auto states_alloc = ((num_buckets + simd_bytes + 63) / 64) * 64;
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
         const auto total = states_alloc + pairs_size;
-        return (total + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t);
+        return (total + sizeof(AlignedBlock) - 1) / sizeof(AlignedBlock);
     }
 
 private:
