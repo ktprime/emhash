@@ -303,7 +303,7 @@ public:
         using reference = value_type&;
 
         const_iterator(const iterator& it) // implicit: std containers require iterator -> const_iterator
-            : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
+            : _map(it._map), _bmask(it._bmask), _bucket(it._bucket), _from(it._from) {}
         const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init() {
@@ -905,7 +905,6 @@ public:
         const auto num_buckets = static_cast<size_t>(buckets);
         // States: num_buckets bytes + simd_bytes sentinel bytes, rounded up to 64B boundary
         const auto states_alloc = ((static_cast<size_t>(num_buckets) + simd_bytes + 63) / 64) * 64;
-        const auto pairs_size = (static_cast<size_t>(num_buckets) + 1) * sizeof(PairT);
 
         auto* new_buffer = reinterpret_cast<char*>(RawAllocTraits::allocate(_alloc, block_pair_elems(num_buckets)));
         auto* new_states = reinterpret_cast<int8_t*>(new_buffer);

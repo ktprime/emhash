@@ -265,7 +265,7 @@ public:
         using reference = value_type&;
 
         const_iterator(const iterator& it) // implicit: std containers require iterator -> const_iterator
-            : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
+            : _map(it._map), _bmask(it._bmask), _bucket(it._bucket), _from(it._from) {}
         const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
         void init() {
