@@ -891,7 +891,6 @@ public:
         }
     }
 
-#ifdef EMH_EXT
     /// Returns the matching ValueT or nullptr if k isn't found.
     [[nodiscard]] bool try_get(const KeyT& key, ValueT& val) const {
         const auto bucket = find_filled_key(key);
@@ -933,13 +932,6 @@ public:
         EMH_VAL(_pairs, bucket) = std::move(val);
         return true;
     }
-
-    /// Convenience function.
-    [[nodiscard]] ValueT get_or_return_default(const KeyT& key) const {
-        const auto bucket = find_filled_key(key);
-        return bucket == _num_buckets ? ValueT() : EMH_VAL(_pairs, bucket);
-    }
-#endif
 
     // -----------------------------------------------------
 #if EMH_BUCKET_INDEX == 1

@@ -264,7 +264,7 @@ public:
         using pointer = value_type*;
         using reference = value_type&;
 
-        explicit const_iterator(const iterator& it)
+        const_iterator(const iterator& it) // implicit: std containers require iterator -> const_iterator
             : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {}
         const_iterator(const htype* hash_map, size_t bucket) : _map(hash_map), _bucket(bucket) { init(); }
 
@@ -341,7 +341,9 @@ public:
             insert(*it);
     }
 
-    template <class InputIt> HashSet(InputIt first, InputIt last, size_t bucket_count = 4) {
+    // SFINAE-constrained to real iterators: HashSet(3, 5) must be a compile error
+    template <class InputIt, typename = decltype(*std::declval<InputIt&>())>
+    HashSet(InputIt first, InputIt last, size_t bucket_count = 4) {
         rehash(static_cast<size_t>(std::distance(first, last)) + bucket_count);
         for (; first != last; ++first)
             insert(*first);
@@ -441,6 +443,9 @@ public:
             _mlf = static_cast<uint32_t>((1 << 28) / mlf);
     }
 
+    hasher hash_function() const noexcept { return _hasher; }
+    key_equal key_eq() const noexcept { return _eq; }
+
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
 
@@ -533,11 +538,18 @@ public:
         return do_insert(std::forward<Args>(args)...);
     }
 
+    // hint is ignored (the underlying open-addressing layout cannot use it); kept for API parity
+    template <class... Args> iterator emplace_hint(const_iterator, Args&&... args) noexcept {
+        return emplace(std::forward<Args>(args)...).first;
+    }
+
     std::pair<iterator, bool> insert(KeyT&& value) noexcept { return do_insert(std::move(value)); }
 
     std::pair<iterator, bool> insert(const KeyT& value) noexcept { return do_insert(value); }
 
-    template <typename Iter> void insert(Iter beginc, Iter endc) noexcept {
+    // SFINAE-constrained to real iterators: a bare insert(3, 4) must be a
+    // compile error instead of dereferencing ints as range iterators
+    template <typename Iter, typename = decltype(*std::declval<Iter&>())> void insert(Iter beginc, Iter endc) noexcept {
         rehash(static_cast<size_t>(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
             do_insert(*beginc);
@@ -603,23 +615,26 @@ public:
         return 1;
     }
 
-    void erase(const const_iterator& cit) noexcept { _erase(cit._bucket); }
-
-    void erase(iterator it) noexcept { _erase(it._bucket); }
-
-    void _erase(size_t bucket) noexcept {
-        _num_filled -= 1;
-        if (need_explicit_dtor())
-            _pairs[bucket].~PairT();
-#if 1
-        const auto gbucket = bucket / simd_bytes * simd_bytes;
-        _states[bucket] = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
-#else
-        _states[bucket] = State::EDELETE;
-        if (EMH_UNLIKELY(_num_filled == 0))
-            clear_meta();
-#endif
+    // erase returning the iterator to the next element (advancing before the erase
+    // keeps the walk on the same code path as a normal ++ traversal)
+    iterator erase(const const_iterator& cit) noexcept {
+        iterator next(this, cit._bucket);
+        ++next;
+        _erase(cit._bucket);
+        return next;
     }
+
+    iterator erase(iterator it) noexcept {
+        iterator next = it;
+        ++next;
+        _erase(it._bucket);
+        return next;
+    }
+
+    // iterator-shaped fast erase; the raw bucket form is private (an int key
+    // would silently convert to a bucket index and erase the wrong element)
+    void _erase(const iterator& it) noexcept { _erase(it._bucket); }
+    void _erase(const const_iterator& cit) noexcept { _erase(cit._bucket); }
 
     iterator erase(const_iterator first, const_iterator last) noexcept {
         auto iend = cend();
@@ -767,6 +782,22 @@ public:
     }
 
 private:
+    // raw-bucket fast erase (private: an int key argument would silently
+    // convert to a bucket index and erase the wrong element)
+    void _erase(size_t bucket) noexcept {
+        _num_filled -= 1;
+        if (need_explicit_dtor())
+            _pairs[bucket].~PairT();
+#if 1
+        const auto gbucket = bucket / simd_bytes * simd_bytes;
+        _states[bucket] = group_mask(gbucket) == State::EEMPTY ? State::EEMPTY : State::EDELETE;
+#else
+        _states[bucket] = State::EDELETE;
+        if (EMH_UNLIKELY(_num_filled == 0))
+            clear_meta();
+#endif
+    }
+
     // Can we fit another element?
     void check_expand_need() { reserve(_num_filled); }
 

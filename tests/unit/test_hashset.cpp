@@ -1,7 +1,7 @@
 // unit/test_hashset.cpp
 // HashSet API coverage for all 5 set implementations (emhash2/4/8 + emihset2/3).
-// Covers: insert/find/erase/contains/count, iteration, copy/move, reserve/clear,
-//         insert_unique, merge, erase_if, shrink_to_fit.
+// Covers: insert/find/erase/_erase/contains/count, iteration, copy/move, reserve/clear,
+//         range ctor, insert range, insert_unique, merge, erase_if, shrink_to_fit.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "common/maps.hpp"
@@ -54,6 +54,50 @@ TEST_CASE_TEMPLATE("set erase by key and iterator", Set, AllIntSets) {
     s.erase(it);
     CHECK(!s.contains(3));
     CHECK(s.size() == 8);
+}
+
+// _erase: void-returning fast erase by iterator (all 5 sets; the raw-bucket
+// form _erase(size_t) is private — pinned by test_api_contract.cpp)
+TEST_CASE_TEMPLATE("set _erase fast void erase by iterator", Set, AllIntSets) {
+    Set s;
+    for (int i = 0; i < 20; ++i)
+        s.insert(i);
+
+    for (int i = 0; i < 20; i += 2) {
+        auto it = s.find(i);
+        REQUIRE(it != s.end());
+        s._erase(it);
+    }
+
+    CHECK(s.size() == 10);
+    for (int i = 0; i < 20; ++i) {
+        if (i % 2 == 0)
+            CHECK_FALSE(s.contains(i));
+        else
+            CHECK(s.contains(i));
+    }
+}
+
+// Range constructor: emhash2/8 + emilib2/3 (emhash4 lacks a range ctor;
+// emilib2's was added in the 2026-10 API audit)
+TEST_CASE_TEMPLATE("set range constructor", Set, set2<int>, set8<int>, iset2<int>, iset3<int>) {
+    std::vector<int> src{1, 2, 3, 2, 1};
+    Set s(src.begin(), src.end());
+    CHECK(s.size() == 3);
+    CHECK(s.contains(1));
+    CHECK(s.contains(2));
+    CHECK(s.contains(3));
+}
+
+// insert(first, last): emhash4/8 + emilib3 (emhash2/emilib2 sets lack this overload;
+// emilib3's is SFINAE-constrained to real iterators)
+TEST_CASE_TEMPLATE("set insert range", Set, set4<int>, set8<int>, iset3<int>) {
+    std::vector<int> src{10, 20, 30, 20};
+    Set s;
+    s.insert(src.begin(), src.end());
+    CHECK(s.size() == 3);
+    CHECK(s.contains(10));
+    CHECK(s.contains(30));
 }
 
 TEST_CASE_TEMPLATE("set emplace returns pair", Set, AllIntSets) {

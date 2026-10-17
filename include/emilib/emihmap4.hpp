@@ -680,6 +680,9 @@ public:
     constexpr float max_load_factor() const { return mlf; }
     void max_load_factor(float) {} // swiss table has fixed load factor; no-op for API compatibility
 
+    hasher hash_function() const noexcept { return _hasher(); }
+    key_equal key_eq() const noexcept { return _eq(); }
+
     // ─── iterators ────────────────────────────────────────────────────
 
     EMH_INLINE iterator begin() noexcept {
@@ -845,6 +848,11 @@ public:
         return do_insert(std::forward<Args>(args)...);
     }
 
+    // hint is ignored (the underlying swiss-group layout cannot use it); kept for API parity
+    template <class... Args> iterator emplace_hint(const_iterator, Args&&... args) {
+        return emplace(std::forward<Args>(args)...).first;
+    }
+
     template <class... Args> std::pair<iterator, bool> try_emplace(const KeyT& key, Args&&... args) {
         return do_insert(key, ValueT(std::forward<Args>(args)...));
     }
@@ -875,7 +883,9 @@ public:
             do_insert(v.first, v.second);
     }
 
-    template <typename Iter> void insert(Iter beginc, Iter endc) {
+    // SFINAE-constrained to real iterators: a bare insert(3, 4) must be a
+    // compile error instead of dereferencing ints as range iterators
+    template <typename Iter, typename = decltype(*std::declval<Iter&>())> void insert(Iter beginc, Iter endc) {
         rehash_impl(_num_filled + static_cast<size_t>(endc - beginc));
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
@@ -968,8 +978,22 @@ public:
         return 0;
     }
 
-    void erase(const iterator& it) noexcept { erase_at(it._pc, it._p); }
-    void erase(const const_iterator& it) noexcept { erase_at(const_cast<uint8_t*>(it._pc), const_cast<PairT*>(it._p)); }
+    // erase returning the iterator to the next element (advancing before the erase
+    // keeps the walk on the same code path as a normal ++ traversal)
+    iterator erase(const iterator& it) noexcept {
+        iterator next = it;
+        ++next;
+        erase_at(it._pc, it._p);
+        return next;
+    }
+    iterator erase(const const_iterator& it) noexcept {
+        iterator next(const_cast<uint8_t*>(it._pc), const_cast<PairT*>(it._p));
+        ++next;
+        erase_at(const_cast<uint8_t*>(it._pc), const_cast<PairT*>(it._p));
+        return next;
+    }
+
+    void _erase(const const_iterator& it) noexcept { erase(it); }
 
     template <typename Pred> size_t erase_if(Pred pred) noexcept {
         auto old = _num_filled;
@@ -1065,6 +1089,8 @@ public:
         do_insert(std::forward<K>(key), std::forward<V>(val));
         return _num_filled; // approximate return
     }
+
+    size_t insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
 
 private:
     // ─── internal constants ───────────────────────────────────────────

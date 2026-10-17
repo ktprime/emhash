@@ -278,7 +278,7 @@ public:
         using pointer = value_type*;
         using reference = value_type&;
 
-        explicit const_iterator(const iterator& it)
+        const_iterator(const iterator& it) // implicit: std containers require iterator -> const_iterator
             : _map(it._map), _bucket(it._bucket), _bmask(it._bmask), _from(it._from) {
             init();
         }
@@ -488,6 +488,9 @@ public:
             _mlf = static_cast<uint32_t>((1 << 28) / mlf);
     }
 
+    hasher hash_function() const noexcept { return _hasher; }
+    key_equal key_eq() const noexcept { return _eq; }
+
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
 
@@ -621,11 +624,18 @@ public:
         return do_insert(std::forward<Args>(args)...);
     }
 
+    // hint is ignored (the underlying open-addressing layout cannot use it); kept for API parity
+    template <class... Args> iterator emplace_hint(const_iterator, Args&&... args) noexcept {
+        return emplace(std::forward<Args>(args)...).first;
+    }
+
     std::pair<iterator, bool> insert(value_type&& value) noexcept { return do_insert(std::move(value)); }
 
     std::pair<iterator, bool> insert(const value_type& value) noexcept { return do_insert(value); }
 
-    template <typename Iter> void insert(Iter beginc, Iter endc) noexcept {
+    // SFINAE-constrained to real iterators: a bare insert(3, 4) must be a
+    // compile error instead of dereferencing ints as range iterators
+    template <typename Iter, typename = decltype(*std::declval<Iter&>())> void insert(Iter beginc, Iter endc) noexcept {
         rehash(static_cast<size_t>(endc - beginc) + _num_filled);
         for (; beginc != endc; ++beginc)
             do_insert(beginc->first, beginc->second);
@@ -660,6 +670,8 @@ public:
         _num_filled++;
         return bucket;
     }
+
+    size_t insert_unique(const value_type& value) noexcept { return insert_unique(value.first, value.second); }
 
     template <typename K, typename V> size_t insert_unique2(K&& key, V&& val) noexcept {
         size_t main_bucket;
@@ -740,38 +752,25 @@ public:
         return 1;
     }
 
-    void erase(const const_iterator& cit) noexcept { _erase(cit._bucket); }
-
-    void erase(iterator it) noexcept { _erase(it._bucket); }
-
-    void _erase(size_t bucket) noexcept {
-        _num_filled -= 1;
-        if (need_explicit_dtor())
-            _pairs[bucket].~PairT();
-
-#if EMH_PSL_LINEAR
-        set_states(bucket, _states[bucket + 1] == State::EEMPTY ? State::EEMPTY : State::EDELETE);
-#else
-        set_states(bucket, State::EDELETE);
-#endif
-
-#if EMH_PSL_ERASE && EMH_PSL_LINEAR
-        if (_states[bucket] == State::EEMPTY) {
-            _offset[bucket] = EMPTY_OFFSET;
-            bucket = (bucket - 1) & _mask;
-            while (_states[bucket] == State::EDELETE) {
-                set_states(bucket, State::EEMPTY);
-                _offset[bucket] = EMPTY_OFFSET;
-                bucket = (bucket - 1) & _mask;
-            }
-        }
-#elif 0
-        if (EMH_UNLIKELY(_num_filled == 0)) {
-            std::fill_n(_states, _num_buckets, State::EEMPTY);
-            std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
-        }
-#endif
+    // erase returning the iterator to the next element (advancing before the erase
+    // keeps the walk on the same code path as a normal ++ traversal)
+    iterator erase(const const_iterator& cit) noexcept {
+        iterator next(this, cit._bucket);
+        ++next;
+        _erase(cit._bucket);
+        return next;
     }
+
+    iterator erase(iterator it) noexcept {
+        iterator next = it;
+        ++next;
+        _erase(it._bucket);
+        return next;
+    }
+
+    // iterator-shaped fast erase; the raw bucket form is private (an int key
+    // would silently convert to a bucket index and erase the wrong element)
+    void _erase(const const_iterator& cit) noexcept { _erase(cit._bucket); }
 
     iterator erase(const_iterator first, const_iterator last) noexcept {
         auto iend = cend();
@@ -925,6 +924,37 @@ public:
     }
 
 private:
+    // raw-bucket fast erase (private: an int key argument would silently
+    // convert to a bucket index and erase the wrong element)
+    void _erase(size_t bucket) noexcept {
+        _num_filled -= 1;
+        if (need_explicit_dtor())
+            _pairs[bucket].~PairT();
+
+#if EMH_PSL_LINEAR
+        set_states(bucket, _states[bucket + 1] == State::EEMPTY ? State::EEMPTY : State::EDELETE);
+#else
+        set_states(bucket, State::EDELETE);
+#endif
+
+#if EMH_PSL_ERASE && EMH_PSL_LINEAR
+        if (_states[bucket] == State::EEMPTY) {
+            _offset[bucket] = EMPTY_OFFSET;
+            bucket = (bucket - 1) & _mask;
+            while (_states[bucket] == State::EDELETE) {
+                set_states(bucket, State::EEMPTY);
+                _offset[bucket] = EMPTY_OFFSET;
+                bucket = (bucket - 1) & _mask;
+            }
+        }
+#elif 0
+        if (EMH_UNLIKELY(_num_filled == 0)) {
+            std::fill_n(_states, _num_buckets, State::EEMPTY);
+            std::fill_n(_offset, _num_buckets / OFFSET_STEP + 1, EMPTY_OFFSET);
+        }
+#endif
+    }
+
     // The single mixed block layout is [pairs (buckets+1)][states (buckets + simd_bytes)][offsets (state_size / OFFSET_STEP)].
     // Pairs sit at offset 0 so allocating the whole block as PairT elements keeps alignof(PairT)
     // for the pairs array; _states/_offset are byte arrays and need no alignment. The element

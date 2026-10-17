@@ -12,8 +12,10 @@
 #include "doctest.h"
 #include "common/maps.hpp"
 
+#include <functional>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -62,6 +64,15 @@ EMH_COMPILES(has_insert_key, std::declval<M&>().insert(0));
 EMH_COMPILES(has_insert_unique, std::declval<M&>().insert_unique(0, 1));
 EMH_COMPILES(has_hash_function, std::declval<const M&>().hash_function());
 EMH_COMPILES(has_key_eq, std::declval<const M&>().key_eq());
+EMH_COMPILES(has_gord, std::declval<const M&>().get_or_return_default(0));
+// specifically the pointer-returning try_get(key, uint64_t hash) overload
+EMH_COMPILES(has_try_get_hash, std::declval<M&>().try_get(std::declval<const typename M::key_type&>(), std::declval<uint64_t>()));
+// raw-bucket _erase(size_t) — must be private (not callable from outside)
+EMH_COMPILES(has_raw_bucket_erase, std::declval<M&>()._erase(std::declval<size_t>()));
+// two-int insert: must NOT match the range-insert template (int is not an iterator)
+EMH_COMPILES(has_insert_two_ints, std::declval<M&>().insert(3, 4));
+// (first, last) range constructor
+EMH_COMPILES(has_range_ctor, M(std::declval<const int*>(), std::declval<const int*>()));
 
 // erase(it) return shape: emhash5-8 return the next iterator; emilib1-4 return void
 template <typename M, typename = void> struct erase_it_returns_iterator : std::false_type {};
@@ -125,8 +136,9 @@ template <typename M> void try_emplace_contract() {
 
 // Extended API surface (see README Feature Matrix): all of these must exist
 // on every map implementation unless explicitly pinned as a deviation below.
-// Note: try_get/try_set/set_get availability differs (EMH_EXT-gated on
-// emhash5-7); shapes are pinned in the deviations test case below.
+// Note: set_get/try_set availability differs (absent on emhash6/7); try_get is
+// uniform since the former EMH_EXT gate was removed. Shapes are pinned in the
+// deviations test case below.
 template <typename M> void extended_map_contract() {
     static_assert(has_erase_if<M>::value, "map must provide member erase_if(pred)");
     static_assert(has_merge<M>::value, "map must provide merge(other)");
@@ -195,30 +207,27 @@ TEST_CASE("API contract: extended surface (README Feature Matrix)") {
 }
 
 TEST_CASE("API contract: extended deviations (try_set/set_get/try_get/hetero)") {
-    // Default config: EMH_EXT is NOT defined, so emhash5-7 compile their
-    // try_get/try_set blocks out entirely (see #ifdef EMH_EXT in headers).
-    // set_get: emhash5 + emhash8 + emilib1-3 only
+    // set_get/try_set: emhash5 + emhash8 + emilib1-3 only (absent on emhash6/7)
     static_assert(has_set_get<map5<int, int>>::value, "map5 must keep set_get");
+    static_assert(has_try_set<map5<int, int>>::value, "map5 must keep try_set (EMH_EXT gate removed)");
     static_assert(has_set_get<map8<int, int>>::value && has_try_set<map8<int, int>>::value,
                   "map8 must keep try_set/set_get");
     static_assert(!has_set_get<map6<int, int>>::value && !has_try_set<map6<int, int>>::value,
-                  "map6 has no try_set/set_get by default (documented)");
+                  "map6 has no try_set/set_get (documented)");
     static_assert(!has_set_get<map7<int, int>>::value && !has_try_set<map7<int, int>>::value,
-                  "map7 has no try_set/set_get by default (documented)");
+                  "map7 has no try_set/set_get (documented)");
     static_assert(has_set_get3<imap1<int, int>>::value && has_try_set<imap1<int, int>>::value,
                   "emilib1 must keep try_set/set_get (3-arg set_get shape)");
     static_assert(!has_set_get<imap4<int, int>>::value && !has_try_set<imap4<int, int>>::value,
                   "emilib4 has no try_set/set_get (documented)");
-    static_assert(!has_try_set<map5<int, int>>::value, "map5 try_set requires EMH_EXT (documented)");
 
-    // try_get shapes: emhash8 -> bool try_get(key, out&); emilib -> ValueT* try_get(key);
-    // emhash5-7 -> EMH_EXT only. Overload presence is pinned via member-pointer
-    // casts (plain try_get(1, out) is ambiguous on map8<int, int> between
-    // (key, out) and the precomputed-hash (key, uint64_t) overload - see the
-    // note at the bottom of this test case), and semantics verified at runtime.
-    static_assert(!has_try_get<map5<int, int>>::value, "map5 try_get requires EMH_EXT (documented)");
-    static_assert(!has_try_get<map6<int, int>>::value, "map6 try_get requires EMH_EXT (documented)");
-    static_assert(!has_try_get<map7<int, int>>::value, "map7 try_get requires EMH_EXT (documented)");
+    // try_get shapes: uniform since the EMH_EXT gate was removed — emhash5-7 expose
+    // both bool try_get(key, out) and ValueT* try_get(key); emhash8 exposes
+    // bool try_get(key, out) (the ambiguous hash overload was removed);
+    // emilib exposes ValueT* try_get(key).
+    static_assert(has_try_get<map5<int, int>>::value, "map5 must keep try_get (EMH_EXT gate removed)");
+    static_assert(has_try_get<map6<int, int>>::value, "map6 must keep try_get (EMH_EXT gate removed)");
+    static_assert(has_try_get<map7<int, int>>::value, "map7 must keep try_get (EMH_EXT gate removed)");
     {
         using Map8 = map8<int, int>;
         using TryGetBoolFn = bool (Map8::*)(const int&, int&) const;
@@ -238,10 +247,12 @@ TEST_CASE("API contract: extended deviations (try_set/set_get/try_get/hetero)") 
         CHECK(*mi1.try_get(1) == 42);
     }
 
-    // emplace_hint: emhash5-8 only
+    // emplace_hint: uniform (emilib implementations accept the hint and ignore it)
     static_assert(has_emplace_hint<map5<int, int>>::value, "map5 must keep emplace_hint");
-    static_assert(!has_emplace_hint<imap1<int, int>>::value, "emilib has no emplace_hint (documented)");
-    static_assert(!has_emplace_hint<imap4<int, int>>::value, "emilib4 has no emplace_hint (documented)");
+    static_assert(has_emplace_hint<imap1<int, int>>::value, "emilib1 must keep emplace_hint");
+    static_assert(has_emplace_hint<imap2<int, int>>::value, "emilib2 must keep emplace_hint");
+    static_assert(has_emplace_hint<imap3<int, int>>::value, "emilib3 must keep emplace_hint");
+    static_assert(has_emplace_hint<imap4<int, int>>::value, "emilib4 must keep emplace_hint");
 
     // heterogeneous erase: only emhash8 with a transparent hasher+equality.
     // (emhash6/7 open-template find/erase appear viable to decltype but their
@@ -254,11 +265,49 @@ TEST_CASE("API contract: extended deviations (try_set/set_get/try_get/hetero)") 
     static_assert(!has_hetero_erase<map5<std::string, int, emhash8::string_hash>>::value,
                   "emhash5 has no heterogeneous erase even with a transparent hasher (documented)");
 
-    // API hazard note (pre-existing, not enforced): emhash8's
-    // try_get(key, uint64_t key_hash) overload makes plain m.try_get(1, out)
-    // ambiguous for int keys in multi-header builds; in single-header builds
-    // GCC silently selects the hash overload (out converted to a hash).
-    // Callers should pass a const key lvalue or use operator[]/find instead.
+    // heterogeneous lookup side is uniform: with a transparent hasher+equality
+    // every implementation's open-template find/contains/count/at compile for
+    // string_view keys (emilib4 explicitly pinned - README documents this).
+    struct TransparentHash {
+        using is_transparent = void;
+        size_t operator()(const std::string& s) const noexcept { return std::hash<std::string>{}(s); }
+        size_t operator()(const std::string_view& sv) const noexcept { return std::hash<std::string_view>{}(sv); }
+    };
+    using HeteroMap4 = emilib4::HashMap<std::string, int, TransparentHash, std::equal_to<>>;
+    static_assert(has_hetero_find<HeteroMap4>::value, "emilib4 find must work heterogeneously with a transparent hash");
+    static_assert(!has_hetero_erase<HeteroMap4>::value, "emilib4 has no heterogeneous erase (emhash8 only, documented)");
+
+    // get_or_return_default was removed from all map implementations (EMH_EXT
+    // cleanup); LRU containers keep their own copy.
+    static_assert(!has_gord<map5<int, int>>::value && !has_gord<map6<int, int>>::value &&
+                      !has_gord<map7<int, int>>::value && !has_gord<map8<int, int>>::value,
+                  "get_or_return_default must stay removed from emhash5-8");
+
+    // The ambiguous pointer-form try_get(key, uint64_t key_hash) overload was
+    // REMOVED from emhash8: for integral value types it made
+    // try_get(key, val) an ambiguous call (the value lvalue converts to
+    // uint64_t). The 3-arg try_get(key, val, hash) and the plain 2-arg forms
+    // remain; pin the removal so it cannot silently come back.
+    static_assert(!has_try_get_hash<map8<int, int>>::value, "ambiguous try_get(key, hash) must stay removed");
+    static_assert(has_try_get<map8<int, int>>::value, "plain try_get(key, out) must remain");
+
+    // emilib raw-bucket _erase(size_t) is private: a bare int argument would
+    // silently convert to a bucket index and erase the wrong element.
+    static_assert(!has_raw_bucket_erase<imap1<int, int>>::value && !has_raw_bucket_erase<imap2<int, int>>::value &&
+                      !has_raw_bucket_erase<imap3<int, int>>::value && !has_raw_bucket_erase<iset2<int>>::value &&
+                      !has_raw_bucket_erase<iset3<int>>::value,
+                  "raw-bucket _erase(size_t) must stay private");
+
+    // emilib range insert/ctor are constrained to real iterators:
+    // insert(3, 4) must be a compile error, not int-as-iterator UB.
+    static_assert(!has_insert_two_ints<imap1<int, int>>::value && !has_insert_two_ints<imap2<int, int>>::value &&
+                      !has_insert_two_ints<imap3<int, int>>::value && !has_insert_two_ints<imap4<int, int>>::value &&
+                      !has_insert_two_ints<iset3<int>>::value,
+                  "range insert must reject non-iterator arguments");
+
+    // emilib2 set gained the range constructor (emilib3 already had it)
+    static_assert(has_range_ctor<iset2<int>>::value && has_range_ctor<iset3<int>>::value,
+                  "emilib sets must provide the (first, last) range constructor");
     CHECK(true);
 }
 
@@ -272,7 +321,7 @@ TEST_CASE("API contract: sets basic surface") {
 }
 
 TEST_CASE("API contract: inspectors, erase shape and iterator category") {
-    // hash_function()/key_eq() accessors: emhash5-8 maps and emhash2/4/8 sets only
+    // hash_function()/key_eq() accessors: uniform on all maps and all sets
     static_assert(has_hash_function<map5<int, int>>::value && has_key_eq<map5<int, int>>::value,
                   "map5 must keep hash_function/key_eq");
     static_assert(has_hash_function<map6<int, int>>::value && has_key_eq<map6<int, int>>::value,
@@ -281,34 +330,39 @@ TEST_CASE("API contract: inspectors, erase shape and iterator category") {
                   "map7 must keep hash_function/key_eq");
     static_assert(has_hash_function<map8<int, int>>::value && has_key_eq<map8<int, int>>::value,
                   "map8 must keep hash_function/key_eq");
-    static_assert(!has_hash_function<imap1<int, int>>::value, "emilib1 has no hash_function/key_eq (documented)");
-    static_assert(!has_hash_function<imap2<int, int>>::value, "emilib2 has no hash_function/key_eq (documented)");
-    static_assert(!has_hash_function<imap3<int, int>>::value, "emilib3 has no hash_function/key_eq (documented)");
-    static_assert(!has_hash_function<imap4<int, int>>::value, "emilib4 has no hash_function/key_eq (documented)");
+    static_assert(has_hash_function<imap1<int, int>>::value && has_key_eq<imap1<int, int>>::value,
+                  "emilib1 must keep hash_function/key_eq");
+    static_assert(has_hash_function<imap2<int, int>>::value && has_key_eq<imap2<int, int>>::value,
+                  "emilib2 must keep hash_function/key_eq");
+    static_assert(has_hash_function<imap3<int, int>>::value && has_key_eq<imap3<int, int>>::value,
+                  "emilib3 must keep hash_function/key_eq");
+    static_assert(has_hash_function<imap4<int, int>>::value && has_key_eq<imap4<int, int>>::value,
+                  "emilib4 must keep hash_function/key_eq");
     static_assert(has_hash_function<set2<int>>::value && has_key_eq<set2<int>>::value,
                   "set2 must keep hash_function/key_eq");
     static_assert(has_hash_function<set4<int>>::value && has_key_eq<set4<int>>::value,
                   "set4 must keep hash_function/key_eq");
     static_assert(has_hash_function<set8<int>>::value && has_key_eq<set8<int>>::value,
                   "set8 must keep hash_function/key_eq");
-    static_assert(!has_hash_function<iset2<int>>::value, "emilib2 set has no hash_function/key_eq (documented)");
-    static_assert(!has_hash_function<iset3<int>>::value, "emilib3 set has no hash_function/key_eq (documented)");
+    static_assert(has_hash_function<iset2<int>>::value && has_key_eq<iset2<int>>::value,
+                  "emilib2 set must keep hash_function/key_eq");
+    static_assert(has_hash_function<iset3<int>>::value && has_key_eq<iset3<int>>::value,
+                  "emilib3 set must keep hash_function/key_eq");
 
-    // erase(it) return shape: emhash5-8 maps return the next iterator; emilib maps return void.
-    // Sets: emhash2/4/8 and emilib2 return iterator; emilib3 returns void.
+    // erase(it) return shape: uniform — every map/set returns the next iterator
     static_assert(erase_it_returns_iterator<map5<int, int>>::value, "map5 erase(it) must return iterator");
     static_assert(erase_it_returns_iterator<map6<int, int>>::value, "map6 erase(it) must return iterator");
     static_assert(erase_it_returns_iterator<map7<int, int>>::value, "map7 erase(it) must return iterator");
     static_assert(erase_it_returns_iterator<map8<int, int>>::value, "map8 erase(it) must return iterator");
-    static_assert(!erase_it_returns_iterator<imap1<int, int>>::value, "emilib1 erase(it) returns void (documented)");
-    static_assert(!erase_it_returns_iterator<imap2<int, int>>::value, "emilib2 erase(it) returns void (documented)");
-    static_assert(!erase_it_returns_iterator<imap3<int, int>>::value, "emilib3 erase(it) returns void (documented)");
-    static_assert(!erase_it_returns_iterator<imap4<int, int>>::value, "emilib4 erase(it) returns void (documented)");
+    static_assert(erase_it_returns_iterator<imap1<int, int>>::value, "emilib1 erase(it) must return iterator");
+    static_assert(erase_it_returns_iterator<imap2<int, int>>::value, "emilib2 erase(it) must return iterator");
+    static_assert(erase_it_returns_iterator<imap3<int, int>>::value, "emilib3 erase(it) must return iterator");
+    static_assert(erase_it_returns_iterator<imap4<int, int>>::value, "emilib4 erase(it) must return iterator");
     static_assert(erase_it_returns_iterator<set2<int>>::value, "set2 erase(it) must return iterator");
     static_assert(erase_it_returns_iterator<set4<int>>::value, "set4 erase(it) must return iterator");
     static_assert(erase_it_returns_iterator<set8<int>>::value, "set8 erase(it) must return iterator");
     static_assert(erase_it_returns_iterator<iset2<int>>::value, "emilib2 set erase(it) returns iterator");
-    static_assert(!erase_it_returns_iterator<iset3<int>>::value, "emilib3 set erase(it) returns void (documented)");
+    static_assert(erase_it_returns_iterator<iset3<int>>::value, "emilib3 set erase(it) returns iterator");
 
     // iterator category: bidirectional only on emhash8 map/set, forward elsewhere
     static_assert(bidirectional_iterator<map8<int, int>>::value, "map8 iterators must stay bidirectional");

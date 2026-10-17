@@ -186,8 +186,10 @@ TEST_CASE_TEMPLATE("merge into empty moves all", Map, AllIntMaps) {
 // try_get, try_set, set_get extended API
 // ============================================================================
 
-// try_get is available on emhash8 + all emilib maps (emhash5/6/7 require EMH_EXT)
-#define TryGetMaps map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>
+// try_get: uniform — the former EMH_EXT gate was removed, all maps expose the pointer form
+#define TryGetMaps                                                                                                     \
+    map5<int, int>, map6<int, int>, map7<int, int>, map8<int, int>, imap1<int, int>, imap2<int, int>,                  \
+        imap3<int, int>
 
 TEST_CASE_TEMPLATE("try_get returns pointer or nullptr", Map, TryGetMaps) {
     using K = typename Map::key_type;
@@ -227,8 +229,8 @@ TEST_CASE_TEMPLATE("try_get allows modification via pointer", Map, TryGetMaps) {
     CHECK(m.at(make_kv<K>(1)) == make_kv<V>(100));
 }
 
-// try_set is available on emhash8 + all emilib maps (emhash5 requires EMH_EXT)
-#define TrySetMaps map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>
+// try_set: emhash5 (EMH_EXT gate removed) + emhash8 + all emilib maps
+#define TrySetMaps map5<int, int>, map8<int, int>, imap1<int, int>, imap2<int, int>, imap3<int, int>
 
 // set_get has different signatures: emhash5/8 returns ValueT, emilib returns bool with out-param.
 // Only emilib uses the three-argument (bool, ValueT&) form tested here.

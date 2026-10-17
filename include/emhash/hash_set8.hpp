@@ -760,6 +760,14 @@ public:
         return {this, slot};
     }
 
+    // void-returning erase (skips the iterator return); same work as erase(const_iterator)
+    void _erase(const const_iterator& cit) noexcept {
+        const auto slot = static_cast<size_type>(cit.kv_ - _pairs);
+        size_type main_bucket;
+        const auto sbucket = find_slot_bucket(slot, main_bucket);
+        erase_slot(sbucket, main_bucket);
+    }
+
     // only last >= first
     iterator erase(const_iterator first, const_iterator last) {
         auto esize = static_cast<long>(last.kv_ - first.kv_);

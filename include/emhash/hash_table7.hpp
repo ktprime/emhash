@@ -1031,7 +1031,6 @@ public:
         }
     }
 
-#ifdef EMH_EXT
     [[nodiscard]] bool try_get(const KeyT& key, ValueT& val) const noexcept {
         const auto bucket = find_filled_bucket(key);
         const auto found = bucket != _num_buckets;
@@ -1052,13 +1051,6 @@ public:
         const auto bucket = find_filled_bucket(key);
         return bucket == _num_buckets ? nullptr : &EMH_VAL(_pairs, bucket);
     }
-
-    /// Convenience function.
-    [[nodiscard]] ValueT get_or_return_default(const KeyT& key) const noexcept {
-        const auto bucket = find_filled_bucket(key);
-        return bucket == _num_buckets ? ValueT() : EMH_VAL(_pairs, bucket);
-    }
-#endif
 
     // -----------------------------------------------------
     template <typename K = KeyT, typename V = ValueT> std::pair<iterator, bool> do_assign(K&& key, V&& val) {

@@ -140,6 +140,8 @@ public:
     using reference = KeyT&;
     using const_reference = const KeyT&;
     typedef KeyT key_type;
+    using hasher = HashT;
+    using key_equal = EqT;
 
     class iterator {
     public:
@@ -243,6 +245,14 @@ public:
             insert(*it);
     }
 
+    // SFINAE-constrained to real iterators (matches emilib3's range ctor shape)
+    template <class InputIt, typename = decltype(*std::declval<InputIt&>())>
+    HashSet(InputIt first, InputIt last) {
+        reserve(static_cast<size_t>(std::distance(first, last)));
+        for (; first != last; ++first)
+            insert(*first);
+    }
+
     HashSet& operator=(const HashSet& other) {
         if (this != &other)
             clone(other);
@@ -339,6 +349,9 @@ public:
     float max_load_factor() const noexcept { return 7 / 8.0f; }
     void max_load_factor(float) {}
 
+    hasher hash_function() const noexcept { return _hasher; }
+    key_equal key_eq() const noexcept { return _eq; }
+
     constexpr uint64_t max_size() const { return 1ull << (sizeof(_num_buckets) * 8 - 1); }
     constexpr uint64_t max_bucket_count() const { return max_size(); }
 
@@ -412,6 +425,10 @@ public:
     }
 
     std::pair<iterator, bool> insert([[maybe_unused]] iterator it, const KeyT& key) { return insert(key); }
+
+    // hint is ignored (the underlying open-addressing layout cannot use it); kept for API parity
+    iterator emplace_hint([[maybe_unused]] const_iterator hint, const KeyT& key) { return insert(key).first; }
+    iterator emplace_hint([[maybe_unused]] const_iterator hint, KeyT&& key) { return insert(std::move(key)).first; }
 
     template <typename T> void insert(T beginc, T endc) {
         reserve(endc - beginc + _num_filled);
@@ -493,19 +510,6 @@ public:
     }
 
     void _erase(const iterator& it) { _erase(it._bucket); }
-
-    void _erase(size_t bucket) {
-        if (need_explicit_dtor())
-            _keys[bucket].~KeyT();
-        _states[bucket] = State::EDELETE;
-        _num_filled -= 1;
-        // Propagate empty state leftward only if next bucket is empty,
-        // so that lookup probes still reach elements stored after erased slots.
-        if (_states[bucket + 1] == State::EEMPTY) {
-            while (bucket > 0 && _states[--bucket] == State::EDELETE)
-                _states[bucket] = State::EEMPTY;
-        }
-    }
 
     static constexpr bool need_explicit_dtor() {
 #if __cplusplus >= 201402L || _MSC_VER > 1600 || __clang__
@@ -664,6 +668,21 @@ public:
     }
 
 private:
+    // raw-bucket fast erase (private: an int key argument would silently
+    // convert to a bucket index and erase the wrong element)
+    void _erase(size_t bucket) {
+        if (need_explicit_dtor())
+            _keys[bucket].~KeyT();
+        _states[bucket] = State::EDELETE;
+        _num_filled -= 1;
+        // Propagate empty state leftward only if next bucket is empty,
+        // so that lookup probes still reach elements stored after erased slots.
+        if (_states[bucket + 1] == State::EEMPTY) {
+            while (bucket > 0 && _states[--bucket] == State::EDELETE)
+                _states[bucket] = State::EEMPTY;
+        }
+    }
+
     // Can we fit another element?
     void check_expand_need() { reserve(_num_filled); }
 

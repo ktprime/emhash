@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Removed the `EMH_EXT` compile gate: `try_get`/`try_set` that were hidden inside `#ifdef EMH_EXT` blocks in `hash_table5/6/7.hpp` are now unconditionally compiled (zero runtime cost — plain inline non-virtual functions). `try_get` becomes uniform across all 8 map implementations (emhash5-7 expose both the `bool try_get(key, out&)` and `ValueT* try_get(key)` shapes); `try_set` becomes available on emhash5 in addition to emhash8 and emilib1-3
+- Removed `get_or_return_default()` from `hash_table5/6/7/8.hpp` (legacy `EMH_EXT`-era convenience API, superseded by `try_get`/`at`); the dedicated LRU containers keep their own copies. README heterogeneous-lookup row corrected: `find`/`contains`/`count`/`at`/pointer-form `try_get` are open templates on every implementation and work heterogeneously with a transparent hash & equality (verified for emilib4); only heterogeneous `erase`/value-form `try_get` remain emhash8-exclusive
+- API audit cleanups (2026-10): (1) removed emhash8's ambiguous pointer-form `try_get(key, uint64_t key_hash)` — for integral value types it made `try_get(key, val)` an ambiguous call (compile error in multi-header builds, silently wrong overload elsewhere); the 3-arg `try_get(key, out, hash(key))` and the plain forms remain. (2) emilib1-3 maps and emilib2/3 sets: the raw-bucket `_erase(size_t)` is now private (a bare int argument silently converted to a bucket index and erased the wrong element); the public fast-erase surface is `_erase(const_iterator)`/`_erase(iterator)`. (3) emilib range `insert(first, last)` and emilib3's range constructor are SFINAE-constrained to real iterators, so `insert(3, 4)` is now a compile error instead of int-as-iterator UB. (4) Verified `merge` (emhash5-8, emilib1-3) and set `erase_if`/`merge` against `std::unordered_map`/`std::unordered_set` ground truth (300 randomized rounds + 5000-element rehash-heavy runs) — all correct; the previously documented key-loss/runtime-issue footnotes were removed from the README matrices
+
 ### Added
+- Range constructor `(first, last)` for `emilib2::HashSet` (emilib3 already had one); emilib sets' range constructors are constrained to real iterators
+- API-parity backfill across implementations (no behavioral cost): `hash_function()`/`key_eq()` accessors on emilib1-4 maps and emilib2/3 sets; `emplace_hint` (hint accepted and ignored) on emilib1-4 maps and emilib2/3 sets; `insert_unique(value_type)` overload on emilib1-4 maps; void `_erase` fast-erase on `emhash8::HashMap`/`emhash8::HashSet`/emilib4; single-element `erase(it)` now returns the iterator to the next element on emilib1-4 maps and emilib3 set (advancing before erasing, the same code path as a normal `++` walk)
+- `iterator` -> `const_iterator` conversion on emilib1/2/3 maps and emilib3 set is now implicit (required by the standard container convention; it was `explicit`)
 - Custom allocator support for `emilib1-4` maps (`emihmap1-4.hpp`): trailing `AllocT` template parameter (default `std::allocator<std::pair<KeyT, ValueT>>`), allocator-extended constructors (`(alloc)`, `(n, alloc)`, `(n, lf, alloc)` where applicable, `(map, alloc)` copy/move forms), `get_allocator()`, `select_on_container_copy_construction` and `propagate_on_container_copy_assignment` handling. Raw blocks are routed through the rebound allocator: emihmap1 splits pairs/states, emihmap2/4 keep the single pairs-first block as `PairT` elements, and emihmap3 allocates via a `max_align_t` rebound so its SIMD-aligned state bytes keep the 16-byte alignment malloc previously guaranteed
+
+### Removed
+- Obsolete `include/emilib/emihmap1_opt.hpp` (namespace `emilib1_opt`, 1094 lines) and its manual benchmark `bench/bench_emihmap1_opt.cpp`: an undocumented experimental emihmap1 variant, registered in no CMake target and superseded by the allocator-aware `emihmap1.hpp`
 
 ### Fixed
 - `emihmap4.hpp`: `unchecked_emplace_with_rehash` and `clone` could `free(nullptr)`-style deallocate through the new allocator path without a null guard (harmless with `free`, UB with `allocator_traits::deallocate`)
@@ -88,8 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tracked build artifacts removed from working tree and `.gitignore` hardened
 
 ### Known Issues (tracked via `doctest::skip`)
-- `emhash6::HashMap::merge()` / `emhash7::HashMap::merge()` — key loss during rehash (under investigation)
-- `set merge` / `set erase_if` for `emilib2`/`emilib3` — runtime issue
+- (none — `emhash6/7 merge` and `emilib2/3 set merge/erase_if` were verified correct in 2026-10 against `std::unordered_map`/`std::unordered_set` ground truth, 300 randomized rounds plus 5000-element rehash-heavy runs; the previously documented key-loss/runtime issues no longer reproduce)
 - `erase_if` predicate signature unification across map implementations
 - `emhash8::HashMap::insert_unique` key=0 deduplication failure — see `tests/fuzz/reproduce_emhash8_bug.cpp`
 

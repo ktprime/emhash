@@ -144,6 +144,33 @@ TEST_CASE_TEMPLATE("erase by key and iterator", Map, AllIntMaps) {
 }
 
 // ---------------------------------------------------------------------------
+// _erase: void-returning fast erase by iterator (all maps; the raw-bucket
+// form _erase(size_t) is private — pinned by test_api_contract.cpp)
+// ---------------------------------------------------------------------------
+TEST_CASE_TEMPLATE("_erase fast void erase by iterator", Map, AllIntMaps) {
+    using K = typename Map::key_type;
+    using V = typename Map::mapped_type;
+    Map m;
+    for (int i = 0; i < 20; ++i)
+        m[make_kv<K>(i)] = make_kv<V>(i * 10);
+
+    // erase every even key through the void _erase(it) fast path
+    for (int i = 0; i < 20; i += 2) {
+        auto it = m.find(make_kv<K>(i));
+        REQUIRE(it != m.end());
+        m._erase(it);
+    }
+
+    CHECK(m.size() == 10);
+    for (int i = 0; i < 20; ++i) {
+        if (i % 2 == 0)
+            CHECK_FALSE(m.contains(make_kv<K>(i)));
+        else
+            CHECK(m.at(make_kv<K>(i)) == make_kv<V>(i * 10));
+    }
+}
+
+// ---------------------------------------------------------------------------
 // erase all then empty
 // ---------------------------------------------------------------------------
 TEST_CASE_TEMPLATE("erase all then empty", Map, AllIntMaps) {

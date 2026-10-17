@@ -913,7 +913,6 @@ public:
         }
     }
 
-#ifdef EMH_EXT
     [[nodiscard]] bool try_get(const KeyT& key, ValueT& val) const noexcept {
         const auto bucket = find_filled_bucket(key);
         const auto found = bucket <= _mask;
@@ -934,13 +933,6 @@ public:
         const auto bucket = find_filled_bucket(key);
         return bucket <= _mask ? &EMH_VAL(_pairs, bucket) : nullptr;
     }
-
-    /// Convenience function.
-    [[nodiscard]] ValueT get_or_return_default(const KeyT& key) const noexcept {
-        const auto bucket = find_filled_bucket(key);
-        return bucket <= _mask ? EMH_VAL(_pairs, bucket) : ValueT();
-    }
-#endif
 
     // -----------------------------------------------------
     /// Returns a pair consisting of an iterator to the inserted element
