@@ -421,7 +421,8 @@ public:
         clear_data();
         _num_filled = 0;
         if (_buffer != nullptr)
-            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(_buffer), block_pair_elems(_num_buckets));
+            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(_buffer),
+                                       block_pair_elems(_num_buckets));
     }
 
     [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
@@ -956,7 +957,8 @@ public:
 #endif
 
         if (old_buffer != nullptr)
-            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(old_buffer), block_pair_elems(old_num_buckets));
+            RawAllocTraits::deallocate(_alloc, reinterpret_cast<std::max_align_t*>(old_buffer),
+                                       block_pair_elems(old_num_buckets));
     }
 
 private:

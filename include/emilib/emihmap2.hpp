@@ -955,14 +955,15 @@ private:
 #endif
     }
 
-    // The single mixed block layout is [pairs (buckets+1)][states (buckets + simd_bytes)][offsets (state_size / OFFSET_STEP)].
-    // Pairs sit at offset 0 so allocating the whole block as PairT elements keeps alignof(PairT)
-    // for the pairs array; _states/_offset are byte arrays and need no alignment. The element
-    // count is a pure function of num_buckets so deallocation reproduces it exactly.
+    // The single mixed block layout is [pairs (buckets+1)][states (buckets + simd_bytes)][offsets (state_size /
+    // OFFSET_STEP)]. Pairs sit at offset 0 so allocating the whole block as PairT elements keeps alignof(PairT) for the
+    // pairs array; _states/_offset are byte arrays and need no alignment. The element count is a pure function of
+    // num_buckets so deallocation reproduces it exactly.
     static uint64_t block_pair_elems(uint64_t num_buckets) noexcept {
         const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
         const auto state_size = num_buckets + simd_bytes;
-        const auto total = pairs_size + state_size * sizeof(_states[0]) + (state_size / OFFSET_STEP) * sizeof(_offset[0]);
+        const auto total =
+            pairs_size + state_size * sizeof(_states[0]) + (state_size / OFFSET_STEP) * sizeof(_offset[0]);
         return (total + sizeof(PairT) - 1) / sizeof(PairT);
     }
 

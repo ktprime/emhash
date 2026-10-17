@@ -246,8 +246,7 @@ public:
     }
 
     // SFINAE-constrained to real iterators (matches emilib3's range ctor shape)
-    template <class InputIt, typename = decltype(*std::declval<InputIt&>())>
-    HashSet(InputIt first, InputIt last) {
+    template <class InputIt, typename = decltype(*std::declval<InputIt&>())> HashSet(InputIt first, InputIt last) {
         reserve(static_cast<size_t>(std::distance(first, last)));
         for (; first != last; ++first)
             insert(*first);
