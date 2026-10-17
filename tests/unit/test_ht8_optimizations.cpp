@@ -241,12 +241,12 @@ TEST_CASE("hash() + precomputed-hash lookups agree with plain lookups") {
         CHECK(m.count(k, h) == 1);
         CHECK(m.find(k, h)->second == i);
         CHECK(m.at(k, h) == i);
-        const int* pv = m.try_get(k, h);
-        REQUIRE(pv != nullptr);
-        CHECK(*pv == i);
         int out = 0;
         CHECK(m.try_get(k, out, h));
         CHECK(out == i);
+        const int* pv = m.try_get(k);
+        REQUIRE(pv != nullptr);
+        CHECK(*pv == i);
     }
 
     SUBCASE("misses with a valid hash of an absent key") {
@@ -255,7 +255,11 @@ TEST_CASE("hash() + precomputed-hash lookups agree with plain lookups") {
         CHECK_FALSE(m.contains(absent, h));
         CHECK(m.count(absent, h) == 0);
         CHECK(m.find(absent, h) == m.end());
-        CHECK(m.try_get(absent, h) == nullptr);
+        {
+            int out = -1;
+            CHECK_FALSE(m.try_get(absent, out, h));
+            CHECK(out == -1);
+        }
         CHECK_THROWS_AS(m.at(absent, h), std::out_of_range);
     }
 

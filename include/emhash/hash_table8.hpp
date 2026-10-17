@@ -777,17 +777,12 @@ public:
         }
         return found;
     }
-
-    [[nodiscard]] ValueT* try_get(const KeyT& key, uint64_t key_hash) noexcept {
-        const auto slot = find_filled_slot(key, key_hash);
-        return slot != _num_filled ? &_pairs[slot].second : nullptr;
-    }
-
-    [[nodiscard]] const ValueT* try_get(const KeyT& key, uint64_t key_hash) const noexcept {
-        const auto slot = find_filled_slot(key, key_hash);
-        return slot != _num_filled ? &_pairs[slot].second : nullptr;
-    }
     ///@}
+    // Note: the pointer-returning try_get(key, key_hash) overload was removed:
+    // for integral value types it made try_get(key, val) an ambiguous call
+    // (the value lvalue could convert to uint64_t), producing compile errors
+    // in multi-header builds and silently wrong overload selection elsewhere.
+    // Use try_get(key, val, hash(key)) or the pointer form try_get(key).
 
     const ValueT& index(const uint32_t slot) const noexcept { return _pairs[slot].second; }
 
