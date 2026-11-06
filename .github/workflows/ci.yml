@@ -446,46 +446,39 @@ jobs:
         shell: bash
 
   # ==========================================================================
-  # GCC multi-version regression (oldest + newest only)
+  # C++26 (draft standard) regression. Runs inside a pinned GCC container image
+  # so the toolchain never depends on the runner distro's package set (an
+  # apt-based multi-version matrix cannot install older g++ on ubuntu-latest).
   # ==========================================================================
-  gcc-versions:
-    name: GCC ${{ matrix.gcc_version }} / C++17
+  cpp26:
+    name: GCC 15 / C++26
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        gcc_version: ['10', '13']
+    timeout-minutes: 20
+    container: gcc:15
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install GCC ${{ matrix.gcc_version }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++-${{ matrix.gcc_version }}
-
       - name: Build and run
         run: |
           cd tests
-          GXX=g++-${{ matrix.gcc_version }}
-          FLAGS="-std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon"
-          $GXX $FLAGS unit/test_crud.cpp -o test_crud_gcc
-          $GXX $FLAGS unit/test_full_api.cpp -o test_full_api_gcc
-          $GXX $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_gcc
-          $GXX $FLAGS unit/test_stress_correctness.cpp -o test_stress_correctness_gcc
-          $GXX $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_gcc
-          $GXX $FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_gcc
-          $GXX $FLAGS stress/test_stress_all.cpp -o test_stress_gcc
-          $GXX $FLAGS stress/test_million_stress.cpp -o test_million_gcc
-          ./test_crud_gcc
-          ./test_full_api_gcc
-          ./test_edge_cases_gcc
-          ./test_stress_correctness_gcc
-          ./test_string_key_leak_gcc
-          ./test_lifecycle_audit_gcc
-          ./test_stress_gcc
-          ./test_million_gcc
+          FLAGS="-std=c++26 -O2 -Wall -Wextra -Wno-unused-parameter -I../include -I. -Icommon"
+          g++ $FLAGS unit/test_crud.cpp -o test_crud_cpp26
+          g++ $FLAGS unit/test_full_api.cpp -o test_full_api_cpp26
+          g++ $FLAGS unit/test_edge_cases.cpp -o test_edge_cases_cpp26
+          g++ $FLAGS unit/test_stress_correctness.cpp -o test_stress_correctness_cpp26
+          g++ $FLAGS memory/test_string_key_leak.cpp -o test_string_key_leak_cpp26
+          g++ $FLAGS memory/test_lifecycle_audit.cpp -o test_lifecycle_audit_cpp26
+          g++ $FLAGS stress/test_stress_all.cpp -o test_stress_cpp26
+          g++ $FLAGS stress/test_million_stress.cpp -o test_million_cpp26
+          ./test_crud_cpp26
+          ./test_full_api_cpp26
+          ./test_edge_cases_cpp26
+          ./test_stress_correctness_cpp26
+          ./test_string_key_leak_cpp26
+          ./test_lifecycle_audit_cpp26
+          ./test_stress_cpp26
+          ./test_million_cpp26
         shell: bash
 
   # ==========================================================================
