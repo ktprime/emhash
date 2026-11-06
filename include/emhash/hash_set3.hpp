@@ -88,6 +88,12 @@
 #define EMH_BUCKET(p, n) p[n].second
 
 namespace emhash3 {
+
+// std::is_trivial is deprecated in C++26 (P3242R1); this is its exact definition.
+template <typename T>
+struct is_trivial_key : std::integral_constant<bool, std::is_trivially_default_constructible<T>::value &&
+                                                         std::is_trivially_copyable<T>::value> {};
+
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<KeyT>>
@@ -910,7 +916,7 @@ private:
             return eqkey ? static_cast<size_type>(bucket) : INACTIVE;
         else if (eqkey) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (std::is_trivial<KeyT>::value)
+            if (is_trivial_key<KeyT>::value)
                 std::swap(EMH_KEY(_pairs, bucket), EMH_KEY(_pairs, next_bucket));
             else
                 EMH_KEY(_pairs, bucket) = EMH_KEY(_pairs, next_bucket);
@@ -943,7 +949,7 @@ private:
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-                if (std::is_trivial<KeyT>::value)
+                if (is_trivial_key<KeyT>::value)
                     std::swap(EMH_KEY(_pairs, bucket), EMH_KEY(_pairs, next_bucket));
                 else
                     EMH_KEY(_pairs, bucket) = EMH_KEY(_pairs, next_bucket);

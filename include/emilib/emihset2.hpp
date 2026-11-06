@@ -46,7 +46,8 @@
 #include "sse2neon.h"
 #endif
 
-// likely/unlikely
+// likely/unlikely (emhash/config.hpp already provides these; guard against redefinition)
+#ifndef EMH_LIKELY
 #if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
 #define EMH_LIKELY(condition) __builtin_expect(!!(condition), 1)
 #define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
@@ -57,10 +58,11 @@
 #define EMH_LIKELY(condition) (condition)
 #define EMH_UNLIKELY(condition) (condition)
 #endif
+#endif
 
 namespace emilib2 {
 
-#define KEYHASH_MASK(key_hash) (static_cast<uint8_t>(key_hash >> 24) << 1)
+#define KEYHASH_MASK(key_hash) (static_cast<uint8_t>(static_cast<uint8_t>(key_hash >> 24) << 1))
 
 #ifndef AVX2_EHASH
 const static auto set_simd_empty = _mm_set1_epi8(1);
@@ -645,7 +647,7 @@ public:
                 auto& src_key = old_keys[src_bucket];
 
                 const auto key_hash = _hasher(src_key);
-                const auto dst_bucket = find_empty_slot(key_hash & _mask, 0);
+                const auto dst_bucket = find_empty_slot(static_cast<size_t>(key_hash & _mask), 0);
 #if EMH_DUMP
                 collision += _states[key_hash & _mask] % 2 == State::EFILLED;
 #endif
@@ -698,7 +700,7 @@ private:
     template <typename KeyLike> size_t find_filled_bucket(const KeyLike& key) const {
         const auto key_hash = compute_hash(key);
         auto next_bucket = static_cast<size_t>(key_hash & _mask);
-        const char keymask = KEYHASH_MASK(key_hash);
+        const char keymask = static_cast<char>(KEYHASH_MASK(key_hash));
         const auto filled = SET1_EPI8(keymask);
         int i = _max_probe_length;
 
@@ -708,7 +710,7 @@ private:
             auto maskf = MOVEMASK_EPI8(CMPEQ_EPI8(vec, filled));
 
             while (maskf != 0) {
-                const auto fbucket = next_bucket + set_CTZ(maskf);
+                const auto fbucket = next_bucket + set_CTZ(static_cast<uint64_t>(maskf));
                 if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break; // overflow
                 else if (_eq(_keys[fbucket], key))
@@ -740,7 +742,7 @@ private:
         const char keymask = static_cast<char>(KEYHASH_MASK(key_hash));
         const auto filled = SET1_EPI8(keymask);
         const auto bucket = static_cast<size_t>(key_hash & _mask);
-        const auto round = bucket + _max_probe_length;
+        const auto round = bucket + static_cast<size_t>(_max_probe_length);
         auto next_bucket = bucket, i = bucket;
 
         for (;;) {
@@ -750,7 +752,7 @@ private:
 
             // 1. find filled
             while (maskf != 0) {
-                const auto fbucket = next_bucket + set_CTZ(maskf);
+                const auto fbucket = next_bucket + set_CTZ(static_cast<uint64_t>(maskf));
                 if (EMH_UNLIKELY(fbucket >= _num_buckets))
                     break;
                 else if (_eq(_keys[fbucket], key))
@@ -761,8 +763,9 @@ private:
             // 2. find empty
             const auto maske = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_empty));
             if (maske != 0) {
-                const auto ebucket = hole == static_cast<size_t>(-1) ? next_bucket + set_CTZ(maske) : hole;
-                const int offset = (ebucket - bucket + _num_buckets) & _mask;
+                const auto ebucket =
+                    hole == static_cast<size_t>(-1) ? next_bucket + set_CTZ(static_cast<uint64_t>(maske)) : hole;
+                const int offset = static_cast<int>((ebucket - bucket + _num_buckets) & _mask);
                 if (EMH_UNLIKELY(offset > _max_probe_length))
                     _max_probe_length = offset;
                 return ebucket;
@@ -772,7 +775,7 @@ private:
             if (hole == static_cast<size_t>(-1)) {
                 const auto maskd = MOVEMASK_EPI8(CMPEQ_EPI8(vec, set_simd_delete));
                 if (maskd != 0)
-                    hole = next_bucket + set_CTZ(maskd);
+                    hole = next_bucket + set_CTZ(static_cast<uint64_t>(maskd));
             }
 
             // 4. next round
@@ -789,7 +792,7 @@ private:
         if (EMH_LIKELY(hole != static_cast<size_t>(-1)))
             return hole;
 
-        return find_empty_slot(next_bucket, i - bucket);
+        return find_empty_slot(next_bucket, static_cast<int>(i - bucket));
     }
 
     size_t find_empty_slot(size_t next_bucket, int offset) {

@@ -201,7 +201,7 @@ struct group15 {
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
     int match(size_t hash) const {
         return _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_load_si128(reinterpret_cast<const __m128i*>(m)),
-                                                _mm_set1_epi32(match_word(hash)))) &
+                                                _mm_set1_epi32(static_cast<int>(match_word(hash))))) &
                0x7FFF;
     }
 
@@ -333,7 +333,7 @@ struct pow2_size_policy {
         while (x >>= 1)
             ++bits;
 #endif
-        return sizeof(size_t) * 8 - bits;
+        return sizeof(size_t) * 8 - static_cast<size_t>(bits);
     }
 
     static inline size_t size(size_t size_index) { return size_t(1) << (sizeof(size_t) * 8 - size_index); }
@@ -518,7 +518,7 @@ public:
                 int mask = pg->match_occupied();
                 if (mask != 0) {
                     auto n = unchecked_ctz(mask);
-                    if (EMH_UNLIKELY(pg->is_sentinel(n))) {
+                    if (EMH_UNLIKELY(pg->is_sentinel(static_cast<int>(n)))) {
                         _p = nullptr;
                     } else {
                         _pc += n;
@@ -591,7 +591,7 @@ public:
                 int mask = pg->match_occupied();
                 if (mask != 0) {
                     auto n = unchecked_ctz(mask);
-                    if (EMH_UNLIKELY(pg->is_sentinel(n))) {
+                    if (EMH_UNLIKELY(pg->is_sentinel(static_cast<int>(n)))) {
                         _p = nullptr;
                     } else {
                         _pc += n;
@@ -1196,7 +1196,7 @@ private:
             auto mask = pg->match_available();
             if (EMH_LIKELY(mask != 0)) {
                 auto n = unchecked_ctz(mask);
-                pg->set(n, hash);
+                pg->set(static_cast<int>(n), hash);
                 auto p = _pairs + pos * N + n;
                 return {pg, static_cast<unsigned>(n), p};
             }
@@ -1417,7 +1417,7 @@ private:
     // OPT-FIX2: Mark rehash cold paths as NOINLINE to prevent code bloat in insert hot path
     template <typename... Args> EMILIB4_NOINLINE locator unchecked_emplace_with_rehash(size_t hash, Args&&... args) {
         auto cap = _capacity();
-        auto new_cap = capacity_for((size_t)std::ceil((_num_filled + _num_filled / 61 + 1) / mlf));
+        auto new_cap = capacity_for((size_t)std::ceil((static_cast<float>(_num_filled + _num_filled / 61 + 1)) / mlf));
         if (new_cap <= cap)
             new_cap = capacity_for(cap + N * 2);
 
@@ -1475,7 +1475,7 @@ private:
 
     void rehash_grow() {
         auto cap = _capacity();
-        auto new_cap = capacity_for((size_t)std::ceil((_num_filled + _num_filled / 61 + 1) / mlf));
+        auto new_cap = capacity_for((size_t)std::ceil((static_cast<float>(_num_filled + _num_filled / 61 + 1)) / mlf));
         if (new_cap <= cap)
             new_cap = capacity_for(cap + N * 2);
         rehash_impl(new_cap);

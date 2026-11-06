@@ -997,7 +997,7 @@ private:
     size_t buffer_size() const {
         const auto states_alloc = ((static_cast<size_t>(_num_buckets) + simd_bytes + 63) / 64) * 64;
         const auto pairs_size = (static_cast<size_t>(_num_buckets) + 1) * sizeof(PairT);
-        return states_alloc + pairs_size;
+        return static_cast<size_t>(states_alloc + pairs_size);
     }
 
     // Can we fit another element?

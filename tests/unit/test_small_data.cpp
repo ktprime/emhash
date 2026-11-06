@@ -441,5 +441,5 @@ TEST_CASE("emhash8 size 31 unsigned int key LargeValue regression") {
     test2 = test; // The crash case!
     CHECK(test2.size() == 31);
     for (int i = 1; i <= 31; i++)
-        CHECK(test2.at(i).a == i);
+        CHECK(test2.at(static_cast<unsigned>(i)).a == i);
 }

@@ -1012,7 +1012,7 @@ public:
     }
 
     template <typename Iter> void insert(Iter first, Iter last) {
-        reserve(std::distance(first, last) + _num_filled);
+        reserve(static_cast<uint64_t>(std::distance(first, last)) + static_cast<uint64_t>(_num_filled));
         for (auto it = first; it != last; ++it)
             do_insert(it->first, it->second);
     }

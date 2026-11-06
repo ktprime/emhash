@@ -1031,13 +1031,13 @@ public:
     }
 
     void insert(std::initializer_list<value_type> ilist) {
-        reserve(ilist.size() + _num_filled);
+        reserve(ilist.size() + static_cast<uint64_t>(_num_filled));
         for (auto it = ilist.begin(); it != ilist.end(); ++it)
             (void)do_insert(*it);
     }
 
     template <typename Iter> void insert(Iter first, Iter last) {
-        reserve(std::distance(first, last) + _num_filled);
+        reserve(static_cast<uint64_t>(std::distance(first, last)) + static_cast<uint64_t>(_num_filled));
         for (; first != last; ++first)
             (void)emplace(*first);
     }

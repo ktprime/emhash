@@ -60,6 +60,11 @@
 
 namespace emhash4 {
 
+// std::is_trivial is deprecated in C++26 (P3242R1); this is its exact definition.
+template <typename T>
+struct is_trivial_key : std::integral_constant<bool, std::is_trivially_default_constructible<T>::value &&
+                                                         std::is_trivially_copyable<T>::value> {};
+
 constexpr uint32_t MASK_BIT = sizeof(uint8_t) * 8;
 constexpr uint32_t SIZE_BIT = sizeof(size_t) * 8;
 
@@ -139,7 +144,7 @@ public:
         using reference = value_type&;
 
         explicit iterator(const const_iterator& it)
-            : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
+            : _set(it._set), _bmask(it._bmask), _bucket(it._bucket), _from(it._from) {}
         iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
         iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) {
             _from = size_type(0);
@@ -224,7 +229,7 @@ public:
         using pointer = value_type*;
         using reference = value_type&;
 
-        const_iterator(const iterator& it) : _set(it._set), _bucket(it._bucket), _from(it._from), _bmask(it._bmask) {}
+        const_iterator(const iterator& it) : _set(it._set), _bmask(it._bmask), _bucket(it._bucket), _from(it._from) {}
         const_iterator(const htype* hash_set, size_type bucket, bool) : _set(hash_set), _bucket(bucket) { init(); }
         const_iterator(const htype* hash_set, size_type bucket) : _set(hash_set), _bucket(bucket) {
             _from = size_type(0);
@@ -363,7 +368,7 @@ public:
             return *this;
         //            htype(other).swap(*this);
 
-        if (!std::is_trivial<KeyT>::value)
+        if (!is_trivial_key<KeyT>::value)
             clearkv();
 
         if (_num_buckets != other._num_buckets) {
@@ -757,7 +762,7 @@ public:
     }
 
     template <typename T> inline void new_key(const T& key, size_type bucket) {
-        if (!std::is_trivial<KeyT>::value)
+        if (!is_trivial_key<KeyT>::value)
             new (_pairs + bucket) PairT(key, bucket);
         else {
             _pairs[bucket].first = key;
@@ -768,7 +773,7 @@ public:
     }
 
     template <typename T> inline void new_key(T&& key, size_type bucket) {
-        if (!std::is_trivial<KeyT>::value)
+        if (!is_trivial_key<KeyT>::value)
             new (_pairs + bucket) PairT(std::forward<T>(key), bucket);
         else {
             _pairs[bucket].first = key;
@@ -822,7 +827,7 @@ public:
 #if __cplusplus > 201103L || _MSC_VER > 1600 || __clang__
         return !(std::is_trivially_destructible<KeyT>::value);
 #else
-        return !(std::is_trivial<KeyT>::value);
+        return !(is_trivial_key<KeyT>::value);
 #endif
     }
 
@@ -989,7 +994,7 @@ private:
             return eqkey ? bucket : INACTIVE;
         } else if (eqkey) {
             const auto nbucket = _pairs[next_bucket].second;
-            if (std::is_trivial<KeyT>::value)
+            if (is_trivial_key<KeyT>::value)
                 _pairs[bucket].first = _pairs[next_bucket].first;
             else
                 std::swap(_pairs[bucket].first, _pairs[next_bucket].first);
@@ -1021,7 +1026,7 @@ private:
         if (bucket == main_bucket) {
             if (bucket != next_bucket) {
                 const auto nbucket = _pairs[next_bucket].second;
-                if (std::is_trivial<KeyT>::value)
+                if (is_trivial_key<KeyT>::value)
                     _pairs[bucket].first = _pairs[next_bucket].first;
                 else
                     std::swap(_pairs[bucket].first, _pairs[next_bucket].first);

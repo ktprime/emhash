@@ -432,14 +432,14 @@ TEST_CASE_TEMPLATE("try_emplace multi-arg with string key/value", Map, emhash5::
     Map m;
 
     // std::string(count, ch) is a natural multi-arg mapped-value ctor
-    auto [it1, ok1] = m.try_emplace("alpha", 3, 'a');
+    auto [it1, ok1] = m.try_emplace("alpha", 3u, 'a');
     CHECK(ok1);
     CHECK(it1->first == "alpha");
     CHECK(it1->second == "aaa");
 
     // rvalue key overload with multiple value args (key moved in)
     std::string key = "beta";
-    auto [it2, ok2] = m.try_emplace(std::move(key), 2, 'b');
+    auto [it2, ok2] = m.try_emplace(std::move(key), 2u, 'b');
     CHECK(ok2);
     CHECK(it2->first == "beta");
     CHECK(it2->second == "bb");
@@ -451,7 +451,7 @@ TEST_CASE_TEMPLATE("try_emplace multi-arg with string key/value", Map, emhash5::
 
     // growth across rehash with SSO-escaping values, rvalue keys
     for (int i = 0; i < 200; ++i) {
-        auto [it, ok] = m.try_emplace("k" + std::to_string(i), 40, 'x');
+        auto [it, ok] = m.try_emplace("k" + std::to_string(i), 40u, 'x');
         CHECK(ok);
         CHECK(it->second == std::string(40, 'x'));
     }
@@ -463,7 +463,7 @@ TEST_CASE_TEMPLATE("try_emplace multi-arg with string key/value", Map, emhash5::
     CHECK(m.at("gamma").empty());
 
     // existing keys untouched
-    CHECK_FALSE(m.try_emplace("alpha", 9, 'z').second);
+    CHECK_FALSE(m.try_emplace("alpha", 9u, 'z').second);
     CHECK(m.at("alpha") == "aaa");
 }
 
