@@ -296,7 +296,7 @@ public:
     /// Erase uses them only after checking that the slot still holds this
     /// value index, so a stale hint costs one cached load, never correctness.
     template <bool Const> class iter {
-        using elem_type = std::conditional_t<Const, const value_type, value_type>;
+        using elem_type = std::conditional_t<Const, const typename HashMap::value_type, typename HashMap::value_type>;
 
         elem_type* _ptr = nullptr;
         uint32_t _group = INVALID;
