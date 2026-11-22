@@ -43,7 +43,7 @@ an A/B comparison is only meaningful when both sides are built with identical fl
 prints e.g. `549200.000` (total nanoseconds for the workload) and nothing else.
 
 - `--op` : `insert find_hit find_miss iterate erase_all insert_erase`
-- `--map`: `emhash5 emhash6 emhash7 emhash8 emilib1 emilib2 emilib3 emilib4` (+ `boost`/`absl` when built)
+- `--map`: `emhash5 emhash6 emhash7 emhash8 emhash9 emilib1 emilib2 emilib3 emilib4` (+ `boost`/`absl` when built)
 - `--key`: `int32 int64 string`
 - `--metric`: `min` (robust on noisy hosts, default for A/B) or `median`
 

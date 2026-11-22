@@ -372,7 +372,7 @@ copies or substantial portions of the Software.
 
 Thanks to the following projects and authors for inspiration and comparison:
 
-- [martinus/robin-hood-hashing](https://github.com/martinus/robin-hood-hashing)
+- [martinus/unordered_dense](https://github.com/martinus/unordered_dense)
 - [greg7mdp/parallel-hashmap](https://github.com/greg7mdp/parallel-hashmap)
 - [Tessil/hopscotch-map](https://github.com/Tessil/hopscotch-map)
 - [ska::flat_hash_map](https://github.com/skarupke/flat_hash_map)

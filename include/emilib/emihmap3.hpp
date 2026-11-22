@@ -193,7 +193,11 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
+#if defined(EMH_MAP3_FAST_FIND)
+        return fp_from_hash(key_hash);
+#else
         return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
+#endif
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
@@ -207,8 +211,23 @@ public:
 #endif
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
+#if defined(EMH_MAP3_FAST_FIND)
+        return fp_from_hash(key_hash);
+#else
         return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
+#endif
     }
+
+#if defined(EMH_MAP3_FAST_FIND)
+    // Lookup-first variant: derive the 1-byte fingerprint from the top bits of a
+    // multiply-mixed hash instead of a 64-bit modulo, which sits on the find critical
+    // path. Range stays identical to the %253 form: [EFILLED, EFILLED + 252].
+    static EMH_INLINE int8_t fp_from_hash(uint64_t key_hash) noexcept {
+        const auto mixed = key_hash * UINT64_C(0x9E3779B97F4A7C15);
+        const auto h8 = static_cast<size_t>(mixed >> 56);
+        return static_cast<int8_t>(h8 - 253 * (h8 >= 253) + static_cast<size_t>(EFILLED));
+    }
+#endif
 
     // Access helpers: direct array access into contiguous states/pairs
     EMH_INLINE int8_t& state_at(size_t bucket) noexcept { return _states[bucket]; }
@@ -424,9 +443,7 @@ public:
     ~HashMap() noexcept {
         clear_data();
         _num_filled = 0;
-        if (_buffer != nullptr)
-            RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(_buffer),
-                                       block_pair_elems(_num_buckets));
+        release_blocks(_buffer, split_pairs(), _num_buckets);
     }
 
     [[nodiscard]] allocator_type get_allocator() const noexcept { return allocator_type(_alloc); }
@@ -443,8 +460,7 @@ public:
             // Release the old block BEFORE zeroing _num_buckets: the deallocation element
             // count is derived from it, so it must still hold the old capacity here.
             if (_buffer != nullptr) {
-                RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(_buffer),
-                                           block_pair_elems(_num_buckets));
+                release_blocks(_buffer, split_pairs(), _num_buckets);
                 _buffer = nullptr;
                 _states = nullptr;
                 _pairs = nullptr;
@@ -454,9 +470,14 @@ public:
         }
 
         if (is_trivially_copyable()) {
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+            memcpy(_buffer, other._buffer, states_alloc_size(_num_buckets));
+            memcpy(_pairs_buffer, other._pairs_buffer, pairs_alloc_size(_num_buckets));
+#else
             // Copy the entire buffer: states + sentinel + pairs + sentinel pair
             const auto sz = buffer_size();
             memcpy(_buffer, other._buffer, sz);
+#endif
         } else {
             // Copy states section (including sentinel)
             memcpy(_states, other._states, _num_buckets + simd_bytes);
@@ -475,6 +496,9 @@ public:
         std::swap(_eq, other._eq);
         std::swap(_alloc, other._alloc);
         std::swap(_buffer, other._buffer);
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+        std::swap(_pairs_buffer, other._pairs_buffer);
+#endif
         std::swap(_states, other._states);
         std::swap(_pairs, other._pairs);
         std::swap(_num_buckets, other._num_buckets);
@@ -903,15 +927,28 @@ public:
         assert(buckets <= max_size() && buckets > _num_filled);
 
         const auto num_buckets = static_cast<size_t>(buckets);
-        // States: num_buckets bytes + simd_bytes sentinel bytes, rounded up to 64B boundary
-        const auto states_alloc = ((static_cast<size_t>(num_buckets) + simd_bytes + 63) / 64) * 64;
 
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+        // Split-allocation variant (measurement switch): states and pairs come from two
+        // independent 64B-aligned blocks instead of one sandwich block.
+        auto* new_states_base =
+            reinterpret_cast<char*>(RawAllocTraits::allocate(_alloc, states_block_elems(num_buckets)));
+        auto* new_pairs_base =
+            reinterpret_cast<char*>(RawAllocTraits::allocate(_alloc, pairs_block_elems(num_buckets)));
+        auto* new_states = reinterpret_cast<int8_t*>(new_states_base);
+        auto* new_pairs = reinterpret_cast<PairT*>(new_pairs_base);
+#else
+        // States: num_buckets bytes + simd_bytes sentinel bytes, rounded up to 64B boundary
         auto* new_buffer = reinterpret_cast<char*>(RawAllocTraits::allocate(_alloc, block_pair_elems(num_buckets)));
         auto* new_states = reinterpret_cast<int8_t*>(new_buffer);
-        auto* new_pairs = reinterpret_cast<PairT*>(new_buffer + states_alloc);
+        auto* new_pairs = reinterpret_cast<PairT*>(new_buffer + states_alloc_size(num_buckets));
+#endif
 
         auto old_num_filled = _num_filled;
         auto old_buffer = _buffer;
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+        auto old_pairs_buffer = _pairs_buffer;
+#endif
         auto old_states = _states;
         auto old_pairs = _pairs;
         auto old_num_buckets = _num_buckets;
@@ -922,7 +959,12 @@ public:
         _num_filled = 0;
         _num_buckets = num_buckets;
         _mask = num_buckets - 1;
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+        _buffer = new_states_base;
+        _pairs_buffer = new_pairs_base;
+#else
         _buffer = new_buffer;
+#endif
         _states = new_states;
         _pairs = new_pairs;
 
@@ -959,9 +1001,11 @@ public:
                    max_probe_length, _max_probe_length, collision, collision * 100.0f / _num_buckets);
 #endif
 
-        if (old_buffer != nullptr)
-            RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(old_buffer),
-                                       block_pair_elems(old_num_buckets));
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+        release_blocks(old_buffer, old_pairs_buffer, old_num_buckets);
+#else
+        release_blocks(old_buffer, nullptr, old_num_buckets);
+#endif
     }
 
 private:
@@ -986,10 +1030,46 @@ private:
     // state bytes at offset 0 keep their alignment regardless of the user allocator. The element
     // count is a pure function of num_buckets so deallocation reproduces it exactly.
     static uint64_t block_pair_elems(uint64_t num_buckets) noexcept {
-        const auto states_alloc = ((num_buckets + simd_bytes + 63) / 64) * 64;
-        const auto pairs_size = (num_buckets + 1) * sizeof(PairT);
-        const auto total = states_alloc + pairs_size;
+        const auto total = states_alloc_size(num_buckets) + pairs_alloc_size(num_buckets);
         return (total + sizeof(AlignedBlock) - 1) / sizeof(AlignedBlock);
+    }
+
+    // Bytes reserved for the state array (including the SIMD sentinel group), 64B-rounded.
+    static uint64_t states_alloc_size(uint64_t num_buckets) noexcept {
+        return ((num_buckets + simd_bytes + 63) / 64) * 64;
+    }
+
+    // Bytes reserved for the pair array (buckets + one sentinel pair).
+    static uint64_t pairs_alloc_size(uint64_t num_buckets) noexcept { return (num_buckets + 1) * sizeof(PairT); }
+
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+    static uint64_t states_block_elems(uint64_t num_buckets) noexcept {
+        return states_alloc_size(num_buckets) / sizeof(AlignedBlock);
+    }
+
+    static uint64_t pairs_block_elems(uint64_t num_buckets) noexcept {
+        return (pairs_alloc_size(num_buckets) + sizeof(AlignedBlock) - 1) / sizeof(AlignedBlock);
+    }
+
+    char* split_pairs() const noexcept { return _pairs_buffer; }
+#else
+    static char* split_pairs() noexcept { return nullptr; }
+#endif
+
+    // Free the blocks that currently hold a table of `num_buckets` buckets.
+    void release_blocks(char* states_buf, char* pairs_buf, uint64_t num_buckets) noexcept {
+        if (states_buf == nullptr)
+            return;
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+        RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(states_buf),
+                                   states_block_elems(num_buckets));
+        if (pairs_buf != nullptr)
+            RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(pairs_buf),
+                                       pairs_block_elems(num_buckets));
+#else
+        (void)pairs_buf;
+        RawAllocTraits::deallocate(_alloc, reinterpret_cast<AlignedBlock*>(states_buf), block_pair_elems(num_buckets));
+#endif
     }
 
 private:
@@ -1003,9 +1083,13 @@ private:
     // Can we fit another element?
     void check_expand_need() { reserve(_num_filled); }
 
-    // Prefetch for read operations (find)
+    // Prefetch for read operations (find). The find site issues this right after a
+    // fingerprint hit, so the pair load overlaps the equality checks.
+    // config.hpp disables read prefetch globally (EMH_NO_READ_PREFETCH), but on this
+    // sandwich layout the find-site prefetch measured 7-12% faster hit/erase at
+    // n=200k..220k, so it stays enabled; define EMILIB3_NO_FIND_PREFETCH to opt out.
     static void prefetch_read(char* ctrl) {
-#if !defined(EMH_NO_READ_PREFETCH) && (defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__))
+#if !defined(EMILIB3_NO_FIND_PREFETCH) && (defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__))
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
@@ -1044,7 +1128,11 @@ private:
         size_t main_bucket;
         size_t offset = 0;
         const auto key_h2 = hash_key2(main_bucket, key);
+#if defined(EMH_MAP3_FAST_FIND)
+        const auto filled = EM3_SET1_EPI8(key_h2);
+#else
         const auto filled = EM3_SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
+#endif
         auto next_bucket = main_bucket;
 
         do {
@@ -1180,7 +1268,10 @@ private:
     HashT _hasher;
     EqT _eq;
     RawAlloc _alloc;
-    char* _buffer = nullptr;                // single allocation base
+    char* _buffer = nullptr; // single allocation base
+#if defined(EMH_MAP3_SPLIT_ALLOC)
+    char* _pairs_buffer = nullptr; // pairs block base when allocated separately
+#endif
     int8_t* EMH_RESTRICT _states = nullptr; // points to _buffer (states at front)
     PairT* EMH_RESTRICT _pairs = nullptr;   // points after states in _buffer
     size_t _num_buckets = 0;

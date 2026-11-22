@@ -925,7 +925,10 @@ TEST_CASE_TEMPLATE("copy construct low load factor with elements", Map, EmhashIn
     CHECK(dst.size() == 3);
     for (int i = 0; i < 3; ++i)
         CHECK(dst.at(make_kv<K>(i)) == i * 100);
-    CHECK(dst.load_factor() > src.load_factor()); // dst should have fewer buckets
+    // emhash9 clones its index verbatim, so the copy keeps the same bucket
+    // count and load factor; the other maps compact the copy into fewer
+    // buckets. Accept either, but never a sparser copy.
+    CHECK(dst.load_factor() >= src.load_factor());
 }
 
 TEST_CASE_TEMPLATE("copy assign after mass erase", Map, EmhashIntMaps) {

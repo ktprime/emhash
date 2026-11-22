@@ -26,6 +26,7 @@
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table7.hpp"
 #include "emhash/hash_table8.hpp"
+#include "emhash/hash_table9.hpp"
 #include "emilib/emihmap1.hpp"
 #include "emilib/emihmap2.hpp"
 #include "emilib/emihmap3.hpp"
@@ -63,6 +64,7 @@ template <typename K, typename V> using map5_t  = emhash5::HashMap<K, V>;
 template <typename K, typename V> using map6_t  = emhash6::HashMap<K, V>;
 template <typename K, typename V> using map7_t  = emhash7::HashMap<K, V>;
 template <typename K, typename V> using map8_t  = emhash8::HashMap<K, V>;
+template <typename K, typename V> using map9_t  = emhash9::HashMap<K, V>;
 template <typename K, typename V> using imap1_t = emilib::HashMap<K, V>;
 template <typename K, typename V> using imap2_t = emilib2::HashMap<K, V>;
 template <typename K, typename V> using imap3_t = emilib3::HashMap<K, V>;
@@ -89,6 +91,7 @@ std::vector<Entry> const& registry() {
         add_container<map6_t>(v, "emhash6");
         add_container<map7_t>(v, "emhash7");
         add_container<map8_t>(v, "emhash8");
+        add_container<map9_t>(v, "emhash9");
         add_container<imap1_t>(v, "emilib1");
         add_container<imap2_t>(v, "emilib2");
         add_container<imap3_t>(v, "emilib3");
@@ -147,7 +150,7 @@ void print_usage(char const* prog) {
                  "\n"
                  "  ops   : insert find_hit find_miss iterate erase_all insert_erase\n"
                  "  keys  : int32 int64 string\n"
-                 "  maps  : emhash5 emhash6 emhash7 emhash8 emilib1 emilib2 emilib3 emilib4\n",
+                 "  maps  : emhash5 emhash6 emhash7 emhash8 emhash9 emilib1 emilib2 emilib3 emilib4\n",
                  prog, prog);
 }
 

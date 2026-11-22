@@ -20,6 +20,12 @@
 #include "phmap/btree.h"
 #endif
 
+// Benchmark the third-party sflat::flat_hash_map (thirdparty/sflat), which
+// needs C++17. On by default; build with -DSFLAT_HASH=0 to leave it out.
+#ifndef SFLAT_HASH
+//#define SFLAT_HASH 1
+#endif
+
 static void printInfo(char* out);
 std::map<std::string, std::string> maps = {
 //    {"stl_hash", "unordered_map"},
@@ -40,6 +46,7 @@ std::map<std::string, std::string> maps = {
     {"emhash6", "emhash6"},
     {"emhash7", "emhash7"},
     {"emhash8", "emhash8"},
+    {"emhash9", "emhash9"},
 
     //    {"jg_dense", "jg_dense"},
     //    {"rigtorp", "rigtorp"},
@@ -58,6 +65,9 @@ std::map<std::string, std::string> maps = {
     {"abslf", "absl_flat"},
 #endif
     {"martind", "martin_dense"},
+#if SFLAT_HASH
+    {"sflat", "sflat_hash"},
+#endif
 //    {"f14_value", "f14_value"},
 
 #if 0
@@ -119,6 +129,7 @@ std::map<std::string, std::string> maps = {
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table7.hpp"
 #include "emhash/hash_table8.hpp"
+#include "emhash/hash_table9.hpp"
 // #define EMH_HIGH_LOAD 12345
 #include "emhash/hash_table5.hpp"
 
@@ -143,6 +154,10 @@ std::map<std::string, std::string> maps = {
 #if CXX17
 #include "martin/unordered_dense.h"
 #include "martin/robin_hood.h"
+#endif
+
+#if CXX17 && SFLAT_HASH
+#include "sflat/flat_hash_map.hpp"
 #endif
 
 #if PHMAP_HASH
@@ -338,6 +353,13 @@ static void add_hash_func_time(std::map<std::string, std::map<std::string, int64
                 maxv = h.second;
         }
 
+        if (maxv == 0) {
+            // Every map finished below the timer's resolution; dividing by it
+            // would trap and the function cannot rank anything anyway.
+            printf("%s: all times zero, skipped\n", v.first.c_str());
+            continue;
+        }
+
         for (auto& f : v.second) {
             const auto score = (100ull * f.second) / maxv; // f.second;
             func_hash_score[v.first][f.first] += score;
@@ -350,7 +372,8 @@ static void add_hash_func_time(std::map<std::string, std::map<std::string, int64
     const auto first = double(once_score_hash.begin()->first);
     // print once score
     for (auto& v : once_score_hash) {
-        printf("%5d   %13s   (%6.1lf %%)\n", int(v.first / (func_index - 1)), v.second.data(), 100 * v.first / first);
+        printf("%5d   %13s   (%6.1lf %%)\n", int(v.first / (func_index > 1 ? func_index - 1 : 1)), v.second.data(),
+               first ? (100 * v.first / first) : 0);
     }
 }
 
@@ -1446,11 +1469,16 @@ static int benchHashMap(int n) {
 #endif
 
         { benOneHash<emhash8::HashMap<keyType, valueType, ehash_func>>("emhash8", vList); }
+        { benOneHash<emhash9::HashMap<keyType, valueType, ehash_func>>("emhash9", vList); }
         { benOneHash<emhash7::HashMap<keyType, valueType, ehash_func>>("emhash7", vList); }
         { benOneHash<emhash6::HashMap<keyType, valueType, ehash_func>>("emhash6", vList); }
 
 #if CXX17
         { benOneHash<ankerl::unordered_dense::map<keyType, valueType, ehash_func>>("martind", vList); }
+#endif
+
+#if CXX17 && SFLAT_HASH
+        { benOneHash<sflat::flat_hash_map<keyType, valueType, ehash_func>>("sflat", vList); }
 #endif
 
 #if ET
@@ -1528,7 +1556,7 @@ static void testHashInt(int loops = 500000009) {
     ts = getus();
     sum = r;
     for (int i = 0; i < loops; i++)
-        sum += ankerl::unordered_dense::detail::wyhash::hash(i + r);
+        sum += ankerl::unordered_dense::hash<uint64_t>{}(i + r);
     printf("ankerl hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 #endif
 #endif

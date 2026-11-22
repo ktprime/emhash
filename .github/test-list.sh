@@ -33,6 +33,7 @@ UNIT_TESTS=(
     test_api_coverage
     test_ht8_optimizations
     test_ht8_hetero
+    test_emhash9
 )
 
 # Memory tests — sanitizer + leak + lifecycle (doctest)

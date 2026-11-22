@@ -132,6 +132,7 @@ template <typename HMAP, typename RNG> static void do_warmup(HMAP& hmap, RNG& rn
 #include "emhash/hash_table6.hpp"
 #include "emhash/hash_table7.hpp"
 #include "emhash/hash_table8.hpp"
+#include "emhash/hash_table9.hpp"
 
 #if HAVE_BOOST
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -186,6 +187,7 @@ static float max_lf = 7.0f / 8;
 static std::map<std::string_view, std::string_view> show_name = {
     {"emhash7", "emhash7"},
     {"emhash8", "emhash8"},
+    {"emhash9", "emhash9"},
     //   {"emhash5", "emhash5"},
     {"emhash6", "emhash6"},
 
@@ -212,7 +214,7 @@ static std::map<std::string_view, std::string_view> show_name = {
 #endif
 
 //    {"fhash_table", "fht"},
-//    {"ankerl", "martin dense"},
+    {"ankerl", "martin dense"},
 
 #if QC_HASH
     {"qc", "qchash"},
@@ -1541,6 +1543,10 @@ static void runTest(int sflags, int eflags) {
             bench_IterateIntegers(emap);
         }
         {
+            emhash9::HashMap<uint64_t, uint64_t, hash_func> emap;
+            bench_IterateIntegers(emap);
+        }
+        {
             emhash7::HashMap<uint64_t, uint64_t, hash_func> emap;
             bench_IterateIntegers(emap);
         }
@@ -1675,6 +1681,10 @@ static void runTest(int sflags, int eflags) {
 
         {
             emhash8::HashMap<std::string, size_t, hash_func> bench;
+            bench_randomFindString(bench);
+        }
+        {
+            emhash9::HashMap<std::string, size_t, hash_func> bench;
             bench_randomFindString(bench);
         }
         {
@@ -1829,6 +1839,10 @@ static void runTest(int sflags, int eflags) {
             bench_randomEraseString(bench);
         }
         {
+            emhash9::HashMap<std::string, int, hash_func> bench;
+            bench_randomEraseString(bench);
+        }
+        {
             emhash7::HashMap<std::string, int, hash_func> bench;
             bench_randomEraseString(bench);
         }
@@ -1960,6 +1974,10 @@ static void runTest(int sflags, int eflags) {
         }
         {
             emhash8::HashMap<uint64_t, int, hash_func> emap;
+            bench_copy(emap);
+        }
+        {
+            emhash9::HashMap<uint64_t, int, hash_func> emap;
             bench_copy(emap);
         }
 
@@ -2204,6 +2222,10 @@ static void runTest(int sflags, int eflags) {
                 bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
             }
             {
+                emhash9::HashMap<size_t, size_t, hash_func> emap;
+                bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
+            }
+            {
                 emhash5::HashMap<size_t, size_t, hash_func> emap;
                 bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
             }
@@ -2288,6 +2310,10 @@ static void runTest(int sflags, int eflags) {
 #endif
         {
             emhash8::HashMap<int, int, hash_func> emap;
+            bench_insert(emap);
+        }
+        {
+            emhash9::HashMap<int, int, hash_func> emap;
             bench_insert(emap);
         }
         {
@@ -2443,6 +2469,10 @@ static void runTest(int sflags, int eflags) {
             bench_randomInsertErase(emap);
         }
         {
+            emhash9::HashMap<uint64_t, int, hash_func> emap;
+            bench_randomInsertErase(emap);
+        }
+        {
             emhash5::HashMap<uint64_t, int, hash_func> emap;
             bench_randomInsertErase(emap);
         }
@@ -2556,6 +2586,10 @@ static void runTest(int sflags, int eflags) {
 
         {
             emhash8::HashMap<int, int, hash_func> emap;
+            bench_randomDistinct2(emap);
+        }
+        {
+            emhash9::HashMap<int, int, hash_func> emap;
             bench_randomDistinct2(emap);
         }
         {
@@ -2705,6 +2739,7 @@ static void runTest(int sflags, int eflags) {
         { bench_knucleotide<emhash5::HashMap<uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<emhash7::HashMap<uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<emhash8::HashMap<uint64_t, uint32_t, hash_func>>(); }
+        { bench_knucleotide<emhash9::HashMap<uint64_t, uint32_t, hash_func>>(); }
 
         { bench_knucleotide<emilib::HashMap<uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<emilib2::HashMap<uint64_t, uint32_t, hash_func>>(); }
@@ -2748,6 +2783,7 @@ static void runTest(int sflags, int eflags) {
         { bench_GameOfLife<emhash5::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emhash7::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emhash8::HashMap<uint32_t, bool, hash_func>>(); }
+        { bench_GameOfLife<emhash9::HashMap<uint32_t, bool, hash_func>>(); }
 
 #if QC_HASH
         { bench_GameOfLife<qc::hash::RawMap<uint32_t, bool, hash_func>>(); }
@@ -2819,6 +2855,7 @@ static void runTest(int sflags, int eflags) {
         { bench_AccidentallyQuadratic<emhash7::HashMap<int, int, hash_func>, true>(); }
         { bench_AccidentallyQuadratic<emhash5::HashMap<int, int, hash_func>, true>(); }
         { bench_AccidentallyQuadratic<emhash8::HashMap<int, int, hash_func>, true>(); }
+        { bench_AccidentallyQuadratic<emhash9::HashMap<int, int, hash_func>, true>(); }
 
 #if QC_HASH
         { bench_AccidentallyQuadratic<qc::hash::RawMap<int, int, hash_func>>(); }
@@ -2886,6 +2923,7 @@ static void runTest(int sflags, int eflags) {
         { bench_InsertEraseContinue<emhash7::HashMap<int, int, hash_func>>(); }
         { bench_InsertEraseContinue<emhash5::HashMap<int, int, hash_func>>(); }
         { bench_InsertEraseContinue<emhash8::HashMap<int, int, hash_func>>(); }
+        { bench_InsertEraseContinue<emhash9::HashMap<int, int, hash_func>>(); }
 
 #if QC_HASH
         { bench_InsertEraseContinue<qc::hash::RawMap<int, int, hash_func>>(); }
@@ -2947,6 +2985,7 @@ static void runTest(int sflags, int eflags) {
         { bench_InsertEraseBegin<emhash6::HashMap<int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<emhash7::HashMap<int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<emhash8::HashMap<int64_t, int, hash_func>>(); }
+        { bench_InsertEraseBegin<emhash9::HashMap<int64_t, int, hash_func>>(); }
 
 #if QC_HASH
         { bench_InsertEraseBegin<qc::hash::RawMap<int64_t, int, hash_func>>(); }
@@ -3008,6 +3047,7 @@ static void runTest(int sflags, int eflags) {
         { bench_CreateInsert<emhash6::HashMap<int, int, hash_func>>(); }
         { bench_CreateInsert<emhash7::HashMap<int, int, hash_func>>(); }
         { bench_CreateInsert<emhash8::HashMap<int, int, hash_func>>(); }
+        { bench_CreateInsert<emhash9::HashMap<int, int, hash_func>>(); }
 
 #if QC_HASH
         { bench_CreateInsert<qc::hash::RawMap<int, int, hash_func>>(); }
@@ -3069,6 +3109,7 @@ static void runTest(int sflags, int eflags) {
         { bench_udb3<emhash6::HashMap<uint32_t, uint32_t, hash_func>>(); }
         { bench_udb3<emhash7::HashMap<uint32_t, uint32_t, hash_func>>(); }
         { bench_udb3<emhash8::HashMap<uint32_t, uint32_t, hash_func>>(); }
+        { bench_udb3<emhash9::HashMap<uint32_t, uint32_t, hash_func>>(); }
 
 #if QC_HASH
         { bench_udb3<qc::hash::RawMap<uint32_t, uint32_t, hash_func>>(); }
@@ -3238,7 +3279,7 @@ int main(int argc, char* argv[]) {
 
             // Parse short options (legacy format)
             for (int c = arg[0], i = 0; c != '\0'; c = arg[++i]) {
-                if (c > '4' && c <= '8') {
+                if (c > '4' && c <= '9') {
                     std::string map_name("emhash");
                     map_name += (char)c;
                     checkSet(map_name);

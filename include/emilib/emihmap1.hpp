@@ -26,6 +26,10 @@
 
 #pragma once
 
+#if defined(EMH_MAP1_APPEND_ONLY)
+#include "emihmap1d.hpp"
+#else
+
 #include "emhash/config.hpp"
 #include <cstdlib>
 #include <cstring>
@@ -1135,3 +1139,5 @@ private:
 };
 
 } // namespace emilib
+
+#endif // EMH_MAP1_APPEND_ONLY
