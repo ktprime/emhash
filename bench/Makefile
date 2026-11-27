@@ -97,7 +97,7 @@ endif
 ifneq ($(std),)
 CXXFLAGS += -std=c++$(std)
 else
-CXXFLAGS += -std=c++17
+CXXFLAGS += -std=c++23
 endif
 
 ifneq ($(check),)
@@ -136,15 +136,15 @@ ifneq ($(QB),)
 endif
 
 #	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
-	$(CXX) $(CXXFLAGS) comprehensive_bench.cpp -o cbench
-	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) -fno-rtti -fpermissive ebench.cpp -o ebench
+	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
+	$(CXX) $(CXXFLAGS) comprehensive_bench.cpp -o cbench
 	$(CXX) $(CXXFLAGS) -fno-rtti sbench.cpp -o sb
 	$(CXX) $(CXXFLAGS) -fno-rtti hash_join.cpp -o join_hash
 	$(CXX) $(CXXFLAGS) -fno-rtti buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) -fno-rtti bstring.cpp -o bs
-	$(CXX) $(CXXFLAGS) boost_bench/word_count.cpp -o wc
-	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
+#	$(CXX) $(CXXFLAGS) boost_bench/word_count.cpp -o wc
+#	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
 	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
 	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
 	$(CXX) $(CXXFLAGS) app.cpp -o app

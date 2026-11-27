@@ -25,10 +25,13 @@
 # examples:
 #   ./ab.sh ./bench_base ./bench_cand find_hit emhash7 int64 100000
 #   ./ab.sh ./bench_base ./bench_cand --all 6 2
+#   AB_KEY_LEN=8 ./ab.sh ./bench_base ./bench_cand find_hit emhash7 string 100000
 
 set -u
 
 METRIC="${AB_METRIC:-min}"
+# Optional string-key length; empty means the harness default (32 bytes).
+KEY_LEN="${AB_KEY_LEN:-}"
 PAIRS_DEFAULT=6
 # One harness invocation costs ~40ms, so taking the min of several is cheap and
 # measurably reduces run-to-run spread on a noisy host.
@@ -80,7 +83,9 @@ fi
 
 # Run one side once; print the harness's bare number.
 run_side() {
-    "$1" --single --op "$2" --map "$3" --key "$4" --size "$5" --metric "$METRIC"
+    local extra=()
+    [ -n "$KEY_LEN" ] && extra=(--key-len "$KEY_LEN")
+    "$1" --single --op "$2" --map "$3" --key "$4" --size "$5" --metric "$METRIC" "${extra[@]}"
 }
 
 # min of $REPS invocations

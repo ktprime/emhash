@@ -143,14 +143,17 @@ std::vector<std::size_t> parse_sizes(std::string const& s) {
 void print_usage(char const* prog) {
     std::fprintf(stderr,
                  "usage:\n"
-                 "  %s --suite [--maps a,b] [--keys k1,k2] [--sizes n1,n2] [--ops o1,o2]\n"
-                 "            [--json FILE] [--metric min|median] [--seed N]\n"
+                 "  %s --suite [--maps a,b] [--keys k1,k2] [--sizes n1,n2] [--octave]\n"
+                 "            [--ops o1,o2] [--json FILE] [--metric min|median] [--seed N]\n"
                  "  %s --single --op OP --map NAME --key KIND --size N\n"
-                 "            [--metric min|median] [--seed N]\n"
+                 "            [--metric min|median] [--seed N] [--key-len N]\n"
                  "\n"
                  "  ops   : insert find_hit find_miss iterate erase_all insert_erase\n"
+                 "          churn churn_find_miss\n"
                  "  keys  : int32 int64 string\n"
-                 "  maps  : emhash5 emhash6 emhash7 emhash8 emhash9 emilib1 emilib2 emilib3 emilib4\n",
+                 "  maps  : emhash5 emhash6 emhash7 emhash8 emhash9 emilib1 emilib2 emilib3 emilib4\n"
+                 "  --octave : with --suite, use 1k 10k 100k 1M 4M (unless --sizes is given)\n"
+                 "  --key-len : string key bytes (default 32; >= 8)\n",
                  prog, prog);
 }
 
@@ -168,10 +171,13 @@ struct Args {
     std::vector<std::string> keys;
     std::vector<std::size_t> sizes = {1000, 10000, 100000};
     std::vector<std::string> ops;
+    bool octave       = false;
+    bool sizes_given  = false;
 
     std::string json;
     bool        use_min = false;
     std::uint64_t seed  = 12345;
+    std::size_t key_len = eb::kStringKeyLen;
 };
 
 bool parse_args(int argc, char** argv, Args& a) {
@@ -202,7 +208,10 @@ bool parse_args(int argc, char** argv, Args& a) {
         } else if (arg == "--keys") {
             a.keys = split_csv(next("--keys"));
         } else if (arg == "--sizes") {
-            a.sizes = parse_sizes(next("--sizes"));
+            a.sizes       = parse_sizes(next("--sizes"));
+            a.sizes_given = true;
+        } else if (arg == "--octave") {
+            a.octave = true;
         } else if (arg == "--ops") {
             a.ops = split_csv(next("--ops"));
         } else if (arg == "--json") {
@@ -219,6 +228,12 @@ bool parse_args(int argc, char** argv, Args& a) {
             }
         } else if (arg == "--seed") {
             a.seed = std::strtoull(next("--seed"), nullptr, 10);
+        } else if (arg == "--key-len") {
+            a.key_len = static_cast<std::size_t>(std::strtoull(next("--key-len"), nullptr, 10));
+            if (a.key_len < 8) {
+                std::fprintf(stderr, "error: --key-len must be >= 8\n");
+                return false;
+            }
         } else if (arg == "--help" || arg == "-h") {
             return false;
         } else {
@@ -251,6 +266,7 @@ int run_single(Args const& a) {
 
     eb::BenchOpts opts;
     opts.use_min = a.use_min;
+    opts.string_len = a.key_len;
 
     double ns = fn(op, a.size, a.seed, opts);
     std::printf("%.3f\n", ns);
@@ -310,6 +326,7 @@ int run_suite(Args const& a) {
 
     eb::BenchOpts opts;
     opts.use_min = a.use_min;
+    opts.string_len = a.key_len;
 
     std::vector<Row> rows;
     std::printf("%-10s %-7s %-13s %9s %14s\n", "map", "key", "op", "size", "total_ns");
@@ -396,6 +413,10 @@ int main(int argc, char** argv) {
     if (a.single == a.suite) {
         print_usage(argv[0]);
         return 2;
+    }
+    if (a.octave && !a.sizes_given) {
+        // Five sizes, one per decimal octave: small (L1/L2) to large (TLB-bound).
+        a.sizes = {1000, 10000, 100000, 1000000, 4000000};
     }
     return a.single ? run_single(a) : run_suite(a);
 }

@@ -569,7 +569,8 @@ public:
         }
     }
 
-    HashMap(const HashMap& rhs) : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
+    HashMap(const HashMap& rhs)
+        : _eq(rhs._eq), _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             auto* base = alloc_bucket(rhs._num_buckets);
             _bitmask = reinterpret_cast<bit_type*>(base);
@@ -608,6 +609,10 @@ public:
     HashMap& operator=(const HashMap& rhs) {
         if (this == &rhs)
             return *this;
+
+        // The copy constructor gets _eq through its member-init list; copy
+        // assignment must copy it here (clone() only handles the bucket data).
+        _eq = rhs._eq;
 
         if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
             _alloc = rhs._alloc;
@@ -675,7 +680,8 @@ public:
 
     void clone(const HashMap& rhs) {
         _hasher = rhs._hasher;
-        //_eq          = rhs._eq;
+        // _eq is copied by the callers: copy ctor (copy-construct, so EqT need
+        // not be copy-assignable) and copy assignment (assign).
 
         _num_filled = rhs._num_filled;
         _mask = rhs._mask;
@@ -996,9 +1002,11 @@ public:
         return find_filled_bucket(key) != _num_buckets ? 1u : 0u;
     }
 
-    template <typename Key = KeyT>
-    [[nodiscard]] std::pair<iterator, iterator> equal_range(const Key& key) const noexcept {
-        const auto found = {this, find_filled_bucket(key), true};
+    // Only one overload may be const: a const/non-const pair of templates with
+    // identical parameters makes every call ambiguous (which is why the old
+    // pair could never be instantiated).
+    template <typename K = KeyT> [[nodiscard]] std::pair<iterator, iterator> equal_range(const K& key) noexcept {
+        const auto found = find(key);
         if (found.bucket() == _num_buckets)
             return {found, found};
         else
@@ -1007,7 +1015,7 @@ public:
 
     template <typename K = KeyT>
     [[nodiscard]] std::pair<const_iterator, const_iterator> equal_range(const K& key) const {
-        const auto found = {this, find_filled_bucket(key), true};
+        const auto found = find(key);
         if (found.bucket() == _num_buckets)
             return {found, found};
         else
@@ -1315,7 +1323,14 @@ public:
         _num_filled = 0;
     }
 
-    void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
+    void shrink_to_fit() noexcept {
+        // Size for the current element count *at the configured load factor*.
+        // Sizing for the count alone leaves load_factor() above
+        // max_load_factor(), so the very next insertion (even an update of an
+        // existing key, which still calls check_expand_need) would double the
+        // table again.
+        rehash((static_cast<uint64_t>(_num_filled) * _mlf >> 28) + 2);
+    }
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) noexcept {
@@ -1442,7 +1457,7 @@ private:
             return INACTIVE;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
+        const auto eqkey = _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket));
         if (eqkey) {
             if (next_bucket == bucket)
                 return bucket;
@@ -1464,7 +1479,7 @@ private:
         auto prev_bucket = bucket;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
+            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
                 EMH_BUCKET(_pairs, prev_bucket) = (nbucket == next_bucket) ? prev_bucket : nbucket;
                 return next_bucket;
             }
@@ -1756,7 +1771,7 @@ private:
 #elif EMH_IDENTITY_HASH
             return static_cast<size_type>(key + (key >> 24));
 #else
-            return static_cast<size_type>(_hasher(key));
+            return static_cast<size_type>(_hasher(static_cast<KeyT>(key)));
 #endif
         } else if constexpr (std::is_same<K, std::string>::value) {
             EMH_MSAN_UNPOISON(&key, sizeof(key));

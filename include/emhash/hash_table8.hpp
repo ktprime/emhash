@@ -338,7 +338,7 @@ public:
     explicit HashMap(size_type bucket = 0, float mlf = EMH_DEFAULT_LOAD_FACTOR) { init(bucket, mlf); }
 
     HashMap(const HashMap& rhs)
-        : _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
+        : _eq(rhs._eq), _pair_allocator(PairAllocTraits::select_on_container_copy_construction(rhs._pair_allocator)),
           _index_allocator(IndexAllocTraits::select_on_container_copy_construction(rhs._index_allocator)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             _pairs_capacity = rhs._pairs_capacity;
@@ -377,7 +377,8 @@ public:
         init(bucket, mlf);
     }
 
-    HashMap(const HashMap& rhs, const allocator_type& alloc) : _pair_allocator(alloc), _index_allocator(alloc) {
+    HashMap(const HashMap& rhs, const allocator_type& alloc)
+        : _eq(rhs._eq), _pair_allocator(alloc), _index_allocator(alloc) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             _pairs_capacity = rhs._pairs_capacity;
             _pairs = alloc_bucket(_pairs_capacity);
@@ -398,6 +399,10 @@ public:
     HashMap& operator=(const HashMap& rhs) {
         if (this == &rhs)
             return *this;
+
+        // The copy constructor gets _eq through its member-init list; copy
+        // assignment must copy it here (clone() only handles the bucket data).
+        _eq = rhs._eq;
 
         if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value) {
             _pair_allocator = rhs._pair_allocator;
@@ -463,7 +468,8 @@ public:
 
     void clone(const HashMap& rhs) {
         _hasher = rhs._hasher;
-        //        _eq          = rhs._eq;
+        // _eq is copied by the callers: copy ctor (copy-construct, so EqT need
+        // not be copy-assignable) and copy assignment (assign).
         _num_buckets = rhs._num_buckets;
         _num_filled = rhs._num_filled;
         // _pairs_capacity is NOT overwritten - it was set by caller based on allocation size
@@ -800,9 +806,19 @@ public:
         return find_filled_slot(key) == _num_filled ? 0 : 1;
     }
 
+    // `found.second` does not exist on this iterator: compare with end()/cend().
+    // The const overload is what makes equal_range callable on a const map.
     template <typename K = KeyT> std::pair<iterator, iterator> equal_range(const K& key) {
         const auto found = find(key);
-        if (found.second == _num_filled)
+        if (found == end())
+            return {found, found};
+        else
+            return {found, std::next(found)};
+    }
+
+    template <typename K = KeyT> std::pair<const_iterator, const_iterator> equal_range(const K& key) const {
+        const auto found = find(key);
+        if (found == cend())
             return {found, found};
         else
             return {found, std::next(found)};
@@ -1247,7 +1263,10 @@ public:
 
     void shrink_to_fit(const float min_factor = EMH_DEFAULT_LOAD_FACTOR / 4) {
         if (load_factor() < min_factor && bucket_count() > 10) // safe guard
-            rehash(_num_filled + 1);
+            // Size for the element count *at the configured load factor*: sizing
+            // for the count alone leaves load_factor() above max_load_factor(),
+            // so the next insertion would grow the table again immediately.
+            rehash((static_cast<uint64_t>(_num_filled) * _mlf >> 28) + RESERVE_SLOTS);
     }
 
 #if EMH_HIGH_LOAD

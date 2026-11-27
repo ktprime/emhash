@@ -9,6 +9,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -364,4 +365,29 @@ TEST_CASE("emhash9: precomputed hash lookup") {
     REQUIRE(it != m.end());
     CHECK(it->second == 861);
     CHECK(m.find(m.hash(2000), 2000) == m.end());
+}
+
+// ---------------------------------------------------------------------------
+// opt-in wyhash string hasher
+// ---------------------------------------------------------------------------
+TEST_CASE("emhash9: string_hash is transparent and avalanching") {
+    using SMap = emhash9::HashMap<std::string, int, emhash9::string_hash, std::equal_to<>>;
+    SMap m;
+    m.reserve(10000);
+    for (int i = 0; i < 10000; ++i) {
+        REQUIRE(m.emplace("key-" + std::to_string(i) + "-0123456789abcdef", i).second);
+    }
+    for (int i = 0; i < 10000; ++i) {
+        const std::string key = "key-" + std::to_string(i) + "-0123456789abcdef";
+        auto it = m.find(key);
+        REQUIRE(it != m.end());
+        CHECK(it->second == i);
+        CHECK(m.contains(std::string_view(key)));  // heterogeneous lookup
+        CHECK(m.find(key.c_str()) != m.end());     // same bytes, different type
+    }
+    for (int i = 0; i < 100; ++i) {
+        CHECK(m.find("missing-" + std::to_string(i)) == m.end());
+    }
+    CHECK(m.erase(std::string_view("key-0-0123456789abcdef")) == 1);
+    CHECK_FALSE(m.contains("key-0-0123456789abcdef"));
 }

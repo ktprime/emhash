@@ -153,11 +153,14 @@ struct hash_is_avalanching<Hash, typename std::enable_if<((void)sizeof(typename 
 // ─── group15 metadata ────────────────────────────────────────────────
 //
 // 16-byte metadata per group of N=15 slots:
-//   [h0][h1]...[h14][overflow]
+//   [h0][h1]...[h14][reserved]
 // hi = 0          → slot available
 // hi = 1          → sentinel
 // hi = [2..255]   → reduced hash value (7.99 bits of info)
-// overflow byte: bit k set if any element with (hash%8)==k overflowed from this group
+// byte 15 is a sticky "some class overflowed here" flag: it lives in the same cache line
+// as the fingerprints, so the common fresh-table miss never touches the counter array.
+// The 8 per-class overflow counters themselves live in a separate array after the groups
+// (8 bytes per group) so that an erase can decrement them.
 
 struct group15 {
     static constexpr int N = 15;
@@ -231,19 +234,6 @@ struct group15 {
 
     int match_occupied() const { return (~match_available()) & 0x7FFF; }
 #endif
-
-    bool is_not_overflowed(size_t hash) const {
-        static constexpr uint8_t shift[] = {1, 2, 4, 8, 16, 32, 64, 128};
-        return !(m[N] & shift[hash % 8]);
-    }
-
-    void mark_overflow(size_t hash) { m[N] |= static_cast<uint8_t>(1 << (hash % 8)); }
-
-    static bool maybe_caused_overflow(uint8_t* pc) {
-        auto pos = reinterpret_cast<uintptr_t>(pc) % sizeof(group15);
-        auto* pg = reinterpret_cast<group15*>(reinterpret_cast<uintptr_t>(pc) - pos);
-        return !pg->is_not_overflowed(*pc);
-    }
 
     bool is_occupied(int pos) const {
         assert(pos < N);
@@ -343,11 +333,48 @@ struct pow2_size_policy {
     static inline size_t position(size_t hash, size_t size_index) { return hash >> size_index; }
 };
 
-// ─── quadratic prober ─────────────────────────────────────────────────
-// Triangular number probing: step 1, 3, 6, 10, 15, 21...
+// ─── prober ───────────────────────────────────────────────────────────
+// Default: triangular number probing, step 1, 3, 6, 10, 15, 21...
+//
+// EMILIB4_DOUBLE_HASH: odd stride derived from the hash instead. Keys that share a
+// home group spread over different groups, so churn states stop probing earlier
+// (measured on 100k int64: churn miss 1.65 -> 1.37 groups, churn_find_miss +10~14%,
+// insert_erase +6.5%). The stride is loop-invariant, so the compiler hoists it out of
+// the probe loop and every lookup pays 2-3 instructions even when it ends in the home
+// group (find_hit -4~-9%, Ir +10%). Opt in only for churn-heavy, negative-query-heavy
+// workloads; the default stays triangular.
 
+#if defined(EMILIB4_DOUBLE_HASH)
 struct quadratic_prober {
-    quadratic_prober(size_t pos) : pos_(pos) {}
+    quadratic_prober(size_t pos, size_t hash) : pos_(pos), stride_(stride_of(hash)) {}
+
+    size_t get() const { return pos_; }
+    size_t length() const { return step_ + 1; }
+
+    bool next(size_t mask) {
+        ++step_;
+        pos_ = (pos_ + stride_) & mask;
+        return step_ <= mask;
+    }
+
+private:
+    // Bits 32.. are independent of the high bits that pick the home group for any
+    // realistic table, and an odd stride is coprime with the power-of-two size.
+    static size_t stride_of(size_t hash) noexcept {
+        if constexpr (sizeof(size_t) >= 8)
+            return (hash >> 32) | 1;
+        else
+            return (hash ^ (hash >> 16)) | 1;
+    }
+
+    size_t pos_;
+    size_t stride_;
+    size_t step_ = 0;
+};
+#else
+struct quadratic_prober {
+    // hash is unused; the parameter keeps the call sites identical under both variants.
+    quadratic_prober(size_t pos, size_t) : pos_(pos) {}
 
     size_t get() const { return pos_; }
     size_t length() const { return step_ + 1; }
@@ -362,6 +389,7 @@ private:
     size_t pos_;
     size_t step_ = 0;
 };
+#endif
 
 // ─── unchecked CTZ ────────────────────────────────────────────────────
 
@@ -490,15 +518,16 @@ public:
         friend class HashMap;
         friend class const_iterator;
 
-        iterator(uint8_t* pc, PairT* p) : _pc(pc), _p(p) {}
+        iterator(uint8_t* pc, PairT* p, group15* pg = nullptr) : _pc(pc), _p(p), _pg(pg) {}
 
         void increment() noexcept {
             // Phase 1: byte-by-byte scan within current group
             for (;;) {
                 ++_p;
                 // Last slot in group? (position N-1 = 14)
-                if (reinterpret_cast<uintptr_t>(_pc) % sizeof(group15) == (size_t)(N - 1)) {
+                if (_pc == _pg->m + (N - 1)) {
                     // Skip overflow byte, advance to next group's first slot
+                    ++_pg;
                     _pc += sizeof(group15) - (N - 1);
                     break;
                 }
@@ -514,18 +543,18 @@ public:
 
             // Phase 2: cross-group scan using match_occupied
             for (;;) {
-                auto* pg = reinterpret_cast<group15*>(reinterpret_cast<uintptr_t>(_pc) & ~(sizeof(group15) - 1));
-                int mask = pg->match_occupied();
+                int mask = _pg->match_occupied();
                 if (mask != 0) {
                     auto n = unchecked_ctz(mask);
-                    if (EMH_UNLIKELY(pg->is_sentinel(static_cast<int>(n)))) {
+                    if (EMH_UNLIKELY(_pg->is_sentinel(static_cast<int>(n)))) {
                         _p = nullptr;
                     } else {
-                        _pc += n;
+                        _pc = _pg->m + n;
                         _p += n;
                     }
                     return;
                 }
+                ++_pg;
                 _pc += sizeof(group15);
                 _p += N;
             }
@@ -533,6 +562,7 @@ public:
 
         uint8_t* _pc;
         PairT* _p;
+        group15* _pg; // current group: avoids re-deriving it from _pc on every step
     };
 
     class const_iterator {
@@ -544,7 +574,7 @@ public:
         using reference = value_type&;
 
         const_iterator() : _pc(nullptr), _p(nullptr) {}
-        const_iterator(const iterator& it) : _pc(it._pc), _p(it._p) {}
+        const_iterator(const iterator& it) : _pc(it._pc), _p(it._p), _pg(it._pg) {}
 
         reference operator*() const { return *_p; }
         pointer operator->() const { return _p; }
@@ -568,12 +598,13 @@ public:
         friend class HashMap;
         friend class iterator;
 
-        const_iterator(uint8_t* pc, const PairT* p) : _pc(pc), _p(p) {}
+        const_iterator(uint8_t* pc, const PairT* p, group15* pg = nullptr) : _pc(pc), _p(p), _pg(pg) {}
 
         void increment() noexcept {
             for (;;) {
                 ++_p;
-                if (reinterpret_cast<uintptr_t>(_pc) % sizeof(group15) == (size_t)(N - 1)) {
+                if (_pc == _pg->m + (N - 1)) {
+                    ++_pg;
                     _pc += sizeof(group15) - (N - 1);
                     break;
                 }
@@ -587,18 +618,18 @@ public:
                 return;
             }
             for (;;) {
-                auto* pg = reinterpret_cast<group15*>(reinterpret_cast<uintptr_t>(_pc) & ~(sizeof(group15) - 1));
-                int mask = pg->match_occupied();
+                int mask = _pg->match_occupied();
                 if (mask != 0) {
                     auto n = unchecked_ctz(mask);
-                    if (EMH_UNLIKELY(pg->is_sentinel(static_cast<int>(n)))) {
+                    if (EMH_UNLIKELY(_pg->is_sentinel(static_cast<int>(n)))) {
                         _p = nullptr;
                     } else {
-                        _pc += n;
+                        _pc = _pg->m + n;
                         _p += n;
                     }
                     return;
                 }
+                ++_pg;
                 _pc += sizeof(group15);
                 _p += N;
             }
@@ -606,6 +637,7 @@ public:
 
         uint8_t* _pc;
         const PairT* _p;
+        group15* _pg;
     };
 
     // ─── constructors ─────────────────────────────────────────────────
@@ -687,13 +719,13 @@ public:
 
     EMH_INLINE iterator begin() noexcept {
         // Boost pattern: construct iterator at group[0] slot 0, increment if not occupied
-        auto it = iterator(&_groups[0].m[0], _pairs);
+        auto it = iterator(&_groups[0].m[0], _pairs, _groups);
         if (_groups[0].m[0] == group15::available_)
             ++it;
         return it;
     }
     EMH_INLINE const_iterator cbegin() const noexcept {
-        auto it = const_iterator(const_cast<uint8_t*>(&_groups[0].m[0]), _pairs);
+        auto it = const_iterator(const_cast<uint8_t*>(&_groups[0].m[0]), _pairs, _groups);
         if (_groups[0].m[0] == group15::available_)
             ++it;
         return it;
@@ -720,7 +752,7 @@ public:
         // Inline find loop to avoid template function call overhead
         auto* pairs = _pairs;
         auto* groups = _groups;
-        quadratic_prober pb(pos0);
+        quadratic_prober pb(pos0, hash);
         do {
             auto pos = pb.get();
             auto* pg = groups + pos;
@@ -732,11 +764,11 @@ public:
                 do {
                     auto n = unchecked_ctz(mask);
                     if (EMH_LIKELY(_eq()(p[n].first, key)))
-                        return iterator(&pg->m[n], p + n);
+                        return iterator(&pg->m[n], p + n, pg);
                     mask &= mask - 1;
                 } while (mask);
             }
-            if (EMH_LIKELY(pg->is_not_overflowed(hash)))
+            if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return end();
         } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         return end();
@@ -746,7 +778,7 @@ public:
         auto pos0 = position_for(hash);
         auto* pairs = _pairs;
         auto* groups = _groups;
-        quadratic_prober pb(pos0);
+        quadratic_prober pb(pos0, hash);
         do {
             auto pos = pb.get();
             auto* pg = groups + pos;
@@ -758,11 +790,11 @@ public:
                 do {
                     auto n = unchecked_ctz(mask);
                     if (EMH_LIKELY(_eq()(p[n].first, key)))
-                        return const_iterator(&pg->m[n], p + n);
+                        return const_iterator(&pg->m[n], p + n, pg);
                     mask &= mask - 1;
                 } while (mask);
             }
-            if (EMH_LIKELY(pg->is_not_overflowed(hash)))
+            if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return cend();
         } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         return cend();
@@ -771,7 +803,7 @@ public:
         auto hash = hash_for(key);
         auto pos0 = position_for(hash);
         auto* groups = _groups;
-        quadratic_prober pb(pos0);
+        quadratic_prober pb(pos0, hash);
         do {
             auto pos = pb.get();
             auto* pg = groups + pos;
@@ -785,7 +817,7 @@ public:
                     mask &= mask - 1;
                 } while (mask);
             }
-            if (EMH_LIKELY(pg->is_not_overflowed(hash)))
+            if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return false;
         } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         return false;
@@ -898,7 +930,7 @@ public:
         {
             auto* pairs = _pairs;
             auto* groups = _groups;
-            quadratic_prober pb(pos0);
+            quadratic_prober pb(pos0, hash);
             do {
                 auto pos = pb.get();
                 auto* pg = groups + pos;
@@ -914,7 +946,7 @@ public:
                         mask &= mask - 1;
                     } while (mask);
                 }
-                if (EMH_LIKELY(pg->is_not_overflowed(hash)))
+                if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                     break;
             } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         }
@@ -936,7 +968,7 @@ public:
         {
             auto* pairs = _pairs;
             auto* groups = _groups;
-            quadratic_prober pb(pos0);
+            quadratic_prober pb(pos0, hash);
             do {
                 auto pos = pb.get();
                 auto* pg = groups + pos;
@@ -952,7 +984,7 @@ public:
                         mask &= mask - 1;
                     } while (mask);
                 }
-                if (EMH_LIKELY(pg->is_not_overflowed(hash)))
+                if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                     break;
             } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         }
@@ -970,9 +1002,10 @@ public:
     // ─── erase ────────────────────────────────────────────────────────
 
     EMH_INLINE size_t erase(const KeyT& key) noexcept {
-        auto it = find(key);
-        if (it != end()) {
-            erase_at(it._pc, it._p);
+        auto hash = hash_for(key);
+        auto loc = find_locator_at(key, position_for(hash), hash);
+        if (loc) {
+            erase_at(loc.pg->m + loc.n, loc.p, hash);
             return 1;
         }
         return 0;
@@ -983,13 +1016,13 @@ public:
     iterator erase(const iterator& it) noexcept {
         iterator next = it;
         ++next;
-        erase_at(it._pc, it._p);
+        erase_at(it._pc, it._p, hash_for(it._p->first));
         return next;
     }
     iterator erase(const const_iterator& it) noexcept {
-        iterator next(const_cast<uint8_t*>(it._pc), const_cast<PairT*>(it._p));
+        iterator next(const_cast<uint8_t*>(it._pc), const_cast<PairT*>(it._p), it._pg);
         ++next;
-        erase_at(const_cast<uint8_t*>(it._pc), const_cast<PairT*>(it._p));
+        erase_at(const_cast<uint8_t*>(it._pc), const_cast<PairT*>(it._p), hash_for(it._p->first));
         return next;
     }
 
@@ -1050,6 +1083,7 @@ public:
             groups[gn].initialize();
         }
         groups[ng - 1].set_sentinel();
+        memset(reinterpret_cast<char*>(groups + ng), 0, ng * OVERFLOW_CLASSES);
         _num_filled = 0;
         _max_load = initial_max_load();
     }
@@ -1130,6 +1164,45 @@ private:
 
     EMH_INLINE size_t position_for(size_t hash) const { return pow2_size_policy::position(hash, _groups_size_index); }
 
+    // ─── per-class overflow counters ──────────────────────────────────
+    // One byte per hash class per group, stored right after the groups array. The address
+    // depends only on the group index, so the load can start together with the fingerprint
+    // load. An insert that passes a full group increments that group's counter for its
+    // class; an erase decrements the counters of every group the element passed. So the
+    // counters stay exact and a miss bound never drifts (no anti-drift rehash needed).
+    static constexpr size_t OVERFLOW_CLASSES = 8;
+
+    EMH_INLINE uint8_t* overflow_base() noexcept { return reinterpret_cast<uint8_t*>(_groups + _num_groups()); }
+    EMH_INLINE const uint8_t* overflow_base() const noexcept {
+        return reinterpret_cast<const uint8_t*>(_groups + _num_groups());
+    }
+
+    EMH_INLINE bool is_not_overflowed(size_t pos, size_t hash) const noexcept {
+        // Byte 15 of the group is a sticky "any class overflowed here" flag kept in the same
+        // cache line as the fingerprints (already loaded), so the common fresh-table miss
+        // does not touch the counter array at all.
+        if (_groups[pos].m[N] == 0)
+            return true;
+        return overflow_base()[pos * OVERFLOW_CLASSES + (hash & (OVERFLOW_CLASSES - 1))] == 0;
+    }
+
+    EMH_INLINE void mark_overflow(size_t pos, size_t hash) noexcept {
+        if (_groups[pos].m[N] == 0)
+            _groups[pos].m[N] = 1;
+        auto& count = overflow_base()[pos * OVERFLOW_CLASSES + (hash & (OVERFLOW_CLASSES - 1))];
+        if (count != 255)
+            ++count;
+    }
+
+    // Clear the per-group "any overflow" flag once all eight class counters are zero again.
+    EMH_INLINE void refresh_overflow_flag(size_t pos) noexcept {
+        const auto* counts = overflow_base() + pos * OVERFLOW_CLASSES;
+        uint64_t word;
+        memcpy(&word, counts, sizeof(word));
+        if (word == 0)
+            _groups[pos].m[N] = 0;
+    }
+
     size_t initial_max_load() const {
         auto cap = _capacity();
         if (cap <= 2 * N - 1)
@@ -1141,12 +1214,12 @@ private:
 
     iterator iterator_from(size_t bucket) noexcept {
         auto gn = bucket / N, sn = bucket % N;
-        return iterator(&_groups[gn].m[sn], _pairs + bucket);
+        return iterator(&_groups[gn].m[sn], _pairs + bucket, _groups + gn);
     }
 
     const_iterator const_iterator_from(size_t bucket) const noexcept {
         auto gn = bucket / N, sn = bucket % N;
-        return const_iterator(&_groups[gn].m[sn], _pairs + bucket);
+        return const_iterator(&_groups[gn].m[sn], _pairs + bucket, _groups + gn);
     }
 
     // ─── find ─────────────────────────────────────────────────────────
@@ -1164,7 +1237,7 @@ private:
     template <typename K> EMH_INLINE locator find_locator_at(const K& key, size_t pos0, size_t hash) const noexcept {
         auto* pairs = _pairs;
         auto* groups = _groups;
-        quadratic_prober pb(pos0);
+        quadratic_prober pb(pos0, hash);
         do {
             auto pos = pb.get();
             auto* pg = groups + pos;
@@ -1180,7 +1253,7 @@ private:
                     mask &= mask - 1;
                 } while (mask);
             }
-            if (EMH_LIKELY(pg->is_not_overflowed(hash)))
+            if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return {};
         } while (EMH_LIKELY(pb.next(_groups_size_mask)));
         return {};
@@ -1190,7 +1263,7 @@ private:
 
     EMH_INLINE locator find_empty_slot_and_insert(size_t pos0, size_t hash) {
         assert(_pairs != nullptr);
-        for (quadratic_prober pb(pos0);; pb.next(_groups_size_mask)) {
+        for (quadratic_prober pb(pos0, hash);; pb.next(_groups_size_mask)) {
             auto pos = pb.get();
             auto* pg = _groups + pos;
             auto mask = pg->match_available();
@@ -1200,21 +1273,40 @@ private:
                 auto p = _pairs + pos * N + n;
                 return {pg, static_cast<unsigned>(n), p};
             }
-            pg->mark_overflow(hash);
+            mark_overflow(pos, hash);
         }
     }
 
     // ─── erase ────────────────────────────────────────────────────────
 
-    void erase_bucket(size_t bucket) noexcept { erase_at(&_groups[bucket / N].m[bucket % N], _pairs + bucket); }
+    void erase_bucket(size_t bucket) noexcept {
+        erase_at(&_groups[bucket / N].m[bucket % N], _pairs + bucket, hash_for(_pairs[bucket].first));
+    }
 
-    // Fast erase with both pc and p known (no redundant pointer arithmetic)
-    EMH_INLINE void erase_at(uint8_t* pc, PairT* p) noexcept {
+    // Fast erase with both pc and p known (no redundant pointer arithmetic). The hash is
+    // needed to walk home -> slot and decrement the passed groups' counters for this class.
+    EMH_INLINE void erase_at(uint8_t* pc, PairT* p, size_t hash) noexcept {
         if (need_explicit_dtor())
             p->~PairT();
 
-        // recover_slot: anti-drift (Boost idiom)
-        _max_load -= group15::maybe_caused_overflow(pc);
+        auto* overflow = overflow_base();
+        const auto cls = hash & (OVERFLOW_CLASSES - 1);
+        const auto target = reinterpret_cast<group15*>(reinterpret_cast<uintptr_t>(pc) & ~(sizeof(group15) - 1));
+        for (quadratic_prober pb(position_for(hash), hash);;) {
+            const auto pos = pb.get();
+            if (_groups + pos == target)
+                break;
+            auto& count = overflow[pos * OVERFLOW_CLASSES + cls];
+            // 255 means saturated: an exact count would be wrong forever, so keep it as a
+            // conservative "keep probing" instead of decrementing below the truth.
+            if (count != 0 && count != 255) {
+                if (--count == 0)
+                    refresh_overflow_flag(pos);
+            }
+            if (!pb.next(_groups_size_mask))
+                break;
+        }
+
         group15::reset(pc);
         _num_filled--;
     }
@@ -1260,7 +1352,8 @@ private:
     static size_t buffer_size(size_t num_groups) {
         auto elements_bytes = sizeof(PairT) * (num_groups * N - 1);
         auto groups_bytes = sizeof(group15) * num_groups;
-        auto total = elements_bytes + (sizeof(group15) - 1) + groups_bytes;
+        auto overflow_bytes = num_groups * OVERFLOW_CLASSES;
+        auto total = elements_bytes + (sizeof(group15) - 1) + groups_bytes + overflow_bytes;
         // Round up to alignment of PairT for safe array access
         return ((total + alignof(PairT) - 1) / alignof(PairT)) * alignof(PairT);
     }
@@ -1319,6 +1412,7 @@ private:
             }
         }
         memcpy(_groups, other._groups, ng * sizeof(group15));
+        memcpy(overflow_base(), other.overflow_base(), ng * OVERFLOW_CLASSES);
         _num_filled = other._num_filled;
         _max_load = other._max_load;
     }
@@ -1340,6 +1434,7 @@ private:
         // Cast to char* to avoid -Wclass-memaccess for non-trivially_copyable PairT.
         memset(reinterpret_cast<char*>(_groups), 0, num_groups * sizeof(group15));
         _groups[num_groups - 1].set_sentinel();
+        memset(reinterpret_cast<char*>(_groups + num_groups), 0, num_groups * OVERFLOW_CLASSES);
 
         _max_load = initial_max_load();
     }

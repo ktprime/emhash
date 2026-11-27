@@ -31,48 +31,7 @@
 
 #pragma once
 
-#include "emhash/config.hpp"
-#include <cstdlib>
-#include <cstring>
-#include <cstdint>
-#include <stdexcept>
-#include <iterator>
-#include <utility>
-#include <cassert>
-#include <new>
-
-#ifdef _WIN32
-#include <intrin.h>
-#elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) ||       \
-    defined(_M_X64)
-#include <x86intrin.h>
-#elif defined(__ARM_ARCH__) || defined(__aarch64__) || defined(__arm__)
-#include <sse2neon.h>
-#endif
-
-#undef EMH_LIKELY
-#undef EMH_UNLIKELY
-
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-#define EMH_LIKELY(condition) __builtin_expect(!!(condition), 1)
-#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-#define EMH_LIKELY(condition) ((condition) ? ((void)__assume(condition), 1) : 0)
-#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
-#else
-#define EMH_LIKELY(condition) (condition)
-#define EMH_UNLIKELY(condition) (condition)
-#endif
-
-// pointer restrict qualifier: _states/_pairs never alias each other
-#if defined(__GNUC__) || defined(__clang__)
-#define EMH_RESTRICT __restrict__
-#elif defined(_MSC_VER)
-#define EMH_RESTRICT __restrict
-#else
-#define EMH_RESTRICT
-#endif
+#include "config.h"
 
 namespace emilib3 {
 
@@ -135,20 +94,6 @@ constexpr static uint8_t simd_bytes = sizeof(simd_empty) / sizeof(uint8_t);
 #define EMILIB3_SIMD_DEFINED
 #endif
 
-#ifndef EMILIB3_CTZ_DEFINED
-#define EMILIB3_CTZ_DEFINED
-inline static uint32_t CTZ(size_t n) {
-#ifdef _WIN32
-    unsigned long index;
-    _BitScanForward(&index, (unsigned long)n);
-#else
-    auto index = __builtin_ctzl((unsigned long)n);
-#endif
-
-    return static_cast<uint32_t>(index);
-}
-#endif
-
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 /// Sandwich layout: contiguous states at the front, pairs after, in a single malloc.
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
@@ -193,41 +138,30 @@ public:
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-#if defined(EMH_MAP3_FAST_FIND)
         return fp_from_hash(key_hash);
-#else
-        return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
-#endif
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
     EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
-
-#if __SIZEOF_INT128__ && 0
-        __uint128_t r = key_hash;
-        r *= UINT64_C(0x9E3779B97F4A7C15);
-        key_hash = static_cast<uint64_t>(r) ^ static_cast<uint64_t>(r >> 64U);
-#endif
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-#if defined(EMH_MAP3_FAST_FIND)
-        return fp_from_hash(key_hash);
-#else
-        return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
-#endif
+        // Integral keys: fingerprint from the raw key with one Fibonacci multiply and a
+        // modulo (emilib_fp_from_key, config.h) -- std::hash is the identity in practice,
+        // so any fold of the bucket hash collapses to few fingerprints for dense key
+        // ranges, while the multiply spreads every input bit into 253 distinct
+        // fingerprints independent of the hasher.
+        return emilib_fp_from_key(key, static_cast<int>(EFILLED));
     }
 
-#if defined(EMH_MAP3_FAST_FIND)
-    // Lookup-first variant: derive the 1-byte fingerprint from the top bits of a
-    // multiply-mixed hash instead of a 64-bit modulo, which sits on the find critical
-    // path. Range stays identical to the %253 form: [EFILLED, EFILLED + 252].
-    static EMH_INLINE int8_t fp_from_hash(uint64_t key_hash) noexcept {
-        const auto mixed = key_hash * UINT64_C(0x9E3779B97F4A7C15);
-        const auto h8 = static_cast<size_t>(mixed >> 56);
-        return static_cast<int8_t>(h8 - 253 * (h8 >= 253) + static_cast<size_t>(EFILLED));
+    // Non-integral keys: the hash is already well mixed (std::hash<std::string> is a
+    // murmur/FNV mix), so map it straight into [EFILLED, EFILLED + 252] with one modulo.
+    // 253 is coprime with the power-of-two bucket count, so the fingerprint stays
+    // independent of the home group, and the range never touches EEMPTY/EDELETE/sentinel.
+    template <typename HashType> static EMH_INLINE int8_t fp_from_hash(HashType key_hash) noexcept {
+        const auto h8 = static_cast<uint64_t>(key_hash) % 253;
+        return static_cast<int8_t>(static_cast<int>(h8) + static_cast<int>(EFILLED));
     }
-#endif
 
     // Access helpers: direct array access into contiguous states/pairs
     EMH_INLINE int8_t& state_at(size_t bucket) noexcept { return _states[bucket]; }
@@ -1128,11 +1062,7 @@ private:
         size_t main_bucket;
         size_t offset = 0;
         const auto key_h2 = hash_key2(main_bucket, key);
-#if defined(EMH_MAP3_FAST_FIND)
         const auto filled = EM3_SET1_EPI8(key_h2);
-#else
-        const auto filled = EM3_SET1_EPI32(0x01010101u * static_cast<uint8_t>(key_h2));
-#endif
         auto next_bucket = main_bucket;
 
         do {

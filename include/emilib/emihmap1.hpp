@@ -28,43 +28,40 @@
 
 #if defined(EMH_MAP1_APPEND_ONLY)
 #include "emihmap1d.hpp"
-#else
-
-#include "emhash/config.hpp"
-#include <cstdlib>
-#include <cstring>
-#include <cstdint>
-#include <iterator>
-#include <utility>
-#include <cassert>
-#include <stdexcept>
-
-#ifdef _WIN32
-#include <intrin.h>
-#elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) ||       \
-    defined(_M_X64)
-#include <x86intrin.h>
-#elif defined(__ARM_ARCH__) || defined(__aarch64__) || defined(__arm__)
-#include "sse2neon.h"
-#endif
-
-#undef EMH_LIKELY
-#undef EMH_UNLIKELY
-#undef bucket_to_slot
-
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-#define EMH_LIKELY(condition) __builtin_expect(!!(condition), 1)
-#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-#define EMH_LIKELY(condition) ((condition) ? ((void)__assume(condition), 1) : 0)
-#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
-#else
-#define EMH_LIKELY(condition) (condition)
-#define EMH_UNLIKELY(condition) (condition)
-#endif
+#elif defined(EMILIB1_META32)
+// Opt-in indivi-style 32B metadata (16 slots + per-class overflow counters + 4-bit
+// distances). Lookups are much faster (find_miss +58%, churn_find_miss +54%, string
+// find_hit +13%) but writes pay for the bookkeeping (int64 insert -11%, insert_erase
+// -34%, erase_all -15%), so it is not the default. See docs §5-AB.
+#include <functional>
+#include <memory>
+#include "emihmap1m.hpp"
 
 namespace emilib {
+// The 32B-metadata implementation lives in its own namespace (emilib1m) so benchmarks can
+// instantiate it next to the default map in one TU. This alias keeps the EMILIB1_META32
+// A/B build source-compatible: emilib::HashMap becomes the variant.
+template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>,
+          typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
+using HashMap = emilib1m::HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
+}
+#else
+
+#include "config.h"
+
+namespace emilib {
+
+// The insert chain (emplace -> do_insert -> find_or_allocate) is force-inlined for
+// clang only. clang leaves those calls out of line in this TU shape and loses
+// ~11-14% on a fixed-size erase+insert loop without the hint; gcc already inlines
+// them and regresses 4-8% when forced (bench/framework, small and large TU).
+#ifndef EMILIB1_INSERT_INLINE
+#if defined(__clang__)
+#define EMILIB1_INSERT_INLINE EMH_INLINE
+#else
+#define EMILIB1_INSERT_INLINE inline
+#endif
+#endif
 
 enum State : int8_t {
     EEMPTY = -128,
@@ -103,15 +100,14 @@ constexpr static uint8_t slot_size = simd_bytes - STATE_BITS;
 constexpr static uint8_t group_index = simd_bytes - 1; //> 0
 constexpr static uint32_t group_bmask = (1u << slot_size) - 1;
 
-inline static uint32_t CTZ(uint32_t n) {
-#ifdef _WIN32
-    unsigned long index;
-    _BitScanForward(&index, n);
-#else
-    auto index = __builtin_ctzl((unsigned long)n);
-#endif
-
-    return static_cast<uint32_t>(index);
+// The fingerprint vector: one aligned 16-byte load from the shared 4KB broadcast
+// table (config.h) on the SSE2 width; SET1_EPI8 for wider vectors.
+static EMH_INLINE decltype(simd_empty) fp_vector(int8_t fp) noexcept {
+    if constexpr (sizeof(simd_empty) == 16) {
+        return *reinterpret_cast<const __m128i*>(fp_broadcast.bytes[static_cast<unsigned char>(fp)]);
+    } else {
+        return SET1_EPI8(fp);
+    }
 }
 
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
@@ -145,23 +141,23 @@ public:
     using allocator_type = AllocT;
 
     template <typename UType, typename std::enable_if<!std::is_integral<UType>::value, int8_t>::type = 0>
-    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
-        EMH_MSAN_UNPOISON(&key, sizeof(key));
-        if constexpr (std::is_same<UType, std::string>::value) {
-            EMH_MSAN_UNPOISON(key.data(), key.size());
-        }
-        const auto key_hash = _hasher(key);
+    EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+        const auto key_hash = emilib_hash_of(_hasher, key);
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
+        return emilib_fp_from_hash(key_hash, static_cast<int>(EFILLED));
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
-    inline int8_t hash_key2(size_t& main_bucket, const UType& key) const {
-        const auto key_hash = _hasher(key);
+    EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
+        const auto key_hash = emilib_hash_of(_hasher, key);
         main_bucket = static_cast<size_t>(key_hash & _mask);
         main_bucket -= main_bucket % simd_bytes;
-        return static_cast<int8_t>(static_cast<size_t>(key_hash % 253) + static_cast<size_t>(EFILLED));
+        // Integral keys take the fingerprint from the raw key (see emilib_fp_from_key in
+        // config.h): with identity-like hashes a top-bit fold of the hash collapses to one
+        // fingerprint for dense key ranges, while the Fibonacci multiply keeps 253 distinct
+        // fingerprints and stays independent of the hasher.
+        return emilib_fp_from_key(key, static_cast<int>(EFILLED));
     }
 
 #if 1
@@ -473,13 +469,15 @@ public:
 
     // ------------------------------------------------------------
 
-    template <typename K = KeyT> iterator find(const K& key) noexcept { return {this, find_filled_bucket(key)}; }
-
-    template <typename K = KeyT> const_iterator find(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE iterator find(const K& key) noexcept {
         return {this, find_filled_bucket(key)};
     }
 
-    template <typename K = KeyT> bool contains(const K& key) const noexcept {
+    template <typename K = KeyT> EMH_INLINE const_iterator find(const K& key) const noexcept {
+        return {this, find_filled_bucket(key)};
+    }
+
+    template <typename K = KeyT> EMH_INLINE bool contains(const K& key) const noexcept {
         return find_filled_bucket(key) != _num_buckets;
     }
 
@@ -571,7 +569,7 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    template <typename K, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
+    template <typename K, typename V> EMILIB1_INSERT_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         const auto slot = bucket_to_slot(bucket);
@@ -582,7 +580,7 @@ public:
         return {{this, bucket, false}, bempty};
     }
 
-    std::pair<iterator, bool> do_insert(const value_type& value) noexcept {
+    EMILIB1_INSERT_INLINE std::pair<iterator, bool> do_insert(const value_type& value) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
         const auto slot = bucket_to_slot(bucket);
@@ -593,7 +591,7 @@ public:
         return {{this, bucket, false}, bempty};
     }
 
-    std::pair<iterator, bool> do_insert(value_type&& value) noexcept {
+    EMILIB1_INSERT_INLINE std::pair<iterator, bool> do_insert(value_type&& value) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
         const auto slot = bucket_to_slot(bucket);
@@ -604,7 +602,7 @@ public:
         return {{this, bucket, false}, bempty};
     }
 
-    template <class... Args> inline std::pair<iterator, bool> emplace(Args&&... args) noexcept {
+    template <class... Args> EMILIB1_INSERT_INLINE std::pair<iterator, bool> emplace(Args&&... args) noexcept {
         return do_insert(std::forward<Args>(args)...);
     }
 
@@ -613,9 +611,9 @@ public:
         return emplace(std::forward<Args>(args)...).first;
     }
 
-    std::pair<iterator, bool> insert(value_type&& value) noexcept { return do_insert(std::move(value)); }
+    EMILIB1_INSERT_INLINE std::pair<iterator, bool> insert(value_type&& value) noexcept { return do_insert(std::move(value)); }
 
-    std::pair<iterator, bool> insert(const value_type& value) noexcept { return do_insert(value); }
+    EMILIB1_INSERT_INLINE std::pair<iterator, bool> insert(const value_type& value) noexcept { return do_insert(value); }
 
 #if 0
     iterator insert(iterator hint, const value_type& value) noexcept
@@ -926,9 +924,12 @@ private:
     // Can we fit another element?
     inline void check_expand_need() { reserve(_num_filled); }
 
-    // Prefetch for read operations (find)
+    // Prefetch for read operations (find). Active by default: emilib1 has a 15/16-slot
+    // group and a comparatively long per-group probe step, so overlapping the pair-line
+    // fetch with the SIMD metadata scan measurably helps the find path. Define
+    // EMILIB1_NO_FIND_PREFETCH to disable.
     inline static void prefetch_read(char* ctrl) {
-#ifndef EMH_NO_READ_PREFETCH
+#if !defined(EMILIB1_NO_FIND_PREFETCH)
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
         _mm_prefetch(reinterpret_cast<const char*>(ctrl), _MM_HINT_T0);
 #elif defined(__GNUC__) || defined(__clang__)
@@ -1004,9 +1005,9 @@ private:
     }
 
     // Find the bucket with this key, or return (size_t)-1
-    template <typename K> size_t find_filled_bucket(const K& key) const noexcept {
+    template <typename K> EMH_INLINE size_t find_filled_bucket(const K& key) const noexcept {
         size_t main_bucket, offset = 0;
-        const auto filled = SET1_EPI8(hash_key2(main_bucket, key));
+        const auto filled = fp_vector(hash_key2(main_bucket, key));
         auto next_bucket = main_bucket;
 
         while (true) {
@@ -1032,7 +1033,7 @@ private:
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the latter case, the bucket is expected to be filled.
-    template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
+    template <typename K> EMILIB1_INSERT_INLINE size_t find_or_allocate(const K& key, bool& bnew) noexcept {
         size_t required_buckets = _num_filled + _num_filled / MXLOAD_FACTOR;
         if (EMH_LIKELY(required_buckets >= _num_buckets))
             rehash(required_buckets + 2);
@@ -1043,7 +1044,7 @@ private:
 
         const auto key_h2 = hash_key2(main_bucket, key);
         prefetch_write(reinterpret_cast<char*>(&_pairs[bucket_to_slot(main_bucket)]));
-        const auto filled = SET1_EPI8(key_h2);
+        const auto filled = fp_vector(key_h2);
         auto next_bucket = main_bucket;
 
         do {

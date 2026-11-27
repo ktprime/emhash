@@ -5,41 +5,34 @@
 #define TTVal 0
 #endif
 
-// #define  HAVE_INDIVI 1
-
+// Benchmark body suppressions: this TU intentionally mixes uint64_t / long int
+// (srng returns uint64_t while benchmark keys are long int) and long int /
+// double in the timing summaries -- none of these conversions affect the
+// measured results, but our strict header-level warning set flags each one.
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
 #pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Woverflow"
+#pragma GCC diagnostic ignored "-Wdangling-else"
 #include "util.h"
 
 #if __GNUC__ > 4 && __linux__
 #include <ext/pb_ds/assoc_container.hpp>
 #endif
 
-#if SMAP
-#include "flat_map.hpp"
-#include "phmap/btree.h"
-#endif
-
-// Benchmark the third-party sflat::flat_hash_map (thirdparty/sflat), which
-// needs C++17. On by default; build with -DSFLAT_HASH=0 to leave it out.
-#ifndef SFLAT_HASH
-//#define SFLAT_HASH 1
-#endif
-
 static void printInfo(char* out);
 std::map<std::string, std::string> maps = {
-//    {"stl_hash", "unordered_map"},
-//    {"stl_map", "stl_map"},
-//    {"fmap", "flat_map"},
-//    {"btree", "btree_map"},
-
 #if HAVE_BOOST
     {"boostf", "boost_flat"},
 #endif
 
 #ifdef HAVE_INDIVI
-    //    {"indiviu", "indivi_umap" },
-    {"indiviw", "indivi_wmap"},
+    {"indiviu", "indivi_umap" },
+    //{"indiviw", "indivi_wmap"},
 #endif
 
     {"emhash5", "emhash5"},
@@ -48,64 +41,21 @@ std::map<std::string, std::string> maps = {
     {"emhash8", "emhash8"},
     {"emhash9", "emhash9"},
 
-    //    {"jg_dense", "jg_dense"},
-    //    {"rigtorp", "rigtorp"},
-    //    {"qchash", "qc-hash"},
-    //    {"fph", "fph-table"},
-
-    //    {"lru_time", "lru_time"},
-    //    {"lru_size", "lru_size"},
     {"emilib1", "emilib1"},
+    {"emilib1m", "emilib1m"},
     {"emilib2", "emilib2"},
     {"emilib3", "emilib3"},
     {"emilib4", "emilib4"},
-//    {"simd_hash", "simd_hash"},
 
 #ifdef ABSL_HMAP
     {"abslf", "absl_flat"},
 #endif
     {"martind", "martin_dense"},
-#if SFLAT_HASH
-    {"sflat", "sflat_hash"},
-#endif
-//    {"f14_value", "f14_value"},
-
-#if 0
-    {"martinf", "martin_flat"},
-    {"ck_map", "ck_map"},
-    {"hrd_m", "hrd_m"},
-    {"f14_vector", "f14_vector"},
-    {"fht", "fht"},
-    {"cuckoo", "cuckoo hash"},
-    {"zhashmap", "zhashmap"},
-    {"phmap", "phmap_flat"},
-
-    {"tslr", "tsl_robin"},
-    {"skaf", "ska_flat"},
-
-    {"hopsco", "tsl_hopsco"},
-    {"sbyte", "ska_byte"},
-#endif
 };
 
 // rand data 3ype
 #ifndef RT
 #define RT 2 // 1 wyrand 2 Sfc4 3 RomuDuoJr 4 Lehmer64 5 mt19937_64
-#endif
-
-// #define CUCKOO_HASHMAP     1
-// #define PHMAP_HASH         1
-// #define WY_HASH            1
-
-// #define FL1                1
-
-#ifdef HAVE_BOOST
-#include <boost/unordered/unordered_flat_map.hpp>
-#endif
-
-#ifdef HAVE_INDIVI
-#include "indivi/flat_umap.h"
-#include "indivi/flat_wmap.h"
 #endif
 
 // feature of emhash
@@ -134,49 +84,22 @@ std::map<std::string, std::string> maps = {
 #include "emhash/hash_table5.hpp"
 
 #include "emilib/emihmap1.hpp"
+#include "emilib/emihmap1m.hpp"
 #include "emilib/emihmap2.hpp"
 #include "emilib/emihmap3.hpp"
 #include "emilib/emihmap4.hpp"
 
-#if FHT_HMAP && __linux__
-#include <sys/mman.h>
-#include "fht/fht_ht.hpp"
+#ifdef HAVE_BOOST
+#include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
-#if FOLLY
-#include "folly/container/F14Map.h"
-#endif
-
-#if CUCKOO_HASHMAP
-#include "libcuckoo/cuckoohash_map.hh"
+#ifdef HAVE_INDIVI
+#include "indivi/flat_umap.h"
+#include "indivi/flat_wmap.h"
 #endif
 
 #if CXX17
 #include "martin/unordered_dense.h"
-#include "martin/robin_hood.h"
-#endif
-
-#if CXX17 && SFLAT_HASH
-#include "sflat/flat_hash_map.hpp"
-#endif
-
-#if PHMAP_HASH
-#include "phmap/phmap.h"
-#endif
-
-#if ET
-#if X86_64 && CXX17
-#include "hrd/hash_set_m.h"
-#endif
-#include "tsl/robin_map.h"
-#include "tsl/hopscotch_map.h"
-#if ET > 1
-#include "emhash/lru_size.hpp"
-#include "emhash/lru_time.hpp"
-#include "ska/flat_hash_map.hpp"
-#include "ska/bytell_hash_map.hpp"
-#endif
-#include "phmap/phmap.h"
 #endif
 
 #ifndef PACK
@@ -526,8 +449,12 @@ template <class hash_type> static void iter_all(const hash_type& ht_hash, const 
 
 template <class hash_type>
 static void erase_50_reinsert(hash_type& ht_hash, const std::string& hash_name, const std::vector<keyType>& vList) {
+    // Named behavior: fill the table, erase half of it by key, reinsert exactly
+    // that half -- a churn workload, not just another insert on an empty table
+    // (erase_all leaves the table empty, which made this plain insert_reserve).
     auto ts1 = getus();
     size_t sum = 0;
+    const size_t half = vList.size() / 2;
     for (const auto& v : vList) {
 #ifndef SMAP
         ht_hash.emplace(v, TO_VAL(0));
@@ -535,6 +462,15 @@ static void erase_50_reinsert(hash_type& ht_hash, const std::string& hash_name, 
         ht_hash[v] = TO_VAL(0);
 #endif
         sum++;
+    }
+    for (size_t i = 0; i < half; i++)
+        sum += ht_hash.erase(vList[i]);
+    for (size_t i = 0; i < half; i++) {
+#ifndef SMAP
+        ht_hash.emplace(vList[i], TO_VAL(0));
+#else
+        ht_hash[vList[i]] = TO_VAL(0);
+#endif
     }
     check_func_result(hash_name, __FUNCTION__, sum, ts1);
 }
@@ -762,7 +698,11 @@ static void insert_backtrace(const std::string& hash_name, const std::vector<key
     WyRand srng(vList.size());
     ht_hash[srng()] = 1;
 
-    for (int i = 1; i < 22; i++) {
+    // 15 doubling rounds top out at ~32k elements, which keeps this iteration +
+    // copy + insert mix in the same workload class as the other cases; at 22
+    // rounds (~2M elements plus 22 full-table copies) it dominated the total
+    // score with ~100x the work of any other function.
+    for (int i = 1; i < 15; i++) {
         auto tmp = ht_hash;
         const auto add = srng();
         for (auto it = ht_hash.begin(); it != ht_hash.end(); ++it) {
@@ -958,7 +898,12 @@ static void find_miss(const hash_type& ht_hash, const std::string& hash_name, co
     }
     offset = (offset + 1) * 2; // above max key
     for (size_t i = 0; i < vList.size(); i++) {
-        sum += ht_hash.count((keyType)(offset + i));
+        // Spread consecutive miss keys with a golden-ratio multiply: sequential
+        // keys walk the probe sequence in order and let the branch predictor
+        // memorize it, which flattered miss times. The multiply by an odd
+        // constant is a bijection mod 2^64, so keys stay distinct and above
+        // every table key, i.e. guaranteed misses.
+        sum += ht_hash.count((keyType)(offset + i * UINT64_C(2654435761)));
     }
 #endif
 
@@ -1356,14 +1301,8 @@ static int benchHashMap(int n) {
     using ehash_func = Axxhasher<std::string>;
 #elif KEY_INT && FIB_HASH > 0
     using ehash_func = Int64Hasher<keyType>; // 9 difference hashers
-#elif PHMAP_HASH
-    using ehash_func = phmap::Hash<keyType>;
-#elif QCH
-    using ehash_func = qc::hash::RawMap<keyType, valueType>::hasher;
 #elif STD_HASH
     using ehash_func = std::hash<keyType>;
-#elif HOOD_HASH || CXX17 == 0
-    using ehash_func = robin_hood::hash<keyType>;
 #else
     using ehash_func = ankerl::unordered_dense::hash<keyType>;
 #endif
@@ -1397,59 +1336,6 @@ static int benchHashMap(int n) {
 
         // shuffle(vList.begin(), vList.end());
 
-#if ET > 2
-#if FHT_HMAP
-        { benOneHash<fht_table<keyType, valueType, ehash_func>>("fht", vList); }
-#endif
-        { benOneHash<emlru_size::lru_cache<keyType, valueType, ehash_func>>("lru_size", vList); }
-        { benOneHash<emlru_time::lru_cache<keyType, valueType, ehash_func>>("lru_time", vList); }
-#endif
-
-#if ET > 1
-#if X86_64 && CXX17
-        { benOneHash<ska::bytell_hash_map<keyType, valueType, ehash_func>>("sbyte", vList); }
-#endif
-        { benOneHash<std::unordered_map<keyType, valueType, ehash_func>>("stl_hash", vList); }
-        { benOneHash<tsl::robin_map<keyType, valueType, ehash_func>>("tslr", vList); }
-        { benOneHash<tsl::hopscotch_map<keyType, valueType, ehash_func>>("hopsco", vList); }
-        //{  benOneHash<simd_hash_map<keyType, valueType, ehash_func>>("simd_hash", vList); }
-        //{  benOneHash<zedland::hashmap <keyType, valueType, ehash_func>>("zhashmap", vList); }
-        //{  benOneHash<emilib3::HashMap <keyType, valueType, ehash_func>>("emilib3", vList); }
-        { benOneHash<emilib4::HashMap<keyType, valueType, ehash_func>>("emilib4", vList); }
-
-#if X86_64
-        { benOneHash<ska::flat_hash_map<keyType, valueType, ehash_func>>("skaf", vList); }
-#endif
-#endif
-
-#ifdef SMAP
-        { benOneHash<std::map<keyType, valueTye>>("stl_map", vList); }
-        { benOneHash<phmap::btree_map<keyType, valueType>>("btree", vList); }
-#endif
-
-#if FOLLY
-        { benOneHash<folly::F14ValueMap<keyType, valueType, ehash_func>>("f14_value", vList); }
-        { benOneHash<folly::F14VectorMap<keyType, valueType, ehash_func>>("f14_vector", vList); }
-#endif
-
-#if CUCKOO_HASHMAP
-        { benOneHash<libcuckoo::cuckoohash_map<keyType, valueType, ehash_func>>("cuckoo", vList); }
-#endif
-
-#if CXX20 && JG_MAP
-        { benOneHash<jg::dense_hash_map<keyType, valueType, ehash_func>>("jg_dense", vList); }
-        //{  benOneHash<rigtorp::HashMap <keyType, valueType, ehash_func>>("rigtorp", vList); }
-        //{  benOneHash<HashMap <keyType, valueType, ehash_func>>("ck_map", vList); }
-#endif
-
-#if QC_HASH && KEY_INT
-        { benOneHash<qc::hash::RawMap<keyType, valueType, ehash_func>>("qchash", vList); }
-#endif
-
-#if FPH_HASH
-        { benOneHash<fph::DynamicFphMap<keyType, valueType, fph::MixSeedHash<keyType>>>("fph", vList); }
-#endif
-
 #if HAVE_INDIVI
         { benOneHash<indivi::flat_umap<keyType, valueType, ehash_func>>("indiviu", vList); }
         { benOneHash<indivi::flat_wmap<keyType, valueType, ehash_func>>("indiviw", vList); }
@@ -1459,15 +1345,15 @@ static int benchHashMap(int n) {
 #if HAVE_BOOST
         { benOneHash<boost::unordered_flat_map<keyType, valueType, ehash_func>>("boostf", vList); }
 #endif
-        { benOneHash<emilib2::HashMap<keyType, valueType, ehash_func>>("emilib2", vList); }
         { benOneHash<emilib3::HashMap<keyType, valueType, ehash_func>>("emilib3", vList); }
+        { benOneHash<emilib2::HashMap<keyType, valueType, ehash_func>>("emilib2", vList); }
+        { benOneHash<emilib1m::HashMap<keyType, valueType, ehash_func>>("emilib1m", vList); }
         { benOneHash<emilib::HashMap<keyType, valueType, ehash_func>>("emilib1", vList); }
         { benOneHash<emilib4::HashMap<keyType, valueType, ehash_func>>("emilib4", vList); }
 
 #if ABSL_HMAP
         { benOneHash<absl::flat_hash_map<keyType, valueType, ehash_func>>("abslf", vList); }
 #endif
-
         { benOneHash<emhash8::HashMap<keyType, valueType, ehash_func>>("emhash8", vList); }
         { benOneHash<emhash9::HashMap<keyType, valueType, ehash_func>>("emhash9", vList); }
         { benOneHash<emhash7::HashMap<keyType, valueType, ehash_func>>("emhash7", vList); }
@@ -1475,18 +1361,6 @@ static int benchHashMap(int n) {
 
 #if CXX17
         { benOneHash<ankerl::unordered_dense::map<keyType, valueType, ehash_func>>("martind", vList); }
-#endif
-
-#if CXX17 && SFLAT_HASH
-        { benOneHash<sflat::flat_hash_map<keyType, valueType, ehash_func>>("sflat", vList); }
-#endif
-
-#if ET
-#if X86_64 && CXX17
-        { benOneHash<hrd_m::hash_map<keyType, valueType, ehash_func>>("hrd_m", vList); }
-#endif
-        { benOneHash<phmap::flat_hash_map<keyType, valueType, ehash_func>>("phmap", vList); }
-        { benOneHash<robin_hood::unordered_map<keyType, valueType, ehash_func>>("martinf", vList); }
 #endif
     }
 
@@ -1515,14 +1389,6 @@ static void testHashInt(int loops = 500000009) {
     auto sum = ts;
     auto r = ts;
 
-#ifdef PHMAP_VERSION_MAJOR
-    ts = getus();
-    sum = 0;
-    for (int i = 0; i < loops; i++)
-        sum += phmap::phmap_mix<8>()(i + r);
-    printf("phmap hash = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-#endif
-
 #if ABSL_HASH
     ts = getus();
     sum = r;
@@ -1546,19 +1412,12 @@ static void testHashInt(int loops = 500000009) {
         sum += (int)sum + i;
     printf("sum  add   = %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 
-#ifdef ROBIN_HOOD_H_INCLUDED
-    ts = getus();
-    sum = r;
-    for (int i = 0; i < loops; i++)
-        sum += robin_hood::hash_int(i + r);
-    printf("martin hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
 #if CXX17
     ts = getus();
     sum = r;
     for (int i = 0; i < loops; i++)
         sum += ankerl::unordered_dense::hash<uint64_t>{}(i + r);
     printf("ankerl hash= %4d ms [%ld]\n", (int)(getus() - ts) / 1000, sum);
-#endif
 #endif
 
     ts = getus();
@@ -1629,19 +1488,6 @@ static void testHashInt(int loops = 500000009) {
 #endif
 }
 
-static int test_lru(int n) {
-#if ET > 2
-    emlru_size::lru_cache<uint64_t, int> elru(1 << 10, 1 << 20);
-    Sfc4 srng(n);
-    auto ts = getus();
-    for (int i = 0; i < n; i++)
-        elru.emplace(i, 0);
-    printf("n = %d, hsize = %zd, time use = %d ms\n", n, elru.size(), (int)(getus() - ts) / 1000);
-#endif
-
-    return 0;
-}
-
 int TestFindHit() {
     // key = -1 �� INACTIVE ֵ (0xFFFFFFFF)
     int32_t bad_key = (int32_t)0xFFFFFFFF; // -1
@@ -1670,7 +1516,6 @@ int main(int argc, char* argv[]) {
     TestFindHit();
 
     auto start = getus();
-    //    test_lru(100'000'000);
     //    testHashInt(int(1e8));
 
 #ifdef A_HASH
@@ -1691,8 +1536,7 @@ int main(int argc, char* argv[]) {
     if (maxn > (1 << 30) / type_size)
         maxn = (1 << 30) / type_size;
 
-    float load_factor = 0.0945f;
-    printf("./ebench maxn = %d c(0-1000) f(0-100) d[2-9 mpatseblku] a(0-3) b t(n %dkB - %dMB)\n", (int)maxn,
+    printf("./ebench maxn = %d c(0-1000) d[1-9 edbai] a(0-3) b t(n %dkB - %dMB)\n", (int)maxn,
            minn * type_size >> 10, maxn * type_size >> 20);
 
     for (int i = 1; i < argc; i++) {
@@ -1701,8 +1545,6 @@ int main(int argc, char* argv[]) {
 
         if (isdigit(cmd))
             maxn = atoi(argv[i]) + 1000;
-        else if (cmd == 'f' && value > 0)
-            load_factor = float(atof(&argv[i][0] + 1) / 100.0);
         else if (cmd == 'c' && value > 0)
             maxc = value;
         else if (cmd == 'a')
@@ -1732,52 +1574,33 @@ int main(int argc, char* argv[]) {
                         maps.erase(hash_name);
                     else
                         maps[hash_name] = hash_name;
-                } else if (c == 'm')
-                    maps.erase("martinf");
-                else if (c == 'b')
+                } else if (c == 'e') {
+                    if (maps.count("emilib1m"))
+                        maps.erase("emilib1m");
+                    else
+                        maps.emplace("emilib1m", "emilib1m");
+                } else if (c == 'b')
                     maps.erase("boostf");
-                else if (c == 'd')
+                else if (c == 'a')
+                    maps.erase("abslf");
+                else if (c == 'i') {
+                    maps.emplace("indiviw", "indiviw_map");
+                    maps.emplace("indiviu", "indiviu_map");
+                } else if (c == 'd')
                     if (maps.count("martind"))
                         maps.erase("martind");
                     else
                         maps.emplace("martind", "martin_dense");
-                else if (c == 'p')
-                    maps.erase("phmap");
-                else if (c == 't')
-                    maps.erase("tslr");
-                else if (c == 's')
-                    maps.erase("skaf");
-                else if (c == 'a')
-                    maps.erase("abslf");
-                else if (c == 'v')
-                    maps.erase("f14_vector");
-                else if (c == 'h')
-                    maps.erase("hrd_m");
-                else if (c == 'j')
-                    maps.emplace("jg_dense", "jg_dense");
-                else if (c == 'r')
-                    maps.emplace("rigtorp", "rigtorp");
-                else if (c == 'q')
-                    maps.emplace("qchash", "qc-hash");
-                else if (c == 'f')
-                    maps.emplace("fph", "fph-table");
-                else if (c == 'l') {
-                    maps.emplace("lru_size", "lru_size");
-                    maps.emplace("lru_time", "lru_time");
-                } else if (c == 'i') {
-                    maps.emplace("indiviw", "indiviw_map");
-                    maps.emplace("indiviu", "indiviu_map");
-                } else if (c == 'b') {
-                    maps.emplace("btree", "btree_map");
-                    maps.emplace("stl_map", "stl_map");
-                    maps.emplace("fmap", "flat_map");
-                } else if (c == 'u')
-                    maps.emplace("stl_hash", "unordered_map");
             }
         }
     }
 
     Sfc4 srng(rnd);
+    // The random-walk growth loop computes srng() % (maxn - minn); a positional
+    // arg or -m below minn makes that difference negative and produces absurd
+    // n values (observed: n ~ 320M -> OOM abort). Clamp after option parsing.
+    if (maxn < minn * 2)
+        maxn = minn * 2;
     for (auto& m : maps)
         printf("  %s\n", m.second.data());
     putchar('\n');
@@ -1801,17 +1624,19 @@ int main(int argc, char* argv[]) {
         } else if (run_type == 1) {
             n = (srng() % (maxn - minn)) + minn;
         } else {
-            n += n / 20;
+            // Grow ~10% per case: a smooth ladder of table sizes. The old
+            // pow2 * load_factor override jumped n by ~50% per round once the
+            // default load factor went above 0.2, so consecutive cases either
+            // oscillated between the same two sizes or skipped a scale.
+            n += n / 10;
             if (n > maxn)
                 n = (srng() % (maxn - minn)) + minn;
         }
 
-        auto pow2 = 2 << ilog(n, 2);
-        if (load_factor > 0.2 && load_factor < 1) {
-            n = int(pow2 * load_factor) - (1 << 10) + (srng()) % (1 << 8);
-        }
         if (n < 1e5 || n > 2e9)
             n = minn + srng() % minn;
+        if (n > maxn)
+            n = minn + srng() % (maxn - minn);
 
         int tc = benchHashMap(n);
         if (tc >= maxc)
@@ -1868,3 +1693,6 @@ int main(int argc, char* argv[]) {
 // https://clickhouse.com/blog/clickhouse-fully-supports-joins-hash-joins-part2
 
 // https://jacksonallan.github.io/c_cpp_hash_tables_benchmark/
+// https://martin.ankerl.com/2026/09/09/hash-map-index-structures/
+
+#pragma GCC diagnostic pop

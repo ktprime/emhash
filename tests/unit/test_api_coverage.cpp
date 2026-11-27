@@ -23,6 +23,7 @@
 #include <vector>
 #include <stdexcept>
 #include <utility>
+#include <type_traits>
 
 // ============================================================================
 // 1. operator== / operator!= (container equality)
@@ -242,7 +243,114 @@ TEST_CASE_TEMPLATE("emplace_hint", Map, map5<int, int>, map8<int, int>) {
     CHECK(m.contains(make_kv<K>(2)));
 }
 
-// equal_range omitted: emhash6/7 have ambiguous overloads, emhash8 has internal .second bug at hash_table8.hpp:641
+// equal_range for emhash5-8. emhash6/7 used to declare the pair of overloads
+// both const (every call ambiguous) and emhash8's body read a nonexistent
+// iterator member plus had no const overload.
+TEST_CASE_TEMPLATE("equal_range const and non-const", Map, map5<int, int>, map6<int, int>, map7<int, int>,
+                   map8<int, int>) {
+    Map m;
+    for (int i = 0; i < 100; ++i)
+        m[i] = i * 10;
+
+    // non-const overload: mutable iterator pair covering exactly one element
+    auto r = m.equal_range(7);
+    static_assert(std::is_same<decltype(r.first), typename Map::iterator>::value, "iterator expected");
+    REQUIRE(r.first != m.end());
+    CHECK(r.first->first == 7);
+    CHECK(r.first->second == 70);
+    CHECK(r.second == std::next(r.first));
+
+    // const overload: const_iterator pair
+    const Map& cm = m;
+    auto cr = cm.equal_range(7);
+    static_assert(std::is_same<decltype(cr.first), typename Map::const_iterator>::value, "const_iterator expected");
+    REQUIRE(cr.first != cm.end());
+    CHECK(cr.first->second == 70);
+    CHECK(cr.second == std::next(cr.first));
+
+    // missing key: empty range [end(), end())
+    auto miss = m.equal_range(100000);
+    CHECK(miss.first == m.end());
+    CHECK(miss.first == miss.second);
+    auto cmiss = cm.equal_range(100000);
+    CHECK(cmiss.first == cm.end());
+    CHECK(cmiss.first == cmiss.second);
+}
+
+// Regression: shrink_to_fit used to size for the element count alone, leaving
+// load_factor() above max_load_factor(), so the next operation rehashed again.
+TEST_CASE_TEMPLATE("shrink_to_fit keeps load_factor within max_load_factor", Map, map5<int, int>, map6<int, int>,
+                   map7<int, int>, map8<int, int>) {
+    Map m;
+    // sparse enough to pass the "already sparse" guard some impls have
+    m.reserve(8000);
+    for (int i = 0; i < 1000; ++i)
+        m[i] = i;
+
+    const auto grown = m.bucket_count();
+    m.shrink_to_fit();
+    CHECK(m.size() == 1000);
+    CHECK(m.bucket_count() <= grown);
+    CHECK(m.load_factor() <= m.max_load_factor());
+
+    // neither an update of an existing key nor one more insertion may rehash
+    const auto shrunk = m.bucket_count();
+    m[3] = 12345;
+    CHECK(m.bucket_count() == shrunk);
+    CHECK(m.at(3) == 12345);
+    m[5000] = 1;
+    CHECK(m.bucket_count() == shrunk);
+    CHECK(m.size() == 1001);
+
+    // shrinking an emptied map then reusing it stays valid
+    m.clear();
+    m.shrink_to_fit();
+    CHECK(m.empty());
+    m[7] = 7;
+    CHECK(m.size() == 1);
+    CHECK(m.at(7) == 7);
+}
+
+// Regression: the predicate must travel with the table on copy/assignment
+// (clone() only copies the bucket data).
+struct CountingEqual {
+    static inline int copies = 0;
+    static inline int assigns = 0;
+    CountingEqual() = default;
+    CountingEqual(const CountingEqual&) noexcept { copies++; }
+    CountingEqual& operator=(const CountingEqual&) noexcept {
+        assigns++;
+        return *this;
+    }
+    bool operator()(int a, int b) const { return a == b; }
+};
+
+template <class M> static void check_predicate_copied(const char* /*name*/) {
+    M a;
+    a[1] = 1;
+
+    CountingEqual::copies = CountingEqual::assigns = 0;
+    M b(a);
+    CHECK(CountingEqual::copies >= 1);
+    CHECK(b.size() == 1);
+    CHECK(b.at(1) == 1);
+    CHECK(b.contains(1));
+
+    CountingEqual::copies = CountingEqual::assigns = 0;
+    M c;
+    c = a;
+    CHECK(CountingEqual::assigns >= 1);
+    CHECK(c.size() == 1);
+    CHECK(c.at(1) == 1);
+    CHECK(c.contains(1));
+}
+
+TEST_CASE("key_equal is copied on copy ctor and copy assignment (emhash5-8)") {
+    check_predicate_copied<emhash5::HashMap<int, int, std::hash<int>, CountingEqual>>("emhash5");
+    check_predicate_copied<emhash6::HashMap<int, int, std::hash<int>, CountingEqual>>("emhash6");
+    check_predicate_copied<emhash7::HashMap<int, int, std::hash<int>, CountingEqual>>("emhash7");
+    check_predicate_copied<emhash8::HashMap<int, int, std::hash<int>, CountingEqual>>("emhash8");
+}
 
 // ============================================================================
 // 8. Non-default-constructible value (emplace/try_emplace correctness)

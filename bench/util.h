@@ -1,6 +1,25 @@
 #pragma once
 //#define _HAS_STD_BYTE 0
 
+// Benchmark utilities rely on a few patterns that trip the strict warning
+// set we run the headers under: unsigned __int128 (GCC extension, -Wpedantic),
+// strncpy length matching (harmless, the buffer is sized to the exact
+// formatted string), and a handful of helper functions that are unused in
+// some translation units. This header also pulls in vendored third-party
+// containers (absl, jg) whose own code trips -Wshadow/-Woverflow and cannot be
+// patched here. Suppress the warning classes that only those two sources
+// produce, in this header only -- the benchmark bodies stay strict.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Woverflow"
+#endif
+
 #include <random>
 #include <cstdint>
 #include <cstdio>
@@ -855,4 +874,8 @@ static std::string_view get_random_alphanum_string_view(std::size_t size) {
 
 //#include "ck/Common/HashTable/HashMap.h"
 //#include "ck/Common/HashTable/HashSet.h"
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
 #endif

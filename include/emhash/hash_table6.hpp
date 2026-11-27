@@ -493,7 +493,8 @@ public:
         return bitmask_aligned_size(num_buckets) + (num_buckets + PACK_SIZE) * sizeof(PairT);
     }
 
-    HashMap(const HashMap& rhs) : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
+    HashMap(const HashMap& rhs)
+        : _eq(rhs._eq), _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             auto* base = alloc_bucket(rhs._mask + 1);
             _bitmask = reinterpret_cast<uint8_t*>(base);
@@ -531,6 +532,10 @@ public:
     HashMap& operator=(const HashMap& rhs) {
         if (this == &rhs)
             return *this;
+
+        // The copy constructor gets _eq through its member-init list; copy
+        // assignment must copy it here (clone() only handles the bucket data).
+        _eq = rhs._eq;
 
         if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
             _alloc = rhs._alloc;
@@ -597,7 +602,8 @@ public:
 
     void clone(const HashMap& rhs) {
         _hasher = rhs._hasher;
-//        _eq          = rhs._eq;
+        // _eq is copied by the callers: copy ctor (copy-construct, so EqT need
+        // not be copy-assignable) and copy assignment (assign).
 #if EMH_SAFE_HASH
         _num_main = rhs._num_main;
         _hash_inter = rhs._hash_inter;
@@ -878,8 +884,9 @@ public:
         return find_filled_bucket(key) <= _mask ? 1 : 0;
     }
 
-    template <typename Key = KeyT>
-    [[nodiscard]] std::pair<iterator, iterator> equal_range(const Key& key) const noexcept {
+    // Only one overload may be const: a const/non-const pair of templates with
+    // identical parameters makes every call ambiguous.
+    template <typename K = KeyT> [[nodiscard]] std::pair<iterator, iterator> equal_range(const K& key) noexcept {
         const auto found = find(key);
         if (found.bucket() > _mask)
             return {found, found};
@@ -1203,7 +1210,12 @@ public:
 #endif
     }
 
-    void shrink_to_fit() noexcept { rehash(_num_filled + 1); }
+    void shrink_to_fit() noexcept {
+        // Size for the element count *at the configured load factor*: sizing for
+        // the count alone leaves load_factor() above max_load_factor(), so the
+        // next insertion would grow the table again immediately.
+        rehash((static_cast<uint64_t>(_num_filled) * _mlf >> 27) + 2);
+    }
 
     /// Make room for this many elements
     bool reserve(uint64_t num_elems) noexcept {
@@ -1373,7 +1385,7 @@ private:
         auto next_bucket = EMH_ADDR(_pairs, bucket);
 
         if (next_bucket == bucket * 2) {
-            const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
+            const auto eqkey = _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket));
 #if EMH_SAFE_HASH
             return eqkey ? (_num_main--, bucket) : empty_bucket;
 #else
@@ -1381,7 +1393,7 @@ private:
 #endif
         } else if (next_bucket % 2 > 0)
             return empty_bucket;
-        else if (_eq(key, EMH_KEY(_pairs, bucket))) {
+        else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket))) {
             next_bucket /= 2;
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             EMH_PKV(_pairs, bucket) = std::move(EMH_PKV(_pairs, next_bucket));
@@ -1393,7 +1405,7 @@ private:
         auto prev_bucket = bucket;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
+            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
                 EMH_ADDR(_pairs, prev_bucket) =
                     (nbucket == next_bucket ? prev_bucket : nbucket) * 2 + (1 - (prev_bucket == bucket));
                 return next_bucket;
@@ -1415,7 +1427,7 @@ private:
         auto next_bucket = EMH_ADDR(_pairs, bucket);
 
         if (next_bucket == bucket * 2) { // only one main bucket
-            const auto eqkey = _eq(key, EMH_KEY(_pairs, bucket));
+            const auto eqkey = _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket));
 #if EMH_SAFE_HASH
             return eqkey ? (_num_main--, bucket) : empty_bucket;
 #else
@@ -1429,7 +1441,7 @@ private:
         next_bucket = bucket;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
+            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
                 find_bucket = next_bucket;
                 if (nbucket == next_bucket) {
                     EMH_ADDR(_pairs, prev_bucket) = prev_bucket * 2 + 1 - (prev_bucket == bucket);
@@ -1486,20 +1498,20 @@ private:
 #ifndef EMH_FIND_HIT
         if (next_bucket % 2 > 0)
             return _num_buckets;
-        else if (_eq(key, EMH_KEY(_pairs, bucket)))
+        else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
             return bucket;
         else if (next_bucket == bucket * 2)
             return _num_buckets;
 #else
         if constexpr (std::is_integral<K>::value) {
-            if (_eq(key, EMH_KEY(_pairs, bucket)))
+            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
                 return bucket;
             else if (next_bucket % 2 > 0)
                 return _num_buckets;
         } else {
             if (next_bucket % 2 > 0)
                 return _num_buckets;
-            else if (_eq(key, EMH_KEY(_pairs, bucket)))
+            else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
                 return bucket;
             else if (next_bucket == bucket * 2)
                 return _num_buckets;
@@ -1508,7 +1520,7 @@ private:
 
         next_bucket /= 2;
         while (true) {
-            if (_eq(key, EMH_KEY(_pairs, next_bucket)))
+            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket)))
                 return next_bucket;
 
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
@@ -1562,10 +1574,10 @@ private:
 #if EMH_SAFE_HASH
         if (static_cast<int>(next_bucket) < 0)
             return _num_main++, bucket * 2;
-        else if (_eq(key, EMH_KEY(_pairs, bucket)))
+        else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
             return bucket * 2;
 #else
-        if (static_cast<int>(next_bucket) < 0 || _eq(key, EMH_KEY(_pairs, bucket)))
+        if (static_cast<int>(next_bucket) < 0 || _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
             return bucket * 2;
 #endif
 
@@ -1579,7 +1591,7 @@ private:
         next_bucket /= 2;
         // find next linked bucket and check key
         while (true) {
-            if (_eq(key, EMH_KEY(_pairs, next_bucket))) {
+            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, bucket));
                 return bucket * 2;
@@ -1762,11 +1774,11 @@ private:
 #if EMH_INT_HASH
             return static_cast<size_type>(hash64(key));
 #elif EMH_SAFE_HASH
-            return static_cast<size_type>(_hash_inter == 0 ? mix_hash(_hasher(key)) : hash64(key));
+            return static_cast<size_type>(_hash_inter == 0 ? mix_hash(_hasher(static_cast<KeyT>(key))) : hash64(key));
 #elif EMH_IDENTITY_HASH
             return static_cast<size_type>(key + (key >> 24));
 #else
-            return static_cast<size_type>(mix_hash(_hasher(key)));
+            return static_cast<size_type>(mix_hash(_hasher(static_cast<KeyT>(key))));
 #endif
         } else if constexpr (std::is_same<K, std::string>::value) {
             EMH_MSAN_UNPOISON(&key, sizeof(key));
@@ -1774,10 +1786,10 @@ private:
 #if EMH_WY_HASH
             return static_cast<size_type>(wyhash(key.data(), key.size(), 0));
 #else
-            return static_cast<size_type>(mix_hash(_hasher(key)));
+            return static_cast<size_type>(mix_hash(_hasher(static_cast<KeyT>(key))));
 #endif
         } else {
-            return static_cast<size_type>(mix_hash(_hasher(key)));
+            return static_cast<size_type>(mix_hash(_hasher(static_cast<KeyT>(key))));
         }
     }
 

@@ -32,6 +32,15 @@ target_include_directories(emhash_bench PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/.."   # nanobench.h
 )
 
+# Hash dependency-chain latency (docs §6 row 9). Builds emhash's default string
+# hash, emhash9's hash+mix64 and the bundled wyhash into one small binary.
+add_executable(emhash_hash_latency hash_latency.cpp)
+target_include_directories(emhash_hash_latency PRIVATE
+    "${EMH_BENCH_INC}"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/.."
+)
+
 # ---------------------------------------------------------------------------
 # Optional reference baselines — enabled only when the headers are present,
 # so a partial third-party tree degrades to "skipped" rather than a hard error.
@@ -88,20 +97,27 @@ if(NOT EMH_BENCH_SIMD_LEVEL STREQUAL "NONE")
             set(_simd "avx512f")
         endif()
         target_compile_options(emhash_bench PRIVATE -m${_simd})
+        target_compile_options(emhash_hash_latency PRIVATE -m${_simd})
     endif()
 endif()
 unset(_simd)
 
 if(MSVC)
-    target_compile_options(emhash_bench PRIVATE /W4 /permissive- /Zc:__cplusplus)
-    if(EMH_BENCH_SIMD_LEVEL MATCHES "AVX2")
-        target_compile_options(emhash_bench PRIVATE /arch:AVX2)
-    endif()
+    foreach(_tgt emhash_bench emhash_hash_latency)
+        target_compile_options(${_tgt} PRIVATE /W4 /permissive- /Zc:__cplusplus)
+        if(EMH_BENCH_SIMD_LEVEL MATCHES "AVX2")
+            target_compile_options(${_tgt} PRIVATE /arch:AVX2)
+        endif()
+    endforeach()
+    unset(_tgt)
 else()
-    target_compile_options(emhash_bench PRIVATE -Wall -Wextra -Wno-unused-parameter)
-    if(UNIX)
-        target_link_libraries(emhash_bench PRIVATE pthread)
-    endif()
+    foreach(_tgt emhash_bench emhash_hash_latency)
+        target_compile_options(${_tgt} PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        if(UNIX)
+            target_link_libraries(${_tgt} PRIVATE pthread)
+        endif()
+    endforeach()
+    unset(_tgt)
 endif()
 
 message(STATUS "")

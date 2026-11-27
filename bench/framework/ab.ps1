@@ -34,7 +34,10 @@ param(
     # and measurably reduces run-to-run spread on a noisy host.
     [int]$Reps  = 3,
 
-    [ValidateSet('min', 'median')][string]$Metric = 'min'
+    [ValidateSet('min', 'median')][string]$Metric = 'min',
+
+    # Optional string-key length; 0 means the harness default (32 bytes).
+    [int]$KeyLen = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,7 +62,9 @@ $AllWorkloads = @(
 
 function Invoke-SideOnce {
     param([string]$Bin, [string]$Op, [string]$Map, [string]$Key, [int]$Size)
-    $out = & $Bin --single --op $Op --map $Map --key $Key --size $Size --metric $Metric
+    $sideArgs = @('--single', '--op', $Op, '--map', $Map, '--key', $Key, '--size', $Size, '--metric', $Metric)
+    if ($KeyLen -gt 0) { $sideArgs += @('--key-len', $KeyLen) }
+    $out = & $Bin @sideArgs
     if (-not $out) { throw "harness '$Bin' produced no output" }
     return [double]$out
 }

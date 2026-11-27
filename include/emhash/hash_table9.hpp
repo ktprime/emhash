@@ -31,16 +31,17 @@
 ///
 ///     struct block {
 ///         uint8_t  fingerprints[16]; // low hash byte, 0 means empty
-///         uint8_t  reach[8];         // one max probe step per hash class
+///         uint8_t  overflows[8];     // live count of class-c keys that probed past
 ///         uint32_t index[16];        // into the dense value vector
 ///     };
 ///
 /// A lookup compares all sixteen fingerprints with one SIMD instruction.  The
-/// reach array holds one byte per hash class (the low three bits of the hash):
-/// the furthest step any key of that class homing in this group had to probe.
-/// Once the walk passes the reach of its own class the key is absent.  A reach
-/// only ever grows, so a stale value costs extra probes but can never hide a
-/// key, and erase never has to repair it.  Both the fingerprints and the reaches
+/// overflow array holds one byte per hash class (the low three bits of the
+/// hash): how many keys of that class probed past this group.  A miss stops as
+/// soon as the walk reaches a group whose count for its class is zero.  An
+/// insert increments the count of every group it passes, an erase decrements
+/// them again (and a lazy move-home turns one into zero), so the counts stay
+/// exact and never need a repair rehash.  Both the fingerprints and the counts
 /// live in the first cache line, so a miss reads its bound without touching the
 /// line that holds the value indices.
 ///
@@ -135,19 +136,19 @@
 
 namespace emhash9 {
 
-/// One group of sixteen slots: the fingerprints, one probe reach byte per hash
+/// One group of sixteen slots: the fingerprints, one overflow counter per hash
 /// class, and the value indices.  All sixteen slots hold entries.
 struct group_block {
     uint8_t fingerprints[EMH9_GROUP_SIZE]; // 0 = empty, otherwise low hash byte (0 mapped to 8)
-    uint8_t reach[8];                      // one max probe step per hash class
+    uint8_t overflows[8];                  // live count of class-c keys that probed past this group
     uint32_t index[EMH9_GROUP_SIZE];       // position in the dense value vector
 };
 
 static_assert(sizeof(group_block) == 88, "group_block must stay a single 88-byte unit");
 
-/// A reach of 255 means "a key of this class probed 15 groups or further
-/// from its home group", so lookups scan until the group count is exhausted.
-constexpr uint32_t REACH_UNBOUNDED = 255;
+/// A counter saturated at 255 is never decremented again: it keeps the miss
+/// bound conservative instead of under-counting under a degenerate hash.
+constexpr uint8_t OVERFLOW_SATURATED = 255;
 
 namespace detail {
 
@@ -256,6 +257,25 @@ struct erase_stats {
 #endif
 
 } // namespace detail
+
+/// A transparent, avalanching hasher for string-family keys, mirroring
+/// emhash8::string_hash. Pair it with std::equal_to<> for heterogeneous lookup:
+///
+///   emhash9::HashMap<std::string, int, emhash9::string_hash, std::equal_to<>>
+///
+/// The functor declares `is_avalanching`, so hash_key() uses its output as-is
+/// instead of adding mix64 on top. On MSVC, where std::hash<std::string> is
+/// byte-at-a-time FNV, this is the difference between a 64-byte key costing
+/// ~75 ns and ~4 ns on the lookup's dependency chain; the whole-table A/B in
+/// bench/framework measured +56~259% on find and +38~43% on insert.
+struct string_hash {
+    using is_transparent = void;
+    using is_avalanching = void;
+
+    std::size_t operator()(const char* s) const noexcept { return emh_wyhash(s, std::strlen(s), 0); }
+    std::size_t operator()(std::string_view s) const noexcept { return emh_wyhash(s.data(), s.size(), 0); }
+    std::size_t operator()(const std::string& s) const noexcept { return emh_wyhash(s.data(), s.size(), 0); }
+};
 
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
@@ -799,6 +819,9 @@ public:
             const uint64_t moved_hash = hash_key(_pairs[last].first);
             slot_of_value(moved_hash, last, moved_g, moved_i);
         }
+        // The element no longer probes past the groups it overflowed through.
+        unmark_path(_blocks, _num_groups, _mask, static_cast<uint8_t>(h) & 7, static_cast<uint32_t>(home_of(h, _mask)),
+                    g);
         erase_slot(g, i, moved_g, moved_i);
         // The value that was last now lives at idx, and its coordinates are
         // known, so a caller that erases in a loop skips the next probe.
@@ -918,8 +941,10 @@ private:
     // ------------------------------------------------------------------
     // hashing
     // ------------------------------------------------------------------
-    template <typename K> [[nodiscard]] uint64_t hash_key(const K& key) const {
-        const uint64_t h = static_cast<uint64_t>(_hasher(key));
+    // Hash with an explicit hasher, so a rebuild loop can hold it in a local instead of
+    // reloading the member on every element (the loop's stores can alias `_hasher`).
+    template <typename K> [[nodiscard]] static uint64_t hash_key_with(const HashT& hash_fn, const K& key) {
+        const uint64_t h = static_cast<uint64_t>(hash_fn(static_cast<KeyT>(key)));
         // A murmur3-style finalizer costs two multiplies and buys the property
         // the index depends on: every key bit reaches every hash bit.  Without
         // it, keys that differ only in bits 16..31 (multiples of 65536, say)
@@ -929,6 +954,8 @@ private:
             return h;
         return detail::mix64(h);
     }
+
+    template <typename K> [[nodiscard]] uint64_t hash_key(const K& key) const { return hash_key_with(_hasher, key); }
 
     [[nodiscard]] static uint64_t home_of(uint64_t hash, size_type mask) noexcept {
         return static_cast<uint32_t>(hash >> 32) & static_cast<uint32_t>(mask);
@@ -965,26 +992,37 @@ private:
         return round_up(sizeof(group_block) * static_cast<std::size_t>(groups), alignof(value_type));
     }
 
-    /// Furthest step a key of hash class `cls` homing in this group had to
-    /// probe.  Zero means every key of the class sits in this group, so a miss
-    /// may stop immediately.
-    static EMH9_FORCEINLINE uint8_t reach_of(const group_block& block, uint8_t cls) noexcept {
-        return block.reach[cls];
+    /// How many keys of hash class `cls` probed past this group.  Zero means no
+    /// such key can be further along, so a miss may stop here.
+    static EMH9_FORCEINLINE uint8_t overflow_of(const group_block& block, uint8_t cls) noexcept {
+        return block.overflows[cls];
     }
 
-    /// Record that a key of `cls` homing in `block` was placed `step` groups away.
-    static EMH9_FORCEINLINE void grow_reach(group_block& block, uint8_t cls, uint32_t step) noexcept {
-        const uint32_t cur = block.reach[cls];
-        if (cur == REACH_UNBOUNDED)
-            return;
-        const uint32_t next = step >= REACH_UNBOUNDED ? REACH_UNBOUNDED : (step > cur ? step : cur);
-        block.reach[cls] = static_cast<uint8_t>(next);
+    /// Record that a key of `cls` probed past `block` (saturating).
+    static EMH9_FORCEINLINE void mark_overflow(group_block& block, uint8_t cls) noexcept {
+        uint8_t& count = block.overflows[cls];
+        if (count != OVERFLOW_SATURATED)
+            ++count;
     }
 
-    /// Probe bound implied by a reach byte; the unbounded marker widens to the
-    /// table size so the walk cannot stop early.
-    static EMH9_FORCEINLINE uint32_t reach_guard(uint8_t reach) noexcept {
-        return reach == REACH_UNBOUNDED ? static_cast<uint32_t>(INVALID) : static_cast<uint32_t>(reach);
+    /// Undo one mark_overflow.  A saturated counter stays saturated so the miss
+    /// bound can only over-estimate, never under-estimate.
+    static EMH9_FORCEINLINE void unmark_overflow(group_block& block, uint8_t cls) noexcept {
+        uint8_t& count = block.overflows[cls];
+        if (count != 0 && count != OVERFLOW_SATURATED)
+            --count;
+    }
+
+    /// Decrement the counters of every group a key probed past on its way from
+    /// `home` to `group` (the landing group itself is excluded).
+    static EMH9_FORCEINLINE void unmark_path(group_block* blocks, size_type groups, size_type mask, uint8_t cls,
+                                             uint32_t home, uint32_t group) noexcept {
+        uint32_t g = home;
+        uint32_t step = 0;
+        for (size_type visited = 0; visited < groups && g != group; ++visited) {
+            unmark_overflow(blocks[g], cls);
+            g = (g + (++step)) & static_cast<uint32_t>(mask);
+        }
     }
 
     static constexpr std::size_t arena_units(size_type groups, size_type cap) noexcept {
@@ -1145,8 +1183,22 @@ private:
         group_block* const nb = split ? allocate_index(groups) : reinterpret_cast<group_block*>(base);
         value_type* const np = split ? allocate_pairs(cap) : pairs_in(base, groups);
 
-        for (size_type i = 0; i < _num_filled; ++i)
-            ::new (static_cast<void*>(np + i)) value_type(std::move_if_noexcept(_pairs[i]));
+        // Keep the old table's pointer/count/hasher in locals: the loop stores into the new
+        // table, so with reads through `this` the compiler has to assume the stores may alias
+        // `_pairs` / `_num_filled` / `_hasher` and reload them on every element.
+        value_type* const op = _pairs;
+        const size_type n_filled = _num_filled;
+        const HashT& hash_fn = _hasher;
+
+        // Trivially copyable values can move in bulk; the element loop cannot be turned into a
+        // memcpy by the compiler because the two buffers may overlap from its point of view.
+        if constexpr (std::is_trivially_copyable<value_type>::value) {
+            if (n_filled)
+                std::memcpy(static_cast<void*>(np), static_cast<const void*>(op), n_filled * sizeof(value_type));
+        } else {
+            for (size_type i = 0; i < n_filled; ++i)
+                ::new (static_cast<void*>(np + i)) value_type(std::move_if_noexcept(op[i]));
+        }
 
         const size_type nmask = groups - 1;
         if (keep_index) {
@@ -1154,15 +1206,32 @@ private:
                 std::memcpy(nb, _blocks, sizeof(group_block) * _num_groups);
         } else {
             std::memset(nb, 0, sizeof(group_block) * groups);
-            for (size_type idx = 0; idx < _num_filled; ++idx)
-                place_index(nb, groups, nmask, hash_key(np[idx].first), idx);
+            // Pipelined reindex: keep the next 16 hashes ready and issue the destination-group
+            // prefetch 16 elements ahead, so the random access into the fresh block array (and
+            // its page-table walk) overlaps the current placement instead of stalling it.
+            constexpr size_type kPipe = 16;
+            uint64_t ring[kPipe];
+            const size_type depth = n_filled < kPipe ? n_filled : kPipe;
+            for (size_type i = 0; i < depth; ++i)
+                ring[i] = hash_key_with(hash_fn, np[i].first);
+
+            for (size_type idx = 0; idx < n_filled; ++idx) {
+                const uint64_t h = ring[idx & (kPipe - 1)];
+                const size_type ahead = idx + kPipe;
+                if (ahead < n_filled) {
+                    const uint64_t nh = hash_key_with(hash_fn, np[ahead].first);
+                    ring[ahead & (kPipe - 1)] = nh;
+                    detail::prefetch_group(nb + home_of(nh, nmask));
+                }
+                place_index(nb, groups, nmask, h, idx);
+            }
         }
 
-        if (_pairs) {
-            for (size_type i = 0; i < _num_filled; ++i)
-                _pairs[i].~value_type();
+        if (op) {
+            for (size_type i = 0; i < n_filled; ++i)
+                op[i].~value_type();
         }
-        release_storage(_blocks, _pairs, _num_groups, _capacity);
+        release_storage(_blocks, op, _num_groups, _capacity);
 
         _blocks = nb;
         _pairs = np;
@@ -1192,8 +1261,8 @@ private:
         relocate(groups, needed > _capacity ? needed : _capacity, false);
     }
 
-    /// Insert `idx` into a freshly zeroed index and widen the home group's reach
-    /// for the key's class to the distance the key had to travel.
+    /// Insert `idx` into a freshly zeroed index, counting every full group the
+    /// key probed past.
     static void place_index(group_block* blocks, size_type groups, size_type mask, uint64_t hash, size_type idx) {
         const uint8_t fp = detail::fingerprint(hash);
         const uint8_t cls = static_cast<uint8_t>(hash) & 7;
@@ -1207,9 +1276,9 @@ private:
                 const uint32_t i = detail::ctz32(empties);
                 b.fingerprints[i] = fp;
                 b.index[i] = static_cast<uint32_t>(idx);
-                grow_reach(blocks[home], cls, step);
                 return;
             }
+            mark_overflow(b, cls);
             g = (g + (++step)) & static_cast<uint32_t>(mask);
         }
     }
@@ -1245,17 +1314,17 @@ private:
             const uint32_t i = detail::ctz32(mask);
             mask &= mask - 1;
             const size_type idx = hb.index[i];
-            if (EMH_LIKELY(_key_equal(_pairs[idx].first, key))) {
+            if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
                 group_out = home;
                 slot_out = i;
                 return idx;
             }
         }
 
-        // Miss in the home group: the key can only be one of the overflows this
-        // group recorded for its hash class.
-        const uint32_t guard = reach_guard(reach_of(hb, static_cast<uint8_t>(hash) & 7));
-        if (guard == 0)
+        // Miss in the home group: if no key of this class probed past it, the
+        // key cannot be further along.
+        const uint8_t cls = static_cast<uint8_t>(hash) & 7;
+        if (overflow_of(hb, cls) == 0)
             return INVALID;
 
         uint32_t g = home;
@@ -1269,14 +1338,14 @@ private:
                 const uint32_t i = detail::ctz32(mask);
                 mask &= mask - 1;
                 const size_type idx = b.index[i];
-                if (EMH_LIKELY(_key_equal(_pairs[idx].first, key))) {
+                if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
                     group_out = g;
                     slot_out = i;
                     return idx;
                 }
             }
-            // No key of this class homing here probed past this step.
-            if (step >= guard)
+            // No key of this class probed past this group.
+            if (overflow_of(b, cls) == 0)
                 return INVALID;
         }
         return INVALID;
@@ -1298,15 +1367,15 @@ private:
             const uint32_t i = detail::ctz32(mask);
             mask &= mask - 1;
             const size_type idx = hb.index[i];
-            if (EMH_LIKELY(_key_equal(_pairs[idx].first, key))) {
+            if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
                 group_out = home;
                 slot_out = i;
                 return true;
             }
         }
 
-        const uint32_t guard = reach_guard(reach_of(hb, static_cast<uint8_t>(hash) & 7));
-        if (guard == 0)
+        const uint8_t cls = static_cast<uint8_t>(hash) & 7;
+        if (overflow_of(hb, cls) == 0)
             return false;
 
         uint32_t g = home;
@@ -1320,14 +1389,14 @@ private:
                 const uint32_t i = detail::ctz32(mask);
                 mask &= mask - 1;
                 const size_type idx = b.index[i];
-                if (EMH_LIKELY(_key_equal(_pairs[idx].first, key))) {
+                if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
                     group_out = g;
                     slot_out = i;
                     return true;
                 }
             }
-            // No key of this class homing here probed past this step.
-            if (step >= guard)
+            // No key of this class probed past this group.
+            if (overflow_of(b, cls) == 0)
                 return false;
         }
         return false;
@@ -1357,8 +1426,8 @@ private:
             }
         }
 
-        const uint32_t guard = reach_guard(reach_of(hb, static_cast<uint8_t>(hash) & 7));
-        if (guard == 0) {
+        const uint8_t cls = static_cast<uint8_t>(hash) & 7;
+        if (overflow_of(hb, cls) == 0) {
             group_out = INVALID;
             return;
         }
@@ -1378,7 +1447,7 @@ private:
                     return;
                 }
             }
-            if (step >= guard)
+            if (overflow_of(b, cls) == 0)
                 break;
         }
         group_out = INVALID; // unreachable for a live value index
@@ -1427,7 +1496,7 @@ private:
             const uint32_t i = detail::ctz32(mask);
             mask &= mask - 1;
             const size_type idx = hb.index[i];
-            if (EMH_LIKELY(_key_equal(_pairs[idx].first, key))) {
+            if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
                 if constexpr (WithPos)
                     return result_type(iterator(_pairs + idx, home, i), false);
                 else
@@ -1435,9 +1504,8 @@ private:
             }
         }
 
-        // No key of this class homing here probed past the group, so the key is
-        // absent.
-        if (reach_of(hb, cls) == 0) {
+        // No key of this class probed past the group, so the key is absent.
+        if (overflow_of(hb, cls) == 0) {
             const uint32_t empties = detail::match_byte(hb.fingerprints, 0);
             if (empties) {
                 const uint32_t slot = detail::ctz32(empties);
@@ -1470,7 +1538,6 @@ private:
     EMH9_NOINLINE slot_pos insert_impl_far(uint64_t hash, uint32_t home, uint8_t fp, const K& key,
                                            Ctor& construct_value) {
         const uint8_t cls = static_cast<uint8_t>(hash) & 7;
-        const uint32_t guard = reach_guard(reach_of(_blocks[home], cls));
         uint32_t g = home;
         uint32_t step = 0;
         for (size_type visited = 0; visited < _num_groups; ++visited) {
@@ -1481,7 +1548,7 @@ private:
                 const uint32_t i = detail::ctz32(mask);
                 mask &= mask - 1;
                 const size_type idx = b.index[i];
-                if (_key_equal(_pairs[idx].first, key)) {
+                if (_key_equal(_pairs[idx].first, static_cast<KeyT>(key))) {
 #if EMH9_HOME_RELOCATE
                     if (g != home) {
                         const uint32_t lane = relocate_home(home, g, i);
@@ -1492,9 +1559,9 @@ private:
                     return {g, i, idx, false};
                 }
             }
-            // No key of this class homing here probed past this step, so the key
-            // cannot be further along the sequence.
-            if (step >= guard)
+            // No key of this class probed past this group, so the key cannot be
+            // further along the sequence.
+            if (overflow_of(b, cls) == 0)
                 break;
             g = (g + (++step)) & static_cast<uint32_t>(_mask);
         }
@@ -1540,11 +1607,11 @@ private:
                 construct_value(_pairs + _num_filled);
                 b.fingerprints[i] = fp;
                 b.index[i] = _num_filled;
-                grow_reach(_blocks[home], cls, step);
                 group_out = g;
                 slot_out = i;
                 return _num_filled++;
             }
+            mark_overflow(b, cls);
             g = (g + (++step)) & static_cast<uint32_t>(_mask);
         }
         return INVALID; // unreachable: the load factor stays below 1
@@ -1561,6 +1628,9 @@ private:
         uint32_t moved_g = 0, moved_i = 0;
         if (_blocks[g].index[i] != last)
             slot_of_value(hash_key(_pairs[last].first), last, moved_g, moved_i);
+        // The element no longer probes past the groups it overflowed through.
+        unmark_path(_blocks, _num_groups, _mask, static_cast<uint8_t>(hash) & 7,
+                    static_cast<uint32_t>(home_of(hash, _mask)), g);
         erase_slot(g, i, moved_g, moved_i);
         return 1;
     }
@@ -1602,10 +1672,11 @@ private:
         // as in erase_slot(): the group base would otherwise be reloaded.
         const uint8_t fp = blocks[g].fingerprints[i];
         const size_type idx = blocks[g].index[i];
+        // The element now sits at home, so it no longer probes past any group.
+        unmark_path(blocks, _num_groups, _mask, static_cast<uint8_t>(fp) & 7, home, g);
         hb.fingerprints[e] = fp;
         hb.index[e] = idx;
         blocks[g].fingerprints[i] = 0;
-        // `reach` is left as it was: it may overestimate, never underestimate.
         return e;
     }
 #endif

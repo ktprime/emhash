@@ -26,40 +26,19 @@
 
 #pragma once
 
-#include "emhash/config.hpp"
-#include <cstdlib>
-#include <cstring>
-#include <cstdint>
-#include <stdexcept>
-#include <iterator>
-#include <utility>
-#include <cassert>
-
-#ifdef _WIN32
-#include <intrin.h>
-#elif defined(__x86_64__) || defined(__amd64__) || defined(__i386__) || defined(__i686__) || defined(_M_IX86) ||       \
-    defined(_M_X64)
-#include <x86intrin.h>
-#elif defined(__ARM_ARCH__) || defined(__aarch64__) || defined(__arm__)
-#include <sse2neon.h>
-#endif
-
-#undef EMH_LIKELY
-#undef EMH_UNLIKELY
-
-// likely/unlikely
-#if defined(__GNUC__) && (__GNUC__ >= 3) && (__GNUC_MINOR__ >= 1) || defined(__clang__)
-#define EMH_LIKELY(condition) __builtin_expect(!!(condition), 1)
-#define EMH_UNLIKELY(condition) __builtin_expect(!!(condition), 0)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1920)
-#define EMH_LIKELY(condition) ((condition) ? ((void)__assume(condition), 1) : 0)
-#define EMH_UNLIKELY(condition) ((condition) ? 1 : ((void)__assume(!condition), 0))
-#else
-#define EMH_LIKELY(condition) (condition)
-#define EMH_UNLIKELY(condition) (condition)
-#endif
+#include "config.h"
 
 namespace emilib2 {
+
+// The insert chain (emplace -> do_insert -> find_or_allocate) is force-inlined for
+// clang only: clang leaves those calls out of line in this TU shape and loses
+// ~7-9% on a fixed-size erase+insert loop without the hint, while gcc already
+// inlines them and does not benefit (bench/framework, small and large TU).
+#if defined(__clang__)
+#define EMILIB2_INSERT_INLINE EMH_INLINE
+#else
+#define EMILIB2_INSERT_INLINE inline
+#endif
 
 enum State : int8_t {
     EEMPTY = -128,
@@ -127,19 +106,6 @@ const static auto simd2_filled = _mm256_set1_epi8(EFILLED);
 #define EMH_ITERATOR_BITS 16
 #endif
 
-#ifndef EMILIB2_CTZ_DEFINED
-#define EMILIB2_CTZ_DEFINED
-inline static uint32_t CTZ(size_t n) {
-#if defined(_MSC_VER)
-    unsigned long index;
-    _BitScanForward(&index, (unsigned long)n);
-#else
-    auto index = __builtin_ctzl((unsigned long)n);
-#endif
-    return static_cast<uint32_t>(index);
-}
-#endif
-
 /// A cache-friendly hash table with open addressing, linear probing and power-of-two capacity
 template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
           typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
@@ -175,14 +141,25 @@ public:
         }
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash) & _mask;
-        return static_cast<int8_t>(static_cast<size_t>(key_hash % MAP_BITS)) + EFILLED;
+        // Reduce into [0, 252] as an unsigned value, then add EFILLED in int: adding
+        // it to the unsigned remainder would wrap and only land inside int8_t through
+        // the narrowing conversion (a signed hasher result would also go negative).
+        const auto fp = static_cast<int>(static_cast<uint64_t>(key_hash) % 253) + static_cast<int>(EFILLED);
+        return static_cast<int8_t>(fp);
     }
 
     template <typename UType, typename std::enable_if<std::is_integral<UType>::value, int8_t>::type = 0>
     EMH_INLINE int8_t hash_key2(size_t& main_bucket, const UType& key) const {
         const auto key_hash = _hasher(key);
         main_bucket = static_cast<size_t>(key_hash) & _mask;
-        return static_cast<int8_t>(static_cast<size_t>(key_hash % MAP_BITS)) + EFILLED;
+        // Multiply first (Fibonacci mix spreads dense key ranges over all bits),
+        // then reduce by division into [0, 252] and offset into [EFILLED,
+        // EFILLED + 252] -- the 253 int8_t values above the EEMPTY/EDELETE/
+        // ESENTINEL states. `mixed` must stay uint64_t (this class shadows size_t
+        // with uint32_t), and the reduction happens in int so the sum with EFILLED
+        // never wraps through unsigned and never leaves int8_t.
+        const auto mixed = static_cast<uint64_t>(key) * UINT64_C(0xA0761D6478BD642F);
+        return static_cast<int8_t>(static_cast<int>(mixed % 253) + static_cast<int>(EFILLED));
     }
 
     class const_iterator;
@@ -589,7 +566,8 @@ public:
 
     // -----------------------------------------------------
 
-    template <typename K, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
+    template <typename K, typename V>
+    EMILIB2_INSERT_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
 
@@ -600,7 +578,7 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    std::pair<iterator, bool> do_insert(const value_type& value) noexcept {
+    EMILIB2_INSERT_INLINE std::pair<iterator, bool> do_insert(const value_type& value) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
         if (bempty) {
@@ -610,7 +588,7 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    std::pair<iterator, bool> do_insert(value_type&& value) noexcept {
+    EMILIB2_INSERT_INLINE std::pair<iterator, bool> do_insert(value_type&& value) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(value.first, bempty);
         if (bempty) {
@@ -620,7 +598,7 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    template <class... Args> inline std::pair<iterator, bool> emplace(Args&&... args) noexcept {
+    template <class... Args> EMILIB2_INSERT_INLINE std::pair<iterator, bool> emplace(Args&&... args) noexcept {
         return do_insert(std::forward<Args>(args)...);
     }
 
@@ -629,9 +607,13 @@ public:
         return emplace(std::forward<Args>(args)...).first;
     }
 
-    std::pair<iterator, bool> insert(value_type&& value) noexcept { return do_insert(std::move(value)); }
+    EMILIB2_INSERT_INLINE std::pair<iterator, bool> insert(value_type&& value) noexcept {
+        return do_insert(std::move(value));
+    }
 
-    std::pair<iterator, bool> insert(const value_type& value) noexcept { return do_insert(value); }
+    EMILIB2_INSERT_INLINE std::pair<iterator, bool> insert(const value_type& value) noexcept {
+        return do_insert(value);
+    }
 
     // SFINAE-constrained to real iterators: a bare insert(3, 4) must be a
     // compile error instead of dereferencing ints as range iterators
@@ -905,19 +887,54 @@ public:
                 memset(reinterpret_cast<char*>(_pairs + num_buckets), 0, sizeof(PairT));
         }
 
-        for (size_t src_bucket = old_buckets - 1; _num_filled < old_num_filled; --src_bucket) {
-            if (old_states[src_bucket] >= State::EFILLED) {
-                auto& src_pair = old_pairs[src_bucket];
-                size_t main_bucket;
-                const auto key_h2 = hash_key2(main_bucket, src_pair.first);
-                const auto bucket = find_empty_slot(main_bucket, main_bucket, 0);
+        // Pipeline the reinsertion: hashing and target prefetches run 16
+        // elements ahead of the stores, so the random access into the fresh
+        // table (states + pairs, two distinct regions) overlaps with the
+        // sequential backward walk over the old table. Same shape as the
+        // emhash9 pipelined rehash.
+        struct Stage {
+            size_t src_bucket;
+            size_t main_bucket;
+            int8_t fp;
+        };
+        Stage ring[16];
+        size_t produced = 0, consumed = 0, src = old_buckets;
 
-                set_states(bucket, key_h2);
-                new (_pairs + bucket) PairT(std::move(src_pair));
-                _num_filled++;
-                if (need_explicit_dtor())
-                    src_pair.~PairT();
+        while (consumed < old_num_filled) {
+            while (produced - consumed < 16 && src > 0) {
+                --src;
+                if (old_states[src] >= State::EFILLED) {
+                    size_t main_bucket;
+                    const auto key_h2 = hash_key2(main_bucket, old_pairs[src].first);
+                    prefetch_heap_block(reinterpret_cast<char*>(&_pairs[main_bucket]));
+                    prefetch_heap_block(reinterpret_cast<char*>(&_states[main_bucket]));
+                    Stage& st = ring[produced++ & 15];
+                    st.src_bucket = src;
+                    st.main_bucket = main_bucket;
+                    st.fp = key_h2;
+                }
             }
+            if (produced == consumed)
+                break; // no filled entries remain
+
+            const Stage& st = ring[consumed++ & 15];
+            // Copy the pair into a register-resident local before any store:
+            // states are byte arrays, whose stores may alias anything under
+            // TBAA, so a heap reference would be reloaded around every store.
+            PairT src_pair(std::move(old_pairs[st.src_bucket]));
+
+            size_t bucket;
+            {
+                const auto vec = LOAD_UEPI8(reinterpret_cast<decltype(&simd_empty)>(&_states[st.main_bucket]));
+                const auto maske = static_cast<size_t>(MOVEMASK_EPI8(CMPEQ_EPI8(vec, simd_empty)));
+                bucket = maske ? st.main_bucket + CTZ(maske) : find_empty_slot(st.main_bucket, st.main_bucket, 0);
+            }
+
+            set_states(bucket, st.fp);
+            new (_pairs + bucket) PairT(std::move(src_pair));
+            _num_filled++;
+            if (need_explicit_dtor())
+                old_pairs[st.src_bucket].~PairT();
         }
         if (old_pairs != nullptr)
             PairAllocTraits::deallocate(_alloc, old_pairs, block_pair_elems(old_buckets));
@@ -1076,7 +1093,7 @@ private:
 
     // Find the main_bucket with this key, or return a good empty main_bucket to place the key in.
     // In the later case, the main_bucket is expected to be filled.
-    template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
+    template <typename K> EMILIB2_INSERT_INLINE size_t find_or_allocate(const K& key, bool& bnew) noexcept {
         const auto required_buckets = static_cast<size_t>(static_cast<uint64_t>(_num_filled) * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);

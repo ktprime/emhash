@@ -386,7 +386,8 @@ public:
 
     explicit HashMap(size_type bucket = 2, float mlf = EMH_DEFAULT_LOAD_FACTOR) noexcept { init(bucket, mlf); }
 
-    HashMap(const HashMap& rhs) : _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
+    HashMap(const HashMap& rhs)
+        : _eq(rhs._eq), _alloc(PairAllocTraits::select_on_container_copy_construction(rhs._alloc)) {
         if (rhs.load_factor() > EMH_MIN_LOAD_FACTOR) {
             _pairs = alloc_bucket(rhs._num_buckets);
             clone(rhs);
@@ -421,6 +422,11 @@ public:
     HashMap& operator=(const HashMap& rhs) {
         if (this == &rhs)
             return *this;
+
+        // The copy constructor gets _eq through its member-init list; copy
+        // assignment must copy it here (clone() only handles the bucket data).
+        _eq = rhs._eq;
+
         if constexpr (PairAllocTraits::propagate_on_container_copy_assignment::value)
             _alloc = rhs._alloc;
 
@@ -469,6 +475,8 @@ public:
                 if (rhs._num_buckets > EMH_SMALL_SIZE)
                     _pairs = alloc_bucket(rhs._num_buckets);
             }
+            // clone() only moves the bucket data, and this path bypasses swap().
+            _eq = rhs._eq;
             clone(rhs);
             rhs.clear();
             return *this;
@@ -504,7 +512,8 @@ public:
 
     void clone(const HashMap& rhs) {
         _hasher = rhs._hasher;
-        //        _eq          = rhs._eq;
+        // _eq is copied by the callers: copy ctor (copy-construct, so EqT need
+        // not be copy-assignable) and copy assignment (assign).
         _num_buckets = rhs._num_buckets;
         _num_filled = rhs._num_filled;
         _mlf = rhs._mlf;
@@ -1261,7 +1270,10 @@ public:
             return;
 #endif
         if (load_factor() < min_factor) // safe guard
-            rehash(static_cast<uint64_t>(_num_filled) + 1);
+            // Size for the element count *at the configured load factor*: sizing
+            // for the count alone leaves load_factor() above max_load_factor(),
+            // so the next insertion would grow the table again immediately.
+            rehash((static_cast<uint64_t>(_num_filled) * _mlf >> 27) + 2);
     }
 
     /// Make room for this many elements

@@ -29,6 +29,7 @@ build_v/
 build_verify/
 vsbuild/
 bench/bin/
+bench/framework/build_single/
 .cache/
 build_log.txt
 
