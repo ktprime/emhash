@@ -1388,6 +1388,59 @@ WSL 上再用 clang 20.1.8 与 gcc 16.0.1 各测一遍（同一台机器，`-O3 
   若要非线性的 append-only map，应先把迭代改成按 value 槽位序（需要 slot→bucket
   反向存活信息），属于重设计而非探测微调。
 
+### AL. 已落地：`emihmap4` 三角前缀 + 尾部 key 步长（修复"按迭代序复制"的悬崖，2026-11-28）
+
+- 起点：`server_resutl.txt` 里 `bench_AccidentallyQuadratic`（10M int：随机插满 → 迭代 →
+  无 `reserve` 地 emplace 进第二张表）emilib4 27.68s，而 emhash7 1.53s、emilib1/2 2.1/1.9s。
+  最初假设是 8-bit overflow 计数器饱和；用审计 harness 直接读：`max counter=5, saturated=0,
+  nonzero=71545` → **假设证伪**，计数器从未饱和。
+- 真实机理（诊断插桩，1M int64，仅统计 `find_empty_slot_and_insert` 的探测组数）：
+  - `insert_random` avg 1.07 组、`copy_reserved`（先 reserve 再复制）avg 1.00 组；
+  - 但"迭代序复制 + 边增长" avg **40.46** 组，5M 时 **120.91** 组（max 786），耗时 7.55s。
+  根因不是"顺序插入"本身，而是**同 home 组的长串**：源表按组序遍历，目标表更小，所以
+  目标 home 只是源 home 的粗化，于是"该 home 的 key 成串到达"。三角探测（1,3,6,10…）
+  把整串压进一个连续块，串内第 k 个 key 必须跨过前 k−1 个 → 每串 O(run²)，run 随规模增长。
+- 试过并否决（均为 1M/5M 诊断 + 单 map A/B）：
+  - rehash 重插顺序乘法置换：5M 7.55s→约 7.3s，几乎无效（瓶颈在"用户驱动的插入串"，
+    不在 rehash 重插）；
+  - 三角序列按 key 旋转（`T_{k+s} − T_s`）：无效（仍是"慢速递增 + 局部"，块照样长）；
+  - 纯线性探测（步长 1）：5M **23.3s（更差）**——整串被压成一个环状连续块，
+    后续串只能绕行找洞；
+  - 有界 key 步长（1..63 组）：5M **90s（灾难）**——步长太小逃不出块；
+  - 步长从 home 派生（每 home 一次乘法）：修好了悬崖但每次查找 +3 指令，Ir +14.6%；
+  - **全表奇数 key 步长（double hashing）**：悬崖修得很好，但每次查找都付步长，
+    `find_hit` −14.7%、Ir +17%（与 §5-Z 的结论一致）。
+- 落地形态：`quadratic_prober::prefix = 16` 跳仍走三角步进（保住 home 邻域的局部性），
+  之后切到 `((hash >> 32) | 1)`——奇数保证遍历全表，高位与选 home 的位正交，
+  且对同一 home 串里的不同 key 不同，从而把串打散。关键是 **步长只在 `next()` 里、
+  且只在 `step_ > prefix` 时计算**，并把 `hash` 作为 `next()` 的第二个参数传入：
+  命中在 home 组（绝大多数）时执行的指令与 HEAD 完全一致，构造函数不多一个成员
+  （先试过"构造期算步长 / 存 home 成员"两版，前者 Ir +20%、后者 +14.6%）。
+- 实测（单 map 单 workload，交错 A/B，1M int64；A = HEAD，B = 本改动，正 delta = B 快）：
+
+  | workload | delta | 胜场 | pairs |
+  |---|---|---|---|
+  | insert | +0.44% | 3:5 | 8 |
+  | find_hit | −0.10% | 4:4 | 8 |
+  | find_miss | **+6.87%** | 3:5 | 8 |
+  | iterate | +1.76% | 3:5 | 8 |
+  | erase_all | **+5.02%** | 4:4 | 8 |
+  | insert_erase | −0.71% | 12:4 | 16 |
+  | churn | −0.35% | 4:4 | 8 |
+  | churn_find_miss | −0.45% | 4:4 | 8 |
+
+- 悬崖（诊断程序，int64）：复制 1M **0.163s**（HEAD 0.51s）、5M **0.859s**（HEAD 7.55s，
+  **8.8x**）、10M **1.754s**（mbench 同规模 HEAD 为 22~27.7s，**13x+**）；反序复制 5M
+  **0.786s**（HEAD 5.03s）。`insert_random`/`copy_reserved`/`find_miss` 与 HEAD 同一水平。
+- 指令数（callgrind，300k int64）：`insert_erase` 61,831,567 → 62,448,183（**+1.00%**，
+  Bc +0.42%）；`find_hit` 10,303,000 → 10,906,312（+5.85%）；`find_miss` 8,081,707 →
+  8,677,189（+7.37%）。多出的约 2 条/查找来自"`hash` 作为循环携带的活值传给 `next()`"，
+  **不是多探测**（同一批 A/B 里 `find_miss` 反而快 6.9%），所以 wall-clock 没有回归。
+- 正确性：`test_emihmap4` 全过（含"顺序 int 键"与"高负载 erase+reinsert"）；gcc 16 /
+  clang 20 × C++17/20 × SSE2/AVX2/AVX-512，`-Wall -Wextra -Wshadow -Wconversion(gcc) -Werror`
+  全干净；`-DEMILIB4_DOUBLE_HASH`（§5-Z 的 opt-in）签名同步为两参数后仍可编译运行；
+  ASan+UBSan 构建与运行干净。
+
 ---
 
 ## 6. 本仓库的落地顺序（按"收益/风险"）

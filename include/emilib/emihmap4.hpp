@@ -334,54 +334,68 @@ struct pow2_size_policy {
 };
 
 // ─── prober ───────────────────────────────────────────────────────────
-// Default: triangular number probing, step 1, 3, 6, 10, 15, 21...
+// Default: triangular hops (1, 3, 6, 10, ...) for the first `prefix` probes, then an odd,
+// key-derived stride.
 //
-// EMILIB4_DOUBLE_HASH: odd stride derived from the hash instead. Keys that share a
-// home group spread over different groups, so churn states stop probing earlier
-// (measured on 100k int64: churn miss 1.65 -> 1.37 groups, churn_find_miss +10~14%,
-// insert_erase +6.5%). The stride is loop-invariant, so the compiler hoists it out of
-// the probe loop and every lookup pays 2-3 instructions even when it ends in the home
-// group (find_hit -4~-9%, Ir +10%). Opt in only for churn-heavy, negative-query-heavy
-// workloads; the default stays triangular.
+// The tail must not stay triangular. Quadratic probing is only pseudo-random, and a map
+// filled by walking another map in iteration (group) order presents long runs of keys that
+// share one home group; the triangular walk then packs every run into one growing block and
+// each new key of the run has to cross it, so a copy costs O(run^2). Measured on int64,
+// copying by iteration while the target grows: 1M 0.51s / 5M 7.55s (avg 40 -> 121 groups
+// probed per insert), versus 0.16s / 0.86s with the stride below. A constant table-wide
+// stride does not help either — it keeps (pos mod stride) invariant, so the spills of a
+// run still collapse into one residue class.
+//
+// The stride is computed inside next() and only once a probe leaves the prefix, so the
+// common cases (found in the home group, or stopped by the overflow flag) execute exactly
+// the same instructions as before.
+//
+// EMILIB4_DOUBLE_HASH: key-derived stride from the first hop instead. It stops churn
+// misses slightly earlier but adds instructions to *every* lookup, even one that ends in
+// the home group (find_hit -4~-9%, Ir +10%), so it stays opt-in.
+// Bits 32.. are independent of the high bits that pick the home group for any realistic
+// table, and an odd stride is coprime with the power-of-two size.
+EMH_INLINE size_t prober_stride_of(size_t hash) noexcept {
+    if constexpr (sizeof(size_t) >= 8)
+        return (hash >> 32) | 1;
+    else
+        return (hash ^ (hash >> 16)) | 1;
+}
 
 #if defined(EMILIB4_DOUBLE_HASH)
 struct quadratic_prober {
-    quadratic_prober(size_t pos, size_t hash) : pos_(pos), stride_(stride_of(hash)) {}
+    quadratic_prober(size_t pos, size_t hash) : pos_(pos), stride_(prober_stride_of(hash)) {}
 
     size_t get() const { return pos_; }
     size_t length() const { return step_ + 1; }
 
-    bool next(size_t mask) {
+    bool next(size_t mask, size_t) {
         ++step_;
         pos_ = (pos_ + stride_) & mask;
         return step_ <= mask;
     }
 
 private:
-    // Bits 32.. are independent of the high bits that pick the home group for any
-    // realistic table, and an odd stride is coprime with the power-of-two size.
-    static size_t stride_of(size_t hash) noexcept {
-        if constexpr (sizeof(size_t) >= 8)
-            return (hash >> 32) | 1;
-        else
-            return (hash ^ (hash >> 16)) | 1;
-    }
-
     size_t pos_;
     size_t stride_;
     size_t step_ = 0;
 };
 #else
 struct quadratic_prober {
-    // hash is unused; the parameter keeps the call sites identical under both variants.
+    // Probes spent on the triangular walk before switching to the key-derived stride.
+    static constexpr size_t prefix = 16;
+
     quadratic_prober(size_t pos, size_t) : pos_(pos) {}
 
     size_t get() const { return pos_; }
     size_t length() const { return step_ + 1; }
 
-    bool next(size_t mask) {
+    bool next(size_t mask, size_t hash) {
         step_ += 1;
-        pos_ = (pos_ + step_) & mask;
+        if (EMH_LIKELY(step_ <= prefix))
+            pos_ = (pos_ + step_) & mask;
+        else
+            pos_ = (pos_ + prober_stride_of(hash)) & mask;
         return step_ <= mask;
     }
 
@@ -770,7 +784,7 @@ public:
             }
             if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return end();
-        } while (EMH_LIKELY(pb.next(_groups_size_mask)));
+        } while (EMH_LIKELY(pb.next(_groups_size_mask, hash)));
         return end();
     }
     template <typename K> EMH_INLINE const_iterator find(const K& key) const noexcept {
@@ -796,7 +810,7 @@ public:
             }
             if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return cend();
-        } while (EMH_LIKELY(pb.next(_groups_size_mask)));
+        } while (EMH_LIKELY(pb.next(_groups_size_mask, hash)));
         return cend();
     }
     template <typename K = KeyT> EMH_INLINE bool contains(const K& key) const noexcept {
@@ -819,7 +833,7 @@ public:
             }
             if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return false;
-        } while (EMH_LIKELY(pb.next(_groups_size_mask)));
+        } while (EMH_LIKELY(pb.next(_groups_size_mask, hash)));
         return false;
     }
     template <typename K = KeyT> size_t count(const K& key) const noexcept { return contains(key); }
@@ -948,7 +962,7 @@ public:
                 }
                 if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                     break;
-            } while (EMH_LIKELY(pb.next(_groups_size_mask)));
+            } while (EMH_LIKELY(pb.next(_groups_size_mask, hash)));
         }
         // Key not found - insert
         if (EMH_UNLIKELY(_num_filled >= _max_load)) {
@@ -986,7 +1000,7 @@ public:
                 }
                 if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                     break;
-            } while (EMH_LIKELY(pb.next(_groups_size_mask)));
+            } while (EMH_LIKELY(pb.next(_groups_size_mask, hash)));
         }
         if (EMH_UNLIKELY(_num_filled >= _max_load)) {
             auto loc = unchecked_emplace_with_rehash(hash, std::move(key), ValueT());
@@ -1255,7 +1269,7 @@ private:
             }
             if (EMH_LIKELY(is_not_overflowed(pos, hash)))
                 return {};
-        } while (EMH_LIKELY(pb.next(_groups_size_mask)));
+        } while (EMH_LIKELY(pb.next(_groups_size_mask, hash)));
         return {};
     }
 
@@ -1263,7 +1277,7 @@ private:
 
     EMH_INLINE locator find_empty_slot_and_insert(size_t pos0, size_t hash) {
         assert(_pairs != nullptr);
-        for (quadratic_prober pb(pos0, hash);; pb.next(_groups_size_mask)) {
+        for (quadratic_prober pb(pos0, hash);; pb.next(_groups_size_mask, hash)) {
             auto pos = pb.get();
             auto* pg = _groups + pos;
             auto mask = pg->match_available();
@@ -1303,7 +1317,7 @@ private:
                 if (--count == 0)
                     refresh_overflow_flag(pos);
             }
-            if (!pb.next(_groups_size_mask))
+            if (!pb.next(_groups_size_mask, hash))
                 break;
         }
 
