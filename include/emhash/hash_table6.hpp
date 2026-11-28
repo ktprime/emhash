@@ -1385,7 +1385,7 @@ private:
         auto next_bucket = EMH_ADDR(_pairs, bucket);
 
         if (next_bucket == bucket * 2) {
-            const auto eqkey = _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket));
+            const auto eqkey = eq_key(key, EMH_KEY(_pairs, bucket));
 #if EMH_SAFE_HASH
             return eqkey ? (_num_main--, bucket) : empty_bucket;
 #else
@@ -1393,7 +1393,7 @@ private:
 #endif
         } else if (next_bucket % 2 > 0)
             return empty_bucket;
-        else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket))) {
+        else if (eq_key(key, EMH_KEY(_pairs, bucket))) {
             next_bucket /= 2;
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
             EMH_PKV(_pairs, bucket) = std::move(EMH_PKV(_pairs, next_bucket));
@@ -1405,7 +1405,7 @@ private:
         auto prev_bucket = bucket;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
+            if (eq_key(key, EMH_KEY(_pairs, next_bucket))) {
                 EMH_ADDR(_pairs, prev_bucket) =
                     (nbucket == next_bucket ? prev_bucket : nbucket) * 2 + (1 - (prev_bucket == bucket));
                 return next_bucket;
@@ -1427,7 +1427,7 @@ private:
         auto next_bucket = EMH_ADDR(_pairs, bucket);
 
         if (next_bucket == bucket * 2) { // only one main bucket
-            const auto eqkey = _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket));
+            const auto eqkey = eq_key(key, EMH_KEY(_pairs, bucket));
 #if EMH_SAFE_HASH
             return eqkey ? (_num_main--, bucket) : empty_bucket;
 #else
@@ -1441,7 +1441,7 @@ private:
         next_bucket = bucket;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
+            if (eq_key(key, EMH_KEY(_pairs, next_bucket))) {
                 find_bucket = next_bucket;
                 if (nbucket == next_bucket) {
                     EMH_ADDR(_pairs, prev_bucket) = prev_bucket * 2 + 1 - (prev_bucket == bucket);
@@ -1498,20 +1498,20 @@ private:
 #ifndef EMH_FIND_HIT
         if (next_bucket % 2 > 0)
             return _num_buckets;
-        else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
+        else if (eq_key(key, EMH_KEY(_pairs, bucket)))
             return bucket;
         else if (next_bucket == bucket * 2)
             return _num_buckets;
 #else
         if constexpr (std::is_integral<K>::value) {
-            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
+            if (eq_key(key, EMH_KEY(_pairs, bucket)))
                 return bucket;
             else if (next_bucket % 2 > 0)
                 return _num_buckets;
         } else {
             if (next_bucket % 2 > 0)
                 return _num_buckets;
-            else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
+            else if (eq_key(key, EMH_KEY(_pairs, bucket)))
                 return bucket;
             else if (next_bucket == bucket * 2)
                 return _num_buckets;
@@ -1520,7 +1520,7 @@ private:
 
         next_bucket /= 2;
         while (true) {
-            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket)))
+            if (eq_key(key, EMH_KEY(_pairs, next_bucket)))
                 return next_bucket;
 
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
@@ -1574,10 +1574,10 @@ private:
 #if EMH_SAFE_HASH
         if (static_cast<int>(next_bucket) < 0)
             return _num_main++, bucket * 2;
-        else if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
+        else if (eq_key(key, EMH_KEY(_pairs, bucket)))
             return bucket * 2;
 #else
-        if (static_cast<int>(next_bucket) < 0 || _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket)))
+        if (static_cast<int>(next_bucket) < 0 || eq_key(key, EMH_KEY(_pairs, bucket)))
             return bucket * 2;
 #endif
 
@@ -1591,7 +1591,7 @@ private:
         next_bucket /= 2;
         // find next linked bucket and check key
         while (true) {
-            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
+            if (eq_key(key, EMH_KEY(_pairs, next_bucket))) {
 #if EMH_LRU_SET
                 EMH_PKV(_pairs, next_bucket).swap(EMH_PKV(_pairs, bucket));
                 return bucket * 2;
@@ -1769,16 +1769,37 @@ private:
     static uint64_t mix_hash(uint64_t h) { return h; }
 #endif
 
+    // Homogeneous lookups (K == KeyT) must not materialise a KeyT copy: for
+    // non-trivial keys (std::string, structs) `static_cast<KeyT>(key)` is an
+    // identity cast that still runs a copy constructor -- a heap allocation per
+    // hash and per key comparison for std::string.  Heterogeneous lookups keep
+    // the original conversion.
+    template <typename K> EMH_INLINE bool eq_key(const K& key, const KeyT& stored) const {
+        if constexpr (std::is_same<std::decay_t<K>, KeyT>::value) {
+            return _eq(key, stored);
+        } else {
+            return _eq(static_cast<KeyT>(key), stored);
+        }
+    }
+
+    template <typename K, typename H> EMH_INLINE auto hash_of(const H& hash_fn, const K& key) const {
+        if constexpr (std::is_same<std::decay_t<K>, KeyT>::value) {
+            return hash_fn(key);
+        } else {
+            return hash_fn(static_cast<KeyT>(key));
+        }
+    }
+
     template <typename K> EMH_INLINE size_type hash_key(const K& key) const {
         if constexpr (std::is_integral<K>::value) {
 #if EMH_INT_HASH
             return static_cast<size_type>(hash64(key));
 #elif EMH_SAFE_HASH
-            return static_cast<size_type>(_hash_inter == 0 ? mix_hash(_hasher(static_cast<KeyT>(key))) : hash64(key));
+            return static_cast<size_type>(_hash_inter == 0 ? mix_hash(hash_of(_hasher, key)) : hash64(key));
 #elif EMH_IDENTITY_HASH
             return static_cast<size_type>(key + (key >> 24));
 #else
-            return static_cast<size_type>(mix_hash(_hasher(static_cast<KeyT>(key))));
+            return static_cast<size_type>(mix_hash(hash_of(_hasher, key)));
 #endif
         } else if constexpr (std::is_same<K, std::string>::value) {
             EMH_MSAN_UNPOISON(&key, sizeof(key));
@@ -1786,10 +1807,10 @@ private:
 #if EMH_WY_HASH
             return static_cast<size_type>(wyhash(key.data(), key.size(), 0));
 #else
-            return static_cast<size_type>(mix_hash(_hasher(static_cast<KeyT>(key))));
+            return static_cast<size_type>(mix_hash(hash_of(_hasher, key)));
 #endif
         } else {
-            return static_cast<size_type>(mix_hash(_hasher(static_cast<KeyT>(key))));
+            return static_cast<size_type>(mix_hash(hash_of(_hasher, key)));
         }
     }
 

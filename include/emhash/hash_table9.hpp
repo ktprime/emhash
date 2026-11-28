@@ -940,11 +940,31 @@ public:
 private:
     // ------------------------------------------------------------------
     // hashing
+    // Homogeneous lookups (K == KeyT, i.e. the normal find/insert path) must not
+    // materialise a KeyT temporary.  `static_cast<KeyT>(key)` reads like an
+    // identity cast there, but it still constructs a copy: for std::string keys
+    // that is a heap allocation per hash and per key comparison, which measured
+    // ~3.5x slower finds than ankerl's dense map at 100k keys.  Heterogeneous
+    // lookups keep the original conversion.
+    template <typename K, typename H> [[nodiscard]] static EMH9_FORCEINLINE uint64_t hash_of(const H& hash_fn, const K& key) {
+        if constexpr (std::is_same_v<std::decay_t<K>, KeyT>)
+            return static_cast<uint64_t>(hash_fn(key));
+        else
+            return static_cast<uint64_t>(hash_fn(static_cast<KeyT>(key)));
+    }
+
+    template <typename K> [[nodiscard]] EMH9_FORCEINLINE bool eq_key(const KeyT& stored, const K& key) const {
+        if constexpr (std::is_same_v<std::decay_t<K>, KeyT>)
+            return _key_equal(stored, key);
+        else
+            return _key_equal(stored, static_cast<KeyT>(key));
+    }
+
     // ------------------------------------------------------------------
     // Hash with an explicit hasher, so a rebuild loop can hold it in a local instead of
     // reloading the member on every element (the loop's stores can alias `_hasher`).
     template <typename K> [[nodiscard]] static uint64_t hash_key_with(const HashT& hash_fn, const K& key) {
-        const uint64_t h = static_cast<uint64_t>(hash_fn(static_cast<KeyT>(key)));
+        const uint64_t h = hash_of(hash_fn, key);
         // A murmur3-style finalizer costs two multiplies and buys the property
         // the index depends on: every key bit reaches every hash bit.  Without
         // it, keys that differ only in bits 16..31 (multiples of 65536, say)
@@ -1314,7 +1334,7 @@ private:
             const uint32_t i = detail::ctz32(mask);
             mask &= mask - 1;
             const size_type idx = hb.index[i];
-            if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
+            if (EMH_LIKELY(eq_key(_pairs[idx].first, key))) {
                 group_out = home;
                 slot_out = i;
                 return idx;
@@ -1338,7 +1358,7 @@ private:
                 const uint32_t i = detail::ctz32(mask);
                 mask &= mask - 1;
                 const size_type idx = b.index[i];
-                if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
+                if (EMH_LIKELY(eq_key(_pairs[idx].first, key))) {
                     group_out = g;
                     slot_out = i;
                     return idx;
@@ -1367,7 +1387,7 @@ private:
             const uint32_t i = detail::ctz32(mask);
             mask &= mask - 1;
             const size_type idx = hb.index[i];
-            if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
+            if (EMH_LIKELY(eq_key(_pairs[idx].first, key))) {
                 group_out = home;
                 slot_out = i;
                 return true;
@@ -1389,7 +1409,7 @@ private:
                 const uint32_t i = detail::ctz32(mask);
                 mask &= mask - 1;
                 const size_type idx = b.index[i];
-                if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
+                if (EMH_LIKELY(eq_key(_pairs[idx].first, key))) {
                     group_out = g;
                     slot_out = i;
                     return true;
@@ -1496,7 +1516,7 @@ private:
             const uint32_t i = detail::ctz32(mask);
             mask &= mask - 1;
             const size_type idx = hb.index[i];
-            if (EMH_LIKELY(_key_equal(_pairs[idx].first, static_cast<KeyT>(key)))) {
+            if (EMH_LIKELY(eq_key(_pairs[idx].first, key))) {
                 if constexpr (WithPos)
                     return result_type(iterator(_pairs + idx, home, i), false);
                 else
@@ -1548,7 +1568,7 @@ private:
                 const uint32_t i = detail::ctz32(mask);
                 mask &= mask - 1;
                 const size_type idx = b.index[i];
-                if (_key_equal(_pairs[idx].first, static_cast<KeyT>(key))) {
+                if (eq_key(_pairs[idx].first, key)) {
 #if EMH9_HOME_RELOCATE
                     if (g != home) {
                         const uint32_t lane = relocate_home(home, g, i);

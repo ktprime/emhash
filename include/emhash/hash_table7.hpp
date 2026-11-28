@@ -1457,7 +1457,7 @@ private:
             return INACTIVE;
 
         auto next_bucket = EMH_BUCKET(_pairs, bucket);
-        const auto eqkey = _eq(static_cast<KeyT>(key), EMH_KEY(_pairs, bucket));
+        const auto eqkey = eq_key(key, EMH_KEY(_pairs, bucket));
         if (eqkey) {
             if (next_bucket == bucket)
                 return bucket;
@@ -1479,7 +1479,7 @@ private:
         auto prev_bucket = bucket;
         while (true) {
             const auto nbucket = EMH_BUCKET(_pairs, next_bucket);
-            if (_eq(static_cast<KeyT>(key), EMH_KEY(_pairs, next_bucket))) {
+            if (eq_key(key, EMH_KEY(_pairs, next_bucket))) {
                 EMH_BUCKET(_pairs, prev_bucket) = (nbucket == next_bucket) ? prev_bucket : nbucket;
                 return next_bucket;
             }
@@ -1763,6 +1763,19 @@ private:
 #endif
     }
 #endif
+
+    // Homogeneous lookups (K == KeyT) must not materialise a KeyT copy: for
+    // non-trivial keys (std::string, structs) `static_cast<KeyT>(key)` is an
+    // identity cast that still runs a copy constructor -- a heap allocation per
+    // key comparison for std::string.  Heterogeneous lookups keep the original
+    // conversion.
+    template <typename K> EMH_INLINE bool eq_key(const K& key, const KeyT& stored) const {
+        if constexpr (std::is_same<std::decay_t<K>, KeyT>::value) {
+            return _eq(key, stored);
+        } else {
+            return _eq(static_cast<KeyT>(key), stored);
+        }
+    }
 
     template <typename K> EMH_INLINE size_type hash_key(const K& key) const {
         if constexpr (std::is_integral<K>::value) {
