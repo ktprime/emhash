@@ -1349,6 +1349,45 @@ WSL 上再用 clang 20.1.8 与 gcc 16.0.1 各测一遍（同一台机器，`-O3 
 
 
 
+### AK. 实测否决：`emihmap1d` 的组线性探测改为三角跳探（2026-11-28）
+
+- 现状：emihmap1d 是唯一 **纯线性组扫描** 的 map（`next_bucket = (next_bucket +
+  simd_bytes) & _mask`，见 `find_filled_bucket` / `probe_empty` / `find_or_allocate`
+  三处），无任何探测界元数据，靠"窗内首个 empty 截断指纹 mask"保证正确性。
+  它的 `_slots[]` 间接层使探测顺序本来可以任意，所以看起来最适合去线性化。
+- 尝试：复用 `emihmap1` 的跳探方案——前 7 跳为三角组偏移（1,3,6,10,15,21,28 组），
+  之后用 `((_num_buckets/8/simd_bytes)|1)*simd_bytes` 的奇数**组**步长；探测界存进每组
+  状态字最后一个字节（可用槽 16→15，`slot_size/group_index/group_bmask`），255 表示饱和、
+  退化为"探到 empty 为止"。同时保留"窗内首个 empty 截断"以保证正确性，单组表
+  （`_num_buckets <= simd_bytes`）强制从槽 0 开始，避免绕回后落点早于起始槽。
+- 正确性：churn/erase/reinsert/iterate 计数/copy 对拍全部通过（两版同 harness）。
+- 实测（单 map 专用 harness，ab.sh 6 对 × 3 reps 取最小，200k int64；A=线性基线，
+  B=三角跳探，负 delta 表示 A 更快）：
+
+  | workload | A (ns/elem) | B (ns/elem) | 胜场 | delta |
+  |---|---|---|---|---|
+  | insert | 140.6 | 131.8 | 1:5 | B +6.75% |
+  | find_hit | 15.4 | 15.9 | 2:4 | −2.92%（均值与胜场矛盾→噪声） |
+  | find_miss | 20.2 | 21.4 | 3:3 | A 快 5.35% |
+  | **iterate** | **8.5** | **10.2** | **4:2** | **A 快 16.32%** |
+  | erase_all | 19.3 | 18.4 | 3:3 | 噪声 |
+  | insert_erase | 48.9 | 49.8 | 3:3 | 噪声 |
+  | churn | 162.4 | 160.5 | 3:3 | 噪声 |
+
+  单次冒烟更差（iterate +114%、find_miss +12%、erase_all +16.5%、insert_erase
+  +14.1%、churn +8.0%），也说明本机 wall-clock 噪声仍偏大，结论只取交错 A/B。
+- 根因：
+  1. **迭代/重哈希的价值局部性依赖桶序与 value 槽位序一致**。emihmap1d 迭代读
+     `_values[_slots[bucket]]`；线性组扫描时两者基本同步（同窗口的槽位相邻分配），
+     跳探打散桶序后，迭代退化为对 ~3.2MB values 数组的随机 gather。
+  2. **miss 的"首个 empty"距离被拉长**：跳探按组跳跃，遇到 empty 的平均步数变大。
+  3. **探测界粒度不匹配**：一个 15 槽组共享一个 bound，它是该组 ~15 个 key 的最大
+     偏移，起不到 emihmap1（15 槽组也是共享，但其探测顺序本身按窗口连续）那样的截断作用。
+- 判定：**否决并回退**。emihmap1d 的探测顺序与 append-only 迭代布局强耦合，
+  去线性化的收益（insert +6.8%）不足以抵消 iterate/find_miss 的系统性退化。
+  若要非线性的 append-only map，应先把迭代改成按 value 槽位序（需要 slot→bucket
+  反向存活信息），属于重设计而非探测微调。
+
 ---
 
 ## 6. 本仓库的落地顺序（按"收益/风险"）
