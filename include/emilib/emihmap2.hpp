@@ -1194,9 +1194,9 @@ private:
     }
 
 private:
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _alloc;
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
     int8_t* _states = nullptr;
     uint8_t* _offset = nullptr;
     PairT* _pairs = nullptr;

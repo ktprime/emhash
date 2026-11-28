@@ -7,7 +7,7 @@
 #sudo apt install libc++abi-12-dev libstdc++-dev-12
 #endif
 
-CXXFLAGS =-O3 -DNDEBUG=1 -Wextra -Wno-unused-parameter -march=native -I../include -I../thirdparty
+CXXFLAGS =-O2 -DNDEBUG=1 -Wextra -Wno-unused-parameter -march=native -I../include -I../thirdparty
 #-march=armv8.6-a -fpermissive
 #-I/usr/local/include
 
@@ -81,7 +81,7 @@ endif
 ifneq ($(std),)
 CXXFLAGS += -std=c++$(std)
 else
-CXXFLAGS += -std=c++23
+CXXFLAGS += -std=c++20
 endif
 
 ifneq ($(check),)

@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "emhash/config.hpp"
+#include "config.h"
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
@@ -1592,9 +1592,12 @@ private:
 
     // ─── data members ─────────────────────────────────────────────────
 
-    detail::ebo<HashT, 0> _hasher_base;
-    detail::ebo<EqT, 1> _eq_base;
-    detail::ebo<PairAlloc, 2> _alloc_base; // EBO: zero-size for empty allocators
+    // EBO wrappers: [[no_unique_address]] makes an empty hasher/eq/allocator zero-size even
+    // as a member (the ebo base alone only helps when the wrapper itself is a base class),
+    // so the three empties stop forcing 8 bytes of padding before _groups.
+    EMH_NO_UNIQUE_ADDRESS detail::ebo<HashT, 0> _hasher_base;
+    EMH_NO_UNIQUE_ADDRESS detail::ebo<EqT, 1> _eq_base;
+    EMH_NO_UNIQUE_ADDRESS detail::ebo<PairAlloc, 2> _alloc_base; // EBO: zero-size for empty allocators
 
     group15* _groups = dummy_groups(); // derived pointer into _pairs allocation
     PairT* _pairs = nullptr;           // base allocation pointer

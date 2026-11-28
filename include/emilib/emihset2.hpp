@@ -26,7 +26,7 @@
 
 #pragma once
 
-#include "emhash/config.hpp"
+#include "config.h"
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
@@ -854,8 +854,10 @@ private:
     };
 #pragma GCC diagnostic pop
 
-    HashT _hasher;
-    EqT _eq;
+    // Empty functors share their byte (and the struct's tail padding) via
+    // [[no_unique_address]], so they do not push the pointers past 8 bytes of padding.
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
     uint8_t* _states = nullptr;
     KeyT* _keys = nullptr;
     size_t _num_buckets = 0;

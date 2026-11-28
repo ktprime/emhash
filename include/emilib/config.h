@@ -44,7 +44,7 @@
 // fingerprint policies (hash % 253, Fibonacci hash of the raw key). Only
 // global-scope code is shared from here.
 
-#include "emhash/config.hpp"
+// emilib intentionally does not include anything from emhash/: the two trees are independent.
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
@@ -88,6 +88,62 @@
 #define EMH_RESTRICT __restrict
 #else
 #define EMH_RESTRICT
+#endif
+
+// Force inline. emilib must stay self-contained (it may not include emhash/config.hpp), so
+// the few macros its containers share with emhash are defined here as well, behind #ifndef
+// so a translation unit that also uses emhash keeps a single definition.
+#ifndef EMH_INLINE
+#if defined(__GNUC__) || defined(__clang__)
+#define EMH_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define EMH_INLINE __forceinline
+#else
+#define EMH_INLINE inline
+#endif
+#endif
+
+// Assume the condition holds (used on hot paths after a load the compiler cannot see).
+#ifndef EMH_ASSUME
+#if defined(__GNUC__) || defined(__clang__)
+#define EMH_ASSUME(cond) (static_cast<void>(!(cond) ? __builtin_unreachable() : (void)0))
+#elif defined(_MSC_VER)
+#define EMH_ASSUME(cond) __assume(cond)
+#else
+#define EMH_ASSUME(cond) ((void)0)
+#endif
+#endif
+
+// MemorySanitizer: mark freshly allocated / written storage as initialized.
+#ifndef EMH_MSAN_UNPOISON
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer)
+#include <sanitizer/msan_interface.h>
+#define EMH_MSAN_UNPOISON(p, n) __msan_unpoison(p, n)
+#else
+#define EMH_MSAN_UNPOISON(p, n) ((void)0)
+#endif
+#elif defined(__SANITIZE_MEMORY__)
+#include <sanitizer/msan_interface.h>
+#define EMH_MSAN_UNPOISON(p, n) __msan_unpoison(p, n)
+#else
+#define EMH_MSAN_UNPOISON(p, n) ((void)0)
+#endif
+#endif
+
+// [[no_unique_address]] lets an empty hasher/comparator/allocator member share the byte it
+// would otherwise occupy (and, when placed after the real fields, the struct's own tail
+// padding) instead of pushing the pointers past 8 bytes of padding. GCC and Clang honor the
+// standard attribute in C++17 too; MSVC only accepts it with /std:c++20, so it is gated on
+// the feature-test macro there to avoid C5051 under -Werror.
+#ifndef EMH_NO_UNIQUE_ADDRESS
+#if defined(__cpp_no_unique_address) && __cpp_no_unique_address >= 201803L
+#define EMH_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#elif (defined(__GNUC__) || defined(__clang__)) && __cplusplus >= 201703L
+#define EMH_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#else
+#define EMH_NO_UNIQUE_ADDRESS
+#endif
 #endif
 
 // Count trailing zeros of a (non-zero) SIMD match mask.

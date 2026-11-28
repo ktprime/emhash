@@ -1817,9 +1817,9 @@ private:
     size_type _mask;
     size_type _num_filled;
     uint32_t _mlf;
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _alloc;
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
 
 #if EMH_SAFE_HASH
     size_type _num_main;

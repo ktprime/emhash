@@ -1808,9 +1808,9 @@ private:
     size_type _num_buckets;
     size_type _num_filled;
     uint32_t _mlf;
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _alloc;
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
 
 private:
     static constexpr uint32_t BIT_PACK = sizeof(uint64_t);

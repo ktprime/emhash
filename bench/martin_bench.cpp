@@ -63,11 +63,12 @@ class ResultOutput {
 public:
     static void output_text(const BenchResult& r) {
         if (r.time_stddev > 0) {
-            printf("    %20s: %.3f s (median=%.3f stddev=%.3f) ops=%zu throughput=%.2f M/s\n", r.hash_map_name.c_str(),
-                   r.time_sec, r.time_median, r.time_stddev, r.operations, r.throughput / 1000000.0);
-        } else {
-            printf("    %20s: %.3f s ops=%zu throughput=%.2f M/s\n", r.hash_map_name.c_str(), r.time_sec, r.operations,
+            printf("    %20s: %8.3f s (median=%8.3f stddev=%8.3f) ops=%zu throughput=%7.2f M/s\n",
+                   r.hash_map_name.c_str(), r.time_sec, r.time_median, r.time_stddev, r.operations,
                    r.throughput / 1000000.0);
+        } else {
+            printf("    %20s: %8.3f s ops=%zu throughput=%7.2f M/s\n", r.hash_map_name.c_str(), r.time_sec,
+                   r.operations, r.throughput / 1000000.0);
         }
     }
 
@@ -448,7 +449,7 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                 for (size_t n = 0; n < maxn; ++n)
                     hmap[static_cast<int>(rng())];
 
-                printf("\t\t        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
+                printf("\t\t        (lf=%.2f) insert %7.2f", hmap.load_factor(), now2sec() - ts);
                 fflush(stdout);
 
                 // Record result for CSV/JSON output
@@ -470,7 +471,7 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                 MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn * 9 / 10; ++n)
                     hmap.erase(static_cast<int>(rng()));
-                printf(", remove 90%% %.2f", now2sec() - ts);
+                printf(", remove 90%% %7.2f", now2sec() - ts);
                 fflush(stdout);
                 // erase attempts target the same key stream as inserts;
                 // duplicates in the stream leave a small remainder.
@@ -495,7 +496,7 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                 MRNG rng(RNDI + 1);
                 for (size_t n = 0; n < maxn; ++n)
                     (void)hmap.emplace(static_cast<int>(rng()), 0);
-                printf(", reinsert %.2f", now2sec() - ts);
+                printf(", reinsert %7.2f", now2sec() - ts);
 
                 // Same RNG stream for every map, so the final size is
                 // deterministic; a map that mis-inserts will diverge here.
@@ -517,10 +518,10 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
             {
                 auto ts = now2sec();
                 hmap.clear();
-                printf(", clear %.3f", now2sec() - ts);
+                printf(", clear %8.3f", now2sec() - ts);
             }
         }
-        printf(" %dM, total %2.2f s\n", int(maxn / 1000000), now2sec() - nows);
+        printf(" %dM, total %7.2f s\n", int(maxn / 1000000), now2sec() - nows);
         maxn *= 10;
     }
 }
@@ -559,7 +560,7 @@ template <typename HMAP, bool unique = false> static void bench_AccidentallyQuad
     }
     verify(hmap.size() == map2.size(), "AccidentallyQuadratic copy size");
 #endif
-    printf(" time %2.2f s\n", now2sec() - nows);
+    printf(" time %7.2f s\n", now2sec() - nows);
     {
         BenchResult r;
         r.test_name = "AccidentallyQuadratic";
@@ -596,12 +597,12 @@ template <typename HMAP> static void bench_InsertEraseBegin() {
             (void)hmap.emplace((int64_t)rng(), 0);
         }
 
-        printf("\n\t\t        %.2f loadf = %.2f mapsize = %d time %2.2f s", ((double)max_n / 1000000.0),
+        printf("\n\t\t        %.2f loadf = %.2f mapsize = %d time %7.2f s", ((double)max_n / 1000000.0),
                hmap.load_factor(), (int)hmap.size(), now2sec() - starts);
         max_n *= 5;
     }
 
-    printf(", total %2.2f s\n", now2sec() - nows);
+    printf(", total %7.2f s\n", now2sec() - nows);
     {
         BenchResult r;
         r.test_name = "InsertEraseBegin";
@@ -655,12 +656,12 @@ template <typename HMAP> static void bench_InsertEraseContinue() {
             (void)hmap.emplace((int)rng(), 0);
         }
 
-        printf("\n\t\t        %.2f loadf = %.2f mapsize = %d time %.2f", ((double)max_n / 1000000.0),
+        printf("\n\t\t        %.2f loadf = %.2f mapsize = %d time %7.2f", ((double)max_n / 1000000.0),
                hmap.load_factor(), (int)hmap.size(), now2sec() - starts);
         max_n *= 7;
     }
 
-    printf(", total %2.2f s\n", now2sec() - nows);
+    printf(", total %7.2f s\n", now2sec() - nows);
     {
         BenchResult r;
         r.test_name = "InsertEraseContinue";
@@ -784,7 +785,7 @@ template <typename HMAP> static void bench_randomInsertErase(HMAP& hmap) {
         erase2 = now2sec() - nows;
     }
 
-    printf(" erase time %.2f + %.2f, total %2.2f s\n", erase1, erase2, erase1 + erase2);
+    printf(" erase time %7.2f + %7.2f, total %7.2f s\n", erase1, erase2, erase1 + erase2);
     {
         BenchResult r;
         r.test_name = "randomInsertErase";
@@ -841,7 +842,7 @@ template <typename HMAP> static void bench_CreateInsert() {
     verify(res != 0, "CreateInsert res");
     check_consistent("CreateInsert size sum", (uint64_t)res);
     auto erase2 = now2sec() - nows;
-    printf(" CreateInsert/InsertCreate %2.2f + %2.2f, total %2.2f s\n", erase1, erase2, erase1 + erase2);
+    printf(" CreateInsert/InsertCreate %7.2f + %7.2f, total %7.2f s\n", erase1, erase2, erase1 + erase2);
     {
         BenchResult r;
         r.test_name = "CreateInsert";
@@ -925,7 +926,7 @@ template <typename HMAP> static void bench_udb3() {
         }
     }
 
-    printf(" z[%d] = %d loadf = %.2f, total %2.2f s\n", is_del, (int)z, h.load_factor(), now2sec() - nows);
+    printf(" z[%d] = %d loadf = %.2f, total %7.2f s\n", is_del, (int)z, h.load_factor(), now2sec() - nows);
     verify(z > 0, "udb3 z > 0");
     check_consistent("udb3 z", z);
     {
@@ -1007,7 +1008,7 @@ template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
     }
     // #endif
 
-    printf(" time %2.2f s\n", now2sec() - nows);
+    printf(" time %7.2f s\n", now2sec() - nows);
     {
         BenchResult r;
         r.test_name = "randomDistinct2";
@@ -1088,7 +1089,7 @@ template <typename HMAP> static void bench_knucleotide() {
     ans += kcount<HMAP>(poly, "GGTATT");
     ans += kcount<HMAP>(poly, "GGTA");
     ans += kcount<HMAP>(poly, "GGT");
-    printf(" ans = %d time %2.2f s\n", (int)ans, now2sec() - nows);
+    printf(" ans = %d time %7.2f s\n", (int)ans, now2sec() - nows);
     verify(ans > 0, "knucleotide ans > 0");
     check_consistent("knucleotide ans", (uint64_t)ans);
     {
@@ -1211,7 +1212,7 @@ template <typename HMAP> static void bench_GameOfLife() {
         game_of_life("Bunnies", 17332, 1744, hmap,
                      {{0, 0}, {6, 0}, {2, 1}, {6, 1}, {2, 2}, {5, 2}, {7, 2}, {1, 3}, {3, 3}});
 
-        printf(" stastabilizing = %.2f", now2sec() - stastabilizing);
+        printf(" stastabilizing = %7.2f", now2sec() - stastabilizing);
     }
 
     auto grow = now2sec();
@@ -1241,7 +1242,7 @@ template <typename HMAP> static void bench_GameOfLife() {
                      });
     }
 
-    printf(", grow = %.2f, total %2.2f s\n", now2sec() - grow, now2sec() - stastabilizing);
+    printf(", grow = %7.2f, total %7.2f s\n", now2sec() - grow, now2sec() - stastabilizing);
     {
         BenchResult r;
         r.test_name = "GameOfLife";
@@ -1297,7 +1298,7 @@ template <typename HMAP> static void bench_copy(HMAP&) {
     }
     //    assert(result == 600039800);
     check_consistent("copy result", result);
-    printf("result = %d copy = %2.2f, assign = %2.2f s\n", int(result), copyt - nows, now2sec() - copyt);
+    printf("result = %d copy = %7.2f, assign = %7.2f s\n", int(result), copyt - nows, now2sec() - copyt);
     {
         BenchResult r;
         r.test_name = "copy";
@@ -1353,13 +1354,8 @@ template <typename HMAP>
 static uint64_t randomFindInternalString(size_t numRandom, size_t const length, size_t numInserts,
                                          size_t numFindsPerInsert) {
     size_t constexpr NumTotal = 4;
-    size_t const numSequential = NumTotal - numRandom;
 
     size_t const numFindsPerIter = numFindsPerInsert * NumTotal;
-
-    std::stringstream ss;
-    ss << (numSequential * 100 / NumTotal) << "% " << length << " byte";
-    auto title = ss.str();
 
     sfc64 rng(RND + 3);
 
@@ -1379,7 +1375,6 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
     auto const idx32 = (length / 4) - 1;
     auto const strData32 = reinterpret_cast<uint32_t*>(&str[0]) + idx32;
 
-    auto ts = now2sec();
     HMAP hmap;
     hmap.max_load_factor(max_lf);
     {
@@ -1415,9 +1410,6 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
         } while (i < numInserts);
     }
 
-    if (hmap.size() > 12)
-        printf("\t\t        %s time %2.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found,
-               hmap.load_factor());
     return num_found;
 }
 
@@ -1425,7 +1417,7 @@ template <typename HMAP> static void bench_randomFindString(HMAP&) {
     auto map_name = find_hash(typeid(HMAP).name());
     if (!map_name)
         return;
-    printf("    %20s\n", map_name);
+    printf("    %20s:", map_name);
 
     auto nows = now2sec();
     auto now1 = nows, now2 = nows;
@@ -1456,7 +1448,7 @@ template <typename HMAP> static void bench_randomFindString(HMAP&) {
     // Fixed find stream: every correct map must observe the same hit count.
     verify(total_hits > 0, "randomFindString hits > 0");
     check_consistent("randomFindString hits", total_hits);
-    printf("\t\t\t%.2f + %.2f, total %2.2f s\n", now1 - nows, now2 - now1, now2 - nows);
+    printf(" %7.2f + %7.2f, total %7.2f s\n", now1 - nows, now2 - now1, now2 - nows);
     {
         BenchResult r;
         r.test_name = "randomFindString";
@@ -1491,7 +1483,7 @@ template <typename HMAP> static void bench_randomEraseString(HMAP&) {
     verify(total_erased > 0, "randomEraseString erased > 0");
     check_consistent("randomEraseString erased", total_erased);
 
-    printf("time %2.2f s\n", now2sec() - nows);
+    printf("time %7.2f s\n", now2sec() - nows);
     {
         BenchResult r;
         r.test_name = "randomEraseString";
@@ -1508,7 +1500,6 @@ template <typename HMAP>
 static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const size_t numInserts,
                                    const size_t numFindsPerInsert) {
     size_t constexpr NumTotal = 4;
-    size_t const numSequential = NumTotal - numRandom;
 
     size_t const numFindsPerIter = numFindsPerInsert * NumTotal;
 
@@ -1525,13 +1516,11 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
     sfc64 anotherUnrelatedRng(987654321);
     auto const anotherUnrelatedRngInitialState = anotherUnrelatedRng.state();
     sfc64 findRng(anotherUnrelatedRngInitialState);
-    auto ts = now2sec();
 
     {
         size_t i = 0;
         size_t findCount = 0;
 
-        // bench.beginMeasure(title.c_str());
         do {
             // insert NumTotal entries: some random, some sequential.
             std::shuffle(insertRandom.begin(), insertRandom.end(), rng);
@@ -1556,9 +1545,7 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
         } while (i < numInserts);
     }
 
-    printf("    %3u%% %016x time %2.2f s, %8d loadf = %.2f\n", uint32_t(numSequential * 100 / NumTotal), (int)bitMask,
-           now2sec() - ts, (int)num_found, hmap.load_factor());
-
+    (void)num_found;
     return (uint64_t)hmap.size();
 }
 
@@ -1629,7 +1616,7 @@ template <typename HMAP> static void bench_IterateIntegers(HMAP& hmap) {
             sq += (t - mean) * (t - mean);
         t_sd = std::sqrt(sq / (rep_times.size() - 1));
     }
-    printf("result = %d, time add/removing = %.2f, %.2f (best of %d)\n", int(result), t_add, t_remove, reps);
+    printf("result = %d, time add/removing = %7.2f, %7.2f (best of %d)\n", int(result), t_add, t_remove, reps);
 
     // Record result for CSV/JSON output
     {
@@ -1678,7 +1665,7 @@ template <typename HMAP> static void bench_randomFind(HMAP&, size_t numInserts, 
     check_consistent("randomFind distinct n=" + std::to_string(numInserts), sum);
 
     auto elapsed = now2sec() - ts;
-    printf(" nums = %zd, time %2.2f s\n", numInserts, elapsed);
+    printf(" nums = %zd, time %7.2f s\n", numInserts, elapsed);
 
     // Record result for CSV/JSON output
     {
@@ -2524,7 +2511,7 @@ static void runTest(int sflags, int eflags) {
         { bench_udb3<emhash5::HashMap<uint32_t, uint32_t, hash_func>>(); }
     }
 
-    printf("\ntime %2.2f s\n", now2sec() - start);
+    printf("\ntime %7.2f s\n", now2sec() - start);
 }
 
 static void checkSet(const std::string_view& map_name) {

@@ -382,8 +382,8 @@ TEST_CASE("emhash9: string_hash is transparent and avalanching") {
         auto it = m.find(key);
         REQUIRE(it != m.end());
         CHECK(it->second == i);
-        CHECK(m.contains(std::string_view(key)));  // heterogeneous lookup
-        CHECK(m.find(key.c_str()) != m.end());     // same bytes, different type
+        CHECK(m.contains(std::string_view(key))); // heterogeneous lookup
+        CHECK(m.find(key.c_str()) != m.end());    // same bytes, different type
     }
     for (int i = 0; i < 100; ++i) {
         CHECK(m.find("missing-" + std::to_string(i)) == m.end());

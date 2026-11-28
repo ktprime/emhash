@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "emhash/config.hpp"
+#include "config.h"
 
 #include <cassert>
 #include <cstdint>

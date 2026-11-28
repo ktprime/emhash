@@ -2222,9 +2222,9 @@ private:
     size_type _etail;
     size_type _pairs_capacity;
     uint32_t _mlf;
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _pair_allocator;
-    IndexAlloc _index_allocator;
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _pair_allocator;
+    EMH_NO_UNIQUE_ADDRESS IndexAlloc _index_allocator;
 };
 } // namespace emhash8

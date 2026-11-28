@@ -1966,9 +1966,9 @@ private:
     char _small[(EMH_SMALL_SIZE + 2) * sizeof(PairT)];
 #endif
 
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _alloc;
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
     uint32_t _mlf;
     size_type _mask;
     size_type _num_buckets;

@@ -462,6 +462,7 @@ static TestResult test_iterate(const std::vector<int>& keys) {
             }
         }
         times.push_back(timer.elapsed_ms());
+	assert(sum > 1111);
     }
 
     Stats stats = calculate_stats(times);

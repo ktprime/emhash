@@ -1214,9 +1214,9 @@ private:
 private:
     // the first cache line packed
     PairT* _pairs;
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _alloc;
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
     uint32_t _mlf;
     size_type _mask;
 

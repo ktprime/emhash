@@ -77,6 +77,21 @@
 #define EMH_INLINE inline
 #endif
 
+// [[no_unique_address]] lets an empty hasher/equality/allocator member share its byte (and,
+// when placed after the real fields, the struct's tail padding) instead of pushing the
+// pointers past a full 8-byte pad. GCC and Clang honor the standard attribute in C++17 too;
+// MSVC only accepts it with /std:c++20, so it is gated on the feature-test macro there to
+// avoid C5051 under -Werror.
+#ifndef EMH_NO_UNIQUE_ADDRESS
+#if defined(__cpp_no_unique_address) && __cpp_no_unique_address >= 201803L
+#define EMH_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#elif (defined(__GNUC__) || defined(__clang__)) && __cplusplus >= 201703L
+#define EMH_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#else
+#define EMH_NO_UNIQUE_ADDRESS
+#endif
+#endif
+
 // Unreachable code hint
 #if defined(__GNUC__) || defined(__clang__)
 #define EMH_UNREACHABLE() __builtin_unreachable()

@@ -423,7 +423,7 @@ private:
     using ArenaAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<arena_unit>;
     using ArenaAllocTraits = std::allocator_traits<ArenaAlloc>;
 
-    PairAlloc _alloc;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
     value_type* _pairs = nullptr;
     group_block* _blocks = nullptr;
     size_type _num_filled = 0;
@@ -432,8 +432,8 @@ private:
     size_type _mask = 0;
     size_type _max_filled = 0; // groups * GROUP_SIZE * max_load_factor
     float _max_load_factor = EMH9_MAX_LOAD_FACTOR;
-    mutable hasher _hasher;
-    mutable key_equal _key_equal;
+    EMH_NO_UNIQUE_ADDRESS mutable hasher _hasher;
+    EMH_NO_UNIQUE_ADDRESS mutable key_equal _key_equal;
 
 public:
     // ------------------------------------------------------------------

@@ -41,10 +41,10 @@ namespace emilib {
 // The 32B-metadata implementation lives in its own namespace (emilib1m) so benchmarks can
 // instantiate it next to the default map in one TU. This alias keeps the EMILIB1_META32
 // A/B build source-compatible: emilib::HashMap becomes the variant.
-template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>,
-          typename EqT = std::equal_to<KeyT>, typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
+template <typename KeyT, typename ValueT, typename HashT = std::hash<KeyT>, typename EqT = std::equal_to<KeyT>,
+          typename AllocT = std::allocator<std::pair<KeyT, ValueT>>>
 using HashMap = emilib1m::HashMap<KeyT, ValueT, HashT, EqT, AllocT>;
-}
+} // namespace emilib
 #else
 
 #include "config.h"
@@ -569,7 +569,8 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    template <typename K, typename V> EMILIB1_INSERT_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
+    template <typename K, typename V>
+    EMILIB1_INSERT_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         const auto slot = bucket_to_slot(bucket);
@@ -611,9 +612,13 @@ public:
         return emplace(std::forward<Args>(args)...).first;
     }
 
-    EMILIB1_INSERT_INLINE std::pair<iterator, bool> insert(value_type&& value) noexcept { return do_insert(std::move(value)); }
+    EMILIB1_INSERT_INLINE std::pair<iterator, bool> insert(value_type&& value) noexcept {
+        return do_insert(std::move(value));
+    }
 
-    EMILIB1_INSERT_INLINE std::pair<iterator, bool> insert(const value_type& value) noexcept { return do_insert(value); }
+    EMILIB1_INSERT_INLINE std::pair<iterator, bool> insert(const value_type& value) noexcept {
+        return do_insert(value);
+    }
 
 #if 0
     iterator insert(iterator hint, const value_type& value) noexcept
@@ -1128,15 +1133,20 @@ private:
     }
 
 private:
-    HashT _hasher;
-    EqT _eq;
-    PairAlloc _alloc;
-    StateAlloc _state_alloc;
+    // Data first, then the small 32-bit counters, then the empty functors/allocators at the
+    // tail: the empty objects take one byte each and would otherwise force 8 bytes of
+    // padding in front of the pointers. Keeping them last overlaps that byte with the
+    // struct's own tail padding, so sizeof shrinks 40 -> 32 with no layout change to the
+    // hot fields.
     int8_t* _states = nullptr;
     PairT* _pairs = nullptr;
     size_t _num_buckets = 0;
     size_t _mask = 0; // _num_buckets minus one
     size_t _num_filled = 0;
+    HashT _hasher;
+    EqT _eq;
+    PairAlloc _alloc;
+    StateAlloc _state_alloc;
 };
 
 } // namespace emilib

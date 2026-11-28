@@ -1181,8 +1181,8 @@ private:
 
 private:
     // the first cache line packed
-    HashT _hasher;
-    EqT _eq;
+    EMH_NO_UNIQUE_ADDRESS HashT _hasher;
+    EMH_NO_UNIQUE_ADDRESS EqT _eq;
     uint32_t _mlf;
     size_type _main_mask;
     size_type _coll_mask;
@@ -1194,7 +1194,7 @@ private:
     size_type _num_colls;
     size_type _num_mains;
     PairT* _pairs;
-    PairAlloc _alloc;
+    EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
 };
 } // namespace emhash3
 #if __cplusplus > 199711
