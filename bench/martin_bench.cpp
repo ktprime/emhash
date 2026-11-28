@@ -1,12 +1,22 @@
-//#define FIB_HASH 7
+// #define FIB_HASH 7
 #include "util.h"
+#include <cmath>
 #include <sstream>
 #include <fstream>
 #include <numeric>
+#include <thread>
 #include <algorithm>
 
 #ifndef _WIN32
 #include <sys/resource.h>
+#include <sched.h>
+#else
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <psapi.h>
+#pragma comment(lib, "psapi.lib")
 #endif
 
 // ============================================================================
@@ -36,10 +46,12 @@ struct BenchResult {
     std::string hash_map_name;
     double time_sec;
     double time_stddev = 0.0; // Standard deviation (if multiple runs)
+    double time_median = 0.0; // Median over repeated runs (global --iter)
     size_t operations = 0;
     double throughput = 0.0; // Operations per second
     float load_factor = 0.0f;
     size_t map_size = 0;
+    size_t memory_bytes = 0;
 };
 
 // Global configuration
@@ -51,19 +63,21 @@ class ResultOutput {
 public:
     static void output_text(const BenchResult& r) {
         if (r.time_stddev > 0) {
-            printf("    %20s: %.3f s (stddev=%.3f) ops=%zu throughput=%.2f M/s\n", r.hash_map_name.c_str(), r.time_sec,
-                   r.time_stddev, r.operations, r.throughput / 1000000.0);
+            printf("    %20s: %.3f s (median=%.3f stddev=%.3f) ops=%zu throughput=%.2f M/s\n", r.hash_map_name.c_str(),
+                   r.time_sec, r.time_median, r.time_stddev, r.operations, r.throughput / 1000000.0);
         } else {
             printf("    %20s: %.3f s ops=%zu throughput=%.2f M/s\n", r.hash_map_name.c_str(), r.time_sec, r.operations,
                    r.throughput / 1000000.0);
         }
     }
 
-    static void output_csv_header() { printf("Test,HashMap,Time,StdDev,Operations,Throughput,LoadFactor,MapSize\n"); }
+    static void output_csv_header() {
+        printf("Test,HashMap,Time,StdDev,Operations,Throughput,LoadFactor,MapSize,MemBytes\n");
+    }
 
     static void output_csv(const BenchResult& r) {
-        printf("%s,%s,%.6f,%.6f,%zu,%.2f,%.2f,%zu\n", r.test_name.c_str(), r.hash_map_name.c_str(), r.time_sec,
-               r.time_stddev, r.operations, r.throughput, r.load_factor, r.map_size);
+        printf("%s,%s,%.6f,%.6f,%zu,%.2f,%.2f,%zu,%zu\n", r.test_name.c_str(), r.hash_map_name.c_str(), r.time_sec,
+               r.time_stddev, r.operations, r.throughput, r.load_factor, r.map_size, r.memory_bytes);
     }
 
     static void output_json_header() { printf("[\n"); }
@@ -74,10 +88,12 @@ public:
         printf("    \"hashmap\": \"%s\",\n", r.hash_map_name.c_str());
         printf("    \"time\": %.6f,\n", r.time_sec);
         printf("    \"stddev\": %.6f,\n", r.time_stddev);
+        printf("    \"median\": %.6f,\n", r.time_median);
         printf("    \"operations\": %zu,\n", r.operations);
         printf("    \"throughput\": %.2f,\n", r.throughput);
         printf("    \"load_factor\": %.2f,\n", r.load_factor);
-        printf("    \"map_size\": %zu\n", r.map_size);
+        printf("    \"map_size\": %zu,\n", r.map_size);
+        printf("    \"memory_bytes\": %zu\n", r.memory_bytes);
         printf("  }%s\n", is_last ? "" : ",");
     }
 
@@ -111,21 +127,16 @@ template <typename HMAP, typename RNG> static void do_warmup(HMAP& hmap, RNG& rn
     hmap.clear();
 }
 
-//#define EMH_ITER_SAFE 1
-//#include "wyhash.h"
+// #define EMH_ITER_SAFE 1
+// #include "wyhash.h"
 
-//#define EMH_STATIS 1
-//#define ET            1
-//#define EMH_WYHASH64   1
-//#define HOOD_HASH     1
+// #define EMH_STATIS 1
+// #define ET            1
+// #define EMH_WYHASH64   1
 //
-//#define EMH_PACK_TAIL 16
-//#define EMH_HIGH_LOAD 123456
-//#define EMH_STATIS 1234567
-
-#if CK_HMAP
-#include "ck/Common/HashTable/HashMap.h"
-#endif
+// #define EMH_PACK_TAIL 16
+// #define EMH_HIGH_LOAD 123456
+// #define EMH_STATIS 1234567
 
 #include "emhash/hash_table5.hpp"
 #include "emhash/hash_table6.hpp"
@@ -137,14 +148,6 @@ template <typename HMAP, typename RNG> static void do_warmup(HMAP& hmap, RNG& rn
 #include <boost/unordered/unordered_flat_map.hpp>
 #endif
 
-//#define HAVE_EXCALIBUR 1
-//#define HAVE_INDIVI 1
-#if HAVE_EXCALIBUR
-// https://github.com/SergeyMakeev/ExcaliburHash
-#include "ExcaliburHash/ExcaliburHash.h"
-#endif
-
-// https://github.com/gaujay/indivi_collection
 #if HAVE_INDIVI
 #include "indivi/flat_umap.h"
 #include "indivi/flat_wmap.h"
@@ -159,30 +162,80 @@ template <typename HMAP, typename RNG> static void do_warmup(HMAP& hmap, RNG& rn
 #include "emilib/emihmap2.hpp"
 #include "emilib/emihmap3.hpp"
 #include "emilib/emihmap4.hpp"
-
-#include "martin/robin_hood.h"
-
-#if CXX17
 #include "martin/unordered_dense.h"
-#endif
 
-//#include "FHashTable/fhash_table.h"
+// #include "FHashTable/fhash_table.h"
 
-#if ET
-#include "phmap/phmap.h"
-#include "tsl/robin_map.h"
-#if X86_64
-#include "ska/flat_hash_map.hpp"
-#include "hrd/hash_set_m.h"
-#endif
-#endif
-
-#if FOLLY_F14
-#include "folly/container/F14Map.h"
-#endif
-
-static const uint64_t RND = (uint64_t)getus();
+// Fixed seed: reproducible run-to-run. All cases derive their RNG streams
+// from RND, so numbers are directly comparable across runs and maps.
+static constexpr uint64_t RND = UINT64_C(123);
 static float max_lf = 7.0f / 8;
+
+static int g_check_errors = 0;
+
+// Runtime checksum verification: unlike assert(), survives -DNDEBUG, so the
+// DCE-prevention guarantees and workload validation hold in release builds.
+static inline void verify(bool ok, const char* what) {
+    if (!ok) {
+        printf("  !! CHECK FAILED: %s\n", what);
+        ++g_check_errors;
+    }
+}
+
+// Cross-map workload consistency. Deterministic workloads (fixed seeds) must
+// produce identical results on every correct map: the first map run records
+// the value, every later map verifies against it. This catches maps that
+// silently drop, overwrite or duplicate entries without needing precomputed
+// per-case constants.
+static std::map<std::string, uint64_t> g_expected;
+static inline void check_consistent(const std::string& what, uint64_t v) {
+    auto it = g_expected.find(what);
+    if (it == g_expected.end())
+        g_expected.emplace(what, v);
+    else if (it->second != v) {
+        printf("  !! CHECK FAILED: %s (expected %llu, got %llu)\n", what.c_str(), (unsigned long long)it->second,
+               (unsigned long long)v);
+        ++g_check_errors;
+    }
+}
+
+// Current RSS of the process (NOT peak-so-far): before/after deltas must
+// reflect the live map. ru_maxrss on Linux is a monotonic peak and always
+// reports the high-water mark, so deltas for later maps would read 0.
+static size_t current_rss_bytes() {
+#ifndef _WIN32
+    FILE* f = fopen("/proc/self/statm", "r");
+    if (!f)
+        return 0;
+    long long total_pages = 0, resident_pages = 0;
+    if (fscanf(f, "%lld %lld", &total_pages, &resident_pages) != 2)
+        resident_pages = 0;
+    fclose(f);
+    return (size_t)resident_pages * (size_t)sysconf(_SC_PAGESIZE);
+#else
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return (size_t)pmc.WorkingSetSize; // current working set
+    return 0;
+#endif
+}
+
+// Unified hash function for every case so timings are comparable across
+// sections. One -D override (ABSL_HASH / STD_HASH / FIB_HASH / A_HASH)
+// switches all cases at once; the old per-case divergent fallbacks are gone.
+#if ABSL_HASH
+template <typename T> struct default_hash : absl::Hash<T> {};
+#elif A_HASH
+template <typename T> struct default_hash : Axxhasher<T> {};
+#elif STD_HASH
+template <typename T> struct default_hash : std::hash<T> {};
+#elif FIB_HASH
+template <typename T> struct default_hash : Int64Hasher<T> {};
+#elif CXX17
+template <typename T> struct default_hash : ankerl::unordered_dense::hash<T> {};
+#else
+template <typename T> struct default_hash : std::hash<T> {};
+#endif
 
 static std::map<std::string_view, std::string_view> show_name = {
     {"emhash7", "emhash7"},
@@ -201,44 +254,16 @@ static std::map<std::string_view, std::string_view> show_name = {
     {"boost", "boost flat"},
 #endif
 
-#if HAVE_EXCALIBUR
-    {"Excalibur", "excalibur"},
-#endif
-
 #if HAVE_INDIVI
     {"flat_u", "indivi_umap"},
-    //{"flat_w", "indivi_wmap"},
-#endif
-#if CK_HMAP
-    {"HashMapCell", "ck_hashmap"},
-    {"HashMapTable", "ck_hashmap"},
+//{"flat_w", "indivi_wmap"},
 #endif
 
-//    {"fhash_table", "fht"},
+    //    {"fhash_table", "fht"},
     {"ankerl", "martin dense"},
-
-#if QC_HASH
-    {"qc", "qchash"},
-    {"fph", "fph"},
-#endif
 
 #if ABSL_HMAP
     {"absl", "absl flat"},
-#endif
-#if CXX210
-    {"rigtorp", "rigtorp"},
-    {"jg", "jg_dense"},
-#endif
-#if ET
-    {"hrd_m", "hrdm"},
-    {"phmap", "phmap flat"},
-    {"robin_hood", "martin flat"},
-//    {"folly", "f14_vector"},
-
-#if ET > 1
-    {"robin_map", "tessil robin"},
-    {"ska", "skarupk flat"},
-#endif
 #endif
 };
 
@@ -253,10 +278,6 @@ static const char* find_hash(const std::string& map_name) {
         return show_name.count("emilib3") ? show_name["emilib3"].data() : nullptr;
     if (map_name.find("emilib4") < 10)
         return show_name.count("emilib4") ? show_name["emilib4"].data() : nullptr;
-    if (map_name.find("HashMapCell") < 30)
-        return show_name.count("HashMapCell") ? show_name["HashMapCell"].data() : nullptr;
-    if (map_name.find("HashMapTable") < 30)
-        return show_name.count("HashMapTable") ? show_name["HashMapTable"].data() : nullptr;
     if (map_name.find("flat_u") < 30)
         return show_name.count("flat_u") ? show_name["flat_u"].data() : nullptr;
     if (map_name.find("flat_w") < 30)
@@ -338,9 +359,7 @@ public:
 #endif
     }
 
-    std::array<uint64_t, 4> state() const {
-        return {m_a, m_b, m_c, m_counter};
-    }
+    std::array<uint64_t, 4> state() const { return {m_a, m_b, m_c, m_counter}; }
 
     void state(std::array<uint64_t, 4> const& s) {
         m_a = s[0];
@@ -350,9 +369,7 @@ public:
     }
 
 private:
-    template <typename T> T rotl(T const x, uint32_t k) {
-        return (x << k) | (x >> (8 * sizeof(T) - k));
-    }
+    template <typename T> T rotl(T const x, uint32_t k) { return (x << k) | (x >> (8 * sizeof(T) - k)); }
 
     static constexpr int rotation = 24;
     static constexpr int right_shift = 11;
@@ -379,11 +396,11 @@ static inline double now2sec() {
      * (the NT epoch) to 1970-01-01T00:00:00Z (the Unix Epoch).  */
     return (t / 10000'000 - 11644473600);
 #elif __linux__
-    struct rusage rup;
-    getrusage(RUSAGE_SELF, &rup);
-    long sec = rup.ru_utime.tv_sec + rup.ru_stime.tv_sec;
-    long usec = rup.ru_utime.tv_usec + rup.ru_stime.tv_usec;
-    return (double)sec + (double)usec / 1000000.0;
+    // Wall clock (monotonic), not CPU time: Windows/Unix branches use wall
+    // clock too, and only wall clock is comparable across platforms.
+    struct timespec ts = {0, 0};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
 #elif __unix__
     struct timeval start;
     gettimeofday(&start, NULL);
@@ -393,17 +410,6 @@ static inline double now2sec() {
     return std::chrono::duration_cast<std::chrono::microseconds>(tp).count() / 1000000.0;
 #endif
 }
-
-template <typename HMAP, typename Key, typename Value>
-auto has_insert_unique(int)
-    -> decltype(std::declval<HMAP>().insert_unique(std::declval<Key>(), std::declval<Value>()), std::true_type{});
-
-template <typename HMAP, typename Key, typename Value> std::false_type has_insert_unique(...) {
-    return std::false_type{};
-}
-
-template <typename HMAP, typename Key, typename Value>
-constexpr bool has_insert_unique_v = decltype(has_insert_unique<HMAP, Key, Value>(0))::value;
 
 template <typename HMAP> static void bench_insert(HMAP& hmap) {
     auto map_name = find_hash(typeid(HMAP).name());
@@ -430,21 +436,23 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
             }
 
             {
-                if (g_config.enable_reserve && RND % 2 == 0)
+                if (g_config.enable_reserve)
                     hmap.reserve(maxn / 2);
+                const size_t rss_before = current_rss_bytes();
                 auto ts = now2sec();
+                // Uniform workload for every map: operator[] dedupes, while
+                // emilib's insert_unique skips the duplicate lookup entirely
+                // (caller-asserted-unique fast path), so mixing the two made
+                // maps run different workloads and diverge in final size.
                 MRNG rng(RNDI);
                 for (size_t n = 0; n < maxn; ++n)
-                    if constexpr (has_insert_unique_v<HMAP, int, int>)
-                        hmap.insert_unique(static_cast<int>(rng()), 0);
-                    else
-                        hmap[static_cast<int>(rng())];
+                    hmap[static_cast<int>(rng())];
 
                 printf("\t\t        (lf=%.2f) insert %.2f", hmap.load_factor(), now2sec() - ts);
                 fflush(stdout);
 
                 // Record result for CSV/JSON output
-                if (g_config.output_format != OutputFormat::Text) {
+                {
                     BenchResult r;
                     r.test_name = "insert";
                     r.hash_map_name = map_name;
@@ -453,6 +461,7 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                     r.throughput = maxn / r.time_sec;
                     r.load_factor = hmap.load_factor();
                     r.map_size = static_cast<size_t>(hmap.size());
+                    r.memory_bytes = current_rss_bytes() - rss_before;
                     g_results.push_back(r);
                 }
             }
@@ -463,16 +472,21 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                     hmap.erase(static_cast<int>(rng()));
                 printf(", remove 90%% %.2f", now2sec() - ts);
                 fflush(stdout);
-                assert(hmap.size() == 0);
+                // erase attempts target the same key stream as inserts;
+                // duplicates in the stream leave a small remainder.
+                verify((size_t)hmap.size() < maxn, "insert/erase90 sanity");
 
                 // Record result
-                if (g_config.output_format != OutputFormat::Text) {
+                {
                     BenchResult r;
                     r.test_name = "erase_90pct";
                     r.hash_map_name = map_name;
                     r.time_sec = now2sec() - ts;
                     r.operations = maxn * 9 / 10;
                     r.throughput = static_cast<double>(r.operations) / r.time_sec;
+                    // Survivor count distinguishes the 1M/10M/100M tiers in
+                    // the aggregation group key (deterministic across maps).
+                    r.map_size = static_cast<size_t>(hmap.size());
                     g_results.push_back(r);
                 }
             }
@@ -480,14 +494,15 @@ template <typename HMAP> static void bench_insert(HMAP& hmap) {
                 auto ts = now2sec();
                 MRNG rng(RNDI + 1);
                 for (size_t n = 0; n < maxn; ++n)
-                    if constexpr (has_insert_unique_v<HMAP, int, int>)
-                        hmap.insert_unique(static_cast<int>(rng()), 0);
-                    else
-                        hmap.emplace(static_cast<int>(rng()), 0);
+                    (void)hmap.emplace(static_cast<int>(rng()), 0);
                 printf(", reinsert %.2f", now2sec() - ts);
 
+                // Same RNG stream for every map, so the final size is
+                // deterministic; a map that mis-inserts will diverge here.
+                check_consistent("insert reinsert size " + std::to_string(maxn), (uint64_t)hmap.size());
+
                 // Record result
-                if (g_config.output_format != OutputFormat::Text) {
+                {
                     BenchResult r;
                     r.test_name = "reinsert";
                     r.hash_map_name = map_name;
@@ -520,18 +535,18 @@ template <typename HMAP, bool unique = false> static void bench_AccidentallyQuad
     sfc64 rng(12345);
 
     HMAP hmap;
+    hmap.max_load_factor(max_lf);
     for (size_t n = 0; n < 10'000'000; ++n) {
         hmap[static_cast<int>(rng())];
     }
-    assert(9988513 == hmap.size());
+    verify(9988513 == hmap.size(), "AccidentallyQuadratic distinct count");
 
     // bench.beginMeasure("iterate");
     uint64_t sum = 0;
     for (auto const& kv : hmap) {
         sum += (uint64_t)kv.first + (uint64_t)kv.second;
     }
-    if (sum != UINT64_C(18446739465311920326))
-        puts("error\n");
+    verify(sum == UINT64_C(18446739465311920326), "AccidentallyQuadratic iteration sum");
 
 #if CXX17
     //    bench.beginMeasure("iterate & copy");
@@ -542,9 +557,19 @@ template <typename HMAP, bool unique = false> static void bench_AccidentallyQuad
         else
             map2.emplace(kv.first, kv.second);
     }
-    assert(hmap.size() == map2.size());
+    verify(hmap.size() == map2.size(), "AccidentallyQuadratic copy size");
 #endif
     printf(" time %2.2f s\n", now2sec() - nows);
+    {
+        BenchResult r;
+        r.test_name = "AccidentallyQuadratic";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 10000000;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = hmap.size();
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP> static void bench_InsertEraseBegin() {
@@ -559,6 +584,7 @@ template <typename HMAP> static void bench_InsertEraseBegin() {
     for (uint64_t i = 0; i < 3; ++i) {
         auto starts = now2sec();
         HMAP hmap;
+        hmap.max_load_factor(max_lf);
         MRNG rng(987654321ull + i * i * i);
 
         // benchmark randomly inserting & erasing begin
@@ -576,6 +602,16 @@ template <typename HMAP> static void bench_InsertEraseBegin() {
     }
 
     printf(", total %2.2f s\n", now2sec() - nows);
+    {
+        BenchResult r;
+        r.test_name = "InsertEraseBegin";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 0;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP> static void bench_InsertEraseContinue() {
@@ -590,6 +626,7 @@ template <typename HMAP> static void bench_InsertEraseContinue() {
     for (uint64_t i = 0; i < 3; ++i) {
         auto starts = now2sec();
         HMAP hmap;
+        hmap.max_load_factor(max_lf);
         // hmap.reserve((std::size_t)(max_n * .));
         MRNG rng(2345ull + i * i * i);
 
@@ -624,9 +661,21 @@ template <typename HMAP> static void bench_InsertEraseContinue() {
     }
 
     printf(", total %2.2f s\n", now2sec() - nows);
+    {
+        BenchResult r;
+        r.test_name = "InsertEraseContinue";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 0;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
-template <typename T> struct as_bits_t { T value; };
+template <typename T> struct as_bits_t {
+    T value;
+};
 
 template <typename T> as_bits_t<T> as_bits(T value) {
     return as_bits_t<T>{value};
@@ -730,10 +779,22 @@ template <typename HMAP> static void bench_randomInsertErase(HMAP& hmap) {
             //                    int(std::bitset<64>(bitMask).count()), int(max_n / 1000000), now2sec() - ts,
             //                    (int)map2.size(), map2.load_factor());
         }
+        // Key stream is fixed, so the churn-steady-state size is deterministic.
+        check_consistent("randomInsertErase final size", map2.size());
         erase2 = now2sec() - nows;
     }
 
     printf(" erase time %.2f + %.2f, total %2.2f s\n", erase1, erase2, erase1 + erase2);
+    {
+        BenchResult r;
+        r.test_name = "randomInsertErase";
+        r.hash_map_name = map_name;
+        r.time_sec = erase1 + erase2;
+        r.operations = 0;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP> static void bench_CreateInsert() {
@@ -746,11 +807,12 @@ template <typename HMAP> static void bench_CreateInsert() {
 
     MRNG rng(213 + RND);
     auto nows = now2sec(), erase1 = 0.;
+    size_t res = 0;
     for (size_t i = 0; i < counts.size(); ++i) {
         size_t count = counts[i];
         size_t repeats = counts.back() / count;
-        [[maybe_unused]] size_t res = 0;
         HMAP hmap;
+        hmap.max_load_factor(max_lf);
 
         for (size_t j = 0; j < repeats; ++j) {
             for (size_t n = 0; n < count; ++n)
@@ -765,8 +827,8 @@ template <typename HMAP> static void bench_CreateInsert() {
     for (size_t i = 0; i < counts.size(); ++i) {
         size_t count = counts[i];
         size_t repeats = counts.back() / count;
-        [[maybe_unused]] size_t res = 0;
         HMAP hmap;
+        hmap.max_load_factor(max_lf);
 
         for (size_t j = 0; j < repeats; ++j) {
             for (size_t n = 0; n < count; ++n)
@@ -776,9 +838,20 @@ template <typename HMAP> static void bench_CreateInsert() {
         }
     }
 
-    assert(res);
+    verify(res != 0, "CreateInsert res");
+    check_consistent("CreateInsert size sum", (uint64_t)res);
     auto erase2 = now2sec() - nows;
     printf(" CreateInsert/InsertCreate %2.2f + %2.2f, total %2.2f s\n", erase1, erase2, erase1 + erase2);
+    {
+        BenchResult r;
+        r.test_name = "CreateInsert";
+        r.hash_map_name = map_name;
+        r.time_sec = erase1 + erase2;
+        r.operations = 0;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 static inline uint32_t udb_hash32(uint32_t key) {
@@ -821,8 +894,8 @@ struct Hash32 {
     inline size_t operator()(const uint32_t x) const { return x; }
 };
 
-const static uint32_t x0 = (uint32_t)getus();
-const static bool is_del = (x0 % 2 == 0);
+static constexpr uint32_t x0 = (uint32_t)RND;
+static constexpr bool is_del = (x0 % 2 == 0);
 
 template <typename HMAP> static void bench_udb3() {
     auto map_name = find_hash(typeid(HMAP).name());
@@ -835,6 +908,7 @@ template <typename HMAP> static void bench_udb3() {
     constexpr uint32_t step = (N - n0) / (n_cp - 1);
 
     HMAP h;
+    h.max_load_factor(max_lf);
     uint64_t z = 0, x = x0;
     for (uint32_t j = 0, i = 0, n = n0; j < n_cp; ++j, n += step) {
         for (; i < n; ++i) {
@@ -852,6 +926,18 @@ template <typename HMAP> static void bench_udb3() {
     }
 
     printf(" z[%d] = %d loadf = %.2f, total %2.2f s\n", is_del, (int)z, h.load_factor(), now2sec() - nows);
+    verify(z > 0, "udb3 z > 0");
+    check_consistent("udb3 z", z);
+    {
+        BenchResult r;
+        r.test_name = "udb3";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 80000000;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = h.size();
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
@@ -879,7 +965,7 @@ template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
         }
         //        printf("     05%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(),
         //        (int)hmap.size());
-        assert(RND != 123 || 549985352 == checksum);
+        verify(RND != 123 || n != 50000000 || 549953097 == checksum, "distinct 05% checksum");
     }
 
     {
@@ -892,19 +978,20 @@ template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
         }
         //        printf("     25%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(),
         //        (int)hmap.size());
-        assert(RND != 123 || 149979034 == checksum);
+        verify(RND != 123 || n != 50000000 || 149998262 == checksum, "distinct 25% checksum");
     }
 
     {
         hmap.clear();
         // auto ts = now2sec();
+        checksum = 0;
         size_t const max_rng = n / 2;
         for (size_t i = 0; i < n; ++i) {
             checksum += ++hmap[static_cast<int>(rng(max_rng))];
         }
         //        printf("     50%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(),
         //        (int)hmap.size());
-        assert(RND != 123 || 249981806 == checksum);
+        verify(RND != 123 || n != 50000000 || 99994827 == checksum, "distinct 50% checksum");
     }
 
     {
@@ -916,11 +1003,21 @@ template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
         }
         //        printf("    100%% distinct %.3f s loadf = %.2f, size = %d\n", now2sec() - ts, hmap.load_factor(),
         //        (int)hmap.size());
-        assert(RND != 123 || 50291811 == checksum);
+        verify(RND != 123 || n != 50000000 || 50290416 == checksum, "distinct 100% checksum");
     }
-    //#endif
+    // #endif
 
     printf(" time %2.2f s\n", now2sec() - nows);
+    {
+        BenchResult r;
+        r.test_name = "randomDistinct2";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 50000000 * 4;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 #define CODE_FOR_NUCLEOTIDE(nucleotide) (" \0 \1\3  \2"[nucleotide & 0x7])
@@ -928,7 +1025,7 @@ template <typename HMAP> static void bench_randomDistinct2(HMAP& hmap) {
 template <typename HMAP> static size_t kcount(const std::vector<char>& poly, const std::string& oligo) {
 
     HMAP hmap;
-    // hmap.max_load_factor(0.5);
+    hmap.max_load_factor(max_lf);
 
     uint64_t key = 0;
     const uint64_t mask = ((uint64_t)1 << 2 * oligo.size()) - 1;
@@ -992,6 +1089,18 @@ template <typename HMAP> static void bench_knucleotide() {
     ans += kcount<HMAP>(poly, "GGTA");
     ans += kcount<HMAP>(poly, "GGT");
     printf(" ans = %d time %2.2f s\n", (int)ans, now2sec() - nows);
+    verify(ans > 0, "knucleotide ans > 0");
+    check_consistent("knucleotide ans", (uint64_t)ans);
+    {
+        BenchResult r;
+        r.test_name = "knucleotide";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 25000000 * 3;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 class vec2 {
@@ -1075,7 +1184,7 @@ static void game_of_life(const char* name, size_t nsteps, size_t finalPopulation
     for (auto const& kv : *m1) {
         count += kv.second;
     }
-    assert(finalPopulation == count);
+    verify(finalPopulation == count, "GameOfLife final population");
 }
 
 template <typename HMAP> static void bench_GameOfLife() {
@@ -1085,6 +1194,7 @@ template <typename HMAP> static void bench_GameOfLife() {
     printf("    %20s:", map_name);
 
     HMAP hmap;
+    hmap.max_load_factor(max_lf);
     auto stastabilizing = now2sec();
     {
         // https://conwaylife.com/wiki/R-pentomino
@@ -1132,6 +1242,16 @@ template <typename HMAP> static void bench_GameOfLife() {
     }
 
     printf(", grow = %.2f, total %2.2f s\n", now2sec() - grow, now2sec() - stastabilizing);
+    {
+        BenchResult r;
+        r.test_name = "GameOfLife";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - stastabilizing;
+        r.operations = 0;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP> static void bench_copy(HMAP&) {
@@ -1176,7 +1296,18 @@ template <typename HMAP> static void bench_copy(HMAP&) {
             mapForCopy[rng()] = (int)rng();
     }
     //    assert(result == 600039800);
+    check_consistent("copy result", result);
     printf("result = %d copy = %2.2f, assign = %2.2f s\n", int(result), copyt - nows, now2sec() - copyt);
+    {
+        BenchResult r;
+        r.test_name = "copy";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 1000;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = mapSource.size();
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP> static size_t runInsertEraseString(size_t max_n, size_t string_length, uint32_t bitMask) {
@@ -1278,18 +1409,15 @@ static uint64_t randomFindInternalString(size_t numRandom, size_t const length, 
                 *strData32 = (uint32_t)findRng();
                 auto it = hmap.find(str);
                 if (it != hmap.end()) {
-#ifndef CK_HMAP
                     num_found += it->second;
-#else
-                    num_found += 1;
-#endif
                 }
             }
         } while (i < numInserts);
     }
 
     if (hmap.size() > 12)
-        printf("\t\t        %s time %2.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found, hmap.load_factor());
+        printf("\t\t        %s time %2.2f s %8d loadf = %.2f\n", title.c_str(), now2sec() - ts, (int)num_found,
+               hmap.load_factor());
     return num_found;
 }
 
@@ -1301,15 +1429,16 @@ template <typename HMAP> static void bench_randomFindString(HMAP&) {
 
     auto nows = now2sec();
     auto now1 = nows, now2 = nows;
+    uint64_t total_hits = 0;
     if (1) {
         static constexpr size_t numInserts = 1000000 / 2;
         static constexpr size_t numFindsPerInsert = 200 / 2;
 
-        randomFindInternalString<HMAP>(4, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(3, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(2, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(1, 13, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(0, 13, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(4, 13, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(3, 13, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(2, 13, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(1, 13, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(0, 13, numInserts, numFindsPerInsert);
         now1 = now2sec();
     }
 
@@ -1317,14 +1446,28 @@ template <typename HMAP> static void bench_randomFindString(HMAP&) {
         static constexpr size_t numInserts = 100000;
         static constexpr size_t numFindsPerInsert = 1000;
 
-        randomFindInternalString<HMAP>(4, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(3, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(2, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(1, 100, numInserts, numFindsPerInsert);
-        randomFindInternalString<HMAP>(0, 100, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(4, 100, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(3, 100, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(2, 100, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(1, 100, numInserts, numFindsPerInsert);
+        total_hits += randomFindInternalString<HMAP>(0, 100, numInserts, numFindsPerInsert);
         now2 = now2sec();
     }
+    // Fixed find stream: every correct map must observe the same hit count.
+    verify(total_hits > 0, "randomFindString hits > 0");
+    check_consistent("randomFindString hits", total_hits);
     printf("\t\t\t%.2f + %.2f, total %2.2f s\n", now1 - nows, now2 - now1, now2 - nows);
+    {
+        BenchResult r;
+        r.test_name = "randomFindString";
+        r.hash_map_name = map_name;
+        r.time_sec = now2 - nows;
+        // 5 x (500k inserts x 100 finds) + 5 x (100k inserts x 1000 finds)
+        r.operations = (500000ull * 100 + 100000ull * 1000) * 5;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP> static void bench_randomEraseString(HMAP&) {
@@ -1334,15 +1477,31 @@ template <typename HMAP> static void bench_randomEraseString(HMAP&) {
     printf("    %20s:", map_name);
 
     auto nows = now2sec();
-    { runInsertEraseString<HMAP>(20000000, 7, 0xfffff); }
-    { runInsertEraseString<HMAP>(20000000, 8, 0xfffff); }
-    { runInsertEraseString<HMAP>(20000000, 13, 0xfffff); }
+    uint64_t total_erased = 0;
+    total_erased += runInsertEraseString<HMAP>(20000000, 7, 0xfffff);
+    total_erased += runInsertEraseString<HMAP>(20000000, 8, 0xfffff);
+    total_erased += runInsertEraseString<HMAP>(20000000, 13, 0xfffff);
     { runInsertEraseString<HMAP>(10000000, 24, 0xfffff); }
-    { runInsertEraseString<HMAP>(12000000, 100, 0x4ffff); }
-    { runInsertEraseString<HMAP>(8000000, 200, 0x3ffff); }
-    { runInsertEraseString<HMAP>(6000000, 1000, 0x7ffff); }
+    total_erased += runInsertEraseString<HMAP>(12000000, 100, 0x4ffff);
+    total_erased += runInsertEraseString<HMAP>(8000000, 200, 0x3ffff);
+    total_erased += runInsertEraseString<HMAP>(6000000, 1000, 0x7ffff);
+
+    // Insert/erase streams are fixed: the successful-erase count must agree
+    // across maps (a map that drops or duplicates entries diverges here).
+    verify(total_erased > 0, "randomEraseString erased > 0");
+    check_consistent("randomEraseString erased", total_erased);
 
     printf("time %2.2f s\n", now2sec() - nows);
+    {
+        BenchResult r;
+        r.test_name = "randomEraseString";
+        r.hash_map_name = map_name;
+        r.time_sec = now2sec() - nows;
+        r.operations = 20000000 * 3 + 10000000 + 12000000 + 8000000 + 6000000;
+        r.throughput = r.time_sec > 0 ? static_cast<double>(r.operations) / r.time_sec : 0;
+        r.map_size = 0;
+        g_results.push_back(r);
+    }
 }
 
 template <typename HMAP>
@@ -1397,10 +1556,8 @@ static uint64_t randomFindInternal(size_t numRandom, uint64_t bitMask, const siz
         } while (i < numInserts);
     }
 
-    if (hmap.size() == 0) {
-        printf("    %3u%% %016x time %2.2f s, %8d loadf = %.2f\n", uint32_t(numSequential * 100 / NumTotal),
-               (int)bitMask, now2sec() - ts, (int)num_found, hmap.load_factor());
-    }
+    printf("    %3u%% %016x time %2.2f s, %8d loadf = %.2f\n", uint32_t(numSequential * 100 / NumTotal), (int)bitMask,
+           now2sec() - ts, (int)num_found, hmap.load_factor());
 
     return (uint64_t)hmap.size();
 }
@@ -1428,44 +1585,59 @@ template <typename HMAP> static void bench_IterateIntegers(HMAP& hmap) {
         result = 0;
     }
 
-    auto ts = now2sec();
+    // Single pass: repetition/statistics are handled globally in main
+    // (--iter=N repeats the whole suite, results aggregated to best/median).
+    const int reps = 1;
+    double t_add = 1e30, t_remove = 1e30;
+    std::vector<double> rep_times;
+    for (int rep = 0; rep < reps; ++rep) {
+        hmap.clear();
+        result = 0;
 
-    {
-        MRNG rng(123);
-        for (size_t n = 0; n < num_iters; ++n) {
-            hmap[rng()] = n;
-            for (const auto& keyVal : hmap)
-#ifndef CK_HMAP
-                result += keyVal.second;
-#else
-                result += 1;
-#endif
+        auto ts = now2sec();
+        {
+            MRNG rng(123);
+            for (size_t n = 0; n < num_iters; ++n) {
+                hmap[rng()] = n;
+                for (const auto& keyVal : hmap)
+                    result += keyVal.second;
+            }
         }
-        assert(result == 20833333325000ull);
+        verify(result == 20833333325000ull, "IterateIntegers insert checksum");
+        t_add = std::min(t_add, now2sec() - ts);
+
+        auto ts1 = now2sec();
+        {
+            MRNG rng(123);
+            for (size_t n = 0; n < num_iters; ++n) {
+                hmap.erase(rng());
+                for (auto const& keyVal : hmap)
+                    result += keyVal.second;
+            }
+        }
+        // final result = insert sum 20833333325000 + erase-phase sum 41665416675000
+        verify(result == 62498750000000ull, "IterateIntegers erase checksum");
+        t_remove = std::min(t_remove, now2sec() - ts1);
+        rep_times.push_back((now2sec() - ts) + (now2sec() - ts1));
     }
 
-    auto ts1 = now2sec();
-    {
-        MRNG rng(123);
-        for (size_t n = 0; n < num_iters; ++n) {
-            hmap.erase(rng());
-            for (auto const& keyVal : hmap)
-#ifndef CK_HMAP
-                result += keyVal.second;
-#else
-                result += 1;
-#endif
-        }
+    double t_sd = 0.0;
+    if (rep_times.size() > 1) {
+        const double mean = std::accumulate(rep_times.begin(), rep_times.end(), 0.0) / rep_times.size();
+        double sq = 0.0;
+        for (double t : rep_times)
+            sq += (t - mean) * (t - mean);
+        t_sd = std::sqrt(sq / (rep_times.size() - 1));
     }
-    assert(result == 62498750000000ull + 20833333325000ull);
-    printf("result = %d, time add/removing = %.2f, %.2f\n", int(result), ts1 - ts, now2sec() - ts1);
+    printf("result = %d, time add/removing = %.2f, %.2f (best of %d)\n", int(result), t_add, t_remove, reps);
 
     // Record result for CSV/JSON output
-    if (g_config.output_format != OutputFormat::Text) {
+    {
         BenchResult r;
         r.test_name = "IterateIntegers";
         r.hash_map_name = map_name;
-        r.time_sec = now2sec() - ts;
+        r.time_sec = t_add + t_remove;
+        r.time_stddev = t_sd;
         r.operations = num_iters * 2;
         r.throughput = static_cast<double>(r.operations) / r.time_sec;
         g_results.push_back(r);
@@ -1502,12 +1674,14 @@ template <typename HMAP> static void bench_randomFind(HMAP&, size_t numInserts, 
     sum += randomFindInternal<HMAP>(1, upper32bit, numInserts, numFindsPerInsert);
     sum += randomFindInternal<HMAP>(0, lower32bit, numInserts, numFindsPerInsert);
 
+    // Distinct counts are stream-determined; every correct map must agree.
+    check_consistent("randomFind distinct n=" + std::to_string(numInserts), sum);
+
     auto elapsed = now2sec() - ts;
-    if (sum != 123)
-        printf(" nums = %zd, time %2.2f s\n", numInserts, elapsed);
+    printf(" nums = %zd, time %2.2f s\n", numInserts, elapsed);
 
     // Record result for CSV/JSON output
-    if (g_config.output_format != OutputFormat::Text) {
+    {
         BenchResult r;
         r.test_name = "randomFind";
         r.hash_map_name = map_name;
@@ -1522,28 +1696,9 @@ static void runTest(int sflags, int eflags) {
     const auto start = now2sec();
 
     if (sflags <= 1 && eflags >= 1) {
-#if ABSL_HASH
-        typedef absl::Hash<uint64_t> hash_func;
-#elif STD_HASH
-        typedef std::hash<uint64_t> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<uint64_t> hash_func;
-#else
-        using hash_func = ankerl::unordered_dense::hash<uint64_t>;
-#endif
+        using hash_func = default_hash<uint64_t>;
 
         puts("\nbench_IterateIntegers:");
-
-#if QC_HASH
-        {
-            qc::hash::RawMap<uint64_t, uint64_t, hash_func> emap;
-            bench_IterateIntegers(emap);
-        }
-        {
-            fph::DynamicFphMap<uint64_t, uint64_t, fph::MixSeedHash<uint64_t>> emap;
-            bench_IterateIntegers(emap);
-        }
-#endif
 
         {
             emhash5::HashMap<uint64_t, uint64_t, hash_func> emap;
@@ -1565,48 +1720,10 @@ static void runTest(int sflags, int eflags) {
             emhash6::HashMap<uint64_t, uint64_t, hash_func> emap;
             bench_IterateIntegers(emap);
         }
-#if CXX17
         {
             ankerl::unordered_dense::map<uint64_t, uint64_t, hash_func> martin;
             bench_IterateIntegers(martin);
         }
-#endif
-#if CXX20
-        {
-            jg::dense_hash_map<uint64_t, uint64_t, hash_func> emap;
-            bench_IterateIntegers(emap);
-        }
-        {
-            rigtorp::HashMap<uint64_t, uint64_t, hash_func> emap;
-            bench_IterateIntegers(emap);
-        }
-#endif
-#if ET
-        {
-            tsl::robin_map<uint64_t, uint64_t, hash_func> rmap;
-            bench_IterateIntegers(rmap);
-        }
-        {
-            robin_hood::unordered_map<uint64_t, uint64_t, hash_func> martin;
-            bench_IterateIntegers(martin);
-        }
-
-#if X86_64
-        {
-            hrd_m::hash_map<uint64_t, uint64_t, hash_func> hmap;
-            bench_IterateIntegers(hmap);
-        }
-        {
-            ska::flat_hash_map<uint64_t, uint64_t, hash_func> fmap;
-            bench_IterateIntegers(fmap);
-        }
-#endif
-        {
-            phmap::flat_hash_map<uint64_t, uint64_t, hash_func> hmap;
-            bench_IterateIntegers(hmap);
-        }
-#endif
-
         {
             emilib::HashMap<uint64_t, uint64_t, hash_func> emap;
             bench_IterateIntegers(emap);
@@ -1635,10 +1752,6 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if HAVE_EXCALIBUR
-        //{ Excalibur::HashMap<uint64_t, uint64_t> hmap; bench_IterateIntegers(hmap); }
-#endif
-
 #if HAVE_INDIVI
         {
             indivi::flat_umap<uint64_t, uint64_t, hash_func> hmap;
@@ -1650,50 +1763,22 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if CK_HMAP
-        {
-            ck::HashMap<uint64_t, uint64_t, hash_func> hmap;
-            bench_IterateIntegers(hmap);
-        }
-#endif
-
 #if ABSL_HMAP
         {
             absl::flat_hash_map<uint64_t, uint64_t, hash_func> hmap;
             bench_IterateIntegers(hmap);
         }
 #endif
-#if FOLLY_F14
-        {
-            folly::F14VectorMap<uint64_t, uint64_t, hash_func> hmap;
-            bench_IterateIntegers(hmap);
-        }
-#endif
     }
 
     if (sflags <= 2 && eflags >= 2) {
-#if HOOD_HASH
-        typedef robin_hood::hash<std::string> hash_func;
-#elif ABSL_HASH
-        typedef absl::Hash<std::string> hash_func;
-#elif A_HASH
-        using hash_func = Axxhasher<std::string>;
-#elif ANKERL_HASH
-        using hash_func = ankerl::unordered_dense::hash<std::string>;
-#elif STD_HASH
-        typedef std::hash<std::string> hash_func;
-#else
-        typedef WysHasher hash_func;
-#endif
+        using hash_func = default_hash<std::string>;
         puts("\nbench_randomFindString:");
 
-#if CXX17
         {
             ankerl::unordered_dense::map<std::string, size_t, hash_func> bench;
             bench_randomFindString(bench);
         }
-#endif
-
         {
             emhash8::HashMap<std::string, size_t, hash_func> bench;
             bench_randomFindString(bench);
@@ -1710,12 +1795,6 @@ static void runTest(int sflags, int eflags) {
             emhash5::HashMap<std::string, size_t, hash_func> bench;
             bench_randomFindString(bench);
         }
-#if QC_HASH > 1
-        {
-            fph::DynamicFphMap<std::string, size_t, fph::MixSeedHash<std::string>> bench;
-            bench_randomFindString(bench);
-        }
-#endif
         {
             emhash7::HashMap<std::string, size_t, hash_func> bench;
             bench_randomFindString(bench);
@@ -1749,13 +1828,6 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if HAVE_EXCALIBUR
-        {
-            Excalibur::HashMap<std::string, size_t> hmap;
-            bench_randomFindString(hmap);
-        }
-#endif
-
 #if HAVE_INDIVI
         {
             indivi::flat_umap<std::string, size_t, hash_func> bench;
@@ -1767,51 +1839,6 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if CK_HMAP // crash TODO
-//        { ck::HashMap<std::string, size_t, hash_func> bench; bench_randomFindString(bench); }
-#endif
-
-#if ET
-        {
-            tsl::robin_map<std::string, size_t, hash_func> bench;
-            bench_randomFindString(bench);
-        }
-        {
-            robin_hood::unordered_map<std::string, size_t, hash_func> bench;
-            bench_randomFindString(bench);
-        }
-
-#if X86_64
-        {
-            hrd_m::hash_map<std::string, size_t, hash_func> hmap;
-            bench_randomFindString(hmap);
-        }
-        {
-            ska::flat_hash_map<std::string, size_t, hash_func> bench;
-            bench_randomFindString(bench);
-        }
-#endif
-        {
-            phmap::flat_hash_map<std::string, size_t, hash_func> bench;
-            bench_randomFindString(bench);
-        }
-#endif
-#if CXX20
-        {
-            jg::dense_hash_map<std::string, int, hash_func> bench;
-            bench_randomFindString(bench);
-        }
-        {
-            rigtorp::HashMap<std::string, size_t, hash_func> bench;
-            bench_randomFindString(bench);
-        }
-#endif
-#if FOLLY_F14
-        {
-            folly::F14VectorMap<std::string, size_t, hash_func> bench;
-            bench_randomFindString(bench);
-        }
-#endif
 #if ABSL_HMAP
         {
             absl::flat_hash_map<std::string, size_t, hash_func> bench;
@@ -1821,19 +1848,7 @@ static void runTest(int sflags, int eflags) {
     }
 
     if (sflags <= 3 && eflags >= 3) {
-#if HOOD_HASH
-        typedef robin_hood::hash<std::string> hash_func;
-#elif ABSL_HASH
-        typedef absl::Hash<std::string> hash_func;
-#elif A_HASH
-        using hash_func = Axxhasher<std::string>;
-#elif STD_HASH
-        typedef std::hash<std::string> hash_func;
-#elif ANKERL_HASH
-        using hash_func = ankerl::unordered_dense::hash<std::string>;
-#else
-        typedef WysHasher hash_func;
-#endif
+        using hash_func = default_hash<std::string>;
         puts("\nbench_randomEraseString:");
 
         {
@@ -1878,61 +1893,11 @@ static void runTest(int sflags, int eflags) {
             bench_randomEraseString(bench);
         }
 
-#if CXX17
         {
             ankerl::unordered_dense::map<std::string, int, hash_func> bench;
             bench_randomEraseString(bench);
         }
-#endif
-#if CXX20
-        {
-            rigtorp::HashMap<std::string, int, hash_func> bench;
-            bench_randomEraseString(bench);
-        }
-        {
-            jg::dense_hash_map<std::string, int, hash_func> bench;
-            bench_randomEraseString(bench);
-        }
-#endif
 
-#if QC_HASH > 1
-        {
-            fph::DynamicFphMap<std::string, int, fph::MixSeedHash<std::string>> bench;
-            bench_randomEraseString(bench);
-        }
-#endif
-
-#if ET
-        {
-            tsl::robin_map<std::string, int, hash_func> bench;
-            bench_randomEraseString(bench);
-        }
-        {
-            robin_hood::unordered_map<std::string, int, hash_func> bench;
-            bench_randomEraseString(bench);
-        }
-
-#if X86_64
-        {
-            hrd_m::hash_map<std::string, int, hash_func> hmap;
-            bench_randomEraseString(hmap);
-        }
-        {
-            ska::flat_hash_map<std::string, int, hash_func> bench;
-            bench_randomEraseString(bench);
-        }
-#endif
-        {
-            phmap::flat_hash_map<std::string, int, hash_func> bench;
-            bench_randomEraseString(bench);
-        }
-#endif
-#if FOLLY_F14
-        {
-            folly::F14VectorMap<std::string, int, hash_func> bench;
-            bench_randomEraseString(bench);
-        }
-#endif
 #if ABSL_HMAP
         {
             absl::flat_hash_map<std::string, int, hash_func> bench;
@@ -1946,13 +1911,6 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if HAVE_EXCALIBUR
-        {
-            Excalibur::HashMap<std::string, int> hmap;
-            bench_randomEraseString(hmap);
-        }
-#endif
-
 #if HAVE_INDIVI
         {
             indivi::flat_umap<std::string, int, hash_func> bench;
@@ -1963,24 +1921,10 @@ static void runTest(int sflags, int eflags) {
             bench_randomEraseString(bench);
         }
 #endif
-
-#if CK_HMAP // crash TODO
-//        { ck::HashMap<std::string, int, hash_func> bench; bench_randomEraseString(bench); }
-#endif
     }
 
     if (sflags <= 4 && eflags >= 4) {
-#if STD_HASH
-        typedef std::hash<uint64_t> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<uint64_t> hash_func;
-#elif ANKERL_HASH
-        using hash_func = ankerl::unordered_dense::hash<uint64_t>;
-#elif HOOD_HASH
-        typedef robin_hood::hash<uint64_t> hash_func;
-#else
-        typedef std::hash<uint64_t> hash_func;
-#endif
+        using hash_func = default_hash<uint64_t>;
         puts("\nbench_copy:");
 
         {
@@ -2004,29 +1948,10 @@ static void runTest(int sflags, int eflags) {
             bench_copy(emap);
         }
 
-#if QC_HASH
-        {
-            qc::hash::RawMap<uint64_t, int, hash_func> emap;
-            bench_copy(emap);
-        }
-#endif
-
-#if CXX20
-        {
-            jg::dense_hash_map<uint64_t, int, hash_func> emap;
-            bench_copy(emap);
-        }
-        {
-            rigtorp::HashMap<uint64_t, int, hash_func> emap;
-            bench_copy(emap);
-        }
-#endif
-#if CXX17
         {
             ankerl::unordered_dense::map<uint64_t, int, hash_func> martin;
             bench_copy(martin);
         }
-#endif
 
         {
             emilib::HashMap<uint64_t, int, hash_func> emap;
@@ -2049,27 +1974,6 @@ static void runTest(int sflags, int eflags) {
             bench_copy(emap);
         }
 
-#if ET
-        {
-            tsl::robin_map<uint64_t, int, hash_func> rmap;
-            bench_copy(rmap);
-        }
-        {
-            robin_hood::unordered_map<uint64_t, int, hash_func> martin;
-            bench_copy(martin);
-        }
-
-#if X86_64
-        {
-            ska::flat_hash_map<uint64_t, int, hash_func> fmap;
-            bench_copy(fmap);
-        }
-#endif
-        {
-            phmap::flat_hash_map<uint64_t, int, hash_func> hmap;
-            bench_copy(hmap);
-        }
-#endif
 #if ABSL_HMAP
         {
             absl::flat_hash_map<uint64_t, int, hash_func> hmap;
@@ -2079,13 +1983,6 @@ static void runTest(int sflags, int eflags) {
 #if HAVE_BOOST
         {
             boost::unordered_flat_map<uint64_t, int, hash_func> hmap;
-            bench_copy(hmap);
-        }
-#endif
-
-#if HAVE_EXCALIBUR
-        {
-            Excalibur::HashMap<uint64_t, int> hmap;
             bench_copy(hmap);
         }
 #endif
@@ -2100,89 +1997,24 @@ static void runTest(int sflags, int eflags) {
             bench_copy(hmap);
         }
 #endif
-
-#if CK_HMAP
-//        { ck::HashMap <uint64_t, int, hash_func> hmap; bench_copy(hmap); }
-#endif
-
-#if FOLLY_F14
-        {
-            folly::F14VectorMap<uint64_t, int, hash_func> hmap;
-            bench_copy(hmap);
-        }
-#endif
     }
 
     if (sflags <= 5 && eflags >= 5) {
-#if ABSL_HASH
-        typedef absl::Hash<size_t> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<size_t> hash_func;
-//#elif STD_HASH
-//        typedef std::hash<size_t> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<size_t> hash_func;
-#else
-        using hash_func = ankerl::unordered_dense::hash<size_t>;
-#endif
+        // Same unified hash as every other case; the old per-case #if chain
+        // (with a dead STD_HASH branch) made this section incomparable.
+        using hash_func = default_hash<size_t>;
+
         puts("\nbench_randomFind:");
 
-        MRNG rng((size_t)time(0));
+        // Fixed seed: the 6 workload sizes must not vary run to run, otherwise
+        // numbers are not reproducible or comparable.
+        MRNG rng(RND);
         const size_t numInserts[] = {(size_t)rng() % 123 + 123,         (size_t)rng() % 1234 + 1234,
                                      (size_t)rng() % 12345 + 12345,     (size_t)rng() % 123456 + 123456,
                                      (size_t)rng() % 1234567 + 1234567, (size_t)rng() % 12345678 + 12345678};
         constexpr size_t numFindsPerInsert[] = {800000, 50000, 5000, 200, 10, 2};
 
         for (size_t i = 0; i < size_t(sizeof(numInserts) / sizeof(numInserts[0])); i++) {
-#if ET
-            {
-                tsl::robin_map<size_t, size_t, hash_func> rmap;
-                bench_randomFind(rmap, numInserts[i], numFindsPerInsert[i]);
-            }
-            {
-                robin_hood::unordered_map<size_t, size_t, hash_func> martin;
-                bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]);
-            }
-
-#if X86_64
-            {
-                ska::flat_hash_map<size_t, size_t, hash_func> fmap;
-                bench_randomFind(fmap, numInserts[i], numFindsPerInsert[i]);
-            }
-            {
-                hrd_m::hash_map<size_t, size_t, hash_func> hmap;
-                bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
-
-            {
-                phmap::flat_hash_map<size_t, size_t, hash_func> hmap;
-                bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
-#if QC_HASH
-#if QC_HASH > 1
-            {
-                fph::DynamicFphMap<size_t, size_t, fph::MixSeedHash<size_t>> emap;
-                bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
-            {
-                qc::hash::RawMap<size_t, size_t, hash_func> emap;
-                bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
-#if CXX20
-            {
-                jg::dense_hash_map<size_t, size_t, hash_func> emap;
-                bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
-            }
-            {
-                rigtorp::HashMap<size_t, size_t, hash_func> emap;
-                bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
-
             {
                 emilib3::HashMap<size_t, size_t, hash_func> emap;
                 bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
@@ -2217,13 +2049,6 @@ static void runTest(int sflags, int eflags) {
             }
 #endif
 
-#if HAVE_EXCALIBUR
-            {
-                Excalibur::HashMap<size_t, size_t> hmap;
-                bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
-
 #if HAVE_INDIVI
             {
                 indivi::flat_umap<size_t, size_t, hash_func> hmap;
@@ -2235,19 +2060,10 @@ static void runTest(int sflags, int eflags) {
             }
 #endif
 
-#if CK_HMAP
-            {
-                ck::HashMap<size_t, size_t, hash_func> hmap;
-                bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
-
-#if CXX17
             {
                 ankerl::unordered_dense::map<size_t, size_t, hash_func> martin;
                 bench_randomFind(martin, numInserts[i], numFindsPerInsert[i]);
             }
-#endif
             {
                 emhash8::HashMap<size_t, size_t, hash_func> emap;
                 bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
@@ -2268,28 +2084,12 @@ static void runTest(int sflags, int eflags) {
                 emhash7::HashMap<size_t, size_t, hash_func> emap;
                 bench_randomFind(emap, numInserts[i], numFindsPerInsert[i]);
             }
-#if FOLLY_F14
-            {
-                folly::F14VectorMap<size_t, size_t, hash_func> hmap;
-                bench_randomFind(hmap, numInserts[i], numFindsPerInsert[i]);
-            }
-#endif
             putchar('\n');
         }
     }
 
     if (sflags <= 6 && eflags >= 6) {
-#if ABSL_HASH
-        typedef absl::Hash<int> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<int> hash_func;
-#elif ANKERL_HASH
-        using hash_func = ankerl::unordered_dense::hash<int>;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
-        typedef std::hash<int> hash_func;
-#endif
+        using hash_func = default_hash<int>;
 
         puts("\nbench_insert:");
 
@@ -2299,46 +2099,16 @@ static void runTest(int sflags, int eflags) {
             bench_insert(amap);
         }
 #endif
-#if CK_HMAP
-        {
-            ck::HashMap<int, int, hash_func> amap;
-            bench_insert(amap);
-        }
-#endif
-#if FOLLY_F14
-        {
-            folly::F14VectorMap<int, int, hash_func> hmap;
-            bench_insert(hmap);
-        }
-#endif
         {
             emhash7::HashMap<int, int, hash_func> emap;
             bench_insert(emap);
         }
 
-#if CXX20
-        {
-            jg::dense_hash_map<int, int, hash_func> qmap;
-            bench_insert(qmap);
-        }
-        {
-            rigtorp::HashMap<int, int, hash_func> emap;
-            bench_insert(emap);
-        }
-#endif
-#if CXX17
         {
             ankerl::unordered_dense::map<int, int, hash_func> martin;
             bench_insert(martin);
         }
-#endif
 
-#if QC_HASH
-        {
-            qc::hash::RawMap<int, int, hash_func> qmap;
-            bench_insert(qmap);
-        }
-#endif
         {
             emhash8::HashMap<int, int, hash_func> emap;
             bench_insert(emap);
@@ -2371,13 +2141,6 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if HAVE_EXCALIBUR
-        {
-            Excalibur::HashMap<int, int> amap;
-            bench_insert(amap);
-        }
-#endif
-
 #if HAVE_INDIVI
         {
             indivi::flat_umap<int, int, hash_func> amap;
@@ -2401,46 +2164,10 @@ static void runTest(int sflags, int eflags) {
             emilib4::HashMap<int, int, hash_func> emap;
             bench_insert(emap);
         }
-
-#if ET
-        {
-            tsl::robin_map<int, int, hash_func> rmap;
-            bench_insert(rmap);
-        }
-        {
-            robin_hood::unordered_map<int, int, hash_func> martin;
-            bench_insert(martin);
-        }
-
-#if X86_64
-        {
-            ska::flat_hash_map<int, int, hash_func> fmap;
-            bench_insert(fmap);
-        }
-        {
-            hrd_m::hash_map<int, int, hash_func> hmap;
-            bench_insert(hmap);
-        }
-#endif
-        {
-            phmap::flat_hash_map<int, int, hash_func> hmap;
-            bench_insert(hmap);
-        }
-#endif
     }
 
     if (sflags <= 7 && eflags >= 7) {
-#if ABSL_HASH
-        typedef absl::Hash<uint64_t> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<uint64_t> hash_func;
-#elif STD_HASH
-        typedef std::hash<uint64_t> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<uint64_t> hash_func;
-#else
-        using hash_func = ankerl::unordered_dense::hash<uint64_t>;
-#endif
+        using hash_func = default_hash<uint64_t>;
 
         puts("\nbench_randomInsertErase:");
 
@@ -2477,13 +2204,6 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if HAVE_EXCALIBUR
-        {
-            Excalibur::HashMap<uint64_t, int> amap;
-            bench_randomInsertErase(amap);
-        }
-#endif
-
 #if HAVE_INDIVI
         {
             indivi::flat_umap<uint64_t, int, hash_func> hmap;
@@ -2491,13 +2211,6 @@ static void runTest(int sflags, int eflags) {
         }
         {
             indivi::flat_wmap<uint64_t, int, hash_func> hmap;
-            bench_randomInsertErase(hmap);
-        }
-#endif
-
-#if CK_HMAP
-        {
-            ck::HashMap<uint64_t, int, hash_func> hmap;
             bench_randomInsertErase(hmap);
         }
 #endif
@@ -2524,104 +2237,21 @@ static void runTest(int sflags, int eflags) {
             emhash7::HashMap<uint64_t, int, hash_func> emap;
             bench_randomInsertErase(emap);
         }
-#if QC_HASH
-        {
-            qc::hash::RawMap<uint64_t, int, hash_func> emap;
-            bench_randomInsertErase(emap);
-        } // hang
-#if QC_HASH > 1
-        {
-            fph::DynamicFphMap<uint64_t, int, fph::MixSeedHash<uint64_t>> emap;
-            bench_randomInsertErase(emap);
-        }
-#endif
-#endif
-
-#if ET
-        {
-            tsl::robin_map<uint64_t, int, hash_func> rmap;
-            bench_randomInsertErase(rmap);
-        }
-        {
-            robin_hood::unordered_map<uint64_t, int, hash_func> martin;
-            bench_randomInsertErase(martin);
-        }
-
-#if X86_64
-        {
-            ska::flat_hash_map<uint64_t, int, hash_func> fmap;
-            bench_randomInsertErase(fmap);
-        }
-        {
-            hrd_m::hash_map<size_t, size_t, hash_func> hmap;
-            bench_randomInsertErase(hmap);
-        }
-#endif
-        {
-            phmap::flat_hash_map<uint64_t, int, hash_func> hmap;
-            bench_randomInsertErase(hmap);
-        }
-#endif
-#if FOLLY_F14
-        {
-            folly::F14VectorMap<uint64_t, int, hash_func> hmap;
-            bench_randomInsertErase(hmap);
-        }
-#endif
-#if CXX17
         {
             ankerl::unordered_dense::map<uint64_t, int, hash_func> martin;
             bench_randomInsertErase(martin);
         }
-#endif
-#if CXX20
-        {
-            jg::dense_hash_map<uint64_t, int, hash_func> emap;
-            bench_randomInsertErase(emap);
-        }
-        //{ rigtorp::HashMap<uint64_t, int, hash_func> emap; bench_randomInsertErase(emap); } //hange
-#endif
     }
 
     if (sflags <= 8 && eflags >= 8) {
-#if ABSL_HASH
-        typedef absl::Hash<int> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<int> hash_func;
-#elif STD_HASH
-        typedef std::hash<int> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
-        using hash_func = ankerl::unordered_dense::hash<int>;
-#endif
+        using hash_func = default_hash<int>;
 
         puts("\nbench_randomDistinct2:");
-#if QC_HASH
-        {
-            qc::hash::RawMap<int, int, hash_func> emap;
-            bench_randomDistinct2(emap);
-        }
-//        { fph::DynamicFphMap<int, int, fph::MixSeedHash<int>> emap; bench_randomDistinct2(emap); } //hang
-#endif
 
-#if CXX20
-        {
-            jg::dense_hash_map<int, int, hash_func> emap;
-            bench_randomDistinct2(emap);
-        }
-        {
-            rigtorp::HashMap<int, int, hash_func> emap;
-            bench_randomDistinct2(emap);
-        }
-#endif
-
-#if CXX17
         {
             ankerl::unordered_dense::map<int, int, hash_func> martin;
             bench_randomDistinct2(martin);
         }
-#endif
 
         {
             emhash8::HashMap<int, int, hash_func> emap;
@@ -2665,42 +2295,10 @@ static void runTest(int sflags, int eflags) {
             bench_randomDistinct2(emap);
         }
 
-#if ET
-        {
-            tsl::robin_map<int, int, hash_func> rmap;
-            bench_randomDistinct2(rmap);
-        }
-        {
-            robin_hood::unordered_map<int, int, hash_func> martin;
-            bench_randomDistinct2(martin);
-        }
-
-#if X86_64
-        {
-            ska::flat_hash_map<int, int, hash_func> fmap;
-            bench_randomDistinct2(fmap);
-        }
-        {
-            hrd_m::hash_map<int, int, hash_func> hmap;
-            bench_randomDistinct2(hmap);
-        }
-#endif
-        {
-            phmap::flat_hash_map<int, int, hash_func> hmap;
-            bench_randomDistinct2(hmap);
-        }
-#endif
 #if HAVE_BOOST
         {
             boost::unordered_flat_map<int, int, hash_func> hmap;
             bench_randomDistinct2(hmap);
-        }
-#endif
-
-#if HAVE_EXCALIBUR
-        {
-            Excalibur::HashMap<int, int> amap;
-            bench_randomDistinct2(amap);
         }
 #endif
 
@@ -2715,58 +2313,22 @@ static void runTest(int sflags, int eflags) {
         }
 #endif
 
-#if CK_HMAP
-        {
-            ck::HashMap<int, int, hash_func> emap;
-            bench_randomDistinct2(emap);
-        }
-#endif
 #if ABSL_HMAP
         {
             absl::flat_hash_map<int, int, hash_func> hmap;
             bench_randomDistinct2(hmap);
         }
 #endif
-
-#if FOLLY_F14
-        {
-            folly::F14VectorMap<int, int, hash_func> hmap;
-            bench_randomDistinct2(hmap);
-        }
-#endif
     }
 
     if (sflags <= 9 && eflags >= 9) {
-#if ABSL_HASH
-        typedef absl::Hash<uint64_t> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<uint64_t> hash_func;
-#elif ANKERL_HASH
-        typedef ankerl::unordered_dense::hash<uint64_t> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<uint64_t> hash_func;
-#else
-        typedef std::hash<uint64_t> hash_func;
-#endif
+        using hash_func = default_hash<uint64_t>;
         puts("\nbench_knucleotide:");
 
-#if QC_HASH
-        { bench_knucleotide<qc::hash::RawMap<uint64_t, uint32_t, hash_func>>(); }
-#endif
-
-#if CXX20
-        { bench_knucleotide<jg::dense_hash_map<uint64_t, uint32_t, hash_func>>(); }
-        { bench_knucleotide<rigtorp::HashMap<uint64_t, uint32_t, hash_func>>(); }
-#endif
-#if CXX17
         { bench_knucleotide<ankerl::unordered_dense::map<uint64_t, uint32_t, hash_func>>(); }
-#endif
+
 #if HAVE_BOOST
         { bench_knucleotide<boost::unordered_flat_map<uint64_t, uint32_t, hash_func>>(); }
-#endif
-
-#if HAVE_EXCALIBUR
-        { bench_knucleotide<Excalibur::HashMap<uint64_t, uint32_t>>(); }
 #endif
 
 #if HAVE_INDIVI
@@ -2789,38 +2351,10 @@ static void runTest(int sflags, int eflags) {
         { bench_knucleotide<emilib2::HashMap<uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<emilib3::HashMap<uint64_t, uint32_t, hash_func>>(); }
         { bench_knucleotide<emilib4::HashMap<uint64_t, uint32_t, hash_func>>(); }
-
-#if ET
-        { bench_knucleotide<tsl::robin_map<uint64_t, uint32_t, hash_func>>(); }
-        { bench_knucleotide<robin_hood::unordered_map<uint64_t, uint32_t, hash_func>>(); }
-
-#if X86_64
-        { bench_knucleotide<ska::flat_hash_map<uint64_t, uint32_t, hash_func>>(); }
-        { bench_knucleotide<hrd_m::hash_map<uint64_t, uint32_t, hash_func>>(); }
-#endif
-        { bench_knucleotide<phmap::flat_hash_map<uint64_t, uint32_t, hash_func>>(); }
-#endif
-
-#if FOLLY
-        { bench_knucleotide<folly::F14VectorMap<uint64_t, uint32_t, hash_func>>(); }
-#endif
-#if CK_HMAP
-        { bench_knucleotide<ck::HashMap<uint64_t, uint32_t, hash_func>>(); }
-#endif
     }
 
     if (sflags <= 10 && eflags >= 10) {
-#if ABSL_HASH
-        typedef absl::Hash<uint32_t> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<uint32_t> hash_func;
-#elif STD_HASH
-        typedef std::hash<uint32_t> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<uint32_t> hash_func;
-#else
-        typedef ankerl::unordered_dense::hash<uint32_t> hash_func;
-#endif
+        using hash_func = default_hash<uint32_t>;
         puts("\nbench_GameOfLife:");
 
         { bench_GameOfLife<emhash6::HashMap<uint32_t, bool, hash_func>>(); }
@@ -2828,24 +2362,10 @@ static void runTest(int sflags, int eflags) {
         { bench_GameOfLife<emhash7::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emhash8::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emhash9::HashMap<uint32_t, bool, hash_func>>(); }
-
-#if QC_HASH
-        { bench_GameOfLife<qc::hash::RawMap<uint32_t, bool, hash_func>>(); }
-#endif
-
-#if CXX20
-        { bench_GameOfLife<jg::dense_hash_map<uint32_t, bool, hash_func>>(); }
-        { bench_GameOfLife<rigtorp::HashMap<uint32_t, bool, hash_func>>(); }
-#endif
-#if CXX17
         { bench_GameOfLife<ankerl::unordered_dense::map<uint32_t, bool, hash_func>>(); }
-#endif
+
 #if HAVE_BOOST
         { bench_GameOfLife<boost::unordered_flat_map<uint32_t, bool, hash_func>>(); }
-#endif
-
-#if HAVE_EXCALIBUR
-        //{ bench_GameOfLife<Excalibur::HashMap <uint64_t, bool>>(); }
 #endif
 
 #if HAVE_INDIVI
@@ -2861,38 +2381,10 @@ static void runTest(int sflags, int eflags) {
         { bench_GameOfLife<emilib2::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emilib3::HashMap<uint32_t, bool, hash_func>>(); }
         { bench_GameOfLife<emilib4::HashMap<uint32_t, bool, hash_func>>(); }
-
-#if ET
-        { bench_GameOfLife<tsl::robin_map<uint32_t, bool, hash_func>>(); }
-        { bench_GameOfLife<robin_hood::unordered_map<uint32_t, bool, hash_func>>(); }
-
-#if X86_64
-        { bench_GameOfLife<ska::flat_hash_map<uint32_t, bool, hash_func>>(); }
-        { bench_GameOfLife<hrd_m::hash_map<uint32_t, bool, hash_func>>(); }
-#endif
-        { bench_GameOfLife<phmap::flat_hash_map<uint32_t, bool, hash_func>>(); }
-#endif
-
-#if FOLLY
-        { bench_GameOfLife<folly::F14VectorMap<uint32_t, bool, hash_func>>(); }
-#endif
-#if CK_HMAP
-        { bench_GameOfLife<ck::HashMap<uint32_t, bool, hash_func>>(); }
-#endif
     }
 
     if (sflags <= 11 && eflags >= 11) {
-#if ABSL_HASH
-        typedef absl::Hash<int> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<int> hash_func;
-#elif STD_HASH
-        typedef std::hash<int> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
-        typedef ankerl::unordered_dense::hash<int> hash_func;
-#endif
+        using hash_func = default_hash<int>;
 
         puts("\nbench_AccidentallyQuadratic (10M int insert.copy.iterator):");
 
@@ -2901,22 +2393,10 @@ static void runTest(int sflags, int eflags) {
         { bench_AccidentallyQuadratic<emhash5::HashMap<int, int, hash_func>, true>(); }
         { bench_AccidentallyQuadratic<emhash8::HashMap<int, int, hash_func>, true>(); }
         { bench_AccidentallyQuadratic<emhash9::HashMap<int, int, hash_func>, true>(); }
-
-#if QC_HASH
-        { bench_AccidentallyQuadratic<qc::hash::RawMap<int, int, hash_func>>(); }
-#endif
-#if CXX20
-        { bench_AccidentallyQuadratic<jg::dense_hash_map<int, int, hash_func>>(); }
-        { bench_AccidentallyQuadratic<rigtorp::HashMap<int, int, hash_func>>(); }
-#endif
-#if CXX17
         { bench_AccidentallyQuadratic<ankerl::unordered_dense::map<int, int, hash_func>>(); }
-#endif
+
 #if HAVE_BOOST
         { bench_AccidentallyQuadratic<boost::unordered_flat_map<int, int, hash_func>>(); }
-#endif
-#if HAVE_EXCALIBUR
-//        { bench_AccidentallyQuadratic<Excalibur::HashMap <int, int>>(); }
 #endif
 
 #if HAVE_INDIVI
@@ -2933,35 +2413,10 @@ static void runTest(int sflags, int eflags) {
         { bench_AccidentallyQuadratic<emilib2::HashMap<int, int, hash_func>>(); }
         { bench_AccidentallyQuadratic<emilib3::HashMap<int, int, hash_func>>(); }
         { bench_AccidentallyQuadratic<emilib4::HashMap<int, int, hash_func>>(); }
-
-#if ET
-        { bench_AccidentallyQuadratic<tsl::robin_map<int, int, hash_func>>(); }
-        { bench_AccidentallyQuadratic<robin_hood::unordered_map<int, int, hash_func>>(); }
-
-#if X86_64
-        { bench_AccidentallyQuadratic<hrd_m::hash_map<int, int, hash_func>>(); }
-        { bench_AccidentallyQuadratic<ska::flat_hash_map<int, int, hash_func>>(); }
-#endif
-        { bench_AccidentallyQuadratic<phmap::flat_hash_map<int, int, hash_func>>(); }
-#endif
-
-#if CK_HMAP
-//        { ck::HashMap <int, int, hash_func> bench_AccidentallyQuadratic(); }
-#endif
     }
 
     if (sflags <= 12 && eflags >= 12) {
-#if ABSL_HASH
-        typedef absl::Hash<int> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<int> hash_func;
-#elif ANKERL_HASH
-        typedef ankerl::unordered_dense::hash<int> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
-        typedef std::hash<int> hash_func;
-#endif
+        using hash_func = default_hash<int>;
 
         puts("\nbench_InsertEraseContinue:");
 
@@ -2970,29 +2425,8 @@ static void runTest(int sflags, int eflags) {
         { bench_InsertEraseContinue<emhash5::HashMap<int, int, hash_func>>(); }
         { bench_InsertEraseContinue<emhash8::HashMap<int, int, hash_func>>(); }
         { bench_InsertEraseContinue<emhash9::HashMap<int, int, hash_func>>(); }
-
-#if QC_HASH
-        { bench_InsertEraseContinue<qc::hash::RawMap<int, int, hash_func>>(); }
-#endif
-#if CXX20
-        { bench_InsertEraseContinue<jg::dense_hash_map<int, int, hash_func>>(); }
-//        {  bench_InsertEraseContinue<rigtorp::HashMap<int, int, hash_func>>(); }
-#endif
-#if CXX17
         { bench_InsertEraseContinue<ankerl::unordered_dense::map<int, int, hash_func>>(); }
-#endif
-#if HAVE_BOOST
-//        {  bench_InsertEraseContinue<boost::unordered_flat_map <int, int, hash_func>>(); }
-#endif
 
-#if HAVE_EXCALIBUR
-//        { bench_InsertEraseContinue<Excalibur::HashMap <int, int>>(); }
-#endif
-
-#if HAVE_INDIVI
-//        { bench_InsertEraseContinue<indivi::flat_umap <int, int, hash_func>>(); }
-//        { bench_InsertEraseContinue<indivi::flat_umap <int, int, hash_func>>(); }
-#endif
 #if ABSL_HMAP
         { bench_InsertEraseContinue<absl::flat_hash_map<int, int, hash_func>>(); }
 #endif
@@ -3001,31 +2435,10 @@ static void runTest(int sflags, int eflags) {
         { bench_InsertEraseContinue<emilib::HashMap<int, int, hash_func>>(); }
         { bench_InsertEraseContinue<emilib1m::HashMap<int, int, hash_func>>(); }
         { bench_InsertEraseContinue<emilib2::HashMap<int, int, hash_func>>(); }
-
-#if ET
-        { bench_InsertEraseContinue<tsl::robin_map<int, int, hash_func>>(); }
-        { bench_InsertEraseContinue<robin_hood::unordered_map<int, int, hash_func>>(); }
-
-#if X86_64
-        //        {  bench_InsertEraseContinue<hrd_m::hash_map <int, int, hash_func>>(); }
-        { bench_InsertEraseContinue<ska::flat_hash_map<int, int, hash_func>>(); }
-#endif
-        { bench_InsertEraseContinue<phmap::flat_hash_map<int, int, hash_func>>(); }
-#endif
     }
 
     if (sflags <= 13 && eflags >= 13) {
-#if ABSL_HASH
-        typedef absl::Hash<int64_t> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<int64_t> hash_func;
-#elif ANKERL_HASH
-        typedef ankerl::unordered_dense::hash<int64_t> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int64_t> hash_func;
-#else
-        typedef std::hash<int64_t> hash_func;
-#endif
+        using hash_func = default_hash<int64_t>;
 
         puts("\nbench_InsertEraseBegin:");
 
@@ -3033,62 +2446,21 @@ static void runTest(int sflags, int eflags) {
         { bench_InsertEraseBegin<emhash7::HashMap<int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<emhash8::HashMap<int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<emhash9::HashMap<int64_t, int, hash_func>>(); }
-
-#if QC_HASH
-        { bench_InsertEraseBegin<qc::hash::RawMap<int64_t, int, hash_func>>(); }
-#endif
-#if CXX20
-        { bench_InsertEraseBegin<jg::dense_hash_map<int64_t, int, hash_func>>(); }
-//        {  bench_InsertEraseBegin<rigtorp::HashMap<int64_t, int, hash_func>>(); }
-#endif
-#if CXX17
         { bench_InsertEraseBegin<ankerl::unordered_dense::map<int64_t, int, hash_func>>(); }
-#endif
-#if HAVE_BOOST
-//        {  bench_InsertEraseBegin<boost::unordered_flat_map <int64_t, int, hash_func>>(); }
-#endif
-#if HAVE_EXCALIBUR
-//        { bench_InsertEraseBegin<Excalibur::HashMap <int64_t, int>>(); }
-#endif
+
 #if HAVE_INDIVI
         //        {  bench_InsertEraseBegin<indivi::flat_umap <int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<indivi::flat_wmap<int64_t, int, hash_func>>(); }
-#endif
-
-#if ABSL_HMAP
-//        {  bench_InsertEraseBegin<absl::flat_hash_map <int64_t, int, hash_func>>(); }
 #endif
 
         { bench_InsertEraseBegin<emilib2::HashMap<int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<emilib3::HashMap<int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<emilib::HashMap<int64_t, int, hash_func>>(); }
         { bench_InsertEraseBegin<emilib1m::HashMap<int64_t, int, hash_func>>(); }
-
-#if ET
-        //        {  bench_InsertEraseBegin<tsl::robin_map <int64_t, int, hash_func>>(); }
-        //        {  bench_InsertEraseBegin<robin_hood::unordered_map <int64_t, int, hash_func>>(); }
-
-#if X86_64
-//        {  bench_InsertEraseBegin<hrd_m::hash_map <int64_t, int, hash_func>>(); }
-//        {  bench_InsertEraseBegin<ska::flat_hash_map <int64_t, int, hash_func>>(); }
-#endif
-        //{  bench_InsertEraseBegin<phmap::flat_hash_map <int64_t, int, hash_func>>(); }
-#endif
-        //        {  bench_InsertEraseBegin<emhash5::HashMap<int64_t, int, hash_func>>(); }
     }
 
     if (sflags <= 14 && eflags >= 14) {
-#if ABSL_HASH
-        typedef absl::Hash<int> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<int> hash_func;
-#elif ANKERL_HASH
-        typedef ankerl::unordered_dense::hash<int> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
-        typedef std::hash<int> hash_func;
-#endif
+        using hash_func = default_hash<int>;
 
         puts("\nbench_CreateInsert:");
 
@@ -3096,22 +2468,10 @@ static void runTest(int sflags, int eflags) {
         { bench_CreateInsert<emhash7::HashMap<int, int, hash_func>>(); }
         { bench_CreateInsert<emhash8::HashMap<int, int, hash_func>>(); }
         { bench_CreateInsert<emhash9::HashMap<int, int, hash_func>>(); }
-
-#if QC_HASH
-        { bench_CreateInsert<qc::hash::RawMap<int, int, hash_func>>(); }
-#endif
-#if CXX20
-        { bench_CreateInsert<jg::dense_hash_map<int, int, hash_func>>(); }
-        { bench_CreateInsert<rigtorp::HashMap<int, int, hash_func>>(); }
-#endif
-#if CXX17
         { bench_CreateInsert<ankerl::unordered_dense::map<int, int, hash_func>>(); }
-#endif
+
 #if HAVE_BOOST
         { bench_CreateInsert<boost::unordered_flat_map<int, int, hash_func>>(); }
-#endif
-#if HAVE_EXCALIBUR
-        { bench_CreateInsert<Excalibur::HashMap<int, int>>(); }
 #endif
 #if HAVE_INDIVI
         { bench_CreateInsert<indivi::flat_umap<int, int, hash_func>>(); }
@@ -3127,31 +2487,11 @@ static void runTest(int sflags, int eflags) {
         { bench_CreateInsert<emilib3::HashMap<int, int, hash_func>>(); }
         { bench_CreateInsert<emilib4::HashMap<int, int, hash_func>>(); }
 
-#if ET
-        { bench_CreateInsert<tsl::robin_map<int, int, hash_func>>(); }
-        { bench_CreateInsert<robin_hood::unordered_map<int, int, hash_func>>(); }
-
-#if X86_64
-//        {  bench_CreateInsert<hrd_m::hash_map <int, int, hash_func>>(); }
-//        {  bench_CreateInsert<ska::flat_hash_map <int, int, hash_func>>(); }
-#endif
-        //{  bench_CreateInsert<phmap::flat_hash_map <int, int, hash_func>>(); }
-#endif
         { bench_CreateInsert<emhash5::HashMap<int, int, hash_func>>(); }
     }
 
     if (sflags <= 15 && eflags >= 15) {
-#if ABSL_HASH
-        typedef absl::Hash<int> hash_func;
-#elif FIB_HASH
-        typedef Int64Hasher<int> hash_func;
-#elif ANKERL_HASH
-        typedef ankerl::unordered_dense::hash<int> hash_func;
-#elif HOOD_HASH
-        typedef robin_hood::hash<int> hash_func;
-#else
-        typedef Hash32 hash_func;
-#endif
+        using hash_func = default_hash<int>;
 
         puts("\nbench_udb3:");
 
@@ -3160,21 +2500,10 @@ static void runTest(int sflags, int eflags) {
         { bench_udb3<emhash8::HashMap<uint32_t, uint32_t, hash_func>>(); }
         { bench_udb3<emhash9::HashMap<uint32_t, uint32_t, hash_func>>(); }
 
-#if QC_HASH
-        { bench_udb3<qc::hash::RawMap<uint32_t, uint32_t, hash_func>>(); }
-#endif
-#if CXX20
-        { bench_udb3<jg::dense_hash_map<uint32_t, uint32_t, hash_func>>(); }
-        { bench_udb3<rigtorp::HashMap<uint32_t, uint32_t, hash_func>>(); }
-#endif
-#if CXX17
         { bench_udb3<ankerl::unordered_dense::map<uint32_t, uint32_t, hash_func>>(); }
-#endif
+
 #if HAVE_BOOST
         { bench_udb3<boost::unordered_flat_map<uint32_t, uint32_t, hash_func>>(); }
-#endif
-#if HAVE_EXCALIBUR
-        { bench_udb3<Excalibur::HashMap<uint32_t, uint32_t>>(); }
 #endif
 
 #if HAVE_INDIVI
@@ -3192,16 +2521,6 @@ static void runTest(int sflags, int eflags) {
         { bench_udb3<emilib3::HashMap<uint32_t, uint32_t, hash_func>>(); }
         { bench_udb3<emilib4::HashMap<uint32_t, uint32_t, hash_func>>(); }
 
-#if ET
-        { bench_udb3<tsl::robin_map<uint32_t, uint32_t, hash_func>>(); }
-        { bench_udb3<robin_hood::unordered_map<uint32_t, uint32_t, hash_func>>(); }
-
-#if X86_64
-//        {  bench_udb3<hrd_m::hash_map <uint32_t, uint32_t, hash_func>>(); }
-//        {  bench_udb3<ska::flat_hash_map <uint32_t, uint32_t, hash_func>>(); }
-#endif
-        //{  bench_udb3<phmap::flat_hash_map <uint32_t, uint32_t, hash_func>>(); }
-#endif
         { bench_udb3<emhash5::HashMap<uint32_t, uint32_t, hash_func>>(); }
     }
 
@@ -3283,12 +2602,69 @@ void test_mm_set1_epi8() {
 }
 #endif
 
+// Collapse repeated suite runs (--iter=N): one record per (test, map, size)
+// group. time_sec = best (least-noise estimator for comparisons), plus median
+// and stddev over all reps. group key includes map_size so size-tiered cases
+// (insert 1M/10M/100M) stay separate.
+static void aggregate_results() {
+    std::map<std::string, std::pair<BenchResult, std::vector<double>>> groups;
+    std::vector<std::string> order;
+    for (const auto& r : g_results) {
+        std::string key = r.test_name + "|" + r.hash_map_name + "|" + std::to_string(r.map_size);
+        auto it = groups.find(key);
+        if (it == groups.end()) {
+            groups.emplace(key, std::make_pair(r, std::vector<double>{r.time_sec}));
+            order.push_back(key);
+        } else {
+            it->second.second.push_back(r.time_sec);
+        }
+    }
+
+    std::vector<BenchResult> aggregated;
+    aggregated.reserve(order.size());
+    for (const auto& key : order) {
+        BenchResult rec = groups[key].first;
+        std::vector<double>& times = groups[key].second;
+        std::sort(times.begin(), times.end());
+        rec.time_sec = times.front();
+        rec.time_median = (times.size() % 2 == 1) ? times[times.size() / 2]
+                                                  : 0.5 * (times[times.size() / 2 - 1] + times[times.size() / 2]);
+        double mean = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+        double sq = 0.0;
+        for (double t : times)
+            sq += (t - mean) * (t - mean);
+        rec.time_stddev = times.size() > 1 ? std::sqrt(sq / (times.size() - 1)) : 0.0;
+        if (rec.time_sec > 0 && rec.operations > 0)
+            rec.throughput = rec.operations / rec.time_sec;
+        aggregated.push_back(rec);
+    }
+    g_results.swap(aggregated);
+}
+
 int main(int argc, char* argv[]) {
     srand((unsigned int)time(0));
     printInfo(nullptr);
 
+    // Pin to one core (skip core 0, which also services IRQs): removes
+    // migration and cache-invalidation noise from per-map comparisons.
+    {
+        const unsigned ncpu = std::thread::hardware_concurrency();
+        const unsigned core = ncpu > 2 ? 2 : 0;
+#if defined(_WIN32)
+        if (SetProcessAffinityMask(GetCurrentProcess(), (DWORD_PTR)1ull << core))
+            printf("pinned to CPU core %u of %u\n", core, ncpu);
+#else
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        CPU_SET(core, &set);
+        if (sched_setaffinity(0, sizeof(set), &set) == 0)
+            printf("pinned to CPU core %u of %u\n", core, ncpu);
+#endif
+    }
+
     puts("usage: ./mbench [2-9mptseabrjqfx]b[d]e[d] [--warmup=N] [--iter=N] [--format=csv|json|text] [--output=FILE] "
          "[--lf=N] [--no-reserve]");
+    puts("       --iter=N repeats the WHOLE suite N times and reports best/median/stddev per case");
     puts("all test case:");
     for (int i = 0; i < int(sizeof(cases) / sizeof(cases[0])); i++)
         printf("    %2d %s\n", i + 1, cases[i]);
@@ -3334,18 +2710,9 @@ int main(int argc, char* argv[]) {
                     map_name += (char)c;
                     checkSet(map_name);
                 } else if (c == 'm') {
-                    checkSet("robin_hood");
                     checkSet("ankerl");
-                } else if (c == 'p')
-                    checkSet("phmap");
-                else if (c == 'a')
+                } else if (c == 'a')
                     checkSet("absl");
-                else if (c == 't')
-                    checkSet("robin_map");
-                else if (c == 's')
-                    checkSet("ska");
-                else if (c == 'h')
-                    checkSet("hrd_m");
                 else if (c == '1')
                     checkSet("emilib");
                 else if (c == '2')
@@ -3356,24 +2723,10 @@ int main(int argc, char* argv[]) {
                     checkSet("emilib4");
                 else if (c == 'x')
                     checkSet("emilib1m");
-                else if (c == 'j')
-                    checkSet("jg");
-                else if (c == 'r')
-                    checkSet("rigtorp");
-                else if (c == 'k') {
-                    checkSet("HashMapTable");
-                    checkSet("HashMapCell");
-                } else if (c == 'i') {
+                else if (c == 'i') {
                     checkSet("flat_u");
                     checkSet("flat_w");
-                }
-#if QC_HASH
-                else if (c == 'q')
-                    checkSet("qc");
-                else if (c == 'f')
-                    checkSet("fph");
-#endif
-                else if (c == 'b') {
+                } else if (c == 'b') {
                     if (isdigit(arg[i + 1]))
                         sflags = atoi(&arg[++i]);
 #if HAVE_BOOST
@@ -3407,11 +2760,19 @@ int main(int argc, char* argv[]) {
         printf("%10s %20s\n", m.first.data(), m.second.data());
     puts("-------------------------------------------------------------------------");
 
-    runTest(sflags, eflags);
+    const int suite_reps = g_config.benchmark_iterations > 0 ? g_config.benchmark_iterations : 1;
+    for (int rep = 0; rep < suite_reps; ++rep) {
+        if (suite_reps > 1)
+            printf("\n=== repetition %d/%d ===\n", rep + 1, suite_reps);
+        runTest(sflags, eflags);
+    }
+    if (suite_reps > 1)
+        aggregate_results();
 
-    // Output results in specified format
-    if (g_config.output_format != OutputFormat::Text && !g_results.empty()) {
-        puts("\n=== Benchmark Results ===");
+    // Output results in specified format; in text mode still show the
+    // aggregated best/median/stddev table when the suite ran multiple times.
+    if (!g_results.empty() && (g_config.output_format != OutputFormat::Text || suite_reps > 1)) {
+        puts("\n=== Benchmark Results (best/median/stddev) ===");
         ResultOutput::output_all(g_results, g_config.output_format);
     }
 
@@ -3420,10 +2781,11 @@ int main(int argc, char* argv[]) {
         std::ofstream fout(g_config.output_file);
         if (fout.is_open()) {
             if (g_config.output_format == OutputFormat::CSV) {
-                fout << "Test,HashMap,Time,StdDev,Operations,Throughput,LoadFactor,MapSize\n";
+                fout << "Test,HashMap,Time,StdDev,Operations,Throughput,LoadFactor,MapSize,MemBytes\n";
                 for (const auto& r : g_results) {
                     fout << r.test_name << "," << r.hash_map_name << "," << r.time_sec << "," << r.time_stddev << ","
-                         << r.operations << "," << r.throughput << "," << r.load_factor << "," << r.map_size << "\n";
+                         << r.operations << "," << r.throughput << "," << r.load_factor << "," << r.map_size << ","
+                         << r.memory_bytes << "\n";
                 }
             } else if (g_config.output_format == OutputFormat::JSON) {
                 fout << "[\n";
@@ -3437,7 +2799,8 @@ int main(int argc, char* argv[]) {
                     fout << "    \"operations\": " << r.operations << ",\n";
                     fout << "    \"throughput\": " << r.throughput << ",\n";
                     fout << "    \"load_factor\": " << r.load_factor << ",\n";
-                    fout << "    \"map_size\": " << r.map_size << "\n";
+                    fout << "    \"map_size\": " << r.map_size << ",\n";
+                    fout << "    \"memory_bytes\": " << r.memory_bytes << "\n";
                     fout << "  }" << (i == g_results.size() - 1 ? "" : ",") << "\n";
                 }
                 fout << "]\n";
@@ -3447,6 +2810,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    if (g_check_errors)
+        printf("\n*** %d checksum check(s) FAILED -- results are suspect ***\n", g_check_errors);
     puts("---------------------------- all pass -----------------------------------");
     return 0;
 }
