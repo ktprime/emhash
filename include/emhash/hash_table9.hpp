@@ -72,6 +72,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -405,6 +406,23 @@ private:
 #define EMH9_SPLIT_THRESHOLD (1u << 20)
 #endif
 
+// Erase coordinates: a per-value (group, slot) record so erase() repoints the
+// moved element with a read instead of a second hash + probe.  Costs 4 bytes
+// per element and 3-11% on insert, and buys 24-41% on erase at 5M keys; it is
+// therefore on automatically once the value is large enough for the extra
+// array to be a small fraction of the table.  Override with
+// -DEMH9_ERASE_COORD=0 (off) or 1 (force on).
+#ifndef EMH9_ERASE_COORD
+#define EMH9_ERASE_COORD -1
+#endif
+
+#define EMH9_ASSERT(x) assert(x)
+
+    /// auto: 4 bytes per element is <= 12.5% of a 32-byte value slot; below
+    /// that the insert-side cost of the extra array outweighs the erase win.
+    static constexpr bool kEraseCoord =
+        EMH9_ERASE_COORD >= 0 ? (EMH9_ERASE_COORD != 0) : (sizeof(value_type) >= 32);
+
     static constexpr std::size_t kArenaAlign = alignof(value_type) > alignof(group_block) ? alignof(value_type)
                                                                                           : alignof(group_block);
 
@@ -422,10 +440,13 @@ private:
     using IndexAllocTraits = std::allocator_traits<IndexAlloc>;
     using ArenaAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<arena_unit>;
     using ArenaAllocTraits = std::allocator_traits<ArenaAlloc>;
+    using CoordAlloc = typename std::allocator_traits<AllocT>::template rebind_alloc<uint32_t>;
+    using CoordAllocTraits = std::allocator_traits<CoordAlloc>;
 
     EMH_NO_UNIQUE_ADDRESS PairAlloc _alloc;
     value_type* _pairs = nullptr;
     group_block* _blocks = nullptr;
+    uint32_t* _coords = nullptr;
     size_type _num_filled = 0;
     size_type _capacity = 0;   // value slots allocated in _pairs
     size_type _num_groups = 0; // power of two
@@ -453,12 +474,14 @@ public:
     }
 
     HashMap(HashMap&& other) noexcept(std::is_nothrow_move_constructible<PairAlloc>::value)
-        : _alloc(std::move(other._alloc)), _pairs(other._pairs), _blocks(other._blocks), _num_filled(other._num_filled),
+        : _alloc(std::move(other._alloc)), _pairs(other._pairs), _blocks(other._blocks), _coords(other._coords),
+          _num_filled(other._num_filled),
           _capacity(other._capacity), _num_groups(other._num_groups), _mask(other._mask),
           _max_filled(other._max_filled), _max_load_factor(other._max_load_factor), _hasher(std::move(other._hasher)),
           _key_equal(std::move(other._key_equal)) {
         other._pairs = nullptr;
         other._blocks = nullptr;
+        other._coords = nullptr;
         other._num_filled = other._capacity = other._num_groups = other._mask = other._max_filled = 0;
     }
 
@@ -501,6 +524,7 @@ public:
             _alloc = std::move(other._alloc);
         _pairs = other._pairs;
         _blocks = other._blocks;
+        _coords = other._coords;
         _num_filled = other._num_filled;
         _capacity = other._capacity;
         _num_groups = other._num_groups;
@@ -511,6 +535,7 @@ public:
         _key_equal = std::move(other._key_equal);
         other._pairs = nullptr;
         other._blocks = nullptr;
+        other._coords = nullptr;
         other._num_filled = other._capacity = other._num_groups = other._mask = other._max_filled = 0;
         return *this;
     }
@@ -814,10 +839,17 @@ public:
 
         uint32_t moved_g = INVALID, moved_i = INVALID;
         if (idx != last) {
-            // The last key is hashed up front: that load is independent of the
-            // probe above, so one stall pays for both.
-            const uint64_t moved_hash = hash_key(_pairs[last].first);
-            slot_of_value(moved_hash, last, moved_g, moved_i);
+            if constexpr (kEraseCoord) {
+                const uint32_t c = _coords[last];
+                moved_g = c / GROUP_SIZE;
+                moved_i = c % GROUP_SIZE;
+                EMH9_ASSERT(_blocks[moved_g].index[moved_i] == last);
+            } else {
+                // The last key is hashed up front: that load is independent of
+                // the probe above, so one stall pays for both.
+                const uint64_t moved_hash = hash_key(_pairs[last].first);
+                slot_of_value(moved_hash, last, moved_g, moved_i);
+            }
         }
         // The element no longer probes past the groups it overflowed through.
         unmark_path(_blocks, _num_groups, _mask, static_cast<uint8_t>(h) & 7, static_cast<uint32_t>(home_of(h, _mask)),
@@ -910,6 +942,7 @@ public:
         using std::swap;
         swap(_pairs, other._pairs);
         swap(_blocks, other._blocks);
+        swap(_coords, other._coords);
         swap(_num_filled, other._num_filled);
         swap(_capacity, other._capacity);
         swap(_num_groups, other._num_groups);
@@ -940,6 +973,7 @@ public:
 private:
     // ------------------------------------------------------------------
     // hashing
+    // ------------------------------------------------------------------
     // Homogeneous lookups (K == KeyT, i.e. the normal find/insert path) must not
     // materialise a KeyT temporary.  `static_cast<KeyT>(key)` reads like an
     // identity cast there, but it still constructs a copy: for std::string keys
@@ -960,7 +994,6 @@ private:
             return _key_equal(stored, static_cast<KeyT>(key));
     }
 
-    // ------------------------------------------------------------------
     // Hash with an explicit hasher, so a rebuild loop can hold it in a local instead of
     // reloading the member on every element (the loop's stores can alias `_hasher`).
     template <typename K> [[nodiscard]] static uint64_t hash_key_with(const HashT& hash_fn, const K& key) {
@@ -1107,6 +1140,24 @@ private:
         }
     }
 
+    uint32_t* allocate_coords(size_type cap) {
+        if (cap == 0)
+            return nullptr;
+        CoordAlloc alloc(_alloc);
+        return CoordAllocTraits::allocate(alloc, cap);
+    }
+
+    void deallocate_coords(uint32_t* coords, size_type cap) noexcept {
+        if (coords) {
+            CoordAlloc alloc(_alloc);
+            CoordAllocTraits::deallocate(alloc, coords, cap);
+        }
+    }
+
+    EMH9_FORCEINLINE void set_coord(size_type idx, uint32_t g, uint32_t slot) {
+        _coords[idx] = static_cast<uint32_t>(g * GROUP_SIZE + slot);
+    }
+
     void destroy_all() noexcept {
         if (_pairs) {
             for (size_type i = 0; i < _num_filled; ++i)
@@ -1115,6 +1166,10 @@ private:
         release_storage(_blocks, _pairs, _num_groups, _capacity);
         _pairs = nullptr;
         _blocks = nullptr;
+        if constexpr (kEraseCoord) {
+            deallocate_coords(_coords, _capacity);
+        }
+        _coords = nullptr;
         _num_filled = _capacity = _num_groups = _mask = _max_filled = 0;
     }
 
@@ -1147,6 +1202,7 @@ private:
         char* base = nullptr;
         group_block* blocks = _blocks;
         value_type* pairs = _pairs;
+        [[maybe_unused]] uint32_t* coords = _coords;
         if (!reuse) {
             if (split) {
                 blocks = allocate_index(groups);
@@ -1160,6 +1216,19 @@ private:
                 base = allocate_arena(groups, cap);
                 blocks = reinterpret_cast<group_block*>(base);
                 pairs = pairs_in(base, groups);
+            }
+            if constexpr (kEraseCoord) {
+                try {
+                    coords = allocate_coords(cap);
+                } catch (...) {
+                    if (split) {
+                        deallocate_index(blocks, groups);
+                        deallocate_pairs(pairs, cap);
+                    } else {
+                        deallocate_arena(base, groups, cap);
+                    }
+                    throw;
+                }
             }
         }
         PairAlloc alloc(_alloc);
@@ -1178,6 +1247,8 @@ private:
                 } else {
                     deallocate_arena(base, groups, cap);
                 }
+                if constexpr (kEraseCoord)
+                    deallocate_coords(coords, cap);
             }
             throw;
         }
@@ -1187,8 +1258,13 @@ private:
             _pairs = pairs;
             _capacity = cap;
             _num_groups = groups;
+            _coords = coords;
         }
         std::memcpy(_blocks, other._blocks, sizeof(group_block) * groups);
+        if constexpr (kEraseCoord) {
+            if (other._coords)
+                std::memcpy(_coords, other._coords, sizeof(uint32_t) * other._num_filled);
+        }
         _mask = other._mask;
         _num_filled = other._num_filled;
         refresh_max_filled();
@@ -1202,6 +1278,9 @@ private:
         char* const base = split ? nullptr : allocate_arena(groups, cap);
         group_block* const nb = split ? allocate_index(groups) : reinterpret_cast<group_block*>(base);
         value_type* const np = split ? allocate_pairs(cap) : pairs_in(base, groups);
+        [[maybe_unused]] uint32_t* nc = nullptr;
+        if constexpr (kEraseCoord)
+            nc = allocate_coords(cap);
 
         // Keep the old table's pointer/count/hasher in locals: the loop stores into the new
         // table, so with reads through `this` the compiler has to assume the stores may alias
@@ -1224,6 +1303,10 @@ private:
         if (keep_index) {
             if (_num_groups)
                 std::memcpy(nb, _blocks, sizeof(group_block) * _num_groups);
+            if constexpr (kEraseCoord) {
+                if (n_filled)
+                    std::memcpy(nc, _coords, sizeof(uint32_t) * n_filled);
+            }
         } else {
             std::memset(nb, 0, sizeof(group_block) * groups);
             // Pipelined reindex: keep the next 16 hashes ready and issue the destination-group
@@ -1243,7 +1326,7 @@ private:
                     ring[ahead & (kPipe - 1)] = nh;
                     detail::prefetch_group(nb + home_of(nh, nmask));
                 }
-                place_index(nb, groups, nmask, h, idx);
+                place_index(nb, groups, nmask, h, idx, nc);
             }
         }
 
@@ -1252,6 +1335,10 @@ private:
                 op[i].~value_type();
         }
         release_storage(_blocks, op, _num_groups, _capacity);
+        if constexpr (kEraseCoord) {
+            deallocate_coords(_coords, _capacity);
+            _coords = nc;
+        }
 
         _blocks = nb;
         _pairs = np;
@@ -1283,7 +1370,8 @@ private:
 
     /// Insert `idx` into a freshly zeroed index, counting every full group the
     /// key probed past.
-    static void place_index(group_block* blocks, size_type groups, size_type mask, uint64_t hash, size_type idx) {
+    static void place_index(group_block* blocks, size_type groups, size_type mask, uint64_t hash, size_type idx,
+                            uint32_t* coords) {
         const uint8_t fp = detail::fingerprint(hash);
         const uint8_t cls = static_cast<uint8_t>(hash) & 7;
         const uint32_t home = static_cast<uint32_t>(home_of(hash, mask));
@@ -1296,6 +1384,8 @@ private:
                 const uint32_t i = detail::ctz32(empties);
                 b.fingerprints[i] = fp;
                 b.index[i] = static_cast<uint32_t>(idx);
+                if constexpr (kEraseCoord)
+                    coords[idx] = static_cast<uint32_t>(g * GROUP_SIZE + i);
                 return;
             }
             mark_overflow(b, cls);
@@ -1533,6 +1623,8 @@ private:
                 group_block& t = _blocks[home];
                 t.fingerprints[slot] = fp;
                 t.index[slot] = _num_filled;
+                if constexpr (kEraseCoord)
+                    set_coord(_num_filled, home, slot);
                 ++_num_filled;
                 if constexpr (WithPos)
                     return result_type(iterator(_pairs + (_num_filled - 1), home, slot), true);
@@ -1627,6 +1719,8 @@ private:
                 construct_value(_pairs + _num_filled);
                 b.fingerprints[i] = fp;
                 b.index[i] = _num_filled;
+                if constexpr (kEraseCoord)
+                    set_coord(_num_filled, g, i);
                 group_out = g;
                 slot_out = i;
                 return _num_filled++;
@@ -1646,8 +1740,18 @@ private:
             return 0;
         const size_type last = _num_filled - 1;
         uint32_t moved_g = 0, moved_i = 0;
-        if (_blocks[g].index[i] != last)
-            slot_of_value(hash_key(_pairs[last].first), last, moved_g, moved_i);
+        if (_blocks[g].index[i] != last) {
+            if constexpr (kEraseCoord) {
+                // The moved element's slot is recorded, so repointing it is a
+                // read instead of a second hash + probe.
+                const uint32_t c = _coords[last];
+                moved_g = c / GROUP_SIZE;
+                moved_i = c % GROUP_SIZE;
+                EMH9_ASSERT(_blocks[moved_g].index[moved_i] == last);
+            } else {
+                slot_of_value(hash_key(_pairs[last].first), last, moved_g, moved_i);
+            }
+        }
         // The element no longer probes past the groups it overflowed through.
         unmark_path(_blocks, _num_groups, _mask, static_cast<uint8_t>(hash) & 7,
                     static_cast<uint32_t>(home_of(hash, _mask)), g);
@@ -1669,6 +1773,8 @@ private:
         if (idx != last) {
             _pairs[idx] = std::move(_pairs[last]);
             blocks[moved_g].index[moved_i] = idx;
+            if constexpr (kEraseCoord)
+                set_coord(idx, moved_g, moved_i);
         }
         _pairs[last].~value_type();
         --_num_filled;
@@ -1696,6 +1802,8 @@ private:
         unmark_path(blocks, _num_groups, _mask, static_cast<uint8_t>(fp) & 7, home, g);
         hb.fingerprints[e] = fp;
         hb.index[e] = idx;
+        if constexpr (kEraseCoord)
+            set_coord(idx, home, e);
         blocks[g].fingerprints[i] = 0;
         return e;
     }
