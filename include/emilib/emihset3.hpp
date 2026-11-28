@@ -847,7 +847,7 @@ private:
     inline void set_offset(size_t offset) noexcept { _max_probe_length = offset; }
 
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept {
-#if EMH_PSL_LINEAR == 0
+#if EMH_PSL_LINEAR == 1
         if (offset < 7) // || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else

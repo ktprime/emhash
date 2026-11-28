@@ -799,7 +799,7 @@ public:
         return bempty;
     }
 
-    ValueT& operator[](const KeyT& key) noexcept {
+    EMH_INLINE ValueT& operator[](const KeyT& key) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         const auto slot = bucket_to_slot(bucket);

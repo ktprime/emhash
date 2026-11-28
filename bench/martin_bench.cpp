@@ -2635,8 +2635,9 @@ int main(int argc, char* argv[]) {
     // Pin to one core (skip core 0, which also services IRQs): removes
     // migration and cache-invalidation noise from per-map comparisons.
     {
+        // Prefer core 1: core 0 also services IRQs; on 1-core machines use 0.
         const unsigned ncpu = std::thread::hardware_concurrency();
-        const unsigned core = ncpu > 2 ? 2 : 0;
+        const unsigned core = ncpu > 1 ? 1 : 0;
 #if defined(_WIN32)
         if (SetProcessAffinityMask(GetCurrentProcess(), (DWORD_PTR)1ull << core))
             printf("pinned to CPU core %u of %u\n", core, ncpu);

@@ -863,7 +863,7 @@ public:
     }
     EMH_INLINE std::pair<iterator, bool> insert(value_type&& value) { return do_insert(std::move(value)); }
 
-    template <typename K, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) {
+    template <typename K, typename V> EMH_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) {
         auto hash = hash_for(key);
         auto pos0 = position_for(hash);
 
@@ -890,7 +890,7 @@ public:
         return do_insert(value.first, value.second);
     }
 
-    template <class... Args> std::pair<iterator, bool> emplace(Args&&... args) {
+    template <class... Args> EMH_INLINE std::pair<iterator, bool> emplace(Args&&... args) {
         return do_insert(std::forward<Args>(args)...);
     }
 
@@ -1027,7 +1027,7 @@ public:
 
     // erase returning the iterator to the next element (advancing before the erase
     // keeps the walk on the same code path as a normal ++ traversal)
-    iterator erase(const iterator& it) noexcept {
+    EMH_INLINE iterator erase(const iterator& it) noexcept {
         iterator next = it;
         ++next;
         erase_at(it._pc, it._p, hash_for(it._p->first));

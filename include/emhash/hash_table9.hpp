@@ -420,8 +420,7 @@ private:
 
     /// auto: 4 bytes per element is <= 12.5% of a 32-byte value slot; below
     /// that the insert-side cost of the extra array outweighs the erase win.
-    static constexpr bool kEraseCoord =
-        EMH9_ERASE_COORD >= 0 ? (EMH9_ERASE_COORD != 0) : (sizeof(value_type) >= 32);
+    static constexpr bool kEraseCoord = EMH9_ERASE_COORD >= 0 ? (EMH9_ERASE_COORD != 0) : (sizeof(value_type) >= 32);
 
     static constexpr std::size_t kArenaAlign = alignof(value_type) > alignof(group_block) ? alignof(value_type)
                                                                                           : alignof(group_block);
@@ -475,10 +474,9 @@ public:
 
     HashMap(HashMap&& other) noexcept(std::is_nothrow_move_constructible<PairAlloc>::value)
         : _alloc(std::move(other._alloc)), _pairs(other._pairs), _blocks(other._blocks), _coords(other._coords),
-          _num_filled(other._num_filled),
-          _capacity(other._capacity), _num_groups(other._num_groups), _mask(other._mask),
-          _max_filled(other._max_filled), _max_load_factor(other._max_load_factor), _hasher(std::move(other._hasher)),
-          _key_equal(std::move(other._key_equal)) {
+          _num_filled(other._num_filled), _capacity(other._capacity), _num_groups(other._num_groups),
+          _mask(other._mask), _max_filled(other._max_filled), _max_load_factor(other._max_load_factor),
+          _hasher(std::move(other._hasher)), _key_equal(std::move(other._key_equal)) {
         other._pairs = nullptr;
         other._blocks = nullptr;
         other._coords = nullptr;
@@ -773,7 +771,7 @@ public:
             insert(v);
     }
 
-    template <typename... Args> std::pair<iterator, bool> emplace(Args&&... args) {
+    template <typename... Args> EMH_INLINE std::pair<iterator, bool> emplace(Args&&... args) {
         return insert_value(value_type(std::forward<Args>(args)...));
     }
 
@@ -861,7 +859,7 @@ public:
                                  : iterator(_pairs + _num_filled, INVALID, INVALID);
     }
 
-    size_type erase(const key_type& key) { return erase_key(hash_key(key), key); }
+    EMH_INLINE size_type erase(const key_type& key) { return erase_key(hash_key(key), key); }
 
     template <typename K, typename = std::enable_if_t<!std::is_same_v<std::decay_t<K>, key_type>>,
               typename = std::enable_if_t<std::is_invocable_v<const hasher&, const K&>>>
@@ -980,7 +978,8 @@ private:
     // that is a heap allocation per hash and per key comparison, which measured
     // ~3.5x slower finds than ankerl's dense map at 100k keys.  Heterogeneous
     // lookups keep the original conversion.
-    template <typename K, typename H> [[nodiscard]] static EMH9_FORCEINLINE uint64_t hash_of(const H& hash_fn, const K& key) {
+    template <typename K, typename H>
+    [[nodiscard]] static EMH9_FORCEINLINE uint64_t hash_of(const H& hash_fn, const K& key) {
         if constexpr (std::is_same_v<std::decay_t<K>, KeyT>)
             return static_cast<uint64_t>(hash_fn(key));
         else
@@ -1685,7 +1684,7 @@ private:
         return {placed_g, placed_i, idx, true};
     }
 
-    template <typename V> std::pair<iterator, bool> insert_value(V&& value) {
+    template <typename V> EMH_INLINE std::pair<iterator, bool> insert_value(V&& value) {
         const uint64_t h = hash_key(value.first);
         return insert_impl(h, value.first,
                            [&](value_type* p) { ::new (static_cast<void*>(p)) value_type(std::forward<V>(value)); });
@@ -1734,7 +1733,7 @@ private:
     // ------------------------------------------------------------------
     // erase core
     // ------------------------------------------------------------------
-    template <typename K> size_type erase_key(uint64_t hash, const K& key) {
+    template <typename K> EMH_INLINE size_type erase_key(uint64_t hash, const K& key) {
         uint32_t g, i;
         if (!find_slot(hash, key, g, i))
             return 0;

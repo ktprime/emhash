@@ -581,7 +581,7 @@ public:
     /// Returns a pair consisting of an iterator to the inserted element
     /// (or to the element that prevented the insertion)
     /// and a bool denoting whether the insertion took place.
-    template <typename K, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
+    template <typename K, typename V> EMH_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
 
@@ -612,7 +612,7 @@ public:
         return {{this, bucket}, bempty};
     }
 
-    template <class... Args> inline std::pair<iterator, bool> emplace(Args&&... args) noexcept {
+    template <class... Args> EMH_INLINE std::pair<iterator, bool> emplace(Args&&... args) noexcept {
         return do_insert(std::forward<Args>(args)...);
     }
 
@@ -720,7 +720,7 @@ public:
         return bempty;
     }
 
-    ValueT& operator[](const KeyT& key) noexcept {
+    EMH_INLINE ValueT& operator[](const KeyT& key) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         /* Check if inserting a new value rather than overwriting an old entry */
@@ -1096,7 +1096,7 @@ private:
 
     // Find the bucket with this key, or return a good empty bucket to place the key in.
     // In the later case, the bucket is expected to be filled.
-    template <typename K> size_t find_or_allocate(const K& key, bool& bnew) noexcept {
+    template <typename K> EMH_INLINE size_t find_or_allocate(const K& key, bool& bnew) noexcept {
         const size_t required_buckets = static_cast<size_t>(static_cast<uint64_t>(_num_filled) * _mlf >> 28);
         if (required_buckets >= _num_buckets)
             rehash(required_buckets + 2);

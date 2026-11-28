@@ -146,6 +146,16 @@
 #endif
 #endif
 
+// Default probing sequence for the emilib containers. 0 = triangular step then a
+// prime-like stride (the historical default), 1 = the linear-style step used by
+// emihmap2's PSL_LINEAR==1 branch (and emihmap1/emihset3's #else), 2 = pure linear.
+// Striped A/B runs on martin_bench (integer core cases, 2^21 scale) showed 1 is a
+// net win over 0 for find/insert/erase/reinsert, so it is the default here.
+// Override on the command line with -DEMH_PSL_LINEAR=0|2.
+#ifndef EMH_PSL_LINEAR
+#define EMH_PSL_LINEAR 1
+#endif
+
 // Count trailing zeros of a (non-zero) SIMD match mask.
 inline static uint32_t CTZ(size_t n) {
 #if defined(_MSC_VER)

@@ -701,7 +701,7 @@ public:
         return bempty;
     }
 
-    ValueT& operator[](const KeyT& key) noexcept {
+    EMH_INLINE ValueT& operator[](const KeyT& key) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         const auto slot = bucket_to_slot(bucket);
@@ -996,7 +996,7 @@ private:
     inline void set_states(size_t ebucket, int8_t key_h2) noexcept { _states[ebucket] = key_h2; }
 
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept {
-#if EMH_PSL_LINEAR == 0
+#if EMH_PSL_LINEAR == 1
         if (offset < 7) // || _num_buckets < 32 * simd_bytes)
             next_bucket += simd_bytes * offset;
         else

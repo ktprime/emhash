@@ -952,7 +952,7 @@ public:
         return {{this, slot}, bempty};
     }
 
-    template <typename K, typename V> std::pair<iterator, bool> do_insert(K&& key, V&& val) {
+    template <typename K, typename V> EMH_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) {
         const auto key_hash = hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
         const auto bempty = emh_empty(bucket);
@@ -1040,7 +1040,7 @@ public:
 
     size_type insert_unique(const value_type& value) { return insert_unique(value.first, value.second); }
 
-    template <class... Args> std::pair<iterator, bool> emplace(Args&&... args) {
+    template <class... Args> EMH_INLINE std::pair<iterator, bool> emplace(Args&&... args) {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
@@ -1097,7 +1097,7 @@ public:
     }
 
     /// Like std::map<KeyT, ValueT>::operator[].
-    ValueT& operator[](const KeyT& key) {
+    EMH_INLINE ValueT& operator[](const KeyT& key) {
         check_expand_need();
         const auto key_hash = hash_key(key);
         const auto bucket = find_or_allocate(key, key_hash);
@@ -1127,7 +1127,7 @@ public:
     /// @return 1 if the element was erased, 0 if the key was not found.
     /// Erase an element from the hash table.
     /// return 0 if element was not found
-    size_type erase(const KeyT& key) {
+    EMH_INLINE size_type erase(const KeyT& key) {
         const auto key_hash = hash_key(key);
         const auto sbucket = find_filled_bucket(key, key_hash);
         if (sbucket == INACTIVE)
@@ -1176,7 +1176,7 @@ public:
     }
 
     // iterator erase(const_iterator begin_it, const_iterator end_it)
-    iterator erase(const const_iterator& cit) {
+    EMH_INLINE iterator erase(const const_iterator& cit) {
         const auto slot = static_cast<size_type>(cit.kv_ - _pairs);
         size_type main_bucket;
         const auto sbucket = find_slot_bucket(slot, main_bucket);
@@ -1578,7 +1578,7 @@ private:
     }
 
     // very slow
-    void erase_slot(const size_type sbucket, const size_type main_bucket) {
+    EMH_INLINE void erase_slot(const size_type sbucket, const size_type main_bucket) {
         const auto slot = _index[sbucket].slot & _mask;
         const auto last_slot = _num_filled - 1;
         // Find last_slot's bucket BEFORE erase_bucket modifies the chain
@@ -1808,7 +1808,7 @@ private:
     //     kick the guest out and claim the main bucket.
     //  4. Otherwise walk the collision chain: return the matching bucket, or
     //     append a new empty slot at the chain tail for a fresh insertion.
-    template <typename K = KeyT> size_type find_or_allocate(const K& key, uint64_t key_hash) noexcept {
+    template <typename K = KeyT> EMH_INLINE size_type find_or_allocate(const K& key, uint64_t key_hash) noexcept {
         const auto bucket = size_type(key_hash & _mask);
         const auto& idx = _index[bucket];
         auto next_bucket = idx.next;

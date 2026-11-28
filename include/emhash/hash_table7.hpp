@@ -1092,7 +1092,7 @@ public:
         return {{this, bucket}, isempty};
     }
 
-    template <typename K = KeyT, typename V = ValueT> std::pair<iterator, bool> do_insert(K&& key, V&& val) {
+    template <typename K = KeyT, typename V = ValueT> EMH_INLINE std::pair<iterator, bool> do_insert(K&& key, V&& val) {
         bool isempty;
         const auto bucket = find_or_allocate(key, isempty);
         if (isempty) {
@@ -1160,7 +1160,7 @@ public:
         return do_assign(std::move(key), std::forward<ValueT>(val));
     }
 
-    template <typename... Args> std::pair<iterator, bool> emplace(Args&&... args) {
+    template <typename... Args> EMH_INLINE std::pair<iterator, bool> emplace(Args&&... args) {
         check_expand_need();
         return do_insert(std::forward<Args>(args)...);
     }
@@ -1192,7 +1192,7 @@ public:
     }
 
     /* Check if inserting a new value rather than overwriting an old entry */
-    ValueT& operator[](const KeyT& key) {
+    EMH_INLINE ValueT& operator[](const KeyT& key) {
         check_expand_need();
 
         bool isempty;
@@ -1236,7 +1236,10 @@ public:
 
     /// Erase an element typedef an iterator.
     /// Returns an iterator to the next element (or end()).
-    iterator erase(iterator it) {
+    /// EMH_INLINE: clang's cost model refuses to inline this into erase-begin
+    /// loops (a real call + iterator-struct memory round trip per element,
+    /// ~4x slower); gcc inlines it unconditionally.
+    EMH_INLINE iterator erase(iterator it) {
         // Ensure _bmask is initialized before we modify _bitmask.
         // If _from == -1 (lazy init), ++it would trigger init() AFTER
         // clear_bucket() — loading _bmask from the already-updated
@@ -1589,7 +1592,7 @@ private:
     //     append a new empty slot at the chain tail for a fresh insertion.
     // isempty is set to false if the key already exists, true if a new slot
     // was allocated.
-    template <typename K = KeyT> size_type find_or_allocate(const K& key, bool& isempty) {
+    template <typename K = KeyT> EMH_INLINE size_type find_or_allocate(const K& key, bool& isempty) {
         const auto bucket = hash_key(key) & _mask;
         const auto& bucket_key = EMH_KEY(_pairs, bucket);
         if (emh_empty(bucket)) {

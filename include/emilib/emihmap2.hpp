@@ -56,8 +56,12 @@ constexpr static float EMH_MAX_LOAD_FACTOR = 0.999f;
 constexpr static uint8_t MAP_BITS = 253;
 constexpr static uint8_t EMPTY_OFFSET = 0;
 
+// Offset bounds are stored one byte per OFFSET_STEP buckets. Override with
+// -DEMH_OFFSET_STEP=N (N in {4,8,16,...}) for A/B analysis; default 8.
 #if EMH_OFFSET_STEP == 0
 constexpr static uint8_t OFFSET_STEP = 8;
+#else
+constexpr static uint8_t OFFSET_STEP = EMH_OFFSET_STEP;
 #endif
 
 #if !defined(AVX2_EHASH)
@@ -701,7 +705,7 @@ public:
         return bempty;
     }
 
-    ValueT& operator[](const KeyT& key) noexcept {
+    EMH_INLINE ValueT& operator[](const KeyT& key) noexcept {
         bool bempty = true;
         const auto bucket = find_or_allocate(key, bempty);
         if (bempty) {
@@ -725,7 +729,7 @@ public:
 
     // -------------------------------------------------------
 
-    size_t erase(const KeyT& key) noexcept {
+    EMH_INLINE size_t erase(const KeyT& key) noexcept {
         auto bucket = find_filled_bucket(key);
         if (bucket == _num_buckets)
             return 0;
@@ -948,11 +952,13 @@ private:
         if (need_explicit_dtor())
             _pairs[bucket].~PairT();
 
-#if EMH_PSL_LINEAR
-        set_states(bucket, _states[bucket + 1] == State::EEMPTY ? State::EEMPTY : State::EDELETE);
-#else
+        // Always leave a tombstone. Reclaiming the slot as EEMPTY when bucket+1 is
+        // empty is unsafe here: a key whose home group is this group may have been
+        // displaced past it, and find() stops on the first EEMPTY it sees in the home
+        // group, which would make that key unreachable (failed erase -> the table
+        // keeps growing). This was observable as an IterateIntegers checksum failure
+        // with EMH_PSL_LINEAR=1.
         set_states(bucket, State::EDELETE);
-#endif
 
 #if EMH_PSL_ERASE && EMH_PSL_LINEAR
         if (_states[bucket] == State::EEMPTY) {
@@ -1012,6 +1018,7 @@ private:
         assert(off / 128 < 128);
         _offset[main_bucket / OFFSET_STEP] = off <= 128 ? off : 128 + off / 128;
 #else
+        assert(off < 255);
         _offset[main_bucket / OFFSET_STEP] = static_cast<uint8_t>(off);
 #endif
     }
@@ -1021,19 +1028,10 @@ private:
     inline size_t get_next_bucket(size_t next_bucket, size_t offset) const {
 #if EMH_SAFE_PSL
         next_bucket += simd_bytes * offset | 1;
-#elif EMH_PSL_LINEAR == 0
-        if (offset < 5)
-            next_bucket += simd_bytes * offset;
-        else {
-            // Use a prime-like step to ensure all buckets are reachable
-            // (_num_buckets is always a power of 2, so odd step guarantees full coverage)
-            next_bucket += (_num_buckets / 11) | 1;
-        }
 #elif EMH_PSL_LINEAR == 1
-        if (offset < 8)
-            next_bucket += simd_bytes * 2 + offset;
-        else
-            next_bucket += (_num_buckets / 32) | 1;
+        next_bucket += offset < 8 ? simd_bytes * 2 + offset : (_num_buckets / 32) | 1;
+#elif EMH_PSL_LINEAR == 2
+        next_bucket += offset < 5 ? simd_bytes * offset : (_num_buckets / 11) | 1;
 #else
         next_bucket += simd_bytes;
 #endif
