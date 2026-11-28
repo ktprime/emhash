@@ -11,10 +11,6 @@ CXXFLAGS =-O3 -DNDEBUG=1 -Wextra -Wno-unused-parameter -march=native -I../includ
 #-march=armv8.6-a -fpermissive
 #-I/usr/local/include
 
-ifneq ($(FOLLY),)
-CXXFLAGS += -DFOLLY_F14 -lfolly
-endif
-
 ifneq ($(SW),)
 CXXFLAGS += -DABSL_HMAP=1
 endif
@@ -22,10 +18,6 @@ endif
 ifneq ($(BF),)
 CXXFLAGS += -DHAVE_BOOST=1
 CXXFLAGS += -DHAVE_INDIVI=1
-endif
-
-ifneq ($(MH),)
-CXXFLAGS += -DHOOD_HASH=1
 endif
 
 ifneq ($(FH),)
@@ -70,10 +62,6 @@ ifneq ($(Val),)
 CXXFLAGS += -DTTVal=$(Val)
 endif
 
-ifneq ($(ET),)
-CXXFLAGS += -DET=$(ET)
-endif
-
 ifneq ($(HL),)
 CXXFLAGS += -DEMH_HIGH_LOAD=$(HL)
 endif
@@ -88,10 +76,6 @@ endif
 
 ifneq ($(SMAP),)
 CXXFLAGS += -DSMAP=1
-endif
-
-ifneq ($(QC),)
-CXXFLAGS += -DQC_HASH=$(QC) -std=c++20
 endif
 
 ifneq ($(std),)
@@ -120,43 +104,17 @@ ifneq ($(MF),)
 CXXFLAGS += $(MF)
 endif
 
-ifneq ($(CK),)
-CXXFLAGS += -std=c++20 -I../thirdparty/ck -I../thirdparty/ck/base -DCK_HMAP=1
-endif
-
 CXXFLAGS += -flto=auto  -Wall # -static -static-libstdc++?
 
-ifneq ($(PSL),)
-CXXFLAGS += -DPSL= (PSL)
-endif
-
+# Core benchmarks: ebench/mbench (full suites), cbench (scenario bench),
+# sb (type matrix), bi/bs (Peter Dimov micro-benchmarks, int/string keys)
 all:
-ifneq ($(QB),)
-	$(CXX) $(CXXFLAGS) -std=c++20 -I. qbench.cpp -o qbench
-endif
-
-#	$(CXX) $(CXXFLAGS) -Werror=conversion martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) -fno-rtti -fpermissive ebench.cpp -o ebench
 	$(CXX) $(CXXFLAGS) martin_bench.cpp -o mbench
 	$(CXX) $(CXXFLAGS) comprehensive_bench.cpp -o cbench
 	$(CXX) $(CXXFLAGS) -fno-rtti sbench.cpp -o sb
-	$(CXX) $(CXXFLAGS) -fno-rtti hash_join.cpp -o join_hash
 	$(CXX) $(CXXFLAGS) -fno-rtti buint64.cpp -o bi
 	$(CXX) $(CXXFLAGS) -fno-rtti bstring.cpp -o bs
-#	$(CXX) $(CXXFLAGS) boost_bench/word_count.cpp -o wc
-#	$(CXX) $(CXXFLAGS) tbench.cpp -o tbench
-	$(CXX) $(CXXFLAGS) hbench.cpp -o hbench
-	$(CXX) $(CXXFLAGS) simple_bench.cpp -o simbench
-	$(CXX) $(CXXFLAGS) app.cpp -o app
-	$(CXX) $(CXXFLAGS) fbench.cpp -o fbench
-	$(CXX) $(CXXFLAGS) -fopenmp hash_join2.cpp -o join_hash2
-	$(CXX) $(CXXFLAGS) zhash_bench.cc -o zbench
-ifneq ($(EMH),)
-# template.cc is not currently available; uncomment when added
-# $(CXX) $(CXXFLAGS) template.cc -o template
-	$(CXX) $(CXXFLAGS) patch_bench.cpp -o pabench
-	$(CXX) $(CXXFLAGS) ph_bench.cpp -o phbench
-endif
 
 eb:
 	./ebench
@@ -164,14 +122,9 @@ mb:
 	./mbench
 cb:
 	./cbench
-qb:
-	./qbench
-ww:
-	./wc
 
 cbench:
 	$(CXX) $(CXXFLAGS) comprehensive_bench.cpp -o cbench
 
 clean:
-	rm -rf ebench sb mbench hbench simbench pabench phbench fbench app zbench qbench wc bi bs cbench
-
+	rm -rf ebench mbench cbench sb bi bs
