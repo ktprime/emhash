@@ -1053,8 +1053,13 @@ private:
 
     inline void set_offset(size_t offset) noexcept { _max_probe_length = offset; }
 
-    inline size_t get_next_bucket(size_t next_bucket, size_t /*offset*/) const noexcept {
-        return (next_bucket + simd_bytes) & _mask;
+    inline size_t get_next_bucket(size_t next_bucket, size_t offset) const noexcept {
+        // return (next_bucket + simd_bytes) & _mask;
+        if (offset < 7) // || _num_buckets < 32 * simd_bytes)
+            next_bucket += simd_bytes * offset;
+        else
+            next_bucket += ((_num_buckets / 8 / simd_bytes) | 1) * simd_bytes;
+        return next_bucket & _mask;
     }
 
     // Find the bucket with this key, or return (size_t)-1
